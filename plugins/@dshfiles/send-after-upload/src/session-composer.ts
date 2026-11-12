@@ -43,10 +43,24 @@ const memoizedView = (input: SessionInput): (() => ComposerView & { readonly pla
   }
 }
 
-const composers = new Map<SessionId, { readonly input: SessionInput; readonly composer: SessionComposer }>()
+const composers = new Map<SessionId, { readonly session: object | undefined; readonly input: SessionInput; readonly composer: SessionComposer }>()
 
-/** The pending-send actor of one session's composer, kept for the page's lifetime so a wait survives a thread switch. */
+/**
+ * Drop the idle actors of Sessions the controller released: each holds its composer, and through it the whole Session,
+ * so keeping one per visited thread grew the tab by megabytes per thread. A waiting or failed send stays.
+ */
+const releaseUnbound = (ctx: Context): void => {
+  for (const [sessionId, entry] of composers) {
+    if (ctx.sessions.binding(sessionId)?.session === entry.session) continue
+    if (!entry.composer.actor.getSnapshot().matches('idle')) continue
+    composers.delete(sessionId)
+    entry.composer.actor.stop()
+  }
+}
+
+/** The pending-send actor of one session's composer, kept while its Session is bound so a wait survives a thread switch. */
 export const sessionComposer = (ctx: Context, sessionId: SessionId): SessionComposer | undefined => {
+  releaseUnbound(ctx)
   const scoped = ctx.sessions.scope(sessionId)
   const conversation = scoped?.get('conversation')
   if (scoped === undefined || !isConversation(conversation)) return undefined
@@ -69,7 +83,7 @@ export const sessionComposer = (ctx: Context, sessionId: SessionId): SessionComp
     submit: async () => input.submit('queue', 'enter'),
   }
   const composer: SessionComposer = { view, uploadStatus, actor: startPendingSend(ports) }
-  composers.set(sessionId, { input, composer })
+  composers.set(sessionId, { session: ctx.sessions.binding(sessionId)?.session, input, composer })
   return composer
 }
 
