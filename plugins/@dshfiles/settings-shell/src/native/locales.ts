@@ -247,8 +247,15 @@ const shellZh = {
   'releaseNotice.off': '已关闭 DSH 版本自动检查',
 } satisfies Record<keyof typeof shellEn, string>
 
-// Ported verbatim from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.1 (MIT), lib/client.js `zh` and `en`.
+// Ported verbatim from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.2 (MIT), lib/client.js `zh` and `en`, without the
+// update-channel row's `desktop.channel.*` keys (that row is not ported).
 const zh = {
+  'desktop.channel.unavailable': '配置不可用',
+  'desktop.update.configurationFailed': '未能应用更新配置。请点击桌面更新入口查看原因。',
+  'desktop.update.configuration.read': '更新已暂停：无法读取配置文件',
+  'desktop.update.configuration.format': '更新已暂停：配置文件格式有误',
+  'desktop.update.configuration.channel': '更新已暂停：channel 只能是 nightly 或 stable',
+  'desktop.update.configuration.cleanup': '更新已暂停：无法清理旧更新，请重启应用',
   trigger: '设置',
   'shortcut.open': '打开设置',
   'desktop.update.available': '新版本',
@@ -262,6 +269,9 @@ const zh = {
   'desktop.update.downloadDetail': '正在下载更新：{percent}%\n目标版本：{version}',
   'desktop.update.checkFailed': '检查更新失败，请稍后重试。',
   'desktop.update.downloadFailed': '下载更新失败，请重试。',
+  'desktop.update.downloadSpaceFailed': '磁盘空间不足，无法下载更新。请释放空间后重试。',
+  'desktop.update.downloadPermissionFailed': '无法写入更新文件，请检查目录权限后重试。',
+  'desktop.update.downloadBusyFailed': '更新文件正被占用，请关闭占用它的程序后重试。',
   'desktop.update.installFailed': '安装更新失败，请稍后重试。',
   'desktop.update.checkNetworkFailed': '检查更新失败，请检查网络连接后重试。',
   'desktop.update.downloadNetworkFailed': '下载更新失败，请检查网络连接后重试。',
@@ -295,6 +305,12 @@ const zh = {
 }
 
 const en = {
+  'desktop.channel.unavailable': 'Configuration unavailable',
+  'desktop.update.configurationFailed': 'Could not apply update settings. Open the desktop update indicator for details.',
+  'desktop.update.configuration.read': 'Updates paused: cannot read settings file',
+  'desktop.update.configuration.format': 'Updates paused: invalid settings file',
+  'desktop.update.configuration.channel': 'Updates paused: channel must be nightly or stable',
+  'desktop.update.configuration.cleanup': 'Updates paused: cannot discard previous update; restart the app',
   trigger: 'Settings',
   'shortcut.open': 'Open settings',
   'desktop.update.available': 'Update',
@@ -308,6 +324,9 @@ const en = {
   'desktop.update.downloadDetail': 'Downloading update: {percent}%\nTarget version: {version}',
   'desktop.update.checkFailed': 'Could not check for updates. Please try again later.',
   'desktop.update.downloadFailed': 'Could not download the update. Please try again.',
+  'desktop.update.downloadSpaceFailed': 'Not enough disk space to download the update. Free up space, then retry.',
+  'desktop.update.downloadPermissionFailed': 'Cannot write the update files. Check the folder permissions and retry.',
+  'desktop.update.downloadBusyFailed': 'An update file is in use. Close the program using it, then retry.',
   'desktop.update.installFailed': 'Could not install the update. Please try again later.',
   'desktop.update.checkNetworkFailed': 'Could not check for updates. Check your connection and try again.',
   'desktop.update.downloadNetworkFailed': 'Could not download the update. Check your connection and try again.',

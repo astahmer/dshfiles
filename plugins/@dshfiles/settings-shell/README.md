@@ -225,7 +225,7 @@ search entries.
 
 ## Port
 
-This bundle is a **port** of `@deepseek-ai/dsh-client-ui-settings-general` **0.2.1-rc.2** (MIT, © DeepSeek), the
+This bundle is a **port** of `@deepseek-ai/dsh-client-ui-settings-general` **0.2.2-rc.2** (MIT, © DeepSeek), the
 native Settings shell: the sidebar trigger row with its connection-recovery pill and Desktop update indicator, the
 settings surface and its section navigation, the General section (Coding view switch, current version), the
 `settings.*` child slots every settings page registers into, the onboarding coordinator, the `settings.open`
@@ -246,14 +246,14 @@ the version it was taken from:
 - the Host logs `settings-shell: ported from … but DSH ships …` at boot when the running DSH resolves another version,
   and the General section's version row shows the running one.
 
-To refresh: diff the new `lib/client.js` of the native package against 0.2.1-rc.2, port the changes into
+To refresh: diff the new `lib/client.js` of the native package against 0.2.2-rc.2, port the changes into
 `src/native/`, then bump `PORTED_FROM`.
 
 Deliberate differences from upstream:
 
 - Styles are `dshx:` utilities instead of CSS modules (one shared plugin stylesheet).
 - Dictionaries live under `dshfiles.settings-shell`; dshx reserves the native `settings` namespace.
-- The native welcome notice (`@deepseek-ai/dsh-client-ui-settings-models` 0.2.1-rc.2) keeps its acknowledgement in
+- The native welcome notice (`@deepseek-ai/dsh-client-ui-settings-models` 0.2.2-rc.2) keeps its acknowledgement in
   the `ui-settings-general` namespace, which only the switched-off native row serves, and a Loader patch cannot give
   this row that id. So the step is ported too (`src/native/welcome-notice.tsx`): it shadows the `welcome-notice`
   onboarding entry and stores `welcomeNoticeVersion` in `dshfiles-settings-shell`. Someone who acknowledged the native

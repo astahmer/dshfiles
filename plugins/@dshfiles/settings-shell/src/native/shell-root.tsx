@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2 (MIT): `SettingsRoot.js`. The sidebar-foot
+ * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.2 (MIT): `SettingsRoot.js`. The sidebar-foot
  * trigger row (connection recovery, Desktop update) plus the settings surface and the onboarding coordinator, which
  * mounts exactly one ordered `settings.onboarding` step while the main view shows no thread.
  */
@@ -84,7 +84,10 @@ export const ShellRoot = (props: {
   const launcherProps: SettingsLauncherOwnerProps = {
     wide,
     settingsOpen: open,
-    openSettings: deps.openSettings,
+    openSettings: (sectionId?: string) => {
+      if (sectionId === undefined) deps.openSettings()
+      else deps.openSection(sectionId)
+    },
     openOnboarding: (id: string) => {
       deps.closeSettings()
       setRequestedOnboarding(id)

@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.1 (MIT): `DesktopUpdateIndicator.js` and
+ * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.2 (MIT): `DesktopUpdateIndicator.js` and
  * `desktop-update-source.js`. Optional Electron update status; the native shell owns actions and Web owns copy.
  */
 import { DownloadIcon, LoaderCircleIcon } from '@dshfiles/plugin-ui/icons'
@@ -12,6 +12,8 @@ import * as Option from 'effect/Option'
 import type { ShellTranslate } from './locales.js'
 
 const BUSY_PHASES: ReadonlySet<DesktopUpdatePresentation['phase']> = new Set(['checking', 'downloading', 'verifying', 'installing'])
+/** A running download still opens its panel; the other busy phases join the shell-owned operation. */
+const OPEN_BLOCKING_PHASES: ReadonlySet<DesktopUpdatePresentation['phase']> = new Set(['checking', 'verifying', 'installing'])
 
 interface DesktopGlobal {
   readonly dshDesktop: { readonly protocolVersion: 1; readonly updates: DesktopUpdateBridge }
@@ -47,6 +49,8 @@ interface UpdateCopy {
 }
 
 const updateCopy = (state: DesktopUpdatePresentation, t: ShellTranslate): UpdateCopy => {
+  if (state.configurationError !== undefined)
+    return { label: t('desktop.channel.unavailable'), detail: t(`desktop.update.configuration.${state.configurationError}`) }
   const label = {
     idle: '',
     checking: t('desktop.update.checking'),
@@ -62,9 +66,13 @@ const updateCopy = (state: DesktopUpdatePresentation, t: ShellTranslate): Update
     return {
       label,
       detail: {
+        configuration: t('desktop.update.configurationFailed'),
         check: t('desktop.update.checkFailed'),
         'check-network': t('desktop.update.checkNetworkFailed'),
         download: t('desktop.update.downloadFailed'),
+        'download-space': t('desktop.update.downloadSpaceFailed'),
+        'download-permission': t('desktop.update.downloadPermissionFailed'),
+        'download-busy': t('desktop.update.downloadBusyFailed'),
         'download-network': t('desktop.update.downloadNetworkFailed'),
         install: t('desktop.update.installFailed'),
         'install-network': t('desktop.update.installNetworkFailed'),
@@ -87,13 +95,17 @@ export class DesktopUpdateSource {
   readonly store = createSnapshotStore<DesktopUpdateView>({ failed: false, opening: false })
   private live = true
   private received = false
+  private openingOperation: symbol | undefined
   private readonly unsubscribe: (() => void) | undefined
 
   constructor(private readonly bridge: DesktopUpdateBridge | undefined) {
     this.unsubscribe = bridge?.subscribe(presentation => {
       if (!this.live) return
       this.received = true
-      this.store.set({ ...this.store.getSnapshot(), presentation, failed: false })
+      const previous = this.store.getSnapshot()
+      const startedDownload = presentation.phase === 'downloading' && previous.presentation?.phase !== 'downloading'
+      if (startedDownload) this.openingOperation = undefined
+      this.store.set({ ...previous, presentation, failed: false, opening: startedDownload ? false : previous.opening })
     })
     bridge?.status().then(
       presentation => {
@@ -105,19 +117,29 @@ export class DesktopUpdateSource {
     )
   }
 
-  /** Invoke one user action; subsequent clicks join the shell-owned operation. */
+  /** Invoke one user action; subsequent clicks join the shell-owned operation, except a running download's own panel. */
   open(): void {
     if (!this.live || this.bridge === undefined) return
     const state = this.store.getSnapshot()
-    if (state.opening || (state.presentation !== undefined && BUSY_PHASES.has(state.presentation.phase))) return
+    if (
+      state.opening ||
+      (state.presentation !== undefined && state.presentation.configurationError === undefined && OPEN_BLOCKING_PHASES.has(state.presentation.phase))
+    )
+      return
+    // A download that starts while this open is pending settles `opening` itself; the stale completion is then ignored.
+    const operation = Symbol()
+    this.openingOperation = operation
     this.store.set({ ...state, opening: true })
     this.bridge
       .open()
       .catch(() => {
-        if (this.live) this.store.set({ ...this.store.getSnapshot(), failed: true })
+        if (this.live && this.openingOperation === operation) this.store.set({ ...this.store.getSnapshot(), failed: true })
       })
       .finally(() => {
-        if (this.live) this.store.set({ ...this.store.getSnapshot(), opening: false })
+        if (this.live && this.openingOperation === operation) {
+          this.openingOperation = undefined
+          this.store.set({ ...this.store.getSnapshot(), opening: false })
+        }
       })
   }
 
@@ -142,20 +164,21 @@ export const DesktopUpdateIndicator = (props: {
   readonly source: DesktopUpdateSource
 }): JSX.Element | null => {
   const { presentation: state, failed, opening } = useUpdateView(props.source)
-  if (!props.wide || props.hidden || (!failed && (state === undefined || state.phase === 'idle'))) return null
+  if (!props.wide || props.hidden || (!failed && (state === undefined || (state.phase === 'idle' && state.configurationError === undefined)))) return null
   const retryLabel = props.t('desktop.update.retry')
   const copy: UpdateCopy = state === undefined ? { label: retryLabel, detail: retryLabel } : updateCopy(state, props.t)
   const label = failed ? retryLabel : copy.label
-  const error = failed || state?.phase === 'error'
-  const busy = opening || (state !== undefined && BUSY_PHASES.has(state.phase))
+  const error = failed || state?.phase === 'error' || state?.configurationError !== undefined
+  const busy = opening || (state !== undefined && state.configurationError === undefined && BUSY_PHASES.has(state.phase))
+  const disabled = opening || (busy && state?.phase !== 'downloading')
   return (
     <Tooltip label={failed ? retryLabel : copy.detail} side="top">
       <button
-        aria-disabled={busy}
+        aria-disabled={disabled}
         aria-label={label}
         className="dshx:box-border dshx:inline-grid dshx:h-7 dshx:flex-none dshx:cursor-pointer dshx:grid-cols-[14px_max-content] dshx:items-center dshx:gap-x-1 dshx:rounded-md dshx:border dshx:border-[color-mix(in_srgb,var(--dsw-alias-brand-primary-new-colorprimary-new-color)_20%,transparent)] dshx:bg-[color-mix(in_srgb,var(--dsw-alias-brand-primary-new-colorprimary-new-color)_8%,transparent)] dshx:px-2 dshx:text-left dshx:text-xs dshx:leading-[18px] dshx:font-medium dshx:whitespace-nowrap dshx:text-[var(--dsw-alias-brand-primary-new-colorprimary-new-color)] dshx:aria-disabled:cursor-default"
         onClick={() => {
-          if (!busy) props.source.open()
+          if (!disabled) props.source.open()
         }}
         type="button"
       >
@@ -168,7 +191,7 @@ export const DesktopUpdateIndicator = (props: {
             <DownloadIcon strokeWidth={1.5} size={14} />
           )}
         </span>
-        <span>{label}</span>
+        <span className={!error && state?.phase === 'downloading' ? 'dshx:min-w-[calc(3ch+1em)] dshx:text-end dshx:tabular-nums' : undefined}>{label}</span>
       </button>
     </Tooltip>
   )
@@ -182,7 +205,8 @@ export const DesktopUpdateBadge = (props: {
 }): JSX.Element | null => {
   const { presentation: state, failed } = useUpdateView(props.source)
   const offline = props.connectionState === 'disconnected' || props.connectionState === 'connecting'
-  if ((offline && state?.phase !== 'installing') || (!failed && (state === undefined || state.phase === 'idle'))) return null
+  if ((offline && state?.phase !== 'installing') || (!failed && (state === undefined || (state.phase === 'idle' && state.configurationError === undefined))))
+    return null
   const retryLabel = props.t('desktop.update.retry')
   const copy: UpdateCopy = state === undefined ? { label: retryLabel, detail: retryLabel } : updateCopy(state, props.t)
   const label = failed ? retryLabel : copy.label

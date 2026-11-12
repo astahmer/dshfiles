@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.1 (MIT): `HostReleasePrompt.js`. The native row
+ * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.2 (MIT): `HostReleasePrompt.js`. The native row
  * registers this dialog into `shell.overlay`, the frame-wide seat no shipped entry else fills, so the switched-off row
  * would otherwise leave a page reconnected to another Host release without its reload prompt.
  */

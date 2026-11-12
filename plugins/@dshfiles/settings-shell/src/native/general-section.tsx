@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.1 (MIT): `GeneralSection.js`,
+ * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.2 (MIT): `GeneralSection.js`,
  * `CurrentVersionRow.js`, `DeveloperToolsRow.js` and `chrome.js`.
  */
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
