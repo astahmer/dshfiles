@@ -81,7 +81,8 @@ const serversQuery = (api: PreviewClient, sessionId: string) =>
   queryOptions({
     queryKey: DevServerPoll.serversKey(sessionId),
     queryFn: ({ signal }) => api.devServers({ sessionId }, { signal }),
-    refetchInterval: query => DevServerPoll.serversIntervalMs({ ownerMissing: query.state.error !== null && isApiOwnerMissing(query.state.error) }),
+    refetchInterval: query =>
+      DevServerPoll.serversIntervalMs({ ownerMissing: query.state.error !== null && isApiOwnerMissing(query.state.error), onScreen: true }),
     retry: false,
   })
 

@@ -24,12 +24,14 @@ export class DevServerPoll {
   }
 
   /**
-   * The dev-server list polls until an older Host without the API is detected.
-   * @param input - whether this round failed because the Host lacks the plugin API.
+   * The dev-server list of the thread on screen polls until an older Host without the API is detected. Main tabs keep
+   * every visited thread's header mounted, and each header polled its own list: three open threads read three lists
+   * every 10 s. Another thread reads once when its header mounts and polls again once it shows.
+   * @param input - whether this round failed because the Host lacks the plugin API, and whether the thread shows.
    * @returns the poll interval in milliseconds, or false to stop polling.
    */
-  static serversIntervalMs(input: { readonly ownerMissing: boolean }): number | false {
-    return input.ownerMissing ? false : DEV_SERVERS_POLL_MS
+  static serversIntervalMs(input: { readonly ownerMissing: boolean; readonly onScreen: boolean }): number | false {
+    return input.ownerMissing || !input.onScreen ? false : DEV_SERVERS_POLL_MS
   }
 
   /**

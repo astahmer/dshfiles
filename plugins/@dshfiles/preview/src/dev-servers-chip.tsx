@@ -83,7 +83,8 @@ export const DevServersChip = (props: {
   const serversQuery = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => api.devServers({ sessionId: props.sessionId }, { signal }),
-    refetchInterval: query => DevServerPoll.serversIntervalMs({ ownerMissing: query.state.error !== null && isApiOwnerMissing(query.state.error) }),
+    refetchInterval: query =>
+      DevServerPoll.serversIntervalMs({ ownerMissing: query.state.error !== null && isApiOwnerMissing(query.state.error), onScreen: props.onScreen }),
     retry: false,
   })
   const pagesQuery = useQuery({
