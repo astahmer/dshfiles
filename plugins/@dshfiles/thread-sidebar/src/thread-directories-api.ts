@@ -9,6 +9,7 @@ const threadDirectorySchema = Schema.Struct({
 /** Where the VCS providers put each project's thread workspaces, so the browser groups them without guessing paths. */
 export const threadSidebarThreadDirectoriesApi = defineApi({
   id: 'thread-sidebar-thread-directories',
+  owner: '@dshfiles/thread-sidebar',
   version: 1,
   methods: {
     list: method({
