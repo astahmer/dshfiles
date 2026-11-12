@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import * as Schema from 'effect/Schema'
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { createElement, type ComponentType } from 'react'
+import { createElement, type ComponentType, type ReactNode } from 'react'
 import { BrowserBroker, type Live } from '../src/client/broker.js'
 import { AppServicesModel, Command, Dialogs, type DialogsService } from '../src/client/app-services.js'
 import { PluginHooksModel } from '../src/client/hooks.js'
@@ -282,6 +282,30 @@ describe('registries', () => {
     )
     label = undefined
     expect(renderToStaticMarkup(createElement(Frame, { sessionId: 's1' }))).toBe('')
+  })
+
+  it('marks a ComposerPill with its registry id in every render path, so a page can name the contributed pill', () => {
+    const primitivesPath = nodeRequire.resolve('@deepseek-ai/dsh-client-ui-primitives')
+    // The platform-module path renders the pill through the native `Pill`/`Menu`; the marker must survive it. The
+    // Client loader's require is this realm's CommonJS loader under Node, so its cache stands in for the platform module.
+    const stub = {
+      Pill: (props: { readonly children?: ReactNode; readonly 'data-dshx-composer-pill'?: string }) =>
+        createElement('button', { type: 'button', 'data-dshx-composer-pill': props['data-dshx-composer-pill'] }, props.children),
+      Menu: (props: { readonly anchor: ReactNode }) => props.anchor,
+    }
+    nodeRequire.cache[primitivesPath] = { id: primitivesPath, filename: primitivesPath, loaded: true, exports: stub } as never
+    try {
+      const { plugin, host } = createPlugin('@test/pill-primitives')
+      plugin.add(ComposerPill, {
+        id: 'pending',
+        usePill: session => ({ label: `Sending after upload ${session.sessionId}`, menu: [{ id: 'cancel', title: 'Cancel', run: () => {} }] }),
+      })
+      // SAFETY: the registry mounts a component whose only prop is the container's `sessionId`, which every ComposerPill frame renders.
+      const Frame = host.registered[0]?.component as ComponentType<{ readonly sessionId: string }>
+      expect(renderToStaticMarkup(createElement(Frame, { sessionId: 's1' }))).toContain('data-dshx-composer-pill="pending"')
+    } finally {
+      delete nodeRequire.cache[primitivesPath]
+    }
   })
 
   it('gives a ComposerTool the same props in the conversation row and in any surface that renders ComposerTools', () => {

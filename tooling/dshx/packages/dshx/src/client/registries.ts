@@ -266,6 +266,8 @@ interface PillPrimitives {
     readonly onClick?: () => void
     readonly 'aria-haspopup'?: 'menu'
     readonly 'aria-expanded'?: boolean
+    /** The registry id, so a page can name the contributed pill the same way in every render path. */
+    readonly 'data-dshx-composer-pill'?: string
   }>
   readonly Menu: ComponentType<{
     readonly open: boolean
@@ -307,12 +309,13 @@ const composerPillFrame = (item: ComposerPillItem): ComponentType<{ readonly ses
       rows.find(row => row.id === id && row.disabled !== true)?.run()
     }
     if (primitives !== undefined) {
-      if (rows.length === 0) return createElement(primitives.Pill, null, ...content)
+      const marker = { 'data-dshx-composer-pill': item.id }
+      if (rows.length === 0) return createElement(primitives.Pill, marker, ...content)
       return createElement(primitives.Menu, {
         open,
         side: 'top',
         portal: true,
-        anchor: createElement(primitives.Pill, { onClick: () => setOpen(!open), 'aria-haspopup': 'menu', 'aria-expanded': open }, ...content),
+        anchor: createElement(primitives.Pill, { ...marker, onClick: () => setOpen(!open), 'aria-haspopup': 'menu', 'aria-expanded': open }, ...content),
         items: rows.map(row => ({ id: row.id, label: row.title, disabled: row.disabled, danger: row.danger })),
         onSelect: select,
         onClose: () => setOpen(false),
