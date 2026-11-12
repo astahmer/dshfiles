@@ -40,7 +40,7 @@ describe('Web search credential reads', () => {
     card.subscribe(() => undefined)
     await vi.advanceTimersByTimeAsync(10)
     expect(row.describeCredentials).toHaveBeenCalledTimes(1)
-    expect(card.getSnapshot().apiKeyConfigured).toBe(true)
+    expect(card.getSnapshot().legacyKey?.configured).toBe(true)
   })
 
   it('reads once for a settings describe that republishes all three scopes', async () => {

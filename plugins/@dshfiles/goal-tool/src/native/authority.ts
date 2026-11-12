@@ -94,7 +94,7 @@ function someOpenTurnEvent(
 
 /** Whether host-attested human input appears in the current root-agent turn. */
 function hasDirectHumanInput(ctx: Context, execution: GoalToolExecution): boolean {
-  if (!ctx.agents.roots().includes(execution.agent)) return false
+  if (ctx.agents.get(execution.agent.id) !== execution.agent || execution.agent.session.header.origin === 'subagent') return false
   const questions = ctx.sessionProjections.snapshot(execution.agent.session, ['userQuestions']).values.userQuestions
   return someOpenTurnEvent(execution, event => event.type === 'user/message'
     && (event.data.source.kind === 'user' || isAcceptedQuestionReply(event.data.source, questions)))

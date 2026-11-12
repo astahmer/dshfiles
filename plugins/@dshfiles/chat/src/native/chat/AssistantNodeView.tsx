@@ -35,10 +35,22 @@ export const AssistantNodeView = memo(function AssistantNodeView({
     if (tail?.closing?.finalNode.seq !== data.finalNode.seq) return undefined
     return { turn, seq: data.finalNode.seq, openFile }
   }, [data.finalNode, openFile, tail, turn])
-  const mentions = useMemo(
-    () => owner === undefined ? undefined : fileMentions(owner, getFileTriggerProps),
-    [fileMentions, owner, getFileTriggerProps],
-  )
+  // dshfiles (productivity pass T1.3): a mention written with a line (`name.ts:24`, `name.ts#L24`) resolves through
+  // its path and opens at that line, so it becomes a file chip like the bare path does.
+  const mentions = useMemo(() => {
+    const native = owner === undefined ? undefined : fileMentions(owner, getFileTriggerProps)
+    if (native === undefined) return undefined
+    return {
+      resolve: (value: string) => {
+        const direct = native.resolve(value)
+        if (direct !== undefined) return direct
+        const { path, line } = MarkdownProse.parseFileReference(value)
+        if (line === undefined || path === value) return undefined
+        const target = native.resolve(path)
+        return target === undefined ? undefined : { ...target, open: () => { openFile(path, { line: Number(line) }) } }
+      },
+    }
+  }, [fileMentions, getFileTriggerProps, openFile, owner])
   const keepReplies = usePresentation(policy => policy.foldedReplies === 'all')
   // A kept reply row stays visible while the folded Turn hides its inline reasoning.
   const reasoningHidden = turnProcess !== undefined

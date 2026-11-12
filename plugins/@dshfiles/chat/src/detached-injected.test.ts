@@ -52,6 +52,7 @@ describe('detached Chat injection', () => {
       view.chatScroll.save(null)
     }).not.toThrow()
     expect(view.chatScroll.read()).toBeNull()
+    expect(view.consumeOlder()).toBe(false)
     expect(view.dispatchInteraction({} as never)).toBeNull()
     expect(view.resolveFilePath('src/a.ts')).toBe('src/a.ts')
     await expect(view.openFile('/tmp/none')).resolves.toBeUndefined()

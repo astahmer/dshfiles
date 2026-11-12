@@ -1,5 +1,5 @@
 /** Ordered Chat rows, local echoes, and running status share the flow slot's parent. */
-import { memo, type ReactElement } from 'react'
+import { Fragment, memo, useContext, useMemo, type ReactElement } from 'react'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { ChatFlowSlotProps } from '../contract/slots.ts'
@@ -31,6 +31,7 @@ export const ChatFlow = memo(function ChatFlow({
   useSession, useChat, useChatNode, useChatNodeBottom, useChatNodeProcess, useChatGroup, usePresentation, useConnectionState,
   useStore, actions, renderSlot, renderFactorySlot, t, useGroupAction, useGroupHeaderAction,
   cwd, openFile, inspectCall, forkAt, loadImage, useProjection,
+  sessionId, useSessions, useSessionStatus,
 }: ChatFlowSlotProps) {
   const nodeStore = useChat(snapshot => snapshot.nodes)
   // dshfiles (b:7rv2): runs of background jobs and subagents fold in every mode but Verbose.
@@ -43,8 +44,8 @@ export const ChatFlow = memo(function ChatFlow({
       <ChatFlowRows {...{
         entries, pendingInputs, lastInputTurn, deferCollapse, nodeStore,
         useSession, useChat, useChatNode, useChatNodeBottom, useChatNodeProcess, useChatGroup, usePresentation,
-        useStore, actions, renderSlot, renderFactorySlot, t, useGroupAction, useGroupHeaderAction,
-        cwd, openFile, inspectCall, forkAt, loadImage, useProjection, fileMentions,
+        useConnectionState, useStore, actions, renderSlot, renderFactorySlot, t, useGroupAction, useGroupHeaderAction,
+        cwd, openFile, inspectCall, forkAt, loadImage, useProjection,
       }} />
     </RunFoldContext.Provider>
   )
@@ -53,15 +54,15 @@ export const ChatFlow = memo(function ChatFlow({
 type ChatFlowRowsProps = Pick<ChatFlowSlotProps,
   'entries' | 'pendingInputs' | 'lastInputTurn' | 'deferCollapse'
   | 'useSession' | 'useChat' | 'useChatNode' | 'useChatNodeBottom' | 'useChatNodeProcess' | 'useChatGroup' | 'usePresentation'
-  | 'useStore' | 'actions' | 'renderSlot' | 'renderFactorySlot' | 't' | 'useGroupAction' | 'useGroupHeaderAction'
-  | 'cwd' | 'openFile' | 'inspectCall' | 'forkAt' | 'loadImage' | 'useProjection' | 'fileMentions'>
+  | 'useConnectionState' | 'useStore' | 'actions' | 'renderSlot' | 'renderFactorySlot' | 't' | 'useGroupAction'
+  | 'useGroupHeaderAction' | 'cwd' | 'openFile' | 'inspectCall' | 'forkAt' | 'loadImage' | 'useProjection'>
   & { readonly nodeStore: ChatNodeStore }
 
 const ChatFlowRows = memo(function ChatFlowRows({
   entries, pendingInputs, lastInputTurn, deferCollapse, nodeStore,
   useSession, useChat, useChatNode, useChatNodeBottom, useChatNodeProcess, useChatGroup, usePresentation,
-  useStore, actions, renderSlot, renderFactorySlot, t, useGroupAction, useGroupHeaderAction,
-  cwd, openFile, inspectCall, forkAt, loadImage, useProjection, fileMentions,
+  useConnectionState, useStore, actions, renderSlot, renderFactorySlot, t, useGroupAction, useGroupHeaderAction,
+  cwd, openFile, inspectCall, forkAt, loadImage, useProjection,
 }: ChatFlowRowsProps) {
   const runKeys = useMemo(() => entries.map(entry => entry.kind === 'node' && entry.groupPart === undefined ? entry.key : undefined), [entries])
   const placements = useRunFoldPlacements(nodeStore, runKeys)
@@ -99,6 +100,11 @@ const ChatFlowRows = memo(function ChatFlowRows({
         return assertNever(entry)
     }
   })
+  // At the unread landing the answer row draws it (ChatNodeSeat); otherwise it goes above the first unseen Turn.
+  if (sinceYouLeft !== null && sinceYouLeft.answerTurn === undefined) {
+    const index = entries.findIndex(entry => chatRenderKey(entry) === sinceYouLeft.beforeKey)
+    if (index !== -1) rows.splice(index, 0, <Fragment key="dshfiles-since-you-left">{sinceYouLeft.element}</Fragment>)
+  }
   // Transcript echoes open the running Turn and precede the status; steering
   // and Inbox echoes follow it, so the status stays on the running Turn's tail.
   // The first transcript echo opens the next Turn, whose first claim takes the

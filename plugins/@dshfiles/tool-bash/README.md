@@ -4,8 +4,8 @@ Owned Host fork of DSH's `@deepseek-ai/dsh-tool-bash` package: the model-facing 
 and sandbox-escalation support. Execution, sandboxing, approvals and job hand-off are upstream's, byte for byte.
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness), `packages/shell/tool-bash`
-- Package: `@deepseek-ai/dsh-tool-bash@0.2.2-rc.1`
-- Pinned revision: tag `dsh-v0.2.2-rc.1` (`66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`)
+- Package: `@deepseek-ai/dsh-tool-bash@0.2.2-rc.2`
+- Pinned revision: tag `dsh-v0.2.2-rc.2` (`ddac96760b6edf8fa0fe17cbdcf0b512f4c12b2c`)
 - License: MIT, see [LICENSE](LICENSE)
 
 ## Why a fork

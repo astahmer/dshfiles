@@ -151,7 +151,12 @@ it('registers the builtin terminal tab type with its close handler and guide', (
   expect(harness.closeHandlers.has('terminal')).toBe(true)
   expect(harness.locales).toEqual(['sidebarTerminal'])
   expect(harness.shortcuts.map(shortcut => shortcut.id)).toEqual(['terminal.new', 'terminal.excerpt'])
-  expect(harness.slots.map(slot => slot.name)).toEqual(['sidebar.right.tab.guide.entry', 'sidebar.right.pane.tab', 'sidebar.right.pane.tab.title'])
+  expect(harness.slots.map(slot => slot.name)).toEqual([
+    'sidebar.right.tab.guide.entry',
+    'sidebar.right.pane.tab',
+    'sidebar.right.pane.tab.title',
+    'conversation.session.header.actions',
+  ])
 })
 
 it('binds each terminal body to the session that owns it', () => {

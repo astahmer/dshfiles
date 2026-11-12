@@ -4,7 +4,7 @@
 
 ![Native preview, review and terminal resources hosted in the Workbench](docs/screenshots/addressable-resources.png)
 
-Owned whole-package fork of `@deepseek-ai/dsh-client-ui-sidebar-right` 0.2.2-rc.1, pinned to `dsh-v0.2.2-rc.1` (`packages/client/ui-sidebar-right`). Upstream MIT license is retained in [LICENSE](LICENSE); mapping and deliberate changes are in [native-fork.json](native-fork.json).
+Owned whole-package fork of `@deepseek-ai/dsh-client-ui-sidebar-right` 0.2.2-rc.2, pinned to `dsh-v0.2.2-rc.2` (`packages/client/ui-sidebar-right`). Upstream MIT license is retained in [LICENSE](LICENSE); mapping and deliberate changes are in [native-fork.json](native-fork.json).
 
 ## Why fork
 

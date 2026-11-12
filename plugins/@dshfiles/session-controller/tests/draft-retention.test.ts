@@ -35,7 +35,7 @@ function fixture() {
     commands: { execute: vi.fn<SessionRemotes['commands']['execute']>() },
     subagents: {
       prompt: vi.fn<SessionRemotes['subagents']['prompt']>(),
-      interruptByParent: vi.fn<SessionRemotes['subagents']['interruptByParent']>(),
+      interruptByUser: vi.fn<SessionRemotes['subagents']['interruptByUser']>(),
     },
     session: {
       attachment: vi.fn<SessionRemotes['session']['attachment']>(),

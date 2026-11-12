@@ -55,12 +55,6 @@ export type FoldedReplies = typeof FOLDED_REPLIES[number]
 /** Keep every Assistant reply visible when no folded-reply preference is saved. */
 export const DEFAULT_FOLDED_REPLIES: FoldedReplies = 'all'
 
-/** Work-details presentation modes a user can choose. */
-export const TRANSCRIPT_VIEW_MODES = ['compact', 'standard', 'detailed', 'verbose'] as const
-
-/** Work-details presentation mode. */
-export type TranscriptViewMode = typeof TRANSCRIPT_VIEW_MODES[number]
-
 /**
  * Saved value from the two-mode generation of this setting. Read as `detailed`;
  * never offered as a choice and never written back.
@@ -114,9 +108,9 @@ export interface ChatSettings {
 /** Durable Chat schema; also the wire envelope the browser scope validates against. */
 export const ChatSettingsFields = {
   [COLLAPSE_TIMING_FIELD]: z.union([...COLLAPSE_TIMINGS]).default(DEFAULT_COLLAPSE_TIMING),
-  [FOLDED_REPLIES_FIELD]: z.union([...FOLDED_REPLIES]).default(DEFAULT_FOLDED_REPLIES),
   [IMAGE_GALLERY_SCOPE_FIELD]: z.union([...IMAGE_GALLERY_SCOPES]).default(DEFAULT_IMAGE_GALLERY_SCOPE),
   [UNREAD_LANDING_FIELD]: z.union([...UNREAD_LANDINGS]).default(DEFAULT_UNREAD_LANDING),
+  [FOLDED_REPLIES_FIELD]: z.union([...FOLDED_REPLIES]).default(DEFAULT_FOLDED_REPLIES),
   linkOpening: z.union(['sidebar', 'new-tab']).default(DEFAULT_LINK_OPENING),
   performanceUsage: z.union([...PERFORMANCE_USAGE_MODES]).default(DEFAULT_PERFORMANCE_USAGE),
   // Missing and unrecognized modes defer to the client's default.

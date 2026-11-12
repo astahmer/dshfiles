@@ -7,7 +7,7 @@
 import { DatabaseIcon, GaugeIcon } from '@dshfiles/plugin-ui/icons'
 import { memo, useMemo, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { IconDatabaseOutlineRegular, IconGaugeOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { InjectFace, PropsRenderSlots, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: merges the sessionStats key into SessionProjectionMap for useProjection.
@@ -19,7 +19,7 @@ import { formatTokensPerSecond } from './message-chrome.ts'
 import { countsText } from './stats-counts.ts'
 import { assistantStepReading } from '../contract/turn-metrics.ts'
 import { formatCacheHitPercent, formatExactTokens, formatTokens } from './token-format.ts'
-import { MEASURE_STYLE, useStatDialog } from './stat-dialog.ts'
+import { useStatDialog } from './stat-dialog.ts'
 import type { SessionUsageCostPlacement } from '../../session-usage-cost.ts'
 import css from './StatsPills.module.css'
 import dialogCss from './stat-dialog.module.css'
@@ -206,9 +206,9 @@ function DialogPill({ stat, icon, label, text, title, titleValue, children }: Pi
   titleValue?: string
   children: ReactNode
 }) {
-  const { open, setOpen, rootRef, panelRef, pos } = useStatDialog()
+  const { open, setOpen, rootRef, panelRef, anchorName } = useStatDialog()
   return (
-    <span ref={rootRef} className={css.anchor} data-composer-stat={stat}>
+    <span ref={rootRef} style={{ anchorName }} className={css.anchor} data-composer-stat={stat}>
       {/* The open dialog already shows every figure; a tooltip would cover it. */}
       <Tooltip label={text} {...FULL_READING_TOOLTIP} disabled={open}>
         <button
@@ -229,7 +229,7 @@ function DialogPill({ stat, icon, label, text, title, titleValue, children }: Pi
           className={dialogCss.panel}
           role="dialog"
           aria-label={title}
-          style={pos ?? MEASURE_STYLE}
+          style={{ positionAnchor: anchorName }}
         >
           <div className={dialogCss.title}>
             <span className={dialogCss.titleLabel}>
@@ -254,11 +254,14 @@ function DialogPill({ stat, icon, label, text, title, titleValue, children }: Pi
 export const ActivityPill = memo(function ActivityPill({ useChat, useProjection, usePerformanceUsage, t }: StatPillProps) {
   const mode = usePerformanceUsage(value => value)
   const stats = useSessionStats(useChat, useProjection)
-  const speed = stats.decodeMs > 0 ? decodeSpeed(stats, t) : null
-  const icon = <IconGaugeOutlineRegular />
+  // Composer follow-up b:gyk7: the speed is a live reading, shown only while an answer streams; the dialog keeps it.
+  const streaming = useChat(s => s.legacy.partial !== null)
+  const sessionSpeed = stats.decodeMs > 0 ? decodeSpeed(stats, t) : null
+  const speed = streaming ? sessionSpeed : null
+  const icon = <GaugeIcon size={14} strokeWidth={1.5} />
   if (mode === 'compact') return speed === null ? null : <PlainPill stat="activity" icon={icon} {...reading(speed, null)} />
   if (stats.steps === 0) return null
-  const counts = t('stats.counts', { turns: stats.turns, steps: stats.steps })
+  const counts = countsText(stats, t)
   const content: PillContent = { stat: 'activity', icon, ...reading(counts, speed) }
   // A window without one timed figure has no dialog rows to show, so the pill
   // stays a plain reading instead of a button opening an empty dialog.
@@ -322,13 +325,13 @@ export const UsagePill = memo(function UsagePill({ useProjection, usePerformance
   const totalText = t('message.turnUsage.count', { count: formatTokens(total, t) })
   const cost = (placement: SessionUsageCostPlacement): ReactNode =>
     renderSlot?.('conversation.composer.usageCost', { placement, useProjection }) ?? null
-  const usageReading = reading(totalText, cacheHitText)
+  const totalReading = reading(totalText, cacheHitText)
   return (
     <DialogPill
       stat="usage"
       icon={icon}
-      text={usageReading.text}
-      label={<>{usageReading.label}{cost('pill')}</>}
+      label={<>{totalReading.label}{cost('pill')}</>}
+      text={totalReading.text}
       title={t('stats.dialog.usageTitle')}
       titleValue={exactCount(total, t)}
     >

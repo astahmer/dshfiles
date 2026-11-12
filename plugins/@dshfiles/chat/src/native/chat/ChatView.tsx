@@ -9,7 +9,8 @@ import type {
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import {
-  Button, classifyLinkPath, IconChevronDownOutlineRegular, MarkdownDelegateProvider, Modal, type MarkdownMenuTarget,
+  Button, classifyLinkPath, FenceCodeBlock, MarkdownDelegateProvider, Modal,
+  type MarkdownDelegateFenceInfo, type MarkdownMenuTarget,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@dshfiles/plugin-ui/components/image-lightbox'
 import { endInteractionAfterPaint } from '@dshfiles/dshx/tracing/client'
@@ -18,15 +19,22 @@ import type { ChatFlowHookContext, ChatViewSlotProps, OpenFileOptions } from '..
 import type { ImageGalleryNode } from './image-gallery.ts'
 import { collectChatGalleryImages, selectChatImageGallery } from './image-gallery.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
+import { markdownLabels } from '../markdown-labels.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { AnnotateSelection } from './AnnotateSelection.tsx'
 import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
 import { chatRenderKey } from './render-entry.ts'
 import { ConversationViewOpenerContext, useChatFocus } from '../../chat-focus-reveal.ts'
 import { InlineReferenceScope } from '../../inline-references.tsx'
-import { mergeTurnRailItems, turnStarts } from './turn-rail-items.ts'
-import { TranscriptFind } from '../../transcript-find.ts'
-import { TranscriptFindBar } from '../../transcript-find-bar.tsx'
+import { mergeTurnRailItems } from './turn-rail-items.ts'
+import { TurnMarksModel, type TurnMarkFilter } from '../../turn-marks.ts'
+import { SinceYouLeftModel, ThreadToolsModel, type SinceYouLeftNote } from '../../thread-tools.ts'
+import { ChatViewRegistry } from './chat-view-registry.ts'
+import { ThreadFindBar } from './ThreadFindBar.tsx'
+import { ThreadFindModel } from './thread-find-model.ts'
+import { TurnsSheet } from './TurnsSheet.tsx'
+import { SinceYouLeftRecapModel } from './since-you-left.ts'
+import { SinceYouLeftCard, SinceYouLeftContext, type SinceYouLeftPlacement } from './SinceYouLeftCard.tsx'
 import { useTextInteraction } from './text-interaction.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
@@ -74,9 +82,8 @@ type PendingInput = PendingSubmission | InboxState['next-step'][number]
 export function ChatView({
   useSession, useChat, useConversation, useSessions, renderSlot, useImageGalleryScope, useUnreadLanding,
   sessionId, openFile, openExternalLink, resolveFilePath, useContextMenu,
-  loadOlder, loadThrough, loadImage, inspectCall, chatScroll, seenAnswer, forkAt,
-  usePresentation, useProjection, useInteractionIds, dispatchInteraction, t, fileDrag,
-  viewRequest, completeViewRequest, openView,
+  loadOlder, consumeOlder, loadThrough, loadImage, inspectCall, chatScroll, seenAnswer, forkAt,
+  usePresentation, useProjection, useInteractionIds, dispatchInteraction, t, fileDrag, viewRequest, completeViewRequest, openView,
 }: ChatViewSlotProps) {
   const { getTriggerProps } = useContextMenu()
   const getMarkdownTriggerProps = useCallback((target: MarkdownMenuTarget) => getTriggerProps(() => {
@@ -128,6 +135,15 @@ export function ChatView({
       dialog: t('image.dialog'), close: t('image.close'),
     },
   }), [cwd, t, fileDrag, sessionId])
+  const codeLabels = useMemo(() => markdownLabels(t).code, [t])
+  // Every fence in the flow dispatches by language; the content is the plain
+  // code block, so a language without a layer renders as code without diff rows.
+  const renderCode = useCallback((fence: MarkdownDelegateFenceInfo) => renderSlot('conversation.chat.markdown.fence', fence, {
+    entryKey: fence.lang,
+    children: (
+      <FenceCodeBlock lang={fence.lang} code={fence.code} streaming={fence.streaming} labels={codeLabels} diff={false} />
+    ),
+  }), [renderSlot, codeLabels])
   const [imagePreview, setImagePreview] = useState<ImagePreview<LightboxImage>>(() =>
     ImagePreviewRequestModel.imagePreviewClosed<LightboxImage>(),
   )
@@ -231,6 +247,16 @@ export function ChatView({
     if (transcript.hidden === 0 || firstMounted === null) return order
     return order.filter(key => (nodeStore.get(key)?.anchorSeq ?? firstMounted) >= firstMounted)
   }, [order, nodeStore, transcript.hidden, transcript.firstSeq])
+  // dshfiles: rows the transcript window keeps unmounted act as an already prepared history page, so mounting them
+  // goes through the same anchored consumption as a Host page instead of loading again on every check.
+  const historyLoadStatus = useSession(s => s.historyLoadStatus)
+  const windowHistoryStatus = transcript.hidden > 0 && historyLoadStatus === 'idle' ? 'pendingConsumption' : historyLoadStatus
+  const widenOlder = transcript.loadOlder
+  const consumeWindowOlder = useCallback(() => {
+    if (transcript.hidden === 0) return consumeOlder()
+    widenOlder()
+    return true
+  }, [transcript.hidden, widenOlder, consumeOlder])
   const [fileOpen, setFileOpen] = useState<FileOpenRequest>(FileOpenRequestModel.idleFileOpen)
   /** The refusal dialog's content: the settled refusal, or the one a running retry keeps on screen. */
   const fileOpenFailure = fileOpen.status === 'refused'
@@ -326,9 +352,10 @@ export function ChatView({
   const steeringId = latestSteering?.source.kind === 'user' && 'rpcId' in latestSteering.source
     ? latestSteering.source.rpcId : latestSteering?.id ?? null
   const scroll = useChatScroll({
-    ready: openState === 'open',
-    order: mountedOrder, firstSeq, lastKey, running, loadingOlder, hasMore: transcript.hasMore, chatScroll,
-    loadOlder: transcript.loadOlder, loadThrough: transcript.loadThrough, deferCompletedTurns,
+    isOpen: openState === 'open',
+    order: mountedOrder, firstSeq, lastKey, running, loadingOlder, historyLoadStatus: windowHistoryStatus,
+    hasMore: transcript.hasMore, chatScroll, loadOlder: transcript.loadOlder, consumeOlder: consumeWindowOlder,
+    loadThrough: transcript.loadThrough, deferCompletedTurns,
     lastIsUser: lastKey !== null && nodeStore.get(lastKey)?.kind === 'user',
     steeringId,
     submissionId: visibleSubmissions.at(-1)?.requestId ?? null,
@@ -589,6 +616,7 @@ export function ChatView({
               openFile={requestOpenImageAwareFile}
               openExternalLink={requestOpenMarkdownExternalLink}
               fileImages={fileImages}
+              renderCode={renderCode}
             >
               <InlineReferenceScope sessionId={sessionId} cwd={cwd}>
               <ConversationViewOpenerContext.Provider value={openView}>

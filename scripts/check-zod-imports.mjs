@@ -42,7 +42,7 @@ const bridges = new Map([
   ['plugins/@dshfiles/storage-domain/tests/lazy-json-backend.test.ts', 'test boundary: exercises the vendored contract with a ZodType'],
   ['tooling/dshx/packages/dshx/tests/api-zod-schema.spec.ts', 'the bridge spec'],
   ['plugins/@dshfiles/agent-loop/src/native/inbox.ts', 'vendored native fork of dsh-agent-loop, kept byte-comparable to upstream'],
-  ['plugins/@dshfiles/agent-loop/src/native/index.ts', 'vendored native fork of dsh-agent-loop, kept byte-comparable to upstream'],
+  ['plugins/@dshfiles/session-controller/src/native/continuation.ts', 'vendored native fork of dsh-api-session-controller, kept byte-comparable to upstream'],
   ['plugins/@dshfiles/session-controller/typert/host.js', 'derived by scripts/derive-typert.mjs from the native package, not hand-written'],
 ])
 

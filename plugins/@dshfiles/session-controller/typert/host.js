@@ -95,42 +95,41 @@ const _deepseek_ai_dsh_api_session_controller_session_control_result$schema = ()
 })).readonly().readonly(),
 }).optional().describe('Action card proposals and decisions for the currently open Session.'),
   'agentPreset': z.union([z.literal(null), z.string()]).optional().describe('Preset the Session runs, or null when the deployment composes none.'),
-  'title': z.union([z.literal(null), z.string()]).optional().describe('The session\'s current normalized title — the latest `session/title` event\'s text (last-wins), or `null` before the first title lands. A plain string: the shape the client list rows consume.'),
-  'todos': z.union([z.literal(null), z.array(z.object({
-  'content': z.string().describe('What this task is — a short imperative line shown in the UI.'),
-  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress")]).describe('Lifecycle state. `in_progress` marks a task being worked now; parallel work may mark several.'),
-}))]).optional().describe('The agent\'s current whole todo list (the latest `todo/write` snapshot), or `null` before the first write. Whole-value rule: every `todo/write` carries the complete replacement list, so the fold is last-wins. Excluded from Session summary payloads, with `null` kept outside the exclusion mark so the pre-first-write value stays expressible.'),
-  'sessionListMetadata': z.object({
-  'blank': z.boolean().readonly().describe('Whether the folded prefix contains no turn.'),
-  'lastPromptAt': z.union([z.literal(null), z.number()]).readonly().describe('Latest human-authored prompt time in the folded prefix.'),
-}).optional().describe('Persisted facts used to summarize a Session without activating it.'),
-  'imageLimits': z.object({
-  'maxImageBytes': z.number(),
-  'maxImagesPerMessage': z.number(),
-  'maxMessageImageBytes': z.number(),
-  'maxImagePixels': z.number(),
-  'maxImageDimension': z.number().describe('Maximum intrinsic width and maximum intrinsic height in pixels for one image.'),
-  'mediaTypes': z.array(z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")])),
-}).optional().describe('Image-intake limits enforced by the Session prompt endpoint. Boot constant, excluded from Session summary payloads: every Session shares it, so a list row would repeat one host-wide fact.'),
+  'agentTeam': z.object({
+  'enabled': z.boolean().readonly(),
+  'tasks': z.array(z.object({
+  'id': z.string().readonly(),
+  'revision': z.number().readonly(),
+  'subject': z.string().readonly(),
+  'description': z.string().readonly(),
+  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress"), z.literal("deleted")]).readonly(),
+  'blockedBy': z.array(z.string()).readonly(),
+  'writeScopes': z.array(z.string()).readonly(),
+  'ownerId': z.string().readonly().optional(),
+  'ownerName': z.string().readonly().optional().describe('Immutable agent path captured at assignment; absent on unnamed historical owners.'),
+  'ready': z.boolean().readonly(),
+  'writeScopeWarnings': z.array(z.string()).readonly(),
+})).readonly(),
+  'failure': z.string().readonly().optional(),
+}).optional().describe('Saved selection and non-deleted task board of the Team rooted at the projected Session.'),
   'workingDirectory': z.union([z.literal(null), z.string()]).optional().describe('Recorded current directory for Session observations, or null when none is recorded.'),
-  'permissions': z.object({
-  'currentValue': z.string().describe('The effective current value: a configured preset key, `auto`, or `custom`.'),
-}).optional().describe('The session\'s current permission, folded from the three whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`) over the composition defaults. Selectable options come from the process-level catalog Remote. Key absence means no permission service is composed — clients hide the control.'),
   'subagentCatalog': z.array(z.union([z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("one-shot").readonly(),
-  'label': z.string().readonly().optional(),
+  'mode': z.literal("one-shot").readonly().describe('A terminal one-shot child.'),
+  'label': z.string().readonly().optional().describe('Optional durable creation label from the parent catalog.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("external").readonly(),
-  'label': z.string().readonly().optional(),
+  'mode': z.literal("external").readonly().describe('An external execution without a local child Session.'),
+  'label': z.string().readonly().optional().describe('Optional durable creation label from the parent catalog.'),
+  'name': z.string().readonly().optional().describe('Name unique among the parent\'s children; absent on historical entries.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("continuable").readonly(),
-  'label': z.string().readonly(),
+  'mode': z.literal("continuable").readonly().describe('A resumable conversation.'),
+  'label': z.string().readonly().describe('Durable creation label from the parent catalog.'),
+  'name': z.string().readonly().optional().describe('Name unique among the parent\'s children; absent on historical entries.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
@@ -154,6 +153,27 @@ const _deepseek_ai_dsh_api_session_controller_session_control_result$schema = ()
   'label': z.string().describe('Durable creation label from the child\'s descriptor.'),
   'seq': z.number().describe('Seq of the folded descriptor event; see the one-shot arm for the own-suffix proof.'),
 })]).optional().describe('Identity of a descriptor-backed subagent session. `null` ⟺ no valid descriptor (missing, malformed, or unrecognized-version — deliberately undistinguished). The sentinel is deliberately serializable: a value pushed over JSON transports must survive `JSON.stringify` losslessly, where an `undefined` field would be dropped and a stale identity would survive on the receiving side. The entry itself stays non-optional.'),
+  'title': z.union([z.literal(null), z.string()]).optional().describe('The session\'s current normalized title — the latest `session/title` event\'s text (last-wins), or `null` before the first title lands. A plain string: the shape the client list rows consume.'),
+  'todos': z.union([z.literal(null), z.array(z.object({
+  'content': z.string().describe('What this task is — a short imperative line shown in the UI.'),
+  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress")]).describe('Lifecycle state. `in_progress` marks a task being worked now; parallel work may mark several.'),
+}))]).optional().describe('The agent\'s current whole todo list (the latest `todo/write` snapshot), or `null` before the first write. Whole-value rule: every `todo/write` carries the complete replacement list, so the fold is last-wins. Excluded from Session summary payloads, with `null` kept outside the exclusion mark so the pre-first-write value stays expressible.'),
+  'permissions': z.object({
+  'currentValue': z.string().describe('The effective current value: a configured preset key, `auto`, or `custom`.'),
+}).optional().describe('The session\'s current permission, folded from the three whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`) over the composition defaults. Selectable options come from the process-level catalog Remote. Key absence means no permission service is composed — clients hide the control.'),
+  'conversationContinuation': z.union([z.literal(null), z.number()]).optional().describe('Eligible latest failed turn/end for an empty prompt, or null.'),
+  'sessionListMetadata': z.object({
+  'blank': z.boolean().readonly().describe('Whether the folded prefix contains no turn.'),
+  'lastPromptAt': z.union([z.literal(null), z.number()]).readonly().describe('Latest human-authored prompt time in the folded prefix.'),
+}).optional().describe('Persisted facts used to summarize a Session without activating it.'),
+  'imageLimits': z.object({
+  'maxImageBytes': z.number(),
+  'maxImagesPerMessage': z.number(),
+  'maxMessageImageBytes': z.number(),
+  'maxImagePixels': z.number(),
+  'maxImageDimension': z.number().describe('Maximum intrinsic width and maximum intrinsic height in pixels for one image.'),
+  'mediaTypes': z.array(z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")])),
+}).optional().describe('Image-intake limits enforced by the Session prompt endpoint. Boot constant, excluded from Session summary payloads: every Session shares it, so a list row would repeat one host-wide fact.'),
   'tokenUsage': z.object({
   'uncachedInputTokens': z.number(),
   'outputTokens': z.number(),
@@ -220,28 +240,6 @@ const _deepseek_ai_dsh_api_session_controller_session_control_result$schema = ()
 })).readonly().describe('The recorded batch, one entry per question; empty when the late reply carried none.'),
 })).readonly().describe('Calls an answer settled, in settlement order.'),
 }).optional().describe('Timed questions that remain answerable in this Session, and the ones a late reply settled.'),
-  'agentTeam': z.object({
-  'members': z.array(z.object({
-  'id': z.string().readonly(),
-  'name': z.string().readonly(),
-  'role': z.union([z.literal("lead"), z.literal("teammate")]).readonly(),
-  'phase': z.union([z.literal("failed"), z.literal("provisioning"), z.literal("active")]).readonly().describe('Durable lifecycle; the Lead row is always `active`. Turn activity comes from Session status.'),
-  'error': z.string().readonly().optional(),
-})).readonly(),
-  'tasks': z.array(z.object({
-  'id': z.string().readonly(),
-  'revision': z.number().readonly(),
-  'subject': z.string().readonly(),
-  'description': z.string().readonly(),
-  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress"), z.literal("deleted")]).readonly(),
-  'blockedBy': z.array(z.string()).readonly(),
-  'writeScopes': z.array(z.string()).readonly(),
-  'ownerName': z.string().readonly().optional(),
-  'ready': z.boolean().readonly(),
-  'writeScopeWarnings': z.array(z.string()).readonly(),
-})).readonly(),
-  'failure': z.string().readonly().optional(),
-}).optional().describe('Durable roster and non-deleted task board of the Team rooted at the projected Session.'),
   'forgeChangeRequests': z.array(z.object({
   'url': z.string().readonly().describe('Web URL as first recorded.'),
   'origin': z.union([z.literal("created"), z.literal("referenced"), z.literal("discovered"), z.literal("tracked")]).readonly().describe('How the change request became bound.'),
@@ -254,6 +252,15 @@ const _deepseek_ai_dsh_api_session_controller_session_control_result$schema = ()
   'baseCommit': z.string().readonly().describe('Commit object name the branch started from.'),
   'repositoryRoot': z.string().readonly().describe('Canonical root of the source checkout.'),
 })]).optional().describe('The worktree the panel created for the Session while the Session works in it, else null.'),
+  'worktree': z.array(z.object({
+  'worktree': z.object({
+  'path': z.string().describe('Canonical absolute checkout directory in the filesystem provider\'s execution world.'),
+  'branch': z.string().describe('Newly created branch name.'),
+  'baseCommit': z.string().describe('Resolved commit object name; repository-local replacement refs can change its checked-out content.'),
+  'repositoryRoot': z.string().describe('Canonical root of the source checkout.'),
+}).readonly(),
+  'owned': z.boolean().readonly().describe('False for a creation inside the fork-inherited prefix.'),
+})).optional().describe('Checkouts recorded in the Session\'s log, in creation order.'),
   'forkLineage': z.object({
   'origin': z.literal("fork").readonly().describe('How the Session came to exist; only `fork` is published under this key.'),
   'sourceSessionId': z.string().readonly().describe('Session the branch was cut from.'),
@@ -445,42 +452,41 @@ const _deepseek_ai_dsh_api_session_controller_session_follow_result$schema = () 
 })).readonly().readonly(),
 }).optional().describe('Action card proposals and decisions for the currently open Session.'),
   'agentPreset': z.union([z.literal(null), z.string()]).optional().describe('Preset the Session runs, or null when the deployment composes none.'),
-  'title': z.union([z.literal(null), z.string()]).optional().describe('The session\'s current normalized title — the latest `session/title` event\'s text (last-wins), or `null` before the first title lands. A plain string: the shape the client list rows consume.'),
-  'todos': z.union([z.literal(null), z.array(z.object({
-  'content': z.string().describe('What this task is — a short imperative line shown in the UI.'),
-  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress")]).describe('Lifecycle state. `in_progress` marks a task being worked now; parallel work may mark several.'),
-}))]).optional().describe('The agent\'s current whole todo list (the latest `todo/write` snapshot), or `null` before the first write. Whole-value rule: every `todo/write` carries the complete replacement list, so the fold is last-wins. Excluded from Session summary payloads, with `null` kept outside the exclusion mark so the pre-first-write value stays expressible.'),
-  'sessionListMetadata': z.object({
-  'blank': z.boolean().readonly().describe('Whether the folded prefix contains no turn.'),
-  'lastPromptAt': z.union([z.literal(null), z.number()]).readonly().describe('Latest human-authored prompt time in the folded prefix.'),
-}).optional().describe('Persisted facts used to summarize a Session without activating it.'),
-  'imageLimits': z.object({
-  'maxImageBytes': z.number(),
-  'maxImagesPerMessage': z.number(),
-  'maxMessageImageBytes': z.number(),
-  'maxImagePixels': z.number(),
-  'maxImageDimension': z.number().describe('Maximum intrinsic width and maximum intrinsic height in pixels for one image.'),
-  'mediaTypes': z.array(z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")])),
-}).optional().describe('Image-intake limits enforced by the Session prompt endpoint. Boot constant, excluded from Session summary payloads: every Session shares it, so a list row would repeat one host-wide fact.'),
+  'agentTeam': z.object({
+  'enabled': z.boolean().readonly(),
+  'tasks': z.array(z.object({
+  'id': z.string().readonly(),
+  'revision': z.number().readonly(),
+  'subject': z.string().readonly(),
+  'description': z.string().readonly(),
+  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress"), z.literal("deleted")]).readonly(),
+  'blockedBy': z.array(z.string()).readonly(),
+  'writeScopes': z.array(z.string()).readonly(),
+  'ownerId': z.string().readonly().optional(),
+  'ownerName': z.string().readonly().optional().describe('Immutable agent path captured at assignment; absent on unnamed historical owners.'),
+  'ready': z.boolean().readonly(),
+  'writeScopeWarnings': z.array(z.string()).readonly(),
+})).readonly(),
+  'failure': z.string().readonly().optional(),
+}).optional().describe('Saved selection and non-deleted task board of the Team rooted at the projected Session.'),
   'workingDirectory': z.union([z.literal(null), z.string()]).optional().describe('Recorded current directory for Session observations, or null when none is recorded.'),
-  'permissions': z.object({
-  'currentValue': z.string().describe('The effective current value: a configured preset key, `auto`, or `custom`.'),
-}).optional().describe('The session\'s current permission, folded from the three whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`) over the composition defaults. Selectable options come from the process-level catalog Remote. Key absence means no permission service is composed — clients hide the control.'),
   'subagentCatalog': z.array(z.union([z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("one-shot").readonly(),
-  'label': z.string().readonly().optional(),
+  'mode': z.literal("one-shot").readonly().describe('A terminal one-shot child.'),
+  'label': z.string().readonly().optional().describe('Optional durable creation label from the parent catalog.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("external").readonly(),
-  'label': z.string().readonly().optional(),
+  'mode': z.literal("external").readonly().describe('An external execution without a local child Session.'),
+  'label': z.string().readonly().optional().describe('Optional durable creation label from the parent catalog.'),
+  'name': z.string().readonly().optional().describe('Name unique among the parent\'s children; absent on historical entries.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("continuable").readonly(),
-  'label': z.string().readonly(),
+  'mode': z.literal("continuable").readonly().describe('A resumable conversation.'),
+  'label': z.string().readonly().describe('Durable creation label from the parent catalog.'),
+  'name': z.string().readonly().optional().describe('Name unique among the parent\'s children; absent on historical entries.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
@@ -504,6 +510,27 @@ const _deepseek_ai_dsh_api_session_controller_session_follow_result$schema = () 
   'label': z.string().describe('Durable creation label from the child\'s descriptor.'),
   'seq': z.number().describe('Seq of the folded descriptor event; see the one-shot arm for the own-suffix proof.'),
 })]).optional().describe('Identity of a descriptor-backed subagent session. `null` ⟺ no valid descriptor (missing, malformed, or unrecognized-version — deliberately undistinguished). The sentinel is deliberately serializable: a value pushed over JSON transports must survive `JSON.stringify` losslessly, where an `undefined` field would be dropped and a stale identity would survive on the receiving side. The entry itself stays non-optional.'),
+  'title': z.union([z.literal(null), z.string()]).optional().describe('The session\'s current normalized title — the latest `session/title` event\'s text (last-wins), or `null` before the first title lands. A plain string: the shape the client list rows consume.'),
+  'todos': z.union([z.literal(null), z.array(z.object({
+  'content': z.string().describe('What this task is — a short imperative line shown in the UI.'),
+  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress")]).describe('Lifecycle state. `in_progress` marks a task being worked now; parallel work may mark several.'),
+}))]).optional().describe('The agent\'s current whole todo list (the latest `todo/write` snapshot), or `null` before the first write. Whole-value rule: every `todo/write` carries the complete replacement list, so the fold is last-wins. Excluded from Session summary payloads, with `null` kept outside the exclusion mark so the pre-first-write value stays expressible.'),
+  'permissions': z.object({
+  'currentValue': z.string().describe('The effective current value: a configured preset key, `auto`, or `custom`.'),
+}).optional().describe('The session\'s current permission, folded from the three whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`) over the composition defaults. Selectable options come from the process-level catalog Remote. Key absence means no permission service is composed — clients hide the control.'),
+  'conversationContinuation': z.union([z.literal(null), z.number()]).optional().describe('Eligible latest failed turn/end for an empty prompt, or null.'),
+  'sessionListMetadata': z.object({
+  'blank': z.boolean().readonly().describe('Whether the folded prefix contains no turn.'),
+  'lastPromptAt': z.union([z.literal(null), z.number()]).readonly().describe('Latest human-authored prompt time in the folded prefix.'),
+}).optional().describe('Persisted facts used to summarize a Session without activating it.'),
+  'imageLimits': z.object({
+  'maxImageBytes': z.number(),
+  'maxImagesPerMessage': z.number(),
+  'maxMessageImageBytes': z.number(),
+  'maxImagePixels': z.number(),
+  'maxImageDimension': z.number().describe('Maximum intrinsic width and maximum intrinsic height in pixels for one image.'),
+  'mediaTypes': z.array(z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")])),
+}).optional().describe('Image-intake limits enforced by the Session prompt endpoint. Boot constant, excluded from Session summary payloads: every Session shares it, so a list row would repeat one host-wide fact.'),
   'tokenUsage': z.object({
   'uncachedInputTokens': z.number(),
   'outputTokens': z.number(),
@@ -570,28 +597,6 @@ const _deepseek_ai_dsh_api_session_controller_session_follow_result$schema = () 
 })).readonly().describe('The recorded batch, one entry per question; empty when the late reply carried none.'),
 })).readonly().describe('Calls an answer settled, in settlement order.'),
 }).optional().describe('Timed questions that remain answerable in this Session, and the ones a late reply settled.'),
-  'agentTeam': z.object({
-  'members': z.array(z.object({
-  'id': z.string().readonly(),
-  'name': z.string().readonly(),
-  'role': z.union([z.literal("lead"), z.literal("teammate")]).readonly(),
-  'phase': z.union([z.literal("failed"), z.literal("provisioning"), z.literal("active")]).readonly().describe('Durable lifecycle; the Lead row is always `active`. Turn activity comes from Session status.'),
-  'error': z.string().readonly().optional(),
-})).readonly(),
-  'tasks': z.array(z.object({
-  'id': z.string().readonly(),
-  'revision': z.number().readonly(),
-  'subject': z.string().readonly(),
-  'description': z.string().readonly(),
-  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress"), z.literal("deleted")]).readonly(),
-  'blockedBy': z.array(z.string()).readonly(),
-  'writeScopes': z.array(z.string()).readonly(),
-  'ownerName': z.string().readonly().optional(),
-  'ready': z.boolean().readonly(),
-  'writeScopeWarnings': z.array(z.string()).readonly(),
-})).readonly(),
-  'failure': z.string().readonly().optional(),
-}).optional().describe('Durable roster and non-deleted task board of the Team rooted at the projected Session.'),
   'forgeChangeRequests': z.array(z.object({
   'url': z.string().readonly().describe('Web URL as first recorded.'),
   'origin': z.union([z.literal("created"), z.literal("referenced"), z.literal("discovered"), z.literal("tracked")]).readonly().describe('How the change request became bound.'),
@@ -604,6 +609,15 @@ const _deepseek_ai_dsh_api_session_controller_session_follow_result$schema = () 
   'baseCommit': z.string().readonly().describe('Commit object name the branch started from.'),
   'repositoryRoot': z.string().readonly().describe('Canonical root of the source checkout.'),
 })]).optional().describe('The worktree the panel created for the Session while the Session works in it, else null.'),
+  'worktree': z.array(z.object({
+  'worktree': z.object({
+  'path': z.string().describe('Canonical absolute checkout directory in the filesystem provider\'s execution world.'),
+  'branch': z.string().describe('Newly created branch name.'),
+  'baseCommit': z.string().describe('Resolved commit object name; repository-local replacement refs can change its checked-out content.'),
+  'repositoryRoot': z.string().describe('Canonical root of the source checkout.'),
+}).readonly(),
+  'owned': z.boolean().readonly().describe('False for a creation inside the fork-inherited prefix.'),
+})).optional().describe('Checkouts recorded in the Session\'s log, in creation order.'),
   'forkLineage': z.object({
   'origin': z.literal("fork").readonly().describe('How the Session came to exist; only `fork` is published under this key.'),
   'sourceSessionId': z.string().readonly().describe('Session the branch was cut from.'),
@@ -732,30 +746,41 @@ const _deepseek_ai_dsh_api_session_controller_session_list_result$schema = () =>
 })]).readonly().describe('Selection the next model step uses; null while the Agent\'s initial options supply the route.'),
 }).optional().describe('Recorded model selection for the next model step and the latest request.'),
   'agentPreset': z.union([z.literal(null), z.string()]).optional().describe('Preset the Session runs, or null when the deployment composes none.'),
-  'title': z.union([z.literal(null), z.string()]).optional().describe('The session\'s current normalized title — the latest `session/title` event\'s text (last-wins), or `null` before the first title lands. A plain string: the shape the client list rows consume.'),
-  'sessionListMetadata': z.object({
-  'blank': z.boolean().readonly().describe('Whether the folded prefix contains no turn.'),
-  'lastPromptAt': z.union([z.literal(null), z.number()]).readonly().describe('Latest human-authored prompt time in the folded prefix.'),
-}).optional().describe('Persisted facts used to summarize a Session without activating it.'),
+  'agentTeam': z.object({
+  'enabled': z.boolean().readonly(),
+  'tasks': z.array(z.object({
+  'id': z.string().readonly(),
+  'revision': z.number().readonly(),
+  'subject': z.string().readonly(),
+  'description': z.string().readonly(),
+  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress"), z.literal("deleted")]).readonly(),
+  'blockedBy': z.array(z.string()).readonly(),
+  'writeScopes': z.array(z.string()).readonly(),
+  'ownerId': z.string().readonly().optional(),
+  'ownerName': z.string().readonly().optional().describe('Immutable agent path captured at assignment; absent on unnamed historical owners.'),
+  'ready': z.boolean().readonly(),
+  'writeScopeWarnings': z.array(z.string()).readonly(),
+})).readonly(),
+  'failure': z.string().readonly().optional(),
+}).optional().describe('Saved selection and non-deleted task board of the Team rooted at the projected Session.'),
   'workingDirectory': z.union([z.literal(null), z.string()]).optional().describe('Recorded current directory for Session observations, or null when none is recorded.'),
-  'permissions': z.object({
-  'currentValue': z.string().describe('The effective current value: a configured preset key, `auto`, or `custom`.'),
-}).optional().describe('The session\'s current permission, folded from the three whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`) over the composition defaults. Selectable options come from the process-level catalog Remote. Key absence means no permission service is composed — clients hide the control.'),
   'subagentCatalog': z.array(z.union([z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("one-shot").readonly(),
-  'label': z.string().readonly().optional(),
+  'mode': z.literal("one-shot").readonly().describe('A terminal one-shot child.'),
+  'label': z.string().readonly().optional().describe('Optional durable creation label from the parent catalog.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("external").readonly(),
-  'label': z.string().readonly().optional(),
+  'mode': z.literal("external").readonly().describe('An external execution without a local child Session.'),
+  'label': z.string().readonly().optional().describe('Optional durable creation label from the parent catalog.'),
+  'name': z.string().readonly().optional().describe('Name unique among the parent\'s children; absent on historical entries.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("continuable").readonly(),
-  'label': z.string().readonly(),
+  'mode': z.literal("continuable").readonly().describe('A resumable conversation.'),
+  'label': z.string().readonly().describe('Durable creation label from the parent catalog.'),
+  'name': z.string().readonly().optional().describe('Name unique among the parent\'s children; absent on historical entries.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
@@ -770,6 +795,15 @@ const _deepseek_ai_dsh_api_session_controller_session_list_result$schema = () =>
 }).optional().describe('Same-cut bounds of the currently open turn, when one has not reached `turn/end`.'),
   'lastTurnCompleted': z.boolean().optional().describe('Whether the latest closed turn after the child\'s own descriptor completed normally; absent while a turn is open or before one closes.'),
 }).optional().describe('Active-turn duration and latest closed-turn completion for a descriptor-backed subagent session.'),
+  'title': z.union([z.literal(null), z.string()]).optional().describe('The session\'s current normalized title — the latest `session/title` event\'s text (last-wins), or `null` before the first title lands. A plain string: the shape the client list rows consume.'),
+  'permissions': z.object({
+  'currentValue': z.string().describe('The effective current value: a configured preset key, `auto`, or `custom`.'),
+}).optional().describe('The session\'s current permission, folded from the three whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`) over the composition defaults. Selectable options come from the process-level catalog Remote. Key absence means no permission service is composed — clients hide the control.'),
+  'conversationContinuation': z.union([z.literal(null), z.number()]).optional().describe('Eligible latest failed turn/end for an empty prompt, or null.'),
+  'sessionListMetadata': z.object({
+  'blank': z.boolean().readonly().describe('Whether the folded prefix contains no turn.'),
+  'lastPromptAt': z.union([z.literal(null), z.number()]).readonly().describe('Latest human-authored prompt time in the folded prefix.'),
+}).optional().describe('Persisted facts used to summarize a Session without activating it.'),
   'tokenUsage': z.object({
   'uncachedInputTokens': z.number(),
   'outputTokens': z.number(),
@@ -826,28 +860,6 @@ const _deepseek_ai_dsh_api_session_controller_session_list_result$schema = () =>
 })).readonly().describe('The recorded batch, one entry per question; empty when the late reply carried none.'),
 })).readonly().describe('Calls an answer settled, in settlement order.'),
 }).optional().describe('Timed questions that remain answerable in this Session, and the ones a late reply settled.'),
-  'agentTeam': z.object({
-  'members': z.array(z.object({
-  'id': z.string().readonly(),
-  'name': z.string().readonly(),
-  'role': z.union([z.literal("lead"), z.literal("teammate")]).readonly(),
-  'phase': z.union([z.literal("failed"), z.literal("provisioning"), z.literal("active")]).readonly().describe('Durable lifecycle; the Lead row is always `active`. Turn activity comes from Session status.'),
-  'error': z.string().readonly().optional(),
-})).readonly(),
-  'tasks': z.array(z.object({
-  'id': z.string().readonly(),
-  'revision': z.number().readonly(),
-  'subject': z.string().readonly(),
-  'description': z.string().readonly(),
-  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress"), z.literal("deleted")]).readonly(),
-  'blockedBy': z.array(z.string()).readonly(),
-  'writeScopes': z.array(z.string()).readonly(),
-  'ownerName': z.string().readonly().optional(),
-  'ready': z.boolean().readonly(),
-  'writeScopeWarnings': z.array(z.string()).readonly(),
-})).readonly(),
-  'failure': z.string().readonly().optional(),
-}).optional().describe('Durable roster and non-deleted task board of the Team rooted at the projected Session.'),
   'forgeChangeRequests': z.array(z.object({
   'url': z.string().readonly().describe('Web URL as first recorded.'),
   'origin': z.union([z.literal("created"), z.literal("referenced"), z.literal("discovered"), z.literal("tracked")]).readonly().describe('How the change request became bound.'),
@@ -860,6 +872,15 @@ const _deepseek_ai_dsh_api_session_controller_session_list_result$schema = () =>
   'baseCommit': z.string().readonly().describe('Commit object name the branch started from.'),
   'repositoryRoot': z.string().readonly().describe('Canonical root of the source checkout.'),
 })]).optional().describe('The worktree the panel created for the Session while the Session works in it, else null.'),
+  'worktree': z.array(z.object({
+  'worktree': z.object({
+  'path': z.string().describe('Canonical absolute checkout directory in the filesystem provider\'s execution world.'),
+  'branch': z.string().describe('Newly created branch name.'),
+  'baseCommit': z.string().describe('Resolved commit object name; repository-local replacement refs can change its checked-out content.'),
+  'repositoryRoot': z.string().describe('Canonical root of the source checkout.'),
+}).readonly(),
+  'owned': z.boolean().readonly().describe('False for a creation inside the fork-inherited prefix.'),
+})).optional().describe('Checkouts recorded in the Session\'s log, in creation order.'),
   'forkLineage': z.object({
   'origin': z.literal("fork").readonly().describe('How the Session came to exist; only `fork` is published under this key.'),
   'sourceSessionId': z.string().readonly().describe('Session the branch was cut from.'),
@@ -1073,42 +1094,41 @@ const _deepseek_ai_dsh_api_session_controller_session_projections_result$schema 
 })).readonly().readonly(),
 }).optional().describe('Action card proposals and decisions for the currently open Session.'),
   'agentPreset': z.union([z.literal(null), z.string()]).optional().describe('Preset the Session runs, or null when the deployment composes none.'),
-  'title': z.union([z.literal(null), z.string()]).optional().describe('The session\'s current normalized title — the latest `session/title` event\'s text (last-wins), or `null` before the first title lands. A plain string: the shape the client list rows consume.'),
-  'todos': z.union([z.literal(null), z.array(z.object({
-  'content': z.string().describe('What this task is — a short imperative line shown in the UI.'),
-  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress")]).describe('Lifecycle state. `in_progress` marks a task being worked now; parallel work may mark several.'),
-}))]).optional().describe('The agent\'s current whole todo list (the latest `todo/write` snapshot), or `null` before the first write. Whole-value rule: every `todo/write` carries the complete replacement list, so the fold is last-wins. Excluded from Session summary payloads, with `null` kept outside the exclusion mark so the pre-first-write value stays expressible.'),
-  'sessionListMetadata': z.object({
-  'blank': z.boolean().readonly().describe('Whether the folded prefix contains no turn.'),
-  'lastPromptAt': z.union([z.literal(null), z.number()]).readonly().describe('Latest human-authored prompt time in the folded prefix.'),
-}).optional().describe('Persisted facts used to summarize a Session without activating it.'),
-  'imageLimits': z.object({
-  'maxImageBytes': z.number(),
-  'maxImagesPerMessage': z.number(),
-  'maxMessageImageBytes': z.number(),
-  'maxImagePixels': z.number(),
-  'maxImageDimension': z.number().describe('Maximum intrinsic width and maximum intrinsic height in pixels for one image.'),
-  'mediaTypes': z.array(z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")])),
-}).optional().describe('Image-intake limits enforced by the Session prompt endpoint. Boot constant, excluded from Session summary payloads: every Session shares it, so a list row would repeat one host-wide fact.'),
+  'agentTeam': z.object({
+  'enabled': z.boolean().readonly(),
+  'tasks': z.array(z.object({
+  'id': z.string().readonly(),
+  'revision': z.number().readonly(),
+  'subject': z.string().readonly(),
+  'description': z.string().readonly(),
+  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress"), z.literal("deleted")]).readonly(),
+  'blockedBy': z.array(z.string()).readonly(),
+  'writeScopes': z.array(z.string()).readonly(),
+  'ownerId': z.string().readonly().optional(),
+  'ownerName': z.string().readonly().optional().describe('Immutable agent path captured at assignment; absent on unnamed historical owners.'),
+  'ready': z.boolean().readonly(),
+  'writeScopeWarnings': z.array(z.string()).readonly(),
+})).readonly(),
+  'failure': z.string().readonly().optional(),
+}).optional().describe('Saved selection and non-deleted task board of the Team rooted at the projected Session.'),
   'workingDirectory': z.union([z.literal(null), z.string()]).optional().describe('Recorded current directory for Session observations, or null when none is recorded.'),
-  'permissions': z.object({
-  'currentValue': z.string().describe('The effective current value: a configured preset key, `auto`, or `custom`.'),
-}).optional().describe('The session\'s current permission, folded from the three whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`) over the composition defaults. Selectable options come from the process-level catalog Remote. Key absence means no permission service is composed — clients hide the control.'),
   'subagentCatalog': z.array(z.union([z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("one-shot").readonly(),
-  'label': z.string().readonly().optional(),
+  'mode': z.literal("one-shot").readonly().describe('A terminal one-shot child.'),
+  'label': z.string().readonly().optional().describe('Optional durable creation label from the parent catalog.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("external").readonly(),
-  'label': z.string().readonly().optional(),
+  'mode': z.literal("external").readonly().describe('An external execution without a local child Session.'),
+  'label': z.string().readonly().optional().describe('Optional durable creation label from the parent catalog.'),
+  'name': z.string().readonly().optional().describe('Name unique among the parent\'s children; absent on historical entries.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("continuable").readonly(),
-  'label': z.string().readonly(),
+  'mode': z.literal("continuable").readonly().describe('A resumable conversation.'),
+  'label': z.string().readonly().describe('Durable creation label from the parent catalog.'),
+  'name': z.string().readonly().optional().describe('Name unique among the parent\'s children; absent on historical entries.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
@@ -1132,6 +1152,27 @@ const _deepseek_ai_dsh_api_session_controller_session_projections_result$schema 
   'label': z.string().describe('Durable creation label from the child\'s descriptor.'),
   'seq': z.number().describe('Seq of the folded descriptor event; see the one-shot arm for the own-suffix proof.'),
 })]).optional().describe('Identity of a descriptor-backed subagent session. `null` ⟺ no valid descriptor (missing, malformed, or unrecognized-version — deliberately undistinguished). The sentinel is deliberately serializable: a value pushed over JSON transports must survive `JSON.stringify` losslessly, where an `undefined` field would be dropped and a stale identity would survive on the receiving side. The entry itself stays non-optional.'),
+  'title': z.union([z.literal(null), z.string()]).optional().describe('The session\'s current normalized title — the latest `session/title` event\'s text (last-wins), or `null` before the first title lands. A plain string: the shape the client list rows consume.'),
+  'todos': z.union([z.literal(null), z.array(z.object({
+  'content': z.string().describe('What this task is — a short imperative line shown in the UI.'),
+  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress")]).describe('Lifecycle state. `in_progress` marks a task being worked now; parallel work may mark several.'),
+}))]).optional().describe('The agent\'s current whole todo list (the latest `todo/write` snapshot), or `null` before the first write. Whole-value rule: every `todo/write` carries the complete replacement list, so the fold is last-wins. Excluded from Session summary payloads, with `null` kept outside the exclusion mark so the pre-first-write value stays expressible.'),
+  'permissions': z.object({
+  'currentValue': z.string().describe('The effective current value: a configured preset key, `auto`, or `custom`.'),
+}).optional().describe('The session\'s current permission, folded from the three whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`) over the composition defaults. Selectable options come from the process-level catalog Remote. Key absence means no permission service is composed — clients hide the control.'),
+  'conversationContinuation': z.union([z.literal(null), z.number()]).optional().describe('Eligible latest failed turn/end for an empty prompt, or null.'),
+  'sessionListMetadata': z.object({
+  'blank': z.boolean().readonly().describe('Whether the folded prefix contains no turn.'),
+  'lastPromptAt': z.union([z.literal(null), z.number()]).readonly().describe('Latest human-authored prompt time in the folded prefix.'),
+}).optional().describe('Persisted facts used to summarize a Session without activating it.'),
+  'imageLimits': z.object({
+  'maxImageBytes': z.number(),
+  'maxImagesPerMessage': z.number(),
+  'maxMessageImageBytes': z.number(),
+  'maxImagePixels': z.number(),
+  'maxImageDimension': z.number().describe('Maximum intrinsic width and maximum intrinsic height in pixels for one image.'),
+  'mediaTypes': z.array(z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")])),
+}).optional().describe('Image-intake limits enforced by the Session prompt endpoint. Boot constant, excluded from Session summary payloads: every Session shares it, so a list row would repeat one host-wide fact.'),
   'tokenUsage': z.object({
   'uncachedInputTokens': z.number(),
   'outputTokens': z.number(),
@@ -1198,28 +1239,6 @@ const _deepseek_ai_dsh_api_session_controller_session_projections_result$schema 
 })).readonly().describe('The recorded batch, one entry per question; empty when the late reply carried none.'),
 })).readonly().describe('Calls an answer settled, in settlement order.'),
 }).optional().describe('Timed questions that remain answerable in this Session, and the ones a late reply settled.'),
-  'agentTeam': z.object({
-  'members': z.array(z.object({
-  'id': z.string().readonly(),
-  'name': z.string().readonly(),
-  'role': z.union([z.literal("lead"), z.literal("teammate")]).readonly(),
-  'phase': z.union([z.literal("failed"), z.literal("provisioning"), z.literal("active")]).readonly().describe('Durable lifecycle; the Lead row is always `active`. Turn activity comes from Session status.'),
-  'error': z.string().readonly().optional(),
-})).readonly(),
-  'tasks': z.array(z.object({
-  'id': z.string().readonly(),
-  'revision': z.number().readonly(),
-  'subject': z.string().readonly(),
-  'description': z.string().readonly(),
-  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress"), z.literal("deleted")]).readonly(),
-  'blockedBy': z.array(z.string()).readonly(),
-  'writeScopes': z.array(z.string()).readonly(),
-  'ownerName': z.string().readonly().optional(),
-  'ready': z.boolean().readonly(),
-  'writeScopeWarnings': z.array(z.string()).readonly(),
-})).readonly(),
-  'failure': z.string().readonly().optional(),
-}).optional().describe('Durable roster and non-deleted task board of the Team rooted at the projected Session.'),
   'forgeChangeRequests': z.array(z.object({
   'url': z.string().readonly().describe('Web URL as first recorded.'),
   'origin': z.union([z.literal("created"), z.literal("referenced"), z.literal("discovered"), z.literal("tracked")]).readonly().describe('How the change request became bound.'),
@@ -1232,6 +1251,15 @@ const _deepseek_ai_dsh_api_session_controller_session_projections_result$schema 
   'baseCommit': z.string().readonly().describe('Commit object name the branch started from.'),
   'repositoryRoot': z.string().readonly().describe('Canonical root of the source checkout.'),
 })]).optional().describe('The worktree the panel created for the Session while the Session works in it, else null.'),
+  'worktree': z.array(z.object({
+  'worktree': z.object({
+  'path': z.string().describe('Canonical absolute checkout directory in the filesystem provider\'s execution world.'),
+  'branch': z.string().describe('Newly created branch name.'),
+  'baseCommit': z.string().describe('Resolved commit object name; repository-local replacement refs can change its checked-out content.'),
+  'repositoryRoot': z.string().describe('Canonical root of the source checkout.'),
+}).readonly(),
+  'owned': z.boolean().readonly().describe('False for a creation inside the fork-inherited prefix.'),
+})).optional().describe('Checkouts recorded in the Session\'s log, in creation order.'),
   'forkLineage': z.object({
   'origin': z.literal("fork").readonly().describe('How the Session came to exist; only `fork` is published under this key.'),
   'sourceSessionId': z.string().readonly().describe('Session the branch was cut from.'),
@@ -1296,42 +1324,41 @@ const _deepseek_ai_dsh_api_session_controller_session_projections_result$schema 
 })).readonly().readonly(),
 }).optional().describe('Action card proposals and decisions for the currently open Session.'),
   'agentPreset': z.union([z.literal(null), z.string()]).optional().describe('Preset the Session runs, or null when the deployment composes none.'),
-  'title': z.union([z.literal(null), z.string()]).optional().describe('The session\'s current normalized title — the latest `session/title` event\'s text (last-wins), or `null` before the first title lands. A plain string: the shape the client list rows consume.'),
-  'todos': z.union([z.literal(null), z.array(z.object({
-  'content': z.string().describe('What this task is — a short imperative line shown in the UI.'),
-  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress")]).describe('Lifecycle state. `in_progress` marks a task being worked now; parallel work may mark several.'),
-}))]).optional().describe('The agent\'s current whole todo list (the latest `todo/write` snapshot), or `null` before the first write. Whole-value rule: every `todo/write` carries the complete replacement list, so the fold is last-wins. Excluded from Session summary payloads, with `null` kept outside the exclusion mark so the pre-first-write value stays expressible.'),
-  'sessionListMetadata': z.object({
-  'blank': z.boolean().readonly().describe('Whether the folded prefix contains no turn.'),
-  'lastPromptAt': z.union([z.literal(null), z.number()]).readonly().describe('Latest human-authored prompt time in the folded prefix.'),
-}).optional().describe('Persisted facts used to summarize a Session without activating it.'),
-  'imageLimits': z.object({
-  'maxImageBytes': z.number(),
-  'maxImagesPerMessage': z.number(),
-  'maxMessageImageBytes': z.number(),
-  'maxImagePixels': z.number(),
-  'maxImageDimension': z.number().describe('Maximum intrinsic width and maximum intrinsic height in pixels for one image.'),
-  'mediaTypes': z.array(z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")])),
-}).optional().describe('Image-intake limits enforced by the Session prompt endpoint. Boot constant, excluded from Session summary payloads: every Session shares it, so a list row would repeat one host-wide fact.'),
+  'agentTeam': z.object({
+  'enabled': z.boolean().readonly(),
+  'tasks': z.array(z.object({
+  'id': z.string().readonly(),
+  'revision': z.number().readonly(),
+  'subject': z.string().readonly(),
+  'description': z.string().readonly(),
+  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress"), z.literal("deleted")]).readonly(),
+  'blockedBy': z.array(z.string()).readonly(),
+  'writeScopes': z.array(z.string()).readonly(),
+  'ownerId': z.string().readonly().optional(),
+  'ownerName': z.string().readonly().optional().describe('Immutable agent path captured at assignment; absent on unnamed historical owners.'),
+  'ready': z.boolean().readonly(),
+  'writeScopeWarnings': z.array(z.string()).readonly(),
+})).readonly(),
+  'failure': z.string().readonly().optional(),
+}).optional().describe('Saved selection and non-deleted task board of the Team rooted at the projected Session.'),
   'workingDirectory': z.union([z.literal(null), z.string()]).optional().describe('Recorded current directory for Session observations, or null when none is recorded.'),
-  'permissions': z.object({
-  'currentValue': z.string().describe('The effective current value: a configured preset key, `auto`, or `custom`.'),
-}).optional().describe('The session\'s current permission, folded from the three whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`) over the composition defaults. Selectable options come from the process-level catalog Remote. Key absence means no permission service is composed — clients hide the control.'),
   'subagentCatalog': z.array(z.union([z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("one-shot").readonly(),
-  'label': z.string().readonly().optional(),
+  'mode': z.literal("one-shot").readonly().describe('A terminal one-shot child.'),
+  'label': z.string().readonly().optional().describe('Optional durable creation label from the parent catalog.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("external").readonly(),
-  'label': z.string().readonly().optional(),
+  'mode': z.literal("external").readonly().describe('An external execution without a local child Session.'),
+  'label': z.string().readonly().optional().describe('Optional durable creation label from the parent catalog.'),
+  'name': z.string().readonly().optional().describe('Name unique among the parent\'s children; absent on historical entries.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
-  'mode': z.literal("continuable").readonly(),
-  'label': z.string().readonly(),
+  'mode': z.literal("continuable").readonly().describe('A resumable conversation.'),
+  'label': z.string().readonly().describe('Durable creation label from the parent catalog.'),
+  'name': z.string().readonly().optional().describe('Name unique among the parent\'s children; absent on historical entries.'),
 }), z.object({
   'id': z.string().readonly(),
   'createdAt': z.number().readonly(),
@@ -1355,6 +1382,27 @@ const _deepseek_ai_dsh_api_session_controller_session_projections_result$schema 
   'label': z.string().describe('Durable creation label from the child\'s descriptor.'),
   'seq': z.number().describe('Seq of the folded descriptor event; see the one-shot arm for the own-suffix proof.'),
 })]).optional().describe('Identity of a descriptor-backed subagent session. `null` ⟺ no valid descriptor (missing, malformed, or unrecognized-version — deliberately undistinguished). The sentinel is deliberately serializable: a value pushed over JSON transports must survive `JSON.stringify` losslessly, where an `undefined` field would be dropped and a stale identity would survive on the receiving side. The entry itself stays non-optional.'),
+  'title': z.union([z.literal(null), z.string()]).optional().describe('The session\'s current normalized title — the latest `session/title` event\'s text (last-wins), or `null` before the first title lands. A plain string: the shape the client list rows consume.'),
+  'todos': z.union([z.literal(null), z.array(z.object({
+  'content': z.string().describe('What this task is — a short imperative line shown in the UI.'),
+  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress")]).describe('Lifecycle state. `in_progress` marks a task being worked now; parallel work may mark several.'),
+}))]).optional().describe('The agent\'s current whole todo list (the latest `todo/write` snapshot), or `null` before the first write. Whole-value rule: every `todo/write` carries the complete replacement list, so the fold is last-wins. Excluded from Session summary payloads, with `null` kept outside the exclusion mark so the pre-first-write value stays expressible.'),
+  'permissions': z.object({
+  'currentValue': z.string().describe('The effective current value: a configured preset key, `auto`, or `custom`.'),
+}).optional().describe('The session\'s current permission, folded from the three whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`) over the composition defaults. Selectable options come from the process-level catalog Remote. Key absence means no permission service is composed — clients hide the control.'),
+  'conversationContinuation': z.union([z.literal(null), z.number()]).optional().describe('Eligible latest failed turn/end for an empty prompt, or null.'),
+  'sessionListMetadata': z.object({
+  'blank': z.boolean().readonly().describe('Whether the folded prefix contains no turn.'),
+  'lastPromptAt': z.union([z.literal(null), z.number()]).readonly().describe('Latest human-authored prompt time in the folded prefix.'),
+}).optional().describe('Persisted facts used to summarize a Session without activating it.'),
+  'imageLimits': z.object({
+  'maxImageBytes': z.number(),
+  'maxImagesPerMessage': z.number(),
+  'maxMessageImageBytes': z.number(),
+  'maxImagePixels': z.number(),
+  'maxImageDimension': z.number().describe('Maximum intrinsic width and maximum intrinsic height in pixels for one image.'),
+  'mediaTypes': z.array(z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")])),
+}).optional().describe('Image-intake limits enforced by the Session prompt endpoint. Boot constant, excluded from Session summary payloads: every Session shares it, so a list row would repeat one host-wide fact.'),
   'tokenUsage': z.object({
   'uncachedInputTokens': z.number(),
   'outputTokens': z.number(),
@@ -1421,28 +1469,6 @@ const _deepseek_ai_dsh_api_session_controller_session_projections_result$schema 
 })).readonly().describe('The recorded batch, one entry per question; empty when the late reply carried none.'),
 })).readonly().describe('Calls an answer settled, in settlement order.'),
 }).optional().describe('Timed questions that remain answerable in this Session, and the ones a late reply settled.'),
-  'agentTeam': z.object({
-  'members': z.array(z.object({
-  'id': z.string().readonly(),
-  'name': z.string().readonly(),
-  'role': z.union([z.literal("lead"), z.literal("teammate")]).readonly(),
-  'phase': z.union([z.literal("failed"), z.literal("provisioning"), z.literal("active")]).readonly().describe('Durable lifecycle; the Lead row is always `active`. Turn activity comes from Session status.'),
-  'error': z.string().readonly().optional(),
-})).readonly(),
-  'tasks': z.array(z.object({
-  'id': z.string().readonly(),
-  'revision': z.number().readonly(),
-  'subject': z.string().readonly(),
-  'description': z.string().readonly(),
-  'status': z.union([z.literal("completed"), z.literal("pending"), z.literal("in_progress"), z.literal("deleted")]).readonly(),
-  'blockedBy': z.array(z.string()).readonly(),
-  'writeScopes': z.array(z.string()).readonly(),
-  'ownerName': z.string().readonly().optional(),
-  'ready': z.boolean().readonly(),
-  'writeScopeWarnings': z.array(z.string()).readonly(),
-})).readonly(),
-  'failure': z.string().readonly().optional(),
-}).optional().describe('Durable roster and non-deleted task board of the Team rooted at the projected Session.'),
   'forgeChangeRequests': z.array(z.object({
   'url': z.string().readonly().describe('Web URL as first recorded.'),
   'origin': z.union([z.literal("created"), z.literal("referenced"), z.literal("discovered"), z.literal("tracked")]).readonly().describe('How the change request became bound.'),
@@ -1455,6 +1481,15 @@ const _deepseek_ai_dsh_api_session_controller_session_projections_result$schema 
   'baseCommit': z.string().readonly().describe('Commit object name the branch started from.'),
   'repositoryRoot': z.string().readonly().describe('Canonical root of the source checkout.'),
 })]).optional().describe('The worktree the panel created for the Session while the Session works in it, else null.'),
+  'worktree': z.array(z.object({
+  'worktree': z.object({
+  'path': z.string().describe('Canonical absolute checkout directory in the filesystem provider\'s execution world.'),
+  'branch': z.string().describe('Newly created branch name.'),
+  'baseCommit': z.string().describe('Resolved commit object name; repository-local replacement refs can change its checked-out content.'),
+  'repositoryRoot': z.string().describe('Canonical root of the source checkout.'),
+}).readonly(),
+  'owned': z.boolean().readonly().describe('False for a creation inside the fork-inherited prefix.'),
+})).optional().describe('Checkouts recorded in the Session\'s log, in creation order.'),
   'forkLineage': z.object({
   'origin': z.literal("fork").readonly().describe('How the Session came to exist; only `fork` is published under this key.'),
   'sourceSessionId': z.string().readonly().describe('Session the branch was cut from.'),
@@ -1485,7 +1520,7 @@ const _deepseek_ai_dsh_api_session_controller_session_projections_result$schema 
 })]))
 let _deepseek_ai_dsh_api_session_controller_session_prompt_parameter_0$schema$value
 const _deepseek_ai_dsh_api_session_controller_session_prompt_parameter_0$schema = () => (_deepseek_ai_dsh_api_session_controller_session_prompt_parameter_0$schema$value ??= z.object({
-  'requestId': z.string().readonly().describe('Client-minted identity persisted on the exact accepted user message.'),
+  'requestId': z.string().readonly().describe('Client-minted identity persisted on the accepted inbox input, including empty continuation.'),
   'sessionId': z.string().readonly(),
   'mode': z.union([z.literal("queue"), z.literal("steer")]).readonly(),
   'content': z.array(z.union([z.object({
@@ -1499,7 +1534,7 @@ const _deepseek_ai_dsh_api_session_controller_session_prompt_parameter_0$schema 
 }), z.object({
   'type': z.literal("file").readonly(),
   'receiptId': z.string().readonly(),
-})])).readonly().describe('At least one non-whitespace text part or attachment.'),
+})])).readonly().describe('Non-whitespace text or attachments; an empty array continues an eligible failed idle Session.'),
   'clientTimeZone': z.string().readonly().optional(),
 }))
 let _deepseek_ai_dsh_api_session_controller_session_prompt_result$schema$value
@@ -1774,7 +1809,7 @@ const _deepseek_ai_dsh_api_session_controller_session_projections_parameter_0_st
 }))
 let _deepseek_ai_dsh_api_session_controller_session_prompt_parameter_0_strict$schema$value
 const _deepseek_ai_dsh_api_session_controller_session_prompt_parameter_0_strict$schema = () => (_deepseek_ai_dsh_api_session_controller_session_prompt_parameter_0_strict$schema$value ??= z.strictObject({
-  'requestId': z.string().readonly().describe('Client-minted identity persisted on the exact accepted user message.'),
+  'requestId': z.string().readonly().describe('Client-minted identity persisted on the accepted inbox input, including empty continuation.'),
   'sessionId': z.string().readonly(),
   'mode': z.union([z.literal("queue"), z.literal("steer")]).readonly(),
   'content': z.array(z.union([z.strictObject({
@@ -1788,7 +1823,7 @@ const _deepseek_ai_dsh_api_session_controller_session_prompt_parameter_0_strict$
 }), z.strictObject({
   'type': z.literal("file").readonly(),
   'receiptId': z.string().readonly(),
-})])).readonly().describe('At least one non-whitespace text part or attachment.'),
+})])).readonly().describe('Non-whitespace text or attachments; an empty array continues an eligible failed idle Session.'),
   'clientTimeZone': z.string().readonly().optional(),
 }))
 let _deepseek_ai_dsh_api_session_controller_session_rename_parameter_0_strict$schema$value
@@ -1932,7 +1967,7 @@ const $remote = createTypertRemoteInfo({
         description: 'the durable attachment reference and base64-encoded bytes.',
         jsonSchema: {"type":"object","properties":{"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true,"description":"Supplied reference after ID, format, byte length, and dimensions verification; display fields are preserved."},"data":{"type":"string"}},"required":["attachment","data"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":497,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":500,"column":3},
     },
     'session/cancel': {
       service: 'sessionController',
@@ -1964,7 +1999,7 @@ const $remote = createTypertRemoteInfo({
         description: 'acknowledgement that cancellation was requested.',
         jsonSchema: {"type":"object","properties":{"accepted":{"type":"boolean","const":true}},"required":["accepted"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":517,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":520,"column":3},
     },
     'session/canOpenWorkspacePath': {
       service: 'sessionController',
@@ -1979,7 +2014,7 @@ const $remote = createTypertRemoteInfo({
         description: 'true when the matching open operation is available.',
         jsonSchema: {"type":"boolean"},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":350,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":353,"column":3},
     },
     'session/control': {
       service: 'sessionController',
@@ -1996,7 +2031,7 @@ const $remote = createTypertRemoteInfo({
         description: 'one complete baseline followed by live replacement frames.',
         jsonSchemaError: 'typert tool schema: selected dictionaries require string keys and unconstrained JSON values',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":628,"column":10},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":631,"column":10},
     },
     'session/create': {
       service: 'sessionController',
@@ -2028,7 +2063,7 @@ const $remote = createTypertRemoteInfo({
         description: 'the created or reused Session identity and its preset when configured.',
         jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string","description":"The created or reused Session, which may differ from the requested `sessionId`."},"agentPreset":{"type":"string","description":"Preset the Session runs, when the deployment composes a preset roster."}},"required":["sessionId"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":304,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":307,"column":3},
     },
     'session/events': {
       service: 'sessionController',
@@ -2061,7 +2096,7 @@ const $remote = createTypertRemoteInfo({
         description: 'one chronological page with its inclusive cursor.',
         jsonSchema: {"type":"object","properties":{"cursor":{"type":"number"},"records":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","const":"event"},"event":{"type":"object","properties":{"type":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"data":{},"ignorable":{"type":"boolean","const":true},"sourceEventSeqs":{"description":"Earlier sources on current surface events; opaque JSON on unknown ignorable events."},"surfaceOp":{"description":"Canonical placement on current surface events; opaque JSON on unknown ignorable events."}},"required":["type","seq","time","data"],"additionalProperties":true}},"required":["type","event"],"additionalProperties":true}},"hasMore":{"type":"boolean"}},"required":["cursor","records","hasMore"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":540,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":543,"column":3},
     },
     'session/follow': {
       service: 'sessionController',
@@ -2095,7 +2130,7 @@ const $remote = createTypertRemoteInfo({
         description: 'a complete opening snapshot followed by gap-free durable event frames and optional cursorless assistant-stream frames.',
         jsonSchemaError: 'typert tool schema: selected dictionaries require string keys and unconstrained JSON values',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":607,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":610,"column":3},
     },
     'session/fork': {
       service: 'sessionController',
@@ -2127,7 +2162,7 @@ const $remote = createTypertRemoteInfo({
         description: 'the new Session identity.',
         jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"}},"required":["sessionId"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":446,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":449,"column":9},
     },
     'session/initializeDefaultModel': {
       service: 'sessionController',
@@ -2142,7 +2177,7 @@ const $remote = createTypertRemoteInfo({
         description: 'after saving the first available model or retaining the existing default.',
         jsonSchemaError: 'typert tool schema: unsupported void value',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":323,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":326,"column":9},
     },
     'session/list': {
       service: 'sessionController',
@@ -2175,7 +2210,7 @@ const $remote = createTypertRemoteInfo({
         description: 'visible Session summaries ordered by activity.',
         jsonSchemaError: 'typert tool schema: selected dictionaries require string keys and unconstrained JSON values',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":279,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":282,"column":9},
     },
     'session/modelCatalog': {
       service: 'sessionController',
@@ -2190,7 +2225,7 @@ const $remote = createTypertRemoteInfo({
         description: 'provider-grouped models, the deployment default, and isolated provider failures.',
         jsonSchemaError: 'typert tool schema: selected dictionaries require string keys and unconstrained JSON values',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":341,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":344,"column":3},
     },
     'session/observeEvent': {
       service: 'sessionController',
@@ -2224,7 +2259,7 @@ const $remote = createTypertRemoteInfo({
         description: 'readiness and subsequent events, without a snapshot.',
         jsonSchema: {"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"event"},"event":{"type":"object","properties":{"type":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"data":{},"ignorable":{"type":"boolean","const":true},"sourceEventSeqs":{"description":"Earlier sources on current surface events; opaque JSON on unknown ignorable events."},"surfaceOp":{"description":"Canonical placement on current surface events; opaque JSON on unknown ignorable events."}},"required":["type","seq","time","data"],"additionalProperties":true}},"required":["type","event"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"ready"}},"required":["type"],"additionalProperties":true}]},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":551,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":554,"column":3},
     },
     'session/observeProjections': {
       service: 'sessionController',
@@ -2258,7 +2293,7 @@ const $remote = createTypertRemoteInfo({
         description: 'readiness followed by one projection change frame per committed event.',
         jsonSchema: {"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"ready"}},"required":["type"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"projection"},"seq":{"type":"number","description":"Seq of the committed event that caused every listed change."},"changes":{"type":"array","items":{"type":"object","properties":{"key":{"type":"string"},"val":{}},"required":["key","val"],"additionalProperties":true},"description":"One entry per client-visible key whose view the event changed, in registration order without duplicate keys, with the key's new value as `val`. A key absent from `changes` is unchanged; unlike a baseline, absence does not mean an absent capability."}},"required":["type","seq","changes"],"additionalProperties":true}]},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":562,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":565,"column":3},
     },
     'session/observeState': {
       service: 'sessionController',
@@ -2292,7 +2327,7 @@ const $remote = createTypertRemoteInfo({
         description: 'complete passive state replacements.',
         jsonSchema: {"type":"object","properties":{"cursor":{"type":"number"},"active":{"type":"boolean"},"running":{"type":"boolean"},"queue":{"oneOf":[{"type":"null","const":null},{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"placement":{"type":"string","enum":["queued","steering","context"]},"rpcId":{"type":"string"},"content":{"type":"array","items":{}}},"required":["id","placement","content"],"additionalProperties":true}}]},"pendingInput":{"type":"array","items":{"type":"string","enum":["approval","question","other"]},"description":"Pending Remote requests sampled when this state was read. A pending change alone does not trigger `observeState`; `wait` refreshes on its own interval."}},"required":["cursor","active","running","queue","pendingInput"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":584,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":587,"column":3},
     },
     'session/openWorkspacePath': {
       service: 'sessionController',
@@ -2325,7 +2360,7 @@ const $remote = createTypertRemoteInfo({
         description: 'confirmation after the native opener accepts the path.',
         jsonSchema: {"type":"object","properties":{"opened":{"type":"boolean","const":true}},"required":["opened"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":371,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":374,"column":9},
     },
     'session/page': {
       service: 'sessionController',
@@ -2358,7 +2393,7 @@ const $remote = createTypertRemoteInfo({
         description: 'one chronological page with its inclusive cursor; an omitted `throughSeq` selects the observed log end.',
         jsonSchema: {"type":"object","properties":{"cursor":{"type":"number"},"records":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","const":"event"},"event":{"type":"object","properties":{"type":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"data":{},"ignorable":{"type":"boolean","const":true},"sourceEventSeqs":{"description":"Earlier sources on current surface events; opaque JSON on unknown ignorable events."},"surfaceOp":{"description":"Canonical placement on current surface events; opaque JSON on unknown ignorable events."}},"required":["type","seq","time","data"],"additionalProperties":true}},"required":["type","event"],"additionalProperties":true}},"hasMore":{"type":"boolean"}},"required":["cursor","records","hasMore"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":529,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":532,"column":3},
     },
     'session/projections': {
       service: 'sessionController',
@@ -2391,7 +2426,7 @@ const $remote = createTypertRemoteInfo({
         description: 'a sequenced baseline, cached hints when migration is deferred, or null when absent.',
         jsonSchemaError: 'typert tool schema: selected dictionaries require string keys and unconstrained JSON values',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":618,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":621,"column":3},
     },
     'session/prompt': {
       service: 'sessionController',
@@ -2406,13 +2441,13 @@ const $remote = createTypertRemoteInfo({
             mode: 'strict',
             typeSymbol: '@deepseek-ai/dsh-api-session-controller/types#SessionPromptRequest',
             create: _deepseek_ai_dsh_api_session_controller_session_prompt_parameter_0$schema,
-            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Client-minted identity persisted on the exact accepted user message."},"sessionId":{"type":"string"},"mode":{"type":"string","enum":["queue","steer"]},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"file"},"receiptId":{"type":"string"}},"required":["type","receiptId"],"additionalProperties":true}]},"description":"At least one non-whitespace text part or attachment."},"clientTimeZone":{"type":"string"}},"required":["requestId","sessionId","mode","content"],"additionalProperties":true},
+            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Client-minted identity persisted on the accepted inbox input, including empty continuation."},"sessionId":{"type":"string"},"mode":{"type":"string","enum":["queue","steer"]},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"file"},"receiptId":{"type":"string"}},"required":["type","receiptId"],"additionalProperties":true}]},"description":"Non-whitespace text or attachments; an empty array continues an eligible failed idle Session."},"clientTimeZone":{"type":"string"}},"required":["requestId","sessionId","mode","content"],"additionalProperties":true},
           },
           strictCodec: {
             mode: 'strict',
             typeSymbol: '@deepseek-ai/dsh-api-session-controller/types#SessionPromptRequest',
             create: _deepseek_ai_dsh_api_session_controller_session_prompt_parameter_0_strict$schema,
-            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Client-minted identity persisted on the exact accepted user message."},"sessionId":{"type":"string"},"mode":{"type":"string","enum":["queue","steer"]},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"file"},"receiptId":{"type":"string"}},"required":["type","receiptId"],"additionalProperties":false}]},"description":"At least one non-whitespace text part or attachment."},"clientTimeZone":{"type":"string"}},"required":["requestId","sessionId","mode","content"],"additionalProperties":false},
+            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Client-minted identity persisted on the accepted inbox input, including empty continuation."},"sessionId":{"type":"string"},"mode":{"type":"string","enum":["queue","steer"]},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"file"},"receiptId":{"type":"string"}},"required":["type","receiptId"],"additionalProperties":false}]},"description":"Non-whitespace text or attachments; an empty array continues an eligible failed idle Session."},"clientTimeZone":{"type":"string"}},"required":["requestId","sessionId","mode","content"],"additionalProperties":false},
           },
         },
       ],
@@ -2424,7 +2459,7 @@ const $remote = createTypertRemoteInfo({
         description: 'acknowledgement that the Agent accepted the prompt.',
         jsonSchema: {"type":"object","properties":{"accepted":{"type":"boolean","const":true}},"required":["accepted"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":465,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":468,"column":9},
     },
     'session/rename': {
       service: 'sessionController',
@@ -2456,7 +2491,7 @@ const $remote = createTypertRemoteInfo({
         description: 'the accepted title and durable event sequence.',
         jsonSchema: {"type":"object","properties":{"title":{"type":"string"},"seq":{"type":"number"}},"required":["title","seq"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":434,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":437,"column":3},
     },
     'session/search': {
       service: 'sessionController',
@@ -2489,7 +2524,7 @@ const $remote = createTypertRemoteInfo({
         description: 'authorized bounded Session search results.',
         jsonSchema: {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"sessionId":{"type":"string"},"snippet":{"type":"string"}},"required":["sessionId","snippet"],"additionalProperties":true}},"hasMore":{"type":"boolean"}},"required":["items","hasMore"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":293,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":296,"column":9},
     },
     'session/selectModel': {
       service: 'sessionController',
@@ -2521,7 +2556,7 @@ const $remote = createTypertRemoteInfo({
         description: 'the normalized selection installed for the Session, without waiting for default persistence.',
         jsonSchema: {"type":"object","properties":{"selected":{"type":"object","properties":{"provider":{"type":"string"},"model":{"type":"string"},"reasoningEffort":{"type":"string"}},"required":["provider","model"],"additionalProperties":true}},"required":["selected"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":314,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":317,"column":3},
     },
     'session/state': {
       service: 'sessionController',
@@ -2554,7 +2589,7 @@ const $remote = createTypertRemoteInfo({
         description: 'current passive state.',
         jsonSchema: {"type":"object","properties":{"cursor":{"type":"number"},"active":{"type":"boolean"},"running":{"type":"boolean"},"queue":{"oneOf":[{"type":"null","const":null},{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"placement":{"type":"string","enum":["queued","steering","context"]},"rpcId":{"type":"string"},"content":{"type":"array","items":{}}},"required":["id","placement","content"],"additionalProperties":true}}]},"pendingInput":{"type":"array","items":{"type":"string","enum":["approval","question","other"]},"description":"Pending Remote requests sampled when this state was read. A pending change alone does not trigger `observeState`; `wait` refreshes on its own interval."}},"required":["cursor","active","running","queue","pendingInput"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":573,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":576,"column":3},
     },
     'session/updateQueue': {
       service: 'sessionController',
@@ -2586,7 +2621,7 @@ const $remote = createTypertRemoteInfo({
         description: 'acknowledgement that the queue mutation was applied.',
         jsonSchema: {"type":"object","properties":{"accepted":{"type":"boolean","const":true}},"required":["accepted"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":507,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":510,"column":3},
     },
     'session/wait': {
       service: 'sessionController',
@@ -2619,7 +2654,7 @@ const $remote = createTypertRemoteInfo({
         description: 'stopping state and bounded assistant output.',
         jsonSchema: {"type":"object","properties":{"reason":{"type":"string","enum":["idle","input-required","timeout"]},"state":{"type":"object","properties":{"cursor":{"type":"number"},"active":{"type":"boolean"},"running":{"type":"boolean"},"queue":{"oneOf":[{"type":"null","const":null},{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"placement":{"type":"string","enum":["queued","steering","context"]},"rpcId":{"type":"string"},"content":{"type":"array","items":{}}},"required":["id","placement","content"],"additionalProperties":true}}]},"pendingInput":{"type":"array","items":{"type":"string","enum":["approval","question","other"]},"description":"Pending Remote requests sampled when this state was read. A pending change alone does not trigger `observeState`; `wait` refreshes on its own interval."}},"required":["cursor","active","running","queue","pendingInput"],"additionalProperties":true},"output":{"type":"object","properties":{"records":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","const":"event"},"event":{"type":"object","properties":{"type":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"data":{},"ignorable":{"type":"boolean","const":true},"sourceEventSeqs":{"description":"Earlier sources on current surface events; opaque JSON on unknown ignorable events."},"surfaceOp":{"description":"Canonical placement on current surface events; opaque JSON on unknown ignorable events."}},"required":["type","seq","time","data"],"additionalProperties":true}},"required":["type","event"],"additionalProperties":true}},"truncated":{"type":"boolean","description":"More eligible assistant messages exist in the selected interval."}},"required":["records","truncated"],"additionalProperties":true}},"required":["reason","state","output"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":595,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":598,"column":3},
     },
     'session/workspacePathApplications': {
       service: 'sessionController',
@@ -2652,7 +2687,7 @@ const $remote = createTypertRemoteInfo({
         description: 'OS application names, icons, and default selection; empty when desktop opening is unavailable.',
         jsonSchema: {"type":"array","items":{"type":"object","properties":{"id":{"type":"string","description":"OS application identifier; callers must revalidate it against the file's current handlers before opening."},"name":{"type":"string"},"default":{"type":"boolean"},"icon":{"oneOf":[{"type":"null","const":null},{"type":"string"}],"description":"PNG or SVG data URL, or null when the desktop supplies no icon."}},"required":["id","name","default","icon"],"additionalProperties":true}},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":401,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":404,"column":9},
     },
     'skills/list': {
       service: 'sessionSkillCatalog',
@@ -3074,6 +3109,10 @@ export const TYPERT = {
             "declaration": "export interface ContinuableSubagentDescriptorData extends SubagentDescriptorBase {\n    readonly mode: 'continuable';\n    readonly label: string;\n    readonly agentProvider?: string;\n    readonly agentModel?: string;\n    readonly agentReasoningEffort?: ReasoningEffortId;\n    readonly persona?: string;\n    readonly toolFilter?: ToolRestriction;\n}"
           },
           {
+            "name": "CreatedWorktree",
+            "declaration": "export interface CreatedWorktree {\n    path: string;\n    branch: string;\n    baseCommit: string;\n    repositoryRoot: string;\n}"
+          },
+          {
             "name": "DetailFailureReason",
             "declaration": "export type DetailFailureReason = 'too-large' | 'network' | 'denied' | 'git-unavailable' | 'invalid';"
           },
@@ -3258,6 +3297,10 @@ export const TYPERT = {
             "declaration": "export type KnownCatalogMode = { readonly mode: 'one-shot'; readonly label?: string; } | { readonly mode: 'continuable'; readonly label: string; };"
           },
           {
+            "name": "KnownSubagentCatalogFields",
+            "declaration": "export type KnownSubagentCatalogFields = { readonly mode: 'one-shot'; readonly label?: string; } | { readonly mode: 'external'; readonly label?: string; readonly name?: string; } | { readonly mode: 'continuable'; readonly label: string; readonly name?: string; };"
+          },
+          {
             "name": "LegacyAfterScheduleRecord",
             "declaration": "export interface LegacyAfterScheduleRecord extends Omit<AfterScheduleRecord, 'title'> {\n    readonly title?: string;\n}"
           },
@@ -3355,7 +3398,7 @@ export const TYPERT = {
           },
           {
             "name": "MessageSourceMap",
-            "declaration": "export interface MessageSourceMap {\n    user: { kind: 'user'; };\n    model: ModelMessageSource;\n    tool: ToolMessageSource;\n    'system-prompt': SystemPromptMessageSource;\n    'model-selection': { kind: 'model-selection'; } & ContextFormed;\n    'tool-registry': { kind: 'tool-registry'; };\n    'action-cards': { kind: 'action-cards'; through: SessionSeq; } & ContextFormed;\n    'runtime-context': { kind: 'runtime-context'; } & ContextFormed;\n    'user-rpc': { kind: 'user'; rpcId: SessionRequestId; clientTimeZone?: string; principal?: Principal; };\n    'working-directory': { kind: 'working-directory'; };\n    'user-approval': { kind: 'user-approval'; } & ContextFormed;\n    'agent-message': AgentMessageSource;\n    'subagent-settled': SubagentSettledMessageSource;\n    'skill-invocation': SkillInvocationSource;\n    'ptc-mode': { kind: 'ptc-mode'; };\n    'compact-checkpoint': CompactionCheckpointSource;\n    'cordis-host-runner': { kind: 'cordis-host-runner'; };\n    'user-question-reply': { kind: 'user-question-reply'; callId: ToolCallId; outcome: 'answered'; };\n    'team-message': TeamMessageSource;\n    goal: GoalMessageSource;\n    'plan-mode': { kind: 'plan-mode'; } & ContextFormed;\n    schedule: { kind: 'schedule'; } & ContextFormed;\n    'session-reference': SessionReferenceSource;\n    webhook: { readonly kind: 'webhook'; readonly provider: string; readonly source: WebhookSourceId; readonly deliveryId: WebhookDeliveryId; readonly ruleId: WebhookRuleId; readonly form: 'notice'; readonly summary: string; };\n}"
+            "declaration": "export interface MessageSourceMap {\n    user: { kind: 'user'; };\n    model: ModelMessageSource;\n    tool: ToolMessageSource;\n    'system-prompt': SystemPromptMessageSource;\n    'model-selection': { kind: 'model-selection'; } & ContextFormed;\n    'tool-registry': { kind: 'tool-registry'; };\n    'action-cards': { kind: 'action-cards'; through: SessionSeq; } & ContextFormed;\n    'runtime-context': { kind: 'runtime-context'; } & ContextFormed;\n    'team-message': TeamMessageSource;\n    'working-directory': { kind: 'working-directory'; };\n    'user-approval': { kind: 'user-approval'; } & ContextFormed;\n    'agent-message': AgentMessageSource;\n    'subagent-settled': SubagentSettledMessageSource;\n    'user-rpc': { kind: 'user'; rpcId: SessionRequestId; clientTimeZone?: string; principal?: Principal; };\n    'retry-rpc': { kind: 'retry'; rpcId: SessionRequestId; clientTimeZone?: string; principal?: Principal; };\n    'skill-invocation': SkillInvocationSource;\n    'ptc-mode': { kind: 'ptc-mode'; };\n    'compact-checkpoint': CompactionCheckpointSource;\n    'cordis-host-runner': { kind: 'cordis-host-runner'; };\n    'user-question-reply': { kind: 'user-question-reply'; callId: ToolCallId; outcome: 'answered'; };\n    goal: GoalMessageSource;\n    'plan-mode': { kind: 'plan-mode'; } & ContextFormed;\n    schedule: { kind: 'schedule'; } & ContextFormed;\n    'session-reference': SessionReferenceSource;\n    webhook: { readonly kind: 'webhook'; readonly provider: string; readonly source: WebhookSourceId; readonly deliveryId: WebhookDeliveryId; readonly ruleId: WebhookRuleId; readonly form: 'notice'; readonly summary: string; };\n}"
           },
           {
             "name": "Model",
@@ -3410,8 +3453,8 @@ export const TYPERT = {
             "declaration": "export interface NotFutureError {\n    readonly code: 'not_future';\n    readonly message: string;\n}"
           },
           {
-            "name": "OfficeToPdfErrorCode",
-            "declaration": "export type OfficeToPdfErrorCode = 'input-too-large' | 'output-too-large' | 'invalid-document' | 'unsupported-format' | 'invalid-output' | 'timeout' | 'unavailable' | 'failed' | 'busy' | 'source-changed';"
+            "name": "OfficeKitErrorCode",
+            "declaration": "export type OfficeKitErrorCode = 'input-too-large' | 'output-too-large' | 'invalid-document' | 'unsupported-format' | 'invalid-output' | 'timeout' | 'unavailable' | 'failed' | 'busy' | 'source-changed' | 'invalid-request';"
           },
           {
             "name": "OneShotScheduleDispatchChange",
@@ -3495,7 +3538,7 @@ export const TYPERT = {
           },
           {
             "name": "RemoteErrorDetailsMap",
-            "declaration": "export interface RemoteErrorDetailsMap {\n    'gateway/bad-request': { readonly issues?: readonly object[]; };\n    'gateway/cancelled': {};\n    'gateway/internal': {};\n    'llm/model-discovery-rejected': { readonly settingsNs: string; readonly baseURL?: string; };\n    'session/not-found': { readonly sessionId: SessionId; };\n    'workspace/not-found': { readonly workspaceId: WorkspaceId; };\n    'remote-access/denied': RemoteAccessDeniedDetails;\n    'agent-preset/not-found': { readonly agentPreset: string; readonly available: readonly string[]; };\n    'agent-preset/invalid': { readonly agentPreset: string; readonly reason: string; };\n    'agent-preset/locked': { readonly sessionId: SessionId; readonly agentPreset: string; };\n    'gateway/ambiguous-endpoint': TypertGatewayFaultDetails;\n    'gateway/arguments-invalid': TypertGatewayFaultDetails;\n    'gateway/binding-invalid': TypertGatewayFaultDetails;\n    'gateway/context-failed': TypertGatewayFaultDetails;\n    'gateway/context-not-found': TypertGatewayFaultDetails;\n    'gateway/context-unavailable': TypertGatewayFaultDetails;\n    'gateway/definition-unavailable': TypertGatewayFaultDetails;\n    'gateway/input-invalid': TypertGatewayFaultDetails;\n    'gateway/interactions-forbidden': TypertGatewayFaultDetails;\n    'gateway/invocation-unavailable': TypertGatewayFaultDetails;\n    'gateway/lookup-failed': TypertGatewayFaultDetails;\n    'gateway/lookup-not-found': TypertGatewayFaultDetails;\n    'gateway/lookup-unavailable': TypertGatewayFaultDetails;\n    'gateway/method-unavailable': TypertGatewayFaultDetails;\n    'gateway/peer-disposed': TypertGatewayFaultDetails;\n    'gateway/protocol': TypertGatewayFaultDetails;\n    'gateway/provider-mismatch': TypertGatewayFaultDetails;\n    'gateway/result-invalid': TypertGatewayFaultDetails;\n    'gateway/service-unavailable': TypertGatewayFaultDetails;\n    'gateway/signature-invalid': TypertGatewayFaultDetails;\n    'gateway/uplink-overflow': TypertGatewayFaultDetails;\n    'job/not-found': { readonly sessionId: SessionId; readonly jobId: JobId; };\n    'session/observation-ended': Record<string, never>;\n    'session/wait-timeout': Record<string, never>;\n    'session/provider-credentials-unavailable': Record<string, never>;\n    'session/provider-models-unavailable': { readonly provider: string; };\n    'session/model-unavailable': { readonly provider: string; readonly model: string; };\n    'session/conflict': { readonly sessionId: SessionId; readonly requestedCwd: string; readonly existingCwd?: string; };\n    'session/projections-unavailable': Record<string, never>;\n    'session/writer-held': { readonly sessionId: SessionId; };\n    'session/agent-busy': { readonly reason: string; };\n    'session/invalid-time-zone': { readonly value: string; };\n    'session/workspace-attach-failed': { readonly sessionId: SessionId; readonly workspaceId: string; };\n    'agent-preset/conflict': { readonly sessionId: SessionId; readonly requestedPreset: string; };\n    'session/attachment-invalid': { readonly reason: string; };\n    'session/queue-item-not-found': { readonly itemId: MessageId; };\n    'session/steer-unavailable': { readonly itemId: MessageId; };\n    'session/title-invalid': { readonly sessionId: SessionId; };\n    'session/fork-unavailable': { readonly sessionId: SessionId; };\n    'session/migration-required': { readonly sessionId: SessionId; };\n    'subagent/not-found': { readonly parentSessionId: SessionId; readonly childSessionId: SessionId; };\n    'subagent/catalog-diagnostic': { readonly parentSessionId: SessionId; readonly childSessionId: SessionId; readonly reason: 'corrupt' | 'unsupported' | 'unavailable'; };\n    'subagent/invalid-time-zone': { readonly value: string; };\n    'subagent/parent-unavailable': { readonly parentSessionId: SessionId; };\n    'subagent/not-resumable': { readonly childSessionId: SessionId; };\n    'subagent/unauthorized': { readonly childSessionId: SessionId; };\n    'subagent/attachment-invalid': { readonly reason: string; };\n    'subagent/delivery-unavailable': { readonly childSessionId: SessionId; };\n    'settings/rejected': { readonly ns: string; };\n    'settings/conflict': { readonly ns: string; readonly expected: number; readonly actual: number; };\n    'credential/rejected': { readonly ref: string; };\n    'terminal/unavailable': Record<string, never>;\n    'terminal/control-unavailable': { readonly reason: 'read-only' | 'not-running'; };\n    'terminal/limit-reached': { readonly limit: number; };\n    'workspace/invalid-path': { readonly path: string; };\n    'workspace/name-conflict': { readonly name: string; };\n    'workspace/session-active': { readonly sessionId: SessionId; readonly activity: readonly SessionActivity[]; };\n    'workspace/move-invalid': { readonly workspaceId: WorkspaceId; readonly sessionId: SessionId; readonly beforeSessionId?: SessionId; };\n    'directory-picker/unavailable': { readonly capability: string; };\n    'directory-picker/unreadable': { readonly path: string; };\n    'directory-picker/exists': { readonly path: string; };\n    'directory-picker/create-failed': { readonly path: string; };\n    'workspace-file/watch-unsupported': { readonly path: string; };\n    'workspace-file/not-found': { readonly path: string; };\n    'workspace-file/outside-workspace': { readonly path: string; };\n    'workspace-file/too-large': { readonly path: string; readonly limit: number; };\n    'workspace-file/not-text': { readonly path: string; };\n    'workspace-file/not-regular-file': { readonly path: string; readonly kind: 'directory' | 'symlink' | 'other'; };\n    'workspace-file/not-directory': { readonly path: string; readonly kind: 'file' | 'symlink' | 'other'; };\n    'speech/invalid-audio': { readonly reason: string; };\n    'speech/transcription-failed': { readonly reason: string; };\n    'cotTranslation/failed': Record<string, never>;\n    'forgePanel/unrecognized-url': Record<string, never>;\n    'forgePanel/session-started': Record<string, never>;\n    'forgePanel/worktrees-unavailable': Record<string, never>;\n    'forgePanel/invalid-branch': Record<string, never>;\n    'forgePanel/no-worktree': Record<string, never>;\n    'forgePanel/session-busy': Record<string, never>;\n    'forgePanel/not-waiting': Record<string, never>;\n    'forgePanel/restore-failed': Record<string, never>;\n    'forgePanel/not-bound': Record<string, never>;\n    'forgePanel/stale-head': Record<string, never>;\n    'forgePanel/action-failed': Record<string, never>;\n    'forgePanel/not-a-checkout': Record<string, never>;\n    'forgePanel/no-fork-point': Record<string, never>;\n    'forgePanel/filter-config-failed': Record<string, never>;\n    'forgePanel/diff-too-large': Record<string, never>;\n    'forgePanel/checks-failed': Record<string, never>;\n    'forgePanel/diff-failed': Record<string, never>;\n    'liveshareShares/share-not-found': { readonly shareId: string; };\n    'liveshareShares/missing-share-id': Record<string, never>;\n    'liveshareShares/missing-session-id': Record<string, never>;\n    'liveshareShares/missing-permission': Record<string, never>;\n    'liveshareShares/invalid-access-mode': Record<string, never>;\n    'liveshareShares/invalid-ttl': Record<string, never>;\n    'liveshareShares/invalid-allows-fork': Record<string, never>;\n    'liveshareShares/invalid-session-mode': Record<string, never>;\n    'liveshareShares/invalid-capabilities': Record<string, never>;\n    'liveshareShares/invalid-relay': { readonly relay: string; };\n    'liveshareShares/invalid-relay-url': Record<string, never>;\n    'liveshareShares/relay-url-required': Record<string, never>;\n    'liveshareShares/owner-login-required': { readonly identity: OwnerIdentityStatus; };\n    'liveshareShares/relay-upgrade-required': { readonly identity: OwnerIdentityStatus; };\n    'liveshareShares/relay-unavailable': { readonly relay: string; readonly reason?: string; };\n    'liveshareShares/owner-state-unavailable': Record<string, never>;\n    'liveshareShares/unknown-plugin': { readonly plugin: string; };\n    'liveshareShares/endpoint-not-offered': { readonly plugin: string; readonly kind: 'readable' | 'writable'; readonly endpoint: string; };\n    'liveshareShares/audit-unavailable': { readonly relay: string; readonly status?: number; readonly contentType?: string; readonly body?: string; };\n    'document-render/failed': { readonly reason: OfficeToPdfErrorCode; };\n    'plugin-manager/unknown-bundle': { readonly name: string; };\n    'plugin-manager/invalid-language': { readonly language: string; };\n    'plugin-manager/detail-unavailable': { readonly reason: DetailFailureReason; };\n    'plugin-market/invalid-index-url': { readonly url: string; readonly reason: string; };\n    'plugin-market/unknown-index': { readonly url: string; };\n    'plugin-market/fetch-failed': { readonly url: string; readonly reason: string; };\n    'plugin-market/invalid-index': { readonly url: string; readonly path: string; readonly reason: string; };\n    'plugin-market/invalid-query': { readonly field: string; readonly reason: string; };\n    'plugin-market/settings-unavailable': Record<string, never>;\n    'plugin-market/unknown-plugin': { readonly name: string; readonly version: string; };\n    'plugin-market/detail-unavailable': { readonly reason: DetailFailureReason; };\n    'schedule/input-invalid': { readonly code: ScheduleInputErrorCode; };\n    'schedule/target-archived': { readonly sessionId: SessionId; };\n}"
+            "declaration": "export interface RemoteErrorDetailsMap {\n    'gateway/bad-request': { readonly issues?: readonly object[]; };\n    'gateway/cancelled': {};\n    'gateway/internal': {};\n    'llm/model-discovery-rejected': { readonly settingsNs: string; readonly baseURL?: string; };\n    'session/not-found': { readonly sessionId: SessionId; };\n    'workspace/not-found': { readonly workspaceId: WorkspaceId; };\n    'remote-access/denied': RemoteAccessDeniedDetails;\n    'agent-preset/not-found': { readonly agentPreset: string; readonly available: readonly string[]; };\n    'agent-preset/invalid': { readonly agentPreset: string; readonly reason: string; };\n    'agent-preset/locked': { readonly sessionId: SessionId; readonly agentPreset: string; };\n    'subagent/invalid-time-zone': { readonly value: string; };\n    'subagent/not-resumable': { readonly childSessionId: SessionId; };\n    'subagent/unauthorized': { readonly childSessionId: SessionId; };\n    'subagent/attachment-invalid': { readonly reason: string; };\n    'subagent/delivery-unavailable': { readonly childSessionId: SessionId; };\n    'gateway/ambiguous-endpoint': TypertGatewayFaultDetails;\n    'gateway/arguments-invalid': TypertGatewayFaultDetails;\n    'gateway/binding-invalid': TypertGatewayFaultDetails;\n    'gateway/context-failed': TypertGatewayFaultDetails;\n    'gateway/context-not-found': TypertGatewayFaultDetails;\n    'gateway/context-unavailable': TypertGatewayFaultDetails;\n    'gateway/definition-unavailable': TypertGatewayFaultDetails;\n    'gateway/input-invalid': TypertGatewayFaultDetails;\n    'gateway/interactions-forbidden': TypertGatewayFaultDetails;\n    'gateway/invocation-unavailable': TypertGatewayFaultDetails;\n    'gateway/lookup-failed': TypertGatewayFaultDetails;\n    'gateway/lookup-not-found': TypertGatewayFaultDetails;\n    'gateway/lookup-unavailable': TypertGatewayFaultDetails;\n    'gateway/method-unavailable': TypertGatewayFaultDetails;\n    'gateway/peer-disposed': TypertGatewayFaultDetails;\n    'gateway/protocol': TypertGatewayFaultDetails;\n    'gateway/provider-mismatch': TypertGatewayFaultDetails;\n    'gateway/result-invalid': TypertGatewayFaultDetails;\n    'gateway/service-unavailable': TypertGatewayFaultDetails;\n    'gateway/signature-invalid': TypertGatewayFaultDetails;\n    'gateway/uplink-overflow': TypertGatewayFaultDetails;\n    'job/not-found': { readonly sessionId: SessionId; readonly jobId: JobId; };\n    'session/observation-ended': Record<string, never>;\n    'session/wait-timeout': Record<string, never>;\n    'session/provider-credentials-unavailable': Record<string, never>;\n    'session/provider-models-unavailable': { readonly provider: string; };\n    'session/model-unavailable': { readonly provider: string; readonly model: string; };\n    'session/conflict': { readonly sessionId: SessionId; readonly requestedCwd: string; readonly existingCwd?: string; };\n    'session/projections-unavailable': Record<string, never>;\n    'session/writer-held': { readonly sessionId: SessionId; };\n    'session/agent-busy': { readonly reason: string; };\n    'session/invalid-time-zone': { readonly value: string; };\n    'session/workspace-attach-failed': { readonly sessionId: SessionId; readonly workspaceId: string; };\n    'agent-preset/conflict': { readonly sessionId: SessionId; readonly requestedPreset: string; };\n    'session/attachment-invalid': { readonly reason: string; };\n    'session/queue-item-not-found': { readonly itemId: MessageId; };\n    'session/steer-unavailable': { readonly itemId: MessageId; };\n    'session/title-invalid': { readonly sessionId: SessionId; };\n    'session/fork-unavailable': { readonly sessionId: SessionId; };\n    'session/migration-required': { readonly sessionId: SessionId; };\n    'subagent/not-found': { readonly parentSessionId: SessionId; readonly childSessionId: SessionId; };\n    'subagent/catalog-diagnostic': { readonly parentSessionId: SessionId; readonly childSessionId: SessionId; readonly reason: 'corrupt' | 'unsupported' | 'unavailable'; };\n    'settings/rejected': { readonly ns: string; };\n    'settings/conflict': { readonly ns: string; readonly expected: number; readonly actual: number; };\n    'credential/rejected': { readonly ref: string; };\n    'terminal/unavailable': Record<string, never>;\n    'terminal/control-unavailable': { readonly reason: 'read-only' | 'not-running'; };\n    'terminal/limit-reached': { readonly limit: number; };\n    'workspace/invalid-path': { readonly path: string; };\n    'workspace/name-conflict': { readonly name: string; };\n    'workspace/session-active': { readonly sessionId: SessionId; readonly activity: readonly SessionActivity[]; };\n    'workspace/move-invalid': { readonly workspaceId: WorkspaceId; readonly sessionId: SessionId; readonly beforeSessionId?: SessionId; };\n    'directory-picker/unavailable': { readonly capability: string; };\n    'directory-picker/unreadable': { readonly path: string; };\n    'directory-picker/exists': { readonly path: string; };\n    'directory-picker/create-failed': { readonly path: string; };\n    'workspace-file/search-failed': Record<string, never>;\n    'workspace-file/watch-unsupported': { readonly path: string; };\n    'workspace-file/not-found': { readonly path: string; };\n    'workspace-file/outside-workspace': { readonly path: string; };\n    'workspace-file/too-large': { readonly path: string; readonly limit: number; };\n    'workspace-file/not-text': { readonly path: string; };\n    'workspace-file/not-regular-file': { readonly path: string; readonly kind: 'directory' | 'symlink' | 'other'; };\n    'workspace-file/not-directory': { readonly path: string; readonly kind: 'file' | 'symlink' | 'other'; };\n    'speech/invalid-audio': { readonly reason: string; };\n    'speech/transcription-failed': { readonly reason: string; };\n    'cotTranslation/failed': Record<string, never>;\n    'forgePanel/unrecognized-url': Record<string, never>;\n    'forgePanel/session-started': Record<string, never>;\n    'forgePanel/worktrees-unavailable': Record<string, never>;\n    'forgePanel/invalid-branch': Record<string, never>;\n    'forgePanel/no-worktree': Record<string, never>;\n    'forgePanel/session-busy': Record<string, never>;\n    'forgePanel/not-waiting': Record<string, never>;\n    'forgePanel/restore-failed': Record<string, never>;\n    'forgePanel/not-bound': Record<string, never>;\n    'forgePanel/stale-head': Record<string, never>;\n    'forgePanel/action-failed': Record<string, never>;\n    'forgePanel/action-unknown': Record<string, never>;\n    'forgePanel/not-a-checkout': Record<string, never>;\n    'forgePanel/no-fork-point': Record<string, never>;\n    'forgePanel/base-missing': Record<string, never>;\n    'forgePanel/filter-config-failed': Record<string, never>;\n    'forgePanel/diff-too-large': Record<string, never>;\n    'forgePanel/checks-failed': Record<string, never>;\n    'forgePanel/diff-failed': Record<string, never>;\n    'forgePanel/commits-missing': Record<string, never>;\n    'forgePanel/commits-not-linear': Record<string, never>;\n    'forgePanel/viewed-failed': Record<string, never>;\n    'forgePanel/reviewers-failed': Record<string, never>;\n    'forgePanel/review-unsupported': Record<string, never>;\n    'forgePanel/review-failed': Record<string, never>;\n    'liveshareShares/share-not-found': { readonly shareId: string; };\n    'liveshareShares/missing-share-id': Record<string, never>;\n    'liveshareShares/missing-session-ids': Record<string, never>;\n    'liveshareShares/workspace-unavailable': Record<string, never>;\n    'liveshareShares/session-workspace-unknown': { readonly sessionId: string; };\n    'liveshareShares/session-workspace-mismatch': { readonly sessionId: string; readonly workspaceId: string; };\n    'liveshareShares/missing-session-id': Record<string, never>;\n    'liveshareShares/missing-permission': Record<string, never>;\n    'liveshareShares/invalid-access-mode': Record<string, never>;\n    'liveshareShares/invalid-ttl': Record<string, never>;\n    'liveshareShares/invalid-allows-fork': Record<string, never>;\n    'liveshareShares/invalid-session-mode': Record<string, never>;\n    'liveshareShares/invalid-capabilities': Record<string, never>;\n    'liveshareShares/invalid-relay': { readonly relay: string; };\n    'liveshareShares/invalid-relay-url': Record<string, never>;\n    'liveshareShares/relay-url-required': Record<string, never>;\n    'liveshareShares/owner-login-required': { readonly identity: OwnerIdentityStatus; };\n    'liveshareShares/relay-upgrade-required': { readonly identity: OwnerIdentityStatus; };\n    'liveshareShares/relay-unavailable': { readonly relay: string; readonly reason?: string; };\n    'liveshareShares/owner-state-unavailable': Record<string, never>;\n    'liveshareShares/unknown-plugin': { readonly plugin: string; };\n    'liveshareShares/endpoint-not-offered': { readonly plugin: string; readonly endpoint: string; };\n    'liveshareShares/audit-unavailable': { readonly relay: string; readonly status?: number; readonly contentType?: string; readonly body?: string; };\n    'document-render/failed': { readonly reason: OfficeKitErrorCode; };\n    'plugin-manager/unknown-bundle': { readonly name: string; };\n    'plugin-manager/invalid-language': { readonly language: string; };\n    'plugin-manager/detail-unavailable': { readonly reason: DetailFailureReason; };\n    'plugin-market/invalid-index-url': { readonly url: string; readonly reason: string; };\n    'plugin-market/unknown-index': { readonly url: string; };\n    'plugin-market/fetch-failed': { readonly url: string; readonly reason: string; };\n    'plugin-market/invalid-index': { readonly url: string; readonly path: string; readonly reason: string; };\n    'plugin-market/invalid-query': { readonly field: string; readonly reason: string; };\n    'plugin-market/settings-unavailable': Record<string, never>;\n    'plugin-market/unknown-plugin': { readonly name: string; readonly version: string; };\n    'plugin-market/detail-unavailable': { readonly reason: DetailFailureReason; };\n    'schedule/input-invalid': { readonly code: ScheduleInputErrorCode; };\n    'schedule/target-archived': { readonly sessionId: SessionId; };\n}"
           },
           {
             "name": "ReplayEnvelope",
@@ -3547,7 +3590,7 @@ export const TYPERT = {
           },
           {
             "name": "Session",
-            "declaration": "export class Session {\n    get surface(): SessionSurface;\n    readonly header: SessionHeader;\n    readonly inheritedEventCount: SessionLogOffset;\n    get id(): SessionId;\n    readonly firstLiveSeq: SessionLogOffset;\n    readonly firstLifecycleSeq: SessionLogOffset;\n    eventAt(seq: SessionSeq): SessionEvent | undefined;\n    snapshotEvents(fromSeq: SessionLogOffset = SessionLogOffset(0), toSeqExclusive: SessionLogOffset = this.seq): readonly SessionEvent[];\n    ownEvents(): readonly SessionEvent[];\n    isOwnSeq(seq: SessionSeq): boolean;\n    get seq(): SessionLogOffset;\n    append<T extends SessionEventType>(type: T, data: SessionEventMap[T], ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent<T>] : []): SessionEvent<T>;\n    requestHeader(): EpochHeader | undefined;\n    requestContext(): RequestContext | undefined;\n    toolHistory(): ToolHistory;\n    deriveMessages(): Message[];\n    deriveEventMessage(event: SessionEvent): Message | null;\n}"
+            "declaration": "export class Session {\n    get surface(): SessionSurface;\n    readonly header: SessionHeader;\n    readonly inheritedEventCount: SessionLogOffset;\n    get id(): SessionId;\n    readonly firstLiveSeq: SessionLogOffset;\n    readonly firstLifecycleSeq: SessionLogOffset;\n    eventAt(seq: SessionSeq): SessionEvent | undefined;\n    snapshotEvents(fromSeq: SessionLogOffset = SessionLogOffset(0), toSeqExclusive: SessionLogOffset = this.seq): readonly SessionEvent[];\n    ownEvents(): readonly SessionEvent[];\n    isOwnSeq(seq: SessionSeq): boolean;\n    get seq(): SessionLogOffset;\n    get currentBatchPublication(): SessionEvent | undefined;\n    append(inputs: readonly SessionEventInput[]): readonly SessionEvent[];\n    append<T extends SessionEventType>(type: T, data: SessionEventMap[T], ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent<T>] : []): SessionEvent<T>;\n    requestHeader(): EpochHeader | undefined;\n    requestContext(): RequestContext | undefined;\n    toolHistory(): ToolHistory;\n    deriveMessages(): Message[];\n    deriveEventMessage(event: SessionEvent): Message | null;\n}"
           },
           {
             "name": "SessionActivity",
@@ -3563,7 +3606,7 @@ export const TYPERT = {
           },
           {
             "name": "SessionActivityKindMap",
-            "declaration": "export interface SessionActivityKindMap {\n    turn: true;\n    job: true;\n    subagent: true;\n    schedule: true;\n}"
+            "declaration": "export interface SessionActivityKindMap {\n    turn: true;\n    subagent: true;\n    job: true;\n    schedule: true;\n}"
           },
           {
             "name": "SessionAddress",
@@ -3626,8 +3669,12 @@ export const TYPERT = {
             "declaration": "export type SessionEventFrame = { readonly type: 'ready'; } | SessionEventEntry;"
           },
           {
+            "name": "SessionEventInput",
+            "declaration": "export type SessionEventInput = { [K in SessionEventType]: readonly [type: K, data: SessionEventMap[K], ...opts: K extends SurfaceEventType ? [opts: SurfaceIntent<K>] : []] }[SessionEventType];"
+          },
+          {
             "name": "SessionEventMap",
-            "declaration": "export interface SessionEventMap {\n    'turn/start': { turn: number; };\n    'turn/end': { turn: number; reason: TurnEndReason; };\n    'step/start': { turn: number; step: number; };\n    'step/end': { turn: number; step: number; };\n    'user/message': UserMessage;\n    'developer/message': { turn: number; step: number; message: DeveloperMessage; headerSeq?: SessionSeq; };\n    'system/message': { turn: number; step: number; message: SystemMessage; };\n    'assistant/message': { turn: number; step: number; message: AssistantMessage; stream: AssistantStreamRecord[]; usage?: TokenUsage; interrupted?: true; };\n    'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[]; };\n    'tool/call': { turn: number; step: number; callId: ToolCallId; name: string; arguments: string; };\n    'tool/result': { turn: number; step: number; message: ToolResultMessage; error?: { name: string; code: string; reason?: string; }; meta?: JsonValue; };\n    'request/header': { header: EpochHeader; reason: RequestHeaderReason; startsSeries?: true; };\n    'request/context': RequestContext;\n    'session/end-seed': { inherited?: true; };\n    'agent/inbox/spliced': { target: InboxTarget; start: number; removedCount?: number; inserted: UserMessage[]; outcome?: 'canceled'; };\n    'model/selection': ModelSelection;\n    'sandbox/mode': { mode: SandboxMode; source?: 'delegation'; };\n    'agent-preset/selected': { agentPreset: string; };\n    'job/registered': JobRegisteredData;\n    'job/settled': JobSettledData;\n    'command/run': { commandId: CommandId; name: string; args?: string; source: CommandSource; };\n    'command/done': { commandId: CommandId; kind: 'success' | 'error'; text?: string; sourceEventSeq?: import('@deepseek-ai/dsh-session/types').SessionSeq; };\n    'image/offload': { targets: ImageOffloadTarget[]; };\n    'session/title': SessionTitleEventData;\n    'todo/write': { todos: TodoItem[]; };\n    'working-directory/change': { cwd: string; };\n    'approval/asked': { id: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string; };\n    'approval/decided': { id: ApprovalRequestId; outcome: ApprovalOutcome; };\n    'approval/policy': { policy: ApprovalPolicy; source?: 'delegation'; };\n    'permission/preset': { preset: string; };\n    'subagent/descriptor': SubagentDescriptorData;\n    'subagent/catalog': SubagentCatalogEvent;\n    'compaction/start': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; };\n    'compaction/summary': { compactionId: CompactionId; sourceCommandId?: CommandId; summary: ContentBlock[]; shadowedRange: { start: SessionSeq; end: SessionSeq; }; shadowedSeqs: SessionSeq[]; shadowedTokenCount: number; provider: string; model: string; maxTokens?: number; usage?: TokenUsage; } & ({ rawOutput: ContentBlock[]; llmStreamCall: true; } | { rawOutput?: ContentBlock[]; llmStreamCall?: never; });\n    'compaction/end': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; error?: string; };\n    'compaction/prune': { shadowedRange: { start: SessionSeq; end: SessionSeq; }; shadowedSeqs: SessionSeq[]; shadowedTokenCount: number; };\n    'tool/ptc-dispatch-start': PtcDispatchStartEventData;\n    'tool/ptc-dispatch': PtcDispatchEventData;\n    'feedback/record': FeedbackRecord;\n    'llm/retry': LlmRetryEventData;\n    'llm/retry-started': LlmRetryStartedEventData;\n    'team/member': { version: 2; teamId: TeamId; member: TeamMemberSnapshot; };\n    'team/task': { version: 2; teamId: TeamId; task: TeamTaskSnapshot; };\n    'team/message/queued': { version: 2; teamId: TeamId; message: TeamMessageSnapshot; };\n    'team/message/delivered': { version: 2; teamId: TeamId; messageId: TeamMessageId; targetId: SessionId; };\n    'goal/change': GoalChangeMeta;\n    'feedback/message-put': MessageFeedbackPut;\n    'feedback/message-delete': MessageFeedbackDelete;\n    'plan/mode': { active: boolean; };\n    'schedule/change': ScheduleChange;\n    'session-log-deepseek/delivery-accepted': { sessionId: import('@deepseek-ai/dsh-session/types').SessionId; sessionFormatVersion?: number; throughSeq: import('@deepseek-ai/dsh-session/types').SessionSeq; };\n    'subagent/model-selection-policy': { allowedModels: AllowedModelRoute[]; };\n    'workspace/changes': { turn: number; };\n}"
+            "declaration": "export interface SessionEventMap {\n    'turn/start': { turn: number; };\n    'turn/end': { turn: number; reason: TurnEndReason; };\n    'step/start': { turn: number; step: number; };\n    'step/end': { turn: number; step: number; };\n    'user/message': UserMessage;\n    'developer/message': { turn: number; step: number; message: DeveloperMessage; headerSeq?: SessionSeq; };\n    'system/message': { turn: number; step: number; message: SystemMessage; };\n    'assistant/message': { turn: number; step: number; message: AssistantMessage; stream: AssistantStreamRecord[]; usage?: TokenUsage; interrupted?: true; };\n    'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[]; };\n    'tool/call': { turn: number; step: number; callId: ToolCallId; name: string; arguments: string; };\n    'tool/result': { turn: number; step: number; message: ToolResultMessage; error?: { name: string; code: string; reason?: string; }; meta?: JsonValue; };\n    'request/header': { header: EpochHeader; reason: RequestHeaderReason; startsSeries?: true; };\n    'request/context': RequestContext;\n    'session/end-seed': { inherited?: true; };\n    'agent/inbox/spliced': { target: InboxTarget; start: number; removedCount?: number; inserted: UserMessage[]; outcome?: 'canceled'; };\n    'model/selection': ModelSelection;\n    'sandbox/mode': { mode: SandboxMode; source?: 'delegation'; };\n    'agent-preset/selected': { agentPreset: string; };\n    'team/mode': { enabled: boolean; };\n    'team/member': { version: 2; teamId: TeamId; member: TeamMemberSnapshot; };\n    'team/task': { version: 2; teamId: TeamId; task: TeamTaskSnapshot; };\n    'team/message/queued': { version: 2; teamId: TeamId; message: TeamMessageSnapshot; };\n    'team/message/delivered': { version: 2; teamId: TeamId; messageId: TeamMessageId; targetId: SessionId; };\n    'working-directory/change': { cwd: string; };\n    'image/offload': { targets: ImageOffloadTarget[]; };\n    'session/title': SessionTitleEventData;\n    'todo/write': { todos: TodoItem[]; };\n    'approval/asked': { id: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string; };\n    'approval/decided': { id: ApprovalRequestId; outcome: ApprovalOutcome; };\n    'approval/policy': { policy: ApprovalPolicy; source?: 'delegation'; };\n    'command/run': { commandId: CommandId; name: string; args?: string; source: CommandSource; };\n    'command/done': { commandId: CommandId; kind: 'success' | 'error'; text?: string; sourceEventSeq?: import('@deepseek-ai/dsh-session/types').SessionSeq; };\n    'permission/preset': { preset: string; };\n    'subagent/descriptor': SubagentDescriptorData;\n    'subagent/catalog': SubagentCatalogEvent;\n    'job/registered': JobRegisteredData;\n    'job/settled': JobSettledData;\n    'compaction/start': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; };\n    'compaction/summary': { compactionId: CompactionId; sourceCommandId?: CommandId; summary: ContentBlock[]; shadowedRange: { start: SessionSeq; end: SessionSeq; }; shadowedSeqs: SessionSeq[]; shadowedTokenCount: number; provider: string; model: string; maxTokens?: number; usage?: TokenUsage; } & ({ rawOutput: ContentBlock[]; llmStreamCall: true; } | { rawOutput?: ContentBlock[]; llmStreamCall?: never; });\n    'compaction/end': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; error?: string; };\n    'compaction/prune': { shadowedRange: { start: SessionSeq; end: SessionSeq; }; shadowedSeqs: SessionSeq[]; shadowedTokenCount: number; };\n    'tool/ptc-dispatch-start': PtcDispatchStartEventData;\n    'tool/ptc-dispatch': PtcDispatchEventData;\n    'feedback/record': FeedbackRecord;\n    'llm/retry': LlmRetryEventData;\n    'llm/retry-started': LlmRetryStartedEventData;\n    'goal/change': GoalChangeMeta;\n    'feedback/message-put': MessageFeedbackPut;\n    'feedback/message-delete': MessageFeedbackDelete;\n    'plan/mode': { active: boolean; };\n    'schedule/change': ScheduleChange;\n    'session-log-deepseek/delivery-accepted': { sessionId: import('@deepseek-ai/dsh-session/types').SessionId; sessionFormatVersion?: number; throughSeq: import('@deepseek-ai/dsh-session/types').SessionSeq; };\n    'subagent/model-selection-policy': { allowedModels: AllowedModelRoute[]; };\n    'workspace/changes': { turn: number; };\n}"
           },
           {
             "name": "SessionEventsPage",
@@ -3723,7 +3770,7 @@ export const TYPERT = {
           },
           {
             "name": "SessionProjectionMap",
-            "declaration": "export interface SessionProjectionMap {\n    inbox: InboxWireState;\n    modelSelection: ModelSelectionProjection;\n    actionCards: SessionProjectionSummaryExcluded<ActionCardView>;\n    agentPreset: string | null;\n    title: string | null;\n    todos: SessionProjectionSummaryExcluded<TodoItem[]> | null;\n    sessionListMetadata: SessionListMetadata;\n    imageLimits: SessionProjectionSummaryExcluded<ImageAttachmentLimits>;\n    workingDirectory: string | null;\n    permissions: PermissionSelection;\n    subagentCatalog: SubagentCatalogEntry[];\n    subagentTiming: SubagentTimingProjection;\n    subagent: SubagentIdentityProjection | null;\n    tokenUsage: TokenUsageProjection;\n    contextPressure: SessionProjectionSummaryExcluded<ContextPressureProjection>;\n    contextBreakdown: SessionProjectionSummaryExcluded<ContextBreakdownProjection>;\n    userQuestions: UserQuestionProjectionView;\n    agentTeam: TeamProjection;\n    forgeChangeRequests: readonly BindingState[];\n    forgeWorktree: ForgeSessionWorktree | null;\n    forkLineage: ForkLineage;\n    goal: GoalProjection | null;\n    plan: PlanProjection;\n}"
+            "declaration": "export interface SessionProjectionMap {\n    inbox: InboxWireState;\n    modelSelection: ModelSelectionProjection;\n    actionCards: SessionProjectionSummaryExcluded<ActionCardView>;\n    agentPreset: string | null;\n    agentTeam: TeamProjection;\n    workingDirectory: string | null;\n    subagentCatalog: SubagentCatalogEntry[];\n    subagentTiming: SubagentTimingProjection;\n    subagent: SubagentIdentityProjection | null;\n    title: string | null;\n    todos: SessionProjectionSummaryExcluded<TodoItem[]> | null;\n    permissions: PermissionSelection;\n    conversationContinuation: SessionSeq | null;\n    sessionListMetadata: SessionListMetadata;\n    imageLimits: SessionProjectionSummaryExcluded<ImageAttachmentLimits>;\n    tokenUsage: TokenUsageProjection;\n    contextPressure: SessionProjectionSummaryExcluded<ContextPressureProjection>;\n    contextBreakdown: SessionProjectionSummaryExcluded<ContextBreakdownProjection>;\n    userQuestions: UserQuestionProjectionView;\n    forgeChangeRequests: readonly BindingState[];\n    forgeWorktree: ForgeSessionWorktree | null;\n    worktree: readonly WorktreeCreation[];\n    forkLineage: ForkLineage;\n    goal: GoalProjection | null;\n    plan: PlanProjection;\n}"
           },
           {
             "name": "SessionProjectionsRequest",
@@ -3903,11 +3950,11 @@ export const TYPERT = {
           },
           {
             "name": "SubagentCatalogEntry",
-            "declaration": "export type SubagentCatalogEntry = { readonly id: SessionId; readonly createdAt: number; } & ({ readonly mode: 'one-shot'; readonly label?: string; } | { readonly mode: 'external'; readonly label?: string; } | { readonly mode: 'continuable'; readonly label: string; } | { readonly mode: 'unknown'; readonly label?: string; });"
+            "declaration": "export type SubagentCatalogEntry = { readonly id: SessionId; readonly createdAt: number; } & (KnownSubagentCatalogFields | { readonly mode: 'unknown'; readonly label?: string; });"
           },
           {
             "name": "SubagentCatalogEvent",
-            "declaration": "export type SubagentCatalogEvent = { readonly childId: SessionId; readonly childCreatedAt: number; } & (({ readonly version: 0; } & KnownCatalogMode) | ({ readonly version: 1; } & (KnownCatalogMode | { readonly mode: 'unknown'; readonly label?: string; })) | { readonly version: 2; readonly mode: 'external'; readonly label?: string; });"
+            "declaration": "export type SubagentCatalogEvent = { readonly childId: SessionId; readonly childCreatedAt: number; } & (({ readonly version: 0; } & KnownCatalogMode) | ({ readonly version: 1; } & (KnownCatalogMode | { readonly mode: 'unknown'; readonly label?: string; })) | { readonly version: 2; readonly mode: 'external'; readonly label?: string; } | ({ readonly version: 3; readonly name: string; } & ({ readonly mode: 'continuable'; readonly label: string; } | { readonly mode: 'external'; readonly label?: string; })));"
           },
           {
             "name": "SubagentDescriptorBase",
@@ -3922,12 +3969,24 @@ export const TYPERT = {
             "declaration": "export type SubagentIdentityProjection = { mode: 'one-shot'; label?: string; seq: SessionSeq; } | { mode: 'continuable'; label: string; seq: SessionSeq; };"
           },
           {
+            "name": "SubagentResult",
+            "declaration": "export interface SubagentResult {\n    readonly output: readonly ContentBlock[];\n    readonly structured?: unknown;\n    readonly diagnostic?: string;\n    readonly stopReason: SubagentStopReason;\n}"
+          },
+          {
             "name": "SubagentSessionError",
             "declaration": "export interface SubagentSessionError {\n    readonly code: 'subagent_session';\n    readonly message: string;\n}"
           },
           {
             "name": "SubagentSettledMessageSource",
-            "declaration": "export interface SubagentSettledMessageSource {\n    readonly kind: 'subagent-settled';\n    readonly form: 'notice';\n    readonly summary: string;\n    readonly senderSessionId: SessionId;\n}"
+            "declaration": "export interface SubagentSettledMessageSource {\n    readonly kind: 'subagent-settled';\n    readonly form: 'notice';\n    readonly summary: string;\n    readonly stopReason?: SubagentResult['stopReason'];\n    readonly senderSessionId: SessionId;\n}"
+          },
+          {
+            "name": "SubagentStopReason",
+            "declaration": "export type SubagentStopReason = SubagentStopReasonMap[keyof SubagentStopReasonMap];"
+          },
+          {
+            "name": "SubagentStopReasonMap",
+            "declaration": "export interface SubagentStopReasonMap {\n    completed: 'completed';\n    aborted: 'aborted';\n    error: 'error';\n    'max-tokens': 'max-tokens';\n    refusal: 'refusal';\n}"
           },
           {
             "name": "SubagentTimingProjection",
@@ -3966,10 +4025,6 @@ export const TYPERT = {
             "declaration": "export type TeamMemberPhase = 'provisioning' | 'active' | 'failed';"
           },
           {
-            "name": "TeamMemberProjection",
-            "declaration": "export interface TeamMemberProjection {\n    readonly id: SessionId;\n    readonly name: string;\n    readonly role: 'lead' | 'teammate';\n    readonly phase: TeamMemberPhase;\n    readonly error?: string;\n}"
-          },
-          {
             "name": "TeamMemberSnapshot",
             "declaration": "export interface TeamMemberSnapshot {\n    readonly id: SessionId;\n    readonly name: string;\n    readonly description: string;\n    readonly provider: string;\n    readonly context: 'fresh' | 'fork';\n    readonly phase: TeamMemberPhase;\n    readonly error?: string;\n}"
           },
@@ -3987,7 +4042,7 @@ export const TYPERT = {
           },
           {
             "name": "TeamProjection",
-            "declaration": "export interface TeamProjection {\n    readonly members: TeamMemberProjection[];\n    readonly tasks: TeamTaskView[];\n    readonly failure?: string;\n}"
+            "declaration": "export interface TeamProjection {\n    readonly enabled: boolean;\n    readonly tasks: TeamTaskView[];\n    readonly failure?: string;\n}"
           },
           {
             "name": "TeamTaskId",
@@ -3995,7 +4050,7 @@ export const TYPERT = {
           },
           {
             "name": "TeamTaskSnapshot",
-            "declaration": "export interface TeamTaskSnapshot {\n    readonly id: TeamTaskId;\n    readonly revision: number;\n    readonly subject: string;\n    readonly description: string;\n    readonly status: TeamTaskStatus;\n    readonly ownerId?: SessionId;\n    readonly blockedBy: TeamTaskId[];\n    readonly writeScopes: string[];\n}"
+            "declaration": "export interface TeamTaskSnapshot {\n    readonly id: TeamTaskId;\n    readonly revision: number;\n    readonly subject: string;\n    readonly description: string;\n    readonly status: TeamTaskStatus;\n    readonly ownerId?: SessionId;\n    readonly ownerName?: string;\n    readonly blockedBy: TeamTaskId[];\n    readonly writeScopes: string[];\n}"
           },
           {
             "name": "TeamTaskStatus",
@@ -4003,7 +4058,7 @@ export const TYPERT = {
           },
           {
             "name": "TeamTaskView",
-            "declaration": "export interface TeamTaskView {\n    readonly id: TeamTaskId;\n    readonly revision: number;\n    readonly subject: string;\n    readonly description: string;\n    readonly status: TeamTaskStatus;\n    readonly blockedBy: TeamTaskId[];\n    readonly writeScopes: string[];\n    readonly ownerName?: string;\n    readonly ready: boolean;\n    readonly writeScopeWarnings: string[];\n}"
+            "declaration": "export interface TeamTaskView {\n    readonly id: TeamTaskId;\n    readonly revision: number;\n    readonly subject: string;\n    readonly description: string;\n    readonly status: TeamTaskStatus;\n    readonly blockedBy: TeamTaskId[];\n    readonly writeScopes: string[];\n    readonly ownerId?: SessionId;\n    readonly ownerName?: string;\n    readonly ready: boolean;\n    readonly writeScopeWarnings: string[];\n}"
           },
           {
             "name": "TextBlock",
@@ -4104,6 +4159,10 @@ export const TYPERT = {
           {
             "name": "WorkspaceId",
             "declaration": "export type WorkspaceId = Branded<'WorkspaceId'>;"
+          },
+          {
+            "name": "WorktreeCreation",
+            "declaration": "export interface WorktreeCreation {\n    readonly worktree: CreatedWorktree;\n    readonly owned: boolean;\n}"
           }
         ]
       },
@@ -4462,7 +4521,7 @@ export const TYPERT = {
           },
           {
             "name": "MessageSourceMap",
-            "declaration": "export interface MessageSourceMap {\n    user: { kind: 'user'; };\n    model: ModelMessageSource;\n    tool: ToolMessageSource;\n    'system-prompt': SystemPromptMessageSource;\n    'model-selection': { kind: 'model-selection'; } & ContextFormed;\n    'tool-registry': { kind: 'tool-registry'; };\n    'action-cards': { kind: 'action-cards'; through: SessionSeq; } & ContextFormed;\n    'runtime-context': { kind: 'runtime-context'; } & ContextFormed;\n    'user-rpc': { kind: 'user'; rpcId: SessionRequestId; clientTimeZone?: string; principal?: Principal; };\n    'working-directory': { kind: 'working-directory'; };\n    'user-approval': { kind: 'user-approval'; } & ContextFormed;\n    'agent-message': AgentMessageSource;\n    'subagent-settled': SubagentSettledMessageSource;\n    'skill-invocation': SkillInvocationSource;\n    'ptc-mode': { kind: 'ptc-mode'; };\n    'compact-checkpoint': CompactionCheckpointSource;\n    'cordis-host-runner': { kind: 'cordis-host-runner'; };\n    'user-question-reply': { kind: 'user-question-reply'; callId: ToolCallId; outcome: 'answered'; };\n    'team-message': TeamMessageSource;\n    goal: GoalMessageSource;\n    'plan-mode': { kind: 'plan-mode'; } & ContextFormed;\n    schedule: { kind: 'schedule'; } & ContextFormed;\n    'session-reference': SessionReferenceSource;\n    webhook: { readonly kind: 'webhook'; readonly provider: string; readonly source: WebhookSourceId; readonly deliveryId: WebhookDeliveryId; readonly ruleId: WebhookRuleId; readonly form: 'notice'; readonly summary: string; };\n}"
+            "declaration": "export interface MessageSourceMap {\n    user: { kind: 'user'; };\n    model: ModelMessageSource;\n    tool: ToolMessageSource;\n    'system-prompt': SystemPromptMessageSource;\n    'model-selection': { kind: 'model-selection'; } & ContextFormed;\n    'tool-registry': { kind: 'tool-registry'; };\n    'action-cards': { kind: 'action-cards'; through: SessionSeq; } & ContextFormed;\n    'runtime-context': { kind: 'runtime-context'; } & ContextFormed;\n    'team-message': TeamMessageSource;\n    'working-directory': { kind: 'working-directory'; };\n    'user-approval': { kind: 'user-approval'; } & ContextFormed;\n    'agent-message': AgentMessageSource;\n    'subagent-settled': SubagentSettledMessageSource;\n    'user-rpc': { kind: 'user'; rpcId: SessionRequestId; clientTimeZone?: string; principal?: Principal; };\n    'retry-rpc': { kind: 'retry'; rpcId: SessionRequestId; clientTimeZone?: string; principal?: Principal; };\n    'skill-invocation': SkillInvocationSource;\n    'ptc-mode': { kind: 'ptc-mode'; };\n    'compact-checkpoint': CompactionCheckpointSource;\n    'cordis-host-runner': { kind: 'cordis-host-runner'; };\n    'user-question-reply': { kind: 'user-question-reply'; callId: ToolCallId; outcome: 'answered'; };\n    goal: GoalMessageSource;\n    'plan-mode': { kind: 'plan-mode'; } & ContextFormed;\n    schedule: { kind: 'schedule'; } & ContextFormed;\n    'session-reference': SessionReferenceSource;\n    webhook: { readonly kind: 'webhook'; readonly provider: string; readonly source: WebhookSourceId; readonly deliveryId: WebhookDeliveryId; readonly ruleId: WebhookRuleId; readonly form: 'notice'; readonly summary: string; };\n}"
           },
           {
             "name": "Model",
@@ -4558,15 +4617,19 @@ export const TYPERT = {
           },
           {
             "name": "Session",
-            "declaration": "export class Session {\n    get surface(): SessionSurface;\n    readonly header: SessionHeader;\n    readonly inheritedEventCount: SessionLogOffset;\n    get id(): SessionId;\n    readonly firstLiveSeq: SessionLogOffset;\n    readonly firstLifecycleSeq: SessionLogOffset;\n    eventAt(seq: SessionSeq): SessionEvent | undefined;\n    snapshotEvents(fromSeq: SessionLogOffset = SessionLogOffset(0), toSeqExclusive: SessionLogOffset = this.seq): readonly SessionEvent[];\n    ownEvents(): readonly SessionEvent[];\n    isOwnSeq(seq: SessionSeq): boolean;\n    get seq(): SessionLogOffset;\n    append<T extends SessionEventType>(type: T, data: SessionEventMap[T], ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent<T>] : []): SessionEvent<T>;\n    requestHeader(): EpochHeader | undefined;\n    requestContext(): RequestContext | undefined;\n    toolHistory(): ToolHistory;\n    deriveMessages(): Message[];\n    deriveEventMessage(event: SessionEvent): Message | null;\n}"
+            "declaration": "export class Session {\n    get surface(): SessionSurface;\n    readonly header: SessionHeader;\n    readonly inheritedEventCount: SessionLogOffset;\n    get id(): SessionId;\n    readonly firstLiveSeq: SessionLogOffset;\n    readonly firstLifecycleSeq: SessionLogOffset;\n    eventAt(seq: SessionSeq): SessionEvent | undefined;\n    snapshotEvents(fromSeq: SessionLogOffset = SessionLogOffset(0), toSeqExclusive: SessionLogOffset = this.seq): readonly SessionEvent[];\n    ownEvents(): readonly SessionEvent[];\n    isOwnSeq(seq: SessionSeq): boolean;\n    get seq(): SessionLogOffset;\n    get currentBatchPublication(): SessionEvent | undefined;\n    append(inputs: readonly SessionEventInput[]): readonly SessionEvent[];\n    append<T extends SessionEventType>(type: T, data: SessionEventMap[T], ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent<T>] : []): SessionEvent<T>;\n    requestHeader(): EpochHeader | undefined;\n    requestContext(): RequestContext | undefined;\n    toolHistory(): ToolHistory;\n    deriveMessages(): Message[];\n    deriveEventMessage(event: SessionEvent): Message | null;\n}"
           },
           {
             "name": "SessionEvent",
             "declaration": "export type SessionEvent<T extends SessionEventType = SessionEventType> = { [K in SessionEventType]: { type: K; seq: SessionSeq; time: number; data: SessionEventMap[K]; ignorable?: true; } & (K extends SurfaceEventType ? SurfaceIntent<K> : { surfaceOp?: never; sourceEventSeqs?: never; }) }[T];"
           },
           {
+            "name": "SessionEventInput",
+            "declaration": "export type SessionEventInput = { [K in SessionEventType]: readonly [type: K, data: SessionEventMap[K], ...opts: K extends SurfaceEventType ? [opts: SurfaceIntent<K>] : []] }[SessionEventType];"
+          },
+          {
             "name": "SessionEventMap",
-            "declaration": "export interface SessionEventMap {\n    'turn/start': { turn: number; };\n    'turn/end': { turn: number; reason: TurnEndReason; };\n    'step/start': { turn: number; step: number; };\n    'step/end': { turn: number; step: number; };\n    'user/message': UserMessage;\n    'developer/message': { turn: number; step: number; message: DeveloperMessage; headerSeq?: SessionSeq; };\n    'system/message': { turn: number; step: number; message: SystemMessage; };\n    'assistant/message': { turn: number; step: number; message: AssistantMessage; stream: AssistantStreamRecord[]; usage?: TokenUsage; interrupted?: true; };\n    'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[]; };\n    'tool/call': { turn: number; step: number; callId: ToolCallId; name: string; arguments: string; };\n    'tool/result': { turn: number; step: number; message: ToolResultMessage; error?: { name: string; code: string; reason?: string; }; meta?: JsonValue; };\n    'request/header': { header: EpochHeader; reason: RequestHeaderReason; startsSeries?: true; };\n    'request/context': RequestContext;\n    'session/end-seed': { inherited?: true; };\n    'agent/inbox/spliced': { target: InboxTarget; start: number; removedCount?: number; inserted: UserMessage[]; outcome?: 'canceled'; };\n    'model/selection': ModelSelection;\n    'sandbox/mode': { mode: SandboxMode; source?: 'delegation'; };\n    'agent-preset/selected': { agentPreset: string; };\n    'job/registered': JobRegisteredData;\n    'job/settled': JobSettledData;\n    'command/run': { commandId: CommandId; name: string; args?: string; source: CommandSource; };\n    'command/done': { commandId: CommandId; kind: 'success' | 'error'; text?: string; sourceEventSeq?: import('@deepseek-ai/dsh-session/types').SessionSeq; };\n    'image/offload': { targets: ImageOffloadTarget[]; };\n    'session/title': SessionTitleEventData;\n    'todo/write': { todos: TodoItem[]; };\n    'working-directory/change': { cwd: string; };\n    'approval/asked': { id: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string; };\n    'approval/decided': { id: ApprovalRequestId; outcome: ApprovalOutcome; };\n    'approval/policy': { policy: ApprovalPolicy; source?: 'delegation'; };\n    'permission/preset': { preset: string; };\n    'subagent/descriptor': SubagentDescriptorData;\n    'subagent/catalog': SubagentCatalogEvent;\n    'compaction/start': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; };\n    'compaction/summary': { compactionId: CompactionId; sourceCommandId?: CommandId; summary: ContentBlock[]; shadowedRange: { start: SessionSeq; end: SessionSeq; }; shadowedSeqs: SessionSeq[]; shadowedTokenCount: number; provider: string; model: string; maxTokens?: number; usage?: TokenUsage; } & ({ rawOutput: ContentBlock[]; llmStreamCall: true; } | { rawOutput?: ContentBlock[]; llmStreamCall?: never; });\n    'compaction/end': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; error?: string; };\n    'compaction/prune': { shadowedRange: { start: SessionSeq; end: SessionSeq; }; shadowedSeqs: SessionSeq[]; shadowedTokenCount: number; };\n    'tool/ptc-dispatch-start': PtcDispatchStartEventData;\n    'tool/ptc-dispatch': PtcDispatchEventData;\n    'feedback/record': FeedbackRecord;\n    'llm/retry': LlmRetryEventData;\n    'llm/retry-started': LlmRetryStartedEventData;\n    'team/member': { version: 2; teamId: TeamId; member: TeamMemberSnapshot; };\n    'team/task': { version: 2; teamId: TeamId; task: TeamTaskSnapshot; };\n    'team/message/queued': { version: 2; teamId: TeamId; message: TeamMessageSnapshot; };\n    'team/message/delivered': { version: 2; teamId: TeamId; messageId: TeamMessageId; targetId: SessionId; };\n    'goal/change': GoalChangeMeta;\n    'feedback/message-put': MessageFeedbackPut;\n    'feedback/message-delete': MessageFeedbackDelete;\n    'plan/mode': { active: boolean; };\n    'schedule/change': ScheduleChange;\n    'session-log-deepseek/delivery-accepted': { sessionId: import('@deepseek-ai/dsh-session/types').SessionId; sessionFormatVersion?: number; throughSeq: import('@deepseek-ai/dsh-session/types').SessionSeq; };\n    'subagent/model-selection-policy': { allowedModels: AllowedModelRoute[]; };\n    'workspace/changes': { turn: number; };\n}"
+            "declaration": "export interface SessionEventMap {\n    'turn/start': { turn: number; };\n    'turn/end': { turn: number; reason: TurnEndReason; };\n    'step/start': { turn: number; step: number; };\n    'step/end': { turn: number; step: number; };\n    'user/message': UserMessage;\n    'developer/message': { turn: number; step: number; message: DeveloperMessage; headerSeq?: SessionSeq; };\n    'system/message': { turn: number; step: number; message: SystemMessage; };\n    'assistant/message': { turn: number; step: number; message: AssistantMessage; stream: AssistantStreamRecord[]; usage?: TokenUsage; interrupted?: true; };\n    'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[]; };\n    'tool/call': { turn: number; step: number; callId: ToolCallId; name: string; arguments: string; };\n    'tool/result': { turn: number; step: number; message: ToolResultMessage; error?: { name: string; code: string; reason?: string; }; meta?: JsonValue; };\n    'request/header': { header: EpochHeader; reason: RequestHeaderReason; startsSeries?: true; };\n    'request/context': RequestContext;\n    'session/end-seed': { inherited?: true; };\n    'agent/inbox/spliced': { target: InboxTarget; start: number; removedCount?: number; inserted: UserMessage[]; outcome?: 'canceled'; };\n    'model/selection': ModelSelection;\n    'sandbox/mode': { mode: SandboxMode; source?: 'delegation'; };\n    'agent-preset/selected': { agentPreset: string; };\n    'team/mode': { enabled: boolean; };\n    'team/member': { version: 2; teamId: TeamId; member: TeamMemberSnapshot; };\n    'team/task': { version: 2; teamId: TeamId; task: TeamTaskSnapshot; };\n    'team/message/queued': { version: 2; teamId: TeamId; message: TeamMessageSnapshot; };\n    'team/message/delivered': { version: 2; teamId: TeamId; messageId: TeamMessageId; targetId: SessionId; };\n    'working-directory/change': { cwd: string; };\n    'image/offload': { targets: ImageOffloadTarget[]; };\n    'session/title': SessionTitleEventData;\n    'todo/write': { todos: TodoItem[]; };\n    'approval/asked': { id: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string; };\n    'approval/decided': { id: ApprovalRequestId; outcome: ApprovalOutcome; };\n    'approval/policy': { policy: ApprovalPolicy; source?: 'delegation'; };\n    'command/run': { commandId: CommandId; name: string; args?: string; source: CommandSource; };\n    'command/done': { commandId: CommandId; kind: 'success' | 'error'; text?: string; sourceEventSeq?: import('@deepseek-ai/dsh-session/types').SessionSeq; };\n    'permission/preset': { preset: string; };\n    'subagent/descriptor': SubagentDescriptorData;\n    'subagent/catalog': SubagentCatalogEvent;\n    'job/registered': JobRegisteredData;\n    'job/settled': JobSettledData;\n    'compaction/start': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; };\n    'compaction/summary': { compactionId: CompactionId; sourceCommandId?: CommandId; summary: ContentBlock[]; shadowedRange: { start: SessionSeq; end: SessionSeq; }; shadowedSeqs: SessionSeq[]; shadowedTokenCount: number; provider: string; model: string; maxTokens?: number; usage?: TokenUsage; } & ({ rawOutput: ContentBlock[]; llmStreamCall: true; } | { rawOutput?: ContentBlock[]; llmStreamCall?: never; });\n    'compaction/end': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; error?: string; };\n    'compaction/prune': { shadowedRange: { start: SessionSeq; end: SessionSeq; }; shadowedSeqs: SessionSeq[]; shadowedTokenCount: number; };\n    'tool/ptc-dispatch-start': PtcDispatchStartEventData;\n    'tool/ptc-dispatch': PtcDispatchEventData;\n    'feedback/record': FeedbackRecord;\n    'llm/retry': LlmRetryEventData;\n    'llm/retry-started': LlmRetryStartedEventData;\n    'goal/change': GoalChangeMeta;\n    'feedback/message-put': MessageFeedbackPut;\n    'feedback/message-delete': MessageFeedbackDelete;\n    'plan/mode': { active: boolean; };\n    'schedule/change': ScheduleChange;\n    'session-log-deepseek/delivery-accepted': { sessionId: import('@deepseek-ai/dsh-session/types').SessionId; sessionFormatVersion?: number; throughSeq: import('@deepseek-ai/dsh-session/types').SessionSeq; };\n    'subagent/model-selection-policy': { allowedModels: AllowedModelRoute[]; };\n    'workspace/changes': { turn: number; };\n}"
           },
           {
             "name": "SessionEventType",
@@ -4630,7 +4693,7 @@ export const TYPERT = {
           },
           {
             "name": "SubagentCatalogEvent",
-            "declaration": "export type SubagentCatalogEvent = { readonly childId: SessionId; readonly childCreatedAt: number; } & (({ readonly version: 0; } & KnownCatalogMode) | ({ readonly version: 1; } & (KnownCatalogMode | { readonly mode: 'unknown'; readonly label?: string; })) | { readonly version: 2; readonly mode: 'external'; readonly label?: string; });"
+            "declaration": "export type SubagentCatalogEvent = { readonly childId: SessionId; readonly childCreatedAt: number; } & (({ readonly version: 0; } & KnownCatalogMode) | ({ readonly version: 1; } & (KnownCatalogMode | { readonly mode: 'unknown'; readonly label?: string; })) | { readonly version: 2; readonly mode: 'external'; readonly label?: string; } | ({ readonly version: 3; readonly name: string; } & ({ readonly mode: 'continuable'; readonly label: string; } | { readonly mode: 'external'; readonly label?: string; })));"
           },
           {
             "name": "SubagentDescriptorBase",
@@ -4641,8 +4704,20 @@ export const TYPERT = {
             "declaration": "export type SubagentDescriptorData = OneShotSubagentDescriptorData | ContinuableSubagentDescriptorData;"
           },
           {
+            "name": "SubagentResult",
+            "declaration": "export interface SubagentResult {\n    readonly output: readonly ContentBlock[];\n    readonly structured?: unknown;\n    readonly diagnostic?: string;\n    readonly stopReason: SubagentStopReason;\n}"
+          },
+          {
             "name": "SubagentSettledMessageSource",
-            "declaration": "export interface SubagentSettledMessageSource {\n    readonly kind: 'subagent-settled';\n    readonly form: 'notice';\n    readonly summary: string;\n    readonly senderSessionId: SessionId;\n}"
+            "declaration": "export interface SubagentSettledMessageSource {\n    readonly kind: 'subagent-settled';\n    readonly form: 'notice';\n    readonly summary: string;\n    readonly stopReason?: SubagentResult['stopReason'];\n    readonly senderSessionId: SessionId;\n}"
+          },
+          {
+            "name": "SubagentStopReason",
+            "declaration": "export type SubagentStopReason = SubagentStopReasonMap[keyof SubagentStopReasonMap];"
+          },
+          {
+            "name": "SubagentStopReasonMap",
+            "declaration": "export interface SubagentStopReasonMap {\n    completed: 'completed';\n    aborted: 'aborted';\n    error: 'error';\n    'max-tokens': 'max-tokens';\n    refusal: 'refusal';\n}"
           },
           {
             "name": "SurfaceEventType",
@@ -4698,7 +4773,7 @@ export const TYPERT = {
           },
           {
             "name": "TeamTaskSnapshot",
-            "declaration": "export interface TeamTaskSnapshot {\n    readonly id: TeamTaskId;\n    readonly revision: number;\n    readonly subject: string;\n    readonly description: string;\n    readonly status: TeamTaskStatus;\n    readonly ownerId?: SessionId;\n    readonly blockedBy: TeamTaskId[];\n    readonly writeScopes: string[];\n}"
+            "declaration": "export interface TeamTaskSnapshot {\n    readonly id: TeamTaskId;\n    readonly revision: number;\n    readonly subject: string;\n    readonly description: string;\n    readonly status: TeamTaskStatus;\n    readonly ownerId?: SessionId;\n    readonly ownerName?: string;\n    readonly blockedBy: TeamTaskId[];\n    readonly writeScopes: string[];\n}"
           },
           {
             "name": "TeamTaskStatus",

@@ -16,7 +16,7 @@ export const installTurnAdmission = (
 ): TurnAdmissionQueue => {
   const queue = new TurnAdmissionQueue({
     running: countSubagents => ctx.agents.list().filter(agent => agent.status === 'running'
-      && (countSubagents || !hasApiSessionSubagentOwner(ctx, agent.session, agent))).length,
+      && (countSubagents || !hasApiSessionSubagentOwner(agent.session))).length,
     release: (held) => {
       const agent = ctx.agents.list().find(candidate => candidate.id === held.sessionId)
       const message = agent?.inbox.nextTurn.find(pending => pending.id === held.messageId)

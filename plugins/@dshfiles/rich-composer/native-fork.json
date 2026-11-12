@@ -3,8 +3,8 @@
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-client-ui-conversation",
-    "version": "0.2.2-rc.1",
-    "ref": "dsh-v0.2.2-rc.1",
+    "version": "0.2.2-rc.2",
+    "ref": "dsh-v0.2.2-rc.2",
     "path": "packages/client/ui-conversation"
   },
   "files": [
@@ -40,6 +40,7 @@
     "src/native/input/hub.ts",
     "src/native/contract/input.ts",
     "src/native/input/facade.ts",
+    "src/native/input/prompt.ts",
     "src/native/input/machine.ts",
     "src/native/skeleton/ConversationSession.tsx",
     "src/native/skeleton/ConversationMainPanel.tsx",
@@ -59,10 +60,8 @@
     "src/native/skeleton/HeroShell.module.css",
     "src/native/skeleton/control-row-layout.ts",
     "src/native/skeleton/DefaultConversationViews.tsx",
-    "src/native/skeleton/control-row-layout.ts",
-    "src/native/input/decorations.ts",
-    "src/native/input/editor/text-ref.ts",
-    "src/native/input/prompt.ts"
+    "src/native/skeleton/ContextMeter.tsx",
+    "src/native/skeleton/ContextMeter.module.css"
   ],
   "added": [
     "src/native/conversation/live-bindings.test.ts",

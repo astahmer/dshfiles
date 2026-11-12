@@ -14,7 +14,11 @@ import { DraftAnnotations } from './native/input/draft-annotations.ts'
 
 // The run row is plain composition inside the real InputBar: the presentation kit is not under test.
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
+  focusWithoutRing: () => undefined,
+  HoverCardGroup: (props: { children: ReactNode }) => props.children,
   IconPlusOutlineMedium: () => null,
+  IconTriangleRightFillRegular: () => null,
+  isMobileDevice: () => false,
   IconWarningOutlineRegular: () => null,
   Tooltip: (props: { children: ReactNode }) => props.children,
   Toast: () => null,
@@ -53,6 +57,8 @@ const barProps = (overrides: Partial<ComposerBarProps>, queue: InputState['queue
     openError: null,
     hasMore: false,
     loadingOlder: false,
+    historyWasPartial: false,
+    historyLoadStatus: 'idle',
     promptError: null,
     blank: true,
     lastAgentError: null,
@@ -98,6 +104,10 @@ const barProps = (overrides: Partial<ComposerBarProps>, queue: InputState['queue
     promptHistory: () => [],
     toggleCommandMenu: vi.fn(),
     stop: vi.fn(),
+    retry: undefined,
+    registerFileIntake: () => () => undefined,
+    occurrence: 'main',
+    useAccess: () => true,
     insertReference: vi.fn(),
     useBusyEnter: selected('queue'),
     useFileUploads: selected({}),

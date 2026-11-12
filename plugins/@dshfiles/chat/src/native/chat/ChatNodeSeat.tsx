@@ -60,6 +60,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   nodeKey, groupPart, useChatNode, useChatNodeProcess, usePresentation,
   cwd, openFile, inspectCall, forkAt,
   loadImage, useProjection, useStore, actions, renderSlot, t, useChatNodeBottom, deferCollapse, useGroupAction,
+  nodeStore, runFold,
 }: ChatNodeSeatProps) {
   const bottom = useChatNodeBottom(nodeKey)
   const node = useChatNode(nodeKey)
@@ -110,6 +111,9 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
     && processPresentation?.turnClosed === true
     && processSpec !== undefined
     && routedNode.data.step === processSpec.answerStep
+  // dshfiles: an unread thread opens at this answer, so "Since you left" (divider and recap) rides at its top.
+  const sinceYouLeft = useContext(SinceYouLeftContext)
+  const sinceHere = finalAnswer && sinceYouLeft?.answerTurn !== undefined && sinceYouLeft.answerTurn === turn ? sinceYouLeft.element : null
   const ownsDisclosure = routedNode?.kind === 'turn-process' || processAnswer || replyRow
   const foldable = processWindowReady
     && (liveProcess || processMember || ownsDisclosure)
@@ -195,6 +199,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       data-chat-step={stepOf(routedNode)}
       data-turn-process-member={processMember || undefined}
       data-turn-process-hidden={processHidden || undefined}
+      data-run-fold-member={runFold === undefined ? undefined : runHead === undefined ? 'member' : 'head'}
       data-chat-final-answer={finalAnswer || undefined}
     >
       {sinceHere}

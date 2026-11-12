@@ -5,10 +5,10 @@
 // usage); times leave the row for the transcript's time dividers (TimeDivider.tsx), so `time` only feeds an accessible
 // label and the `clock` side keeps the row's layout.
 
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { CheckIcon, CopyIcon, EllipsisIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { useId, type ReactNode } from 'react'
-import {
-  IconBranchOutlineRegular, IconCheckOutlineRegular, IconCopyOutlineRegular, Tooltip, useClipboardCopy,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { Tooltip, useClipboardCopy } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import css from './MessageIconActions.module.css'
 
@@ -50,21 +50,10 @@ export function MessageIconActions({
 }: MessageIconActionsProps) {
   const reasonId = useId()
   const { copied, onCopy } = useClipboardCopy(text)
-  const clockEl = time === undefined ? null : (
-    <span className={clock === 'start' ? css.timeStart : css.timeEnd}>
-      {formatMessageClock(time, t, day)}
-    </span>
-  )
-  return (
-    <div className={className === undefined ? css.actions : `${css.actions} ${className}`} data-clock={clock}>
-      {clock === 'start' ? clockEl : null}
-      <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
-        <button type="button" className={css.action} aria-label={copied ? t('copied') : t('copy')} onClick={onCopy}>
-          {copied ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
-        </button>
-      </Tooltip>
-      {extraActions}
-      {onBranch !== undefined && (
+  const more = clock === 'end' && (extraActions != null || onBranch !== undefined || usageAction != null)
+  // dshfiles (b:ysaj): inside the ⋯ menu the branch verb is a labelled row like the plugins' rows (Trace, Add to
+  // backlog, Restore), not a bare icon in a line of mixed icons and words.
+  const branch = onBranch !== undefined && (
         <Tooltip label={branchUnavailable ? t('message.branchUnavailable') : t('message.branch')} side="bottom" openOnClick={branchUnavailable}>
           {/* Native disabled buttons do not deliver the hover/focus events Tooltip needs. */}
           <button

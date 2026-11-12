@@ -1,7 +1,6 @@
 /** Session pin hover button over the workspace owner’s shared callbacks. */
-import {
-  IconPinFillRegular, IconPinOutlineRegular, Tooltip,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { PinIcon } from '@dshfiles/plugin-ui/icons'
+import { IconPinFillRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import clsx from 'clsx'
 import type { PinSessionInjected, SessionRowActionProps } from '../contract/slots.ts'
 import css from '../rows/Rows.module.css'

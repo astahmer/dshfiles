@@ -2,9 +2,9 @@
 
 ![A changed PNG shown as its current version in the review tab](docs/screenshots/changed-image-preview.png)
 
-Owned whole-package fork of `@deepseek-ai/dsh-client-ui-deliverables` from stock DSH **0.2.2-rc.1**, tag
-`dsh-v0.2.2-rc.1`, upstream
-[`packages/client/ui-deliverables`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.1/packages/client/ui-deliverables).
+Owned whole-package fork of `@deepseek-ai/dsh-client-ui-deliverables` from stock DSH **0.2.2-rc.2**, tag
+`dsh-v0.2.2-rc.2`, upstream
+[`packages/client/ui-deliverables`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.2/packages/client/ui-deliverables).
 The original MIT notice is retained in [LICENSE](LICENSE).
 
 It renders the turn's "Edited N files" card, the changed-files review tab, the delivery cards and the closing-prose
@@ -30,7 +30,7 @@ the recorded delta.
 | [host.ts](src/host.ts)                                                                     | Registers `api/changes.image` ([changed-image-route.ts](src/changed-image-route.ts)).                 |
 | [FileDiff.tsx](src/native/FileDiff.tsx)                                                    | Optional `imageUrl`: a binary or oversized image renders [ChangedImage](src/native/ChangedImage.tsx). |
 | [ChangedFiles.tsx](src/native/ChangedFiles.tsx), [ReviewTab.tsx](src/native/ReviewTab.tsx) | Pass the file's `api/changes.image` address to `FileDiff`.                                            |
-| [locales.ts](src/native/locales.ts)                                                        | `image.*` copy for the label and each refusal, in all eight dictionaries.                                                        |
+| [locales.ts](src/native/locales.ts)                                                        | `image.*` copy for the label and each refusal, in all eight dictionaries.                             |
 
 ## Changed images
 

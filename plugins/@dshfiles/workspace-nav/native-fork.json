@@ -3,8 +3,8 @@
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-client-ui-workspace",
-    "version": "0.2.2-rc.1",
-    "ref": "dsh-v0.2.2-rc.1",
+    "version": "0.2.2-rc.2",
+    "ref": "dsh-v0.2.2-rc.2",
     "path": "packages/client/ui-workspace"
   },
   "files": [
@@ -33,8 +33,8 @@
     "src/native/rows/Rows.tsx",
     "src/native/rows/WorkspaceBrowser.tsx",
     "src/native/rows/WorkspaceDialogs.tsx",
-    "src/native/WorkspacePicker.tsx",
-    "src/native/pin-order.ts",
+    "src/native/session-actions/ArchiveSession.tsx",
+    "src/native/session-actions/PinSession.tsx",
     "src/native/stores.ts",
     "src/native/toast/Toast.tsx",
     "src/native/tree.ts",

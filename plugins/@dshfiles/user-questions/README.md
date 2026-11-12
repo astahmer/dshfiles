@@ -43,8 +43,8 @@ Parsing lives in [`src/rich/question-markdown.ts`](src/rich/question-markdown.ts
 ## Upstream and license
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)
-- Package: `@deepseek-ai/dsh-client-ui-user-questions@0.2.2-rc.1` (MIT, [LICENSE](./LICENSE))
-- Pinned revision: tag `dsh-v0.2.2-rc.1`
+- Package: `@deepseek-ai/dsh-client-ui-user-questions@0.2.2-rc.2` (MIT, [LICENSE](./LICENSE))
+- Pinned revision: tag `dsh-v0.2.2-rc.2`
 - Vendored source: [`src/native`](./src/native) is upstream `packages/client/ui-user-questions/src/client`;
   [`src/host.ts`](./src/host.ts) (upstream `src/index.ts`), [`src/css-modules.d.ts`](./src/css-modules.d.ts) and
   [`locale`](./locale) keep the upstream relative layout.
@@ -65,8 +65,8 @@ Every other vendored file is byte-identical to the pinned revision. Owned files 
 | File                                     | Change                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/native/index.ts`                    | upstream revision `69f2241e` (`fix(ui-user-questions): keep an answered question from flashing back`), not yet released: the Remote answer path records each call this Client answered until the Host stops listing it, and the reconcile creates that card without taking the composer seat, so the tool call row can still reveal it |
-| `src/native/QuestionComposer.tsx`        | the question is markdown: heading split, rich body and html previews from `src/rich/`, markdown option descriptions under their option row (b:6); the markdown title keeps upstream's long-copy expand toggle and shows in the header only while minimized, and a plain description keeps upstream's expand toggle                                                                                                                                                                                           |
-| `src/native/QuestionComposer.module.css` | `.optionItem` highlight around the upstream `.optionRow`, `.srOnly` heading, `.cardRich` height for those (b:6)                                                                                                                                                                                                                                                     |
+| `src/native/QuestionComposer.tsx`        | the question is markdown: heading split, rich body and html previews from `src/rich/`, markdown option descriptions under their option row (b:6); the markdown title keeps upstream's long-copy expand toggle and shows in the header only while minimized, and a plain description keeps upstream's expand toggle                     |
+| `src/native/QuestionComposer.module.css` | `.optionItem` highlight around the upstream `.optionRow`, `.srOnly` heading, `.cardRich` height for those (b:6)                                                                                                                                                                                                                        |
 
 Answering a `continued` form queues a `user-question-reply` in the Inbox. The step boundary's `claim()` empties the
 Inbox several awaits before the admitted `user/message` settles the `userQuestions` projection; for that gap the

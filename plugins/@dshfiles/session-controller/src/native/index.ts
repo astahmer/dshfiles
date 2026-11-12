@@ -34,6 +34,8 @@ import { buildModelCatalog, hasProviderApiKey, SessionModelCatalog } from './cat
 import { threadModelPolicyProjection } from '../thread-model-policy.ts'
 import { threadModelPolicySchema, type ThreadModelSelect, type ThreadModelSnapshot } from '../thread-model-api.ts'
 import { PluginApiError } from '@dshfiles/dshx/api'
+import { publishApiEvent } from '@dshfiles/dshx/host'
+import { turnAdmissionApi } from '../turn-admission-api.ts'
 import { ApiSessionNotFound, hasApiSessionSubagentOwner } from './agent.ts'
 import { SessionSkillCatalog } from './skill-catalog.ts'
 import { SessionMediaReferences } from './media-references.ts'
@@ -208,7 +210,12 @@ export class SessionController extends TypertRemoteService {
     this.agents = new ApiSessionAgentController(ctx)
     this.agents.initialize()
     await ctx.sessionProjections.register(threadModelPolicyProjection)
-    this.turnAdmission = installTurnAdmission(ctx)
+    // The waiting-turn dock re-reads on this event instead of polling the snapshot every 3 s.
+    this.turnAdmission = installTurnAdmission(ctx, snapshot => {
+      publishApiEvent(ctx, turnAdmissionApi, 'changed', { running: snapshot.running, waiting: snapshot.waiting.length }).catch((error: unknown) => {
+        ctx.logger.warn(`session-turn-admission: the changed event was not published: ${String(error)}`)
+      })
+    })
     this.commands = new SessionCommandController(ctx, this.agents, process.cwd(), this.turnAdmission)
     ctx.effect(() => ctx.fileUploads.registerAgentResolver(async (sessionId) => {
       const result = await this.agents.resolveAgent(sessionId)
@@ -238,7 +245,10 @@ export class SessionController extends TypertRemoteService {
         }),
       'session-controller.mirrored-projections',
     )
+    await this.commands.initialize()
+    ctx.fiber.assertActive()
     await this.listState.initialize()
+    ctx.fiber.assertActive()
     ctx.plugin(SessionFileReferences)
     ctx.plugin(SessionMediaReferences)
     ctx.plugin(SessionSkillCatalog)
@@ -427,7 +437,7 @@ export class SessionController extends TypertRemoteService {
     const signal = AbortSignal.timeout(10_000)
     const agent = this.ctx.agents.get(sessionId)
     const header = this.ctx.sessions.get(sessionId)?.header ?? (await this.ctx.get('sessionPersistence')?.stat(sessionId, { signal }))?.header
-    if (header !== undefined && hasApiSessionSubagentOwner(this.ctx, { header }, agent)) throw new PluginApiError('Use subagent routing for this child thread.', { code: 'thread-model-subagent' })
+    if (header !== undefined && hasApiSessionSubagentOwner({ header })) throw new PluginApiError('Use subagent routing for this child thread.', { code: 'thread-model-subagent' })
     const values = await this.historyController.projections({ sessionId }, signal)
     if (values === null || values.kind !== 'sequenced') throw new PluginApiError('Open this local thread before changing its account.', { code: 'thread-model-unavailable' })
     const policy = threadModelPolicySchema.parse(values.values.threadModelPolicy ?? threadModelPolicyProjection.init())
@@ -598,7 +608,7 @@ export class SessionController extends TypertRemoteService {
   @Remote('prompt')
   async prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue> {
     signal.throwIfAborted()
-    if (!hasPromptContent(request.content)) {
+    if (request.content.length > 0 && !hasPromptContent(request.content)) {
       throw new RemoteError('gateway/bad-request', 'prompt content must include non-whitespace text or an attachment', {})
     }
     const clientTimeZone = request.clientTimeZone === undefined
@@ -614,7 +624,7 @@ export class SessionController extends TypertRemoteService {
     // The caller is recorded only when it is not the owner, so owner messages keep their exact source.
     const principal = principalOf(this.ctx.invocation)
     const source: MessageSource = {
-      kind: 'user',
+      kind: request.content.length === 0 ? 'retry' : 'user',
       rpcId: request.requestId,
       ...(clientTimeZone === undefined ? {} : { clientTimeZone }),
       ...(principal === undefined ? {} : { principal }),

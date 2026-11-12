@@ -29,14 +29,14 @@ jj-integration resolves a thread workspace's Session before sending into it. `ne
 
 ## Provenance
 
-|                     |                                                                                             |
-| ------------------- | ------------------------------------------------------------------------------------------- |
-| Upstream package    | `@deepseek-ai/dsh-client-ui-workspace`                                                      |
-| Pinned              | `0.2.2-rc.1`, ref `dsh-v0.2.2-rc.1`                                                         |
-| Upstream path       | `packages/client/ui-workspace`                                                              |
-| Loader row replaced | `ui-workspace` (disabled in `cordis.patch.yml`, stock row stays off in profile composition) |
+|                     |                                                                                                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Upstream package    | `@deepseek-ai/dsh-client-ui-workspace`                                                                                                                                                                  |
+| Pinned              | `0.2.2-rc.2`, ref `dsh-v0.2.2-rc.2`                                                                                                                                                                     |
+| Upstream path       | `packages/client/ui-workspace`                                                                                                                                                                          |
+| Loader row replaced | `ui-workspace` (disabled in `cordis.patch.yml`, stock row stays off in profile composition)                                                                                                             |
 | Delta               | `native-fork.json` `delta`; navigation logic lives in `src/new-thread-request.ts`, the Workspace rename/delete dialog stages in `src/native/rows/workspace-dialogs.ts` (used by `WorkspaceDialogs.tsx`) |
-| Verification        | `node scripts/native-fork-diff.mjs workspace-nav`, `tests/new-thread-request.test.ts`       |
+| Verification        | `node scripts/native-fork-diff.mjs workspace-nav`, `tests/new-thread-request.test.ts`                                                                                                                   |
 
 Update policy: bump with `node scripts/native-fork-diff.mjs workspace-nav --to <new-tag>`, re-apply the
 `navigation.ts` delta (local draft navigation and `blankRequest` for explicit Host connections), and re-run the journeys below.

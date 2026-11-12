@@ -1,8 +1,8 @@
 # @dshfiles/session-persistence-jsonl
 
 Owned fork of
-[`@deepseek-ai/dsh-session-persistence-jsonl`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.1/packages/session/session-persistence-jsonl)
-pinned at `dsh-v0.2.2-rc.1`. It replaces the `session-persistence-jsonl` Loader row; the native row is disabled, DSH
+[`@deepseek-ai/dsh-session-persistence-jsonl`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.2/packages/session/session-persistence-jsonl)
+pinned at `dsh-v0.2.2-rc.2`. It replaces the `session-persistence-jsonl` Loader row; the native row is disabled, DSH
 core stays untouched. Provenance and the delta list are in [`native-fork.json`](./native-fork.json); drift is checked
 with `node scripts/native-fork-diff.mjs session-persistence-jsonl`.
 

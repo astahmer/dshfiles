@@ -3,8 +3,8 @@
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-client-ui-chat",
-    "version": "0.2.2-rc.1",
-    "ref": "dsh-v0.2.2-rc.1",
+    "version": "0.2.2-rc.2",
+    "ref": "dsh-v0.2.2-rc.2",
     "path": "packages/client/ui-chat"
   },
   "files": [
@@ -77,6 +77,7 @@
     "src/native/settings/TranscriptViewRow.tsx",
     "src/native/chat/TurnNavigator.module.css",
     "src/native/chat/MessageIconActions.module.css",
+    "src/native/chat/MessageIconActions.tsx",
     "src/native/chat/TurnNavigator.tsx",
     "src/native/chat/use-chat-scroll.ts",
     "src/native/conversation-nodes/register.ts",

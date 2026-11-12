@@ -27,8 +27,8 @@ on the live profile a single thread used to mount up to 42k DOM nodes on open.
 ## Upstream and license
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)
-- Package: `@deepseek-ai/dsh-client-ui-chat@0.2.2-rc.1` (MIT, [LICENSE](./LICENSE))
-- Pinned revision: tag `dsh-v0.2.2-rc.1`
+- Package: `@deepseek-ai/dsh-client-ui-chat@0.2.2-rc.2` (MIT, [LICENSE](./LICENSE))
+- Pinned revision: tag `dsh-v0.2.2-rc.2`
 - Vendored source: [`src/native`](./src/native) is upstream `packages/client/ui-chat/src/client`;
   [`src/chat-settings.ts`](./src/chat-settings.ts), [`src/host.ts`](./src/host.ts) (upstream `src/index.ts`),
   [`src/css-modules.d.ts`](./src/css-modules.d.ts) and [`locale`](./locale) keep the upstream relative layout.

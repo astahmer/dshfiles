@@ -4,12 +4,12 @@
  * Renders nothing until a provider reports both pressure and a route
  * capacity. */
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 // Type-only: the `contextPressure` / `contextBreakdown` projection key merges.
 import type {} from '@deepseek-ai/dsh-token-meter/client'
-import { Tooltip, useAnchoredPosition, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Tooltip, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import { contextOccupancy } from '../context-occupancy.ts'
 import { CONTEXT_METER_VISIBLE_FROM, contextTone } from '../../context-tone.ts'
@@ -65,14 +65,7 @@ export function ContextMeter({ useProjection, t, detail }: ContextMeterProps) {
   const panelRef = useRef<HTMLDivElement | null>(null)
   const context = contextOccupancy(pressure)
   const available = context !== null
-  const position = useAnchoredPosition({
-    open: open && available,
-    anchorRef: rootRef,
-    panelRef,
-    side: 'top',
-    gap: 8,
-    margin: 12,
-  })
+  const anchorName = `--dsh-context-${useId().replaceAll(':', '')}`
   useDismissOnOutsidePointer(rootRef, open && available, setOpen, panelRef)
 
   // A model switch can temporarily remove capacity while this component stays
@@ -110,7 +103,7 @@ export function ContextMeter({ useProjection, t, detail }: ContextMeterProps) {
   const segments = parts.filter(part => part.width > 0)
 
   return (
-    <span ref={rootRef} className={css.root}>
+    <span ref={rootRef} style={{ anchorName }} className={css.root}>
       <Tooltip label={t('context.aria', { percent: reading })} side="top" delayMs={200} disabled={open} portal>
         <button
           type="button"
@@ -139,7 +132,7 @@ export function ContextMeter({ useProjection, t, detail }: ContextMeterProps) {
         <div
           ref={panelRef}
           className={css.panel}
-          style={position ?? { visibility: 'hidden', left: 0, top: 0 }}
+          style={{ positionAnchor: anchorName }}
           role="dialog"
           aria-label={t('context.used')}
         >

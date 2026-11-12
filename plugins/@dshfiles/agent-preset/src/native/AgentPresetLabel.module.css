@@ -19,7 +19,6 @@
 
 .icon {
   flex: none;
-  opacity: 0.7;
 }
 
 /* dshfiles (b:ark0): the name is its own flex item, so a label the header squeezes ends in an ellipsis; as a bare text

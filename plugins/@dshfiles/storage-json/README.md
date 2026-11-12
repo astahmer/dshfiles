@@ -7,8 +7,8 @@ needs: synchronous per-record reads, and one-publish batch writes on the single-
 ## Upstream and license
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)
-- Package: `@deepseek-ai/dsh-storage-json@0.2.2-rc.1` (MIT, [LICENSE](./LICENSE))
-- Pinned revision: tag `dsh-v0.2.2-rc.1`
+- Package: `@deepseek-ai/dsh-storage-json@0.2.2-rc.2` (MIT, [LICENSE](./LICENSE))
+- Pinned revision: tag `dsh-v0.2.2-rc.2`
 - Vendored source: [`src/native`](./src/native) is upstream `packages/storage/storage-json/src`
 - Provenance and delta files: [`native-fork.json`](./native-fork.json), checked by `node scripts/native-fork-diff.mjs`
 

@@ -19,20 +19,32 @@ const commandSchema = Schema.Struct({
   token: Schema.String,
 })
 
+// Lists every QuoteSummary field: decoding strips unknown keys, so a field missing here is dropped from restored drafts.
+const quoteSummarySchema = Schema.Struct({
+  label: Schema.String,
+  title: Schema.String,
+  detail: Schema.optionalKey(Schema.String),
+  body: Schema.String,
+})
+
 const quoteSchema = Schema.Struct({
   offset: Schema.Natural,
   length: Schema.Int.check(Schema.isGreaterThan(0)),
-  text: Schema.String.check(Schema.makeFilter(text => (text.trim() !== '' ? true : 'Quote text must not be blank'))),
+  text: Schema.String.check(Schema.makeFilter((text: string) => text.trim() !== '')),
+  summary: Schema.optionalKey(quoteSummarySchema),
 })
 
 const draftSchema = Schema.Struct({
   text: Schema.String,
   references: Schema.Array(referenceSchema),
   command: Schema.optional(commandSchema),
-  quotes: Schema.optional(Schema.Array(quoteSchema)),
+  quotes: Schema.optionalKey(Schema.Array(quoteSchema)),
 })
 
-/** Whether every reference and quote names a span after the leading command token, in order, and matches the draft text. */
+/**
+ * Whether every reference names a span after the leading command token, in order, and matches the draft text, and
+ * every quote matches its formatted text without overlapping another span.
+ */
 const hasOrderedReferenceSpans = (draft: typeof draftSchema.Type): boolean => {
   const spelling = draft.command?.token.trimEnd()
   if (spelling !== undefined && (!/^\/\S/u.test(spelling) || !draft.text.startsWith(spelling))) return false

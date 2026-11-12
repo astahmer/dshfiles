@@ -29,6 +29,7 @@
  * signal, actions — is read through the slot-owned useTabInfo hook. The Tab
  * domain follows each session's store commits, including sessions off screen.
  */
+import { PanelLeftIcon } from '@dshfiles/plugin-ui/icons'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
 import type { ContextMenuTarget } from '@deepseek-ai/dsh-client-ui-context-menu/client'

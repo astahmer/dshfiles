@@ -4,7 +4,7 @@ Owned fork of DSH's local subprocess service (`@deepseek-ai/dsh-subprocess-local
 shell command, terminal and background job an agent runs goes through it.
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness), `packages/subprocess/subprocess-local`
-- Pinned revision: tag `dsh-v0.2.2-rc.1`
+- Pinned revision: tag `dsh-v0.2.2-rc.2`
 - License: MIT, see [LICENSE](LICENSE)
 
 ## Why

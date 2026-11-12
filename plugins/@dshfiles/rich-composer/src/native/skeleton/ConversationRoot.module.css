@@ -7,12 +7,15 @@
   background: var(--dsw-alias-bg-base);
 }
 
-/* 76px with its rule: the height of the Sidebar's tab strip and header row
-   (ui-dockkit `.tabStrip` 38px + the pane header's 38px), so the two rules
-   meet at the column edge. The rows add up to it — 10px top inset, the 30px
-   title row, the tab strip's 10px margin, and a 25px view row. When the views
-   and the More launcher do not fit on one row, the row wraps and the header
-   grows past 76px. */
+/* `conversation.hero.frame` contract on the home: layer decorations at negative z-index paint above this
+   background and below all Conversation content. Other phases keep the root out of the stacking order, so
+   unportaled Conversation popovers still rise above AppFrame chrome that floats over the column. */
+.root[data-phase='hero'] {
+  isolation: isolate;
+}
+
+/* One header row (visual refresh T1.4): title, actions and the view switch
+   share a 44px band with one hairline under it; there is no second tab row. */
 .header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -189,11 +192,6 @@
   cursor: pointer;
 }
 
-.crumbSubagent {
-  font-size: 12px;
-  line-height: 18px;
-}
-
 @media (hover: hover) {
   button.crumb:hover {
     background: var(--dsw-alias-interactive-bg-hover);
@@ -204,6 +202,11 @@
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
   cursor: default;
+}
+
+.crumbSubagent {
+  font-size: 12px;
+  line-height: 18px;
 }
 
 button.crumbEditable {
@@ -293,6 +296,18 @@ button.crumbEditable {
   display: none;
 }
 
+.headerMenuButton {
+  flex: none;
+  width: 28px;
+  padding: 0;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.headerMenuButton svg {
+  width: 15px;
+  height: 15px;
+}
+
 /* The far-right corner seat reaches 16px into the header's 28px right padding,
    so its control sits past the utilities' edge; it is laid out only while its
    occupant renders something. Its left margin equals the utilities' 8px gap so
@@ -320,50 +335,23 @@ button.crumbEditable {
   }
 }
 
-/* The tab row sits above the header paint so the active bar covers its rule. */
+/* Without a thread panel to host the other views (productivity pass Q5), the view switch is a segmented control in the title row (T1.4; DESIGN.md
+   bans blue underline tabs): a quiet track, the selected view a raised chip
+   in ink. Colour stays a signal, so selection is not accent-coloured. */
 .tabs {
-  grid-column: 1 / -1;
-  position: relative;
-  z-index: 1;
-  display: flex;
-  gap: 16px 20px;
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  margin-top: 10px;
-  padding-left: 8px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: 12px;
+  padding: 2px;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1));
 }
 
-@media (max-width: 767px) {
-  :global(html:not([data-platform])) .tabs {
-    padding-left: 0;
-  }
-}
-
-.viewTabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 32px;
-  min-width: 0;
-  min-height: 25px;
-}
-
-/* The 16px text line retains 9px below it. The press target extends 10px
-   above the text into the strip's top margin and 10px to each side, matching
-   the inline padding of the Sidebar tab chips (ui-dockkit `.tab`); negative
-   margins keep the layout box at its 25px row and text width. The active bar
-   spans the text and reaches 1px past the tab box to sit over the header
-   rule. */
 .tab {
-  --dsh-tab-hit-inline: 10px;
-
-  position: relative;
-  box-sizing: border-box;
-  min-height: 35px;
-  margin: -10px calc(-1 * var(--dsh-tab-hit-inline)) 0;
-  padding: 10px var(--dsh-tab-hit-inline) 9px;
+  height: 24px;
+  padding: 0 10px;
   border: none;
   border-radius: var(--dsw-radius-xs);
   background: transparent;
@@ -375,14 +363,151 @@ button.crumbEditable {
   cursor: pointer;
 }
 
-.tab::after {
-  content: '';
-  position: absolute;
-  right: var(--dsh-tab-hit-inline);
-  bottom: -1px;
-  left: var(--dsh-tab-hit-inline);
-  height: 2px;
-  border-radius: 2px;
+.tab:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+.tabActive {
+  background: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
+  color: var(--dsw-alias-label-primary);
+  box-shadow: 0 0 0 1px var(--dshx-tone-line, var(--dsw-alias-border-l2));
+}
+
+/* Narrow title rows give the crumbs priority over the switch's padding. */
+@container (max-width: 560px) {
+  .tab {
+    padding: 0 6px;
+  }
+}
+
+/* Phone shell (T1.4): the shell's 44pt top bar already shows Back and the
+   title, so the conversation header gives up its row; its view switch and
+   actions live in the `⋯` sheet below, portalled into that top bar. */
+@media (max-width: 639.98px) {
+  :global(html[data-shell-phone-nav]) .header {
+    display: none;
+  }
+}
+
+/* dshfiles (productivity pass Q6): marks where this conversation's header sits; it has a box only while on screen. */
+.phoneBarAnchor {
+  display: block;
+  width: 100%;
+  height: 0;
+}
+
+.phoneBar {
+  position: fixed;
+  top: calc(var(--dsh-phone-top-height, 44px) - 44px);
+  right: max(4px, env(safe-area-inset-right, 0px));
+  z-index: 42;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  transform: translateY(var(--dsh-visual-offset-top, 0px));
+}
+
+/* Only while a thread is the stage: the shell's list (or a page) covers it otherwise. */
+:global(html:not(:has([data-phone-top-bar][data-phone-stage='thread']))) .phoneBar {
+  display: none;
+}
+
+.phoneMenuButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.phoneMenuButton:active,
+.phoneMenuButton[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.phoneScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  border: none;
+  background: color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 30%, transparent);
+}
+
+.phoneSheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1041;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 80vh;
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  border-top-left-radius: var(--dsw-radius-panel, 16px);
+  border-top-right-radius: var(--dsw-radius-panel, 16px);
+  background: var(--dshx-tone-raised, var(--dsw-alias-bg-layer-2));
+  box-shadow: var(--dshx-elevation-3);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* The sheet takes focus on open (the focus trap's start), not as a control: no ring around the whole sheet. */
+.phoneSheet:focus {
+  outline: none;
+}
+
+.phoneGrabber {
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
+}
+
+/* In the sheet the view switch spans the width with 44pt segments. */
+.phoneSheet .tabs {
+  display: flex;
+  margin-left: 0;
+}
+
+.phoneSheet .tab {
+  flex: 1;
+  height: 40px;
+  font-size: 15px;
+}
+
+.phoneSheetActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Composer tools listed by the PhoneThreadMenu contract: one 44px row each, picked from the sheet. */
+.phoneSheetTools {
+  display: flex;
+  flex-direction: column;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+  padding-top: 6px;
+}
+
+.phoneSheetTool {
+  display: block;
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   font: inherit;
   font-size: var(--dsh-content-font-size, 15px);

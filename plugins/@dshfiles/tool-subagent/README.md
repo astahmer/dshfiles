@@ -5,8 +5,8 @@ Owned Host fork of DSH's `@deepseek-ai/dsh-tool-subagent` package, the model-fac
 setting in running threads, instead of being frozen when the thread started (b:rmkm).
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness), `packages/subagent/tool-subagent`
-- Package: `@deepseek-ai/dsh-tool-subagent@0.2.2-rc.1`
-- Pinned revision: tag `dsh-v0.2.2-rc.1` (`66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`)
+- Package: `@deepseek-ai/dsh-tool-subagent@0.2.2-rc.2`
+- Pinned revision: tag `dsh-v0.2.2-rc.2` (`ddac96760b6edf8fa0fe17cbdcf0b512f4c12b2c`)
 - License: MIT, see [LICENSE](LICENSE)
 
 ## Why a fork
@@ -20,10 +20,10 @@ inside this package, so no slot or settings plugin can reach it.
 
 ## Local delta
 
-| File                                  | Change                                                                                                                                                    |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| File                                  | Change                                                                                                                                                                                                                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/native/model-selection-state.ts` | adds `dshfilesSubagentModelSelectionPolicy`, a Host-only projection over the same events that keeps the latest one, and `followingSubagentModelSelection`, a policy reader that appends a replacement event when the enabled setting's route list differs from the recorded one |
-| `src/native/index.ts`                 | the delegation and `list_subagent_models` tools read the policy through that following reader                                                                                                                                                                           |
+| `src/native/index.ts`                 | the delegation and `list_subagent_models` tools read the policy through that following reader                                                                                                                                                                                   |
 
 The fork folds under its own key because the native settings row registers the shared `subagentModelSelectionPolicy`
 unit first, and the projection registry shares the first definition of a key, so a changed fold on the shared key

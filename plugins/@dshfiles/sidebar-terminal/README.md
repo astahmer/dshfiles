@@ -2,7 +2,7 @@
 
 ![A terminal tab open in the right sidebar of a thread](docs/screenshots/terminal-excerpts.png)
 
-An owned fork of `@deepseek-ai/dsh-client-ui-sidebar-terminal` at `dsh-v0.2.2-rc.1` (MIT; see LICENSE). It keeps the upstream terminal lifecycle and tab identity, but adds **Add selection to chat**. Select output in the terminal, then activate the action that appears over the screen (or press `Ctrl+Shift+E`, `Cmd+Shift+E` on macOS) to attach an inspectable excerpt to the thread that owns that terminal. Nothing is copied or sent until explicitly requested; the chip stays in the draft and its full contents are sent when the draft is submitted. Remove it with the composer's normal chip deletion.
+An owned fork of `@deepseek-ai/dsh-client-ui-sidebar-terminal` at `dsh-v0.2.2-rc.2` (MIT; see LICENSE). It keeps the upstream terminal lifecycle and tab identity, but adds **Add selection to chat**. Select output in the terminal, then activate the action that appears over the screen (or press `Ctrl+Shift+E`, `Cmd+Shift+E` on macOS) to attach an inspectable excerpt to the thread that owns that terminal. Nothing is copied or sent until explicitly requested; the chip stays in the draft and its full contents are sent when the draft is submitted. Remove it with the composer's normal chip deletion.
 
 The chip is labelled with the terminal range it quotes (`Terminal 3-4`, 1-based lines of that terminal's output history) and reveals the captured output when activated, so a long or credential-bearing excerpt can be checked before the message leaves. A selection longer than 4000 characters keeps its head and ends with an ellipsis; the terminal itself keeps the full output.
 

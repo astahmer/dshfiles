@@ -36,6 +36,7 @@ import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './contract/composer-blocks.ts'
 import { InputHub } from './input/hub.ts'
 import { transferComposerDraft } from '../composer-draft-handoff.ts'
+import { createComposerFileIntake } from './input/file-intake.ts'
 import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
 import { queueDockEntry } from './queue/QueueDock.tsx'
 import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
@@ -52,8 +53,10 @@ import { InputBar } from './skeleton/InputBar.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { installStopShortcut } from './stop-shortcut.ts'
 import { liveViewBindings } from './conversation/live-bindings.ts'
-import { TRAJECTORY_VIEW_ID, resolveActiveView } from './view-selection.ts'
+import { DEFAULT_VIEW_ID, TRAJECTORY_VIEW_ID, resolveActiveView } from './view-selection.ts'
 import { createViewPins } from './view-pins.ts'
+import { ThreadViewsModel } from '../thread-views.ts'
+import { ThreadViewFacets, type ThreadViewPanel } from '../thread-view-facets.tsx'
 import { en, ja, es, fr, de, ru, pt, NS, zh, type ConversationKey } from './locales.ts'
 import { CONVERSATION_SETTINGS_NAMESPACE, type ConversationSettings } from '../submission-settings.ts'
 import { PromptRecallModel } from '../prompt-recall.ts'
@@ -434,6 +437,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       'conversation.composer': { kind: 'chain', scope: 'session' },
       'conversation.composer.bar': { kind: 'single', scope: 'session-maybe' },
       'conversation.input.dock': { kind: 'list', scope: 'session' },
+      'conversation.hero.frame': { kind: 'hoc', scope: 'root' },
       'conversation.hero.brand.mark': { kind: 'single', scope: 'root' },
       'conversation.hero.workspace': { kind: 'single', scope: 'root' },
       'conversation.hero.agentPreset': { kind: 'single', scope: 'session-maybe' },
@@ -479,12 +483,11 @@ export function apply(ctx: Context, config: Config = Config({})): void {
             sourceSessionId: sessionId,
             destinationSessionId: nextId,
             destinationSessionReady,
-            // The same rule as intake: only an ordinary Session stages image uploads.
-            rebindAttachments: (targetSessionId, attachmentIds) => concreteConversation(ctx).rebindDraftFiles(
-              SessionId(targetSessionId),
-              attachmentIds,
-              sessions.binding(SessionId(targetSessionId))?.session.getSnapshot().subagent === null,
-            ),
+            rebindAttachments: (targetSessionId, attachmentIds) => {
+              // The same rule as intake: only an ordinary Session stages image uploads.
+              const ordinary = sessions.binding(SessionId(targetSessionId))?.session.getSnapshot().subagent === null
+              concreteConversation(ctx).rebindDraftFiles(SessionId(targetSessionId), attachmentIds, ordinary)
+            },
           })
           if (handoff === 'kept') from.notify('info', t('workspace.draftTransferRefused'))
         }),
@@ -567,6 +570,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     }),
   }, ConversationSessionHeader)
 
+  const fileIntake = createComposerFileIntake()
   const registerComposerBar = () => slots.register({
     name: 'conversation.composer.bar',
     locale: NS,
@@ -588,6 +592,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       // action resolves the controller when it runs, and the upload list stays empty meanwhile.
       if (sessionId === undefined || sessions.binding(sessionId) === undefined) {
         return {
+          registerFileIntake: fileIntake,
           keyboard: undefined,
           insertReference: undefined,
           addFiles: undefined,
@@ -597,6 +602,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
           promptHistory: undefined,
           toggleCommandMenu: undefined,
           stop: undefined,
+          retry: undefined,
           hooks: {
             stopShortcut,
             busyEnter: submissionPolicy.busyEnter,
@@ -611,6 +617,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       const inputTriggers = inputHub.inputTriggers(sessionId)
       const bridge = hostPathBridge()
       return {
+        registerFileIntake: fileIntake,
         keyboard: shell,
         insertReference: (reference, span) => {
           const sessionContext = sessions.scope(sessionId)
@@ -689,6 +696,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
             })
           },
         stop: () => { stop(sessionId) },
+        retry: (failureSeq) => { inputHub.retry(sessionId, failureSeq) },
         hooks: {
           stopShortcut,
           busyEnter: submissionPolicy.busyEnter,

@@ -27,11 +27,15 @@ import { DraftAnnotations } from './native/input/draft-annotations.ts'
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   FISH_LOGO_PATH: '',
   FISH_LOGO_VIEWBOX: '',
+  focusWithoutRing: () => undefined,
+  HoverCardGroup: (props: { children: ReactNode }) => props.children,
   IconChevronDownOutlineRegular: () => null,
   IconFolderCloseRegular: () => null,
   IconFolderOpenRegular: () => null,
   IconPlusOutlineMedium: () => null,
+  IconTriangleRightFillRegular: () => null,
   IconWarningOutlineRegular: () => null,
+  isMobileDevice: () => false,
   Tooltip: (props: { children: ReactNode }) => props.children,
   Toast: () => null,
   useAnchoredPosition: () => ({}),
@@ -84,6 +88,8 @@ const fixture = (id: string, initialView = 'chat', fixtureOptions: FixtureOption
     openError: null,
     hasMore: false,
     loadingOlder: false,
+    historyWasPartial: false,
+    historyLoadStatus: 'idle',
     promptError: null,
     blank: false,
     lastAgentError: null,
@@ -156,6 +162,7 @@ const fixture = (id: string, initialView = 'chat', fixtureOptions: FixtureOption
   }
   const barProps: ComposerBarProps = {
     ...shared,
+    occurrence: 'main',
     keyboard: {
       editor,
       snapshot: input,
@@ -174,6 +181,8 @@ const fixture = (id: string, initialView = 'chat', fixtureOptions: FixtureOption
     removeAttachment: vi.fn(),
     resolveDraftAttachments: () => [],
     retryFileUpload: vi.fn(),
+    registerFileIntake: () => () => undefined,
+    retry: undefined,
     promptHistory: () => [],
     toggleCommandMenu: vi.fn(),
     stop: vi.fn(),
@@ -202,9 +211,10 @@ const fixture = (id: string, initialView = 'chat', fixtureOptions: FixtureOption
     // This is the official public local-Views composition: the Content body
     // owns the composer independently of its caller-selected Session view.
     useFactorySlot: name => (name === 'views' ? FixedViews : NoWidthControls),
-    renderSlot: name => {
+    // An unfilled hoc slot (`conversation.hero.frame`, which wraps the scroll body) renders its children.
+    renderSlot: (name: string, _owner: Partial<InputZone>, options?: { readonly children?: ReactNode }) => {
       if (name === 'conversation.composer.bar') return <InputBar {...barProps} />
-      return null
+      return options?.children ?? null
     },
     renderSlotChain: (_name, _owner, options) => options?.fallback,
     SessionProvider: provider => provider.children,
@@ -622,10 +632,10 @@ describe('fixed Conversation content factory composition', () => {
       root.render(
         <ConversationContent
           {...props}
-          renderSlot={(name, owner) => {
-            if (name !== 'conversation.input.dock' || !('input' in owner)) return null
-            // SAFETY: the slot map declares `conversation.input.dock` with one owner shape, `InputZone`; the name check above is that correlation.
-            const draft = (owner as unknown as InputZone).input.draft
+          renderSlot={(name: string, owner: Partial<InputZone>, options?: { readonly children?: ReactNode }) => {
+            if (name === 'conversation.hero.frame') return options?.children ?? null
+            if (name !== 'conversation.input.dock' || owner.input === undefined) return null
+            const draft = owner.input.draft
             dockDrafts.push(draft)
             return <output data-dock-draft={draft} />
           }}

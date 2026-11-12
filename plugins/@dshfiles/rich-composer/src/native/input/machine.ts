@@ -162,7 +162,7 @@ export class SubmitMachine {
       return [{ type: 'begin-submit', attempt, claim: this.claim, args: argsAfter(draft, this.claim.token) }]
     }
     const trimmed = draft.trim()
-    if (trimmed === '' && attachmentIds.length === 0 && annotated !== true) return []
+    if (trimmed === '' && attachmentIds.length === 0 && annotated !== true && ev.allowEmpty !== true) return []
     const attempt = this.beginAttempt(mode, draft, occurrences, quotes, attachmentIds, submission)
     if (trimmed.startsWith('/')) {
       this.phase = 'adjudicating'

@@ -41,6 +41,7 @@ import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
 import { UserContent } from './chat/UserContent.tsx'
 import { ActivityPill, UsagePill } from './chat/StatsPills.tsx'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
+import { registerFenceLayers } from './fence/register.ts'
 import { QuotaNoticeHost } from './chat/QuotaNoticeHost.tsx'
 import { en, ja, es, fr, de, ru, pt, NS, zh } from './locale.ts'
 import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/TranscriptViewRow.tsx'
@@ -177,7 +178,11 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       }),
     }, LinkOpeningRow))
   })
-  const transcriptView = new TranscriptViewPolicy(chatSettings, 'dshDesktop' in globalThis ? 'standard' : DEFAULT_TRANSCRIPT_VIEW_MODE)
+  // dshfiles (visual refresh T2.5): without a saved choice a touch phone gets Summary, other browsers Normal.
+  const transcriptView = new TranscriptViewPolicy(chatSettings, deviceDefaultTranscriptView({
+    desktopApp: 'dshDesktop' in globalThis,
+    coarsePointer: typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches,
+  }))
   const presentation = derivePresentationPolicy(transcriptView.mode, transcriptView.collapseTiming, transcriptView.foldedReplies)
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
   const imageGalleryScope = new ImageGalleryScopePolicy(chatSettings)
@@ -279,6 +284,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       children: {
         'conversation.chat.flow': { kind: 'single', scope: 'session', inject: CHAT_FLOW_INJECT },
         'conversation.chat.text-interaction': { kind: 'keyed', scope: 'session' },
+        'conversation.chat.markdown.fence': { kind: 'hoc', scope: 'session' },
       },
       store: chatStore,
       inject: (sessionId: SessionId): ChatViewInjected => {
@@ -332,7 +338,8 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
               openInNewTab: newTabUrl => { window.open(newTabUrl, '_blank', 'noopener,noreferrer') },
             })
           },
-          loadOlder: () => { void session.loadOlder() },
+          loadOlder: () => { void session.loadOlder({ deferConsumption: true }) },
+          consumeOlder: () => session.consumeOlder(),
           loadThrough: seq => session.loadThrough(seq),
           loadImage: Object.assign(
             (attachment: ImageAttachmentRef) => ctx.uiConversation.imageUrl(sessionId, attachment),
@@ -365,6 +372,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
     }, decorate(ChatView))
     return disposeView
   })
+  registerFenceLayers(ctx)
 
   // The quota notice host lives in the frame-wide layer so a notice outlives
   // the Chat panel that reported it. Its chain child lets a package with a

@@ -37,6 +37,11 @@
   container-type: inline-size;
 }
 
+.scroll,
+:global([data-conversation-scroll]):has(.root) {
+  overscroll-behavior-y: none;
+}
+
 .root[data-chat-following-tail] .scroll,
 :global([data-conversation-scroll]):has(.root[data-chat-following-tail]) {
   overflow-anchor: none;
@@ -268,7 +273,13 @@
   .flowItem:not([data-chat-flow-kind="user"]):not([data-chat-flow-kind="steering"]):not([data-chat-flow-kind="turn-trigger"]),
   [data-chat-group-key]
 ) ~ .running > .runningDivider {
-  opacity: 1;
+  /* dshfiles (visual refresh T2.2): turns separate by spacing, so the rule above the live row never shows. */
+  display: none;
+}
+
+/* dshfiles (visual refresh T2.2): the live row's shimmer runs on the motion token (2.2s), not the native 1.5s. */
+.runningText * {
+  animation-duration: var(--dshx-duration-shimmer, 2.2s);
 }
 
 /* Drawn inside the 16px offset above the status row, so showing or hiding it
@@ -316,33 +327,6 @@
   overflow: hidden;
 }
 
-.runningWhaleAnimated {
-  display: none;
-  position: absolute;
-  inset: 0;
-}
-
-.runningWhaleStill {
-  display: initial;
-}
-
-@supports (mask-mode: alpha) and (mask-image: url('')) {
-  @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
-    .runningWhaleAnimated {
-      display: block;
-      background: currentColor;
-      mask: url('../assets/running-whale@2x.png') center / 100% 100% no-repeat;
-      mask-mode: alpha;
-      /* Keep animated-mask repaints on an icon-sized composited layer. */
-      will-change: transform;
-    }
-
-    .runningWhaleStill {
-      display: none;
-    }
-  }
-}
-
 .openError {
   color: var(--dsw-alias-state-error-primary);
   font-size: var(--dsh-content-font-size-secondary, 13px);
@@ -350,11 +334,15 @@
 }
 
 .older {
+  overflow-anchor: none;
   display: flex;
   justify-content: center;
 }
 
 .older button {
+  display: grid;
+  line-height: 18px;
+  white-space: nowrap;
   border: none;
   border-radius: var(--dsw-radius-sm);
   padding: 4px 12px;
@@ -362,6 +350,14 @@
   color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-interactive-bg-hover-solid);
   cursor: pointer;
+}
+
+.older button > span {
+  grid-area: 1 / 1;
+}
+
+.historyHidden {
+  visibility: hidden;
 }
 
 .older button:disabled {
@@ -430,16 +426,6 @@
   min-width: 72px;
 }
 
-/* Local surfaces do not contribute flex spacing or selected message text. */
-.column > .textInteraction {
-  position: absolute;
-  /* Remain below the sticky composer while scroll placement catches up. */
-  z-index: 6;
-  visibility: hidden;
-  margin: 0;
-  width: max-content;
-}
-
 /* dshfiles fork: the row a focus request (`@dshfiles/chat/chat-focus`) landed on. */
 .column [data-chat-focus] {
   border-radius: var(--dsw-radius-sm);
@@ -448,4 +434,14 @@
   outline-offset: -2px;
   background-color: color-mix(in srgb, var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)) 6%, transparent);
   transition: outline-color 400ms ease;
+}
+
+/* Local surfaces do not contribute flex spacing or selected message text. */
+.column > .textInteraction {
+  position: absolute;
+  /* Remain below the sticky composer while scroll placement catches up. */
+  z-index: 6;
+  visibility: hidden;
+  margin: 0;
+  width: max-content;
 }

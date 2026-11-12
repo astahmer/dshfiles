@@ -63,7 +63,7 @@ export interface AssistantMarkdownProps extends
 /** Renders non-blank reasoning blocks as independent disclosures alongside the response. */
 export const AssistantMarkdown = memo(function AssistantMarkdown({
   blocks, reasoningTimings, streaming, textInteractionSource = false, interrupted, loadImage, groupPart, useDisclosure,
-  reasoningHidden = false, usePresentation, revealProcess, mentions, renderSlot, useGroupAction, t,
+  reasoningHidden = false, usePresentation, revealProcess, mentions, renderSlot, useGroupAction, filler = false, t,
 }: AssistantMarkdownProps) {
   // Stable per locale revision (t identity changes on switch): a fresh object
   // per render would rebuild MarkdownText's component table every chunk.

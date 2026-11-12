@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import type { TurnTokenUsage } from '../contract/chat-nodes.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { formatCacheHitPercent, formatExactTokens, formatTokens } from './token-format.ts'
-import { MEASURE_STYLE, useStatDialog } from './stat-dialog.ts'
+import { useStatDialog } from './stat-dialog.ts'
 import css from './TurnUsagePanel.module.css'
 import dialogCss from './stat-dialog.module.css'
 
@@ -31,7 +31,7 @@ function formatExactCount(value: number, t: ChatViewSlotProps['t']): string {
  * @returns The trigger and, while open, its portaled dialog anchored above the trigger.
  */
 export function TurnUsagePanel({ usage, estimatedCost, t }: TurnUsagePanelProps) {
-  const { open, setOpen, rootRef, panelRef, pos } = useStatDialog()
+  const { open, setOpen, rootRef, panelRef, anchorName } = useStatDialog()
 
   const cacheHit = usage.cacheReadTokens === undefined
     ? null
@@ -40,7 +40,7 @@ export function TurnUsagePanel({ usage, estimatedCost, t }: TurnUsagePanelProps)
   const routes = usage.routes?.map(route => `${route.provider}/${route.model}`).join(', ') ?? ''
 
   return (
-    <span ref={rootRef} className={css.root}>
+    <span ref={rootRef} style={{ anchorName }} className={css.root}>
       <button
         type="button"
         className={css.trigger}
@@ -57,7 +57,7 @@ export function TurnUsagePanel({ usage, estimatedCost, t }: TurnUsagePanelProps)
           className={dialogCss.panel}
           role="dialog"
           aria-label={t('message.turnUsage.title')}
-          style={pos ?? MEASURE_STYLE}
+          style={{ positionAnchor: anchorName }}
         >
           <div className={dialogCss.title}>
             <span className={dialogCss.titleLabel}>

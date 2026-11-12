@@ -8,7 +8,7 @@ and `data-agent-preset-open`; this plugin adds the composer ⋯ row **Agent mode
 the new thread…**, which open its menu. A non-default preset keeps the chip in view; a started thread's header names its preset only when
 it is not the Host default (b:4qjm).
 
-Whole native Loader-row fork of `@deepseek-ai/dsh-client-ui-agent-preset` from stock DSH `0.2.2-rc.1`.
+Whole native Loader-row fork of `@deepseek-ai/dsh-client-ui-agent-preset` from stock DSH `0.2.1-rc.2`.
 The native preset seat's private stage/apply controller cannot be replaced through an additive slot.
 This owned replacement preserves its UI, roster, header label, Settings section, composition viewer,
 Coding Tools gate, refusal handling and both Creator entry points. No DSH core changes or private imports.
@@ -49,7 +49,7 @@ profile, install globally, restart DSH, or update the running Host.
 ## Provenance and updates
 
 - Upstream: <https://github.com/deepseek-ai/deepseek-harness>, `packages/client/ui-agent-preset`.
-- Version/ref: `0.2.2-rc.1` / `dsh-v0.2.2-rc.1`, commit `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`.
+- Version/ref: `0.2.1-rc.2` / `dsh-v0.2.1-rc.2`, commit `687f282e8625c6b8d11ff58211a90524be2e4317`.
 - MIT license retained in [LICENSE](LICENSE).
 - [native-fork.json](native-fork.json) maps the browser snapshot, inert Host entry, CSS declarations and locale assets.
 - Deltas: [native registration](src/native/index.ts) and [seat controller](src/native/seat-store.ts) carry the
@@ -59,9 +59,9 @@ profile, install globally, restart DSH, or update the running Host.
   section and every seat sends one request instead of one per store. At boot that request waits for the page's
   first connected generation, whose `connection/reset` then only releases it instead of reloading every surface.
   [Locales](src/native/locales.ts) carry the
-  recorded copy delta. Native components and styles are unchanged.
-  Upstream 0.2.2-rc.1 counts `agent_preset_switch` from the seat's apply outcome; the seat reports a pick a local
-  draft accepted (`sessionDrafts.stagePreset`) as `applied` and a stage waiting for the next Session as `staged`.
+  recorded copy delta. The [header label](src/native/AgentPresetLabel.tsx) puts the preset name in its own span
+  ([styles](src/native/AgentPresetLabel.module.css)), so a label the header squeezes ends in an ellipsis instead of
+  being cut mid-letter (b:ark0). Other native components and styles are unchanged.
 
 On an upstream bump, run `node scripts/native-fork-diff.mjs agent-preset --to <new-tag>`, copy unchanged
 files, reapply the recorded deltas, update provenance, and rerun the focused tests plus the scratch journey.

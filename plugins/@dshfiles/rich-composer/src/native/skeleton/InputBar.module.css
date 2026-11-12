@@ -226,10 +226,16 @@
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
-@media (pointer: coarse) {
-  .card {
-    font-size: max(16px, var(--dsh-content-font-size, 14px));
-  }
+:global(body[data-ds-dark-theme]) .card {
+  --dsh-composer-card-highlight: transparent;
+}
+
+/* Focus inside the card strengthens the ring one step (a signal of where typing goes), never the accent. */
+.card:focus-within {
+  box-shadow:
+    0 0 0 1px var(--dshx-tone-border-strong, var(--dsw-alias-border-l3)),
+    var(--dshx-elevation-1, var(--dsw-elevation-soft)),
+    inset 0 1px 0 var(--dsh-composer-card-highlight);
 }
 
 /* No-workspace trigger state: an inset 1px dashed outline marks the card as a
@@ -572,16 +578,59 @@
     color var(--dshx-duration-hover, 80ms) var(--dshx-motion-ease-enter, ease);
 }
 
+/* Solid artwork uses a smaller footprint than the thin send arrow. */
+.continueIcon {
+  transform: scale(1.5);
+}
+
 @media (hover: hover) {
   .primary:hover:not(:disabled) {
-    background: var(--dsw-alias-button-info-hover);
+    background: color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 84%, var(--dshx-tone-bg, var(--dsw-alias-bg-base)));
   }
+}
+
+.primary:focus-visible {
+  outline: 2px solid var(--dshx-tone-accent, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
 }
 
 .primary:disabled {
   background: transparent;
   color: var(--dsw-alias-label-caption);
   cursor: default;
+}
+
+/* The glyph enters with a short scale-and-fade when the mode changes (the glyph is keyed by mode). */
+.sendGlyph {
+  animation: send-glyph-in var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease) both;
+}
+
+@keyframes send-glyph-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes send-glyph-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+@media (pointer: coarse) {
+  .primary {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* Touch input never under 16px (visual refresh T3.5): WebKit zooms the page on focus below it. A larger
+     Settings › Font size still wins. */
+  .card {
+    font-size: max(var(--dshx-density-text-input, 16px), var(--dsh-content-font-size, 14px));
+  }
 }
 
 /* Sending: the message waits for the Host to accept it. The circle keeps its

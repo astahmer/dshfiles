@@ -79,6 +79,8 @@ export interface ModelListEditorProps {
    * reasoning control, leaving a catalog model's levels to the catalog.
    */
   reasoningLevels?: readonly string[] | undefined
+  /** Whether the route's protocol accepts only {@link reasoningLevels}, each sent under its own name. */
+  reasoningLevelsOnly?: boolean | undefined
   /** Route input types for models absent from the installed catalog. */
   defaultInput?: readonly string[] | undefined
   /** Whether the user layer currently owns the whole array; absent on a create. */
@@ -180,6 +182,7 @@ interface ModelRowSlotProps {
   inputFallback: readonly string[] | undefined
   inputLoading: boolean
   reasoningLevels: readonly string[] | undefined
+  reasoningLevelsOnly: boolean | undefined
   contextWindowText: string
   maxTokensText: string
   actions: ModelRowActions
@@ -212,6 +215,7 @@ const ModelRowSlot = memo((props: ModelRowSlotProps) => {
       inputFallback={props.inputFallback}
       inputLoading={props.inputLoading}
       reasoningLevels={props.reasoningLevels}
+      reasoningLevelsOnly={props.reasoningLevelsOnly}
       expanded={props.expanded}
       disabled={props.disabled}
       t={props.t}
@@ -463,6 +467,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
             rowKey={key}
             index={index}
             model={model}
+            reasoningLevelsOnly={props.reasoningLevelsOnly}
             expanded={expanded}
             dragging={order.dragging}
             target={order.target}

@@ -200,7 +200,7 @@ export function installDraftKeymap(
     submitAndNewDraft: () => {
       const g = gate.current
       if (g.uploadsPending) {
-        g.showToast(g.t('file.stillUploading'))
+        g.showToast(g.uploadsHeldText)
         return
       }
       keyboard.submit(resolveSubmitMode(g.busyEnter, g.running, 'enter', g.steeringAvailable), 'enter')

@@ -5,7 +5,7 @@ import { apply, inject } from '../src/native/index.js'
 
 interface Observable {
   readonly subscribe: (listener: () => void) => () => void
-  readonly getSnapshot: () => { readonly apiKeyConfigured: boolean }
+  readonly getSnapshot: () => { readonly legacyKey?: { readonly configured: boolean } }
 }
 
 interface Face {
@@ -69,8 +69,10 @@ export const bootWebSearchRow = async ({ answerMs = 5 }: { readonly answerMs?: n
       return () => listeners.delete(listener)
     },
     credentials: { describe: describeCredentials, set: vi.fn(async () => ({ ok: true, value: undefined })) },
+    web: { listProviders: async () => ({ ok: true, value: { search: [{ id: 'deepseek-official' }], fetch: [{ id: 'http' }] } }) },
   })
   ctx.provide('remote.credentials', {})
+  ctx.provide('remote.web', {})
   ctx.provide('configForms', {
     get: (namespace: keyof typeof sections) => sections[namespace],
     whileServed: (_namespaces: readonly string[], install: () => () => void) => install(),

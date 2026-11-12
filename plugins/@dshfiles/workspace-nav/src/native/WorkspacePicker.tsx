@@ -11,20 +11,18 @@
 import { ProjectAddFlow } from '@dshfiles/workspace-folder-picker/project-add-flow'
 import { PlusIcon } from '@dshfiles/plugin-ui/icons'
 import type { ReactNode, RefObject } from 'react'
-import { useCallback, useEffect, useMemo, useReducer } from 'react'
-import {
-  Button, IconFolderCloseRegular, IconPlusOutlineRegular, Menu, Modal, type MenuEntry,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
+import { Button, IconFolderCloseRegular, Menu, Modal, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   WorkspaceId, WorkspaceSnapshot, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from './contract/slots.ts'
+import { distinguishingPathSuffixes } from './path-suffix.ts'
 import {
   PICK_FLOW_MENU, pickFlowBusy, pickFlowError, pickFlowOpen, pickFlowPicking, pickFlowReduce,
 } from './workspace-pick-flow.ts'
-import { distinguishingPathSuffixes } from './path-suffix.ts'
 import css from './WorkspacePicker.module.css'
 
 const ADD_WORKSPACE = '::add-workspace'
@@ -80,12 +78,10 @@ export function WorkspacePickFlow({
   side = 'bottom',
   selectedId,
 }: WorkspacePickFlowProps) {
+  // Without an owner-provided anchor, the menu remains hidden.
+  const absentAnchor = useRef<HTMLElement>(null)
   const workspaceSnapshot = useWorkspaces(state => state)
   const workspaces = workspaceSnapshot.items
-  const getAnchorRect = useCallback(
-    () => anchorRef?.current?.getBoundingClientRect() ?? null,
-    [anchorRef],
-  )
   const [flowState, dispatchFlow] = useReducer(pickFlowReduce, PICK_FLOW_MENU)
   const errorOpen = flowState.kind === 'error'
   const modalError = pickFlowError(flowState)
@@ -228,7 +224,7 @@ export function WorkspacePickFlow({
         onClose={onClose}
         side={side}
         portal
-        getAnchorRect={getAnchorRect}
+        anchorRef={anchorRef ?? absentAnchor}
       />
       {open && !addIsTheOnlyEntry && !menuIsEmpty && workspaceSnapshot.phase === 'pending' && <div className={css.menuStatus} role="status">{t('picker.loading')}</div>}
       {renderDirectoryFlow(flowOwner)}
