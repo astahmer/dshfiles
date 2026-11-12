@@ -65,10 +65,15 @@ export interface PhoneEdge {
   readonly release: (owner: string) => boolean
 }
 
+/**
+ * Route claims by owner package. They outlive one `apply`: a config change or reload re-applies this plugin while the
+ * claimer (phone pairing) keeps its gateway running and never claims again, so a per-apply map would drop its routes.
+ */
+const claims = new Map<string, RouteClaim>()
+
 export const apply = (ctx: Context, config: Config): PhoneEdge => {
   const proxyPort = config.proxyPort ?? 3443
   const configured = configuredOrigins(config)
-  const claims = new Map<string, RouteClaim>()
   let listening = false
   let served = false
   let origins: readonly string[] = []
