@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-opencode-compat
+      name: '@dshfiles/opencode-compat'

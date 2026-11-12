@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "plugin-loader",
+      "title": "Load OpenCode server plugins",
+      "summary": "Loads configured OpenCode v2 server plugins in the Host and records unsupported APIs.",
+      "surfaces": ["host", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: dshfiles-opencode-compat",
+      "configuration": [],
+      "states": ["loaded", "failed", "disabled"],
+      "failureModes": ["Invalid configuration or setup failure prevents the plugin from loading."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "opencode-compat.load",
+          "file": "plugins/@dshfiles/opencode-compat/src/runtime.test.ts",
+          "testName": "loads a plugin with frozen options and awaits cleanup"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "opencode-compat.no-browser",
+          "reason": "Host-only adapter has no client surface or browser journey in this slice."
+        }
+      ],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Load telemetry is deferred to the next slice." }]
+    }
+  ]
+}
