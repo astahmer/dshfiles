@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-12. Follows [README.md](README.md) (P1–P5a shipped). Packs are done and out of scope here except as the tier carrier.
 
-**Resume here:** nothing built yet. Waiting on the decisions at the bottom.
+**Resume here:** decisions taken (bottom). Nothing built yet; start with C1 + C2 + C4, Z1 and S1.
 
 ## Why
 
@@ -85,12 +85,12 @@ Local only: time from first boot to first finished thread, wizard completion and
 4. D1 → D2 → D3; Z2; S2 → S3.
 5. C7, D4, S4, S5, M.
 
-## Decisions needed
+## Decisions (2026-11-12)
 
-1. P5b (from README): A, packs plus an exemption list, which the tiers depend on?
-2. New profiles: progressive by default, or show everything with progressive as opt-in?
-3. Zen: global per window (with optional per-thread memory) or per thread? Chord (proposed `mod+shift+.`, unchecked against `@dshfiles/shortcuts`)?
-4. Setup: the preset profile's default name (e.g. `main`), keeping the seeded `web` profile as "everything"? A seeded `web` resyncs to the seed before every start, so a pack choice there is undone.
-5. Put `onboarding` and `ai-accounts` in Core (a Core-only profile lacks the card and account sign-in today)?
-6. Launch: start DSH directly, or write `launcher.json` so supervision and sync-before-start exist from day one?
-7. S5: publish a bootstrapper, and under which name (check the exact registry first)?
+1. P5b: option A, packs plus an explicit exemption list.
+2. New profiles start progressive, unless `dshx setup` chose their plugins: then they show what was chosen. Existing users keep everything.
+3. Zen: global per window, chord `mod+shift+.` (check against `@dshfiles/shortcuts` before shipping).
+4. `dshx setup` writes a `main` profile; the seeded `web` profile stays "everything" (it resyncs to the seed before every start).
+5. `onboarding` and `ai-accounts` join Core.
+6. Launch writes `launcher.json`, so supervision and sync-before-start exist from day one.
+7. S5 is in scope: publish a bootstrapper. `create-dshfiles` (`npm create dshfiles`) and `dshfiles` returned 404 on registry.npmjs.org on 2026-11-12, which means unpublished at check time, not reserved. Needs a publish workflow and an npm owner before the first release.
