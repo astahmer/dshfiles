@@ -15,11 +15,20 @@ const mount = async (root: string) => {
   await host.ctx.plugin(Storage)
   await host.ctx.plugin(StorageJson, { root })
   await host.ctx.plugin(StorageDomain, { backend: 'json' })
-  host.ctx.provide('sessions', { get: () => undefined } as never)
+  const live = new Map([
+    ['session-a', { header: { cwd: root } }],
+    ['session-b', { header: { cwd: root } }],
+    ['session-a-child', { header: { cwd: root, origin: 'subagent', parentSession: 'session-a' } }],
+  ])
+  // SAFETY: the editor reads only `get` of the live session store and `stat` of the persisted one.
+  host.ctx.provide('sessions', { get: (sessionId: string) => live.get(sessionId) } as never)
   host.ctx.provide('sessionPersistence', { stat: () => Promise.resolve(undefined) } as never)
   host.ctx.provide('settings', { configure: () => () => undefined } as never)
   await host.mount(plugin, { packageId: '@dshfiles/editor' })
-  return { host, client: createHostApiClient(host.ctx, editorArtifactsApi, '@dshfiles/editor') }
+  const agentTool = (sessionId: string, name: string, args: Readonly<Record<string, string | number | boolean>>) =>
+    // SAFETY: the dshx tool edge reads only the Agent's id and its session header's cwd to name the caller.
+    host.runTool({ name, arguments: args, agent: { id: sessionId, session: { header: {} } } as never })
+  return { host, agentTool, client: createHostApiClient(host.ctx, editorArtifactsApi, '@dshfiles/editor') }
 }
 
 test('artifacts survive restart, isolate sessions, and serialize revision checks', async () => {
@@ -48,6 +57,40 @@ test('artifacts survive restart, isolate sessions, and serialize revision checks
     expect(await fixture.client.delete({ sessionId: 'session-a', id, expectedRevision: 1, confirm: true })).toEqual({ status: 'conflict', currentRevision: 2 })
     expect(await fixture.client.delete({ sessionId: 'session-a', id, expectedRevision: 2, confirm: true })).toEqual({ deleted: true })
     expect((await fixture.client.list({ sessionId: 'session-a' })).artifacts).toEqual([])
+  } finally {
+    await fixture.host.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('artifacts belong to an existing thread, and an agent reaches only its own thread and its subagents', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'editor-artifacts-'))
+  const fixture = await mount(root)
+  try {
+    await expect(fixture.client.create({ sessionId: 'session-unknown', title: 'Notes', mimeType: 'text/markdown', content: 'x' })).rejects.toMatchObject({
+      remoteCode: 'session-not-found',
+    })
+    await expect(fixture.client.list({ sessionId: 'session-unknown' })).rejects.toMatchObject({ remoteCode: 'session-not-found' })
+    const foreign = await fixture.client.create({ sessionId: 'session-b', title: 'Theirs', mimeType: 'text/markdown', content: 'secret' })
+
+    const refused = { isError: true, content: [{ type: 'text', text: expect.stringContaining('session-b') }] }
+    expect(await fixture.agentTool('session-a', 'artifact_list', { sessionId: 'session-b' })).toMatchObject(refused)
+    expect(await fixture.agentTool('session-a', 'artifact_read', { sessionId: 'session-b', id: foreign.artifact.id })).toMatchObject(refused)
+    expect(
+      await fixture.agentTool('session-a', 'artifact_create', { sessionId: 'session-b', title: 'Injected', mimeType: 'text/markdown', content: 'x' }),
+    ).toMatchObject(refused)
+    expect(
+      await fixture.agentTool('session-a', 'artifact_delete', { sessionId: 'session-b', id: foreign.artifact.id, expectedRevision: 1, confirm: true }),
+    ).toMatchObject(refused)
+    expect((await fixture.client.list({ sessionId: 'session-b' })).artifacts.map(artifact => artifact.title)).toEqual(['Theirs'])
+
+    expect(
+      await fixture.agentTool('session-a', 'artifact_create', { sessionId: 'session-a-child', title: 'Child', mimeType: 'text/markdown', content: 'x' }),
+    ).not.toHaveProperty('isError', true)
+    expect(await fixture.agentTool('session-a', 'artifact_create', { title: 'Mine', mimeType: 'text/markdown', content: 'x' })).not.toHaveProperty(
+      'isError',
+      true,
+    )
   } finally {
     await fixture.host.dispose()
     await rm(root, { recursive: true, force: true })

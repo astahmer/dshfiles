@@ -22,3 +22,10 @@ export const storedSessionRoot = (input: { readonly store: StoredSessions; reado
     try: () => input.store.stat(input.sessionId),
     catch: cause => new SessionLookupFailed({ sessionId: input.sessionId, cause }),
   }).pipe(Effect.map(stored => stored?.header?.cwd))
+
+/** Whether the session store holds a persisted session with this id. */
+export const storedSessionExists = (input: { readonly store: StoredSessions; readonly sessionId: SessionId }) =>
+  Effect.tryPromise({
+    try: () => input.store.stat(input.sessionId),
+    catch: cause => new SessionLookupFailed({ sessionId: input.sessionId, cause }),
+  }).pipe(Effect.map(stored => stored !== undefined))

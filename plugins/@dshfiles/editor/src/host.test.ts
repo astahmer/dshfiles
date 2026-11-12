@@ -14,7 +14,10 @@ const mountedEditor = Effect.gen(function* () {
     Effect.promise(() => createTestHost()),
     created => Effect.promise(() => created.dispose()),
   )
-  const live = new Map([['session-live', { header: { cwd: workspace } }]])
+  const live = new Map<string, { readonly header: { readonly cwd?: string } }>([
+    ['session-live', { header: { cwd: workspace } }],
+    ['session-no-workspace', { header: {} }],
+  ])
   // SAFETY: the editor reads only `get` of the live session store and `stat` of the persisted one.
   const releaseSessions = host.ctx.provide('sessions', { get: (sessionId: string) => live.get(sessionId) } as never)
   // SAFETY: as above; no session is persisted in this Host.
@@ -55,6 +58,10 @@ describe('editor Host', () => {
         message: 'Pass sessionId: this tool cannot tell which thread workspace to save into.',
       })
       expect(yield* remoteFailure(() => client.write({ sessionId: 'session-gone', path: 'notes.md', text: 'x', expectedSha256: null }))).toMatchObject({
+        remoteCode: 'session-not-found',
+        message: 'No thread session-gone exists. Pass the sessionId of an open or stored thread.',
+      })
+      expect(yield* remoteFailure(() => client.write({ sessionId: 'session-no-workspace', path: 'notes.md', text: 'x', expectedSha256: null }))).toMatchObject({
         remoteCode: 'session-workspace-missing',
         message: 'This session has no workspace directory to save into.',
       })
