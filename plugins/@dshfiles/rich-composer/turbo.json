@@ -187,6 +187,7 @@
         "$TURBO_ROOT$/tooling/dshx/e2e/features/workbench-chat-header.feature",
         "$TURBO_ROOT$/tooling/dshx/e2e/fixtures/**",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/*",
+        "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/keyboard-shortcuts-editor.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/platform-modifier.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/rich-composer.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/workbench-chat-header.steps.ts",

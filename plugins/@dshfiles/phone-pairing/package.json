@@ -33,6 +33,7 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "3.18.5",
     "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/phone-access": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@effect/platform-node": "catalog:",
@@ -49,6 +50,7 @@
     "@standard-schema/spec": "1.1.0",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
+    "jsdom": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
@@ -61,6 +63,7 @@
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": ">=3.18.5 <4.0.0",
+    "@dshfiles/phone-access": ">=0.1.0 <0.2.0-0",
     "react": ">=18.0.0 <20.0.0-0"
   },
   "dsh": {

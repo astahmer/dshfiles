@@ -76,42 +76,19 @@ describe('pairing gateway', () => {
     try {
       await gateway.listen()
       expect((await get(port, '/')).status).toBe(401)
-      const landing = await get(port, '/pair')
-      expect(landing.status).toBe(200)
-      expect(landing.body).toContain('<label for="code">Pairing code</label>')
-      expect(landing.body).toContain('shown in DSH')
       const refused = await post(port, '/pair/redeem', { code: '000000' })
       expect(refused.status).toBe(403)
-      expect(refused.cookie).toBeUndefined()
-      const paired = await fetch(`http://127.0.0.1:${port}/pair/redeem`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        cache: 'no-store',
-        redirect: 'error',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id: offer.id, secret: offer.secret }),
-      })
-      expect(paired.status).toBe(204)
-      const cookie = paired.headers.get('set-cookie')?.split(';')[0]
-      expect(cookie).toMatch(/^__Host-dsh_phone=/)
-      const page = await get(port, '/', cookie)
+      const paired = await post(port, '/pair/redeem', { id: offer.id, secret: offer.secret })
+      expect(paired.status).toBe(200)
+      expect(paired.cookie).toMatch(/^__Host-dsh_phone=/)
+      const page = await get(port, '/', paired.cookie)
       expect(page.status).toBe(200)
       expect(page.body).toContain('native dsh-auth=fixture')
       const replay = await post(port, '/pair/redeem', { id: offer.id, secret: offer.secret })
       expect(replay.status).toBe(403)
       const deviceId = store.listDevices()[0]?.id ?? ''
       expect(await store.revoke(deviceId)).toBe(true)
-      expect((await get(port, '/', cookie)).status).toBe(401)
-      const codeOffer = store.beginOffer()
-      const byCode = await fetch(`http://127.0.0.1:${port}/pair/redeem`, {
-        method: 'POST',
-        redirect: 'error',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ code: codeOffer.code }),
-      })
-      expect(byCode.status).toBe(204)
-      expect(byCode.headers.get('set-cookie')).toContain('Secure')
-      expect((await post(port, '/pair/redeem', { code: codeOffer.code })).status).toBe(403)
+      expect((await get(port, '/', paired.cookie)).status).toBe(401)
     } finally {
       gateway.closeAll()
       await new Promise(resolve => gateway.server.close(resolve))

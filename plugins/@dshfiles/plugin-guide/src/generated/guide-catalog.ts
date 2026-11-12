@@ -28,7 +28,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:12",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:13",
       "docs": "tooling/dshx/docs/guides/client.md",
       "command": "dshx add ui"
     },
@@ -48,7 +48,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:95",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:96",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -68,7 +68,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:94",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:95",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -705,7 +705,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "backlogApi",
       "importFrom": "@dshfiles/backlog/api",
       "owner": "@dshfiles/backlog",
-      "source": "plugins/@dshfiles/backlog/src/api.ts:636",
+      "source": "plugins/@dshfiles/backlog/src/api.ts:747",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/backlog:backlog",
@@ -718,8 +718,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/backlog owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, ready, claim, release, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, syncSources, saveSyncConnection, removeSyncConnection, moveSyncConnection, saveSyncBinding, removeSyncBinding, discoverSync, testSyncConnection, testSyncConnections, importRemote, importAllRemote, acknowledge, triage, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, revert, setProjectGuidance, scheduleRule, pullRequests, linkPullRequest, merge, export, shipped, summarizeShipped, deleteComment, peerInfo, peerOpsSince, peerFiles, peerStatus, peerSync, configurePeers, eventHosts",
-        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_ready (read-only), backlog_claim, backlog_release, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_sync_connections (read-only), backlog_sync_connection_save, backlog_sync_connection_remove, backlog_sync_connection_move, backlog_sync_binding_save, backlog_sync_binding_remove, backlog_sync_discover (read-only), backlog_sync_test_connection (read-only), backlog_sync_test_all (read-only), backlog_import_remote, backlog_sync_import_all, backlog_triage, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment, backlog_revert, backlog_set_project_guidance, backlog_schedule_rule, backlog_pull_requests (read-only), backlog_link_pr, backlog_merge, backlog_export, backlog_shipped (read-only), backlog_summarize_shipped, backlog_peer_status (read-only), backlog_peer_sync, backlog_peers_configure"
+        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, ready, claim, release, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, syncSources, saveSyncConnection, removeSyncConnection, moveSyncConnection, saveSyncBinding, removeSyncBinding, discoverSync, testSyncConnection, testSyncConnections, importRemote, importAllRemote, acknowledge, triage, regenerateImageTitle, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, revert, setProjectGuidance, scheduleRule, pullRequests, linkPullRequest, merge, export, shipped, summarizeShipped, deleteComment, peerInfo, peerOpsSince, peerFiles, peerStatus, peerSync, configurePeers, eventHosts",
+        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_ready (read-only), backlog_claim, backlog_release, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_sync_connections (read-only), backlog_sync_connection_save, backlog_sync_connection_remove, backlog_sync_connection_move, backlog_sync_binding_save, backlog_sync_binding_remove, backlog_sync_discover (read-only), backlog_sync_test_connection (read-only), backlog_sync_test_all (read-only), backlog_import_remote, backlog_sync_import_all, backlog_triage, backlog_regenerate_title, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment, backlog_revert, backlog_set_project_guidance, backlog_schedule_rule, backlog_pull_requests (read-only), backlog_link_pr, backlog_merge, backlog_export, backlog_shipped (read-only), backlog_summarize_shipped, backlog_peer_status (read-only), backlog_peer_sync, backlog_peers_configure"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -1321,7 +1321,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/api.ts:253",
+      "source": "plugins/@dshfiles/jj-integration/src/api.ts:254",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/jj-integration:jj-threads",
@@ -1654,6 +1654,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "details": [],
       "source": "plugins/@dshfiles/multi-host/src/interaction-feed.ts",
       "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "phoneEdgeApi",
+      "importFrom": "@dshfiles/phone-access/edge-api",
+      "owner": "@dshfiles/phone-access",
+      "source": "plugins/@dshfiles/phone-access/src/edge-api.ts:48",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "api:@dshfiles/phone-access:phone-access-edge",
+      "kind": "api",
+      "title": "phoneEdgeApi (phone-access-edge)",
+      "summary": "Host API served by @dshfiles/phone-access.",
+      "scope": "host, called from clients, other Host plugins and agents",
+      "mode": "host methods",
+      "registration": "useApi(phoneEdgeApi) in a Client slot, or createHostApiClient(ctx, phoneEdgeApi, packageId) on the Host",
+      "risk": "additive",
+      "riskNote": "Calling is additive; @dshfiles/phone-access owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
+      "details": [
+        "Methods: status, claimRoutes, releaseRoutes"
+      ],
+      "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
     },
     {
@@ -3328,7 +3350,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 128 catalog feature(s)",
+        "Used by 130 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

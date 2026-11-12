@@ -39,9 +39,9 @@ describe('gateway against a real native listener', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ code: offer.code }),
-        redirect: 'error',
+        redirect: 'manual',
       })
-      expect(redeem.status).toBe(204)
+      expect(redeem.status).toBe(200)
       const cookie = redeem.headers.get('set-cookie')?.split(';')[0] ?? ''
       expect(cookie).toMatch(/^__Host-dsh_phone=/)
       const page = await fetch(`http://127.0.0.1:${port}/`, { headers: { cookie } })
