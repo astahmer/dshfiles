@@ -33,15 +33,16 @@ const decodeEventFrame = Schema.decodeUnknownOption(
 type EventFrame = Option.Option.Value<ReturnType<typeof decodeEventFrame>>
 const decodeQuestionRequest = Schema.decodeUnknownOption(remoteQuestionWireSchema)
 const decodeApprovalRequest = Schema.decodeUnknownOption(remoteApprovalWireSchema)
+/** One committed event's projection changes; only a `projection-patch` frame may carry patches. */
 const decodeProjection = Schema.decodeUnknownOption(
-  Schema.Union([
-    Schema.Struct({ type: Schema.Literal('projection'), sessionId: Schema.String, key: Schema.String, value: Schema.MutableJson, seq: Schema.Number }).pipe(
-      SchemaFields.passthrough,
+  Schema.Struct({
+    type: Schema.Literals(['projection', 'projection-patch']),
+    sessionId: Schema.String,
+    seq: Schema.Number,
+    changes: Schema.Array(
+      Schema.Union([Schema.Struct({ key: Schema.String, val: Schema.MutableJson }), Schema.Struct({ key: Schema.String, patch: Schema.Unknown })]),
     ),
-    Schema.Struct({ type: Schema.Literal('projection-patch'), sessionId: Schema.String, key: Schema.String, patch: Schema.Unknown, seq: Schema.Number }).pipe(
-      SchemaFields.passthrough,
-    ),
-  ]),
+  }).pipe(SchemaFields.passthrough),
 )
 /** A control-stream patch that does not fit the value this connection holds; the connection ends and reopens. */
 class ProjectionPatchMisfit extends Schema.TaggedError<ProjectionPatchMisfit>()('ProjectionPatchMisfit', {
@@ -269,21 +270,26 @@ export class RemoteInteractions extends Context.Service<
               Option.match(decodeProjection(frame), {
                 onNone: () => Effect.void,
                 onSome: update =>
-                  Effect.flatMap(
-                    Effect.suspend(() => {
-                      const cell = ProjectionPatches.cell(update.sessionId, update.key)
-                      if (update.type === 'projection') {
-                        cells.set(cell, update.value)
-                        return Effect.succeed(update.value)
-                      }
-                      const previous = cells.get(cell)
-                      if (previous === undefined) return Effect.fail(new ProjectionPatchMisfit({ key: update.key }))
-                      return Effect.try({
-                        try: () => ProjectionPatches.apply(previous, ProjectionPatches.decode(update.patch)),
-                        catch: cause => new ProjectionPatchMisfit({ key: update.key, cause }),
-                      }).pipe(Effect.tap(value => Effect.sync(() => cells.set(cell, value))))
-                    }),
-                    value => PubSub.publish(projected, { sessionId: update.sessionId, key: update.key, value, seq: update.seq }),
+                  Effect.forEach(
+                    update.changes,
+                    change =>
+                      Effect.flatMap(
+                        Effect.suspend(() => {
+                          const cell = ProjectionPatches.cell(update.sessionId, change.key)
+                          if ('val' in change) {
+                            cells.set(cell, change.val)
+                            return Effect.succeed(change.val)
+                          }
+                          const previous = cells.get(cell)
+                          if (update.type === 'projection' || previous === undefined) return Effect.fail(new ProjectionPatchMisfit({ key: change.key }))
+                          return Effect.try({
+                            try: () => ProjectionPatches.apply(previous, ProjectionPatches.decode(change.patch)),
+                            catch: cause => new ProjectionPatchMisfit({ key: change.key, cause }),
+                          }).pipe(Effect.tap(value => Effect.sync(() => cells.set(cell, value))))
+                        }),
+                        value => PubSub.publish(projected, { sessionId: update.sessionId, key: change.key, value, seq: update.seq }),
+                      ),
+                    { discard: true },
                   ),
               }),
             ),

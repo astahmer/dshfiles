@@ -7,6 +7,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
 import { expect, test } from 'vitest'
@@ -61,6 +62,7 @@ const runAgent = async (input: { readonly recordedThreads: readonly { readonly s
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(TokenMeter)
     await ctx.plugin(AgentLoop)
 
