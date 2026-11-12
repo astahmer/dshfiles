@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "installable-app",
+      "title": "Install the Web UI as an app on the phone",
+      "summary": "The Host serves its own manifest with PNG icons (any and maskable) and a splash color, and injects the head tags Safari on iOS needs for a standalone home-screen launch with its own icon instead of a page screenshot. Registered on the Host Web server, so the Tailscale tunnel, the LAN listener and the desktop URL all get it. No service worker: Chrome has not required one for installation since 108, and a cache in front of a live agent client only risks stale code.",
+      "surfaces": ["host"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: served manifest, icon routes and index head",
+      "configuration": [
+        {
+          "key": "title",
+          "defaultValue": "DeepSeek Harness",
+          "constraints": "Non-empty manifest name shown by the browser and the OS app list.",
+          "coveredBy": ["pwa.manifest-branding"]
+        },
+        {
+          "key": "shortName",
+          "defaultValue": "DSH",
+          "constraints": "Home-screen label; iOS truncates what does not fit.",
+          "coveredBy": ["pwa.head-tags", "pwa.manifest-branding"]
+        },
+        {
+          "key": "backgroundColor",
+          "defaultValue": "#0f1115",
+          "constraints": "CSS color painted behind the icon while the installed app boots.",
+          "coveredBy": ["pwa.manifest-branding"]
+        }
+      ],
+      "states": ["manifest-served", "icons-served", "head-injected"],
+      "failureModes": [
+        "A request for an icon the generator did not produce answers 404 and never reads another file.",
+        "A non-read method on the manifest or an icon answers 405 instead of serving bytes.",
+        "Without this plugin the shell still installs on Chrome; only the iOS standalone launch, the touch icon and the splash color are missing."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "pwa.manifest-shell",
+          "file": "plugins/@dshfiles/pwa/tests/manifest.test.ts",
+          "testName": "keeps the shell metadata the stock manifest declares"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pwa.manifest-icons",
+          "file": "plugins/@dshfiles/pwa/tests/manifest.test.ts",
+          "testName": "offers the raster sizes an Android launcher and maskable icon require"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pwa.manifest-branding",
+          "file": "plugins/@dshfiles/pwa/tests/manifest.test.ts",
+          "testName": "uses the configured branding for the installed app name and splash"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pwa.head-tags",
+          "file": "plugins/@dshfiles/pwa/tests/head.test.ts",
+          "testName": "declares the touch icon, standalone mode, label and status bar style"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pwa.head-escape",
+          "file": "plugins/@dshfiles/pwa/tests/head.test.ts",
+          "testName": "escapes a configured label instead of ending the attribute"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pwa.head-injection",
+          "file": "plugins/@dshfiles/pwa/tests/head.test.ts",
+          "testName": "adds the tags inside the head, before anything the app renders"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pwa.icons-decoded",
+          "file": "plugins/@dshfiles/pwa/tests/icons.test.ts",
+          "testName": "every icon the manifest advertises exists as a PNG of its declared size"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pwa.icon-route",
+          "file": "plugins/@dshfiles/pwa/tests/icons.test.ts",
+          "testName": "serves a known icon as a cacheable PNG at the exact bounds"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "pwa.no-browser-surface",
+          "reason": "The bundle registers Host Web server routes and one index transform, so it adds no client surface to walk: the served manifest, icons and head are proven by the unit tests and a Chromium installability probe, and the app it decorates is already covered by every other bundle's journeys."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "The plugin registers two Web server routes and one index tap; the Web server owns the socket and this code fetches, spawns and schedules nothing."
+        }
+      ]
+    }
+  ]
+}

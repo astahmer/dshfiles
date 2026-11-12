@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-pwa
+      name: '@dshfiles/pwa'
