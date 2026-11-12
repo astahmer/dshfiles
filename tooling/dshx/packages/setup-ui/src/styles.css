@@ -1,0 +1,20 @@
+/* The kit (Tailwind v4 with the `dshx:` prefix), the generated theme and Geist, exactly as DSH plugins get them. */
+@import '@dshfiles/plugin-ui/styles.css';
+@import '@dshfiles/ui-styles/theme.css';
+@import '@dshfiles/ui-styles/fonts.css';
+@source './';
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsh-font-family-text-default);
+  font-size: var(--dshx-density-text-ui, 13px);
+  -webkit-text-size-adjust: 100%;
+}
+
+#root {
+  min-height: 100dvh;
+}

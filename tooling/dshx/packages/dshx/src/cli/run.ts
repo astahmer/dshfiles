@@ -157,6 +157,12 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     if (argv.length === 2 && (argv[1] === '--help' || argv[1] === '-h')) return runScratchCli(['', '--help'], io)
   }
   if (argv[0] === 'checkout') return (await import('./checkout.js')).runCheckoutCli(argv.slice(1), io)
+  if (argv[0] === 'setup') return (await import('./setup.js')).runSetupCli(argv.slice(1), io)
+  if (argv[0] === 'init' && argv.includes('--ui'))
+    return (await import('./setup.js')).runSetupCli(
+      argv.slice(1).filter(token => token !== '--ui'),
+      io,
+    )
   if (argv[0] === 'init') return (await import('./init.js')).runInitCli(argv.slice(1), io)
   if (argv[0] === 'scratch') return (await import('./scratch-sweep.js')).runScratchSweepCli(argv.slice(1), io)
   if (argv[0] === 'registry') return (await import('./registry.js')).runRegistryCli(argv.slice(1), io)

@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-12. Follows [README.md](README.md) (P1–P5a shipped). Packs are done and out of scope here except as the tier carrier.
 
-**Resume here:** decisions taken (bottom). Nothing built yet; start with C1 + C2 + C4, Z1 and S1.
+**Resume here:** decisions taken (bottom). P5b and S1 are done; next C1 + C2 + C4 and Z1, then S2.
 
 ## Why
 
@@ -67,11 +67,13 @@ A local web app served by the dshx CLI before DSH is set up ([5-configurator-des
 
 | Step | Work                                                                                                 |
 | ---- | ---------------------------------------------------------------------------------------------------- |
-| S1   | Checks + presets + review + apply + printed start command, from a checkout                           |
+| S1   | Checks + presets + review + apply + printed start command, from a checkout: **done** (`dshx setup`)  |
 | S2   | Filtered build + launch + handoff                                                                    |
 | S3   | Project, key settings, account detection (presence only, env var names never values)                 |
 | S4   | Reconfigure an existing install (same screens, diff against the live profile)                        |
 | S5   | npm bootstrapper for "clone from zero" (needs a publish decision; `@dshfiles/dshx` is private today) |
+
+S1 as built: `dshx setup` / `dshx init --ui` in `tooling/dshx/packages/dshx/src/setup` (server, checks, plan) and the page in `tooling/dshx/packages/setup-ui`; presets `essentials`, `daily` (default), `team`, `everything`; default profile `main`; seeded `web` and served profiles refused; a profile setup creates holds `dshfiles-setup.json` (decision 2's marker, not read by onboarding yet: D1). The Done screen also prints a build command when a composed plugin has no `dist/` (the filtered build itself is S2). Docs: [cli-reference](../../tooling/dshx/docs/cli-reference.md#dshx-setup-set-up-a-profile-from-a-local-web-page).
 
 ### M. Measure
 

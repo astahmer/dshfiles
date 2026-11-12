@@ -15,7 +15,9 @@
     ".": "./dist/index.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./client": "./dist/client.js"
+    "./client": "./dist/client.js",
+    "./theme.css": "./src/theme.generated.css",
+    "./fonts.css": "./src/fonts.css"
   },
   "scripts": {
     "build": "dshx build",

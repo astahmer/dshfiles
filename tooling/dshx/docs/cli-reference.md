@@ -163,6 +163,32 @@ Composes a DSH profile from the plugin packs the onboarding plugin defines (`plu
 
 It never restarts DSH and never edits the `profiles/web` seed; a change needs **Restart the DSH host process**. `--json` prints `{ schemaVersion, command: "init", ok, data: { profile, profileRoot, packs, plugins, suppliers, kept, created, linked, upToDate, commands, files, restart, dryRun } }` or `error: { code, message, hint }`. Exit codes: 0 composed or up to date, 1 failed (a refused profile, a cancelled prompt, profile-sync failing), 2 usage (an unknown pack, which lists the valid ids; no `--profile`; no `--packs` or `--yes` when it cannot ask).
 
+### `dshx setup`: set up a profile from a local web page
+
+```bash
+dshx setup [--profile main] [--preset daily | --packs <ids>] [--extend] [--home <dir>] [--port <n>] [--no-open]
+dshx setup --yes [--preset <id> | --packs <ids>] [--profile main] [--home <dir>] [--json]
+dshx init --ui …   # alias
+```
+
+![Choose plugins at 390 px](../packages/setup-ui/docs/screenshots/preset-390.png)
+
+A page served by the CLI before DSH runs, from a checkout: **Check** → **Preset** → **Review** → **Apply** → **Done**. Every write is the `dshx init` composition (`ProfileInit.apply`, one `scripts/profile-sync.ts --bundle` run); the page adds nothing a terminal cannot do.
+
+1. **Check** reads this machine: Node exactly the checkout's `.node-version` and not a Nix build, fnm, pnpm, a usable checkout (`node_modules` installed), the checkout's `dsh` and its version against the pin, the DSH home and its profiles (which are seeded, which setup chose, which a running DSH serves, from `scripts/running-hosts.mjs`), the GitHub CLI (signed in or not; its output is never shown), jj and git. Presence only, never a secret value. A failing check (Node, Node build, pnpm, checkout, dsh) blocks Apply; the others only inform.
+2. **Preset** names the profile (default `main`) and picks a preset, an editable list of packs: `essentials` (Core), `daily` (Composer & transcript, Versioning, Knowledge; the default), `team` (daily plus GitHub & review, Backlog & planning) and `everything` (every pack). Core is always on. An existing profile offers **Keep its other plugins** (`--extend`).
+3. **Review** shows the exact plan: the plugins (suppliers marked), the files, the profile-sync command and the setup marker. A seeded profile (`web`, which holds every plugin and resyncs before each start), a profile a running DSH serves, and a profile holding other owned plugins without `--extend` are refused here with the fix.
+4. **Apply** re-plans and refuses when anything changed since Review, then streams each step. It never removes a plugin, never starts or restarts DSH, and writes no credential, `accounts.json`, `cordis.yml` or global install.
+5. **Done** prints the command that starts DSH (`fnm exec --using=<.node-version> <checkout>/node_modules/.bin/dsh --profile <name> web`, with `DSH_HOME=` when the home is not `~/.dsh`), preceded by the build command when a composed plugin has no `dist/` yet. **Close setup** stops the server. Launching DSH from the page is a later step (S2 in `plans/onboarding/calm-onboarding.md`).
+
+`--yes` runs the same checks, plan and apply without a browser and prints the start command; `--json` prints `{ schemaVersion, command: "setup", ok, data: { checks, plan, problem, marker, unbuilt, buildCommand, startCommand, hash } }` or `error: { code, message, hint }`. Exit codes: 0 done (or the page was closed), 1 failed (a failing check, a refused profile, profile-sync failing), 2 usage (an unknown preset, `--json` without `--yes`).
+
+**The setup marker.** A profile setup composes holds `dshfiles-setup.json`: `{ "schemaVersion": 1, "composedBy": "dshx setup", "packs": ["core", …] }` (mode 0600). It records that the user chose these plugins outside DSH, so the onboarding plugin shows them as chosen instead of revealing them progressively (decision 2 of the calm onboarding plan). Setup writes it when it creates the profile and adds packs to it on a later run; a profile setup did not create never gets one.
+
+**Security.** The server binds `127.0.0.1` only, on a free port unless `--port`. The printed link carries a one-time 256-bit token in the URL fragment, which the browser never sends in a request, Referer or log; the page trades it once for an `HttpOnly; SameSite=Strict` session cookie and drops it from the address bar. Every request must name `127.0.0.1:<port>` or `localhost:<port>` as its Host (DNS rebinding) and carry no foreign Origin or cross-site `Sec-Fetch-Site` (CSRF); API bodies are JSON only, at most 64 KB; one apply runs at a time; the page has a strict Content Security Policy. The server stops on **Close setup**, Ctrl-C or 30 minutes without a request.
+
+**The page.** `tooling/dshx/packages/setup-ui` (Vite, React, the `@dshfiles/plugin-ui` kit and the generated theme from `@dshfiles/ui-styles`) holds no data: packs, presets and checks come from `/api/state`. dshx does not depend on it; turbo builds it before dshx, and dshx's build copies its `dist/` into `dist/setup-ui`.
+
 ### `dshx publish --dry-run`: check a registry release without uploading
 
 ```bash

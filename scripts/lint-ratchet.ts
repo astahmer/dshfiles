@@ -16,6 +16,7 @@ const astGrepBoundaries = [
   'plugins/@dshfiles/session-log-window/src/index.ts',
   'scripts/json.ts',
   'tooling/dshx/packages/dshx/src/json.ts',
+  'tooling/dshx/packages/setup-ui/src/api.ts',
   'plugins/@dshfiles/agents/src/contract.ts',
   'plugins/@dshfiles/credential-port/src/index.ts',
   'plugins/@dshfiles/multi-host/src/destination/index.ts',

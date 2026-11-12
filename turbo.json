@@ -30,8 +30,24 @@
       ],
       "outputs": ["dist/**", "build/**", ".cache/*.tsbuildinfo"]
     },
+    "@dshfiles/setup-ui#build": {
+      "dependsOn": [],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/src/**",
+        "$TURBO_ROOT$/plugins/@dshfiles/ui-styles/src/**",
+        "!**/*.md",
+        "!**/*.{test,spec}.{ts,tsx}",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/*.{test,spec}.{ts,tsx}",
+        "!docs/**",
+        "!dist/**",
+        "!node_modules/**",
+        "!.turbo/**"
+      ],
+      "outputs": ["dist/**"]
+    },
     "@dshfiles/dshx#build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@dshfiles/setup-ui#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "!**/*.md",

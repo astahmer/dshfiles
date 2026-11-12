@@ -80,7 +80,13 @@ blocks the app, makes no model request, and changes the profile only when you co
    prerequisites, key settings, catalog features (curated first), how to enable it and its restart need.
    `node scripts/pack-docs.ts` regenerates them from `src/packs.ts` and `src/generated/feature-catalog.ts`;
    `pnpm check:pack-docs` (part of `check:green`) fails on a stale page, so regenerate after changing either.
-3. **Every UI plugin joins a pack.** `features:check` fails a UI plugin that is in no pack of `src/packs.ts` and not in
+3. **Set up from a web page.** `dshx setup` (alias `dshx init --ui`) serves a local page that checks the machine, offers
+   presets of these packs, shows the exact plan and applies it through the same composition; `--yes --preset <id>` runs
+   it without a browser. A profile it creates holds `dshfiles-setup.json`
+   (`{ "schemaVersion": 1, "composedBy": "dshx setup", "packs": [...] }`): the user chose its plugins outside DSH, so
+   Getting started should show them as chosen rather than reveal them progressively. See
+   [the CLI reference](../../../tooling/dshx/docs/cli-reference.md#dshx-setup-set-up-a-profile-from-a-local-web-page).
+4. **Every UI plugin joins a pack.** `features:check` fails a UI plugin that is in no pack of `src/packs.ts` and not in
    its `PACK_EXEMPTIONS` (each exemption names a reason); the pack docs list the exemptions.
 
 ## What's new
