@@ -38,6 +38,7 @@
     "@deepseek-ai/dsh-brand": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-connection": "catalog:",
     "@deepseek-ai/dsh-client-locale": "catalog:",
+    "@deepseek-ai/dsh-client-product-analytics": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-store": "catalog:",
     "@deepseek-ai/dsh-client-ui-conversation": "catalog:",
     "@deepseek-ai/dsh-client-ui-plugin-manager": "catalog:",

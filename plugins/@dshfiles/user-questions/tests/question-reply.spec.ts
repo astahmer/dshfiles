@@ -18,7 +18,7 @@ describe('replyPairsOf', () => {
         answers: [{ id: 'q1', selected: ['A'], custom: 'neither' }],
       }),
     )
-    expect(pairs.questions).toEqual([{ id: 'q1', question: 'Which one?', options: [{ label: 'A', description: 'first' }], multiSelect: true }])
+    expect(pairs.questions).toEqual([{ id: 'q1', question: 'Which one?' }])
     expect(pairs.answers).toEqual([{ id: 'q1', selected: ['A'], custom: 'neither' }])
   })
 

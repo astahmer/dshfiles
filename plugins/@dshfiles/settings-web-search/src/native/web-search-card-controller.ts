@@ -136,6 +136,8 @@ export class WebSearchCardController {
   private readonly credentialRead: DemandRefresh<WebSearchCardState>
   private readonly unsubscribe: (() => void)[]
   private credential: CredentialState = { ref: '', configured: false, writable: true }
+  private credentialReadSequence = 0
+  private disposed = false
 
   /**
    * @param scopes - the bound settings scopes for the page's namespaces.
@@ -168,8 +170,8 @@ export class WebSearchCardController {
     // A staged switch can change which section names the key, without any
     // scope publishing; a scope change can rename the reference itself.
     const publish = () => {
-      this.store.set(this.projection())
       if (this.ref() !== this.credential.ref) this.requestCredential()
+      this.store.set(this.projection())
     }
     this.unsubscribe = [
       ...[this.selection, this.messages, this.api].map(form => form.bind(() => form.shell()).subscribe(publish)),
@@ -184,7 +186,7 @@ export class WebSearchCardController {
   private requestCredential(): void {
     const ref = this.ref()
     if (ref !== this.credential.ref) {
-      this.credential = { ref, configured: false, writable: true }
+      this.resetCredentialReference(ref)
       this.store.set(this.projection())
     }
     this.credentialRead.request()
@@ -231,24 +233,32 @@ export class WebSearchCardController {
     return refOf(this.searchApi() ? this.scopes.api.getSnapshot() : this.scopes.messages.getSnapshot())
   }
 
+  /** Clear the old reference's answer and invalidate its pending reads. */
+  private resetCredentialReference(ref: string): void {
+    this.credential = { ref, configured: false, writable: true }
+    this.credentialReadSequence++
+  }
+
   /**
    * Ask the credentials domain about the reference the selected section currently names.
    *
-   * The answer is stored with the reference it describes: `apiKeyEnv` and the
-   * switch can change between the request and its response, and two reads can
-   * settle out of order, so a response is published only while it still
-   * answers for the reference in force.
+   * Only the latest read for the selected reference publishes its answer.
+   * A write's readback retains its own result even if another read starts.
+   * @returns the answer for this read, or undefined after failure, disposal, or a reference change.
    */
-  private async readCredential(): Promise<void> {
+  private async readCredential(): Promise<CredentialState | undefined> {
+    if (this.disposed) return
     const ref = this.ref()
     if (ref !== this.credential.ref) {
       // A new reference knows nothing yet; keeping the old answer would claim
       // the key is configured under a name nobody has checked.
-      this.credential = { ref, configured: false, writable: true }
+      this.resetCredentialReference(ref)
       this.store.set(this.projection())
     }
+    const sequence = ++this.credentialReadSequence
     const response = await this.ctx.remote.credentials.describe([ref])
-    if (!response.ok || ref !== this.ref()) return
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- dispose() can run during the await.
+    if (this.disposed || !response.ok || ref !== this.ref()) return
     const view = response.value[ref]
     const next: CredentialState = {
       ref,
@@ -257,9 +267,12 @@ export class WebSearchCardController {
       // and the Host is what refuses, rather than the page guessing a refusal.
       writable: view?.writable ?? true,
     }
-    if (next.configured === this.credential.configured && next.writable === this.credential.writable) return
-    this.credential = next
-    this.store.set(this.projection())
+    if (sequence === this.credentialReadSequence
+      && (next.configured !== this.credential.configured || next.writable !== this.credential.writable)) {
+      this.credential = next
+      this.store.set(this.projection())
+    }
+    return next
   }
 
   /**
@@ -341,12 +354,12 @@ export class WebSearchCardController {
     // Refusals surface through the re-read below: the Host is the only
     // authority on whether the key now exists.
     await this.ctx.remote.credentials.set(this.ref(), value)
-    await this.readCredential()
-    return this.credential.configured
+    return (await this.readCredential())?.configured ?? false
   }
 
-  /** Release configuration subscriptions. */
+  /** Release subscriptions and prevent queued reads or late answers from publishing. */
   dispose(): void {
+    this.disposed = true
     for (const off of this.unsubscribe) off()
     this.credentialRead.dispose()
     for (const form of [this.selection, this.messages, this.api]) form.dispose()

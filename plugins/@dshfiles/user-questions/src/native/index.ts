@@ -35,9 +35,9 @@ import { createForegroundRequest } from '../foreground-request.ts'
 import { RemoteQuestions } from '../remote-questions.ts'
 import { createQuestionDraftStore } from './draft-store.ts'
 import { QuestionComposer } from './QuestionComposer.tsx'
-import { questionReplyDefinition } from './question-reply.ts'
+import { answeredQuestionDefinition, questionReplyDefinition } from './question-reply.ts'
 import { QuestionReplyView } from './QuestionReplyView.tsx'
-import { en, zh, type QuestionKey } from './locales.ts'
+import { en, ja, es, fr, de, ru, pt, zh, type QuestionKey } from './locales.ts'
 
 export type {
   PendingQuestion, PlanReview, QuestionAnswer, QuestionComposerProps, QuestionWait,
@@ -424,7 +424,7 @@ function publishRemoteQuestions(input: {
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-user-questions: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-user-questions: dictionaries')
   const questionDraftStore = createQuestionDraftStore()
   const registerPendingInteraction = ctx.uiSession.registerPendingInteraction<PendingQuestion>(
     pending => pending.kind === 'plan-review' ? 2 : 1,
@@ -458,6 +458,7 @@ export function apply(ctx: ClientContext): void {
     QuestionComposer,
   ))
   ctx.uiConversation.events.register(questionReplyDefinition)
+  ctx.uiConversation.events.register(answeredQuestionDefinition)
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: 'question-reply',

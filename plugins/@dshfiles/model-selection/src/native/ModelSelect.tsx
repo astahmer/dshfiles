@@ -12,7 +12,9 @@
  * search field. Provider headings paint their background only while pinned
  * by scrolling. Clearing a query restores the full list and search focus.
  * Selecting restores trigger focus without a ring until the trigger loses focus
- * or the menu reopens. Model names match a case-insensitive ordered subsequence
+ * or the menu reopens. Mobile devices restore button focus when opening or
+ * drilling; model search takes focus only after explicit user input.
+ * Model names match a case-insensitive ordered subsequence
  * within each provider group, ranked by
  * prefix, alignment score, then catalog order. Returning to the root pane
  * hands focus back to the cell that opened it. Data and submission ride the
@@ -25,7 +27,7 @@
  * chevron, and each row whose value that selection carries shows one in place
  * of its check mark.
  */
-import { MenuGroup, MenuSurface, observeStickyMenuGroups } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MenuGroup, MenuSurface, observeStickyMenuGroups, useAnchoredPosition } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore,
   type CSSProperties, type KeyboardEvent, type FocusEvent,
@@ -35,7 +37,7 @@ import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconCloseFillRegular,
-  IconDataOutlineRegular, IconWarningOutlineRegular, Input, rankByName, StateDot, Toast,
+  IconDataOutlineRegular, IconWarningOutlineRegular, Input, isMobileDevice, rankByName, StateDot, Tag, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelLabelOwner, ModelSelectInjected } from './slots.ts'
@@ -62,7 +64,7 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * @returns the trigger and, while open, the two-level menu.
  */
 export function ModelSelect(
-  { locked, available, directory, load, select, t, renderSlot }:
+  { locked, available, directory, load, select, resolveText, t, renderSlot }:
   ModelSelectInjected & Pick<PropsRuntime<'conversation.input.model'>, 'locked'> & PropsLocale<'model'>
     & Omit<PropsRenderSlots<'conversation.input.model.label'>, 'SessionProvider'>,
 ) {
@@ -84,7 +86,16 @@ export function ModelSelect(
   const searchRef = useRef<HTMLInputElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const groupsRef = useRef<HTMLDivElement | null>(null)
-  const [menuPos, setMenuPos] = useState<CSSProperties | null>(null)
+  const menuPos = useAnchoredPosition({
+    open: open && available,
+    anchorRef: triggerRef,
+    panelRef: menuRef,
+    side: 'top',
+    align: 'end',
+    gap: 8,
+    margin: 12,
+    layoutKey: pane,
+  })
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
 
@@ -174,7 +185,7 @@ export function ModelSelect(
     if (!open || intent === null) return
     dispatchMenu({ type: 'focus-applied' })
     if (intent === 'drill') {
-      if (pane === 'model' && showSearch) {
+      if (pane === 'model' && showSearch && !isMobileDevice()) {
         searchRef.current?.focus()
         return
       }
@@ -202,42 +213,6 @@ export function ModelSelect(
       itemRefs.current[activeModelIndex]?.scrollIntoView({ block: 'nearest' })
     }
   }, [open, pane, activeModelIndex, visibleModels])
-
-  // The portal needs viewport coordinates from the trigger and the menu's
-  // measured size before paint. Slot content can resize without parent renders.
-  useLayoutEffect(() => {
-    if (!available || !open) { setMenuPos(null); return }
-    const place = (): void => {
-      /* v8 ignore next 2 -- the trigger ref is attached whenever the menu is open. */
-      const rect = triggerRef.current?.getBoundingClientRect()
-      if (rect === undefined) return
-      const MARGIN = 12
-      const lw = menuRef.current?.offsetWidth ?? 0
-      const lh = menuRef.current?.offsetHeight ?? 0
-      let x = rect.right - lw
-      let y = rect.top - 8 - lh
-      if (lw > 0) x = Math.min(Math.max(x, MARGIN), window.innerWidth - lw - MARGIN)
-      if (lh > 0) y = Math.min(Math.max(y, MARGIN), window.innerHeight - lh - MARGIN)
-      // This effect re-runs on every directory snapshot and query keystroke; a
-      // fresh position object for an unmoved card re-renders the whole list.
-      setMenuPos(previous => previous !== null && previous.left === x && previous.top === y
-        ? previous
-        : { left: x, top: y })
-    }
-    place()
-    window.addEventListener('scroll', place, true)
-    window.addEventListener('resize', place)
-    const menu = menuRef.current
-    const observer = typeof ResizeObserver !== 'undefined' && menu !== null
-      ? new ResizeObserver(place)
-      : null
-    if (menu !== null) observer?.observe(menu)
-    return () => {
-      observer?.disconnect()
-      window.removeEventListener('scroll', place, true)
-      window.removeEventListener('resize', place)
-    }
-  }, [available, open, pane, state, query])
 
   if (!available) return null
 
@@ -422,7 +397,15 @@ export function ModelSelect(
     <span data-provider-id={provider.id} data-model-id={model.id}>
       {renderSlot('conversation.input.model.label', {
         provider, model, placement, selected,
-      }, { fallback: model.name })}
+      }, {
+        fallback: model.badge === undefined ? model.name : (
+          <span className={css.badgedName}>
+            {placement === 'trigger' ? <><Tag className={css.badge} tone={model.badge.tone}>{resolveText(model.badge.text)}</Tag>{' '}</> : null}
+            <span className={css.badgedNameText}>{model.name}</span>
+            {placement === 'trigger' ? null : <>{' '}<Tag className={css.badge} tone={model.badge.tone}>{resolveText(model.badge.text)}</Tag></>}
+          </span>
+        ),
+      })}
     </span>
   )
   let itemIndex = 0
@@ -617,30 +600,32 @@ export function ModelSelect(
                   <button type="button" className={css.retry} onClick={reload}>{t('action.reload')}</button>
                 </div>
               )}
-              {effortChoices.length === 0
-                ? <div className={css.empty}>{t('empty.efforts')}</div>
-                : effortChoices.map(level => (
-                  <button
-                    ref={itemRef()}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={effectiveEffort === level.effort}
-                    className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
-                    key={level.key}
-                    disabled={busy}
-                    onClick={() => { chooseEffort(level.effort) }}
-                  >
-                    <span className={css.optionCopy}>
-                      <span className={css.modelName}>{level.label}</span>
-                    </span>
-                    <span className={css.check}>
-                      {pending !== null && pending.provider === state.current?.provider
-                        && pending.model === state.current.model && pending.reasoningEffort === level.effort
-                        ? <StateDot state="ongoing" />
-                        : effectiveEffort === level.effort ? <IconCheckOutlineRegular /> : null}
-                    </span>
-                  </button>
-                ))}
+              <div className={clsx(css.groups, 'scrollable')}>
+                {effortChoices.length === 0
+                  ? <div className={css.empty}>{t('empty.efforts')}</div>
+                  : effortChoices.map(level => (
+                    <button
+                      ref={itemRef()}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={effectiveEffort === level.effort}
+                      className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
+                      key={level.key}
+                      disabled={busy}
+                      onClick={() => { chooseEffort(level.effort) }}
+                    >
+                      <span className={css.optionCopy}>
+                        <span className={css.modelName}>{level.label}</span>
+                      </span>
+                      <span className={css.check}>
+                        {pending !== null && pending.provider === state.current?.provider
+                          && pending.model === state.current.model && pending.reasoningEffort === level.effort
+                          ? <StateDot state="ongoing" />
+                          : effectiveEffort === level.effort ? <IconCheckOutlineRegular /> : null}
+                      </span>
+                    </button>
+                  ))}
+              </div>
             </>
           )}
         </MenuSurface>,

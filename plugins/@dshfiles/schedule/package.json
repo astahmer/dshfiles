@@ -36,6 +36,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-api-remote-access": "0.2.2-rc.1",
     "@deepseek-ai/dsh-api-remotes": "catalog:",
     "@deepseek-ai/dsh-api-session-controller": "catalog:",
     "@deepseek-ai/dsh-api-workspace-controller": "catalog:",
@@ -54,6 +55,7 @@
     "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
     "@deepseek-ai/dsh-schedule": "0.2.2-rc.1",
     "@deepseek-ai/dsh-session": "catalog:",
+    "@deepseek-ai/dsh-util-time": "0.2.2-rc.1",
     "@deepseek-ai/dsh-util-values": "0.2.2-rc.1",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "catalog:",

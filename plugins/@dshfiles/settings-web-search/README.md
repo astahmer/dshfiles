@@ -1,8 +1,8 @@
 # Settings web search
 
-Owned whole-package fork of `@deepseek-ai/dsh-client-ui-settings-web-search` from stock DSH **0.2.1-rc.2**, tag
-`dsh-v0.2.1-rc.2` (commit `687f282e8625c6b8d11ff58211a90524be2e4317`), upstream
-[`packages/client/ui-settings-web-search`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.1-rc.2/packages/client/ui-settings-web-search).
+Owned whole-package fork of `@deepseek-ai/dsh-client-ui-settings-web-search` from stock DSH **0.2.2-rc.1**, tag
+`dsh-v0.2.2-rc.1` (commit `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`), upstream
+[`packages/client/ui-settings-web-search`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.1/packages/client/ui-settings-web-search).
 The original MIT notice is retained in [LICENSE](LICENSE).
 
 ## Why fork the native row?
@@ -27,6 +27,10 @@ the recorded delta below.
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [web-search-card-controller.ts](src/native/web-search-card-controller.ts) | The boot read, the per-scope reads and `credentials/reference-updated` go through `requestCredential()`: a changed reference is forgotten at once, as natively, and the read runs once per burst (once quiet for 50 ms, at most 250 ms after it began) while the card subscribes, or once when it shows again. Saving a key still re-reads directly. |
 | [demand-refresh.ts](src/native/demand-refresh.ts)                         | Owned (no upstream file): the observed store the card binds and the coalesced, demand-gated trigger (same file as in `@dshfiles/settings-models`).                                                                                                                                                                                                   |
+
+Upstream 0.2.2-rc.1 coalesces credential reads in a microtask (`queueCredentialRead`) and keeps only the latest read's
+answer (a read sequence); the fork keeps the sequence and disposal guard but routes every read through
+`requestCredential()`, whose demand-gated refresh already coalesces bursts, so the microtask queue is dropped.
 
 On a DSH upgrade, inspect upstream changes, reapply only the recorded deltas, and run:
 

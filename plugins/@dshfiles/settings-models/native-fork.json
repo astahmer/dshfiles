@@ -3,8 +3,8 @@
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-client-ui-settings-models",
-    "version": "0.2.1-rc.2",
-    "ref": "dsh-v0.2.1-rc.2",
+    "version": "0.2.2-rc.1",
+    "ref": "dsh-v0.2.2-rc.1",
     "path": "packages/client/ui-settings-models"
   },
   "files": [

@@ -16,7 +16,7 @@ import type { MenuState } from '../core/contract.js'
 import type { InputTriggerCrumb } from '../types.js'
 import type { MenuViewInjected } from './slots.js'
 import { MenuView } from './MenuView.js'
-import { en, zh, type MenuKey } from './locales.js'
+import { en, ja, es, fr, de, ru, pt, zh, type MenuKey } from './locales.js'
 
 export { InputTriggerService } from './service.js'
 export { InputTriggerController } from './controller.js'
@@ -94,7 +94,7 @@ const CLOSED_MENU_FACE: MenuViewInjected = {
 
 export function apply(ctx: ClientContext): void {
   ctx.plugin(InputTriggerService)
-  ctx.effect(() => ctx.locale.register(MENU_NS, { zh, en }), 'ui-input-trigger: menu dictionaries')
+  ctx.effect(() => ctx.locale.register(MENU_NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-input-trigger: menu dictionaries')
   ctx.inject(['slots', 'inputTriggers', 'sessions'], (scope: ClientContext) => {
     const inputTriggers = scope.inputTriggers
     const sessions = scope.sessions

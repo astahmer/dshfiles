@@ -3,9 +3,9 @@
 ![Choose a model before typing](docs/screenshots/draft-model-selection.png)
 
 Owned whole-package fork of `@deepseek-ai/dsh-client-ui-model-selection` from
-stock DSH **0.2.1-rc.2**, tag `dsh-v0.2.1-rc.2` (commit
-`687f282e8625c6b8d11ff58211a90524be2e4317`), upstream
-[`packages/client/ui-model-selection`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.1-rc.2/packages/client/ui-model-selection).
+stock DSH **0.2.2-rc.1**, tag `dsh-v0.2.2-rc.1` (commit
+`66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`), upstream
+[`packages/client/ui-model-selection`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.1/packages/client/ui-model-selection).
 The original MIT notice is retained in [LICENSE](LICENSE).
 
 ## Why fork the native row?

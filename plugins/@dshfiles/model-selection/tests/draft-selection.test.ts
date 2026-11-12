@@ -1,6 +1,8 @@
 import { Context } from '@deepseek-ai/cordis'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { ModelCatalog, ModelSelection, ModelSelectionProjection } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { ModelSelectionProjection } from '@deepseek-ai/dsh-agent/types'
+import type { ModelCatalog, ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ContextPressureProjection } from '@deepseek-ai/dsh-token-meter/client'
 import { RemoteError, type TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
@@ -11,8 +13,8 @@ import { ModelDirectory } from '../src/native/directory.ts'
 
 // SAFETY: branding only; the RPC seam receives the same identity the client draft owns.
 const sessionId = 'session-local-model' as SessionId
-const initial: ModelSelection = { provider: 'provider', model: 'first' }
-const chosen: ModelSelection = { provider: 'provider', model: 'second', reasoningEffort: 'high' }
+const initial = { provider: 'provider', model: 'first' }
+const chosen = { provider: 'provider', model: 'second', reasoningEffort: ReasoningEffortId('high') }
 const catalogValue: ModelCatalog = {
   default: initial,
   routableProviders: ['provider'],

@@ -1,15 +1,16 @@
 # Schedule
 
-Owned whole-package fork of `@deepseek-ai/dsh-client-ui-schedule` from stock DSH **0.2.1-rc.2**, tag
-`dsh-v0.2.1-rc.2` (commit `687f282e8625c6b8d11ff58211a90524be2e4317`), upstream
-[`packages/client/ui-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.1-rc.2/packages/client/ui-schedule).
+Owned whole-package fork of `@deepseek-ai/dsh-client-ui-schedule` from stock DSH **0.2.2-rc.1**, tag
+`dsh-v0.2.2-rc.1` (commit `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`), upstream
+[`packages/client/ui-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.1/packages/client/ui-schedule).
 The original MIT notice is retained in [LICENSE](LICENSE).
 
 ## Why fork the native row?
 
-The Session header's reminder catalog builds a new `schedule/list` source each time a thread's header mounts, and a
-catalog source drops its read when its last subscriber leaves, so opening a thread again (or the Tasks page) reads the
-list again even when no task changed. The sources and their subscriptions are private to the package.
+A catalog source drops its read when its last subscriber leaves, so opening the Tasks page or a thread header again
+reads the Host catalog again even when no task changed. The sources and their subscriptions are private to the package.
+Since 0.2.2-rc.1 upstream serves the Session header from the one shared `schedule/catalog` source (it no longer builds a
+per-Session `schedule/list` source), so the former per-Session source cache is gone; only the revision gate remains.
 
 ## Composition
 
@@ -24,8 +25,7 @@ the recorded delta below.
 | File                                                              | Owned delta                                                                                                                                                               |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [catalog-source.ts](src/native/catalog-source.ts)                 | Optional `revision` dependency: a source subscribed again keeps its last successful read when the page-wide revision has not moved since; otherwise it reads as natively. |
-| [index.ts](src/native/index.ts)                                   | One page-wide revision bumped by `schedule/changed` and `connection/reset`, registered before any source; one header source per Session for the page's life.              |
-| [session-schedule-state.ts](src/native/session-schedule-state.ts) | Passes the revision to the per-Session source.                                                                                                                            |
+| [index.ts](src/native/index.ts)                                   | One page-wide revision bumped by `schedule/changed` and `connection/reset`, registered before the shared catalog source, which receives it.                               |
 
 While a catalog is subscribed it still rereads on every `schedule/changed` and reset, exactly as natively.
 

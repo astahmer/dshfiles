@@ -15,6 +15,14 @@ thread switch fetched every catalog (`skills/list`, `commands/list`, …) whethe
 `controller.ts` warms the roster on the first non-empty draft instead (`warmOnce`), and a source registered before
 that is warmed with the rest; `tests/warm.test.ts` covers it.
 
+## Synced to 0.2.2-rc.1
+
+Compared against `packages/client/ui-input-trigger` between `dsh-v0.2.1-rc.2` and `dsh-v0.2.2-rc.1` (commit
+`66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`). Carried: `MenuView.module.css` hover rules behind `@media (hover: hover)`
+(touch layouts), the `ja`/`es`/`fr`/`de`/`ru`/`pt` menu dictionaries in `src/client/locales.ts`, and their registration in
+`src/client/index.ts`. Not carried: upstream's `locale/*.json` Loader-row metadata, which describes the native row this
+plugin replaces. No source contract, controller, detector or menu logic changed upstream in that range.
+
 ## Update policy
 
 When the profile moves to another DSH release, compare this package against that release's `packages/client/ui-input-trigger` tree. Carry upstream fixes and contract changes first, then reapply the documented detector delta and its regression tests. Do not silently replace the fork with the native Loader row; validate all registered `/` and `@` sources before changing the pinned upstream version.
