@@ -31,6 +31,8 @@ its answer line, never the payload or the answer:
 node $S/har-capture.mjs --seconds 60 --summary                 # one fresh load, summarized
 node $S/har-capture.mjs --tabs 3 --seconds 60 --out $SCRATCH/three-tabs.har   # three pages share one socket pool
 node $S/har-summary.mjs <capture>.har                        # --json for the raw summary, --top N for more methods
+# Per-plugin request census, same workload before and after a fix: idle, thread switches, then panels by role:name.
+node $S/har-capture.mjs --seconds 15 --switches 6 --visit 'tab:Work>button:Backlog' --visit 'tab:Land>button:History' --initiators
 MATCH='^Thread title' node $S/reload-probe.mjs 3              # reload to interactive, cold and warm HTTP cache (PROFILE_DIR=… adds CPU profiles)
 node --test $S/har-capture.test.mjs $S/har-summary.test.mjs
 ```

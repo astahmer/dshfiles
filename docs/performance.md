@@ -49,6 +49,53 @@ The projection only subtracts the probe time above 100 ms from each stored read;
 in one vitest process (`process.cpuUsage` per list, 40 lists, load average ~100 on the machine). Live after numbers need
 a Host restart, which is the user's call.
 
+## Repeated plugin-client reads: per-plugin request census (2026-11-12)
+
+b:510 reported 38 requests in about 18 s with `aiActivity`, `graphPage`, `modelCatalog`, `listProviders`,
+`listConfigurableProviders` and `describe` repeating. The census is `har-capture.mjs` with a fixed workload: load,
+idle 15 s, six thread switches 3 s apart over three seeded threads, then the Backlog panel (`tab:Work>button:Backlog`)
+and the revision graph (`tab:Land>button:History`) for 15 s each. `--initiators` names the calling functions of each
+core read. Scratch only (`dshx dev up`, four `tool-call-thread` seeds); counts are calls, batched or not.
+
+```sh
+node .agents/skills/live-performance-audit/scripts/har-capture.mjs --seconds 15 --switches 6 --switch-every 3 \
+  --visit 'tab:Work>button:Backlog' --visit 'tab:Land>button:History' --out census.har
+node .agents/skills/live-performance-audit/scripts/har-summary.mjs census.har --top 80
+```
+
+| Read (owner)                                       | Cause                                   | Before | After |
+| -------------------------------------------------- | --------------------------------------- | -----: | ----: |
+| `backlog/aiActivity` (backlog panel)               | 1 s poll while the panel shows          |     16 |     1 |
+| `thread-sidebar-restart/autoRestartStatus` (strip) | 5 s `setInterval` refetch on every page |   10 ¹ |   1 ¹ |
+| all `/api/` requests, focused workload             |                                         |    128 |   121 |
+| dshx batch calls, focused workload                 |                                         |     73 |    59 |
+
+¹ Full `profiles/web` scratch (the status strip mounts only there), load + 30 s idle + six switches.
+
+The fix is event-driven invalidation, not a longer poll. The backlog Host tracks running AI work in a
+`SubscriptionRef` and publishes `aiActivityChanged` on each idle↔busy flip; `aiActivity` carries the `ai-activity`
+tag the event invalidates, so the page-wide resource store stops polling while the event is live and keeps the 1 s
+poll only for an older Host. Thread-sidebar's automatic restart publishes `autoRestartChanged` when its status differs
+from the last tick, and the strip reads through `useResource` with a 5 s fallback poll; a restarted Host is a new
+connection generation, which re-reads it, so the reload-after-restart still fires.
+
+Not changed, with the reason:
+
+- `session/modelCatalog`, `llm/listProviders`, `llm/listConfigurableProviders`: one or two reads per page load, from
+  the model selector (`joinPageRead`, shared key) and the Models onboarding store; none repeated during idle or
+  switches. The live report's repeats need a Host change burst (settings, credentials, adapters), which both stores
+  already coalesce.
+- `settings/describe` (~120–250 KB): two to four reads per load, both from core's settings mirror (`run`, async
+  stack cut); a Host-gap candidate, not an owned client.
+- `credentials/describe` ×7 on load in the focused scratch: the stock `ui-settings-web-search` card
+  (`readCredential`), which `@dshfiles/settings-web-search` replaces in `profiles/web`.
+- `graphPage`: the revision graph keys its page set by repository snapshot generation, so it reads again only when
+  the graph changed and the viewport needs a top-up; correct invalidation, left alone.
+- `session-turn-admission/snapshot` every 3 s (10–16 per run): `@dshfiles/session-controller`, owned by another lane;
+  recorded on b:510.
+- `attention/list` (activity-timeline, 12 per run, bursts on switch) and core `agentPresets/list` (10, one per
+  switch): next candidates.
+
 ## Pull-request watcher GitHub budget (2026-11-11)
 
 `@dshfiles/pull-requests` read each watched pull request with its own `gh pr view`: one process and one GraphQL query
