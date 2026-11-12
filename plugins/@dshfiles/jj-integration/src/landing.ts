@@ -155,13 +155,15 @@ const make = Effect.gen(function* () {
       { bookmark, sessionId: input.sessionId, validate, onProgress: phase => requests.recordProgress({ path: input.path, phase }) },
     )
     if (outcome.status === 'landed' || outcome.status === 'nothing-to-land') yield* views.invalidate
+    const landed =
+      outcome.status === 'landed' ? (outcome.warning === undefined ? { head: outcome.head } : { head: outcome.head, warning: outcome.warning }) : undefined
     const result: LandResult = {
       status: outcome.status,
       revisions: outcome.status === 'nothing-to-land' ? [] : [...outcome.revisions],
       files: outcome.status === 'conflicted' ? [...outcome.files] : [],
       bookmark,
       agentAsked: false,
-      ...(outcome.status === 'landed' && { head: outcome.head, ...(outcome.warning === undefined ? {} : { warning: outcome.warning }) }),
+      ...landed,
     }
     const message = landingMessage(result)
     const agentAsked =

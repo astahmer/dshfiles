@@ -868,18 +868,17 @@ export const ThreadWorkspacesPanel = (props: {
             ...previous,
             repositories: previous.repositories.map(repository => ({
               ...repository,
-              threads: repository.threads.map(thread =>
-                thread.path === input.path
-                  ? {
-                      ...thread,
-                      unlanded: [],
-                      unlandedSummary: { total: 0, conflicted: 0, undescribed: 0 },
-                      behind: false,
-                      behindCount: 0,
-                      ...(result.warning === undefined ? { rebasedAt: Date.now() } : {}),
-                    }
-                  : thread,
-              ),
+              threads: repository.threads.map(thread => {
+                if (thread.path !== input.path) return thread
+                const rebased = {
+                  ...thread,
+                  unlanded: [],
+                  unlandedSummary: { total: 0, conflicted: 0, undescribed: 0 },
+                  behind: false,
+                  behindCount: 0,
+                }
+                return result.warning === undefined ? { ...rebased, rebasedAt: Date.now() } : rebased
+              }),
             })),
           }
         })
