@@ -302,12 +302,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const destinations = useMemo(() => Destinations.resolve(panels, contributedSections), [panels, contributedSections])
   // Sidebar folders (b:952m): the panels this browser can file, reported to the Host for the agent's
   // sidebar_panels_available (best effort; an older Host without the method is ignored).
-  const workbenchRegistry = workbenchPanels()
-  const workbenchViews = useSyncExternalStore(workbenchRegistry.subscribe, workbenchRegistry.list, workbenchRegistry.list)
-  const sidebarCatalog = useMemo(
-    () => SidebarCatalog.catalog({ pages: panels, sections: destinations.flatMap(destination => destination.sections), views: workbenchViews }),
-    [panels, destinations, workbenchViews],
-  )
+  const sidebarCatalog = SidebarCatalog.useCatalog({ pages: panels, destinations, registry: workbenchPanels() })
   const treeApi = useApi(threadSidebarTreeApi)
   // SAFETY: the rail only offers panel ids it read from this sidebar's panel metadata or the Workbench registry.
   const selectAnyPanel = useCallback((panelId: string) => selectPanel(panelId as SidebarPanelMetadata['id']), [selectPanel])

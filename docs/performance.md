@@ -1935,10 +1935,38 @@ What held the bytes, by owner:
    an unregister function and every early withdrawal uses it.
 
 Not fixed, measured: 45 MB is bundle source (external strings) and 16 MB compiled regular expressions, both constant
-across runs; the palette re-registration churn itself (CPU, ~300 registry notifications per switch) remains.
+across runs; the palette re-registration churn itself was fixed next (below).
 
 ```sh
 pnpm --dir tooling/dshx/packages/dshx exec vitest run tests/plugin-context.spec.ts
 pnpm --dir plugins/@dshfiles/queue-reorder exec vitest run src/session-queue-editor.test.ts
 pnpm --dir plugins/@dshfiles/send-after-upload exec vitest run src/session-composer.test.ts
+```
+
+## Palette re-registration on thread switch (2026-11-12)
+
+Same scratch DSH and 40 seeded threads; `registry-churn-probe.mjs 10` opens 10 threads through `?thread=` (2.5 s each)
+and counts dshx registry traffic, five or more runs per side. Before is `main` at `b39671a8`. One early after-run saw
+1,068 notifications once, never again in six more; the probe starts counting 6 s after the first row renders, so late
+boot registrations can land in the window on a loaded machine.
+
+| Over 10 switches                                   | Before    | After     |
+| -------------------------------------------------- | --------- | --------- |
+| `@dshfiles/command-palette.action` notifications   | 2,970     | 0         |
+| palette entries written (Thread Sidebar)           | 1,485     | 0         |
+| Command Palette listener time (its `keyed` reruns) | 64–68 ms  | 0 ms      |
+| Workbench panel registry notifications             | 21        | 21        |
+| page script time, whole switch (load 7–26, noisy)  | 1.8–2.1 s | 1.7–2.3 s |
+
+Each switch replaces one Workbench `tab/*` occurrence (two registry notifications). Neither consumer lists
+occurrences, but both rebuilt from the registry's new array: `registerWorkbenchPaletteActions` withdrew and re-added its
+22 view actions on each notification, and the sidebar catalog (`SidebarCatalog`) took a new identity, which rebuilt the
+folders and every header, destination and command action once per switch. The Workbench palette registration now
+re-adds only an action whose view, label or aliases changed, and `SidebarCatalog.useCatalog` keeps the same array while
+its content is unchanged. All 214 palette entries stay registered across switches. No other dshx registry or contract
+notified during the switches; the native slot registry is not covered by the probe. The whole-switch script time is
+dominated by rendering the opened thread, so the saved listener time is below its noise on this machine.
+
+```sh
+pnpm --dir plugins/@dshfiles/thread-sidebar exec vitest run src/workbench-palette.test.ts src/sidebar-catalog.client.test.tsx
 ```

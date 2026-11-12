@@ -130,5 +130,8 @@ above the core count (leaked `dshx-boot` scratch Hosts, editor jj servers) infla
 - Confirm a suspected hot path by counting it on the live Host instead of trusting the profile: a conditional
   breakpoint whose condition increments a global and returns `false` counts calls without pausing (it showed
   28 `AbortSignal.timeout` fires in 20 s, not the thousands a misread profile implied).
+- A shared registry's list gets a new array on every change, including changes the reader filters out (a Workbench
+  `tab/*` occurrence is replaced on each thread switch). Derive from it by content before it feeds an effect that
+  registers palette actions or slots: Thread Sidebar re-added up to ~148 palette actions three times per switch that way.
 
 Record findings and before/after tables in [`docs/performance.md`](../../../docs/performance.md).

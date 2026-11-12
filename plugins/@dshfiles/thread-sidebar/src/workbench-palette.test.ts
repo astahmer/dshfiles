@@ -44,6 +44,38 @@ describe('workbench palette actions', () => {
     expect(labels).toEqual([])
   })
 
+  it('adds nothing again while thread switches replace occurrences it does not list', () => {
+    const registry = createWorkbenchPanelRegistry()
+    const component = () => null
+    registry.register({ id: 'view/a', title: 'Alpha', component })
+    registry.register({ id: 'view/b', title: 'Beta', component })
+    let added = 0
+    const live = new Map<string, string>()
+    const stop = registerWorkbenchPaletteActions({
+      registry,
+      existingMainPanelIds: new Set(),
+      addActions: actions => {
+        added += actions.length
+        for (const action of actions) live.set(action.id, typeof action.label === 'string' ? action.label : action.label())
+        return () => {
+          for (const action of actions) live.delete(action.id)
+        }
+      },
+    })
+    expect(added).toBe(2)
+    let closeOccurrence = (): void => {}
+    for (let thread = 0; thread < 10; thread++) {
+      closeOccurrence()
+      closeOccurrence = registry.register({ id: `tab/${String(thread)}`, title: `Thread ${String(thread)}`, tabId: `tab-${String(thread)}`, component })
+    }
+    expect(added).toBe(2)
+    registry.register({ id: 'view/b', title: 'Beta renamed', component })
+    expect(added).toBe(3)
+    expect([...live.values()]).toEqual(['Alpha', 'Beta renamed'])
+    stop()
+    expect(live.size).toBe(0)
+  })
+
   it('tracks thread facet availability at invocation time', () => {
     const registry = createWorkbenchPanelRegistry()
     let thread: string | undefined
