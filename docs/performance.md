@@ -1456,6 +1456,29 @@ real history; the lever here is instance and follow-stream count, not bytes: the
 visited threads instead of 14. Real history makes each resident Session cost its transcript window, which is what the
 ~20-instance tab was holding. A live-tab after-number still needs the canonical build and a user restart.
 
+### With real history, and the unrendered-instance release (2026-11-12, `b:d5zd`, `b:db2p`)
+
+Same probe (`ASIDE=1`, 14 visits, `TOP=15` for the largest node types, `EXPAND="Empty drafts"` because seeded logs
+without a projection checkpoint list there), on a scratch DSH whose 14 threads each hold 120 provider-shaped turns
+(~3 KB answer, a 2 KB reasoning signature on the source and the finish chunk; ~1.2 MB of events per thread, written
+through the forked JSONL persistence). Before is the `jj:zrstxszz` build with `RESIDENT_UNMOUNTED_SESSION_LIMIT`
+set to infinity, i.e. no release; after is the shipped limit of 4. `residentThreads` at its default 4.
+
+| Build                          | heap after GC | instances | referenced | parked | `threadSidebarAside` |
+| ------------------------------ | ------------- | --------- | ---------- | ------ | -------------------- |
+| before (no unrendered release) | 84.9 MB       | 7         | 4          | 3      | 4                    |
+| after (`jj:zrstxszz`)          | 84.9 MB       | 7         | 4          | 3      | 4                    |
+
+Identical: with the sidebar-right view bound at its default, at most three instances are unrendered, below the
+release limit of 4, so the release never engages on this workload; it only bounds `residentThreads: 0` or other
+retainers. The page itself stays far below the 300 MB target after 14 long threads. Largest node types in the
+snapshot: external string data 31.2 MB (script source), code 22.8 MB, `Object` 13 MB, strings 11 MB, arrays 10.1 MB,
+closures 7.9 MB; no transcript-sized owner. So the scratch does not reproduce the 4–5 GB tab: the remaining candidate
+owners are the live tab's DevTools retention (the 2.5 GB DevTools window recording thousands of POSTs) and growth
+that needs hours of streamed turns, neither of which a scratch run can show; the live window must be measured with
+DevTools closed (`docs/ram-usage.md`). Not run: the same A/B with `residentThreads: 0` (`dshx config` targets the
+live runtime, so the scratch setting needs the Settings UI).
+
 ## Session-search index on `sqlite-store` (2026-11-11, copied live index)
 
 The search worker opened its own `DatabaseSync` connection. It now builds on `@dshfiles/sqlite-store`

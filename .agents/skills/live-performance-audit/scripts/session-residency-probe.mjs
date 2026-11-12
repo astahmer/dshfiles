@@ -2,7 +2,8 @@
 // by retain source, open `session/follow` streams, page heap after GC, and what one reconnect (offline, then online)
 // sends. It takes a heap snapshot of its own headless page to find the controller, so it refuses the live web URL.
 // Usage: LAUNCH_URL=<scratch launch url> node session-residency-probe.mjs [visits=20]   env: ASIDE=1 also opens the next
-//   row "in side panel" from each visited thread.
+//   row "in side panel" from each visited thread; TOP=<n> adds the n largest node types by self size in the snapshot;
+//   EXPAND=<group label> first opens a collapsed sidebar group (seeded logs without a checkpoint list as "Empty drafts").
 import { createRequire } from 'node:module'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -80,7 +81,19 @@ const residency = async () => {
   await cdp.send('HeapProfiler.takeHeapSnapshot', { reportProgress: false })
   cdp.off('HeapProfiler.addHeapSnapshotChunk', onChunk)
   const snapshot = JSON.parse(chunks.join(''))
-  const { node_fields: nodeFields, edge_fields: edgeFields, edge_types: [edgeTypes] } = snapshot.snapshot.meta
+  const { node_fields: nodeFields, edge_fields: edgeFields, edge_types: [edgeTypes], node_types: [nodeTypes] } = snapshot.snapshot.meta
+  const top = Number(process.env.TOP ?? 0)
+  const bySelfSize = new Map()
+  for (let node = 0; top > 0 && node < snapshot.nodes.length; node += nodeFields.length) {
+    const type = nodeTypes[snapshot.nodes[node + nodeFields.indexOf('type')]]
+    const name = type === 'object' || type === 'native' ? snapshot.strings[snapshot.nodes[node + nodeFields.indexOf('name')]] : type
+    const entry = bySelfSize.get(name) ?? { count: 0, bytes: 0 }
+    entry.count += 1
+    entry.bytes += snapshot.nodes[node + nodeFields.indexOf('self_size')]
+    bySelfSize.set(name, entry)
+  }
+  const largest = [...bySelfSize].sort((left, right) => right[1].bytes - left[1].bytes).slice(0, top)
+    .map(([name, entry]) => ({ name: name.slice(0, 60), count: entry.count, MB: Math.round(entry.bytes / 1e5) / 10 }))
   const property = edgeTypes.indexOf('property')
   const wanted = ['scopes', 'parked', 'manager', 'drafts']
   let serviceId
@@ -91,18 +104,24 @@ const residency = async () => {
     }
     if (wanted.every(name => names.has(name))) serviceId = snapshot.nodes[node + nodeFields.indexOf('id')]
   }
-  if (serviceId === undefined) return { heapMB: Math.round(usedSize / 1e5) / 10, controller: 'not found' }
+  const sizes = top > 0 ? { largest } : {}
+  if (serviceId === undefined) return { heapMB: Math.round(usedSize / 1e5) / 10, controller: 'not found', ...sizes }
   const { result } = await cdp.send('HeapProfiler.getObjectByHeapObjectId', { objectId: String(serviceId) })
   const { result: value } = await cdp.send('Runtime.callFunctionOn', {
     objectId: result.objectId,
     functionDeclaration: residencyOf.toString(),
     returnByValue: true,
   })
-  return { heapMB: Math.round(usedSize / 1e5) / 10, ...value.value }
+  return { heapMB: Math.round(usedSize / 1e5) / 10, ...value.value, ...sizes }
 }
 
 await page.goto(url)
 const rows = page.locator('[data-thread-main-action]')
+if (process.env.EXPAND !== undefined) {
+  const group = page.getByText(process.env.EXPAND, { exact: false }).first()
+  await group.waitFor({ timeout: 90_000 })
+  await group.click()
+}
 await rows.first().waitFor({ timeout: 90_000 })
 await page.waitForTimeout(4000)
 for (let index = 0; index < visits; index++) {
