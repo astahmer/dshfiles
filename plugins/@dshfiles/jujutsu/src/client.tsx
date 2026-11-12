@@ -726,6 +726,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     return state.revisions.filter(revision => branchIds.has(revision.commitId))
   }, [dropPresentation, state])
   const previewBranchIds = useMemo(() => new Set(previewBranch.map(revision => revision.commitId)), [previewBranch])
+  const dropHint = useMemo(() => {
+    const target = dropTarget === null ? undefined : revisionsByCommitId.get(dropTarget)
+    if (dragOrigin === null || target === undefined) return null
+    return RevisionDropModel.hoverHint({ origin: dragOrigin, target, revisions: state?.revisions ?? [] })
+  }, [dragOrigin, dropTarget, revisionsByCommitId, state])
 
   const listItems = useMemo(() => {
     const input = { groups, collapsedDays, layouts: graphRowsByCommitId }
@@ -1804,8 +1809,19 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       workspaceMenu={workspaceMenu}
                       connectionDimmed={connectionIds !== null && !connectionIds.has(item.revision.commitId)}
                       highlighted={locateSnapshot.context.highlighted === item.revision.commitId || connectionIds?.has(item.revision.commitId) === true}
-                      dimmed={movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId)}
+                      dimmed={
+                        dropTarget !== item.revision.commitId &&
+                        (movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId))
+                      }
                       dropTarget={dropTarget === item.revision.commitId || rowDropPresentation !== null}
+                      dropHint={dropTarget === item.revision.commitId ? dropHint : null}
+                      draggedLabel={
+                        dragOrigin !== null && dragOrigin.kind !== 'revision' && dragOrigin.sourceId === item.revision.commitId
+                          ? dragOrigin.kind === 'workspace'
+                            ? { kind: 'workspace', name: dragOrigin.workspace }
+                            : { kind: 'bookmark', name: dragOrigin.bookmark }
+                          : null
+                      }
                       expanded={
                         selectedRevision?.commitId === item.revision.commitId ||
                         rowDropPresentation !== null ||
@@ -2442,8 +2458,9 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
         ))}
       </ol>
     )}
-    <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
-      {props.preview?.summary ?? 'Preparing a state-bound preview…'}
+    <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground" role="status">
+      {props.preview === undefined && <Spinner aria-hidden className="dshx:size-3" role="presentation" />}
+      {props.preview?.summary ?? 'Preparing preview…'}
     </p>
     {props.preview !== undefined && (
       <pre className="dshx:max-h-40 dshx:overflow-auto dshx:rounded-sm dshx:bg-muted dshx:p-2 dshx:font-mono! dshx:text-[11px] dshx:whitespace-pre-wrap">
@@ -2469,6 +2486,8 @@ interface RevisionRowProps {
   readonly connectionDimmed: boolean
   readonly highlighted: boolean
   readonly dropTarget: boolean
+  readonly dropHint: { readonly kind: 'action' | 'invalid'; readonly label: string } | null
+  readonly draggedLabel: { readonly kind: 'workspace' | 'bookmark'; readonly name: string } | null
   readonly isLocalDrag: () => boolean
   readonly graphLayout: RevisionGraphRow
   readonly graphWidth: number
@@ -2502,6 +2521,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
       className={cn(
         'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:cursor-grab dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:font-medium dshx:text-background',
         revision.workingCopy ? 'dshx:bg-info' : 'dshx:bg-teal',
+        props.draggedLabel?.kind === 'workspace' && props.draggedLabel.name === workspace && 'dshx:opacity-40',
       )}
       draggable
       onContextMenu={event => event.stopPropagation()}
@@ -2586,6 +2606,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                     local
                       ? 'dshx:cursor-grab dshx:border-foreground/45 dshx:text-foreground'
                       : 'dshx:border-dashed dshx:border-muted-foreground/50 dshx:text-muted-foreground',
+                    local && props.draggedLabel?.kind === 'bookmark' && props.draggedLabel.name === name && 'dshx:opacity-40',
                   )}
                   draggable={local}
                   onContextMenu={event => event.stopPropagation()}
@@ -2658,8 +2679,11 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
         <ContextMenuTrigger asChild>
           <div
             className={cn(
-              'dshx:flex dshx:items-start dshx:pr-2 dshx:hover:bg-accent',
-              props.dropTarget && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary dshx:ring-inset',
+              'dshx:relative dshx:flex dshx:items-start dshx:pr-2 dshx:hover:bg-accent',
+              props.dropTarget &&
+                (props.dropHint?.kind === 'invalid'
+                  ? 'dshx:bg-destructive/10 dshx:ring-1 dshx:ring-destructive dshx:ring-inset'
+                  : 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary dshx:ring-inset'),
             )}
             draggable={draggable}
             onDragStart={event => {
@@ -2754,6 +2778,18 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 <TooltipContent side="bottom">{fullRevisionId(revision) + (revision.evolved ? ' · rewritten from an earlier commit' : '')}</TooltipContent>
               </Tooltip>
             </div>
+            {props.dropHint !== null && (
+              <span
+                className={cn(
+                  'dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:right-2 dshx:max-w-[70%] dshx:-translate-y-1/2 dshx:truncate dshx:rounded-full dshx:px-2 dshx:py-0.5 dshx:text-[11px] dshx:font-medium dshx:shadow-sm',
+                  props.dropHint.kind === 'invalid' ? 'dshx:bg-destructive dshx:text-white' : 'dshx:bg-primary dshx:text-primary-foreground',
+                )}
+                data-drop-hint={props.dropHint.kind}
+                role="status"
+              >
+                {props.dropHint.label}
+              </span>
+            )}
           </div>
         </ContextMenuTrigger>
         {props.menu}

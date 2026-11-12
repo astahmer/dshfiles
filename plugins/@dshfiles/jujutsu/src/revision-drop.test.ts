@@ -105,6 +105,28 @@ describe('revision drop resolution', () => {
     })
   })
 
+  it('names what a drop on the hovered row would do, or why it cannot, before any preview', () => {
+    const hint = (origin: Parameters<typeof RevisionDropModel.hoverHint>[0]['origin'], target: (typeof revisions)[number]) =>
+      RevisionDropModel.hoverHint({ origin, target, revisions })
+    expect(hint({ kind: 'revision', sourceId: 'feature' }, other)).toEqual({ kind: 'action', label: 'Rebase here' })
+    expect(hint({ kind: 'revision', sourceId: 'feature' }, featureChild)).toEqual({
+      kind: 'invalid',
+      label: 'A branch cannot be rebased onto one of its own revisions.',
+    })
+    expect(hint({ kind: 'bookmark', sourceId: 'feature', bookmark: 'feature/bookmark' }, other)).toEqual({
+      kind: 'action',
+      label: 'Move feature/bookmark here',
+    })
+    expect(hint({ kind: 'revision', sourceId: 'feature' }, feature)).toBeNull()
+    expect(
+      RevisionDropModel.hoverHint({
+        origin: { kind: 'workspace', sourceId: 'trunk', workspace: 'review' },
+        target: other,
+        revisions: [revision('trunk', [], [], ['review']), other],
+      }),
+    ).toEqual({ kind: 'action', label: 'Move review here' })
+  })
+
   it('ignores missing, remote, and already-present bookmarks', () => {
     expect(RevisionDropModel.resolveBookmark({ bookmark: 'stale', sourceRevisionId: 'feature', target: other, revisions })).toEqual({ kind: 'noop' })
     expect(RevisionDropModel.resolveBookmark({ bookmark: 'feature/bookmark', sourceRevisionId: 'missing', target: other, revisions })).toEqual({ kind: 'noop' })

@@ -100,4 +100,18 @@ export class RevisionDropModel {
     }
     return RevisionDropModel.resolveWorkspace({ workspace: input.origin.workspace, target: input.target, revisions: input.revisions })
   }
+
+  /** What dropping on the hovered row would do, shown while dragging and before any Host call; `null` when nothing would. */
+  static readonly hoverHint = (input: {
+    readonly origin: DragOrigin
+    readonly target: DragRevision
+    readonly revisions: readonly DragRevision[]
+  }): { readonly kind: 'action' | 'invalid'; readonly label: string } | null => {
+    const resolution = RevisionDropModel.resolveDragOrigin(input)
+    if (resolution.kind === 'noop') return null
+    if (resolution.kind === 'invalid') return { kind: 'invalid', label: resolution.message }
+    const presentation = resolution.presentation
+    if (presentation.kind === 'rebase') return { kind: 'action', label: 'Rebase here' }
+    return { kind: 'action', label: `Move ${presentation.kind === 'workspace-move' ? presentation.workspace : presentation.bookmark} here` }
+  }
 }
