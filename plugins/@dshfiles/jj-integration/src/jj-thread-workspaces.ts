@@ -317,8 +317,21 @@ const ambiguousDestination = (target: string) =>
     detail: `"${target}" points at more than one revision, so no workspace was created. ${destinationRecovery} To keep it, move a bookmark onto one revision with \`jj bookmark set <name> -r <revision>\`.`,
   })
 
+const conflictedBookmark = (name: string, targets: readonly { readonly commitId: string; readonly summary: string }[]) =>
+  new DestinationRejected({
+    detail: [
+      `The bookmark "${name}" is conflicted: it points at ${targets.length} revisions, so no workspace was created.`,
+      ...targets.map(
+        target =>
+          `To keep ${target.commitId}${target.summary === '' ? '' : ` (${target.summary})`}, run \`jj bookmark set ${name} -r ${target.commitId}\` in the project, then retry.`,
+      ),
+      `Or: ${destinationRecovery}`,
+    ].join(' '),
+  })
+
 /** jj's own words for a name or prefix with several targets, and for text that names nothing. */
 const AMBIGUOUS_REVISION = /is ambiguous|is conflicted|is divergent/iu
+const CONFLICTED_BOOKMARK = /Name [`']([^`']+)[`'] is conflicted/u
 const UNKNOWN_REVISION = /doesn't exist|failed to parse/iu
 
 const jjRunFailed =
@@ -929,6 +942,18 @@ const make = Effect.gen(function* () {
     if (revset.startsWith('-')) return yield* unknownDestination(target)
     const output = yield* run(['--ignore-working-copy', 'log', '--no-graph', '-n', '2', '-r', revset, '-T', 'commit_id ++ "\\n"'], repoRoot)
     if (output.exitCode !== 0) {
+      const conflicted = CONFLICTED_BOOKMARK.exec(output.stderr)?.[1]
+      if (conflicted !== undefined) {
+        const targets = yield* run(
+          ['--ignore-working-copy', 'log', '--no-graph', '-r', bookmarkRevset(conflicted), '-T', 'commit_id ++ " " ++ description.first_line() ++ "\\n"'],
+          repoRoot,
+        )
+        const candidates = lines(targets.stdout).flatMap(line => {
+          const [commitId = '', ...summary] = line.split(' ')
+          return isCommitId(commitId) ? [{ commitId: commitId.slice(0, 12), summary: summary.join(' ').slice(0, 80) }] : []
+        })
+        if (targets.exitCode === 0 && candidates.length > 1) return yield* conflictedBookmark(conflicted, candidates)
+      }
       if (AMBIGUOUS_REVISION.test(output.stderr)) return yield* ambiguousDestination(target)
       if (UNKNOWN_REVISION.test(output.stderr)) return yield* unknownDestination(target)
       return yield* jjFailed(`Could not resolve "${target}" in ${repoRoot}: ${output.stderr.trim().slice(0, 400)}`)

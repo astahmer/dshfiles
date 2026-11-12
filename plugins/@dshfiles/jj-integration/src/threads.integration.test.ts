@@ -359,16 +359,28 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       conflictBookmark(repo, 'forked')
       for (const attempt of [1, 2, 3]) {
         await expect(threads.provision(repo, 'forked', 'thread-c0ffee'), `attempt ${attempt}`).rejects.toThrow(
-          /"forked" points at more than one revision.*no workspace was created/su,
+          /The bookmark "forked" is conflicted.*no workspace was created/su,
         )
         expect(workspaceNames(repo)).toEqual(['default'])
         expect(threadFolders()).toEqual([])
       }
     })
 
+    it('names a conflicted bookmark, its revisions and the exact command that resolves it', async () => {
+      conflictBookmark(repo, 'forked')
+      const targets = jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'bookmarks(exact:"forked")', '-T', 'commit_id.short(12) ++ "\\n"')
+        .split('\n')
+        .filter(id => id.length > 0)
+      expect(targets).toHaveLength(2)
+      const refusal = threads.provision(repo, 'forked', 'thread-c0ffee')
+      await expect(refusal).rejects.toThrow(/The bookmark "forked" is conflicted/u)
+      for (const id of targets) await expect(refusal).rejects.toThrow(`jj bookmark set forked -r ${id}`)
+      expect(threadFolders()).toEqual([])
+    })
+
     it('still gives the thread its name once a real destination is picked after a refusal', async () => {
       conflictBookmark(repo, 'forked')
-      await expect(threads.provision(repo, 'forked', 'thread-c0ffee')).rejects.toThrow(/more than one revision/u)
+      await expect(threads.provision(repo, 'forked', 'thread-c0ffee')).rejects.toThrow(/is conflicted/u)
       const thread = await threads.provision(repo, 'main', 'thread-c0ffee')
       expect(thread.name).toBe('thread-c0ffee')
       expect(commitIdAt(repo, 'thread-c0ffee@-')).toBe(bookmarkTargetCommitId(repo))
