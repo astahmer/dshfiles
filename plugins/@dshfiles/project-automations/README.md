@@ -72,11 +72,12 @@ curl -X POST -H 'content-type: application/json' -H "x-dsh-timestamp: $ts" -H "x
   send GitHub's `x-github-delivery` GUID, with no timestamp header. The signature is verified over the raw bytes
   exactly as received (never re-serialized JSON) with a constant-time digest comparison and a 64-hex-digit digest.
   Replay protection keys on what GitHub actually sends: a delivery id already accepted is refused, and so is the same
-  signed body under a different delivery id within 5 minutes (the delivery header is not signed). Both are remembered
-  in plugin storage for 24 hours by default (Settings › Project automations › `githubDeliveryWindowHours`, 1–168), so
-  a Host restart keeps refusing them; GitHub's own redelivery of an event reuses its id and is therefore refused too.
-  A captured request can still be replayed after that window. The store remembers at most 10,000 deliveries and 2,000
-  body digests, dropping the oldest first, so a very busy Host forgets some entries before their window ends; if the
+  signed body under a different delivery id (the delivery header is not signed). Both are remembered in plugin storage
+  for 24 hours by default (Settings › Project automations › `githubDeliveryWindowHours`, 1–168), so a Host restart
+  keeps refusing them. A delivery is claimed only once the automation is enabled, and released when its thread cannot
+  start, so GitHub's Redeliver works for an event that started nothing; a redelivery of an event that did start a
+  thread reuses its id and is refused. A captured request can still be replayed after that window. The store
+  remembers at most 10,000 deliveries and 10,000 body digests, dropping the oldest first, so a very busy Host forgets some entries before their window ends; if the
   storage read or write fails the request is refused with 503 rather than accepted unguarded. Send one scheme per
   request; both headers together are refused.
 

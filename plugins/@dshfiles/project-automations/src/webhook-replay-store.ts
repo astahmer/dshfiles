@@ -5,12 +5,13 @@ import { AutomationStorageFailure, NAMESPACE } from './automation-store.js'
 
 /** GitHub's delivery id: unique per delivery, and deliberately reused by a redelivery. Not covered by the signature. */
 export const GITHUB_DELIVERY_HEADER = 'x-github-delivery'
-/** A signed body accepted once may not be accepted again under another delivery id inside this window. */
-export const BODY_REPLAY_WINDOW_MS = 300_000
 /** Remembered deliveries; beyond this the oldest are forgotten before their window ends. */
 export const MAX_DELIVERIES = 10_000
-/** Remembered body digests; the five-minute window keeps this far below the delivery count. */
-export const MAX_BODY_DIGESTS = 2_000
+/**
+ * Remembered body digests. Each lives as long as its delivery id: the id is not signed, so a shorter body window would
+ * let a captured request be replayed under a fresh id once it ended.
+ */
+export const MAX_BODY_DIGESTS = MAX_DELIVERIES
 const SWEEP_INTERVAL_MS = 60_000
 const DELIVERY_PREFIX = 'webhook-delivery/'
 const BODY_PREFIX = 'webhook-body/'
@@ -113,19 +114,26 @@ const make = Effect.gen(function* () {
     yield* storage
       .set(`${DELIVERY_PREFIX}${input.deliveryId}`, encodeDelivery({ digest: input.digest, receivedAt: input.now, expiresAt }))
       .pipe(Effect.mapError(failed('set')))
-    const bodyExpiresAt = input.now + BODY_REPLAY_WINDOW_MS
-    yield* storage
-      .set(`${BODY_PREFIX}${input.digest}`, encodeBody({ deliveryId: input.deliveryId, expiresAt: bodyExpiresAt }))
-      .pipe(Effect.mapError(failed('set')))
+    yield* storage.set(`${BODY_PREFIX}${input.digest}`, encodeBody({ deliveryId: input.deliveryId, expiresAt })).pipe(Effect.mapError(failed('set')))
     deliveries.set(input.deliveryId, { digest: input.digest, expiresAt })
-    bodies.set(input.digest, bodyExpiresAt)
+    bodies.set(input.digest, expiresAt)
     yield* enforceCaps()
     return { ok: true as const }
+  })
+
+  /** Forget a claim whose event started no thread, so GitHub's Redeliver of the same delivery is accepted. */
+  const release = Effect.fn('webhook replay release')(function* (input: { readonly deliveryId: string; readonly digest: string }) {
+    if (deliveries.get(input.deliveryId)?.digest !== input.digest) return
+    deliveries.delete(input.deliveryId)
+    bodies.delete(input.digest)
+    yield* storage.delete(`${DELIVERY_PREFIX}${input.deliveryId}`).pipe(Effect.mapError(failed('delete')))
+    yield* storage.delete(`${BODY_PREFIX}${input.digest}`).pipe(Effect.mapError(failed('delete')))
   })
 
   return {
     claim: (input: { readonly deliveryId: string; readonly digest: string; readonly now: number; readonly windowMs: number }) =>
       lock.withPermits(1)(claim(input)),
+    release: (input: { readonly deliveryId: string; readonly digest: string }) => lock.withPermits(1)(release(input)),
   }
 })
 
@@ -142,6 +150,7 @@ export class WebhookReplayStore extends Context.Service<
       readonly now: number
       readonly windowMs: number
     }) => Effect.Effect<ReplayVerdict, AutomationStorageFailure>
+    readonly release: (input: { readonly deliveryId: string; readonly digest: string }) => Effect.Effect<void, AutomationStorageFailure>
   }
 >()('@dshfiles/project-automations/WebhookReplayStore') {
   static readonly layerWithoutStorage = Layer.effect(WebhookReplayStore, make)

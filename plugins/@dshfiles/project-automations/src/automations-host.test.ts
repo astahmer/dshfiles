@@ -522,10 +522,53 @@ it('keeps GitHub delivery ids across a Host restart and forgets them once their 
   expect(created).toHaveLength(1)
 
   // An entry whose window already ended is forgotten, so that delivery id is accepted again (with a new event body,
-  // since the five-minute body window is separate).
+  // since the body digest keeps its own entry for the same window).
   const storage = pluginStorage(ctx, NAMESPACE)
   await storage.set(`webhook-delivery/${delivery}`, { digest: 'f'.repeat(64), receivedAt: Date.now() - 7_200_000, expiresAt: Date.now() - 3_600_000 })
   await restart()
   expect((await send({ body: JSON.stringify({ ref: 'refs/heads/after-window' }), delivery })).status).toBe(202)
   expect(created).toHaveLength(2)
+})
+
+it('remembers a GitHub body for the whole delivery window, and lets GitHub redeliver an event that started no thread', async () => {
+  const { automations, created, origin, ctx, rewrite } = await fixture({ githubDeliveryWindowHours: 1 })
+  const saved = await automations.save({
+    title: 'Push events',
+    projectId: 'project-1',
+    prompt: 'Handle {{body.ref}}',
+    enabled: false,
+    trigger: { kind: 'webhook', secretRef: 'secret:HOOK', ratePerMinute: 20 },
+  })
+  const url = `${origin}${saved.webhookPath ?? ''}`
+  const send = (input: { readonly body: string; readonly delivery: string }) =>
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-github-delivery': input.delivery,
+        'x-hub-signature-256': WebhookSignature.signGitHub({ secret: HOOK_SECRET, body: Buffer.from(input.body) }),
+      },
+      body: input.body,
+    })
+  const body = JSON.stringify({ ref: 'refs/heads/main' })
+  const delivery = '8b324354-1111-4222-8333-944455556666'
+
+  // Paused: refused before the delivery is claimed, so GitHub's Redeliver works once the automation is resumed.
+  expect((await send({ body, delivery })).status).toBe(409)
+  await automations.setEnabled({ id: saved.id, enabled: true })
+
+  // The thread cannot start: the claim is released, so the same delivery is accepted after the cause is fixed.
+  await rewrite(saved.id, record => ({ ...record, projectId: 'gone' }))
+  expect((await send({ body, delivery })).status).toBe(502)
+  await rewrite(saved.id, record => ({ ...record, projectId: 'project-1' }))
+  const startedAt = Date.now()
+  expect((await send({ body, delivery })).status).toBe(202)
+  expect(created).toHaveLength(1)
+
+  // The unsigned delivery id cannot launder a captured body: its digest is kept as long as the delivery id.
+  const entries = await pluginStorage(ctx, NAMESPACE).listAll({ prefix: 'webhook-body/' })
+  const bodyEntry = Schema.decodeUnknownSync(Schema.Struct({ expiresAt: Schema.Number }))(entries[0]?.value)
+  expect(bodyEntry.expiresAt).toBeGreaterThanOrEqual(startedAt + 3_600_000)
+  expect((await send({ body, delivery: '9c435465-1111-4222-8333-944455556666' })).status).toBe(401)
+  expect(created).toHaveLength(1)
 })

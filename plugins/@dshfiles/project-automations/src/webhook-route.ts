@@ -186,13 +186,20 @@ export const handleWebhook = Effect.fn('automation webhook', { kind: 'server' })
         guard: guards.replay,
       })
   if (!verdict.ok) return yield* reject(verdict.reason)
-  if (github) {
-    const deliveryId = header(request, GITHUB_DELIVERY_HEADER)?.trim()
-    if (deliveryId === undefined || deliveryId === '') return yield* reject('missing-delivery')
-    if (!isDeliveryId(deliveryId)) return yield* reject('malformed-delivery')
+  const deliveryId = github ? header(request, GITHUB_DELIVERY_HEADER)?.trim() : undefined
+  if (github && (deliveryId === undefined || deliveryId === '')) return yield* reject('missing-delivery')
+  if (deliveryId !== undefined && !isDeliveryId(deliveryId)) return yield* reject('malformed-delivery')
+  if (!automation.enabled) {
+    yield* outcome('paused')
+    yield* runner.reject({ automation, detail: 'Refused: the automation is paused. Resume it in DSH › Automations to accept requests again.' })
+    return yield* reply(response, 409, { ok: false, message: 'This automation is paused in DSH. Resume it to accept requests.' })
+  }
+  // Claimed only once the event will start a thread, and released if it does not, so GitHub's Redeliver works.
+  const digest = bodyDigestOf(body.success)
+  if (deliveryId !== undefined) {
     const settings = yield* ProjectAutomationsSettingsTag
     const windowMs = (yield* settings.get).githubDeliveryWindowHours * 3_600_000
-    const claimed = yield* replay.claim({ deliveryId, digest: bodyDigestOf(body.success), now, windowMs }).pipe(Effect.result)
+    const claimed = yield* replay.claim({ deliveryId, digest, now, windowMs }).pipe(Effect.result)
     if (Result.isFailure(claimed)) {
       yield* outcome('replay-store-unavailable')
       return yield* reply(response, 503, {
@@ -202,14 +209,10 @@ export const handleWebhook = Effect.fn('automation webhook', { kind: 'server' })
     }
     if (!claimed.success.ok) return yield* reject(claimed.success.reason)
   }
-  if (!automation.enabled) {
-    yield* outcome('paused')
-    yield* runner.reject({ automation, detail: 'Refused: the automation is paused. Resume it in DSH › Automations to accept requests again.' })
-    return yield* reply(response, 409, { ok: false, message: 'This automation is paused in DSH. Resume it to accept requests.' })
-  }
   const text = body.success.toString('utf8')
   const prompt = `${PromptTemplate.fill(automation.prompt, { body: PromptTemplate.body(text, header(request, 'content-type')), headers: request.headers })}${PromptTemplate.framing(automation.title, PromptTemplate.fields(automation.prompt))}`
   const run = yield* runner.start({ automation, trigger: 'webhook', prompt })
+  if (run.outcome !== 'started' && deliveryId !== undefined) yield* replay.release({ deliveryId, digest }).pipe(Effect.ignore)
   yield* outcome(run.outcome)
   return yield* run.outcome === 'started'
     ? reply(response, 202, { ok: true, runId: run.id, sessionId: run.sessionId })
