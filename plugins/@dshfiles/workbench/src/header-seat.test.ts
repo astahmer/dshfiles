@@ -16,6 +16,7 @@ afterEach(() => {
   document.body.replaceChildren()
   document.documentElement.removeAttribute('data-shell-phone-nav')
   document.documentElement.removeAttribute('data-workbench-main-tabs')
+  document.documentElement.removeAttribute('data-dshfiles-zen')
 })
 
 describe('HeaderSeats', () => {
@@ -56,6 +57,21 @@ describe('HeaderSeats', () => {
     expect(HeaderSeats.resolve(panel(main))).toBeNull()
     document.documentElement.removeAttribute('data-shell-layout')
     document.documentElement.setAttribute('data-workbench-main-tabs', 'shown')
+    expect(HeaderSeats.resolve(panel(main))).not.toBeNull()
+  })
+
+  it('renders the main header inline in zen mode and seats it again on leaving, with the setting still shown', () => {
+    const region = document.createElement('div')
+    region.setAttribute('data-workbench-region', 'main')
+    document.body.append(region)
+    const main = group({ width: 1400 })
+    region.append(main.element)
+    const right = group({ width: 1400 })
+    document.documentElement.setAttribute('data-workbench-main-tabs', 'shown')
+    document.documentElement.setAttribute('data-dshfiles-zen', 'on')
+    expect(HeaderSeats.resolve(panel(main))).toBeNull()
+    expect(HeaderSeats.resolve(panel(right))).not.toBeNull()
+    document.documentElement.removeAttribute('data-dshfiles-zen')
     expect(HeaderSeats.resolve(panel(main))).not.toBeNull()
   })
 })

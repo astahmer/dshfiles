@@ -163,7 +163,8 @@
  * region is the stage, not a tab set. Threads switch from the list, ⌘K and the keys, so its tab rows (tabs, New tab,
  * Pane options) are chrome that duplicates the sidebar: hide them and let the thread header take the row. Since the one
  * sidebar layout (b:952m) this setting alone decides; the right pane keeps its facet tabs. */
-[data-workbench-main-tabs='hidden'] [data-workbench-region='main'] .dv-tabs-and-actions-container {
+[data-workbench-main-tabs='hidden'] [data-workbench-region='main'] .dv-tabs-and-actions-container,
+[data-dshfiles-zen='on'] [data-workbench-region='main'] .dv-tabs-and-actions-container {
   display: none;
 }
 

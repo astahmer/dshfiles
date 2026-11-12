@@ -7,7 +7,7 @@
  * No seat (the header renders inline, as its own single row under the tabs) while the panel is not its group's
  * visible tab, while the group's tab row is hidden (Hide tab row), while the row has less than SEAT_MIN_FREE_PX
  * beside its tabs (a half-width split or many open tabs cannot hold the header in the same row), in the main region
- * while its tab rows are hidden (showMainTabs off, productivity pass Q5), and in the phone shell, where the workbench hides
+ * while its tab rows are hidden (showMainTabs off, productivity pass Q5, or zen mode), and in the phone shell, where the workbench hides
  * tab rows and the conversation header moves into the top bar's menu.
  */
 import type { DockviewApi, DockviewPanelApi } from 'dockview-react'
@@ -36,6 +36,9 @@ const phoneShell = (): boolean =>
  */
 export const MAIN_TABS_ATTRIBUTE = 'data-workbench-main-tabs'
 export const mainTabsHidden = (): boolean => document.documentElement.getAttribute(MAIN_TABS_ATTRIBUTE) === 'hidden'
+/** Frame-layout's zen mode (`ZenMode.attribute`) hides the main tab rows too (dockview-theme.css), without writing showMainTabs. */
+const ZEN_ATTRIBUTE = 'data-dshfiles-zen'
+const mainRowsHidden = (): boolean => mainTabsHidden() || document.documentElement.getAttribute(ZEN_ATTRIBUTE) === 'on'
 /** The part of a Dockview group a header seat reads: its element and whether its tab row is hidden. */
 export interface SeatGroup {
   readonly element: HTMLElement
@@ -48,7 +51,7 @@ export interface SeatPanel {
   readonly isVisible: boolean
 }
 
-const hiddenMainRow = (group: SeatGroup): boolean => mainTabsHidden() && group.element.closest("[data-workbench-region='main']") !== null
+const hiddenMainRow = (group: SeatGroup): boolean => mainRowsHidden() && group.element.closest("[data-workbench-region='main']") !== null
 
 export class HeaderSeats {
   /** The group's seat element, created on first use just before its right-hand actions. */
@@ -97,7 +100,7 @@ export const useHeaderSeat = (): HTMLElement | null => {
     media?.addEventListener('change', update)
     // Showing or hiding the main tab rows moves the header in or out of the tab row.
     const layout = typeof MutationObserver === 'function' ? new MutationObserver(update) : undefined
-    layout?.observe(document.documentElement, { attributes: true, attributeFilter: [MAIN_TABS_ATTRIBUTE] })
+    layout?.observe(document.documentElement, { attributes: true, attributeFilter: [MAIN_TABS_ATTRIBUTE, ZEN_ATTRIBUTE] })
     // The group's width decides too (a sash drag or a window resize), and so do its tabs (one opened or closed);
     // a moved panel changes group.
     let observed: HTMLElement | undefined
