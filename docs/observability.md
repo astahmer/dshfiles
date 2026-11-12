@@ -107,7 +107,8 @@ no-op.
   `marketplace hub request`, `tweet context fetch` and `ffmpeg sample`,
   `worktree-memory probe`, `usage index`, `usage metrics export`,
   `background-jobs history pass`, `session tail read` (session-controller),
-  `otlp ingest` (traces receiver, metrics and logs only) and
+  `thread mention resolve` (thread-sidebar: the one Session a thread menu action
+  names, by id), `otlp ingest` (traces receiver, metrics and logs only) and
   `jj-integration workspace sync`.
 - `host event-loop stall` (traces): a root span for each stretch the Host
   event loop was blocked past `eventLoopStallMs` (100 ms), from a 100 ms

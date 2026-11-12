@@ -21,6 +21,8 @@ import { ClientModules } from './client-modules-promise.js'
 import { FinishedTurnAttention } from './inbox-provider.js'
 import { InflightTurns } from './inflight-turns.js'
 import { threadSidebarMachineApi } from './machine-api.js'
+import { threadMentionCandidateApi } from './mention-candidate-api.js'
+import { resolveThreadMentionCandidate } from './mention-candidate.js'
 import { threadSidebarThreadDirectoriesApi } from './thread-directories-api.js'
 import { MachineName } from './machine-name.js'
 import { threadSidebarNavigationApi } from './navigation-api.js'
@@ -177,6 +179,7 @@ export default DshxPlugin.make({
     'sessionPersistence',
     'sessionProjections',
     'sessionQuery',
+    'sessions',
     'storageDomain',
     'subprocess',
     'workspaceController',
@@ -243,6 +246,9 @@ export default DshxPlugin.make({
     }),
     Api.bind(threadSidebarMachineApi, {
       name: () => MachineName.use(machine => Effect.map(machine.name, name => ({ name }))),
+    }),
+    Api.bind(threadMentionCandidateApi, {
+      resolve: input => resolveThreadMentionCandidate(input),
     }),
     Api.bind(threadSidebarPluginUpdatesApi, {
       pending: () => ClientModules.use(modules => Effect.map(modules.pendingPlugins, plugins => ({ plugins: [...plugins] }))),

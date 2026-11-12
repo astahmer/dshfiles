@@ -70,6 +70,7 @@ import { NotificationHistoryPanel } from './notification-history-panel.js'
 import { notificationHistoryLocale } from './notification-history-locales.js'
 import { createSkillMentionSource } from './skill-mention.js'
 import { followUpPrompt } from './follow-up.js'
+import { threadMentionCandidateApi } from './mention-candidate-api.js'
 import {
   buildThreadReferenceInsert,
   classifyThreadMentionFailure,
@@ -166,6 +167,7 @@ export default defineClient({
   // Every registered component reads Settings, so each one goes through decorate.
   setup(ctx, decorate, metadata) {
     const multiHost = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
+    const mentionCandidates = createApiClient(ctx, threadMentionCandidateApi)
     const plugin = metadata?.plugin
     if (plugin !== undefined) ctx.effect(() => PaletteBridge.connect(plugin), 'thread-sidebar: palette bridge')
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
@@ -382,6 +384,22 @@ export default defineClient({
           pending.current.add(controller)
           void (async () => {
             let failurePhase: ThreadMentionFailureDiagnosticInput['phase'] = 'resolver-exception'
+            try {
+              const resolved = await mentionCandidates.resolve({ sessionId: targetSessionId, agentSessionId: props.sessionId }, { signal: controller.signal })
+              if (controller.signal.aborted) return
+              if ('candidate' in resolved) {
+                failurePhase = 'insertion-exception'
+                if (!input.insertReference(buildThreadReferenceInsert(resolved.candidate), span)) {
+                  input.notify('info', translate('threadSidebarMentionDraftChanged'))
+                  return
+                }
+                if (focusAfterInsert) input.focus()
+                return
+              }
+            } catch {
+              // The native resolver below is the fallback for a Host without this read.
+              if (controller.signal.aborted) return
+            }
             try {
               const result = await ctx.remote.sessionReferenceResolver.candidates(props.sessionId, targetSessionId, controller.signal)
               if (controller.signal.aborted) return

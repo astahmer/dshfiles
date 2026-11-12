@@ -2799,12 +2799,24 @@
           "id": "thread-sidebar.thread-reference-mention-unit-main-composer",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
           "testName": "an unaddressed mention goes to the stage composer, never an aside composer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-reference-mention-unit-one-session-resolve",
+          "file": "plugins/@dshfiles/thread-sidebar/src/mention-candidate.test.ts",
+          "testName": "labels a cold Session from its projection cache and prefers the subagent creation label"
         }
       ],
       "telemetry": [
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "thread mention resolve",
+          "file": "plugins/@dshfiles/thread-sidebar/src/mention-candidate.test.ts",
+          "testName": "records one thread mention resolve span with identities only, never the title"
         }
       ]
     },

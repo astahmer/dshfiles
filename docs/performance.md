@@ -3,6 +3,42 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## "@Mention thread" resolves one Session, not the corpus (2026-11-12, `b:450`)
+
+The tab menu's **@Mention thread** item dispatches a client event; the mounted composer
+(`@dshfiles/thread-sidebar`'s input seat) awaited `ctx.remote.sessionReferenceResolver.candidates` before it inserted the
+chip. That native read (`@deepseek-ai/dsh-session-reference`) lists every Session through `sessionQuery.listSessions`
+and labels each one before it filters by the query, so resolving one known id costs the whole corpus per click. An
+isolated E2E run showed 239.73–271.78 ms for the click and 361–371 ms to the chip, but those numbers include
+Playwright actionability and `expect.poll` overhead; the probe here timestamps the menu-item `pointerdown` and the
+chip's first paint inside the page, so it measures the app, not the harness.
+
+Probe: scratch DSH (`dshx dev up`, ten owned bundles), 820 synthetic cold Sessions cloned from the scratch instance's
+own headers and projection cache (the live corpus is ~808), then 8 repetitions of right-click tab → click
+`@Mention thread` → wait for `[data-composer-chip="reference"]`. Runs alternate between the parent build and the fixed
+build on the same machine; `menu open` (right-click to menu visible) is the load control. Load average stayed ~25–40
+on 10 cores across the runs, with one before run's later samples stretching under it.
+
+| Click → chip                          | Before (parent) | Before (recheck) | After (one-Session read) | After (recheck) |
+| ------------------------------------- | --------------- | ---------------- | ------------------------ | --------------- |
+| median                                | 388 ms          | 581 ms           | 47 ms                    | 47 ms           |
+| spread                                | 245–631 ms      | 251–845 ms       | 45–47 ms                 | 45–48 ms        |
+| `sessionReferenceResolver.candidates` | 205–597 ms      | 220–803 ms       | —                        | —               |
+| `thread mention resolve` (new)        | —               | —                | 1–8 ms                   | 1–11 ms         |
+| menu open (load control)              | 62 ms median    | 68 ms median     | 64 ms median             | 62 ms median    |
+
+Fix: `@dshfiles/thread-sidebar` exposes `thread-mention-candidate/resolve`, one bounded Host read that finds the live
+Session through `ctx.agents` (or the stored header through `ctx.sessionPersistence.stat`, no corpus listing), labels it
+from the projection registry or the projection cache with the same `title`/`subagent` keys the native resolver uses,
+and formats the canonical mention with the native `formatSessionReferenceMention` codec. The client tries it first and
+keeps the native resolver, including its remote-thread fallback, for a self reference, a missing Session, an
+unreadable store, or an older Host. The Host unit opens one `thread mention resolve` span with the target Session id
+and whether the request was a self reference, never a title; `dshx.features.json` lists it with its `recordSpans()`
+test.
+
+Regression checks: `mention-candidate.test.ts` fails if the read lists the corpus (its fake persistence and
+`sessionQuery` record any list call) and fails if the span disappears or carries the title.
+
 ## Compaction engine setups replayed on recorded threads (2026-11-12, `b:2ng6`)
 
 Five recorded threads (tool-heavy, large tool results, images, a 128k model, skills with subagents) replayed through
