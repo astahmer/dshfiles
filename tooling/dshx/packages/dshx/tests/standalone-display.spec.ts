@@ -2,15 +2,17 @@
 import { expect, it } from 'vitest'
 import { observeStandaloneDisplay } from '../src/client/host-commands.js'
 
+// The part of MediaQueryList this test drives: a change listener's target with its current match.
+type MediaQueryListDouble = EventTarget & { media: string; matches: boolean }
+
 it('tracks standalone and window-controls-overlay changes', () => {
-  const lists = new Map<string, MediaQueryList>()
+  const lists = new Map<string, MediaQueryListDouble>()
   const matchMedia = window.matchMedia
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     value: (query: string) => {
-      const list = new EventTarget()
-      Object.assign(list, { media: query, matches: false })
-      lists.set(query, list as MediaQueryList)
+      const list: MediaQueryListDouble = Object.assign(new EventTarget(), { media: query, matches: false })
+      lists.set(query, list)
       return list
     },
   })

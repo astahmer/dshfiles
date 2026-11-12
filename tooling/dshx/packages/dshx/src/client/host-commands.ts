@@ -7,7 +7,7 @@
  * Host without it simply reports "cannot run".
  */
 
-export const observeStandaloneDisplay = (window: Window): { readonly matches: () => boolean; readonly dispose: () => void } => {
+export const observeStandaloneDisplay = (window: Window) => {
   if (typeof window.matchMedia !== 'function') return { matches: () => false, dispose: () => undefined }
   const standalone = window.matchMedia('(display-mode: standalone)')
   const overlay = window.matchMedia('(display-mode: window-controls-overlay)')
