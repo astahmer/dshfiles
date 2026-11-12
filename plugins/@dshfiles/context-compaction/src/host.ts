@@ -12,7 +12,7 @@ import { Context, Duration, Effect, Layer, Schema } from 'effect'
 import { compactionApi, type CompactionThreshold } from './compaction-api.js'
 import { compactionThresholdTokens } from './compaction-threshold.js'
 import { compactionRequestBudget, MIN_REQUEST_BUDGET_BYTES } from './budget.js'
-import { serializedMessageBytes, summarizeInChunks, SummaryRequestFailed } from './chunked-summary.js'
+import { CompactionBudgetExceeded, serializedMessageBytes, summarizeInChunks, SummaryRequestFailed } from './chunked-summary.js'
 import { observedIdleCandidate } from './idle-candidate.js'
 import { DEFAULT_IDLE_COMPACTION, type IdleCompactionPolicy } from './idle-compaction.js'
 import { idleGenerationStart } from './idle-generation.js'
@@ -152,6 +152,7 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
           policy = resolved
         },
         background: config.backgroundSummary,
+        isPersistentFailure: error => error instanceof CompactionBudgetExceeded || (error instanceof ContextCompactionFailure && error.reason !== 'model-info'),
         signal: engineAbort.signal,
       })
       yield* Effect.acquireRelease(

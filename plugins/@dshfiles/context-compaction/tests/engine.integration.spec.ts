@@ -93,6 +93,10 @@ const withAgent = async (
     readonly adapter: ScriptedAdapter
     readonly send: (text: string) => Promise<void>
     readonly summaries: () => number
+    /** Compactions that started and ended with an error instead of a checkpoint. */
+    readonly failedCompactions: () => number
+    /** Adds one tool whose description alone is this many bytes, to every request of the thread; returns its removal. */
+    readonly addLargeTool: (bytes: number) => () => void
     /** The `/compact` command's engine call: the whole history up to the newest exchange. */
     readonly compactNow: () => Promise<void>
   }) => Promise<void>,
@@ -127,6 +131,18 @@ const withAgent = async (
           session()
             .snapshotEvents()
             .filter(event => event.type === 'compaction/summary').length,
+        failedCompactions: () =>
+          session()
+            .snapshotEvents()
+            .filter(event => event.type === 'compaction/end' && 'error' in event.data && event.data.error !== undefined).length,
+        addLargeTool: bytes =>
+          host.tools.register({
+            name: 'large_catalog_entry',
+            description: 'x'.repeat(bytes),
+            parameters: { type: 'object', properties: {} },
+            output: { schema: { type: 'string' }, render: () => [] },
+            execute: () => Promise.resolve(''),
+          }),
         compactNow: async () => {
           await host.ctx.compaction.compactNow(handle.agent, new AbortController().signal)
         },
@@ -190,6 +206,22 @@ describe('the compaction engine in a real agent loop', () => {
       await compactNow()
       expect(summaries()).toBe(1)
       expect(adapter.compactions.length).toBeGreaterThan(prepared)
+    })
+  })
+
+  it('does not retry, on every step, a compaction whose summary request can never fit', async () => {
+    await withAgent({}, async ({ send, summaries, failedCompactions, addLargeTool }) => {
+      // The tool catalog alone exceeds the summary request budget of the 20,000-token window, as 365 tools did on a
+      // real thread: every pressure compaction fails before any model request.
+      const removeLargeTool = addLargeTool(40_000)
+      for (let index = 0; index < 8; index += 1) await send(note(index))
+      expect(summaries()).toBe(0)
+      expect(failedCompactions()).toBe(1)
+      // A smaller tool catalog can fit: once a request carries it, the next step tries again.
+      removeLargeTool()
+      for (let index = 8; index < 24 && summaries() === 0; index += 1) await send(note(index))
+      expect(summaries()).toBe(1)
+      expect(failedCompactions()).toBe(1)
     })
   })
 

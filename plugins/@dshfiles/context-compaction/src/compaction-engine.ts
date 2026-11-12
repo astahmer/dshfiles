@@ -41,6 +41,12 @@ interface Pressure {
   readonly measurement: TokenMeasurement
 }
 
+/** A pressure compaction that failed for a reason a retry cannot fix, until the surface or the request prefix changes. */
+interface StalledCompaction {
+  readonly generation: number
+  readonly request: string
+}
+
 const routeOf = (session: Session) => {
   const config = session.requestHeader()?.config
   if (config === undefined || config.provider === '' || config.model === '') return undefined
@@ -57,16 +63,29 @@ const policyFor = (config: ResolvedConfig, route: { readonly provider: string; r
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
+/** The route and tool catalog every summary request replays: a change can make a refused request fit. */
+const requestKeyOf = (session: Session) => {
+  const header = session.requestHeader()
+  return JSON.stringify([header?.config.provider, header?.config.model, header?.tools?.map(tool => tool.name)])
+}
+
 /**
- * The stock engine with three additions, all through its public, dynamically dispatched methods:
+ * The stock engine with four additions, all through its public, dynamically dispatched methods:
  * every summary request is bounded by `summarize` (split, reduced, shortened); a pressure compaction can apply a
- * summary prepared in the background instead of waiting for one; and a provider overflow the core does not code as
- * `CONTEXT_WINDOW_EXCEEDED` still gets the overflow compaction and retry.
+ * summary prepared in the background instead of waiting for one; a pressure failure that a retry cannot fix waits for
+ * the history or request prefix to change instead of repeating at every step; and a provider overflow the core does
+ * not code as `CONTEXT_WINDOW_EXCEEDED` still gets the overflow compaction and retry.
  */
 export const compactionEngine = (options: {
   readonly summarize: (request: SummaryRequest) => Promise<SummaryResult>
   readonly onConfig: (config: ResolvedConfig) => void
   readonly background: BackgroundSummaryPolicy
+  /**
+   * True for a summary failure that the same surface and route reproduce on every attempt (a request that cannot fit
+   * the budget, a route without image pricing). The pressure trigger then waits for the surface or the route to change
+   * instead of failing again at every step.
+   */
+  readonly isPersistentFailure: (error: unknown) => boolean
   /** Aborted when the plugin unloads: stops background summaries still in flight. */
   readonly signal: AbortSignal
 }) =>
@@ -74,6 +93,7 @@ export const compactionEngine = (options: {
     private readonly prepared = new WeakMap<Session, PreparedSummary>()
     private readonly preparing = new WeakSet<Session>()
     private readonly uncodedOverflowRetries = new WeakMap<Agent, number>()
+    private readonly stalled = new WeakMap<Session, StalledCompaction>()
 
     constructor(...args: ConstructorParameters<typeof BasicCompactionEngine>) {
       super(...args)
@@ -120,13 +140,27 @@ export const compactionEngine = (options: {
 
     override async compactIfNeeded(agent: Agent, trigger: CompactionTrigger, signal: AbortSignal): Promise<CompactionResult | null> {
       if (trigger !== 'pressure') return super.compactIfNeeded(agent, trigger, signal)
+      const session = agent.session
+      const stalled = this.stalled.get(session)
+      if (stalled !== undefined && stalled.generation === session.surface.replaceGeneration && stalled.request === requestKeyOf(session)) return null
+      this.stalled.delete(session)
+      try {
+        return await this.compactForPressure(agent, signal)
+      } catch (error: unknown) {
+        if (!signal.aborted && options.isPersistentFailure(error))
+          this.stalled.set(session, { generation: session.surface.replaceGeneration, request: requestKeyOf(session) })
+        throw error
+      }
+    }
+
+    private async compactForPressure(agent: Agent, signal: AbortSignal): Promise<CompactionResult | null> {
       const pressure = await this.pressure(agent, signal)
-      if (pressure === null) return super.compactIfNeeded(agent, trigger, signal)
+      if (pressure === null) return super.compactIfNeeded(agent, 'pressure', signal)
       if (pressure.measurement.totalTokens < pressure.spec.thresholdTokens) return null
       const applied = await this.applyPrepared(agent, signal)
       if (applied !== null && this.ctx.tokenMeter.measure(agent.session).totalTokens < pressure.spec.thresholdTokens) return applied
       const rest = pressure.spec.headroomApplied
-        ? await super.compactIfNeeded(agent, trigger, signal)
+        ? await super.compactIfNeeded(agent, 'pressure', signal)
         : await this.compactWithoutHeadroom(agent, pressure.spec, signal)
       return rest ?? applied
     }

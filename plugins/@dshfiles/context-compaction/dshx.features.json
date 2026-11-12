@@ -15,7 +15,8 @@
       "failureModes": [
         "A system prompt, tool catalog, or one indivisible tool transaction with nothing long enough to shorten can exceed the safe request budget; compaction fails without rewriting the session history.",
         "Shortened tool outputs and older exchange text keep only their first 1,024 and last 512 characters in the summary request, so the summary can miss detail from their middle.",
-        "An image-bearing request without model-declared image pricing cannot be safely sized and fails before dispatch."
+        "An image-bearing request without model-declared image pricing cannot be safely sized and fails before dispatch.",
+        "A failure that the same history and request prefix reproduce (the budget refusals above, a route without image pricing) is attempted once; pressure compaction then waits until a compaction rewrites the history or the route or tool catalog changes."
       ],
       "externalDependencies": [],
       "verification": [
@@ -30,6 +31,12 @@
           "id": "context-compaction.overflow-shortening",
           "file": "tests/chunked-summary.spec.ts",
           "testName": "answers a provider overflow by shortening older tool outputs and keeping the newest exchange intact"
+        },
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.persistent-failure",
+          "file": "tests/engine.integration.spec.ts",
+          "testName": "does not retry, on every step, a compaction whose summary request can never fit"
         },
         {
           "kind": "not-applicable",
