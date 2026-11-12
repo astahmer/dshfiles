@@ -69,9 +69,9 @@ function fixture() {
   const shell = new SessionInputShell({
     actx: ctx,
     inputTriggers: () => triggers,
-    defaultSink: (text, attachments, mode, signal) => {
+    defaultSink: (text, attachments, mode, signal, accept) => {
       // Exercise this package's real routing boundary, not a copy of its materialization logic.
-      const pending = hub['sink'](session, text, attachments, mode, signal)
+      const pending = hub['sink'](session, text, attachments, mode, signal, accept)
       void pending.then(outcome.resolve, outcome.reject)
       return pending
     },
@@ -113,19 +113,20 @@ describe('draft retry after the real composer clears its outgoing content', () =
     update.mockClear()
     shell.submit()
     await expect(outcome.promise).resolves.toEqual({ kind: 'success' })
-    expect(shell.snapshot.attachmentIds).toEqual([])
+    await vi.waitFor(() => expect(shell.snapshot.attachmentIds).toEqual([]))
+    // The composer keeps the attachment until the Host accepts it, then the observed draft empties.
     expect(update.mock.calls).toEqual([
-      [session.sessionId, { text: '', hasAttachments: false }],
       [session.sessionId, { text: '', hasAttachments: true }],
+      [session.sessionId, { text: '', hasAttachments: false }],
     ])
-    expect(update.mock.invocationCallOrder.at(-1)).toBeLessThan(retry.mock.invocationCallOrder[0]!)
+    expect(update.mock.invocationCallOrder[0]).toBeLessThan(retry.mock.invocationCallOrder[0]!)
     expect(send).toHaveBeenCalledOnce()
     expect(retain).toHaveBeenCalledExactlyOnceWith(session.sessionId, { source: 'controllerOperation' })
     expect(release).toHaveBeenCalledOnce()
     expect(readiness).not.toHaveBeenCalled()
   })
 
-  it('re-admits serialized references after the editor clears and before retrying failed selection', async () => {
+  it('re-admits serialized references before retrying failed selection while the editor holds the sent draft', async () => {
     const { session, drafts, update, retry, send, shell, outcome, serialized, serializeReference } = fixture()
     shell.setDraft({
       text: '@file',
@@ -134,15 +135,16 @@ describe('draft retry after the real composer clears its outgoing content', () =
     update.mockClear()
     shell.submit()
     expect(serializeReference).toHaveBeenCalledOnce()
-    expect(shell.snapshot.draft).toBe('')
-    expect(update).toHaveBeenLastCalledWith(session.sessionId, { text: '', hasAttachments: false })
+    expect(shell.snapshot.phase).toBe('sending')
+    expect(shell.snapshot.draft).toBe('@file')
+    expect(update).not.toHaveBeenCalled()
     expect(drafts.retry).not.toHaveBeenCalled()
     serialized.resolve('Serialized reference payload')
     await expect(outcome.promise).resolves.toEqual({ kind: 'success' })
-    expect(update).toHaveBeenLastCalledWith(session.sessionId, { text: 'Serialized reference payload', hasAttachments: false })
-    expect(update.mock.invocationCallOrder.at(-1)).toBeLessThan(retry.mock.invocationCallOrder[0]!)
+    expect(update).toHaveBeenNthCalledWith(1, session.sessionId, { text: 'Serialized reference payload', hasAttachments: false })
+    expect(update.mock.invocationCallOrder[0]).toBeLessThan(retry.mock.invocationCallOrder[0]!)
     expect(send).toHaveBeenCalledOnce()
-    // Re-admitting the outgoing payload must not restore or replace the editor's current contents.
-    expect(shell.snapshot.draft).toBe('')
+    // The accepted send clears the editor; re-admission never wrote the payload into it.
+    await vi.waitFor(() => expect(shell.snapshot.draft).toBe(''))
   })
 })

@@ -75,13 +75,14 @@ describe('draft annotations', () => {
     await vi.waitFor(() => expect(sent).toEqual(['Annotation 1 on your previous reply:\n> only this']))
   })
 
-  it('gives the annotations back when the send fails', async () => {
+  it('keeps the annotations on the draft when the send fails', async () => {
     const admitted = Promise.withResolvers<SubmitOutcome>()
     const shell = shellSendingTo(() => admitted.promise)
     shell.annotations.add({ text: 'kept', source: 'step-key' })
     shell.setDraft('message')
     shell.submit()
-    expect(shell.annotations.snapshot()).toEqual([])
+    expect(shell.snapshot.phase).toBe('sending')
+    expect(shell.annotations.snapshot().map(annotation => annotation.text)).toEqual(['kept'])
 
     admitted.resolve({ kind: 'error', text: 'refused' })
 

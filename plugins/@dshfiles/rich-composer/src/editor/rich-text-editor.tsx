@@ -214,6 +214,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
         additionalNodes: nodeTypes.current,
         onUpdate: () => {},
         openReference: () => false,
+        quoteLabels: () => ({ remove: '' }),
         lexicon: () => new Map(),
         resolveLexicon: () => undefined,
       }),

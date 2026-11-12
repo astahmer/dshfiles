@@ -14,6 +14,7 @@ const runtimeFor = () => {
   const runtime = new DraftEditorRuntime({
     onUpdate: () => holder.current?.refreshProjection(),
     openReference: () => false,
+    quoteLabels: () => ({ remove: '' }),
     lexicon: () => new Map(),
     resolveLexicon: () => undefined,
   })

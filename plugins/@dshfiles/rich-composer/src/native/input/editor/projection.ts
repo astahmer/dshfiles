@@ -11,8 +11,9 @@ import type { ElementNode, LexicalNode, NodeKey, Point } from 'lexical'
 import {
   $getRoot, $getSelection, $isElementNode, $isLineBreakNode, $isRangeSelection, $isTextNode,
 } from 'lexical'
-import type { Occurrence } from '../../contract/draft-editor.ts'
+import type { DraftQuote, Occurrence } from '../../contract/draft-editor.ts'
 import type { CommandClaim } from '../../contract/input.ts'
+import { $isQuoteNode } from './QuoteNode.tsx'
 import { $isReferenceChipNode } from './chip-node.tsx'
 import { $isCommandChipNode } from './command-chip-node.tsx'
 
@@ -81,7 +82,7 @@ export function $composerLayout(): ComposerLayout {
     const kids = element.getChildren()
     children.set(element.getKey(), kids.map(kid => kid.getKey()))
     for (const kid of kids) {
-      if ($isReferenceChipNode(kid) || $isCommandChipNode(kid)) {
+      if ($isReferenceChipNode(kid) || $isCommandChipNode(kid) || $isQuoteNode(kid)) {
         pushLeaf('chip', kid, ATOMIC_CHAR, kid.getTextContent())
       } else if ($isTextNode(kid)) {
         const text = kid.getTextContent()
@@ -160,6 +161,8 @@ export interface EditorProjection {
   readonly clipboardText: string
   /** InputState-compatible occurrence view (clipboardText coordinates). */
   readonly occurrences: readonly Occurrence[]
+  /** Atomic quotes in clipboard coordinates. */
+  readonly quotes: readonly DraftQuote[]
   /** Range selection in detect coordinates (ordered); null while absent or non-range. */
   readonly selection: { readonly start: number; readonly end: number } | null
   /** Collapsed caret in detect coordinates; null while the selection is absent or ranged. */
@@ -199,6 +202,8 @@ export interface ComposerProjectionContent {
   readonly clipboardText: string
   /** InputState-compatible occurrence view (clipboardText coordinates). */
   readonly occurrences: readonly Occurrence[]
+  /** Atomic quotes in clipboard coordinates. */
+  readonly quotes: readonly DraftQuote[]
   /** Claim of the command chip opening the document; undefined without one. */
   readonly command: CommandClaim | undefined
 }
@@ -219,8 +224,14 @@ export interface ComposerSelectionProjection {
  */
 export function $composerProjectionContent(layout: ComposerLayout, idOf: (key: NodeKey) => number): ComposerProjectionContent {
   const occurrences: Occurrence[] = []
+  const quotes: DraftQuote[] = []
   for (const segment of layout.segments) {
-    if (segment.kind !== 'chip' || !$isReferenceChipNode(segment.node)) continue
+    if (segment.kind !== 'chip') continue
+    if ($isQuoteNode(segment.node)) {
+      quotes.push({ offset: segment.clipboardStart, length: segment.clipboardLength, text: segment.node.getQuoteText() })
+      continue
+    }
+    if (!$isReferenceChipNode(segment.node)) continue
     const chip = segment.node
     occurrences.push({
       occurrenceId: idOf(chip.getKey()),
@@ -239,6 +250,7 @@ export function $composerProjectionContent(layout: ComposerLayout, idOf: (key: N
     detectText: layout.detectText,
     clipboardText: layout.clipboardText,
     occurrences,
+    quotes,
     command: $isCommandChipNode(lead) ? lead.getClaim() : undefined,
   }
 }

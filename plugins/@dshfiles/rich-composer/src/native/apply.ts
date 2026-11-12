@@ -1,3 +1,4 @@
+import type {} from '@deepseek-ai/dsh-client-ui-context-menu/client'
 /** Registers the target-neutral Conversation assembly, shell, input, and docks. */
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
 import type { Context } from '@deepseek-ai/cordis'
@@ -51,10 +52,9 @@ import { InputBar } from './skeleton/InputBar.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { installStopShortcut } from './stop-shortcut.ts'
 import { liveViewBindings } from './conversation/live-bindings.ts'
-import { DEFAULT_VIEW_ID, TRAJECTORY_VIEW_ID, resolveActiveView } from './view-selection.ts'
-import { ThreadViewsModel } from '../thread-views.ts'
-import { ThreadViewFacets, type ThreadViewPanel } from '../thread-view-facets.tsx'
-import { en, NS, zh, type ConversationKey } from './locales.ts'
+import { TRAJECTORY_VIEW_ID, resolveActiveView } from './view-selection.ts'
+import { createViewPins } from './view-pins.ts'
+import { en, ja, es, fr, de, ru, pt, NS, zh, type ConversationKey } from './locales.ts'
 import { CONVERSATION_SETTINGS_NAMESPACE, type ConversationSettings } from '../submission-settings.ts'
 import { PromptRecallModel } from '../prompt-recall.ts'
 
@@ -176,7 +176,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
   const slots = ctx.slots
   // Schemastery's field default is materialized before Cordis calls apply.
   const maxConcurrentFileUploads = config.maxConcurrentFileUploads as number
-  const workspaceNavigation = ctx.get('uiWorkspace') as unknown as WorkspaceNavigation
+  const workspaceNavigation = ctx.get('uiWorkspace') as WorkspaceNavigation
   const uiConversation = new UiConversation(ctx, sessions)
   uiConversation.userText.register(sessionReferenceRule)
   uiConversation.userText.register(collapseWhitespaceRule)
@@ -231,7 +231,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     yield slots.register({ name: 'conversation.user.text.node', key: 'session', priority: 100 }, SessionReference)
   })
 
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-conversation: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-conversation: dictionaries')
   const t = ctx.locale.bind(NS)
   const conversationStore = createConversationStore()
   const submissionPolicy = new ComposerSubmissionPolicy(
@@ -306,6 +306,11 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     facetPanel.set({ Panel: panels.ViewPanel })
     return () => { facetPanel.set(undefined); offView(); offRoot(); panels.dispose(); offCatalog() }
   }, 'ui-conversation: workbench view sources')
+  const viewPins = createViewPins()
+  const viewActions = {
+    getSnapshot: () => slots.entriesOfSlot('conversation.session.header.views.actions').length > 0,
+    subscribe: (listener: () => void) => slots.subscribe('conversation.session.header.views.actions', listener),
+  }
   const bindings = new Set<SessionBinding>()
   const trackedBindings = new WeakSet<SessionBinding>()
   const trackBinding = (binding: SessionBinding): void => {
@@ -458,6 +463,8 @@ export function apply(ctx: Context, config: Config = Config({})): void {
         selectWorkspace: workspaceId => workspaceNavigation.openWorkspace(workspaceId, nextId => {
           if (sessionId === undefined || nextId === sessionId) return
           const from = inputHub.shell(sessionId)
+          // A draft with a submission in flight stays with the Session that is admitting it.
+          if (from.snapshot.phase !== 'plain' && from.snapshot.phase !== 'claimed') return
           const carriesDraft = from.snapshot.draft !== '' || from.snapshot.attachmentIds.length > 0
           if (!carriesDraft) return
           const destinationSessionReady = sessions.binding(nextId) !== undefined
@@ -472,8 +479,12 @@ export function apply(ctx: Context, config: Config = Config({})): void {
             sourceSessionId: sessionId,
             destinationSessionId: nextId,
             destinationSessionReady,
-            rebindAttachments: (targetSessionId, attachmentIds) =>
-              concreteConversation(ctx).rebindDraftFiles(SessionId(targetSessionId), attachmentIds),
+            // The same rule as intake: only an ordinary Session stages image uploads.
+            rebindAttachments: (targetSessionId, attachmentIds) => concreteConversation(ctx).rebindDraftFiles(
+              SessionId(targetSessionId),
+              attachmentIds,
+              sessions.binding(SessionId(targetSessionId))?.session.getSnapshot().subagent === null,
+            ),
           })
           if (handoff === 'kept') from.notify('info', t('workspace.draftTransferRefused'))
         }),
@@ -538,10 +549,12 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       'conversation.session.header.utilities': { kind: 'list', scope: 'session' },
       'conversation.session.header.changes': { kind: 'list', scope: 'session' },
       'conversation.session.header.corner': { kind: 'single', scope: 'session' },
+      'conversation.session.header.views.actions': { kind: 'list', scope: 'root' },
     },
     store: conversationStore,
     inject: (sessionId: SessionId, actions: BoundActions<typeof conversationStore>): ConversationSessionHeaderInjected => ({
-      hooks: { conversationViews },
+      hooks: { conversationViews, entryPins: viewPins.unpinned, entryActions: viewActions },
+      setPinned: viewPins.setPinned,
       open: (id) => { workspaceNavigation.openSession(id) },
       rename: async (id, title) => {
         const result = await ctx.remote.session.rename({ sessionId: id, title })
@@ -608,7 +621,8 @@ export function apply(ctx: Context, config: Config = Config({})): void {
         addFiles: (files, directories = new Set()) => {
           const conversation = liveConversation(ctx)
           if (sessions.binding(sessionId) === undefined || conversation === undefined) return t('file.sessionUnavailable')
-          if (shell.snapshot.phase === 'adjudicating' || shell.snapshot.phase === 'submitting') {
+          const { phase } = shell.snapshot
+          if (phase === 'adjudicating' || phase === 'submitting' || phase === 'sending') {
             return t('attachment.dropBlocked')
           }
           const uploads: File[] = []
@@ -634,7 +648,9 @@ export function apply(ctx: Context, config: Config = Config({})): void {
             })
           }
           try {
-            const drafts = conversation.createDrafts(sessionId, uploads)
+            // The Host stages uploads for ordinary Sessions only; a subagent continuation's images travel inline.
+            const ordinary = sessions.binding(sessionId)?.session.getSnapshot().subagent === null
+            const drafts = conversation.createDrafts(sessionId, uploads, ordinary)
             const existingImageCount = conversation.resolveDraftAttachments(shell.snapshot.attachmentIds)
               .filter(attachment => attachment.kind === 'image').length
             references.push(...imageAttachmentReferences(

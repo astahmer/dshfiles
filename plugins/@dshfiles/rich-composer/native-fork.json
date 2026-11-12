@@ -3,8 +3,8 @@
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-client-ui-conversation",
-    "version": "0.2.1-rc.2",
-    "ref": "dsh-v0.2.1-rc.2",
+    "version": "0.2.2-rc.1",
+    "ref": "dsh-v0.2.2-rc.1",
     "path": "packages/client/ui-conversation"
   },
   "files": [
@@ -59,16 +59,16 @@
     "src/native/skeleton/HeroShell.module.css",
     "src/native/skeleton/control-row-layout.ts",
     "src/native/skeleton/DefaultConversationViews.tsx",
-    "src/native/skeleton/ContextMeter.tsx",
-    "src/native/skeleton/ContextMeter.module.css"
+    "src/native/skeleton/control-row-layout.ts",
+    "src/native/input/decorations.ts",
+    "src/native/input/editor/text-ref.ts",
+    "src/native/input/prompt.ts"
   ],
   "added": [
     "src/native/conversation/live-bindings.test.ts",
     "src/native/conversation/live-bindings.ts",
     "src/native/image-attachment-references.test.ts",
     "src/native/image-attachment-references.ts",
-    "src/native/input/detached-sends.test.ts",
-    "src/native/input/detached-sends.ts",
     "src/native/input/draft-annotations.ts",
     "src/native/input/editor/keymap.test.ts",
     "src/native/input/editor/reference-activation.test.ts",

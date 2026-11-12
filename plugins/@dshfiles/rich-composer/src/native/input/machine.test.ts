@@ -9,7 +9,7 @@ const claim: CommandClaim = {
 }
 
 const attemptOf = (machine: SubmitMachine, draft: string) => {
-  const [effect] = machine.dispatch({ type: 'enter', mode: 'queue', draft })
+  const [effect] = machine.dispatch({ type: 'enter', mode: 'queue', draft, occurrences: [], quotes: [], attachmentIds: [] })
   if (effect?.type !== 'adjudicate' && effect?.type !== 'begin-submit') throw new Error('expected a frozen attempt effect')
   return effect.attempt
 }
@@ -17,7 +17,7 @@ const attemptOf = (machine: SubmitMachine, draft: string) => {
 describe('SubmitMachine', () => {
   it('does not cancel an in-flight default send when its composer releases', () => {
     const machine = new SubmitMachine()
-    const [effect] = machine.dispatch({ type: 'enter', mode: 'queue', draft: 'A sent answer' })
+    const [effect] = machine.dispatch({ type: 'enter', mode: 'queue', draft: 'A sent answer', occurrences: [], quotes: [], attachmentIds: [] })
     if (effect?.type !== 'default-sink') throw new Error('expected a default-send effect')
 
     machine.dispatch({ type: 'release' })

@@ -14,6 +14,7 @@ const runtime = (): DraftEditorRuntime => {
   const editor = new DraftEditorRuntime({
     onUpdate: () => undefined,
     openReference: () => false,
+    quoteLabels: () => ({ remove: '' }),
     lexicon: () => new Map(),
     resolveLexicon: () => undefined,
   })

@@ -60,12 +60,13 @@ function fixture(sink: (text: string) => Promise<SubmitOutcome>) {
 }
 
 describe('composer restore state', () => {
-  it('restores a failed send into the emptied draft', async () => {
+  it('keeps a refused send in the draft', async () => {
     const admitted = Promise.withResolvers<SubmitOutcome>()
     const { shell } = fixture(() => admitted.promise)
     shell.setDraft('A sent answer')
     shell.submit()
-    expect(shell.snapshot.draft).toBe('')
+    expect(shell.snapshot.phase).toBe('sending')
+    expect(shell.snapshot.draft).toBe('A sent answer')
 
     admitted.resolve({ kind: 'error', text: 'refused' })
 

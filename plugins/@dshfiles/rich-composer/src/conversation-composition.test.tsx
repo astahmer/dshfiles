@@ -118,7 +118,9 @@ const fixture = (id: string, initialView = 'chat', fixtureOptions: FixtureOption
     useProjection: vi.fn().mockImplementation((_key, selector) => selector?.(undefined)),
     useWorkspaces: selected({ phase: 'ready' as const, items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle' as const, error: null }),
     usePanelInfo: vi.fn(),
+    useContextMenu: () => ({ getTriggerProps: () => ({}) }),
     inputActions: {
+      insertQuote: () => false,
       captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
       insertText: () => true,
       setDraft: vi.fn(),
@@ -215,6 +217,9 @@ const fixture = (id: string, initialView = 'chat', fixtureOptions: FixtureOption
     actions: viewProps.actions,
     open: vi.fn(),
     rename: vi.fn(async () => undefined),
+    setPinned: vi.fn(),
+    useEntryPins: selected<readonly string[]>([]),
+    useEntryActions: selected(false),
     selectView: view => {
       viewState.view = view
     },

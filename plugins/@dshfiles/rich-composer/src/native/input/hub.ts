@@ -5,7 +5,6 @@
  * returns; Session-scope disposal releases the shell and its resources.
  */
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
-import type { ModelSelectionProjection } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { PlanProjection } from '@deepseek-ai/dsh-plan-mode/types'
 import type { GoalProjection } from '@deepseek-ai/dsh-goal/types'
 import type { Context } from '@deepseek-ai/cordis'
@@ -15,12 +14,14 @@ import type {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
+import type { ModelSelectionProjection } from '@deepseek-ai/dsh-agent/types'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type {
   DraftAttachmentId, DraftAttachmentSerializationResult, DraftInitializationOptions, DraftInitializationResult, InputTriggerController,
   SessionInputResolver, SessionInput, SubmitOutcome,
 } from '../contract/input.ts'
 import type { ComposerKeyboard } from '../contract/draft-editor.ts'
+import type { ComposerBlocks } from '../contract/composer-blocks.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type { PopupDismissFace } from './facade.ts'
 import { SessionInputShell } from './facade.ts'
@@ -46,12 +47,14 @@ interface InputTriggerServiceFace {
 
 /** Attachment-send face resolved lazily to keep hub/service construction acyclic. */
 interface ConversationAttachmentFace {
+  readonly blocks: ComposerBlocks
   sendSession(
     session: SessionFace,
     text: string,
     attachmentIds: readonly DraftAttachmentId[],
     mode: InputSubmitMode,
     signal?: AbortSignal,
+    accept?: () => void,
   ): Promise<SubmitOutcome>
   serializeDraftAttachments(attachmentIds: readonly DraftAttachmentId[]): Promise<DraftAttachmentSerializationResult>
   releaseDraftAttachment(id: DraftAttachmentId): void
@@ -110,6 +113,7 @@ export class InputHub implements SessionInputResolver {
         const model = session.projections.faceOf('modelSelection').getSnapshot() as ModelSelectionProjection | undefined
         const plan = session.projections.faceOf('plan').getSnapshot() as PlanProjection | undefined
         const goal = session.projections.faceOf('goal').getSnapshot() as GoalProjection | null | undefined
+        const agentPreset = session.projections.faceOf('agentPreset').getSnapshot()
         const selection = model?.next ?? model?.lastUsed
         return Object.freeze({
           ...state.blank ? {} : { sessionId: state.sessionId },
@@ -119,13 +123,22 @@ export class InputHub implements SessionInputResolver {
           }) },
           runMode: plan?.active ? 'plan' : goal?.goal.phase === 'active' ? 'goal' : 'default',
           running: state.running,
+          newSession: state.blank,
+          ...typeof agentPreset === 'string' ? { agentPreset } : {},
         })
       },
       messageSubmitted: (submission) => { reportMessageSubmission(this.rootCtx, submission) },
       inputTriggers: () => this.controller(actx),
       popup: () => this.popup(actx),
       inbox: session.projections.faceOf('inbox') as ObservableSnapshot<InboxState | undefined>,
-      defaultSink: (text, attachmentIds, mode, signal) => this.sink(session, text, attachmentIds, mode, signal),
+      defaultSink: (text, attachmentIds, mode, signal, accept) => this.sink(session, text, attachmentIds, mode, signal, accept),
+      quoteRemoveLabel: () => this.t('quote.remove'),
+      quoteInsertionAllowed: () => {
+        const state = session.getSnapshot()
+        return !state.removed && (state.subagent === null
+          || (state.subagent.address.mode === 'continuable' && state.subagent.parentAvailable === true))
+          && this.conversation().blocks.storeFor(session.sessionId).getSnapshot() === undefined
+      },
       steerQueue: () => { void this.steerQueue(session, shell) },
       commandAttachments: {
         serialize: async (ids) => {
@@ -239,8 +252,9 @@ export class InputHub implements SessionInputResolver {
 
   /**
    * Default sink: materialize before workspace intake, attachment routing and
-   * the final prompt. An immediate first send must not skip destination hooks
-   * just because its local identity has not attached to the Host workspace yet.
+   * the final prompt, while the composer holds the sent draft. An immediate first
+   * send must not skip destination hooks just because its local identity has not
+   * attached to the Host workspace yet; a refused or failed prompt keeps the draft.
    */
   private async sink(
     session: SessionFace,
@@ -248,6 +262,7 @@ export class InputHub implements SessionInputResolver {
     attachmentIds: readonly DraftAttachmentId[],
     mode: InputSubmitMode,
     signal: AbortSignal,
+    accept: () => void,
   ): Promise<SubmitOutcome> {
     if (text === '' && attachmentIds.length === 0) return { kind: 'success' }
     return whileSessionRetained({
@@ -258,14 +273,14 @@ export class InputHub implements SessionInputResolver {
         whenCreated: async waiterSignal => {
           const drafts = this.rootCtx.get('sessionDrafts')
           if (drafts === undefined) return
-          // Attachment commit and async reference serialization may already have cleared the editor.
-          // Admit the captured outgoing payload, not the editor's now-empty observation, before retrying.
+          // Async reference serialization may outlive the editor observation.
+          // Admit the captured outgoing payload before retrying.
           drafts.update(session.sessionId, { text, hasAttachments: attachmentIds.length > 0 })
-          // Sending is also an explicit retry; failure keeps the existing editor restoration path.
+          // Sending is also an explicit retry; failure keeps the draft in the composer.
           void drafts.retry(session.sessionId).catch(() => undefined)
           await drafts.whenCreated(session.sessionId, waiterSignal)
         },
-        send: () => this.conversation().sendSession(session, text, attachmentIds, mode, signal),
+        send: () => this.conversation().sendSession(session, text, attachmentIds, mode, signal, accept),
       }),
     })
   }

@@ -124,6 +124,15 @@
   }
 }
 
+/* The docked composer reserves one statistics row before its readings
+   arrive, so the projections landing never change the composer height. The
+   row height matches the readings: a 20px secondary line plus 1px block
+   padding (ui-chat StatsPills `.pill`, ContextMeter `.trigger`). A minimum,
+   not a fixed height, so taller readings still size the row. */
+.root:not(.hero) > .dock {
+  min-height: calc(22px + var(--dsh-content-font-delta-secondary, 0px));
+}
+
 .hero .dock:empty {
   display: none;
 }
@@ -217,16 +226,10 @@
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
-:global(body[data-ds-dark-theme]) .card {
-  --dsh-composer-card-highlight: transparent;
-}
-
-/* Focus inside the card strengthens the ring one step (a signal of where typing goes), never the accent. */
-.card:focus-within {
-  box-shadow:
-    0 0 0 1px var(--dshx-tone-border-strong, var(--dsw-alias-border-l3)),
-    var(--dshx-elevation-1, var(--dsw-elevation-soft)),
-    inset 0 1px 0 var(--dsh-composer-card-highlight);
+@media (pointer: coarse) {
+  .card {
+    font-size: max(16px, var(--dsh-content-font-size, 14px));
+  }
 }
 
 /* No-workspace trigger state: an inset 1px dashed outline marks the card as a
@@ -257,8 +260,10 @@
   pointer-events: none;
 }
 
-.cardWorkspaceTrigger:hover::after {
-  color: var(--dsw-alias-state-business-primary);
+@media (hover: hover) {
+  .cardWorkspaceTrigger:hover::after {
+    color: var(--dsw-alias-state-business-primary);
+  }
 }
 
 .accessory {
@@ -501,8 +506,10 @@
   cursor: pointer;
 }
 
-.add:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover-solid);
+@media (hover: hover) {
+  .add:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover-solid);
+  }
 }
 
 .add:disabled {
@@ -533,8 +540,10 @@
   appearance: none;
 }
 
-.select:hover:not(:disabled) {
-  background-color: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .select:hover:not(:disabled) {
+    background-color: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .select:disabled {
@@ -563,13 +572,10 @@
     color var(--dshx-duration-hover, 80ms) var(--dshx-motion-ease-enter, ease);
 }
 
-.primary:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 84%, var(--dshx-tone-bg, var(--dsw-alias-bg-base)));
-}
-
-.primary:focus-visible {
-  outline: 2px solid var(--dshx-tone-accent, var(--dsw-alias-state-business-primary));
-  outline-offset: 2px;
+@media (hover: hover) {
+  .primary:hover:not(:disabled) {
+    background: var(--dsw-alias-button-info-hover);
+  }
 }
 
 .primary:disabled {
@@ -578,37 +584,25 @@
   cursor: default;
 }
 
-/* The glyph enters with a short scale-and-fade when the mode changes (the glyph is keyed by mode). */
-.sendGlyph {
-  animation: send-glyph-in var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease) both;
+/* Sending: the message waits for the Host to accept it. The circle keeps its
+   full fill rather than the disabled fade, and an arc turns where the arrow was. */
+.primary[data-sending]:disabled {
+  opacity: 1;
+  cursor: progress;
 }
 
-@keyframes send-glyph-in {
-  from {
-    opacity: 0;
-    transform: scale(0.6);
-  }
+.sendingSpinner {
+  animation: input-sending 800ms linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  @keyframes send-glyph-in {
-    from {
-      opacity: 0;
-    }
+  .sendingSpinner {
+    animation-duration: 2400ms;
   }
 }
 
-@media (pointer: coarse) {
-  .primary {
-    width: 36px;
-    height: 36px;
-  }
-
-  /* Touch input never under 16px (visual refresh T3.5): WebKit zooms the page on focus below it. A larger
-     Settings › Font size still wins. */
-  .card {
-    font-size: max(var(--dshx-density-text-input, 16px), var(--dsh-content-font-size, 14px));
-  }
+@keyframes input-sending {
+  to { transform: rotate(360deg); }
 }
 
 .retry {

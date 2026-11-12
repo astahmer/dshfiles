@@ -71,6 +71,7 @@
     "@deepseek-ai/dsh-client-product-analytics": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-shortcuts": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-store": "catalog:",
+    "@deepseek-ai/dsh-client-ui-context-menu": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-layout": "catalog:",
     "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
     "@deepseek-ai/dsh-client-ui-renderer": "catalog:",
@@ -119,6 +120,7 @@
     "@deepseek-ai/dsh-client-connection": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-file-upload": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-locale": ">=0.2.2-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-context-menu": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-session": ">=0.2.2-rc.1 <0.3.0-0",
@@ -146,7 +148,8 @@
         "@deepseek-ai/dsh-client-ui-session",
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-workspace",
-        "@deepseek-ai/dsh-client-connection"
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-context-menu"
       ],
       "external": [
         "@deepseek-ai/dsh-agent/types",
