@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
-import type { FrameBottomSeat, FrameSidebarSeat } from '../../regions.ts'
+import type { FrameBottomSeat, FrameSidebarSeat, ZenSeat } from '../../regions.ts'
 import type { PanelInfo } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
 import type { AppFrameInjected } from './AppFrame.tsx'
@@ -30,6 +30,7 @@ import { PanelRetentionModel } from '../../panel-retention.ts'
 import { createMainSurfaceSeat } from '../../main-surface.ts'
 import { createRightPanelSeat } from '../../right-panel.ts'
 import { registerRootAcrossReloads } from '../../root-handoff.ts'
+import { ZenMode } from '../../zen-mode.ts'
 
 // Contract exports only (export-convergence rule: cross-package consumers
 // keep a symbol exported; test-only/package-internal symbols live off /src).
@@ -172,8 +173,9 @@ export const inject = ['slots', 'theme', 'locale', 'shortcuts']
  * and the shared root instance supplying commands and the panel-info source.
  * @param ctx - client root context.
  * @param statusStrip - local delta (dshfiles): the strip the frame renders, decorated so it reads the frame's settings.
+ * @param zen - local delta (dshfiles): the zen mode seat the frame draws and provides as `ctx.zen`.
  */
-export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStripProps>): void {
+export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStripProps>, zen: ZenSeat): void {
   const Frame = (props: ComponentProps<typeof AppFrame>) =>
     createElement(StatusStripSeat.Provider, { value: statusStrip }, createElement(AppFrame, props))
   ctx.effect(() => ctx.locale.register('shortcuts.layout', { zh, en, ja, es, fr, de, ru, pt }), 'layout: command labels')
@@ -209,8 +211,19 @@ export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStrip
     // Workbench owns pane state/actions; the frame owns the cooperating port's
     // lifetime, independently of whether the right pane is currently visible.
     const rightPanel = createRightPanelSeat(instance)
+    // Asking for the sidebar leaves zen, which hides it; the sidebar then shows as it was.
+    const leaveZen = (): boolean => {
+      if (!zen.on()) return false
+      zen.set(false)
+      return true
+    }
     // Show reads the owned store, never a caller's potentially stale render props.
-    const frameSidebar: FrameSidebarSeat = { show: () => instance.actions.showSidebar() }
+    const frameSidebar: FrameSidebarSeat = {
+      show: () => {
+        leaveZen()
+        instance.actions.showSidebar()
+      },
+    }
     // The bottom row's seat: a plugin opens the row and the frame sizes it, so
     // the height survives a reload and one occupant cannot outlive the row.
     const frameBottom: FrameBottomSeat = {
@@ -229,7 +242,7 @@ export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStrip
     const layout = new LayoutController(instance.actions, id =>
       ctx.slots.entries('main').some(entry => entry.options.key === id), panelInfo, panelId => {
         for (const listener of panelRequests) listener(panelId)
-      })
+      }, leaveZen)
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo: layout.panelInfo } })
     const disposeService = ctx.reflect.provide('layout', layout)
     const disposeRightPanel = ctx.reflect.provide('rightPanel', rightPanel)
@@ -239,6 +252,9 @@ export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStrip
     }))
     const disposeFrameBottom = ctx.reflect.provide('frameBottom', frameBottom)
     const disposeFrameSidebar = ctx.reflect.provide('frameSidebar', frameSidebar)
+    const disposeZen = ctx.reflect.provide('zen', zen)
+    const disposeZenAttribute = ZenMode.reflect(zen, document.documentElement)
+    const zenOn: HostObservable<boolean> = { getSnapshot: zen.on, subscribe: zen.subscribe }
     // Local delta (dshfiles): a client hot reload of this bundle never leaves 'root' without a registration (the
     // renderer would throw and blank the page); see root-handoff.ts.
     const disposeRegistration = registerRootAcrossReloads({
@@ -258,7 +274,7 @@ export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStrip
         'shell.leading': { kind: 'single', scope: 'root' },
       },
       store,
-      inject: (): AppFrameInjected => ({ hooks: { foldedLandscape } }),
+      inject: (): AppFrameInjected => ({ hooks: { foldedLandscape, zen: zenOn }, leaveZen }),
     }, Frame),
     })
     const disposeShortcut = ctx.shortcuts.register({
@@ -286,12 +302,14 @@ export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStrip
       panelRetention.dispose()
       disposeRegistration()
       disposePanelInfo()
+      disposeZenAttribute()
       // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
       void disposeService()
       void disposeRightPanel()
       void disposeMainSurface()
       void disposeFrameBottom()
       void disposeFrameSidebar()
+      void disposeZen()
     }
   }, 'ui-layout: service + root registration')
 

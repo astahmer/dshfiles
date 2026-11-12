@@ -100,6 +100,19 @@ export interface FrameBottomSeat {
   readonly height: () => number
 }
 
+/**
+ * The seat behind `ctx.zen` (provided by `@dshfiles/frame-layout`): zen mode leaves the thread and its composer and
+ * hides the sidebar, right panel, status strip and main tabs. Browser-local window presentation; it never writes
+ * another owner's settings, so leaving restores the layout exactly. `<html data-dshfiles-zen="on">` mirrors it for
+ * owners that hide their own chrome in CSS.
+ */
+export interface ZenSeat {
+  readonly on: () => boolean
+  readonly set: (on: boolean) => void
+  /** Subscribe to changes, including another tab's; returns an unsubscribe function. */
+  readonly subscribe: (listener: () => void) => () => void
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Present only while the owned frame is the layout owner. */
@@ -110,6 +123,8 @@ declare module '@deepseek-ai/cordis' {
     frameBottom?: FrameBottomSeat
     /** Idempotent left-sidebar reveal; absent on older or stock frame bundles. */
     frameSidebar?: FrameSidebarSeat
+    /** Zen mode; absent on older or stock frame bundles. */
+    zen?: ZenSeat
   }
 }
 

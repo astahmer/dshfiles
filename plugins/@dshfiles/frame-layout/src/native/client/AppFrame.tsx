@@ -24,13 +24,19 @@ import { DocumentTitle } from './DocumentTitle.tsx'
 import { StatusStrip } from './StatusStrip.tsx'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { Minimize2Icon } from '@dshfiles/plugin-ui/icons'
 import { MainSurfaceRendering } from '../../main-surface.ts'
+import { ZenMode } from '../../zen-mode.ts'
 import type { MainSurfaceMode, RightPanelMode } from '../../regions.ts'
 import type { RightbarOwnerProps } from './index.ts'
 
 /** Browser posture supplied by the root registration. */
 export interface AppFrameInjected {
-  hooks: { foldedLandscape: HostObservable<boolean> }
+  hooks: { foldedLandscape: HostObservable<boolean>; zen: HostObservable<boolean> }
+  /** Local delta (dshfiles): leave zen mode; false when it was already off. */
+  leaveZen: () => boolean
 }
 
 /** Full composed props: runtime, child slots, store, locale, and injected posture. */
@@ -176,6 +182,24 @@ function DragHandle(props: {
   )
 }
 
+/** Zen mode's one on-screen control, where the sidebar's reopen controls sit: the way back for a pointer. */
+function ZenExit({ leave }: { leave: () => void }) {
+  return (
+    <div className={`${css.leadingSeat} dshx-root`} data-zen-exit>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-sm" aria-label="Leave zen mode" onClick={leave}>
+              <Minimize2Icon aria-hidden />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="dshx-root" side="bottom" keys={ZenMode.keys}>Leave zen mode</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  )
+}
+
 /** Below this frame width the status strip collapses to one chip (the phone breakpoint of AppFrame.module.css). */
 const PHONE_STRIP_WIDTH = 640
 
@@ -185,6 +209,8 @@ export function AppFrame({
   useSessions,
   usePanelInfo,
   useFoldedLandscape,
+  useZen,
+  leaveZen,
   actions,
   renderSlot,
   t,
@@ -227,6 +253,10 @@ export function AppFrame({
   const centeredSidebar = foldedLandscape && viewport >= SIDEBAR_DRAWER_BREAKPOINT
   const sidebarCollapsed = narrow ? !layoutInfo.narrowExpanded : layoutInfo.sidebar === 0
   const drawerOpen = drawer && !sidebarCollapsed
+  // Local delta (dshfiles): zen mode drops the sidebar and right tracks. A drawer frame (phone, small tablet) keeps
+  // its navigation: the sidebar is already off-stage there and the right pane is an on-demand sheet.
+  const zen = useZen(on => on)
+  const zenColumns = zen && !drawer
   // Entering drawer mode from a collapsed rail hides the backing immediately.
   const [sidebarTransition, setSidebarTransition] = useState({ drawer, collapsed: sidebarCollapsed, instant: true })
   if (sidebarTransition.drawer !== drawer || sidebarTransition.collapsed !== sidebarCollapsed) {
@@ -270,7 +300,7 @@ export function AppFrame({
   // chase the live window edge. The counter restarts the settle window when a
   // re-toggle interrupts a running transition.
   const [animating, setAnimating] = useState(0)
-  const trackToggle = `${sidebarCollapsed}:${layoutInfo.rightbarTrack}:${centeredSidebar}`
+  const trackToggle = `${sidebarCollapsed}:${layoutInfo.rightbarTrack}:${centeredSidebar}:${zenColumns}`
   const previousToggle = useRef(trackToggle)
   const previousViewport = useRef(viewport)
   // Arm the transition before child layout effects measure the new column widths.
@@ -361,14 +391,14 @@ export function AppFrame({
       mode={layoutInfo.rightPanelMode}
       owner={{ width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 }}
       renderSlot={renderSlot}
-      inert={drawerOpen}
+      inert={drawerOpen || zenColumns}
     />
-  ), [renderSlot, layoutInfo.rightPanelMode, layoutInfo.mainSurfaceMode, normal.rightbar, viewport, drawerOpen])
+  ), [renderSlot, layoutInfo.rightPanelMode, layoutInfo.mainSurfaceMode, normal.rightbar, viewport, drawerOpen, zenColumns])
   // The leading seat serves drawers and fully hidden macOS sidebars.
   // Windows native captions keep their controls in the caption row instead.
   // AppFrame.module.css reserves clearance for the seat's rendered controls.
   const leading = useMemo(() => renderSlot('shell.leading', {}), [renderSlot])
-  const leadingMounted = drawer || darwin && sidebarCollapsed
+  const leadingMounted = !zenColumns && (drawer || darwin && sidebarCollapsed)
 
   return (
     <div
@@ -377,20 +407,22 @@ export function AppFrame({
       style={{
         ...(windowsTitlebar
           ? { '--dsh-windows-sidebar-width': `${cols.sidebar}px` } : {}),
-        gridTemplateColumns:
-          `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`,
+        gridTemplateColumns: zenColumns
+          ? '0px minmax(0px, 1fr) 0px'
+          : `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`,
         ...(bottomHeight.current > 0
           ? { gridTemplateRows: `minmax(0, 1fr) ${bottomHeight.current}px auto`, '--dsh-bottom-height': `${bottomHeight.current}px` }
           : {}),
       }}
-      data-sidebar-collapsed={sidebarCollapsed || undefined}
+      data-sidebar-collapsed={sidebarCollapsed || zenColumns || undefined}
       data-sidebar-drawer={drawer || undefined}
       data-sidebar-instant={drawer && sidebarCollapsed && sidebarTransition.instant || undefined}
-      data-rightbar-collapsed={cols.rightbar === 0 || undefined}
+      data-rightbar-collapsed={cols.rightbar === 0 || zenColumns || undefined}
       data-rightbar-fullscreen={layoutInfo.rightbarFullscreen || undefined}
       data-rightbar-instant={layoutInfo.rightbarInstant || undefined}
       data-dragging={dragging || undefined}
       data-animating={animateTracks || undefined}
+      data-zen={zen ? (zenColumns ? 'columns' : 'compact') : undefined}
     >
       <DocumentTitle
         productTitle={productTitle}
@@ -401,7 +433,7 @@ export function AppFrame({
         onClick={drawerOpen ? () => { actions.toggleSidebar() } : undefined} />}
       <div className={css.sidebarCol}
         style={drawer ? { width: sidebarWidth } : undefined}
-        {...{ inert: drawer && sidebarCollapsed ? '' : undefined }}>
+        {...{ inert: drawer && sidebarCollapsed || zenColumns ? '' : undefined }}>
         {sidebar}
       </div>
       <>
@@ -423,9 +455,10 @@ export function AppFrame({
           {leading}
         </div>
       )}
+      {zenColumns && <ZenExit leave={() => { leaveZen() }} />}
       {/* The collapsed rail is fixed-width: no resize handle while closed. */}
-      {!drawer && !centeredSidebar && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
-      {layoutInfo.rightbarShown && !layoutInfo.rightbarFullscreen && normal.rightbar > 0 && (
+      {!zenColumns && !drawer && !centeredSidebar && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
+      {!zenColumns && layoutInfo.rightbarShown && !layoutInfo.rightbarFullscreen && normal.rightbar > 0 && (
         <DragHandle side="rightbar" left={viewport - normal.rightbar} onStart={onRightbarStart} onDrag={onRightbarDrag} onEnd={onDragEnd} />
       )}
       {bottomHeight.current > 0 && (

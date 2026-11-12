@@ -67,6 +67,8 @@ export class LayoutController implements ILayout {
     private readonly hasMainPanel: (id: MainPanelId) => boolean,
     readonly panelInfo: HostObservable<PanelInfo>,
     private readonly onPanelRequested?: (panelId: MainPanelId | null) => void,
+    /** Leaves zen mode when it is on; true means it did, so the sidebar shows as it was instead of toggling. */
+    private readonly leaveZen?: () => boolean,
   ) {}
 
   /** Select a global panel or return to the Conversation. */
@@ -93,6 +95,7 @@ export class LayoutController implements ILayout {
 
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void {
+    if (this.leaveZen?.() === true) return
     this.panels.toggleSidebar()
   }
 

@@ -565,6 +565,25 @@
   white-space: normal;
 }
 
+/* Local delta (dshfiles): zen mode (plans/onboarding/calm-onboarding.md Z1). The TSX drops the sidebar and right
+   tracks to 0 px ('columns'); these boxes then leave the layout too, so nothing hangs over the stage. The status strip
+   and the native tab strip (shell.beforeMain rows) hide at every width; a drawer frame ('compact') keeps its own
+   navigation. The exit control takes the leading seat's place, and the stage pads by the same clearance. */
+.frame[data-zen='columns'] .sidebarCol,
+.frame[data-zen='columns'] .rightbarCol,
+.frame[data-zen] .statusStrip,
+.frame[data-zen] .centerCol > :not(.mainSurface) {
+  display: none;
+}
+
+.frame[data-zen='columns'] {
+  --dsh-frame-leading-clearance: 48px;
+}
+
+:global(html:not([data-platform='darwin'])) .frame[data-zen='columns'] .leadingSeat {
+  left: 12px;
+}
+
 .overlayLayer {
   position: absolute;
   inset: 0;
