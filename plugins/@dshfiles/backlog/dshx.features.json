@@ -333,7 +333,7 @@
         {
           "kind": "unit-test",
           "id": "backlog.feed-unit-panel-poll",
-          "file": "plugins/@dshfiles/backlog/src/panel-poll.test.ts",
+          "file": "plugins/@dshfiles/backlog/src/panel-poll.client.test.ts",
           "testName": "polls the revision every 5 s, and only every minute while the Host pushes changes"
         },
         {
