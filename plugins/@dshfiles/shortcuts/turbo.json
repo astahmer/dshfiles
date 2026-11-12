@@ -36,6 +36,7 @@
         "$TURBO_ROOT$/tooling/dshx/e2e/features/shortcuts.feature",
         "$TURBO_ROOT$/tooling/dshx/e2e/fixtures/**",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/*",
+        "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/keyboard-shortcuts-editor.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/platform-modifier.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/shortcuts.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/package.json",
