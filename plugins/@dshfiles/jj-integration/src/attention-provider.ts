@@ -4,9 +4,9 @@ import { DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
 import type { RepositoryView, ThreadView } from './api.js'
-import { SessionReads } from './host-edges-promise.js'
 import { Landing, LandingMessages } from './landing.js'
 import { RepositoryViews } from './repository-views.js'
+import { SessionActivity } from './session-activity.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { handleAttentionActs } from './attention-act-promise.js'
 
@@ -192,7 +192,7 @@ const unlandedRevset = (thread: ThreadView): string => thread.unlanded.map(revis
 const make = Effect.gen(function* () {
   const views = yield* RepositoryViews
   const landing = yield* Landing
-  const sessions = yield* SessionReads
+  const activities = yield* SessionActivity
   const jj = yield* JjViewReads
   const apis = yield* HostApis
   const inbox = apis.client(attentionApi)
@@ -211,19 +211,19 @@ const make = Effect.gen(function* () {
     )
 
   const factsOf = Effect.fnUntraced(function* (threads: readonly ThreadView[], titledOnly: readonly ThreadView[] = []) {
-    const sessionIds = [...threads, ...titledOnly].flatMap(thread => thread.sessionIds.slice(-1))
-    const activity = sessionIds.length === 0 ? new Map() : yield* sessions.listActivity(sessionIds).pipe(Effect.orElseSucceed(() => new Map()))
+    // Titles come from the shared display read (at most its TTL stale): a fresh list here read every Session per pass.
+    const activity = threads.length + titledOnly.length === 0 ? undefined : yield* activities.display
     const facts = new Map<string, ReadyFacts>()
     // One workspace after another: each new stat is a jj process; unchanged unlanded work is answered from the cache.
     const stats = yield* Effect.forEach(threads, statOf)
     for (const [index, thread] of threads.entries()) {
       const sessionId = thread.sessionIds.at(-1)
-      const title = sessionId === undefined ? undefined : activity.get(sessionId)?.title
+      const title = sessionId === undefined ? undefined : activity?.get(sessionId)?.title
       facts.set(thread.path, { threadTitle: typeof title === 'string' && title.trim() !== '' ? title.trim() : undefined, stat: stats[index] })
     }
     for (const thread of titledOnly) {
       const sessionId = thread.sessionIds.at(-1)
-      const title = sessionId === undefined ? undefined : activity.get(sessionId)?.title
+      const title = sessionId === undefined ? undefined : activity?.get(sessionId)?.title
       facts.set(thread.path, { threadTitle: typeof title === 'string' && title.trim() !== '' ? title.trim() : undefined })
     }
     return facts

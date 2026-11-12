@@ -3,6 +3,28 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Inbox thread titles from the activity cache (2026-11-12)
+
+Same live window (17:36–18:15): `jj-integration attention reconcile` ran 102 times at 4.6 s mean, and 19 of the 47
+`session activity list` spans in it were reconcile's own. Each lists every Session through the controller (3,257 records,
+1,302 ms mean live) only to read the titles of the ready or blocked threads' last Session.
+
+Fix: reconcile reads titles from `SessionActivity.display`, the 30 s cache every repository scan already refreshes
+right before reconcile reads the views. A rename can reach the inbox one pass late. Regression check:
+`attention-provider.integration.test.ts` "names a ready thread from the cached Session activity instead of listing
+every Session per reconcile" (a `session activity list` child under the reconcile span before, none after).
+
+| Per reconcile with a titled ready or blocked thread | Before                       | After             |
+| --------------------------------------------------- | ---------------------------- | ----------------- |
+| full Session list reads                             | 1                            | 0 (display cache) |
+| that read, live Host (3,257 records)                | 1,302 ms mean (19 in 39 min) | —                 |
+| that read, scratch Host on cloned Sessions (3,257)  | 134–151 ms                   | —                 |
+
+Scratch: `dshx dev up --skip-build` with jj-integration, activity-timeline, traces, session-controller and
+session-persistence-jsonl, then an APFS clone (`cp -c -R`) of the live `sessions/` into its home; spans read from the
+scratch traces store. Its thread workspaces own no Session, so reconcile there never listed before or after; the
+per-reconcile count comes from the regression check and the live traces.
+
 ## Inbox diff stats survive other workspaces' operations (2026-11-12)
 
 The live traces store (copied, 17:36–18:15, after the Host's last boot) put `jj diff` at 516 spawns in 39 minutes,

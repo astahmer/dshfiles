@@ -4,6 +4,7 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import * as activityTimeline from '@dshfiles/activity-timeline'
 import { attentionApi, type AttentionList } from '@dshfiles/activity-timeline/attention-api'
 import { createHostApiClient } from '@dshfiles/dshx/host'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -88,6 +89,25 @@ describe.skipIf(!jjAvailable)('jj-integration inbox provider', () => {
 
     const closed = await until('closed', list => list.items.some(entry => entry.dedupeKey === `${path}:ready` && entry.resolvedAt !== null))
     expect(closed.items.find(entry => entry.dedupeKey === `${path}:ready`)?.source).toBe(READY_TO_LAND_SOURCE)
+  }, 180_000)
+
+  it('names a ready thread from the cached Session activity instead of listing every Session per reconcile', async () => {
+    using recorder = recordSpans()
+    harness.setSession('session-titled', { running: false, questions: 0, title: 'Tidy the parser' })
+    const repo = join(root, 'titled')
+    JjIntegrationTestHost.initRepository(repo)
+    const path = await harness.provisionThread(repo, { sessionIds: ['session-titled'] })
+    await rescan()
+    const listed = await until(
+      'other',
+      list => list.items.some(item => item.dedupeKey === `${path}:ready` && item.reason.startsWith('“Tidy the parser”')),
+      rescan,
+    )
+    expect(listed.items.find(item => item.dedupeKey === `${path}:ready`)?.reason).toBe('“Tidy the parser” is ready to land.')
+
+    const reconciles = recorder.named('jj-integration attention reconcile')
+    expect(reconciles.length).toBeGreaterThan(0)
+    for (const reconcile of reconciles) expect(recorder.children(reconcile).map(span => span.name)).not.toContain('session activity list')
   }, 180_000)
 
   it('resolves the Ready to land item as soon as the Changes facet lands through the land method', async () => {
