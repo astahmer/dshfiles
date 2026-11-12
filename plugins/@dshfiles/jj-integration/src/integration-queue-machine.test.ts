@@ -47,6 +47,17 @@ describe('thread integration queue', () => {
     actor.stop()
   })
 
+  it('keeps a successful land warning visible', async () => {
+    const result: LandResult = { ...landed, warning: 'Integration history was not saved.' }
+    const actor = createActor(integrationQueueMachine, {
+      input: { client: { land: async () => result, integrationProgress: noProgress } },
+    }).start()
+    actor.send({ type: 'start', paths: ['/repo/thread-one'] })
+    await waitFor(actor, snapshot => snapshot.matches('idle'))
+    expect(actor.getSnapshot().context.notice).toEqual({ kind: 'land-result', result })
+    actor.stop()
+  })
+
   it('continues after a failure and keeps the failed workspace retryable', async () => {
     const calls: string[] = []
     const actor = createActor(integrationQueueMachine, {

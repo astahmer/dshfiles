@@ -876,14 +876,17 @@ export const ThreadWorkspacesPanel = (props: {
                       unlandedSummary: { total: 0, conflicted: 0, undescribed: 0 },
                       behind: false,
                       behindCount: 0,
-                      rebasedAt: Date.now(),
+                      ...(result.warning === undefined ? { rebasedAt: Date.now() } : {}),
                     }
                   : thread,
               ),
             })),
           }
         })
-        toast.show({ text: t('integrationComplete', { count: result.revisions.length, bookmark: result.bookmark }), success: true })
+        toast.show({
+          text: result.warning ?? t('integrationComplete', { count: result.revisions.length, bookmark: result.bookmark }),
+          success: result.warning === undefined,
+        })
         return
       }
     },

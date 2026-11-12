@@ -744,7 +744,20 @@ const make = Effect.gen(function* () {
 
   const readRebaseMetadata = metadata.read
   const writeAtomically = metadata.writeAtomically
-  const writeRebaseMetadata = metadata.record
+  const writeRebaseMetadata = (repoRoot: string, name: string, input: Parameters<typeof metadata.record>[2]) =>
+    metadata.record(repoRoot, name, input).pipe(
+      Effect.map(recordedAt => ({ recordedAt })),
+      Effect.catch(error =>
+        Effect.gen(function* () {
+          yield* Effect.annotateCurrentSpan({ 'dshx.jj.land_record': 'failed', 'dshx.jj.land_record.error_type': error._tag })
+          yield* Effect.logWarning('Thread landed, but its integration history could not be recorded.')
+          return {
+            warning:
+              'The land succeeded, but its integration history and review range were not saved. Inspect and repair .dshfiles-rebase-timestamps.json in the threads directory; this past record cannot be recreated by retrying the land.',
+          }
+        }),
+      ),
+    )
 
   const sparesFile = (repoRoot: string) => Effect.map(threadsDirectory(repoRoot), directory => path.join(directory, '.dshfiles-spare-workspaces.json'))
 
@@ -1384,8 +1397,8 @@ const make = Effect.gen(function* () {
               if (yield* ensureAuthorized) yield* jj(['new', knownCommitRevset(afterMoveSnapshot.bookmarkCommitId)], cwd).pipe(Effect.ignore)
               const baseChangeId = yield* changeIdForCommit(verified.snapshot.bookmarkCommitId, cwd).pipe(Effect.option, Effect.map(Option.getOrUndefined))
               const tipChangeId = yield* changeIdForCommit(verified.candidate.commitId, cwd).pipe(Effect.option, Effect.map(Option.getOrUndefined))
-              yield* writeRebaseMetadata(thread.repoRoot, thread.threadName, { tipChangeId, baseChangeId, sessionId: input.sessionId }).pipe(Effect.ignore)
-              return stop({ status: 'landed', revisions: verified.rebased, head: verified.candidate })
+              const record = yield* writeRebaseMetadata(thread.repoRoot, thread.threadName, { tipChangeId, baseChangeId, sessionId: input.sessionId })
+              return stop({ status: 'landed', revisions: verified.rebased, head: verified.candidate, ...record })
             }
             if (yield* cancelled) return stop(cancelledOutcome)
             const targetMovedForward = yield* bookmarkTargetDescendsFrom({
@@ -1470,8 +1483,8 @@ const make = Effect.gen(function* () {
               const head = rebased[0]
               if (head === undefined) return yield* jjFailed('The rebased revisions have no bookmark head.')
               const tipChangeId = yield* changeIdForCommit(head.commitId, cwd).pipe(Effect.option, Effect.map(Option.getOrUndefined))
-              yield* writeRebaseMetadata(thread.repoRoot, thread.threadName, { tipChangeId, baseChangeId, sessionId: input.sessionId }).pipe(Effect.ignore)
-              return { status: 'landed', revisions: rebased, head } satisfies LandOutcome
+              const record = yield* writeRebaseMetadata(thread.repoRoot, thread.threadName, { tipChangeId, baseChangeId, sessionId: input.sessionId })
+              return { status: 'landed', revisions: rebased, head, ...record } satisfies LandOutcome
             }
             if (attempt >= LAND_ATTEMPTS) return yield* jjFailed(`Could not move ${target}: ${moved.stderr.trim().slice(0, 400)}`)
           }

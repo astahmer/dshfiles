@@ -15,6 +15,7 @@ import { WorkspaceSync } from './workspace-sync.js'
 
 const landingMessage = (outcome: LandResult): string | undefined => {
   const bookmark = outcome.bookmark
+  if (outcome.status === 'landed' && outcome.warning !== undefined) return outcome.warning
   if (outcome.status === 'conflicted') {
     return [
       `Rebasing this thread onto \`${bookmark}\` stopped with conflicts in:`,
@@ -160,11 +161,11 @@ const make = Effect.gen(function* () {
       files: outcome.status === 'conflicted' ? [...outcome.files] : [],
       bookmark,
       agentAsked: false,
-      ...(outcome.status === 'landed' && { head: outcome.head }),
+      ...(outcome.status === 'landed' && { head: outcome.head, ...(outcome.warning === undefined ? {} : { warning: outcome.warning }) }),
     }
     const message = landingMessage(result)
     const agentAsked =
-      message !== undefined && !input.fromAgent && (yield* settings.get).askAgentToFixLanding
+      message !== undefined && outcome.status !== 'landed' && !input.fromAgent && (yield* settings.get).askAgentToFixLanding
         ? yield* askAgent({ path: input.path, sessionId: input.sessionId, text: message }).pipe(Effect.orElseSucceed(() => false))
         : false
     if (outcome.status === 'landed')

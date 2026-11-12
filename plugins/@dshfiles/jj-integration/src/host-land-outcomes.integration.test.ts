@@ -99,6 +99,17 @@ describe.skipIf(!jjAvailable)('jj-integration land outcomes', () => {
       `)
     })
 
+    it('returns a warning when integration history cannot be saved', async () => {
+      const sessionId = `session-manual-${String(repoCount + 1)}`
+      harness.setSession(sessionId, { running: false, questions: 0 })
+      const repo = freshRepository()
+      const path = await harness.provisionThread(repo, { sessionIds: [sessionId] })
+      writeFileSync(join(`${repo}-threads`, '.dshfiles-rebase-timestamps.json'), 'not json')
+      const result = await harness.api.land({ path, sessionId })
+      expect(result).toMatchObject({ status: 'landed', warning: expect.stringContaining('history') })
+      expect(result.agentAsked).toBe(false)
+    })
+
     it('nothing-to-land', async () => {
       expect(
         await landManually(async (repo, sessionId) => {

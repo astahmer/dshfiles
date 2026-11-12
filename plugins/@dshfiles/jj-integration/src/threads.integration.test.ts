@@ -769,6 +769,24 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(bookmarkTargetCommitId(repo)).not.toBe(bookmarkBefore)
   })
 
+  it('reports a metadata warning after a verified land', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'verified feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: verified feature')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    writeFileSync(join(ThreadWorkspaceModel.defaultThreadsDirectory(repo), '.dshfiles-rebase-timestamps.json'), 'not json')
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: sourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async () => ({ status: 'passed' }),
+    })
+
+    expect(bookmarkTarget(repo)).toBe('feat: verified feature')
+    expect(outcome).toMatchObject({ status: 'landed', warning: expect.stringContaining('history') })
+  })
+
   it('does not move the bookmark when Project Checks reject the rebased candidate', async () => {
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'feature.txt'), 'unverified feature\n')
@@ -1089,6 +1107,18 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(await threads.workingCopyCommitId(thread.path)).toBe(sourceRevision)
   })
 
+  it('reports a warning when the land record cannot be written', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: add feature')
+    writeFileSync(join(ThreadWorkspaceModel.defaultThreadsDirectory(repo), '.dshfiles-rebase-timestamps.json'), 'not json')
+
+    const outcome = await threads.land(thread.path)
+
+    expect(bookmarkTarget(repo)).toBe('feat: add feature')
+    expect(outcome).toMatchObject({ status: 'landed', warning: expect.stringContaining('history') })
+  })
+
   it('rebases described work onto the bookmark and leaves a fresh working copy', async () => {
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
@@ -1109,7 +1139,10 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main-', '-T', 'description.first_line()')).toBe('other work')
     const [status] = await threads.list(repo)
     const tipChangeId = changeIdAt(repo, 'main')
-    expect(status).toMatchObject({ unlanded: [], behind: false, rebasedAt: expect.any(Number), rebasedTipChangeId: tipChangeId })
+    expect(outcome.status).toBe('landed')
+    if (outcome.status !== 'landed') throw new Error('Expected a landed result.')
+    expect(outcome.recordedAt).toEqual(expect.any(Number))
+    expect(status).toMatchObject({ unlanded: [], behind: false, rebasedAt: outcome.recordedAt, rebasedTipChangeId: tipChangeId })
     const reloaded = ThreadWorkspacesTestSupport.promiseThreads({ executor })
     expect((await reloaded.list(repo))[0]?.rebasedAt).toBe(status?.rebasedAt)
     expect((await reloaded.list(repo))[0]?.rebasedTipChangeId).toBe(tipChangeId)

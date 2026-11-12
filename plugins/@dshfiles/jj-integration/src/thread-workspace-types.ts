@@ -38,7 +38,13 @@ export interface ThreadStatus {
 }
 
 export type LandOutcome =
-  | { readonly status: 'landed'; readonly revisions: readonly ThreadRevision[]; readonly head: ThreadRevision }
+  | {
+      readonly status: 'landed'
+      readonly revisions: readonly ThreadRevision[]
+      readonly head: ThreadRevision
+      readonly warning?: string
+      readonly recordedAt?: number
+    }
   | { readonly status: 'nothing-to-land' }
   | { readonly status: 'needs-description'; readonly revisions: readonly ThreadRevision[] }
   | { readonly status: 'conflicted'; readonly revisions: readonly ThreadRevision[]; readonly files: readonly string[] }

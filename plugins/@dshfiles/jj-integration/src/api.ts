@@ -95,6 +95,7 @@ const landResultSchema = Schema.Struct({
   bookmark: Schema.String,
   /** Where the bookmark points after rebasing; absent from a Host older than this field. */
   head: Schema.optional(jjRevisionEffectSchema),
+  warning: Schema.optional(Schema.String),
   agentAsked: Schema.Boolean,
 })
 export type LandResult = typeof landResultSchema.Type

@@ -52,7 +52,8 @@ type IntegrationQueueEvent =
 const setJob = (jobs: ReadonlyMap<string, IntegrationJob>, path: string, job: IntegrationJob): ReadonlyMap<string, IntegrationJob> =>
   new Map(jobs).set(path, job)
 
-const noticeForResult = (result: LandResult): IntegrationNotice | null => (result.status === 'landed' ? null : { kind: 'land-result', result })
+const noticeForResult = (result: LandResult): IntegrationNotice | null =>
+  result.status === 'landed' && result.warning === undefined ? null : { kind: 'land-result', result }
 
 const noticeForFailure = (error: unknown): IntegrationNotice =>
   IntegrationRecovery.isQueued(error) ? { kind: 'queued' } : { kind: 'failed', message: errorMessage(error, '') }

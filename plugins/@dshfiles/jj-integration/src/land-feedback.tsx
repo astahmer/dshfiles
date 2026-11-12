@@ -15,9 +15,11 @@ export const describeLandResult = (t: JjIntegrationTranslate, result: LandResult
     const hidden = result.revisions.length - listed.length
     const revisions = hidden > 0 ? `${listed.join(', ')} ${t('andMore', { count: hidden })}` : listed.join(', ')
     const rebased = t('rebased', { count: result.revisions.length, bookmark: result.bookmark, revisions })
-    return result.head === undefined
-      ? rebased
-      : `${rebased} ${t('bookmarkNowAt', { bookmark: result.bookmark, changeId: result.head.changeId.slice(0, 8), commitId: result.head.commitId.slice(0, 8) })}`
+    const summary =
+      result.head === undefined
+        ? rebased
+        : `${rebased} ${t('bookmarkNowAt', { bookmark: result.bookmark, changeId: result.head.changeId.slice(0, 8), commitId: result.head.commitId.slice(0, 8) })}`
+    return result.warning === undefined ? summary : `${summary} ${result.warning}`
   }
   const summary =
     result.status === 'nothing-to-land'
