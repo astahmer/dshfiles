@@ -353,7 +353,10 @@ export class GitLabCli extends Context.Service<
             attributes: { ...pluginAttributes, 'gitlab.project': input.project, 'gitlab.merge_request.draft': input.draft },
           }),
         )
-        const url = MERGE_REQUEST_URL.exec(output)?.[0]
+        const url = output
+          .split('\n')
+          .map(line => line.trim())
+          .find(line => MERGE_REQUEST_URL.test(line))
         if (url === undefined) return yield* new GlabResponseInvalid({ operation: 'mr-create' })
         return url
       })
