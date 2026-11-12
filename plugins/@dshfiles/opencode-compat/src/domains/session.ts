@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-system-prompt'
+import { Schema } from 'effect'
 import type { DomainInput } from '../context.js'
 import { unsupportedMember } from '../unsupported.js'
 
@@ -10,8 +11,8 @@ interface SessionContext {
   model: string
   system: Array<{ type: 'text'; text: string }>
   messages: unknown[]
-  options: Record<string, unknown>
-  tools: Record<string, { description: string; input: Record<string, unknown> }>
+  options: { [key: string]: typeof Schema.Json.Type }
+  tools: { [key: string]: { description: string; input: { [key: string]: typeof Schema.Json.Type } } }
 }
 
 export const sessionDomain = (config: { readonly ctx: Context; readonly input: DomainInput }) => {
@@ -33,7 +34,12 @@ export const sessionDomain = (config: { readonly ctx: Context; readonly input: D
             system: [...parts],
             messages: [],
             options: {},
-            tools: Object.fromEntries(assembly.tools.map(tool => [tool.name, { description: tool.description, input: structuredClone(tool.parameters) }])),
+            tools: Object.fromEntries(
+              assembly.tools.map(tool => [
+                tool.name,
+                { description: tool.description, input: Schema.decodeUnknownSync(Schema.Record(Schema.String, Schema.Json))(tool.parameters) },
+              ]),
+            ),
           }
           await callback(context)
           if (context.messages.length || Object.keys(context.options).length)
@@ -58,7 +64,13 @@ export const sessionDomain = (config: { readonly ctx: Context; readonly input: D
       },
     },
     {
-      get: (target, key) => (key in target ? Reflect.get(target, key) : typeof key === 'string' && key !== 'then' ? unsupported(`session.${key}`) : undefined),
+      get: (target, key) => {
+        if (key in target) {
+          // SAFETY: The key was checked against the target, including inherited properties.
+          return target[key as keyof typeof target]
+        }
+        return typeof key === 'string' && key !== 'then' ? unsupported(`session.${key}`) : undefined
+      },
     },
   )
 }

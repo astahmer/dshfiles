@@ -12,6 +12,8 @@ interface Skill {
   autoinvoke: boolean
 }
 
+type SkillRegistration = { -readonly [K in keyof Parameters<Context['skills']['register']>[0]]: Parameters<Context['skills']['register']>[0][K] }
+
 interface Editor {
   list: () => Skill[]
   get: (id: string) => Skill | undefined
@@ -52,16 +54,15 @@ export const skillDomain = (config: { readonly ctx: Context; readonly input: Dom
             },
           })
           for (const skill of skills.values()) {
-            disposers.push(
-              config.ctx.skills.register({
-                name: skill.name,
-                description: skill.description,
-                content: skill.content,
-                source: 'runtime',
-                ...(skill.path === undefined ? {} : { path: skill.path }),
-                invocation: { modelInvocable: skill.autoinvoke, userInvocable: true },
-              }),
-            )
+            const info: SkillRegistration = {
+              name: skill.name,
+              description: skill.description,
+              content: skill.content,
+              source: 'runtime',
+              invocation: { modelInvocable: skill.autoinvoke, userInvocable: true },
+            }
+            if (skill.path !== undefined) info.path = skill.path
+            disposers.push(config.ctx.skills.register(info))
             if (!config.input.contributions.skills.includes(skill.name)) config.input.contributions.skills.push(skill.name)
           }
         }
@@ -93,6 +94,14 @@ export const skillDomain = (config: { readonly ctx: Context; readonly input: Dom
         for (const transform of transforms) transform()
       },
     },
-    { get: (target, key) => (key in target ? Reflect.get(target, key) : typeof key === 'string' && key !== 'then' ? unsupported(`skill.${key}`) : undefined) },
+    {
+      get: (target, key) => {
+        if (key in target) {
+          // SAFETY: The key was checked against the target, including inherited properties.
+          return target[key as keyof typeof target]
+        }
+        return typeof key === 'string' && key !== 'then' ? unsupported(`skill.${key}`) : undefined
+      },
+    },
   )
 }

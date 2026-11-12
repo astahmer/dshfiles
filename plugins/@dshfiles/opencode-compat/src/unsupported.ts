@@ -26,7 +26,7 @@ interface RecorderInput {
 
 export const unsupportedMember = (input: RecorderInput & { readonly path: string }) =>
   new Proxy(
-    (..._args: unknown[]): unknown => {
+    (..._args: never[]) => {
       const api = `ctx.${input.path}`
       const prior = input.records.find(record => record.api === api)
       if (prior === undefined) input.records.push({ pluginId: input.pluginId, api, firstSeenAt: new Date().toISOString(), count: 1 })
@@ -40,7 +40,7 @@ export const unsupportedMember = (input: RecorderInput & { readonly path: string
     },
   )
 
-export const unsupportedDomain = (input: RecorderInput & { readonly domain: string }): unknown =>
+export const unsupportedDomain = (input: RecorderInput & { readonly domain: string }) =>
   new Proxy(
     {},
     {

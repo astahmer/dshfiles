@@ -1,18 +1,22 @@
 import { readFile, stat } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { Schema } from 'effect'
 import type { PluginContext } from './context.js'
 
 // OpenCode MIT: packages/plugin/src/promise/plugin.ts, commit 67139d6827af.
-const setupSchema = Schema.declare((value): value is (context: PluginContext) => unknown => typeof value === 'function')
+export type Cleanup = () => void | Promise<void>
+export type SetupResult = Cleanup | void
+export type OpenCodeSetup = (context: PluginContext) => SetupResult | Promise<SetupResult>
+const setupSchema = Schema.declare((value): value is OpenCodeSetup => typeof value === 'function')
 const pluginSchema = Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1)), setup: setupSchema })
-const manifestSchema = Schema.Struct({ main: Schema.optionalKey(Schema.String), exports: Schema.optionalKey(Schema.Unknown) })
+const manifestSchema = Schema.Struct({ main: Schema.optionalKey(Schema.String), exports: Schema.optionalKey(Schema.Json) })
 
-const exportPath = (value: unknown): string | undefined => {
-  if (typeof value === 'string') return value
-  if (typeof value !== 'object' || value === null) return undefined
-  const record = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))(value)
+const exportPath = (value: typeof Schema.Json.Type | undefined): string | undefined => {
+  const path = Schema.decodeUnknownOption(Schema.String)(value)
+  if (path._tag === 'Some') return path.value
+  const record = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Json))(value)
   if (record._tag === 'None') return undefined
   for (const key of ['.', 'import', 'node', 'default']) {
     const candidate = exportPath(record.value[key])
@@ -27,7 +31,7 @@ export const loadPlugin = async (input: { readonly specifier: string }) => {
   if ((await stat(target)).isDirectory()) {
     let entry = 'index.js'
     try {
-      const manifest = Schema.decodeUnknownSync(manifestSchema)(JSON.parse(await readFile(join(target, 'package.json'), 'utf8')))
+      const manifest = decodeJson(manifestSchema, await readFile(join(target, 'package.json'), 'utf8'))
       entry = exportPath(manifest.exports) ?? manifest.main ?? entry
     } catch (error) {
       if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error

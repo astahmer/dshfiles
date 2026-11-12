@@ -1,7 +1,8 @@
+import { decodeJson } from '@dshfiles/dshx/json'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { Schema } from 'effect'
 import { createContext, type Domains } from './context.js'
-import { loadPlugin } from './load-plugin.js'
+import { loadPlugin, type Cleanup } from './load-plugin.js'
 import type { Registration, UnsupportedRecord } from './unsupported.js'
 
 export interface Entry {
@@ -19,8 +20,8 @@ export interface PluginStatus {
   readonly unsupported: UnsupportedRecord[]
 }
 
-const optionsSchema = Schema.Record(Schema.String, Schema.Unknown)
-const isCleanup = Schema.is(Schema.declare((value): value is () => unknown => typeof value === 'function'))
+const optionsSchema = Schema.Record(Schema.String, Schema.Json)
+const isCleanup = Schema.is(Schema.declare((value): value is Cleanup => typeof value === 'function'))
 
 export const start = async (input: { readonly entries: readonly Entry[]; readonly onUnsupported: 'report' | 'fail'; readonly domains: Domains }) => {
   const statuses: PluginStatus[] = []
@@ -38,7 +39,7 @@ export const start = async (input: { readonly entries: readonly Entry[]; readonl
     statuses.push(status)
     if (!entry.enabled) continue
     const registrations: Registration[] = []
-    let cleanup: (() => unknown) | undefined
+    let cleanup: Cleanup | undefined
     let disposed = false
     const dispose = async () => {
       if (disposed) return
@@ -60,9 +61,9 @@ export const start = async (input: { readonly entries: readonly Entry[]; readonl
     }
     await withSpan('opencode-plugin load', {}, async span => {
       try {
-        let options: Record<string, unknown>
+        let options: typeof optionsSchema.Type
         try {
-          options = Schema.decodeUnknownSync(optionsSchema)(JSON.parse(entry.options))
+          options = decodeJson(optionsSchema, entry.options)
         } catch {
           throw new Error('Invalid options JSON object. Set options to a valid JSON object in Settings › dshfiles-opencode-compat.')
         }

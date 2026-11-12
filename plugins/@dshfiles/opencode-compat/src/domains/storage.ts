@@ -7,6 +7,7 @@ import { Schema } from 'effect'
 import type { DomainInput } from '../context.js'
 
 const valueSchema = Schema.Struct({ value: Schema.Json })
+type ScanResult = { entries: Array<{ key: string; value: typeof Schema.Json.Type }>; next?: string }
 
 export const storageDomain = (config: { readonly ctx: Context; readonly input: DomainInput }) => {
   const name = `opencode_${createHash('sha256').update(config.input.pluginId).digest('hex')}`
@@ -17,8 +18,12 @@ export const storageDomain = (config: { readonly ctx: Context; readonly input: D
       if (config.ctx.get('storageDomain') === undefined)
         throw new Error('DSH storageDomain service is unavailable. Enable Host storage and reload this plugin.')
       opened = new Promise((resolve, reject) => {
-        const fiber = config.ctx.inject(['storageDomain'], scoped => {
-          void scoped.storageDomain.open(spec).then(resolve, reject)
+        const fiber = config.ctx.inject(['storageDomain'], async scoped => {
+          try {
+            resolve(await scoped.storageDomain.open(spec))
+          } catch (error) {
+            reject(error)
+          }
         })
         config.input.register({
           dispose: async () => {
@@ -36,7 +41,7 @@ export const storageDomain = (config: { readonly ctx: Context; readonly input: D
   const operation = <A>(name: string, run: () => Promise<A>) => withSpan(name, {}, () => run())
   return {
     get: (key: string) => operation('opencode-storage get', async () => (await open()).table('values').get(key)?.value),
-    set: (key: string, value: unknown) =>
+    set: (key: string, value: typeof Schema.Json.Type) =>
       operation('opencode-storage set', async () => {
         await (await open()).table('values').put(key, { value: Schema.decodeUnknownSync(Schema.Json)(value) })
       }),
@@ -51,7 +56,11 @@ export const storageDomain = (config: { readonly ctx: Context; readonly input: D
           .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
         const selected = entries.slice(0, options.limit)
         const next = selected.length < entries.length ? selected.at(-1)?.[0] : undefined
-        return { entries: selected.map(([key, entry]) => ({ key, value: entry.value })), ...(next === undefined ? {} : { next }) }
+        const result: ScanResult = {
+          entries: selected.map(([key, entry]) => ({ key, value: entry.value })),
+        }
+        if (next !== undefined) result.next = next
+        return result
       }),
   }
 }

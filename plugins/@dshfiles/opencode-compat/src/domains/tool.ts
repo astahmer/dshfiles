@@ -2,18 +2,20 @@ import { isDeepStrictEqual } from 'node:util'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { ToolExecution, ToolExecutionToken } from '@deepseek-ai/dsh-tools'
+import { jsonValueSchema } from '@dshfiles/dshx/json'
+import { Schema } from 'effect'
 import type { DomainInput } from '../context.js'
 import { unsupportedMember, type Registration } from '../unsupported.js'
-import { convertToolSchema } from './tool-schema.js'
+import { bindToolInput, type ToolInputSchema, type ToolInputValue } from './tool-schema.js'
 
 type ToolResult = { content?: string | readonly { type: string; text?: string }[]; output?: unknown; metadata?: unknown }
 type ToolInfo = {
   name: string
   description: string
-  input: unknown
+  input: ToolInputSchema
   options?: { namespace?: string; codemode?: boolean; pinned?: boolean; permission?: string }
   execute: (
-    input: unknown,
+    input: ToolInputValue,
     context: { sessionID: string; agent: string; messageID: string; id: string; signal: AbortSignal; progress: () => Promise<void> },
   ) => Promise<ToolResult>
 }
@@ -43,7 +45,7 @@ const identity = (exec: ToolExecution) => ({
 
 export const createToolDomain =
   ({ ctx }: { readonly ctx: Context }) =>
-  (input: DomainInput): unknown => {
+  (input: DomainInput) => {
     const transforms: Transform[] = []
     let tools: ListedTool[] = []
     let installed: Registration[] = []
@@ -88,7 +90,7 @@ export const createToolDomain =
       const accepted: ListedTool[] = []
       for (const tool of tools) {
         try {
-          const schema = convertToolSchema({ schema: tool.input })
+          const bound = bindToolInput({ schema: tool.input, execute: tool.execute })
           for (const option of ['codemode', 'pinned', 'permission'] as const) {
             if (tool.options?.[option] !== undefined && !input.records.some(record => record.api === `ctx.tool.options.${option}`))
               record(`tool.options.${option}`)
@@ -96,11 +98,14 @@ export const createToolDomain =
           const off = ctx.tools.register({
             name: tool.id,
             description: tool.description,
-            parameters: { ...schema.json },
+            parameters: { ...bound.json },
             output: { schema: {}, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] },
             execute: async (args, exec) => {
-              const value = await schema.validate(args)
-              const result = await tool.execute(value, { ...identity(exec), signal: exec.signal, progress: async () => undefined })
+              const result = await bound.run(Schema.decodeUnknownSync(jsonValueSchema)(args), {
+                ...identity(exec),
+                signal: exec.signal,
+                progress: async () => undefined,
+              })
               content.set(exec.token, textContent(result.content))
               return result.output ?? null
             },
@@ -140,7 +145,7 @@ export const createToolDomain =
       },
       reload,
       list: async () => [...tools],
-      hook: async (name: string, callback: (event: any) => unknown) => {
+      hook: async (name: string, callback: (event: any) => void | Promise<void>) => {
         if (name === 'execute.before') {
           const off = ctx.on('tools/pre-execute', async (exec, next) => {
             const event = { ...identity(exec), input: structuredClone(exec.arguments) }
@@ -185,11 +190,9 @@ export const createToolDomain =
               if (changedContent) {
                 const downstream = await next()
                 if (downstream.kind !== 'accept') return downstream
-                return {
-                  kind: 'accept',
-                  content: textContent(replacement),
-                  ...(downstream.additionalContexts ? { additionalContexts: downstream.additionalContexts } : {}),
-                }
+                const accepted: typeof downstream = { kind: 'accept', content: textContent(replacement) }
+                if (downstream.additionalContexts) accepted.additionalContexts = downstream.additionalContexts
+                return accepted
               }
             } else if (!isDeepStrictEqual(event, before)) record('tool.hook.execute.after(rewrite)')
             return next()
@@ -205,7 +208,10 @@ export const createToolDomain =
       },
     }
     return new Proxy(domain, {
-      get: (target, key, receiver) =>
-        typeof key === 'string' && !(key in target) ? unsupportedMember({ ...input, path: `tool.${key}` }) : Reflect.get(target, key, receiver),
+      get: (target, key) => {
+        if (typeof key === 'string' && !(key in target)) return unsupportedMember({ ...input, path: `tool.${key}` })
+        // SAFETY: Proxy property access can include inherited or absent symbol keys.
+        return target[key as keyof typeof target]
+      },
     })
   }

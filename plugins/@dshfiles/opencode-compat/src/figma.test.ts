@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import Skill from '@deepseek-ai/dsh-skill'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { Schema } from 'effect'
 import { expect, it } from 'vitest'
@@ -9,8 +10,9 @@ import plugin from './host.js'
 import { compatSettings } from './settings.js'
 
 it('loads the upstream Figma plugin and reports its unsupported MCP call', async () => {
-  const source = Schema.decodeUnknownSync(Schema.Struct({ skills: Schema.Array(Schema.String) }))(
-    JSON.parse(await readFile(new URL('../tests/fixtures/opencode-figma/skills-source.json', import.meta.url), 'utf8')),
+  const source = decodeJson(
+    Schema.Struct({ skills: Schema.Array(Schema.String) }),
+    await readFile(new URL('../tests/fixtures/opencode-figma/skills-source.json', import.meta.url), 'utf8'),
   )
   const host = await createTestHost()
   const document = {

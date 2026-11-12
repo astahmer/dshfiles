@@ -26,7 +26,7 @@ it('runs a representative plugin and disposes its contributions on disable', asy
     revision: 1,
   }
   host.ctx.provide('settings', { configure: () => () => undefined, describe: () => [document], update: async () => undefined, replace: async () => undefined })
-  const call = (name: string, args: unknown) =>
+  const call = (name: string, args: { text?: string }) =>
     host.tools.execute({ callId: ToolCallId('sample'), name, arguments: args, signal: new AbortController().signal })
   try {
     await host.ctx.plugin(Skill)
