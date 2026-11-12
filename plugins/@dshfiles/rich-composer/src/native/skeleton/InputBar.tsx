@@ -533,7 +533,7 @@ export const InputBar = memo(function InputBar({
     && input.phase === 'plain' && retry !== undefined
   // Disabled native buttons may omit mouseleave; their tooltip must close from state.
   const primaryDisabled = primaryStops ? stopAction === undefined
-    : (!primaryRetries && empty) || disabled || machineBusy || uploadsPending
+    : (!primaryRetries && empty) || disabled || machineBusy
   const interruptible = running && (continuable || (sending && subagent === null))
   const primarySubmitMode = resolveSubmitMode(busyEnter, running, 'enter', steeringAvailable)
   const plainMessageDraft = !empty && input?.phase === 'plain' && !draft.trimStart().startsWith('/')
@@ -576,8 +576,13 @@ export const InputBar = memo(function InputBar({
       return
     }
     if (keyboard === undefined) return // absent machine: the button is disabled
-    /* v8 ignore next -- defensive: the primary button is disabled for empty, disabled, and pending-upload states. */
-    if (!empty && !disabled && !machineBusy && !uploadsPending) keyboard.submit(primarySubmitMode, 'click')
+    // A held send says why instead of sitting disabled: a tap on a phone has no tooltip to read.
+    if (uploadsPending) {
+      showToast(uploadsHeldText)
+      return
+    }
+    /* v8 ignore next -- defensive: the primary button is disabled for empty and disabled states. */
+    if (!empty && !disabled && !machineBusy) keyboard.submit(primarySubmitMode, 'click')
   }
 
   // Claim ghost hint: rendered by CSS as generated content after the last
