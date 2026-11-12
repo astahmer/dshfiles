@@ -16,8 +16,8 @@ const pack = (page: Page, title: string) =>
     .locator('[data-pack]')
     .filter({ has: page.getByRole('heading', { name: title, exact: true }) })
 /**
- * The composer behind the open wizard dialog, which hides the page from the accessibility tree: found by element. Its
- * label ends in "@ files or threads" in the fork and "… or sessions" in the stock composer.
+ * The composer beside the open wizard card, found by element. Its label ends in "@ files or threads" in the fork and
+ * "… or sessions" in the stock composer.
  */
 const composerBehindWizard = (page: Page) => page.locator('[role="textbox"][aria-label*="@ files or"]').first()
 
@@ -83,7 +83,7 @@ When('the setup wizard shown on first run is skipped', async ({ page }: { page: 
     .then(() => true)
     .catch(() => false)
   await recordAssertion(page, 'onboarding-wizard-first-run', async () => {
-    // The wizard is a kit dialog now; nothing else may open over a fresh page.
+    // The wizard is the one first-run surface: no other dialog (the upstream Preview Notice included) opens beside it.
     await expect(page.getByRole('dialog')).toHaveCount(opened ? 1 : 0)
     if (!opened) await expect(wizard(page)).toHaveCount(0)
   })

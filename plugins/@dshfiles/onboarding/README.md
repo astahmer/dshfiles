@@ -37,16 +37,18 @@ blocks the app, makes no model request, and changes the profile only when you co
       the feature's page, command or Settings place is registered in this profile. **Show me where** appears when the
       feature's first `reach` step can be replayed here (see _Show me where_).
 2. **Setup wizard** — while an AI account or a project is still missing (read from the checklist) and no thread is
-   open, a dialog (a bottom sheet on a phone) walks **Account → Project → First task**. A profile that has both never opens it by
-   itself (fork default: an existing user met it in every new browser).
+   open, a non-modal card at the top right (a non-modal bottom sheet on a phone) walks **Account → Project → First
+   task**. It is the only first-run surface: settings-shell hides DSH's own Preview Notice unless its `previewNotice`
+   setting is on. A profile that has both never opens it by itself (fork default: an existing user met it in every new
+   browser).
    1. Account and Project tick from the same checklist and link to the pages that own the setup; Project also opens
-      the `jj-integration` **Isolate new threads** setting.
+      the `jj-integration` **Isolate new threads** setting. The page opens beside the card, which stays on its step;
+      the step is kept per browser, so a reload or a replay comes back to it.
    2. First task offers three starter prompts; **Insert prompt** puts one in the composer (or a new thread draft when
       no composer is on screen) and never sends it.
-   3. **Don't show again**, Back and Next on every step. Escape, the close button or a link to a setup page put it
-      away for now (it may open by itself again on a later load while setup is missing); only Done and Don't show
-      again are kept per browser. **Show the setup wizard** (⌘K)
-      or **Start setup** on the page replays it on any profile.
+   3. **Don't show again**, Back and Next on every step. Escape or the close button put it away for now (it may open by
+      itself again on a later load while setup is missing); only Done and Don't show again are kept per browser.
+      **Show the setup wizard** (⌘K) or **Start setup** on the page replays it on any profile.
 
 ## Pack changes
 
@@ -244,7 +246,7 @@ All apply live; none needs a restart.
 3. `src/packs.ts` defines the packs once; a test fails when a pack names a plugin directory or a setting that does not
    exist.
 4. Nothing is stored on the Host. The wizard outcome and What's new's last visit live in browser storage
-   (`dshfiles.onboarding.wizard.v1`, `dshfiles.onboarding.whats-new.v1`, `dshfiles.onboarding.suggestions.*.v1`).
+   (`dshfiles.onboarding.wizard.v1`, `dshfiles.onboarding.wizard-step.v1`, `dshfiles.onboarding.whats-new.v1`, `dshfiles.onboarding.suggestions.*.v1`).
 
 ## Limits
 

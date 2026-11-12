@@ -113,12 +113,11 @@ export default defineClient({
     }
 
     /** Into the composer on screen, else a new thread draft; neither sends. */
-    const useInsertPrompt = (): ((text: string) => boolean) => {
+    const useInsertPrompt = (): ((text: string) => void) => {
       const composer = useContract(Composer)
       return text => {
-        if (composer.status === 'active' && composer.value.insert({ text })) return true
+        if (composer.status === 'active' && composer.value.insert({ text })) return
         ctx.uiWorkspace.startSession(undefined, { prompt: text })
-        return true
       }
     }
 
@@ -128,8 +127,10 @@ export default defineClient({
         loadOverview={useLoadOverview()}
         onClose={props.onClose}
         onFinish={props.onFinish}
+        onStepChange={WizardStore.setStep}
         open={props.open}
         routes={routes}
+        step={WizardStore.useStep()}
       />
     )
 
@@ -206,8 +207,8 @@ export default defineClient({
         if (!show || requested) complete()
       }, [waiting, show, requested, complete])
       if (waiting || !show || requested || (closed && props.explicit !== true)) return null
-      // settings-shell mounts onboarding steps inside its settings trigger row, which this fork hides (b:4v6p): the kit
-      // dialog portals to the body on its own; the portal keeps the step's React tree out of that hidden row too.
+      // settings-shell mounts onboarding steps inside its settings trigger row, which this fork hides (b:4v6p): the card is
+      // fixed to the viewport from the body, and the portal keeps the step's React tree out of that hidden row too.
       return createPortal(
         <Wizard
           onClose={() => {

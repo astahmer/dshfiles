@@ -243,7 +243,7 @@
     {
       "id": "setup-wizard",
       "title": "Get set up in three steps: account, project, first task",
-      "summary": "While an AI account or a project is still missing (the live checklist) and no thread is open, a three-step setup wizard links to AI accounts, Settings › Projects and workspace isolation, ticks each step from the live checklist, and ends by inserting a starter prompt into the composer without sending it. It is a dialog (a bottom sheet on a phone) with focus kept inside: Escape, the close button or a link to a setup page put it away for now; Don't show again, Back and Next on every step, and only Done or Don't show again is kept per browser. Show the setup wizard (⌘K) and Start setup on Getting started replay it, on any profile. It makes no model request.",
+      "summary": "While an AI account or a project is still missing (the live checklist) and no thread is open, a three-step setup wizard links to AI accounts, Settings › Projects and workspace isolation, ticks each step from the live checklist, and ends by inserting a starter prompt into the composer without sending it. It is a non-modal card at the top right (a non-modal bottom sheet on a phone): a setup link opens its page beside the card, which stays on its step, and the step is kept per browser so a reload or a replay resumes there. Escape or the close button put it away for now; Don't show again, Back and Next on every step, and only Done or Don't show again is kept per browser. Show the setup wizard (⌘K) and Start setup on Getting started replay it, on any profile. It makes no model request.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Show the setup wizard\"",
@@ -262,7 +262,7 @@
           "coveredBy": ["onboarding.wizard"]
         }
       ],
-      "states": ["account", "project", "first-task", "inserted", "no-composer", "skipped", "done"],
+      "states": ["account", "project", "first-task", "inserted", "resumed", "skipped", "done"],
       "failureModes": [
         "No composer on screen: Insert prompt opens a new thread draft holding the prompt instead.",
         "Settings shell absent: the workspace isolation button is hidden."
@@ -293,6 +293,12 @@
           "id": "onboarding.wizard",
           "file": "plugins/@dshfiles/onboarding/src/setup-wizard.test.tsx",
           "testName": "walks account, project and first task, inserts the prompt without sending, and keeps Don’t show again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.wizard-non-modal-resume",
+          "file": "plugins/@dshfiles/onboarding/src/setup-wizard.test.tsx",
+          "testName": "is a non-modal card: a setup link opens its page beside it, and the card comes back on the same step"
         }
       ]
     },
