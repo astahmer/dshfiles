@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-12. Follows [README.md](README.md) (P1–P5a shipped). Packs are done and out of scope here except as the tier carrier.
 
-**Resume here:** decisions taken (bottom). P5b, S1, Z1, C1, C2 and C4 are done; next S1b (calm Review screen), C3, C5, C6 and S2.
+**Resume here:** decisions taken (bottom). P5b, S1, S1b, Z1, C1, C2 and C4 are done; next C3, C5, C6 and S2.
 
 ## Why
 
@@ -68,6 +68,7 @@ A local web app served by the dshx CLI before DSH is set up ([5-configurator-des
 | Step | Work                                                                                                 |
 | ---- | ---------------------------------------------------------------------------------------------------- |
 | S1   | Checks + presets + review + apply + printed start command, from a checkout: **done** (`dshx setup`)  |
+| S1b  | Calm setup screens: Review leads with one sentence and pack rows (plugins by title, dependencies in one quiet row, files relative to the DSH home, ids and command behind Show details); Check, Preset, Apply and Done get the same pass. **Done**: jj:voxszpuz (plugin titles, check paths, pack step labels), jj:lrzsztpz (screens, tests, screenshots, cli-reference). Apply's pack rows finish together: one profile-sync run links them all |
 | S2   | Filtered build + launch + handoff                                                                    |
 | S3   | Project, key settings, account detection (presence only, env var names never values)                 |
 | S4   | Reconfigure an existing install (same screens, diff against the live profile)                        |
