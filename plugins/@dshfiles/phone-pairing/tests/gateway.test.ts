@@ -114,6 +114,35 @@ describe('pairing gateway', () => {
     }
   })
 
+  it('marks the device cookie Secure on a loopback http origin, as the __Host- prefix requires', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'pairing-gateway-'))
+    const reservation = http.createServer()
+    const port = await listen(reservation)
+    await new Promise(resolve => reservation.close(resolve))
+    const store = await createPairingStore({ path: join(directory, 'devices.json') })
+    const offer = store.beginOffer()
+    const gateway = createPairingGateway({ upstream: 1, port, store, publicOrigin: 'http://localhost:3443', nativeCookie: async () => undefined })
+    try {
+      await gateway.listen()
+      const cookie = await new Promise<string | undefined>((resolve, reject) => {
+        const request = http.request(
+          { hostname: '127.0.0.1', port, path: '/pair/redeem', method: 'POST', headers: { 'content-type': 'application/json' } },
+          response => {
+            response.resume()
+            resolve(response.headers['set-cookie']?.[0])
+          },
+        )
+        request.on('error', reject)
+        request.end(JSON.stringify({ id: offer.id, secret: offer.secret }))
+      })
+      expect(cookie).toMatch(/^__Host-dsh_phone=.*; Secure$/u)
+    } finally {
+      gateway.closeAll()
+      await new Promise(resolve => gateway.server.close(resolve))
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
   it('mints the native cookie once for concurrent requests and again after a 401', async () => {
     const upstream = http.createServer((request, response) => {
       response.statusCode = request.url === '/expire' && request.headers.cookie === 'dsh-auth=1' ? 401 : 200

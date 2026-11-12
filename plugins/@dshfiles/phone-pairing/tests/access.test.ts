@@ -197,6 +197,30 @@ describe('phone access on Phone access QR’s origin (shared) or its own tunnel 
   })
 })
 
+describe('manual origin', () => {
+  it('refuses a plain-http origin the phone cookie cannot live on, before any gateway or code exists', async () => {
+    const port = await freePort()
+    const { access, closed, tunnels } = await fixture({
+      defaultPort: port,
+      settings: { enabled: false, provider: 'manual', origin: 'http://phone.lan:8080' },
+    })
+    const status = await access.enable()
+    expect(status).toMatchObject({ enabled: false, problem: { reason: 'insecure-origin' } })
+    expect(status.failure).toMatch(/https:\/\//u)
+    expect(access.offer()).toEqual({ state: 'off' })
+    expect(closed).toEqual([])
+    expect(tunnels).toEqual([])
+  })
+
+  it('accepts loopback http for a desktop check', async () => {
+    const { access } = await fixture({
+      defaultPort: await freePort(),
+      settings: { enabled: false, provider: 'manual', origin: 'http://127.0.0.1:3443' },
+    })
+    expect(await access.enable()).toMatchObject({ enabled: true, origin: 'http://127.0.0.1:3443', mode: 'own' })
+  })
+})
+
 describe('busy port inspection', () => {
   it('names this DSH, another program or nobody from lsof output', () => {
     expect(holderOf('p42\ncnode\n', 42)).toEqual({ holder: 'this DSH', holderSelf: true })

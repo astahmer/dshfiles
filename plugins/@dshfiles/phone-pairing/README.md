@@ -14,7 +14,8 @@ Devices live in `$DSH_HOME/plugins/phone-pairing/devices.json` as SHA-256 hashes
    The provider is auto-picked: **Tailscale first** (tailnet-only Serve, no public
    URL), then a public `cloudflared` quick tunnel for machines without it. Set
    `"provider"` explicitly to override (`tailscale-funnel`, `tailscale-serve`,
-   `cloudflared`, `manual` + `"origin"`).
+   `cloudflared`, `manual` + `"origin"`). A manual `"origin"` must be `https://` (or loopback `http://` for a desktop
+   check): the `__Host-` device cookie needs `Secure`, so phone access refuses to turn on with a plain-HTTP origin.
 2. **Shared with Phone access QR.** When `@dshfiles/phone-access` is loaded and its proxy listens on a public
    origin, the gateway binds an OS-assigned loopback port. Through phone-access's edge API it claims `/pair` and its
    device cookie on that origin. Codes open the same `https://<machine>.<tailnet>.ts.net` the phone already uses. No

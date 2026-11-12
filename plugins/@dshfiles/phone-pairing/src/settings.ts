@@ -15,6 +15,16 @@ export interface PhoneSettings {
 
 const DEFAULT: PhoneSettings = { enabled: false }
 
+/**
+ * Whether the phone's `__Host-` device cookie can live on `origin`: browsers accept that prefix only with `Secure`, which
+ * needs HTTPS, or loopback HTTP for a desktop check. Anything else would spend pairing codes on a cookie the browser drops.
+ */
+export const isCookieSafeOrigin = (origin: string): boolean => {
+  if (!URL.canParse(origin)) return false
+  const url = new URL(origin)
+  return url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
+}
+
 const isProvider = (value: unknown): value is Provider =>
   value === 'tailscale-funnel' || value === 'tailscale-serve' || value === 'cloudflared' || value === 'manual'
 

@@ -19,10 +19,10 @@ const port = Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, 
 
 /**
  * Why phone access could not turn on, as data: a busy gateway port names who holds it and a free port to use instead;
- * a missing tunnel or native listener says what to start.
+ * a missing tunnel or native listener says what to start; an insecure manual origin says to use HTTPS.
  */
 export const accessProblemSchema = Schema.Struct({
-  reason: Schema.Literals(['port-busy', 'no-tunnel', 'no-listener', 'failed']),
+  reason: Schema.Literals(['port-busy', 'no-tunnel', 'no-listener', 'insecure-origin', 'failed']),
   /** The loopback gateway port that was tried. */
   port: Schema.optional(port),
   /** A free port next to it, to pass to `phone_pairing_enable`. */

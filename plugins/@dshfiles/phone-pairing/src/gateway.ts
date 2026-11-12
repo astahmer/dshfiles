@@ -4,6 +4,7 @@ import { decodeJson, type JsonObject, type JsonValue, jsonValueSchema } from '@d
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { type GatewayRefusal, landingScript, pairedPage, pairPage, refusalMessage, refusalStatus, unpairedPage, wantsPage } from './landing.ts'
 import type { NativeCookie } from './native-cookie.ts'
+import { isCookieSafeOrigin } from './settings.ts'
 import type { RedeemResult } from './store.ts'
 
 const COOKIE = '__Host-dsh_phone'
@@ -228,7 +229,7 @@ export const createPairingGateway = (options: GatewayOptions) => {
             200,
             { paired: true, message: 'Paired. Opening DSH…' },
             {
-              'set-cookie': `${COOKIE}=${result.token}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict${publicOrigin?.startsWith('https:') ? '; Secure' : ''}`,
+              'set-cookie': `${COOKIE}=${result.token}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict${publicOrigin !== undefined && isCookieSafeOrigin(publicOrigin) ? '; Secure' : ''}`,
             },
           )
         })

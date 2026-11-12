@@ -1,7 +1,7 @@
 import type { AccessProblem, PairingOffer, PairingStatus } from './api.ts'
 import type { BusyPort } from './busy-port.ts'
 import type { Provider } from './providers.ts'
-import type { PhoneSettings } from './settings.ts'
+import { isCookieSafeOrigin, type PhoneSettings } from './settings.ts'
 import type { PairingStore } from './store.ts'
 
 /** What the lifecycle needs from a gateway: bind, and close again. */
@@ -131,6 +131,11 @@ export const createAccess = (deps: AccessDeps) => {
       throw new AccessFailure(
         { reason: 'no-listener' },
         "DSH's own web listener is not available, so there is nothing to proxy to. Reload the page; if it stays, restart DSH when your work is finished.",
+      )
+    if (current?.origin !== undefined && !isCookieSafeOrigin(current.origin))
+      throw new AccessFailure(
+        { reason: 'insecure-origin' },
+        `The manual origin ${current.origin} is not HTTPS, so a phone cannot keep its pairing cookie there. Put an HTTPS reverse proxy in front of the gateway port and set "origin" to its https:// URL in ${deps.settingsPath}, or remove "origin" to use a tunnel. Then turn phone access on again.`,
       )
     store ??= await deps.openStore()
     const provider = await deps.resolveProvider(input.provider ?? current?.provider)
