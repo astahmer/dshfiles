@@ -8,6 +8,7 @@ export interface SetupCheck {
   readonly label: string
   readonly state: 'ok' | 'warn' | 'fail'
   readonly detail: string
+  readonly path: string | null
   readonly fix: string | null
 }
 
@@ -74,6 +75,7 @@ export interface SetupPlanResult {
   readonly unbuilt: readonly string[]
   readonly buildCommand: string | null
   readonly startCommand: string
+  readonly titles: Readonly<Record<string, string>>
   readonly hash: string
 }
 
