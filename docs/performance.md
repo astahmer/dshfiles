@@ -1863,3 +1863,45 @@ node $S/follow-stream-probe.mjs switch 6 3
 pnpm --dir plugins/@dshfiles/session-controller exec vitest run tests/browser-event.test.ts src/native/control.test.ts
 pnpm --dir plugins/@dshfiles/session-source-port exec vitest run src/projection-patch.test.ts
 ```
+
+## Long-lived tab heap: what held every visited thread (2026-11-12)
+
+Scratch DSH (`dshx dev up`, every owned bundle `profiles/web` loads), seeded with 40 real thread logs copied from one
+project (158 MB of decoded events, `cwd` rewritten to the scratch project). A headless Playwright Chromium opened each
+thread through its `?thread=` URL (history push, no reload), 2.5 s per thread, two rounds (80 switches), settled 45 s,
+then read `Runtime.getHeapUsage` after two `HeapProfiler.collectGarbage` calls and took a heap snapshot. Retainers come
+from a dominator tree and shortest retainer paths over that snapshot; both runs used the same thread list and build
+procedure. Before is `jj:vtzskmvy`, after is the three fixes below.
+
+| Measure (after GC, settled)                       | Before   | After    |
+| ------------------------------------------------- | -------- | -------- |
+| page `heapUsed`                                   | 301.2 MB | 175.9 MB |
+| heap snapshot, all nodes                          | 357.9 MB | 232.7 MB |
+| Session instances alive (event window, assembler) | 41       | 9        |
+| strings                                           | 76.9 MB  | 24.6 MB  |
+| dshx plugin scopes left behind (`child` closures) | 39,187   | 87       |
+
+What held the bytes, by owner:
+
+1. **Every visited thread's whole Session** (41 of 41 alive; the controller itself kept 4 viewed + 3 parked). Two
+   module-level maps that said "kept for the page's lifetime" held each thread's Session through its composer:
+   `queue-reorder`'s queue editor and "Move to thread" actor (`session-queue-editor.ts`), and `send-after-upload`'s
+   pending-send actor (`session-composer.ts`). Each Session brings its event window, projection values cache,
+   conversation assembler (`contexts`, `inputs`, `contextsBySeq`) and composer: about 3 MB per thread on this corpus,
+   more on threads with hours of turns. Both maps now drop an idle entry once the Session Controller no longer binds
+   its Session; a busy edit, a pending send or a failed send stays, and an open edit record is persisted anyway. Fixing
+   only the queue editor left 41 alive (271.7 MB): the composer map held the same Sessions.
+2. **dshx plugin scopes.** A plugin's root scope kept one cleanup closure for every `keyed` run, child scope and early
+   `add`/`provide` withdrawal, for the page's lifetime. Thread Sidebar re-registers its ~148 command-palette actions
+   about twice per thread switch (1,485 adds in 10 switches), and each change reran Command Palette's `keyed` source,
+   so a sidebar-click run of 80 visits left 69,089 scopes, one chain of them retaining 31.6 MB. `onDispose` now returns
+   an unregister function and every early withdrawal uses it.
+
+Not fixed, measured: 45 MB is bundle source (external strings) and 16 MB compiled regular expressions, both constant
+across runs; the palette re-registration churn itself (CPU, ~300 registry notifications per switch) remains.
+
+```sh
+pnpm --dir tooling/dshx/packages/dshx exec vitest run tests/plugin-context.spec.ts
+pnpm --dir plugins/@dshfiles/queue-reorder exec vitest run src/session-queue-editor.test.ts
+pnpm --dir plugins/@dshfiles/send-after-upload exec vitest run src/session-composer.test.ts
+```
