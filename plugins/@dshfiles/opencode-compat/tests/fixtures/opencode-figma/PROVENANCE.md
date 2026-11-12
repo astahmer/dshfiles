@@ -1,0 +1,1 @@
+Copied from https://github.com/anomalyco/opencode, `packages/plugins/figma`, commit `67139d6827af`. The skills' own source and revision are recorded in `skills-source.json`; their `SKILL.md` files are test placeholders (see `skills/NOTICE.md`). OpenCode is MIT licensed; see LICENSE.
