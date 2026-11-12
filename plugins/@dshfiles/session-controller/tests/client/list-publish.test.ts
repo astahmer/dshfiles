@@ -36,7 +36,12 @@ describe('session list publication', () => {
     const published = vi.fn()
     sessions.list.subscribe(published)
 
-    sessions.handleControlFrame({ type: 'projection', sessionId: id, seq: 2, changes: [{ key: 'turnOutline', val: [{ turn: 1, prompt: 'q', response: 'a' }] }] })
+    sessions.handleControlFrame({
+      type: 'projection',
+      sessionId: id,
+      seq: 2,
+      changes: [{ key: 'turnOutline', val: [{ turn: 1, prompt: 'q', response: 'a' }] }],
+    })
     await tick()
     sessions.handleSessionActivity(id, 2)
     await tick()

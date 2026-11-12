@@ -139,7 +139,12 @@ describe('agent/request-error fail-over', { timeout: 30_000 }, () => {
     ])
     const continuation = eventsOfType(agent, 'user/message').at(-1)
     expect(continuation?.type === 'user/message' ? continuation.data.content : undefined).toEqual([
-      { type: 'text', text: expect.stringMatching(/^\[ai-accounts fail-over\] The previous request failed on Account cc_a · gpt-6-luna, so this thread moved to Account cc_b · gpt-6-luna\./u) },
+      {
+        type: 'text',
+        text: expect.stringMatching(
+          /^\[ai-accounts fail-over\] The previous request failed on Account cc_a · gpt-6-luna, so this thread moved to Account cc_b · gpt-6-luna\./u,
+        ),
+      },
     ])
 
     await host.ask(agent, 'again')

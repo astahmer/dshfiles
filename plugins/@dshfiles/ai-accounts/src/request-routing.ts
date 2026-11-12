@@ -369,7 +369,12 @@ export class RequestRouting extends Context.Service<
         }
         agent.model.select(nativeSelection(route))
         const message = createUserMessage({
-          content: [{ type: 'text', text: continuationText({ from: input.from, to: `${world.routes().get(route.provider)?.displayName ?? route.provider} · ${route.model}` }) }],
+          content: [
+            {
+              type: 'text',
+              text: continuationText({ from: input.from, to: `${world.routes().get(route.provider)?.displayName ?? route.provider} · ${route.model}` }),
+            },
+          ],
           source: { kind: 'user' },
         })
         const resume = Effect.gen(function* () {

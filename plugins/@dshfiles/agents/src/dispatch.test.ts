@@ -89,7 +89,13 @@ test('narrows the schedule catalog to one agent’s threads', () => {
       { id: 'schedule-1', title: 'Daily review', status: 'active', target: { kind: 'session', sessionId: 'session-a' }, involvedSessionIds: ['session-a'] },
       { id: 'schedule-2', title: 'Someone else', status: 'active', target: { kind: 'session', sessionId: 'session-b' }, involvedSessionIds: ['session-b'] },
       { id: 'schedule-3', status: 'paused', target: { kind: 'new' }, involvedSessionIds: ['session-a'] },
-      { id: 'schedule-4', title: 'Done', status: 'ended', target: { kind: 'new_once', sessionId: 'session-c' }, involvedSessionIds: ['session-c', 'session-a'] },
+      {
+        id: 'schedule-4',
+        title: 'Done',
+        status: 'ended',
+        target: { kind: 'new_once', sessionId: 'session-c' },
+        involvedSessionIds: ['session-c', 'session-a'],
+      },
     ],
     ['session-a'],
   )

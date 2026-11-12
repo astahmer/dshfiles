@@ -38,7 +38,9 @@ export interface AgentRoutingHandlers {
 export class RequestRoutingHooks {
   static register(agent: Agent, services: Context.Context<never>, handlers: AgentRoutingHandlers): () => void {
     const run = Effect.runPromiseWith(services)
-    const offClaimed = agent.ctx.on('agent/inbox/claimed', ({ message, turn }) => Effect.runSyncWith(services)(handlers.claimed({ messageId: message.id, turn })))
+    const offClaimed = agent.ctx.on('agent/inbox/claimed', ({ message, turn }) =>
+      Effect.runSyncWith(services)(handlers.claimed({ messageId: message.id, turn })),
+    )
     const offRequest = agent.ctx.on(
       'agent/request',
       async ({ turn, step }, next) => {

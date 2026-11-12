@@ -75,9 +75,16 @@ const fixture = async () => {
   const owner = new ApiSessionAgentController(ctx)
   const history = historyHarness(ctx, () => undefined)
   // SAFETY: the list's image-limit projection view reads only `imageLimits`; the Session Controller injects the real store.
-  ctx.provide('attachments', { imageLimits: {
-    maxImageBytes: 1, maxImagesPerMessage: 1, maxMessageImageBytes: 1, maxImagePixels: 1, maxImageDimension: 1, mediaTypes: ['image/png'],
-  } } as never)
+  ctx.provide('attachments', {
+    imageLimits: {
+      maxImageBytes: 1,
+      maxImagesPerMessage: 1,
+      maxMessageImageBytes: 1,
+      maxImagePixels: 1,
+      maxImageDimension: 1,
+      mediaTypes: ['image/png'],
+    },
+  } as never)
   const list = new ApiSessionList(ctx, 8)
   await list.initialize()
   const { agent } = await owner.createSession({ cwd: root, reusable: () => false })

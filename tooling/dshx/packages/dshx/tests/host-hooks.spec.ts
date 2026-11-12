@@ -24,8 +24,7 @@ const host = async () => {
   return created
 }
 
-const run = (test: TestHost, text: string) =>
-  test.runTool({ name: 'acme_echo', arguments: { text }, signal: new AbortController().signal })
+const run = (test: TestHost, text: string) => test.runTool({ name: 'acme_echo', arguments: { text }, signal: new AbortController().signal })
 
 describe('defineHost hooks', () => {
   it('denies a tool call before it runs and rewrites the value after, until the plugin unloads', async () => {

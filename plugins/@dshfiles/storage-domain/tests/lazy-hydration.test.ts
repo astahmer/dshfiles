@@ -167,7 +167,10 @@ describe('lazy hydration', () => {
     expect(await table.deleteMany(['a', 'b', 'a', 'missing'])).toBe(2)
     expect(table.get('a')).toBeUndefined()
     expect([...table.keys()]).toEqual(['c'])
-    expect(changes.map(change => [change.key, change.operation])).toEqual([['a', 'deleted'], ['b', 'deleted']])
+    expect(changes.map(change => [change.key, change.operation])).toEqual([
+      ['a', 'deleted'],
+      ['b', 'deleted'],
+    ])
     expect(await table.deleteMany(['a'])).toBe(0)
 
     await domain.close()

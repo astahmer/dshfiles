@@ -29,8 +29,7 @@ describe('fold request', () => {
 
   it('keeps an input request marked when a content change repeats it', () => {
     const byInput = applyFoldRequest(noFoldRequest, { kind: 'requestTail', input: true }).request
-    expect(applyFoldRequest(byInput, { kind: 'requestTail', input: false }).request)
-      .toEqual({ status: 'requested', landing: 'tail', input: true })
+    expect(applyFoldRequest(byInput, { kind: 'requestTail', input: false }).request).toEqual({ status: 'requested', landing: 'tail', input: true })
   })
 
   it('has no retarget callback to call once a batch finished', () => {

@@ -78,7 +78,9 @@ const fixture = async (replies: readonly string[] = []) => {
     sessionId: SessionId('driven-thread'),
     meta: { cwd: root },
     agentOptions: { provider: 'scripted', model: 'model-a' },
-    setup: (agentCtx) => { installModelSelection(agentCtx) },
+    setup: agentCtx => {
+      installModelSelection(agentCtx)
+    },
   })
   cleanups.push(() => handle.dispose())
   const commands = new SessionCommandController(ctx, owner, root)

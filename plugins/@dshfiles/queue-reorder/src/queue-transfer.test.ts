@@ -4,7 +4,10 @@ import { QueueEditModel, type QueuedBlock, type QueuedRow } from './queue-edit-m
 import { startQueueTransfer, transferTargets, type QueueTransferPorts, type TransferDestination } from './queue-transfer.js'
 
 const text = (value: string): QueuedBlock => ({ type: 'text', text: value })
-const image = (name: string): QueuedBlock => ({ type: 'image', attachment: { attachmentId: `stored:${name}`, mediaType: 'image/png', bytes: 3, width: 1, height: 1, name } })
+const image = (name: string): QueuedBlock => ({
+  type: 'image',
+  attachment: { attachmentId: `stored:${name}`, mediaType: 'image/png', bytes: 3, width: 1, height: 1, name },
+})
 const file = (name: string): QueuedBlock => ({ type: 'file', attachment: { attachmentId: `stored:${name}`, name, bytes: 3 } })
 const rowOf = (id: string, content: readonly QueuedBlock[]): QueuedRow => {
   const row = QueueEditModel.decodeQueuedRows({ 'next-turn': [{ id, content }] })[0]

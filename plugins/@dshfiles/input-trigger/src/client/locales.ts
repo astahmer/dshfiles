@@ -35,10 +35,10 @@ export const en = {
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
-  'command': 'コマンド',
-  'skill': 'スキル',
-  'subagent': 'サブエージェント',
-  'loading': '読み込み中…',
+  command: 'コマンド',
+  skill: 'スキル',
+  subagent: 'サブエージェント',
+  loading: '読み込み中…',
   'drill.aria': 'フォルダを参照',
   'drill.hint': 'フォルダを参照',
   'drill.key': 'Tab',
@@ -48,10 +48,10 @@ export const ja = {
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
-  'command': 'Comandos',
-  'skill': 'Habilidades',
-  'subagent': 'Subagentes',
-  'loading': 'Cargando…',
+  command: 'Comandos',
+  skill: 'Habilidades',
+  subagent: 'Subagentes',
+  loading: 'Cargando…',
   'drill.aria': 'Explorar carpeta',
   'drill.hint': 'Explorar carpeta',
   'drill.key': 'Pestaña',
@@ -61,10 +61,10 @@ export const es = {
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
-  'command': 'Commandes',
-  'skill': 'Compétences',
-  'subagent': 'Sous-agents',
-  'loading': 'Chargement…',
+  command: 'Commandes',
+  skill: 'Compétences',
+  subagent: 'Sous-agents',
+  loading: 'Chargement…',
   'drill.aria': 'Parcourir le dossier',
   'drill.hint': 'Parcourir le dossier',
   'drill.key': 'Onglet',
@@ -74,10 +74,10 @@ export const fr = {
 
 /** German dictionary, checked against the English keys. */
 export const de = {
-  'command': 'Befehle',
-  'skill': 'Fähigkeiten',
-  'subagent': 'Subagenten',
-  'loading': 'Laden…',
+  command: 'Befehle',
+  skill: 'Fähigkeiten',
+  subagent: 'Subagenten',
+  loading: 'Laden…',
   'drill.aria': 'Ordner durchsuchen',
   'drill.hint': 'Ordner durchsuchen',
   'drill.key': 'Tab',
@@ -87,10 +87,10 @@ export const de = {
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
-  'command': 'Команды',
-  'skill': 'Навыки',
-  'subagent': 'Субагенты',
-  'loading': 'Загрузка…',
+  command: 'Команды',
+  skill: 'Навыки',
+  subagent: 'Субагенты',
+  loading: 'Загрузка…',
   'drill.aria': 'Просмотреть папку',
   'drill.hint': 'Просмотреть папку',
   'drill.key': 'Вкладка',
@@ -100,10 +100,10 @@ export const ru = {
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
-  'command': 'Comandos',
-  'skill': 'Habilidades',
-  'subagent': 'Subagentes',
-  'loading': 'Carregando…',
+  command: 'Comandos',
+  skill: 'Habilidades',
+  subagent: 'Subagentes',
+  loading: 'Carregando…',
   'drill.aria': 'Navegar na pasta',
   'drill.hint': 'Navegar na pasta',
   'drill.key': 'Guia',

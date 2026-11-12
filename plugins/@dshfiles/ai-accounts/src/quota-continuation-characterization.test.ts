@@ -44,7 +44,8 @@ const recordingSchedule = () => {
   let nextId = 0
   const schedule: SchedulePort = {
     create: async request => {
-      if (request.timing.kind !== 'after' || request.target?.kind !== 'session') throw new Error('Quota recovery must use a relative one-shot schedule on its thread.')
+      if (request.timing.kind !== 'after' || request.target?.kind !== 'session')
+        throw new Error('Quota recovery must use a relative one-shot schedule on its thread.')
       const sessionId = request.target.sessionId
       created.push({ sessionId, afterSeconds: request.timing.after_seconds })
       const record: ScheduleCatalogEntry = {

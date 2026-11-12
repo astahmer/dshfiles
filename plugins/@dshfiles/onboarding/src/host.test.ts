@@ -145,16 +145,12 @@ describe('onboarding Host', () => {
       const tool = host.tools.get('onboarding_reach')
       expect(tool?.name).toBe('onboarding_reach')
       expect(tool?.isConcurrencySafe?.({})).toBe(true)
-      const text = JSON.stringify(
-        await host.runTool({ name: 'onboarding_reach', arguments: { key: 'thread-sidebar#idle-archive-policy' } }),
-      )
+      const text = JSON.stringify(await host.runTool({ name: 'onboarding_reach', arguments: { key: 'thread-sidebar#idle-archive-policy' } }))
       // The fork's thread-sidebar reaches its list views through the Filter menu.
       expect(text).toContain('1. Click \\"Filter: \\" (button)')
       expect(text).toContain('Right-click \\"Idle policy target\\" (button) — not replayable here')
       expect(text).toContain('Docs: https://github.com/astahmer/dshfiles/blob/main/plugins/@dshfiles/thread-sidebar/README.md')
-      const phone = JSON.stringify(
-        await host.runTool({ name: 'onboarding_reach', arguments: { key: 'memory#memory-panel' } }),
-      )
+      const phone = JSON.stringify(await host.runTool({ name: 'onboarding_reach', arguments: { key: 'memory#memory-panel' } }))
       expect(phone).toContain('Desktop (640 px wide or more):\\n1. Click \\"Knowledge\\" (tab)')
       expect(phone).toContain(
         'Phone (narrower than 640 px):\\n1. Click \\"More\\" (button)\\n2. Click \\"Knowledge Memory and reference material agents use.\\" (button)',
@@ -198,9 +194,7 @@ describe('onboarding Host', () => {
     try {
       const tool = on.host.tools.get('onboarding_whats_new')
       expect(tool?.isConcurrencySafe?.({})).toBe(true)
-      const text = JSON.stringify(
-        await on.host.runTool({ name: 'onboarding_whats_new', arguments: { limit: 5 } }),
-      )
+      const text = JSON.stringify(await on.host.runTool({ name: 'onboarding_whats_new', arguments: { limit: 5 } }))
       expect(on.bundleReads).toEqual(['read'])
       expect(text).toContain('does not link Getting started from a dshfiles checkout')
       expect(text).toContain('https://github.com/astahmer/dshfiles/commits/main')
@@ -479,9 +473,9 @@ describe('onboarding Host', () => {
       args: { readonly feature?: string; readonly pack?: string; readonly project?: string; readonly confirm?: true },
     ) =>
       host.runTool({ name: 'onboarding_try_it', arguments: args }).then(
-          value => JSON.stringify(value),
-          (error: unknown) => String(error),
-        )
+        value => JSON.stringify(value),
+        (error: unknown) => String(error),
+      )
 
     const off = await mount({ tryIt: false, withThreadActions: true })
     try {

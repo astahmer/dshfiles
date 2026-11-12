@@ -82,7 +82,9 @@ const fixture = async () => {
       sessionId: SessionId(id),
       meta: { cwd: root },
       agentOptions: { provider: 'gated', model: 'model-a' },
-      setup: (agentCtx) => { installModelSelection(agentCtx) },
+      setup: agentCtx => {
+        installModelSelection(agentCtx)
+      },
     })
     cleanups.push(async () => {
       model.finishNext()

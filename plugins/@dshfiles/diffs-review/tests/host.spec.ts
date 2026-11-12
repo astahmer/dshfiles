@@ -73,7 +73,9 @@ describe.skipIf(!jjAvailable)('diffs-review Host', () => {
       const names = f.host.tools.schemas().map(schema => schema.name)
       expect(names).toEqual(expect.arrayContaining(['diffs_review', 'diffs_review_revisions', 'pulls_review', 'pulls_review_revisions']))
       const text = (name: string) =>
-        Effect.promise(() => f.host.runTool({ name, arguments: { path: f.workspace } })).pipe(Effect.map(result => result.content.map(block => (block.type === 'text' ? block.text : '')).join('\n')))
+        Effect.promise(() => f.host.runTool({ name, arguments: { path: f.workspace } })).pipe(
+          Effect.map(result => result.content.map(block => (block.type === 'text' ? block.text : '')).join('\n')),
+        )
       expect(yield* text('pulls_review')).toBe(yield* text('diffs_review'))
     }),
   )

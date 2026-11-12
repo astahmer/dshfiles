@@ -28,7 +28,10 @@ const settle = async () => {
 }
 
 const text = (value: string): QueuedBlock => ({ type: 'text', text: value })
-const image = (name: string): QueuedBlock => ({ type: 'image', attachment: { attachmentId: `stored:${name}`, mediaType: 'image/png', bytes: 3, width: 1, height: 1, name } })
+const image = (name: string): QueuedBlock => ({
+  type: 'image',
+  attachment: { attachmentId: `stored:${name}`, mediaType: 'image/png', bytes: 3, width: 1, height: 1, name },
+})
 const file = (name: string): QueuedBlock => ({ type: 'file', attachment: { attachmentId: `stored:${name}`, name, bytes: 3 } })
 
 /** The in-memory DSH the tests drive: queue rows, the composer draft, and the attachments both share. */

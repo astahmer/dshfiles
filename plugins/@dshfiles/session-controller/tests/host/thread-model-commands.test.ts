@@ -117,7 +117,7 @@ async function fixture() {
     sessionId: SessionId('command-thread'),
     meta: { cwd: root },
     agentOptions: oldSelection,
-    setup: (agentCtx) => {
+    setup: agentCtx => {
       installModelSelection(agentCtx)
     },
   })
@@ -137,7 +137,7 @@ async function fixture() {
 }
 
 it('thread-local selection commits adjacent durable intent without saving the global default or waking input', async () => {
-  const { ctx, agent, owner, saveDefault, policy, select } = await fixture()
+  const { ctx, agent, saveDefault, policy, select } = await fixture()
   const result = await select()
   expect(result).toEqual({ sessionId: agent.id, selection: newSelection, revision: 1, running: false, preferSelectedProvider: true })
   expect(policy()).toEqual({ revision: 1, selection: newSelection, preferSelectedProvider: true })
@@ -159,7 +159,7 @@ it('normal native selectModel retains its global-default save and clears thread 
 })
 
 it('rejects stale CAS without changing native selection, policy, or global default', async () => {
-  const { agent, owner, saveDefault, policy, select } = await fixture()
+  const { agent, saveDefault, policy, select } = await fixture()
   await select()
   const events = agent.session.snapshotEvents()
   const before = policy()
@@ -184,7 +184,7 @@ it.each([
   { name: 'different-route selection', selection: newSelection },
   { name: 'same-route reselection', selection: oldSelection },
 ])('a queued old automatic follow cannot overwrite the manual $name at the commit boundary', async ({ selection }) => {
-  const { agent, commands, adapter, owner, saveDefault, policy } = await fixture()
+  const { agent, commands, adapter, saveDefault, policy } = await fixture()
   const initial = await commands.selectThreadModel({
     sessionId: agent.id,
     selection: oldSelection,
@@ -226,7 +226,7 @@ it.each([
 })
 
 it('rechecks CAS after model resolution awaits rather than overwriting an intervening picker selection', async () => {
-  const { agent, owner, adapter, saveDefault, policy, select } = await fixture()
+  const { agent, adapter, saveDefault, policy, select } = await fixture()
   const resolving = gate()
   cleanups.push(async () => resolving.release())
   adapter.beforeResolve = resolving.hold
@@ -347,7 +347,7 @@ it('disposing the actual request-policy helper unregisters capture from later re
 it.each(['native', 'thread-local'] as const)(
   '%s selection during prompt assembly preserves the current request and routes the following request to the new model',
   async entryPoint => {
-    const { agent, commands, adapter, owner, saveDefault, policy, select } = await fixture()
+    const { agent, commands, adapter, saveDefault, policy, select } = await fixture()
     await commands.selectModel({ sessionId: agent.id, ...oldSelection })
     expect(saveDefault).toHaveBeenCalledExactlyOnceWith(oldSelection)
     saveDefault.mockClear()

@@ -43,7 +43,8 @@ const createScheduleFixture = (now: () => number) => {
 
   const schedule: SchedulePort = {
     create: async request => {
-      if (request.timing.kind !== 'after' || request.target?.kind !== 'session') throw new Error('Quota recovery must use a relative one-shot schedule on its thread.')
+      if (request.timing.kind !== 'after' || request.target?.kind !== 'session')
+        throw new Error('Quota recovery must use a relative one-shot schedule on its thread.')
       const sessionId = request.target.sessionId
       requests.push({ title: request.title, prompt: request.prompt, after_seconds: request.timing.after_seconds })
       const record: ScheduleCatalogEntry = {
@@ -301,7 +302,9 @@ describe('quota continuation service', () => {
         readResetAt: async () => null,
         sessionController: {
           events: async () => ({
-            records: session.ownEvents().map(event => ({ type: 'event' as const, event: { type: event.type, seq: event.seq, time: event.time, data: wireData(event.data) } })),
+            records: session
+              .ownEvents()
+              .map(event => ({ type: 'event' as const, event: { type: event.type, seq: event.seq, time: event.time, data: wireData(event.data) } })),
             hasMore: false,
             cursor: session.seq,
           }),

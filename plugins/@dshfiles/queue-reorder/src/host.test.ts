@@ -74,8 +74,7 @@ const mountedQueue = Effect.gen(function* () {
       const response = await host.connection.requestApi({ packageId: '@dshfiles/queue-reorder', apiId: 'queue-order', method, version: 1, input })
       return Schema.decodeUnknownSync(wireEnvelope)(await response.json()).result
     })
-  const runTool = (args: ToolArguments) =>
-    Effect.promise(() => host.runTool({ name: 'queue_move', arguments: args }))
+  const runTool = (args: ToolArguments) => Effect.promise(() => host.runTool({ name: 'queue_move', arguments: args }))
   return { inbox, call, runTool }
 })
 

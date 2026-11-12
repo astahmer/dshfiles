@@ -79,7 +79,9 @@ const fixture = async (replies: readonly Reply[]) => {
     sessionId: SessionId('failed-thread'),
     meta: { cwd: root },
     agentOptions: { provider: 'scripted', model: 'model-a' },
-    setup: (agentCtx) => { installModelSelection(agentCtx) },
+    setup: agentCtx => {
+      installModelSelection(agentCtx)
+    },
   })
   cleanups.push(() => handle.dispose())
   const agent = handle.agent
