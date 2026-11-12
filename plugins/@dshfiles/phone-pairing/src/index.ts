@@ -10,10 +10,12 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import z from '@deepseek-ai/schemastery'
-import { definePlugin } from '@dshfiles/dshx/host'
-import type { Effect } from 'effect'
-import { phonePairingApi, type PairingOffer } from './api.ts'
-import { createPairingGateway } from './gateway.ts'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { createHostApiClient, definePlugin } from '@dshfiles/dshx/host'
+import { phoneEdgeApi } from '@dshfiles/phone-access/edge-api'
+import { createAccess, type EdgeLink } from './access.ts'
+import { phonePairingApi } from './api.ts'
+import { createPairingGateway, pairingCookieName } from './gateway.ts'
 import type { NativeCookie } from './native-cookie.ts'
 import { decodeEnableArgs } from './enable-args.ts'
 import { providers, type Provider } from './providers.ts'
@@ -21,6 +23,7 @@ import { renderTerminalQr } from './qr.ts'
 import { phoneRuntime } from './runtime-promise.ts'
 import type { PhoneSettings } from './settings.ts'
 import { createPairingStore } from './store.ts'
+import { setupHint } from './tunnel.ts'
 
 export interface Config {
   gatewayPort?: number
@@ -56,20 +59,7 @@ export default definePlugin({
     const settingsPath = `${directory}/settings.json`
     /** The persisted choice, once read at startup. */
     let settings: PhoneSettings | undefined
-    let gateway: ReturnType<typeof createPairingGateway> | undefined
-    let pairing: Awaited<ReturnType<typeof createPairingStore>> | undefined
-    let stopTunnel: Effect.Effect<void> | undefined
-    let publicOrigin: string | undefined
     const phone = phoneRuntime(ctx)
-
-    ctx.effect(() => () => {
-      gateway?.closeAll()
-      gateway?.server.close()
-      void (async () => {
-        if (stopTunnel !== undefined) await phone.stopTunnel(stopTunnel)
-        await phone.dispose()
-      })()
-    })
 
     const nativeCookie = async (): Promise<NativeCookie | undefined> => {
       // SAFETY: the plugin declares `connection` in `inject`, so it is the native connection service.
@@ -89,83 +79,103 @@ export default definePlugin({
       return server?.port
     }
 
+    /** phone-access's proxy: pairing reuses its origin instead of repointing that origin's Tailscale route. */
+    const edgeClient = createHostApiClient(ctx, phoneEdgeApi, '@dshfiles/phone-pairing')
+    const edge: EdgeLink = {
+      find: async () => {
+        try {
+          const current = await edgeClient.status({})
+          const [origin] = current.origins
+          return current.listening && origin !== undefined ? { origin } : undefined
+        } catch (error) {
+          if (error instanceof Error && isApiOwnerMissing(error)) return undefined
+          throw error
+        }
+      },
+      claim: async port => {
+        await edgeClient.claimRoutes({ port, pathPrefixes: ['/pair'], cookie: pairingCookieName, signIn: { path: '/pair', label: 'Pair this phone' } })
+      },
+      release: async () => {
+        await edgeClient.releaseRoutes({})
+      },
+    }
+
+    const access = createAccess({
+      edge,
+      defaultPort: gatewayPort,
+      settingsPath,
+      openStore: () =>
+        createPairingStore({
+          path: `${directory}/devices.json`,
+          deviceTtlMs: (config.deviceTtlDays ?? 365) * 24 * 3_600_000,
+          offerTtlMs: (config.offerTtlSeconds ?? 300) * 1_000,
+        }),
+      settings: () => settings,
+      /** Persists only once the stored choice was read, so an early tool call never overwrites it. */
+      saveSettings: async next => {
+        if (settings === undefined) return
+        await phone.saveSettings(settingsPath, next)
+        settings = next
+      },
+      resolveProvider: async preferred => (await phone.resolveProvider(preferred)).provider,
+      startTunnel: async (port, provider) => {
+        const tunnel = await phone.startTunnel(port, provider)
+        return tunnel === undefined ? undefined : { origin: tunnel.origin, stop: () => phone.stopTunnel(tunnel.stop) }
+      },
+      serverPort,
+      createGateway: input => {
+        const gateway = createPairingGateway({ upstream: input.upstream, port: input.port, store: input.store, publicOrigin: input.origin, nativeCookie })
+        return {
+          listen: () => gateway.listen(),
+          port: () => gateway.port(),
+          close: () => {
+            gateway.closeAll()
+            gateway.server.close()
+          },
+          closeUnauthorised: () => gateway.closeUnauthorised(),
+        }
+      },
+      inspectBusyPort: port => phone.inspectBusyPort(port),
+      tunnelHint: () => setupHint().slice(1).join(' '),
+    })
+
+    ctx.effect(() => () => {
+      void (async () => {
+        await access.dispose()
+        await phone.dispose()
+      })()
+    })
+
     const printOffer = (): void => {
-      if (pairing === undefined || publicOrigin === undefined) return
-      const offer = pairing.beginOffer()
+      const offer = access.offer()
+      if (offer.state !== 'ready') return
       console.log(
-        [
-          `phone pairing (${publicOrigin}) — scan, or open ${publicOrigin}/pair and type ${offer.code}:`,
-          renderTerminalQr(`${publicOrigin}/pair#id=${offer.id}&secret=${offer.secret}`),
-          '',
-        ].join('\n'),
+        [`phone pairing (${offer.origin}) — scan, or open ${offer.origin}/pair and type ${offer.code}:`, renderTerminalQr(offer.payload), ''].join('\n'),
       )
     }
 
-    /** `state: 'off'` rather than an error: the popover explains how to enable phone access. */
-    const nextOffer = (): PairingOffer => {
-      if (gateway === undefined || pairing === undefined || publicOrigin === undefined) return { state: 'off' }
-      const offer = pairing.beginOffer()
-      return {
-        state: 'ready',
-        payload: `${publicOrigin}/pair#id=${offer.id}&secret=${offer.secret}`,
-        code: offer.code,
-        expiresAt: offer.expiresAt,
-        origin: publicOrigin,
-      }
-    }
-    api.rpc.register(phonePairingApi.host({ offer: () => nextOffer() }))
-
-    /** Persists only once the stored choice was read, so an early tool call never overwrites it. */
-    const save = async (next: PhoneSettings): Promise<void> => {
-      if (settings === undefined) return
-      await phone.saveSettings(settingsPath, next)
-      settings = next
+    const enable = async (input: { readonly provider?: Provider; readonly port?: number } = {}) => {
+      const wasOn = access.running() !== undefined
+      const next = await access.enable(input)
+      if (!wasOn && next.enabled) printOffer()
+      return next
     }
 
-    const start = async (requested?: Provider): Promise<{ provider: string; origin: string }> => {
-      if (gateway !== undefined && publicOrigin !== undefined) return { provider: 'running', origin: publicOrigin }
-      // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot required: a tool call may save new settings across the awaits below.
-      const current = settings
-      pairing ??= await createPairingStore({
-        path: `${directory}/devices.json`,
-        deviceTtlMs: (config.deviceTtlDays ?? 365) * 24 * 3_600_000,
-        offerTtlMs: (config.offerTtlSeconds ?? 300) * 1_000,
-      })
-      const { provider } = await phone.resolveProvider(requested ?? current?.provider)
-      const tunnel = current?.origin === undefined ? await phone.startTunnel(gatewayPort, provider) : undefined
-      const origin = current?.origin ?? tunnel?.origin
-      const upstream = serverPort()
-      if (origin === undefined) throw new Error(`no tunnel for provider ${provider}; set "origin" in ${settingsPath}`)
-      if (upstream === undefined) throw new Error('the native listener is unavailable')
-      stopTunnel = tunnel?.stop
-      publicOrigin = origin
-      gateway = createPairingGateway({ upstream, port: gatewayPort, store: pairing, publicOrigin: origin, nativeCookie })
-      await gateway.listen()
-      await save(current?.origin === undefined ? { enabled: true, provider } : { enabled: true, provider, origin: current.origin })
-      printOffer()
-      return { provider, origin }
-    }
-
-    const stop = async (): Promise<void> => {
-      gateway?.closeAll()
-      gateway?.server.close()
-      gateway = undefined
-      if (stopTunnel !== undefined) await phone.stopTunnel(stopTunnel)
-      stopTunnel = undefined
-      publicOrigin = undefined
-      await save({ enabled: false })
-    }
+    api.rpc.register(phonePairingApi.host({ offer: () => access.offer() }))
 
     const tools = {
       status: defineTool({
         name: 'phone_pairing_status',
-        description: 'Report whether phone access is enabled, the provider it would use, and the paired devices (no secrets).',
+        description:
+          'Report whether phone access is enabled, its origin and gateway port, why the last attempt to turn it on failed (with the free port to use when the gateway port is busy), the provider it would use, and the paired devices (no secrets).',
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
         execute: async () => {
           const { provider, availability } = await phone.resolveProvider(settings?.provider)
-          const devices = (pairing?.listDevices() ?? []).map(device => `${device.id} last used ${new Date(device.lastUsedAt).toISOString()}`)
-          return JSON.stringify({ enabled: settings?.enabled ?? false, provider, available: availability, devices })
+          const devices = (access.store()?.listDevices() ?? []).map(device => `${device.id} last used ${new Date(device.lastUsedAt).toISOString()}`)
+          const current = access.status()
+          // JSON drops the fields a working or never-tried phone access leaves undefined.
+          return JSON.stringify({ ...current, provider, available: availability, devices })
         },
       }),
       enable: defineTool({
@@ -174,11 +184,14 @@ export default definePlugin({
           'Enable phone access: starts the gateway and the tunnel, prints a QR, and persists the choice. Call only when the user asked to enable phone access.',
         parameters: {
           provider: { type: 'string', enum: [...providers], description: 'Optional; omitted keeps the saved choice or picks the best available.' },
+          // The tool DSL rejects `minimum`/`maximum` at registration; decodeEnableArgs bounds it to 1..65535.
+          port: { type: 'integer', description: 'Optional gateway port (1-65535), for when the configured one is busy (status names a free one); remembered.' },
         },
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
         execute: async args => {
-          const started = await start(decodeEnableArgs(args).provider)
-          return `phone access is on via ${started.provider}; the pairing QR is in the sidebar footer and the DSH terminal`
+          const started = await enable(decodeEnableArgs(args))
+          if (!started.enabled) throw new Error(started.failure ?? 'phone access did not turn on')
+          return `phone access is on at ${started.origin ?? 'its origin'} (gateway port ${String(started.port)}); the pairing QR is in the sidebar footer and the DSH terminal`
         },
       }),
       disable: defineTool({
@@ -187,7 +200,7 @@ export default definePlugin({
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
         execute: async () => {
-          await stop()
+          await access.disable()
           return 'phone access is off'
         },
       }),
@@ -198,7 +211,7 @@ export default definePlugin({
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
         execute: async () => {
-          if (gateway === undefined) throw new Error('phone access is off; enable it first')
+          if (access.running() === undefined) throw new Error(`phone access is off; enable it first (${access.status().failure ?? 'phone_pairing_enable'})`)
           printOffer()
           return 'a new one-time pairing code is in the DSH terminal and the sidebar QR button'
         },
@@ -210,8 +223,8 @@ export default definePlugin({
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
         execute: async args => {
           if (args.confirm !== true) throw new Error('pass confirm: true')
-          const revoked = await pairing?.revoke(String(args.deviceId))
-          gateway?.closeUnauthorised()
+          const revoked = await access.store()?.revoke(String(args.deviceId))
+          access.running()?.gateway.closeUnauthorised?.()
           return revoked ? 'device revoked' : 'no such device'
         },
       }),
@@ -231,11 +244,12 @@ export default definePlugin({
         )
         return
       }
-      try {
-        await start()
-      } catch (error) {
-        console.error(`phone-pairing: ${error instanceof Error ? error.message : String(error)}`)
-      }
+      // Every Loader row active first, so phone-access's edge API answers and pairing reuses its origin.
+      // SAFETY: `loader`, when present, is the Cordis Loader service whose `await` settles activation.
+      const loader = ctx.get('loader') as { await?: () => Promise<void> } | undefined
+      await Promise.resolve(loader?.await?.call(loader)).catch(() => undefined)
+      const started = await enable()
+      if (!started.enabled) console.error(`phone-pairing: ${started.failure ?? 'phone access did not turn on'}`)
     })()
   },
 })

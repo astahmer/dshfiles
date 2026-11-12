@@ -44,6 +44,25 @@ token then is the only gate, so treat that QR like a password.
     autoServe: true
 ```
 
+## Sharing the origin (edge API)
+
+Other Host plugins reach phones through this proxy instead of repointing Tailscale. The dshx API
+`phone-access-edge` (module `@dshfiles/phone-access/edge-api`) has three methods:
+
+- `status`: whether the proxy listens, its port, the public origins that reach it, and current claims.
+- `claimRoutes({ port, pathPrefixes, cookie?, signIn? })`: Host plugins only. Requests under those paths, or carrying
+  that cookie, go to the claimer's loopback port with their headers unchanged. `signIn: { path, label }` names a page
+  where a signed-out phone can sign in.
+- `releaseRoutes`: drops the caller's claim.
+
+Phone pairing claims `/pair` and its `__Host-dsh_phone` device cookie. A scanned pairing code therefore opens the same
+`https://<machine>.<tailnet>.ts.net` that this QR uses. While this proxy listens on a public origin, phone pairing
+runs no `tailscale serve` and never turns `https=443` off. Unclaimed requests reach the native listener as before.
+
+A phone that opens the origin signed out does not get the native listener's bare 401. It gets **Sign in to DSH on
+this phone**, which names the terminal QR and each claimer's sign-in link (phone pairing: **Pair this
+phone**). Only page loads get it; fetches, scripts and sockets keep the plain 401.
+
 `DSH_PHONE_ORIGINS` (comma separated) sets origins without editing the patch;
 configured origins win and skip detection. Only absolute `https:` origins without
 credentials, query or fragment are printed.

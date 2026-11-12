@@ -44,6 +44,22 @@ describe('pairing store', () => {
       expect(await store.redeem({ id: expired.id, code: expired.code })).toBeUndefined()
     }))
 
+  it('names why a code no longer pairs', async () =>
+    await fixture(async path => {
+      let time = 1_000
+      const store = await createPairingStore({ path, now: () => time, offerTtlMs: 60_000, maxOffers: 1, maxDevices: 1 })
+      const replaced = store.beginOffer()
+      const used = store.beginOffer()
+      expect(await store.attempt({ code: replaced.code })).toEqual({ ok: false, reason: 'replaced' })
+      expect(await store.attempt({ code: used.code })).toMatchObject({ ok: true })
+      expect(await store.attempt({ id: used.id, secret: used.secret })).toEqual({ ok: false, reason: 'used' })
+      const full = store.beginOffer()
+      expect(await store.attempt({ code: full.code })).toEqual({ ok: false, reason: 'device-limit' })
+      time += 61_000
+      expect(await store.attempt({ code: full.code })).toEqual({ ok: false, reason: 'expired' })
+      expect(await store.attempt({ code: full.code === '000000' ? '000001' : '000000' })).toEqual({ ok: false, reason: 'wrong' })
+    }))
+
   it('accepts the typed code without scanning', async () =>
     await fixture(async path => {
       const store = await createPairingStore({ path })

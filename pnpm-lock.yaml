@@ -5551,9 +5551,15 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(3f5772702fd6c5e570aeb57c54994b9f)
+      '@deepseek-ai/dsh-tools':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.1-rc.2)(@deepseek-ai/dsh-llm@0.2.1-rc.2)(@deepseek-ai/dsh-ptc-runtime@0.2.1-rc.2)(@deepseek-ai/dsh-sandbox-policy@0.2.1-rc.2)(@deepseek-ai/dsh-sandbox@0.2.1-rc.2)(@deepseek-ai/dsh-scope@0.2.1-rc.2)(@deepseek-ai/dsh-session@0.2.1-rc.2)(@deepseek-ai/dsh-system-prompt@0.2.1-rc.2)(@deepseek-ai/dsh-user-approval@0.2.1-rc.2)(@deepseek-ai/dsh-working-directory@0.2.1-rc.2)
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.2(effect@4.1.2)(redis@6.3.1)
+      '@standard-schema/spec':
+        specifier: 1.1.0
+        version: 1.1.0
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.20
@@ -5572,6 +5578,9 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/phone-access':
+        specifier: workspace:*
+        version: link:../phone-access
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -5615,6 +5624,9 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
+      jsdom:
+        specifier: 'catalog:'
+        version: 26.1.0
       react:
         specifier: 'catalog:'
         version: 18.3.1

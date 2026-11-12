@@ -1,5 +1,5 @@
 import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
-import { Deferred, Effect, Exit, Option, Scope, Stream } from 'effect'
+import { Deferred, Effect, Exit, Option, Schema, Scope, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { commandExists, runCommand } from './commands.ts'
 import type { Provider } from './providers.ts'
@@ -33,24 +33,76 @@ const tailnetName = runCommand({ command: 'tailscale', args: ['status', '--json'
   Effect.orElseSucceed(() => undefined),
 )
 
-/** Tailscale Funnel publishes publicly; Serve stays on the tailnet. Both answer on the machine's tailnet name. */
+const serveStatusSchema = Schema.Struct({
+  TCP: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+  Web: Schema.optionalKey(
+    Schema.Record(
+      Schema.String,
+      Schema.Struct({ Handlers: Schema.optionalKey(Schema.Record(Schema.String, Schema.Struct({ Proxy: Schema.optionalKey(Schema.String) }))) }),
+    ),
+  ),
+})
+
+/** What `tailscale serve status --json` says is already served: the HTTPS ports in use and each one's `/` target. */
+export interface ServeRoutes {
+  readonly ports: ReadonlySet<number>
+  readonly proxyOf: (host: string, port: number) => string | undefined
+}
+
+const decodeServeStatus = Schema.decodeUnknownEffect(Schema.fromJsonString(serveStatusSchema))
+
+const routesOf = (status: typeof serveStatusSchema.Type): ServeRoutes => {
+  const web = status.Web ?? {}
+  const ports = new Set<number>(Object.keys(status.TCP ?? {}).map(Number))
+  for (const key of Object.keys(web)) ports.add(Number(key.slice(key.lastIndexOf(':') + 1)))
+  return { ports, proxyOf: (host, port) => web[`${host}:${String(port)}`]?.Handlers?.['/']?.Proxy }
+}
+
+/** Decode `tailscale serve status --json`; an empty answer means nothing is served. */
+const parseServeStatus = (raw: string) => decodeServeStatus(raw.trim() === '' ? '{}' : raw).pipe(Effect.map(routesOf))
+
+const serveStatus = runCommand({ command: 'tailscale', args: ['serve', 'status', '--json'], timeout: '5 seconds' }).pipe(
+  Effect.flatMap(parseServeStatus),
+  Effect.option,
+)
+
+/** HTTPS ports phone pairing may take: Funnel accepts only these three; Serve takes any, so a few spares follow. */
+const candidatePorts = (mode: 'funnel' | 'serve'): readonly number[] => (mode === 'funnel' ? [443, 8443, 10_000] : [443, 8443, 9443, 10_443])
+
+/** The first candidate HTTPS port nothing serves yet; never one another route (Phone access QR's 443) already uses. */
+const freeServePort = (mode: 'funnel' | 'serve', routes: ServeRoutes): number | undefined => candidatePorts(mode).find(port => !routes.ports.has(port))
+
+/** Reading `tailscale serve status --json` and picking an HTTPS port nothing serves yet. */
+export class ServeRoutesModel {
+  static readonly parse = parseServeStatus
+  static readonly freePort = freeServePort
+}
+
+/**
+ * Tailscale Funnel publishes publicly; Serve stays on the tailnet. Both answer on the machine's tailnet name.
+ * phone pairing takes only an HTTPS port nothing serves yet, and `stop` turns off only that port, and only while it
+ * still points at this gateway, so another route (Phone access QR's `https=443`) is never replaced or removed.
+ */
 const startTailscale = Effect.fnUntraced(function* (input: { readonly mode: 'funnel' | 'serve'; readonly port: number }) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const name = yield* tailnetName
   if (name === undefined) return undefined
-  const started = yield* runCommand({ command: 'tailscale', args: [input.mode, '--bg', '--https=443', `http://127.0.0.1:${input.port}`] }).pipe(
+  const before = yield* serveStatus
+  if (Option.isNone(before)) return undefined
+  const https = freeServePort(input.mode, before.value)
+  if (https === undefined) return undefined
+  const target = `http://127.0.0.1:${String(input.port)}`
+  const started = yield* runCommand({ command: 'tailscale', args: [input.mode, '--bg', `--https=${String(https)}`, target] }).pipe(
     Effect.as(true),
     Effect.orElseSucceed(() => false),
   )
   if (!started) return undefined
-  const tunnel: Tunnel = {
-    origin: `https://${name}`,
-    provider: 'tailscale',
-    stop: runCommand({ command: 'tailscale', args: [input.mode, '--https=443', 'off'] }).pipe(
-      Effect.ignore,
-      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
-    ),
-  }
+  const stop = Effect.gen(function* () {
+    const after = yield* serveStatus
+    if (Option.isNone(after) || after.value.proxyOf(name, https) !== target) return
+    yield* runCommand({ command: 'tailscale', args: [input.mode, `--https=${String(https)}`, 'off'] })
+  }).pipe(Effect.ignore, Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner))
+  const tunnel: Tunnel = { origin: https === 443 ? `https://${name}` : `https://${name}:${String(https)}`, provider: 'tailscale', stop }
   return tunnel
 })
 

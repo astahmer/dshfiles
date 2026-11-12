@@ -4,6 +4,7 @@ import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spaw
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
 import { Effect, Layer, ManagedRuntime } from 'effect'
 import { FetchHttpClient } from 'effect/http'
+import { inspectBusyPort } from './busy-port.ts'
 import { mintNativeCookie } from './native-cookie.ts'
 import { resolveProvider, type Provider } from './providers.ts'
 import { loadPhoneSettings, savePhoneSettings, type PhoneSettings } from './settings.ts'
@@ -24,6 +25,8 @@ export const phoneRuntime = (ctx: Context) => {
     resolveProvider: (preferred: Provider | undefined) => runtime.runPromise(resolveProvider(preferred)),
     startTunnel: (port: number, provider: Provider) => runtime.runPromise(startTunnel(port, provider)),
     stopTunnel: (stop: Effect.Effect<void>) => runtime.runPromise(stop),
+    /** Who holds a busy gateway port and a free one beside it. */
+    inspectBusyPort: (port: number) => runtime.runPromise(inspectBusyPort(port)),
     /** `undefined` when the native listener refuses or is unreachable. */
     mintNativeCookie: (url: string) => runtime.runPromise(mintNativeCookie(url).pipe(Effect.orElseSucceed(() => undefined))),
     loadSettings: (path: string) => runtime.runPromise(loadPhoneSettings(path)),

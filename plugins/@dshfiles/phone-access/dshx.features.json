@@ -15,7 +15,8 @@
       "failureModes": [
         "A non-HTTPS, credentialed, or non-absolute origin is ignored instead of printed.",
         "A busy proxy port is reported on the terminal and leaves the rest of DSH running.",
-        "Missing Tailscale, or Serve failing to start, prints no auto-detected QR and never guesses an origin."
+        "Missing Tailscale, or Serve failing to start, prints no auto-detected QR and never guesses an origin.",
+        "A phone that opens the origin signed out gets a sign-in page naming the terminal QR and any claimer's sign-in link (phone-pairing's Pair this phone), not the native listener's bare 401; API requests keep their 401."
       ],
       "externalDependencies": [],
       "verification": [
@@ -30,6 +31,12 @@
           "id": "phone-access.rewrite-authority",
           "file": "plugins/@dshfiles/phone-access/tests/rewrite-proxy.test.ts",
           "testName": "rewrites Host and Origin to the loopback authority"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-access.signed-out-page",
+          "file": "plugins/@dshfiles/phone-access/tests/rewrite-proxy.test.ts",
+          "testName": "answers a signed-out page load with both ways in, and leaves API 401s alone"
         },
         {
           "kind": "unit-test",
@@ -75,6 +82,48 @@
           "testName": "records one bounded span and refuses an invalid port without running Tailscale"
         }
       ]
+    },
+    {
+      "id": "phone-edge-routes",
+      "title": "Share the phone origin with other Host plugins",
+      "summary": "The edge API (`@dshfiles/phone-access/edge-api`) reports whether the proxy listens and which public origins reach it, and lets a Host plugin claim paths and a cookie on that origin. Claimed requests go to the claimer's loopback port unchanged; the rest still reach the native listener. Phone pairing uses it to serve /pair and paired devices on the same tailnet address instead of repointing Tailscale.",
+      "surfaces": ["host"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: dshx API phone-access-edge (status, claimRoutes, releaseRoutes)",
+      "configuration": [],
+      "states": ["no-claim", "routes-claimed", "claim-released"],
+      "failureModes": [
+        "A browser Client or the agent cannot claim routes; only a Host plugin caller can, and only its own package's claim.",
+        "With the proxy not listening, status says so and a claimer falls back to its own route."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "phone-access.edge-forwarding",
+          "file": "plugins/@dshfiles/phone-access/tests/edge.test.ts",
+          "testName": "sends claimed requests to the claimer unchanged and every other request to DSH with the loopback Host"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-access.edge-claims",
+          "file": "plugins/@dshfiles/phone-access/tests/apply.test.ts",
+          "testName": "keeps one route claim per package and reports it until it is released"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-access.edge-callers",
+          "file": "plugins/@dshfiles/phone-access/tests/apply.test.ts",
+          "testName": "lets only a Host plugin claim phone routes"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "phone-access.edge-no-browser-surface",
+          "reason": "A Host-to-Host API with no UI; the forwarding test drives real HTTP through the proxy, and phone-pairing's access tests cover the claimer that uses it."
+        }
+      ],
+      "telemetry": [{ "kind": "automatic", "source": "api-dispatch" }]
     }
   ]
 }

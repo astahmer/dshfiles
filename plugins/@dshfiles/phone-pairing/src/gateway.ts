@@ -2,35 +2,14 @@ import http from 'node:http'
 import type { Duplex } from 'node:stream'
 import { decodeJson, type JsonObject, type JsonValue, jsonValueSchema } from '@dshfiles/dshx/json'
 import { withSpan } from '@dshfiles/dshx/tracing'
+import { type GatewayRefusal, landingScript, pairedPage, pairPage, refusalMessage, refusalStatus, unpairedPage, wantsPage } from './landing.ts'
 import type { NativeCookie } from './native-cookie.ts'
+import type { RedeemResult } from './store.ts'
 
 const COOKIE = '__Host-dsh_phone'
 
-const page = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pair phone</title>
-<style>body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:3rem 1.25rem;max-width:26rem;margin-inline:auto}input{font:inherit;letter-spacing:.4em;padding:.75rem;width:100%;box-sizing:border-box;text-align:center}button{font:inherit;margin-top:1rem;padding:.75rem 1.25rem;width:100%}#status{margin-top:1rem}</style>
-</head><body><main><h1>Pair this phone</h1><p id="status" role="status">Enter the 6-digit code shown in the DSH terminal.</p>
-<form id="form"><input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required><button type="submit">Pair</button></form></main>
-<script src="/pair/landing.js" defer></script></body></html>`
-
-const script = `(() => {
-  const status = document.querySelector('#status')
-  const form = document.querySelector('#form')
-  const input = document.querySelector('#code')
-  const fragment = location.hash.slice(1)
-  history.replaceState(null, '', location.pathname)
-  const parameters = new URLSearchParams(fragment)
-  const id = parameters.get('id')
-  const secret = parameters.get('secret')
-  const done = response => {
-    if (!response.ok) { status.textContent = 'That code is not valid any more. Ask DSH for a new one.'; return }
-    status.textContent = 'Paired. Opening DSH…'
-    location.assign('/')
-  }
-  const submit = body => fetch('/pair/redeem', { method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(done).catch(() => { status.textContent = 'Pairing failed. Try again.' })
-  if (id && secret && [...parameters.keys()].sort().join(',') === 'id,secret') { submit({ id, secret }); return }
-  form.addEventListener('submit', event => { event.preventDefault(); if (/^[0-9]{6}$/.test(input.value)) submit({ code: input.value }) })
-})()`
+const PAGE_CSP =
+  "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 const cookieOf = (header: string | undefined): string | undefined => {
   if (header === undefined) return undefined
@@ -49,17 +28,15 @@ export interface GatewayOptions {
   /** Loopback port the tunnel targets. */
   readonly port: number
   readonly store: {
-    redeem: (input: {
-      readonly id?: string
-      readonly secret?: string
-      readonly code?: string
-      readonly name?: string
-    }) => Promise<{ deviceId: string; token: string } | undefined>
+    attempt: (input: { readonly id?: string; readonly secret?: string; readonly code?: string; readonly name?: string }) => Promise<RedeemResult>
     authenticate: (credential: string) => { deviceId: string; expiresAt: number } | undefined
     listDevices: () => { id: string }[]
   }
-  /** Public origin the phone uses, for cookie bounds and the landing redirect. */
-  readonly publicOrigin?: string
+  /**
+   * Public origin the phone uses, for cookie bounds and the landing redirect. A getter when the gateway binds before
+   * the tunnel that names the origin exists (bind first, so a busy port never starts a tunnel).
+   */
+  readonly publicOrigin?: string | (() => string | undefined)
   /** The native listener needs its own authority-bound session cookie; minted once, re-minted near expiry or on 401/403. */
   readonly nativeCookie: () => Promise<NativeCookie | undefined>
 }
@@ -130,6 +107,40 @@ export const createPairingGateway = (options: GatewayOptions) => {
     response.end()
   }
 
+  const html = (response: http.ServerResponse, status: number, body: string): void => {
+    response.writeHead(status, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': PAGE_CSP,
+    })
+    response.end(body)
+  }
+
+  /**
+   * The redeem answer is JSON, never a redirect: the page's `fetch` cannot follow a 303 to the app, and it
+   * treated the 303 as a failure after the cookie was already set, so the phone read "failed" and a retyped code
+   * "not valid".
+   */
+  const json = (
+    response: http.ServerResponse,
+    status: number,
+    body: Readonly<Record<string, string | boolean>>,
+    headers: http.OutgoingHttpHeaders = {},
+  ): void => {
+    response.writeHead(status, {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
+      ...headers,
+    })
+    response.end(JSON.stringify(body))
+  }
+  const refuse = (response: http.ServerResponse, reason: GatewayRefusal): void =>
+    json(response, refusalStatus(reason), { paired: false, reason, message: refusalMessage[reason] })
+
   const rewrite = (headers: http.IncomingHttpHeaders): http.IncomingHttpHeaders => {
     const next: http.IncomingHttpHeaders = { ...headers, host: authority }
     delete next.cookie
@@ -147,27 +158,32 @@ export const createPairingGateway = (options: GatewayOptions) => {
 
   const server = http.createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://gateway.invalid')
-    const publicOrigin = options.publicOrigin
+    const publicOrigin = typeof options.publicOrigin === 'function' ? options.publicOrigin() : options.publicOrigin
 
-    if (url.pathname === '/pair' || url.pathname === '/pair/landing.js') {
-      const body = url.pathname === '/pair' ? page : script
+    if (url.pathname === '/pair') return html(response, 200, authorised(request) === undefined ? pairPage : pairedPage)
+
+    if (url.pathname === '/pair/landing.js') {
       response.writeHead(200, {
-        'content-type': url.pathname === '/pair' ? 'text/html; charset=utf-8' : 'text/javascript; charset=utf-8',
+        'content-type': 'text/javascript; charset=utf-8',
         'cache-control': 'no-store',
         'referrer-policy': 'no-referrer',
         'x-content-type-options': 'nosniff',
-        'content-security-policy':
-          "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        'content-security-policy': PAGE_CSP,
       })
-      response.end(body)
+      response.end(landingScript)
       return
     }
 
     if (url.pathname === '/pair/redeem') {
       if (request.method !== 'POST' || !limited(request)) return respond(response, 405)
+      // A phone that already paired (it scanned the QR, then typed the same code) keeps its cookie and spends no offer.
+      if (authorised(request) !== undefined) {
+        request.resume()
+        return json(response, 200, { paired: true, already: true, message: 'This phone is already paired. Opening DSH…' })
+      }
       void readBody(request)
         .then(async body => {
-          if (!isJsonObject(body)) return respond(response, 400)
+          if (!isJsonObject(body)) return refuse(response, 'invalid')
           const fields = Object.keys(body).sort().join(',')
           const { id, secret, code } = body
           const input =
@@ -176,23 +192,29 @@ export const createPairingGateway = (options: GatewayOptions) => {
               : fields === 'id,secret' && typeof id === 'string' && typeof secret === 'string'
                 ? { id, secret }
                 : undefined
-          if (input === undefined) return respond(response, 400)
-          const paired = await options.store.redeem(input)
-          if (paired === undefined) return respond(response, 403)
+          if (input === undefined) return refuse(response, 'invalid')
+          const result = await options.store.attempt(input)
+          if (!result.ok) return refuse(response, result.reason)
           const maxAge = 365 * 24 * 3600
-          respond(response, 303, {
-            location: '/',
-            'set-cookie': `${COOKIE}=${paired.token}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict${publicOrigin?.startsWith('https:') ? '; Secure' : ''}`,
-          })
+          json(
+            response,
+            200,
+            { paired: true, message: 'Paired. Opening DSH…' },
+            {
+              'set-cookie': `${COOKIE}=${result.token}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict${publicOrigin?.startsWith('https:') ? '; Secure' : ''}`,
+            },
+          )
         })
-        .catch(() => respond(response, 400))
+        .catch(() => refuse(response, 'invalid'))
       return
     }
 
     const credential = authorised(request)
     if (credential === undefined) {
+      // A page load gets a way back in; a fetch or script gets a plain 401 it can act on.
+      if (wantsPage(request.headers, request.method)) return html(response, 401, unpairedPage)
       response.writeHead(401, { 'cache-control': 'no-store', 'content-type': 'text/plain; charset=utf-8' })
-      response.end('Pair this device at /pair\n')
+      response.end('This phone is not paired any more. Open /pair to pair it again.\n')
       return
     }
 
@@ -274,6 +296,11 @@ export const createPairingGateway = (options: GatewayOptions) => {
 
   return {
     server,
+    /** The bound port once listening: the OS picks one when asked for 0 (behind phone-access's proxy). */
+    port: (): number | undefined => {
+      const address = server.address()
+      return address === null || !(address instanceof Object) ? undefined : address.port
+    },
     /** Close sockets whose device credential no longer authenticates (revocation). */
     closeUnauthorised: (): void => {
       for (const entry of active) if (options.store.authenticate(entry.credential) === undefined) closeCredential(entry.credential)

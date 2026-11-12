@@ -1657,6 +1657,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "phoneEdgeApi",
+      "importFrom": "@dshfiles/phone-access/edge-api",
+      "owner": "@dshfiles/phone-access",
+      "source": "plugins/@dshfiles/phone-access/src/edge-api.ts:48",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "api:@dshfiles/phone-access:phone-access-edge",
+      "kind": "api",
+      "title": "phoneEdgeApi (phone-access-edge)",
+      "summary": "Host API served by @dshfiles/phone-access.",
+      "scope": "host, called from clients, other Host plugins and agents",
+      "mode": "host methods",
+      "registration": "useApi(phoneEdgeApi) in a Client slot, or createHostApiClient(ctx, phoneEdgeApi, packageId) on the Host",
+      "risk": "additive",
+      "riskNote": "Calling is additive; @dshfiles/phone-access owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
+      "details": [
+        "Methods: status, claimRoutes, releaseRoutes"
+      ],
+      "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
       "publicSymbol": "PhonePairingQr",
       "importFrom": "@dshfiles/phone-pairing/contract",
       "owner": "@dshfiles/phone-pairing",
@@ -3328,7 +3350,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 124 catalog feature(s)",
+        "Used by 125 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
