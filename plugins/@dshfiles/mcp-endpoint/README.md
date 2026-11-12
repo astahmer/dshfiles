@@ -1,6 +1,8 @@
 # @dshfiles/mcp-endpoint
 
-![Settings › MCP endpoint after generating a token](docs/screenshots/mcp-endpoint-settings.png)
+![Settings › MCP endpoint: issue a bearer token and connect a client](docs/screenshots/mcp-endpoint-settings.png)
+
+![The same section on a 390 px wide screen](docs/screenshots/mcp-endpoint-settings-narrow.png)
 
 An [MCP](https://modelcontextprotocol.io) server on the DSH Web server, so an agent in a terminal (Claude Code, Codex,
 any MCP client) can drive DSH threads: list them, read them, start one, message it, wait for its turn and stop it.

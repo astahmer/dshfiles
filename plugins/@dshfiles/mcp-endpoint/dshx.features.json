@@ -117,8 +117,8 @@
       "summary": "Settings › MCP endpoint and the MCP endpoint: connect a client palette command open copyable setup instructions for Claude Code, Codex, Cursor, VS Code and generic JSON. The section generates, rotates and revokes a bearer token and controls LAN access; a freshly issued token appears once and only its SHA-256 is stored. The agent can read status, revoke a token and switch LAN access but cannot issue a token.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"MCP endpoint\"", "expect tab \"Claude Code\""],
       "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click button \"Account menu\"",
+        "click menuitem \"Settings\"",
         "click combobox \"Sections\"",
         "click option \"MCP endpoint\"",
         "expect tab \"Claude Code\""
@@ -164,6 +164,11 @@
         {
           "kind": "gherkin",
           "id": "mcp-endpoint.settings-token",
+          "featureFile": "tooling/dshx/e2e/features/mcp-endpoint.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "mcp-endpoint.connect-client-keyboard",
           "featureFile": "tooling/dshx/e2e/features/mcp-endpoint.feature"
         },
         {

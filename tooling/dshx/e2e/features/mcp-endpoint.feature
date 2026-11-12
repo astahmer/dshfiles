@@ -19,3 +19,9 @@ Feature: Outside agents drive threads through the MCP endpoint
     And an MCP client with that token starts a thread with a first prompt
     Then the MCP client lists the thread and reads the answer to its prompt
     And the thread opens on that answer in the app
+
+  @scenario:mcp-endpoint.connect-client-keyboard
+  Scenario: The palette command opens MCP client setup with the keyboard only
+    Given the isolated plugin composition of "@dshfiles/mcp-endpoint, @dshfiles/command-palette, @dshfiles/settings-shell" is booted
+    When the MCP endpoint palette command is run from the keyboard
+    Then the MCP endpoint settings show client setup with no token and generate token is keyboard reachable

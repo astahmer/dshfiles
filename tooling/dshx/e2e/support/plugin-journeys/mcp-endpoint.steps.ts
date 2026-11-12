@@ -126,10 +126,44 @@ Then('the MCP client lists the thread and reads the answer to its prompt', async
 
 Then('the thread opens on that answer in the app', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'mcp-endpoint-thread-visible-in-app', async () => {
-    const row = page.getByText(TITLE, { exact: true }).first()
+    const ungrouped = page.getByRole('treeitem', { name: 'Ungrouped', exact: true })
+    if ((await ungrouped.isVisible().catch(() => false)) && (await ungrouped.getAttribute('aria-expanded')) !== 'true') await ungrouped.click()
+    const row = page.getByRole('treeitem', { name: new RegExp(TITLE, 'u') }).first()
     await expect(row).toBeVisible({ timeout: 30_000 })
     await row.click()
     await expect(page.getByText(ANSWER, { exact: true })).toBeVisible({ timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+const paletteDialog = (page: Page) => page.getByRole('dialog', { name: 'Command palette' })
+
+When('the MCP endpoint palette command is run from the keyboard', async ({ page }: { page: Page }) => {
+  await page.keyboard.press('Meta+Shift+P')
+  await expect(paletteDialog(page)).toBeVisible()
+  await paletteDialog(page).getByRole('combobox').fill('MCP endpoint: connect a client')
+  await expect(
+    paletteDialog(page)
+      .getByRole('option', { name: /MCP endpoint: connect a client/u })
+      .first(),
+  ).toBeVisible()
+  await page.keyboard.press('Enter')
+  await expect(paletteDialog(page)).toBeHidden()
+})
+
+Then('the MCP endpoint settings show client setup with no token and generate token is keyboard reachable', async ({ page }: { page: Page }) => {
+  const settings = settingsPage(page)
+  await recordAssertion(page, 'mcp-endpoint-palette-opens-client-setup', async () => {
+    await expect(settings.getByRole('tab', { name: 'Claude Code' })).toBeVisible()
+    await expect(settings.getByText('dshmcp_', { exact: false })).toHaveCount(0)
+  })
+  await recordAssertion(page, 'mcp-endpoint-settings-generate-token-keyboard-reachable', async () => {
+    for (let press = 0; press < 80; press++) {
+      await page.keyboard.press('Tab')
+      const focused = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? '')
+      if (focused === 'Generate token') return
+    }
+    throw new Error('Tab never reached the Generate token control inside Settings › MCP endpoint.')
   })
   await finishJourneyAssertions(page)
 })
