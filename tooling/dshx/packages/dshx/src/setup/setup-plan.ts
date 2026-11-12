@@ -55,6 +55,8 @@ export interface SetupPlanResult {
   readonly unbuilt: readonly string[]
   readonly buildCommand: string | null
   readonly startCommand: string
+  /** What each planned plugin does, as people read it, keyed by package name: the page never labels a row with an id. */
+  readonly titles: Readonly<Record<string, string>>
   readonly hash: string
 }
 
@@ -128,6 +130,29 @@ const markerOf = async (plan: InitProfilePlan): Promise<SetupPlanResult['marker'
   return packs.length === recorded.length ? null : { path, packs }
 }
 
+const featuresSchema = Schema.Struct({
+  features: Schema.Array(Schema.Struct({ title: Schema.String, onboarding: Schema.optional(Schema.Unknown) })),
+})
+const descriptionSchema = Schema.Struct({ description: Schema.optional(Schema.String) })
+
+/**
+ * A plugin's label from its own catalog: the feature it onboards with, else its first feature, else the first clause of
+ * its package description, else its directory name.
+ */
+const titleOf = async (root: string, packageName: string): Promise<string> => {
+  const directory = join(root, 'plugins', packageName)
+  const featuresFile = join(directory, 'dshx.features.json')
+  const features = existsSync(featuresFile) ? decodeJson(featuresSchema, await readFile(featuresFile, 'utf8')).features : []
+  const feature = features.find(candidate => candidate.onboarding !== undefined) ?? features[0]
+  if (feature !== undefined) return feature.title
+  const manifestFile = join(directory, 'package.json')
+  const description = existsSync(manifestFile) ? decodeJson(descriptionSchema, await readFile(manifestFile, 'utf8')).description : undefined
+  return description?.split(/[.:]\s/u)[0]?.trim() || packageName.replace(/^@[^/]+\//u, '')
+}
+
+const titlesOf = async (root: string, packageNames: readonly string[]): Promise<Readonly<Record<string, string>>> =>
+  Object.fromEntries(await Promise.all(packageNames.map(async name => [name, await titleOf(root, name)] as const)))
+
 const hashOf = (text: string): string => createHash('sha256').update(text).digest('hex')
 
 const unbuiltOf = (root: string, plugins: readonly string[]): readonly string[] => plugins.filter(plugin => !existsSync(join(root, 'plugins', plugin, 'dist')))
@@ -135,7 +160,7 @@ const unbuiltOf = (root: string, plugins: readonly string[]): readonly string[] 
 /** The exact preview: `ProfileInit.apply` as a dry run, plus the setup marker; writes nothing. */
 const planOf = async (context: SetupContext, request: SetupRequest): Promise<SetupPlanResult> => {
   const startCommand = await startCommandOf(context, request.profile)
-  const empty = { plan: null, marker: null, unbuilt: [], buildCommand: null, startCommand }
+  const empty = { plan: null, marker: null, unbuilt: [], buildCommand: null, startCommand, titles: {} }
   const problem = await problemOf(context, request)
   if (problem !== null) return { ...empty, problem, hash: hashOf(JSON.stringify(problem)) }
   try {
@@ -153,7 +178,8 @@ const planOf = async (context: SetupContext, request: SetupRequest): Promise<Set
     const hash = hashOf(
       JSON.stringify({ plugins: plan.plugins, linked: plan.linked, files: plan.files, commands: plan.commands, created: plan.created, marker }),
     )
-    return { plan, problem: null, marker, unbuilt, buildCommand, startCommand, hash }
+    const titles = await titlesOf(context.root, [...plan.plugins, ...plan.kept])
+    return { plan, problem: null, marker, unbuilt, buildCommand, startCommand, titles, hash }
   } catch (error) {
     if (error instanceof PackSelectionError || error instanceof ProfilePluginError) {
       const refused = { message: error.message, hint: error.hint }
@@ -175,9 +201,10 @@ const applyPlan = async (
   if (reviewed.problem !== null) throw new ProfilePluginError(reviewed.problem.message, reviewed.problem.hint)
   if (reviewed.hash !== input.hash)
     throw new ProfilePluginError('The profile changed since you reviewed the plan; nothing was written.', 'Go back to Review and check the new plan.')
+  const packCount = reviewed.plan?.packs.length ?? 0
   const compose: SetupStep = {
     id: 'compose',
-    label: `Link ${String(reviewed.plan?.plugins.length ?? 0)} plugins into ${input.request.profile}`,
+    label: `Add ${String(packCount)} pack${packCount === 1 ? '' : 's'} to ${input.request.profile}`,
     status: 'running',
   }
   input.onStep(compose)
@@ -193,7 +220,7 @@ const applyPlan = async (
   }
   input.onStep({ ...compose, status: 'done' })
   if (reviewed.marker !== null) {
-    const record: SetupStep = { id: 'record', label: 'Record that setup chose these plugins', status: 'running' }
+    const record: SetupStep = { id: 'record', label: 'Remember the packs you chose', status: 'running' }
     input.onStep(record)
     const marker = { schemaVersion: 1, composedBy: 'dshx setup', packs: reviewed.marker.packs } satisfies typeof markerSchema.Type
     await writeFileAtomic(reviewed.marker.path, `${JSON.stringify(marker, null, 2)}\n`, { mode: 0o600 })

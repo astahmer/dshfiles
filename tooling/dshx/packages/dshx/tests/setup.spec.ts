@@ -70,6 +70,7 @@ describe('dshx setup server', () => {
       unbuilt: [],
       buildCommand: null,
       startCommand: '',
+      titles: {},
       hash: 'h',
     }),
     apply: async (body, emit) => {
@@ -218,6 +219,12 @@ describe('dshx setup checks', () => {
     expect(SetupChecks.blocking(noTools.checks)).toBe(true)
   })
 
+  it('keeps directories out of the visible detail', async () => {
+    const { checks } = await SetupChecks.inspect(probe({}))
+    expect(checks.find(check => check.id === 'dsh-home')).toMatchObject({ detail: 'New', path: join(tmpdir(), 'dshx-setup-checks-missing-home') })
+    expect(checks.find(check => check.id === 'checkout')).toMatchObject({ detail: 'Dependencies installed', path: DSHFILES_ROOT })
+  })
+
   it('never shows what gh prints, only whether it is signed in', async () => {
     const checks = await SetupChecks.inspect(
       probe({
@@ -258,6 +265,8 @@ describe('dshx setup plan and apply', () => {
     expect(result.plan?.plugins).toEqual(expect.arrayContaining(['@dshfiles/onboarding', '@dshfiles/ai-accounts', '@dshfiles/jj-integration']))
     expect(result.marker).toEqual({ path: join(profileRoot(), 'dshfiles-setup.json'), packs: ['core', 'versioning'] })
     expect(result.startCommand).toMatch(/^DSH_HOME=\S+ fnm exec --using=\S+ \S+ --profile probe-setup web$/u)
+    expect(Object.keys(result.titles)).toEqual(result.plan?.plugins)
+    expect(Object.values(result.titles).filter(title => title === '' || title.startsWith('@dshfiles/'))).toEqual([])
     expect(readdirSync(home)).toEqual([])
   })
 

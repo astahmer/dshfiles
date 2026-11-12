@@ -16,6 +16,8 @@ export interface SetupCheck {
   readonly label: string
   readonly state: CheckState
   readonly detail: string
+  /** The directory a check is about, kept out of `detail` so the page can tuck it behind its details. */
+  readonly path: string | null
   readonly fix: string | null
 }
 
@@ -95,12 +97,13 @@ const nodeChecks = async (probe: SetupProbe, pinned: string): Promise<readonly S
   const fnm = await probe.run('fnm', ['--version'])
   return [
     probe.nodeVersion === `v${pinned}`
-      ? { id: 'node-version', label: 'Node', state: 'ok', detail: probe.nodeVersion, fix: null }
+      ? { id: 'node-version', label: 'Node', state: 'ok', detail: probe.nodeVersion, path: null, fix: null }
       : {
           id: 'node-version',
           label: 'Node',
           state: 'fail',
           detail: `${probe.nodeVersion}, the checkout pins ${pinned}`,
+          path: null,
           fix: `fnm install ${pinned} && fnm use ${pinned}`,
         },
     fromNix
@@ -109,12 +112,20 @@ const nodeChecks = async (probe: SetupProbe, pinned: string): Promise<readonly S
           label: 'Node build',
           state: 'fail',
           detail: 'A Nix build: dsh fails at boot with it',
+          path: null,
           fix: 'Put fnm first on PATH (nix develop or direnv allow does it), then run setup again',
         }
-      : { id: 'node-origin', label: 'Node build', state: 'ok', detail: 'Official build', fix: null },
+      : { id: 'node-origin', label: 'Node build', state: 'ok', detail: resolved.includes('/fnm/') ? 'From fnm' : 'Official build', path: null, fix: null },
     fnm.exitCode === 0
-      ? { id: 'fnm', label: 'fnm', state: 'ok', detail: firstLine(fnm.stdout), fix: null }
-      : { id: 'fnm', label: 'fnm', state: 'warn', detail: 'Not found', fix: 'Install fnm (https://github.com/Schniz/fnm) to switch to the pinned Node' },
+      ? { id: 'fnm', label: 'fnm', state: 'ok', detail: firstLine(fnm.stdout), path: null, fix: null }
+      : {
+          id: 'fnm',
+          label: 'fnm',
+          state: 'warn',
+          detail: 'Not found',
+          path: null,
+          fix: 'Install fnm (https://github.com/Schniz/fnm) to switch to the pinned Node',
+        },
   ]
 }
 
@@ -124,22 +135,36 @@ const toolCheck = async (
 ): Promise<SetupCheck> => {
   const result = await probe.run(tool.id, ['--version'])
   return result.exitCode === 0
-    ? { id: tool.id, label: tool.label, state: 'ok', detail: firstLine(result.stdout), fix: null }
-    : { id: tool.id, label: tool.label, state: tool.missing, detail: 'Not found', fix: tool.fix }
+    ? { id: tool.id, label: tool.label, state: 'ok', detail: firstLine(result.stdout), path: null, fix: null }
+    : { id: tool.id, label: tool.label, state: tool.missing, detail: 'Not found', path: null, fix: tool.fix }
 }
 
 const checkoutCheck = (probe: SetupProbe): SetupCheck => {
   const missing = ['scripts/profile-sync.ts', 'plugins/@dshfiles/onboarding/src/packs.ts', 'node_modules'].filter(path => !existsSync(join(probe.root, path)))
   return missing.length === 0
-    ? { id: 'checkout', label: 'Checkout', state: 'ok', detail: probe.root, fix: null }
-    : { id: 'checkout', label: 'Checkout', state: 'fail', detail: `Missing ${missing.join(', ')}`, fix: `cd ${probe.root} && pnpm install --frozen-lockfile` }
+    ? { id: 'checkout', label: 'Checkout', state: 'ok', detail: 'Dependencies installed', path: probe.root, fix: null }
+    : {
+        id: 'checkout',
+        label: 'Checkout',
+        state: 'fail',
+        detail: `Missing ${missing.join(', ')}`,
+        path: probe.root,
+        fix: `cd ${probe.root} && pnpm install --frozen-lockfile`,
+      }
 }
 
 const dshCheck = async (probe: SetupProbe, pinned: string | undefined): Promise<SetupCheck> => {
   const executable = await resolveDshExecutable(undefined, probe.env, probe.root)
   const result = await probe.run(executable, ['--version'])
   if (result.exitCode !== 0)
-    return { id: 'dsh', label: 'dsh', state: 'fail', detail: 'Not installed in this checkout', fix: `cd ${probe.root} && pnpm install --frozen-lockfile` }
+    return {
+      id: 'dsh',
+      label: 'dsh',
+      state: 'fail',
+      detail: 'Not installed in this checkout',
+      path: null,
+      fix: `cd ${probe.root} && pnpm install --frozen-lockfile`,
+    }
   const version = firstLine(result.stdout)
   if (pinned !== undefined && !version.includes(pinned))
     return {
@@ -147,20 +172,28 @@ const dshCheck = async (probe: SetupProbe, pinned: string | undefined): Promise<
       label: 'dsh',
       state: 'warn',
       detail: `${version}, the checkout pins ${pinned}`,
+      path: null,
       fix: `cd ${probe.root} && pnpm install --frozen-lockfile`,
     }
-  return { id: 'dsh', label: 'dsh', state: 'ok', detail: version, fix: null }
+  return { id: 'dsh', label: 'dsh', state: 'ok', detail: version, path: null, fix: null }
 }
 
 const githubCheck = async (probe: SetupProbe): Promise<SetupCheck> => {
   const installed = await probe.run('gh', ['--version'])
   if (installed.exitCode !== 0)
-    return { id: 'gh', label: 'GitHub CLI', state: 'warn', detail: 'Not found', fix: 'Install the GitHub CLI (https://cli.github.com) for the GitHub pack' }
+    return {
+      id: 'gh',
+      label: 'GitHub CLI',
+      state: 'warn',
+      detail: 'Not found',
+      path: null,
+      fix: 'Install the GitHub CLI (https://cli.github.com) for the GitHub pack',
+    }
   // Only the exit code is read: gh prints the account name, which setup never shows.
   const auth = await probe.run('gh', ['auth', 'status', '--hostname', 'github.com'])
   return auth.exitCode === 0
-    ? { id: 'gh', label: 'GitHub CLI', state: 'ok', detail: 'Signed in', fix: null }
-    : { id: 'gh', label: 'GitHub CLI', state: 'warn', detail: 'Not signed in', fix: 'gh auth login' }
+    ? { id: 'gh', label: 'GitHub CLI', state: 'ok', detail: 'Signed in', path: null, fix: null }
+    : { id: 'gh', label: 'GitHub CLI', state: 'warn', detail: 'Not signed in', path: null, fix: 'gh auth login' }
 }
 
 const manifestSchema = Schema.Struct({ devDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)) })
@@ -188,10 +221,10 @@ const existingProfiles = async (probe: SetupProbe): Promise<readonly ExistingPro
 }
 
 const homeCheck = (probe: SetupProbe, profiles: readonly ExistingProfile[]): SetupCheck => {
-  if (!existsSync(probe.dshHome)) return { id: 'dsh-home', label: 'DSH home', state: 'ok', detail: `${probe.dshHome} (new)`, fix: null }
+  if (!existsSync(probe.dshHome)) return { id: 'dsh-home', label: 'DSH home', state: 'ok', detail: 'New', path: probe.dshHome, fix: null }
   const running = profiles.filter(profile => profile.running).length
-  const detail = `${probe.dshHome}, ${String(profiles.length)} profile${profiles.length === 1 ? '' : 's'}${running > 0 ? `, ${String(running)} running` : ''}`
-  return { id: 'dsh-home', label: 'DSH home', state: 'ok', detail, fix: null }
+  const detail = `${String(profiles.length)} profile${profiles.length === 1 ? '' : 's'}${running > 0 ? `, ${String(running)} running` : ''}`
+  return { id: 'dsh-home', label: 'DSH home', state: 'ok', detail, path: probe.dshHome, fix: null }
 }
 
 /** Read the machine once: Node, tools, the checkout, dsh, the DSH home and its profiles. Presence only, never a secret. */
