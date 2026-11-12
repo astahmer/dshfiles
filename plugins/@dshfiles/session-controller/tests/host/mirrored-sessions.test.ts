@@ -91,7 +91,7 @@ describe('mirrored sessions', () => {
     ctx.provide('sessionPersistence', {
       stat: async (sessionId: string) => (sessionId === 'session-stored' ? { header: { id: sessionId } } : undefined),
     } as never)
-    const page = { records: [], hasMore: false }
+    const page = { cursor: -1, records: [], hasMore: false }
     const pageOf = (sessionId: string) =>
       mirrored.page({ address: { kind: 'session', sessionId: SessionId(sessionId) } } as never, new AbortController().signal, async () => page)
 
@@ -187,7 +187,7 @@ describe('mirrored sessions', () => {
       }),
     )
     await mirrored.merge([summary('session-cold', 100)], {}, new AbortController().signal)
-    const page = { records: [], hasMore: false }
+    const page = { cursor: -1, records: [], hasMore: false }
     await expect(
       mirrored.page({ address: { kind: 'session', sessionId: SessionId('session-cold') }, throughSeq: 0 }, new AbortController().signal, async () => page),
     ).resolves.toBe(page)
@@ -204,7 +204,7 @@ describe('mirrored sessions', () => {
         },
       }),
     )
-    const page = { records: [], hasMore: false }
+    const page = { cursor: -1, records: [], hasMore: false }
     await expect(
       mirrored.page({ address: { kind: 'session', sessionId: SessionId('session-other') }, throughSeq: 0 }, new AbortController().signal, async () => page),
     ).resolves.toBe(page)

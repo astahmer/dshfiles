@@ -22,7 +22,7 @@ import type {
   SessionFollowFrame,
   SessionFollowRequest,
   SessionListRequest,
-  SessionPage,
+  SessionEventsPage,
   SessionPageRequest,
   SessionProjectionsRequest,
   SessionProjectionsValue,
@@ -211,14 +211,17 @@ export class MirroredSessions {
   async page(
     request: SessionPageRequest,
     signal: AbortSignal,
-    local: (request: SessionPageRequest, signal: AbortSignal) => Promise<SessionPage>,
-  ): Promise<SessionPage> {
+    local: (request: SessionPageRequest, signal: AbortSignal) => Promise<SessionEventsPage>,
+  ): Promise<SessionEventsPage> {
     const sessionId = addressedSessionId(request.address)
     const source = sessionId === undefined ? undefined : await this.resolve(sessionId)
     if (source === undefined) return local(request, signal)
     if (source.page === undefined) throw new RemoteError('gateway/bad-request', 'This runtime cannot page that Session.', {})
     try {
-      return await source.page(request, signal)
+      const page = await source.page(request, signal)
+      // A source answers the pre-0.2.2 page shape; the cut it covered is the requested one, else its newest record.
+      const cursor = request.throughSeq ?? page.records.at(-1)?.event.seq ?? -1
+      return { cursor, records: page.records, hasMore: page.hasMore }
     } catch (error) {
       throw MirroredSessions.failure('session/page', error)
     }

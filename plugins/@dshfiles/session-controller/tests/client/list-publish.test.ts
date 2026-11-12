@@ -31,12 +31,12 @@ describe('session list publication', () => {
     const sessions = fixture()
     const id = SessionId('session-streaming')
     sessions.handleSessionAdded({ sessionId: id, agentAvailable: true, updatedAt: 1, running: true, blank: false })
-    sessions.handleControlFrame({ type: 'projection', sessionId: id, key: 'title', value: 'Streaming', seq: 1 })
+    sessions.handleControlFrame({ type: 'projection', sessionId: id, seq: 1, changes: [{ key: 'title', val: 'Streaming' }] })
     await tick()
     const published = vi.fn()
     sessions.list.subscribe(published)
 
-    sessions.handleControlFrame({ type: 'projection', sessionId: id, key: 'turnOutline', value: [{ turn: 1, prompt: 'q', response: 'a' }], seq: 2 })
+    sessions.handleControlFrame({ type: 'projection', sessionId: id, seq: 2, changes: [{ key: 'turnOutline', val: [{ turn: 1, prompt: 'q', response: 'a' }] }] })
     await tick()
     sessions.handleSessionActivity(id, 2)
     await tick()
@@ -63,9 +63,8 @@ describe('session list publication', () => {
     sessions.handleControlFrame({
       type: 'projection',
       sessionId: parent,
-      key: 'subagentCatalog',
-      value: [{ id: child, createdAt: 1, mode: 'one-shot', label: 'Child' }],
       seq: 1,
+      changes: [{ key: 'subagentCatalog', val: [{ id: child, createdAt: 1, mode: 'one-shot', label: 'Child' }] }],
     })
     await tick()
     const row = sessions.list.getSnapshot().byId[child]

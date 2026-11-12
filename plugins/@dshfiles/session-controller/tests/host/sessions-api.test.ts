@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import AgentDefaultModel from '@deepseek-ai/dsh-agent-default-model'
@@ -20,7 +21,6 @@ import { createTestHost } from '@dshfiles/dshx/testing'
 import { afterEach, expect, it } from 'vitest'
 import { ApiSessionAgentController } from '../../src/native/agent.ts'
 import { SessionCommandController } from '../../src/native/commands.ts'
-import { installModelSelectionProjection } from '../../src/native/model-selection-projection.ts'
 import { sessionControllerEffectPlugin } from '../../src/effect-runtime.ts'
 import { sessionsApi } from '../../src/sessions-api.ts'
 import { loadSessionInstructions, sessionInstructionsSection, sessionsHost } from '../../src/sessions-host.ts'
@@ -71,7 +71,6 @@ const fixture = async (replies: readonly string[] = []) => {
   await ctx.plugin(RemoteAccess)
   await ctx.plugin(AgentDefaultModel, { provider: 'scripted', model: 'model-a' })
   await ctx.plugin(AgentLoop)
-  installModelSelectionProjection(ctx)
   const model = new ScriptedModel(replies)
   ctx.llm.registerAdapter(['scripted'], model)
   const owner = new ApiSessionAgentController(ctx)
@@ -79,7 +78,7 @@ const fixture = async (replies: readonly string[] = []) => {
     sessionId: SessionId('driven-thread'),
     meta: { cwd: root },
     agentOptions: { provider: 'scripted', model: 'model-a' },
-    setup: (_agentCtx, agent) => void owner.selectionFor(agent),
+    setup: (agentCtx) => { installModelSelection(agentCtx) },
   })
   cleanups.push(() => handle.dispose())
   const commands = new SessionCommandController(ctx, owner, root)

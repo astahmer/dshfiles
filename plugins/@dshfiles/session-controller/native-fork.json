@@ -1,10 +1,10 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The recorded commands/index deltas include guarded thread-local model selection; see README. Update with every upstream bump or delta change; the list delta recovers cold list metadata from the stored log in the background when a projection checkpoint is missing, persists those answers by createdAt and log revision (added list-metadata-store.ts), cuts projection selections from one memoized full cold block, and patches the cached corpus on Session create/dispose, and folds a checkpoint-less small log through one persistence read handle instead of sessionQuery.readSession (which lists the whole corpus per read); the history delta sizes each follower item once and counts followers per Session, and answers a cold page/follow of a Session with no stored log from the tail's one lookup; the agent delta keeps the handle of every Agent it creates or resumes and disposes one idle for 5 minutes (not running, nothing queued, no open question, no history follower, no held command, no live child), and index suppresses api-session/removed for that eviction so the row stays listed; the control delta (control, index, types, client/transport, client/sessions/manager) sends a projection's later values on one session/control stream as patches from the value that stream sent last (codec in @dshfiles/session-source-port/projection-patch), decoded in the client transport before Session state sees them; the commands/index admission delta (added turn-admission-ports.ts) parks a new turn for an idle thread in its inbox (agent.send next-turn, no wake) while the running-thread limit is reached, and starts it FIFO (inbox.remove + followup/steer) when an Agent goes idle or leaves, or when the user forces it.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The recorded commands/index deltas include guarded thread-local model selection; see README. Update with every upstream bump or delta change; the list delta recovers cold list metadata from the stored log in the background when a projection checkpoint is missing, persists those answers by createdAt and log revision (added list-metadata-store.ts), cuts projection selections from one memoized full cold block, and patches the cached corpus on Session create/dispose, and folds a checkpoint-less small log through one persistence read handle instead of sessionQuery.readSession (which lists the whole corpus per read); the history delta (history.ts helpers, web/controller.ts follow, history/controller.ts events, history/listener.ts budget since 0.2.2 split them) sizes each follower item once, counts followers per Session, resumes a cold opening only when its log stops inside a turn, and answers a cold page/follow of a Session with no stored log from the tail's one lookup; the agent delta keeps the handle of every Agent it creates or resumes and disposes one idle for 5 minutes (not running, nothing queued, no open question, no history follower, no held command, no live child), and index suppresses api-session/removed for that eviction so the row stays listed; the control delta (control, index, types, client/transport, client/sessions/manager) sends a projection's later values on one session/control stream as patches from the value that stream sent last (per change entry of the 0.2.2 per-event frame) (codec in @dshfiles/session-source-port/projection-patch), decoded in the client transport before Session state sees them; the commands/index admission delta (added turn-admission-ports.ts) parks a new turn for an idle thread in its inbox (agent.send next-turn, no wake) while the running-thread limit is reached, and starts it FIFO (inbox.remove + followup/steer) when an Agent goes idle or leaves, or when the user forces it.",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-api-session-controller",
-    "version": "0.2.1-rc.2",
-    "ref": "dsh-v0.2.1-rc.2",
+    "version": "0.2.2-rc.1",
+    "ref": "dsh-v0.2.2-rc.1",
     "path": "packages/api/session-controller"
   },
   "files": [
@@ -41,9 +41,11 @@
     "src/native/commands.ts",
     "src/native/control.ts",
     "src/native/history.ts",
+    "src/native/history/controller.ts",
+    "src/native/history/listener.ts",
     "src/native/index.ts",
     "src/native/list.ts",
-    "src/native/model-selection-projection.ts",
-    "src/native/types.ts"
+    "src/native/types.ts",
+    "src/native/web/controller.ts"
   ]
 }

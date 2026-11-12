@@ -12,6 +12,7 @@ import type {
   SessionControlFrame,
   SessionControlValueFrame,
   SessionProjectionBaseline,
+  SessionProjectionUpdate,
   SessionProjectionValues,
 } from './types.ts'
 
@@ -21,13 +22,13 @@ export class SessionControlController {
 
   /** @param ctx - Host context carrying live Agent and projection services. */
   constructor(private readonly ctx: Context) {
-    ctx.sessionProjections.onChanged((session, key, value, seq) => {
+    ctx.sessionProjections.onEventChanged((session, changes, seq) => {
       this.broadcast({
         type: 'projection',
         sessionId: session.id,
-        key,
-        value: value as JsonValue,
         seq,
+        // Every projection definition validates its value before change publication.
+        changes: changes as SessionProjectionUpdate['changes'],
       })
     })
     ctx.effect(() => () => {
@@ -61,7 +62,7 @@ export class SessionControlController {
    * @param update - the owning runtime's finished value.
    */
   publishMirrored(update: { readonly sessionId: SessionId; readonly key: string; readonly value: JsonValue; readonly seq: number }): void {
-    this.broadcast({ type: 'projection', ...update })
+    this.broadcast({ type: 'projection', sessionId: update.sessionId, seq: update.seq, changes: [{ key: update.key, val: update.value }] })
   }
 
   private baseline(): SessionControlBaseline {
@@ -103,18 +104,24 @@ export class ProjectionPatchEncoder {
   private readonly sent = new Map<string, JsonValue>()
 
   encode(frame: Extract<SessionControlFrame, { readonly type: 'projection' }>): SessionControlFrame {
-    const cell = ProjectionPatches.cell(frame.sessionId, frame.key)
-    const previous = this.sent.get(cell)
-    this.sent.delete(cell)
-    this.sent.set(cell, frame.value)
-    if (this.sent.size > ProjectionPatchEncoder.MAX_CELLS) {
-      const oldest = this.sent.keys().next()
-      if (oldest.done !== true) this.sent.delete(oldest.value)
-    }
-    if (previous === undefined) return frame
-    const patch = ProjectionPatches.diff(previous, frame.value)
-    if (patch === 'replace') return frame
-    return { type: 'projection-patch', sessionId: frame.sessionId, key: frame.key, patch, seq: frame.seq }
+    let patched = false
+    const changes = frame.changes.map((change) => {
+      const cell = ProjectionPatches.cell(frame.sessionId, change.key)
+      const previous = this.sent.get(cell)
+      this.sent.delete(cell)
+      this.sent.set(cell, change.val)
+      if (this.sent.size > ProjectionPatchEncoder.MAX_CELLS) {
+        const oldest = this.sent.keys().next()
+        if (oldest.done !== true) this.sent.delete(oldest.value)
+      }
+      if (previous === undefined) return change
+      const patch = ProjectionPatches.diff(previous, change.val)
+      if (patch === 'replace') return change
+      patched = true
+      return { key: change.key, patch }
+    })
+    if (!patched) return frame
+    return { type: 'projection-patch', sessionId: frame.sessionId, seq: frame.seq, changes }
   }
 }
 

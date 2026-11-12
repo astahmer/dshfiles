@@ -16,9 +16,8 @@ import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { afterEach, expect, it } from 'vitest'
 import { ApiSessionAgentController } from '../../src/native/agent.ts'
-import { SessionHistoryController } from '../../src/native/history.ts'
+import { historyHarness } from './history-harness.ts'
 import { ApiSessionList } from '../../src/native/list.ts'
-import { installModelSelectionProjection } from '../../src/native/model-selection-projection.ts'
 
 const cleanups: Array<() => Promise<void>> = []
 
@@ -71,12 +70,16 @@ const fixture = async () => {
   await ctx.plugin(ExactSessionQuery)
   await ctx.plugin(AgentDefaultModel, { provider: 'scripted', model: 'model-a' })
   await ctx.plugin(AgentLoop)
-  installModelSelectionProjection(ctx)
   const model = new GatedModel()
   ctx.llm.registerAdapter(['scripted'], model)
   const owner = new ApiSessionAgentController(ctx)
-  const history = new SessionHistoryController(ctx, () => undefined)
+  const history = historyHarness(ctx, () => undefined)
+  // SAFETY: the list's image-limit projection view reads only `imageLimits`; the Session Controller injects the real store.
+  ctx.provide('attachments', { imageLimits: {
+    maxImageBytes: 1, maxImagesPerMessage: 1, maxMessageImageBytes: 1, maxImagePixels: 1, maxImageDimension: 1, mediaTypes: ['image/png'],
+  } } as never)
   const list = new ApiSessionList(ctx, 8)
+  await list.initialize()
   const { agent } = await owner.createSession({ cwd: root, reusable: () => false })
   agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Hello?' }], source: { kind: 'user' } }))
   await agent.whenIdle()

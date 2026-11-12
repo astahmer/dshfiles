@@ -3,7 +3,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { afterEach, expect, it } from 'vitest'
-import { SessionHistoryController } from '../../src/native/history.ts'
+import { historyHarness } from './history-harness.ts'
 
 const contexts = new Set<Context>()
 
@@ -35,7 +35,7 @@ it('ends a follower that stops reading instead of buffering every frame', async 
   ctx.provide('sessions', { get: () => undefined } as never)
   // SAFETY: follow() reads only observeSession from the query service.
   ctx.provide('sessionQuery', { observeSession: async () => observation() } as never)
-  const history = new SessionHistoryController(ctx, () => undefined)
+  const history = historyHarness(ctx, () => undefined)
   const controller = new AbortController()
   const frames = history.follow({ address: { kind: 'session', sessionId } } as never, controller.signal)[Symbol.asyncIterator]()
   expect((await frames.next()).value).toMatchObject({ type: 'snapshot' })
@@ -69,7 +69,7 @@ it('still delivers a client that keeps up', async () => {
   })
   ctx.provide('sessions', { get: () => undefined } as never)
   ctx.provide('sessionQuery', { observeSession: async () => observation() } as never)
-  const history = new SessionHistoryController(ctx, () => undefined)
+  const history = historyHarness(ctx, () => undefined)
   const controller = new AbortController()
   const frames = history.follow({ address: { kind: 'session', sessionId } } as never, controller.signal)[Symbol.asyncIterator]()
   expect((await frames.next()).value).toMatchObject({ type: 'snapshot' })

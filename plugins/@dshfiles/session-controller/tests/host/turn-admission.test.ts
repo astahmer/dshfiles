@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
@@ -19,7 +20,6 @@ import { createTestHost } from '@dshfiles/dshx/testing'
 import { afterEach, expect, it } from 'vitest'
 import { ApiSessionAgentController } from '../../src/native/agent.ts'
 import { SessionCommandController } from '../../src/native/commands.ts'
-import { installModelSelectionProjection } from '../../src/native/model-selection-projection.ts'
 import { installTurnAdmission } from '../../src/native/turn-admission-ports.ts'
 import type { TurnAdmissionSnapshot } from '../../src/turn-admission.ts'
 import type { SessionRequestId } from '../../src/native/types.ts'
@@ -69,7 +69,6 @@ const fixture = async () => {
   await ctx.plugin(RemoteAccess)
   await ctx.plugin(AgentDefaultModel, { provider: 'gated', model: 'model-a' })
   await ctx.plugin(AgentLoop)
-  installModelSelectionProjection(ctx)
   // Text-only prompts carry no attachment or upload receipt; these stand in for the storage-backed services.
   ctx.provide('attachments')
   ctx.provide('fileUploads')
@@ -83,7 +82,7 @@ const fixture = async () => {
       sessionId: SessionId(id),
       meta: { cwd: root },
       agentOptions: { provider: 'gated', model: 'model-a' },
-      setup: (_agentCtx, agent) => void owner.selectionFor(agent),
+      setup: (agentCtx) => { installModelSelection(agentCtx) },
     })
     cleanups.push(async () => {
       model.finishNext()

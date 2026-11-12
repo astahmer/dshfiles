@@ -1,7 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { afterEach, expect, it } from 'vitest'
-import { SessionHistoryController } from '../../src/native/history.ts'
+import { historyHarness } from './history-harness.ts'
 
 const contexts = new Set<Context>()
 
@@ -38,7 +38,7 @@ const missingSession = () => {
       throw new Error(`session ${id} not found`)
     },
   } as never)
-  return { history: new SessionHistoryController(ctx, () => undefined), lookups }
+  return { history: historyHarness(ctx, () => undefined), lookups }
 }
 
 const sessionId = SessionId('session-draft-never-created')

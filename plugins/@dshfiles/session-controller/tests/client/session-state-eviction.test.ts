@@ -22,8 +22,8 @@ const createManager = () => {
 
 /** Land the two kinds of projection an opened Session receives: a list label and history state. */
 const seedSession = (manager: SessionManager, sessionId: SessionId): void => {
-  manager.handleControlFrame({ type: 'projection', sessionId, key: 'title', value: `title-${sessionId}`, seq: 1 })
-  manager.handleControlFrame({ type: 'projection', sessionId, key: 'turnOutline', value: [{ turn: 1, prompt: 'q', response: 'a' }], seq: 2 })
+  manager.handleControlFrame({ type: 'projection', sessionId, seq: 1, changes: [{ key: 'title', val: `title-${sessionId}` }] })
+  manager.handleControlFrame({ type: 'projection', sessionId, seq: 2, changes: [{ key: 'turnOutline', val: [{ turn: 1, prompt: 'q', response: 'a' }] }] })
 }
 
 /** Open a Session (instantiating it) and then leave the view (its unmount path). */
@@ -118,7 +118,7 @@ describe('SessionManager resident per-session state', () => {
     for (const sessionId of viewed) {
       const session = manager.get(sessionId)
       seedSession(manager, sessionId)
-      manager.handleControlFrame({ type: 'projection', sessionId, key: 'promptedTurnCount', value: 1, seq: 3 })
+      manager.handleControlFrame({ type: 'projection', sessionId, seq: 3, changes: [{ key: 'promptedTurnCount', val: 1 }] })
       await manager.drop(sessionId, session)
     }
 

@@ -4,7 +4,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { SessionHistoryController } from '../../src/native/history.ts'
+import { historyHarness } from './history-harness.ts'
 
 const contexts = new Set<Context>()
 
@@ -38,11 +38,11 @@ const openedWith = async (events: readonly SessionEvent[]): Promise<readonly str
   // SAFETY: follow() reads only observeSession from the query service.
   ctx.provide('sessionQuery', { observeSession: async () => observation() } as never)
   const promoted: string[] = []
-  const history = new SessionHistoryController(ctx, opened => {
+  const history = historyHarness(ctx, opened => {
     promoted.push(opened.header.id)
   })
   const controller = new AbortController()
-  const frames = history.follow({ address: { kind: 'session', sessionId } } as never, controller.signal)[Symbol.asyncIterator]()
+  const frames = history.follow({ address: { kind: 'session', sessionId }, activate: true } as never, controller.signal)[Symbol.asyncIterator]()
   const snapshot = await frames.next()
   expect(snapshot.value).toMatchObject({ type: 'snapshot' })
   const following = frames.next()

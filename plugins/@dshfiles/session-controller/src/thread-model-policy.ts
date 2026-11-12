@@ -40,7 +40,7 @@ export const threadModelPolicyProjection = {
     return parsed.success
   },
   wire: { viewSchema: threadModelPolicySchema, view: (state: ThreadModelPolicy) => state },
-} satisfies ProjectionDefinition<'threadModelPolicy'>
+} satisfies ProjectionDefinition<'threadModelPolicy', ThreadModelPolicy>
 
 /** Append immediately after the native selection, without any asynchronous boundary. */
 export function annotateThreadModel(session: Session, policy: ThreadModelPolicy): void {

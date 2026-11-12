@@ -1,7 +1,9 @@
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
+import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import AgentDefaultModel from '@deepseek-ai/dsh-agent-default-model'
@@ -20,7 +22,6 @@ import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
 import { afterEach, expect, it, vi } from 'vitest'
 import { ApiSessionAgentController } from '../../src/native/agent.ts'
 import { SessionCommandController } from '../../src/native/commands.ts'
-import { installModelSelectionProjection } from '../../src/native/model-selection-projection.ts'
 import { threadModelPolicyProjection } from '../../src/thread-model-policy.ts'
 // Test-only cross-plugin integration: exercise the actual production capture helper, not a restated listener.
 import { ThreadRequestPolicy } from '../../../ai-accounts/src/thread-request-policy.ts'
@@ -107,8 +108,8 @@ async function fixture() {
   await ctx.plugin(RemoteAccess)
   await ctx.plugin(AgentDefaultModel, { provider: 'global-account', model: 'global-model' })
   await ctx.plugin(AgentLoop)
-  ctx.sessionProjections.register(threadModelPolicyProjection)
-  installModelSelectionProjection(ctx)
+  await ctx.plugin(NativeToolExecutor)
+  const policyHandle = await ctx.sessionProjections.register(threadModelPolicyProjection)
   const adapter = new CatalogAdapter()
   ctx.llm.registerAdapter(['account-a', 'account-b'], adapter)
   const owner = new ApiSessionAgentController(ctx)
@@ -116,15 +117,15 @@ async function fixture() {
     sessionId: SessionId('command-thread'),
     meta: { cwd: root },
     agentOptions: oldSelection,
-    setup: (_agentCtx, agent) => {
-      owner.selectionFor(agent)
+    setup: (agentCtx) => {
+      installModelSelection(agentCtx)
     },
   })
   cleanups.push(() => handle.dispose())
   const agent = handle.agent
   const commands = new SessionCommandController(ctx, owner, root)
   const saveDefault = vi.spyOn(ctx.agentDefaultModel, 'saveSelection')
-  const policy = () => ctx.sessionProjections.stateOf(agent.session, 'threadModelPolicy')
+  const policy = () => policyHandle.stateOf(agent.session)
   const select = (expectedRevision = policy()?.revision ?? 0) =>
     commands.selectThreadModel({
       sessionId: agent.id,
@@ -140,7 +141,7 @@ it('thread-local selection commits adjacent durable intent without saving the gl
   const result = await select()
   expect(result).toEqual({ sessionId: agent.id, selection: newSelection, revision: 1, running: false, preferSelectedProvider: true })
   expect(policy()).toEqual({ revision: 1, selection: newSelection, preferSelectedProvider: true })
-  expect(owner.selectionFor(agent).current).toEqual(newSelection)
+  expect(agent.model.current()).toEqual(newSelection)
   expect(agent.session.snapshotEvents().map(event => event.type)).toEqual(['model/selection', 'plugin:dshfiles/session-controller/thread-selection'])
   expect(saveDefault).not.toHaveBeenCalled()
   expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'global-account', model: 'global-model' })
@@ -165,7 +166,7 @@ it('rejects stale CAS without changing native selection, policy, or global defau
   await expect(select(0)).rejects.toMatchObject({ code: 'thread-model-stale' })
   expect(agent.session.snapshotEvents()).toEqual(events)
   expect(policy()).toEqual(before)
-  expect(owner.selectionFor(agent).current).toEqual(newSelection)
+  expect(agent.model.current()).toEqual(newSelection)
   expect(saveDefault).not.toHaveBeenCalled()
 })
 
@@ -213,7 +214,7 @@ it.each([
   await automaticRejected
   expect(accepted.revision).toBeGreaterThan(initial.revision)
   expect(policy()).toEqual({ revision: accepted.revision, selection, preferSelectedProvider: true })
-  expect(owner.selectionFor(agent).current).toEqual(selection)
+  expect(agent.model.current()).toEqual(selection)
   expect(agent.session.snapshotEvents().map(event => event.type)).toEqual([
     'model/selection',
     'plugin:dshfiles/session-controller/thread-selection',
@@ -231,7 +232,7 @@ it('rechecks CAS after model resolution awaits rather than overwriting an interv
   adapter.beforeResolve = resolving.hold
   const selecting = select(0)
   await resolving.entered
-  owner.selectForNextRequest(agent, oldSelection)
+  agent.model.select(oldSelection)
   const events = agent.session.snapshotEvents()
   resolving.release()
   await expect(selecting).rejects.toMatchObject({ code: 'thread-model-stale' })
@@ -365,12 +366,11 @@ it.each(['native', 'thread-local'] as const)(
     expect(agent.status).toBe('running')
     if (entryPoint === 'native') await commands.selectModel({ sessionId: agent.id, ...newSelection })
     else await expect(select()).resolves.toMatchObject({ running: true, selection: newSelection, preferSelectedProvider: true })
-    expect(owner.selectionFor(agent).current).toEqual(newSelection)
+    expect(agent.model.current()).toEqual(newSelection)
     const selectedPolicy = policy()
     assembling.release()
     await agent.whenIdle()
     expect(adapter.requests).toEqual([oldSelection])
-    expect(owner.selectionFor(agent).assembled).toEqual(oldSelection)
     expect(policy()).toEqual(selectedPolicy)
     expect(agent.inbox.nextTurn).toEqual([])
     expect(agent.inbox.nextStep).toEqual([])

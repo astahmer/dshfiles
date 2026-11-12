@@ -82,8 +82,12 @@ it('updates, removes and namespaces another plugin’s tools for live and later 
   expect(view(excluded)).not.toHaveProperty('ci_acme_jobs')
   expect(ctx.tools.schemas().map(schema => schema.name)).toEqual(expect.arrayContaining(['acme_status', 'acme_secret', 'acme_jobs']))
 
-  const ran = await ctx.tools.execute({ callId: ToolCallId('call-1'), name: 'ci_acme_jobs', arguments: {}, agent: after, signal: new AbortController().signal })
-  expect(ran).toMatchObject({ isError: false, value: 'acme_jobs ran' })
+  const ran = await ctx.tools.execute({
+    calls: [{ type: 'tool-call', id: ToolCallId('call-1'), name: 'ci_acme_jobs', arguments: '{}' }],
+    agent: after,
+    signal: new AbortController().signal,
+  })
+  expect(ran.results[0]?.result).toMatchObject({ isError: false, value: 'acme_jobs ran' })
 
   await editor.dispose()
   expect(view(after)).toMatchObject({ acme_status: 'Report status.', acme_secret: 'Read the secret.', acme_jobs: 'List jobs.' })

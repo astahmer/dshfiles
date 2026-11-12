@@ -163,12 +163,17 @@ describe('Session history lifecycle', () => {
 })
 
 describe('Session composer phase', () => {
-  it('engages on a local submission before the prompt is sent', () => {
+  it('engages only once the Host accepts a submitted prompt', async () => {
     const { session } = createSession()
     expect(lifecycle(session)).toMatchObject({ blank: true, promptAttempted: false, awaitingFirstTurn: false })
 
-    session.beginSubmission({ mode: 'queue', text: 'hello', attachments: [] })
-    expect(lifecycle(session)).toMatchObject({ blank: true, promptAttempted: true, awaitingFirstTurn: false })
+    const { requestId } = session.beginSubmission({ mode: 'queue', text: 'hello', attachments: [] })
+    expect(lifecycle(session)).toMatchObject({ blank: true, promptAttempted: false, awaitingFirstTurn: false })
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+
+    await session.prompt([{ type: 'text', text: 'hello' }], 'queue', undefined, requestId)
+    expect(lifecycle(session)).toMatchObject({ blank: false, promptAttempted: true, awaitingFirstTurn: true })
+    expect(session.getSnapshot().pendingSubmissions.map(echo => echo.requestId)).toEqual([requestId])
   })
 
   it('keeps the first accepted prompt awaiting its turn until one is observed', async () => {

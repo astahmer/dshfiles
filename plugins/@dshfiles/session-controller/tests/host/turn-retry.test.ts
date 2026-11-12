@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import AgentDefaultModel from '@deepseek-ai/dsh-agent-default-model'
@@ -19,7 +20,6 @@ import { afterEach, expect, it } from 'vitest'
 import { latestStoppedTurn } from '../../src/interrupted-turn.ts'
 import { ApiSessionAgentController } from '../../src/native/agent.ts'
 import { SessionCommandController } from '../../src/native/commands.ts'
-import { installModelSelectionProjection } from '../../src/native/model-selection-projection.ts'
 import { TURN_RETRY_TEXT } from '../../src/turn-retry.ts'
 
 const cleanups: Array<() => Promise<void>> = []
@@ -72,7 +72,6 @@ const fixture = async (replies: readonly Reply[]) => {
   await ctx.plugin(RemoteAccess)
   await ctx.plugin(AgentDefaultModel, { provider: 'scripted', model: 'model-a' })
   await ctx.plugin(AgentLoop)
-  installModelSelectionProjection(ctx)
   const model = new ScriptedModel(replies)
   ctx.llm.registerAdapter(['scripted'], model)
   const owner = new ApiSessionAgentController(ctx)
@@ -80,7 +79,7 @@ const fixture = async (replies: readonly Reply[]) => {
     sessionId: SessionId('failed-thread'),
     meta: { cwd: root },
     agentOptions: { provider: 'scripted', model: 'model-a' },
-    setup: (_agentCtx, agent) => void owner.selectionFor(agent),
+    setup: (agentCtx) => { installModelSelection(agentCtx) },
   })
   cleanups.push(() => handle.dispose())
   const agent = handle.agent

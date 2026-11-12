@@ -9,9 +9,8 @@ import { ControlQueue, ProjectionPatchEncoder } from './control.ts'
 const projection = (sessionId: string, key: string, value: string) => ({
   type: 'projection' as const,
   sessionId: SessionId(sessionId),
-  key,
-  value,
   seq: 1,
+  changes: [{ key, val: value }],
 })
 
 describe('the control queue', () => {
@@ -21,7 +20,7 @@ describe('the control queue', () => {
     queue.end()
     const frames: string[] = []
     for await (const frame of queue.iterate(new AbortController().signal)) {
-      if (frame.type === 'projection') frames.push(String(frame.value))
+      if (frame.type === 'projection') frames.push(String(frame.changes[0]?.val))
     }
     expect(frames).toHaveLength(4_096)
     // The newest change is still delivered; only the ones nobody read in time are gone.
@@ -55,7 +54,7 @@ describe('the control queue', () => {
     const encoder = new ProjectionPatchEncoder()
     const turn = (index: number) => ({ turn: index, groups: [{ provider: 'anthropic', model: 'claude-opus', input: index * 1_000, output: index * 37 }] })
     const cost = (turns: number): JsonValue => ({ turn: turn(turns - 1), turns: Array.from({ length: turns }, (_, index) => turn(index)) })
-    const frame = (sessionId: string, turns: number) => ({ type: 'projection' as const, sessionId: SessionId(sessionId), key: 'aiAccountsCost', value: cost(turns), seq: turns })
+    const frame = (sessionId: string, turns: number) => ({ type: 'projection' as const, sessionId: SessionId(sessionId), seq: turns, changes: [{ key: 'aiAccountsCost', val: cost(turns) }] })
     expect(encoder.encode(frame('a', 30))).toEqual(frame('a', 30))
     expect(encoder.encode(frame('b', 30))).toEqual(frame('b', 30))
     let held = cost(30)
@@ -63,10 +62,22 @@ describe('the control queue', () => {
       const sent = encoder.encode(frame('a', turns))
       if (sent.type !== 'projection-patch') throw new Error(`expected a patch, got ${sent.type}`)
       expect(JSON.stringify(sent).length).toBeLessThan(JSON.stringify(frame('a', turns)).length / 5)
-      held = ProjectionPatches.apply(held, ProjectionPatches.decode(JSON.parse(JSON.stringify(sent.patch))))
+      const [change] = sent.changes
+      if (change === undefined || !('patch' in change)) throw new Error('expected a patched change')
+      held = ProjectionPatches.apply(held, ProjectionPatches.decode(JSON.parse(JSON.stringify(change.patch))))
       expect(held).toEqual(cost(turns))
       expect(sent.seq).toBe(turns)
     }
-    expect(encoder.encode({ ...frame('a', 1), value: 'scalar' }).type).toBe('projection')
+    expect(encoder.encode({ ...frame('a', 1), changes: [{ key: 'aiAccountsCost', val: 'scalar' }] }).type).toBe('projection')
+  })
+
+  it('patches only the changed cells of one event and sends the others whole', () => {
+    const encoder = new ProjectionPatchEncoder()
+    const list = (length: number): JsonValue => Array.from({ length }, (_, index) => ({ index, label: `item-${index}` }))
+    const id = SessionId('a')
+    encoder.encode({ type: 'projection', sessionId: id, seq: 1, changes: [{ key: 'turnOutline', val: list(40) }] })
+    const sent = encoder.encode({ type: 'projection', sessionId: id, seq: 2, changes: [{ key: 'title', val: 'New' }, { key: 'turnOutline', val: list(41) }] })
+    if (sent.type !== 'projection-patch') throw new Error(`expected a patch, got ${sent.type}`)
+    expect(sent.changes.map(change => [change.key, 'patch' in change])).toEqual([['title', false], ['turnOutline', true]])
   })
 })

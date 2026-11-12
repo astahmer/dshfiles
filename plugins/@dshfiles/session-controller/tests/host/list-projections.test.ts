@@ -36,12 +36,16 @@ const coldFixture = async () => {
   const list = new ApiSessionList(ctx, 8)
   const session = ctx.sessions.prepare(SessionId('cold-one'), { meta: { createdAt: 100, cwd: resolve('list-projections-fixture') } })
   const records: SessionRecord[] = [{ header: session.header, live: false, persisted: true }]
-  const reads: (readonly string[] | undefined)[] = []
+  const reads: (Iterable<string> | undefined)[] = []
+  // The fixture's checkpoint values stand for registered summary units; the cache serves only the summary key set.
+  const summaryKeys = new Set(Object.keys(fixtureValues))
+  // SAFETY: the list reads only this face of the registry for cold rows.
+  ctx.sessionProjections.summaryKeys = () => summaryKeys as never
   // SAFETY: list() reads only listSessions from the query service and these cache methods.
   ctx.provide('sessionQuery', { listSessions: async () => records } as never)
   // SAFETY: the cold path calls only cachedSnapshot and cachedPredecessorTitle on the persisted cache.
   ctx.provide('sessionProjectionCache', {
-    cachedSnapshot: (_header: SessionRecord['header'], keys?: readonly string[]) => {
+    cachedSnapshot: (_header: SessionRecord['header'], keys?: Iterable<string>) => {
       reads.push(keys)
       const picked: Record<string, SessionProjectionValue> = {}
       for (const key of keys ?? []) {
@@ -53,21 +57,21 @@ const coldFixture = async () => {
     },
     cachedPredecessorTitle: () => undefined,
   } as never)
-  return { ctx, list, reads, session }
+  return { ctx, list, reads, session, summaryKeys }
 }
 
 it('omitted selector returns every projection', async () => {
-  const { list, reads } = await coldFixture()
+  const { list, reads, summaryKeys } = await coldFixture()
   const items = await list.list()
-  expect(reads).toEqual([undefined])
+  expect(reads).toEqual([summaryKeys])
   expect(items[0]?.projections?.values).toEqual(fixtureValues)
 })
 
 it('a selector returns only the named projections', async () => {
-  const { list, reads } = await coldFixture()
+  const { list, reads, summaryKeys } = await coldFixture()
   const items = await list.list({ projections: ['title'] })
   // The whole block is read once; the caller's columns and the row's own metadata are both cut from it.
-  expect(reads).toEqual([undefined])
+  expect(reads).toEqual([summaryKeys])
   expect(items[0]?.projections?.values).toEqual({ title: fixtureValues.title })
   expect(items[0]?.blank).toBe(false)
   expect(items[0]?.createdAt).toBe(100)
@@ -75,16 +79,16 @@ it('a selector returns only the named projections', async () => {
 })
 
 it('an unknown projection key is ignored deliberately', async () => {
-  const { list, reads } = await coldFixture()
+  const { list, reads, summaryKeys } = await coldFixture()
   const items = await list.list({ projections: ['title', 'notAProjection'] })
-  expect(reads).toEqual([undefined])
+  expect(reads).toEqual([summaryKeys])
   expect(items[0]?.projections?.values).toEqual({ title: fixtureValues.title })
 })
 
 it('an empty selector returns no projection columns but keeps the row metadata', async () => {
-  const { list, reads } = await coldFixture()
+  const { list, reads, summaryKeys } = await coldFixture()
   const items = await list.list({ projections: [] })
-  expect(reads).toEqual([undefined])
+  expect(reads).toEqual([summaryKeys])
   expect(items[0]?.projections).toBeUndefined()
   expect(items[0]?.blank).toBe(false)
   expect(items[0]?.createdAt).toBe(100)
@@ -92,22 +96,22 @@ it('an empty selector returns no projection columns but keeps the row metadata',
 })
 
 it('keeps the cold cache full after a filtered read', async () => {
-  const { list, reads } = await coldFixture()
+  const { list, reads, summaryKeys } = await coldFixture()
   await list.list({ projections: ['title'] })
   const full = await list.list()
-  expect(reads).toEqual([undefined])
+  expect(reads).toEqual([summaryKeys])
   expect(full[0]?.projections?.values).toEqual(fixtureValues)
 })
 
 it('serves repeated filtered lists from one checkpoint read until the Session appends', async () => {
-  const { ctx, list, reads, session } = await coldFixture()
+  const { ctx, list, reads, session, summaryKeys } = await coldFixture()
   await list.list({ projections: [] })
   const titled = await list.list({ projections: ['title'] })
-  expect(reads).toEqual([undefined])
+  expect(reads).toEqual([summaryKeys])
   expect(titled[0]?.projections?.values).toEqual({ title: fixtureValues.title })
 
   // SAFETY: the list only uses the event to drop the Session's memoized block.
   ctx.emit('session/event', session, { seq: 0, time: 300, type: 'permission/preset', data: {} } as never)
   await list.list({ projections: ['title'] })
-  expect(reads).toEqual([undefined, undefined])
+  expect(reads).toEqual([summaryKeys, summaryKeys])
 })

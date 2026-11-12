@@ -42,26 +42,37 @@ const addListProjections = (source, file) => {
   return patched
 }
 
-/** The fork's control stream patches a projection's later values (src/native/control.ts `ProjectionPatchEncoder`). */
+/**
+ * The fork's control stream patches a projection's later values (src/native/control.ts `ProjectionPatchEncoder`): a
+ * `projection-patch` frame lists the same per-event changes as a `projection` frame, each entry carrying its value
+ * (`val`) or a patch from the value the stream sent last (`patch`). Only the control arm carries `sessionId`, which
+ * tells it apart from the `observeProjections` arm.
+ */
 const addControlPatchFrame = (source, file) => {
-  const projectionArm = `z.object({
+  const armStart = `z.object({
   'type': z.literal("projection").readonly(),
   'sessionId': z.string().readonly(),
-  'key': z.string().readonly(),
-  'value': z.json().readonly(),
-  'seq': z.number().readonly(),
-})]))`
-  if (source.split(projectionArm).length !== 2) throw new Error(`derive-typert: ${file} is missing the control projection frame schema`)
-  return source.replace(
-    projectionArm,
-    `${projectionArm.slice(0, -3)}, z.object({
+  'seq': z.number().readonly()`
+  const armEnd = `'val': z.json().readonly(),\n})).readonly()`
+  const start = source.indexOf(armStart)
+  if (start === -1 || source.indexOf(armStart, start + 1) !== -1) throw new Error(`derive-typert: ${file} is missing the control projection frame schema`)
+  const valEnd = source.indexOf(armEnd, start)
+  const unionEnd = source.indexOf('})]))', start)
+  if (valEnd === -1 || unionEnd === -1 || valEnd > unionEnd) throw new Error(`derive-typert: ${file} changed the control projection frame schema`)
+  const patchArm = `, z.object({
   'type': z.literal("projection-patch").readonly(),
   'sessionId': z.string().readonly(),
+  'seq': z.number().readonly(),
+  'changes': z.array(z.union([z.object({
+  'key': z.string().readonly(),
+  'val': z.json().readonly(),
+}), z.object({
   'key': z.string().readonly(),
   'patch': z.json().readonly(),
-  'seq': z.number().readonly(),
-})]))`,
-  )
+})])).readonly(),
+})`
+  const insertAt = unionEnd + '})'.length
+  return `${source.slice(0, insertAt)}${patchArm}${source.slice(insertAt)}`
 }
 
 mkdirSync(join(root, 'typert'), { recursive: true })

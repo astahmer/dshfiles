@@ -1,3 +1,4 @@
+import { modelSelectionProjectionDefinition } from '@deepseek-ai/dsh-agent'
 import { Context } from '@deepseek-ai/cordis'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import SessionStore, { appendPluginRecord, pluginRecordOf, SessionId, type Session } from '@deepseek-ai/dsh-session'
@@ -8,7 +9,6 @@ import type { ThreadModelPolicy } from '../../src/thread-model-api.ts'
 import { ThreadModelSessionRequired } from '../../src/effect-runtime.ts'
 import { threadModelSessionForCaller } from '../../src/thread-model-host.ts'
 import { annotateThreadModel, THREAD_MODEL_RECORD, threadModelPolicyProjection } from '../../src/thread-model-policy.ts'
-import { installModelSelectionProjection } from '../../src/native/model-selection-projection.ts'
 
 const contexts = new Set<Context>()
 const selected = { provider: 'account-a', model: 'model-a', reasoningEffort: ReasoningEffortId('high') }
@@ -30,8 +30,9 @@ async function fixture() {
   contexts.add(ctx)
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
-  const unregisterPolicy = ctx.sessionProjections.register(threadModelPolicyProjection)
-  installModelSelectionProjection(ctx)
+  await ctx.sessionProjections.register(modelSelectionProjectionDefinition)
+  const policyHandle = await ctx.sessionProjections.register(threadModelPolicyProjection)
+  const unregisterPolicy = () => policyHandle.dispose()
   const session = ctx.sessions.create(SessionId('policy-source'))
   const policy = (target: Session = session) => ctx.sessionProjections.snapshot(target, ['threadModelPolicy']).values.threadModelPolicy
   return { ctx, session, policy, unregisterPolicy }
@@ -55,8 +56,7 @@ describe('thread model policy through public Session and projection services', (
   it('reports capability absence rather than throwing when the policy is not registered', async () => {
     const { ctx, session, unregisterPolicy } = await fixture()
     session.append('model/selection', selected)
-    unregisterPolicy()
-    expect(ctx.sessionProjections.stateOf(session, 'threadModelPolicy')).toBeUndefined()
+    await unregisterPolicy()
     expect(ctx.sessionProjections.snapshot(session, ['threadModelPolicy']).values.threadModelPolicy).toBeUndefined()
   })
 

@@ -131,17 +131,24 @@ export function createSessionControlStream(
   // stream keeps that value per cell; a new stream generation starts from its baseline with no cells.
   const cells = new Map<string, JsonValue>()
   const update = (frame: SessionControlDeltaFrame): void => {
-    const cell = ProjectionPatches.cell(frame.sessionId, frame.key)
     if (frame.type === 'projection') {
-      cells.set(cell, frame.value)
+      for (const change of frame.changes) cells.set(ProjectionPatches.cell(frame.sessionId, change.key), change.val)
       options.accept(frame)
       return
     }
-    const previous = cells.get(cell)
-    if (previous === undefined) throw new RemoteError('gateway/internal', `session control patch for an unknown ${frame.key} value`, {})
-    const value = ProjectionPatches.apply(previous, ProjectionPatches.decode(frame.patch))
-    cells.set(cell, value)
-    options.accept({ type: 'projection', sessionId: frame.sessionId, key: frame.key, value, seq: frame.seq })
+    const changes = frame.changes.map((change) => {
+      const cell = ProjectionPatches.cell(frame.sessionId, change.key)
+      if ('val' in change) {
+        cells.set(cell, change.val)
+        return change
+      }
+      const previous = cells.get(cell)
+      if (previous === undefined) throw new RemoteError('gateway/internal', `session control patch for an unknown ${change.key} value`, {})
+      const val = ProjectionPatches.apply(previous, ProjectionPatches.decode(change.patch))
+      cells.set(cell, val)
+      return { key: change.key, val }
+    })
+    options.accept({ type: 'projection', sessionId: frame.sessionId, seq: frame.seq, changes })
   }
   return new RemoteSnapshotStream(stream, {
     name: 'session control stream',
@@ -200,6 +207,7 @@ export class SessionEventStream extends RemoteJournalStream<
     let assistantRevision: number | undefined
     for await (const frame of this.remote.session.follow({
       address: this.address,
+      activate: true,
       assistantStream: true,
       ...this.repairRequest(request),
     }, signal)) {

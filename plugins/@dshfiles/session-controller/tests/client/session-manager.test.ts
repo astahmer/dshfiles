@@ -136,7 +136,7 @@ describe('SessionManager list projections', () => {
     const child = SessionId('session-child')
     const other = SessionId('session-other')
     const pull = manager.refreshList()
-    pulls[0]?.resolve(listResult([summary(other), summary(child, { parentSessionId: parent }), summary(parent)]))
+    pulls[0]?.resolve(listResult([summary(other), summary(child, { parentSessionId: parent, origin: 'subagent' }), summary(parent)]))
     await pull
     const before = manager.getListSnapshot().items
     expect(before.map(item => [item.sessionId, item.depth])).toEqual([
@@ -145,7 +145,7 @@ describe('SessionManager list projections', () => {
       [child, 1],
     ])
 
-    manager.handleControlFrame({ type: 'projection', sessionId: child, key: 'title', value: 'Child title', seq: 3 })
+    manager.handleControlFrame({ type: 'projection', sessionId: child, seq: 3, changes: [{ key: 'title', val: 'Child title' }] })
     const after = manager.getListSnapshot().items
     expect(after.map(item => [item.sessionId, item.depth, item.title])).toEqual([
       [other, 0, undefined],
