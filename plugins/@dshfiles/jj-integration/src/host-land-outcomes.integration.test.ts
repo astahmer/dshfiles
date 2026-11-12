@@ -246,6 +246,22 @@ describe.skipIf(!jjAvailable)('jj-integration land outcomes', () => {
       `)
     })
 
+    it('landed with a metadata warning stays attention', async () => {
+      const { events } = await integrateAutomatically({
+        prepare: async (repo, sessionId) => {
+          const path = await describedThread(repo, sessionId)
+          writeFileSync(join(`${repo}-threads`, '.dshfiles-rebase-timestamps.json'), 'not json')
+          return path
+        },
+      })
+      const integration = events.filter(event => event.type.startsWith('workspace.auto_integration'))
+      expect(integration.map(event => [event.type, event.level])).toEqual([
+        ['workspace.auto_integration_queued', 'notable'],
+        ['workspace.auto_integration_landed', 'attention'],
+      ])
+      expect(integration[1]?.summary).toContain('integration history')
+    })
+
     it('nothing-to-land', async () => {
       expect(
         await integrateAutomatically({

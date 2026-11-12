@@ -153,7 +153,7 @@ export class AutoIntegration extends Context.Service<AutoIntegration, { readonly
             return yield* report(
               'landed',
               `Automatically rebased ${String(landed.revisions.length)} revision(s) onto ${bookmarkLabel}.${landed.warning === undefined ? '' : ` ${landed.warning}`}`,
-              landed.warning === undefined ? 'routine' : 'attention',
+              landed.warning === undefined ? 'notable' : 'attention',
             )
           }
           if (landed.status === 'nothing-to-land') return yield* report('nothing-to-land', 'Automatic integration found no remaining work.', 'routine')
