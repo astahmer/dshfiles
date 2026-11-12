@@ -5,7 +5,6 @@ import { LightbulbIcon, LocateFixedIcon, RotateCcwIcon, SearchIcon, SettingsIcon
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState, type ReactNode } from 'react'
-import { pluginLabel } from './labels.js'
 import type { Suggestion, Suggestions, SuggestionsInput } from './suggestions-model.js'
 import { SuggestionsWindow, type FeaturedDay } from './suggestions-window.js'
 
@@ -49,10 +48,7 @@ const SuggestionItem = (props: {
       <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-2">
         {props.prominent ? <LightbulbIcon aria-hidden className="dshx:mt-0.5 dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
         <div className="dshx:min-w-0 dshx:flex-1">
-          <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2">
-            <p className="dshx:min-w-0 dshx:text-sm dshx:font-medium">{row.title}</p>
-            <span className="dshx:text-xs dshx:text-muted-foreground">{pluginLabel(row.plugin)}</span>
-          </div>
+          <p className="dshx:min-w-0 dshx:text-sm dshx:font-medium">{row.title}</p>
           <p className="dshx:text-xs dshx:text-muted-foreground">{suggestion.why}</p>
           <p className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{suggestion.evidence}</p>
         </div>

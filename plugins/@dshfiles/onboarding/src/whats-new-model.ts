@@ -182,39 +182,23 @@ const select = (input: { readonly entries: readonly WhatsNewEntry[]; readonly re
   return { entries: matching.slice(0, limit), more: matching.length > limit }
 }
 
-export interface WindowGroup {
-  readonly plugin: string
-  readonly description: string
-  readonly features: number
-  readonly entries: readonly (WhatsNewEntry & { readonly isNew: boolean })[]
-}
+export type WindowEntry = WhatsNewEntry & { readonly isNew: boolean }
 
 /**
  * Since your last visit: entries after the browser's last-seen instant are new. With no instant yet (first visit),
- * none is, so the latest changes read as a list, not a wall of badges. Groups keep the newest plugin first.
+ * none is, so the latest changes read as a list, not a wall of badges. Entries stay newest first.
  */
 const windowOf = (input: { readonly value: WhatsNewReady; readonly lastSeen: string | null }) => {
-  const descriptions = new Map(input.value.plugins.map(plugin => [plugin.name, plugin] as const))
-  const groups = new Map<string, WindowGroup['entries'][number][]>()
-  let newCount = 0
-  for (const entry of input.value.entries) {
-    const isNew = input.lastSeen !== null && entry.date > input.lastSeen
-    if (isNew) newCount += 1
-    const group = groups.get(entry.plugin) ?? []
-    group.push({ ...entry, isNew })
-    groups.set(entry.plugin, group)
-  }
+  const entries: readonly WindowEntry[] = input.value.entries.map(entry => ({ ...entry, isNew: input.lastSeen !== null && entry.date > input.lastSeen }))
   return {
-    newCount,
+    newCount: entries.filter(entry => entry.isNew).length,
     newest: input.value.entries[0]?.date ?? null,
-    groups: [...groups].map(([plugin, entries]): WindowGroup => ({
-      plugin,
-      description: descriptions.get(plugin)?.description ?? '',
-      features: descriptions.get(plugin)?.features ?? 0,
-      entries,
-    })),
+    entries,
   }
 }
+
+/** A change summary as a sentence for people: the commit title's type and scope are already gone, so only the case. */
+const sentence = (summary: string): string => `${summary.charAt(0).toLocaleUpperCase()}${summary.slice(1)}`
 
 const day = (date: string): string => date.slice(0, 10)
 
@@ -244,5 +228,6 @@ export class WhatsNewModel {
   static readonly upstreamTargets = upstreamTargets
   static readonly select = select
   static readonly window = windowOf
+  static readonly sentence = sentence
   static readonly render = render
 }

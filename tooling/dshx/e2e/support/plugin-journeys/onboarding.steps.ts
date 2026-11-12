@@ -104,11 +104,9 @@ Then('Getting started shows the setup checklist, the packs and curated features'
     await expect(checklist.locator('[data-checklist-item="github"]')).toHaveAttribute('data-state', /^(done|todo|unknown)$/u)
     const packs = gettingStarted(page).getByRole('region', { name: /^Packs/u })
     await expect(packs.locator('[data-pack]')).toHaveCount(8)
-    // Display names with a status glyph in neutral ink; the package name stays in a data attribute.
-    const sidebar = packs.locator('[data-pack="core"] [data-plugin="thread-sidebar"]')
-    await expect(sidebar).toHaveAttribute('data-plugin-state', 'enabled')
-    await expect(sidebar).toHaveText('Thread sidebar')
-    await expect(sidebar.getByRole('img', { name: 'enabled', exact: true })).toBeVisible()
+    // A pack says how much of it is on; plugin names stay in the change preview.
+    await expect(packs.locator('[data-pack="core"]')).toContainText(/[1-9]\d* of \d+ enabled/u)
+    await expect(packs.locator('[data-plugin]')).toHaveCount(0)
     await expect(gettingStarted(page).getByRole('list', { name: 'Features', exact: true }).locator('[data-feature]').first()).toBeVisible()
   })
   await page.screenshot({ path: test.info().outputPath('getting-started.png'), animations: 'disabled' })
@@ -482,7 +480,7 @@ Then(
   async ({ page }: { page: Page }, title: string) => {
     await recordAssertion(page, 'onboarding-pack-cancel-changes-nothing', async () => {
       await expect(pack(page, title).getByRole('button', { name: `Enable pack: ${title}`, exact: true })).toBeFocused()
-      await expect(pack(page, title).locator('[data-plugin-state="not-installed"]')).toHaveCount(4)
+      await expect(pack(page, title)).toContainText('0 of 4 enabled')
       expect(writes.get(page) ?? []).toEqual([])
       expect(await page.evaluate(() => sessionStorage.getItem('onboarding-e2e-no-reload'))).toBe('kept')
     })

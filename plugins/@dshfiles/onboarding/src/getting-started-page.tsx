@@ -12,7 +12,7 @@ import type * as Types from 'effect/Types'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { DESTINATION_ORDER, type ChecklistItem, type FeatureRow, type Overview, type OverviewInput, type PackView } from './overview-model.js'
 import { PackChangeDialog, type PackChangeDialogProps, type PackTarget } from './pack-change-dialog.js'
-import { CHECKLIST_GLYPH, CHECKLIST_LABEL, PLUGIN_GLYPH, PLUGIN_STATE_LABEL, PREREQUISITE_LABELS, pluginLabel } from './labels.js'
+import { CHECKLIST_GLYPH, CHECKLIST_LABEL, PREREQUISITE_LABELS } from './labels.js'
 import type { PackAction } from './pack-plan.js'
 import { Routes, type RouteServices } from './routes.js'
 import { onboardingSettings, type OnboardingSettings } from './settings.js'
@@ -133,16 +133,6 @@ const PackCard = (props: {
         </span>
       </div>
       <p className="dshx:text-xs dshx:text-muted-foreground">{pack.summary}</p>
-      <ul aria-label={`${pack.title} plugins`} className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
-        {pack.plugins.map(plugin => (
-          <li key={plugin.name}>
-            <Badge className="dshx:gap-1 dshx:font-normal" data-plugin={plugin.name} data-plugin-state={plugin.state} variant="outline">
-              <StatusGlyph className="dshx:size-3" label={PLUGIN_STATE_LABEL[plugin.state]} status={PLUGIN_GLYPH[plugin.state]} />
-              {pluginLabel(plugin.name)}
-            </Badge>
-          </li>
-        ))}
-      </ul>
       {pack.prerequisites.length === 0 ? null : (
         <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
           Needs
@@ -207,12 +197,7 @@ const FeatureItem = (props: {
   return (
     <EntityRow
       data-feature={row.key}
-      description={
-        <>
-          <span className="dshx:line-clamp-2">{row.firstAction ?? row.summary}</span>
-          {row.currentSurface === null ? null : <span className="dshx:truncate">{row.currentSurface}</span>}
-        </>
-      }
+      description={<span className="dshx:line-clamp-2">{row.summary}</span>}
       heading={row.title}
       meta={destinationLabel(row.destination)}
       role="listitem"
@@ -303,10 +288,9 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
     () => routes.openSettings({ setting: { entryId: onboardingSettings.namespace, fieldPath: ['suggestions'] } }),
     [routes],
   )
-  const showFeatures = useCallback((plugin: string) => {
+  const findFeature = useCallback((text: string) => {
     setDestination(undefined)
-    // The plugin's name as people read it: every word of it still matches the plugin's own features.
-    setSearch(pluginLabel(plugin))
+    setSearch(text)
     searchInput.current?.focus()
   }, [])
 
@@ -334,20 +318,14 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
           </PageSection>
         ) : null}
         {props.settings.whatsNew ? (
-          <WhatsNewSection
-            copy={props.copy}
-            lastSeen={lastSeen}
-            loadWhatsNew={props.loadWhatsNew}
-            markSeen={WhatsNewStore.markSeen}
-            showFeatures={showFeatures}
-          />
+          <WhatsNewSection copy={props.copy} lastSeen={lastSeen} loadWhatsNew={props.loadWhatsNew} markSeen={WhatsNewStore.markSeen} />
         ) : null}
         <SuggestionsSection
           dismiss={SuggestionsStore.dismiss}
           dismissed={dismissed}
           enabled={props.settings.suggestions}
           featured={featured}
-          findFeature={showFeatures}
+          findFeature={findFeature}
           loadSuggestions={props.loadSuggestions}
           openSetting={props.routes.hasSettings() ? openSuggestionsSetting : null}
           remember={SuggestionsStore.remember}

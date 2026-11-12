@@ -122,22 +122,24 @@ describe('What’s new windows', () => {
     ['onboarding', '2026-11-09T10:00:00.000Z'],
   ])
 
-  it('marks nothing new on a first visit, and groups by plugin newest first with its description', () => {
+  it('marks nothing new on a first visit and keeps the changes newest first', () => {
     const first = WhatsNewModel.window({ value, lastSeen: null })
     expect(first.newCount).toBe(0)
     expect(first.newest).toBe('2026-11-11T10:00:00.000Z')
-    expect(first.groups.map(group => [group.plugin, group.description, group.entries.map(entry => entry.summary)])).toEqual([
-      ['onboarding', 'Getting started.', ['change 0', 'change 2']],
-      ['backlog', 'Backlog items.', ['change 1']],
-    ])
-    expect(first.groups.flatMap(group => group.entries).some(entry => entry.isNew)).toBe(false)
+    expect(first.entries.map(entry => entry.summary)).toEqual(['change 0', 'change 1', 'change 2'])
+    expect(first.entries.some(entry => entry.isNew)).toBe(false)
   })
 
   it('marks only what landed after the last seen instant, and nothing once the newest was seen', () => {
     const later = WhatsNewModel.window({ value, lastSeen: '2026-11-09T12:00:00.000Z' })
     expect(later.newCount).toBe(2)
-    expect(later.groups.flatMap(group => group.entries.filter(entry => entry.isNew).map(entry => entry.summary))).toEqual(['change 0', 'change 1'])
+    expect(later.entries.filter(entry => entry.isNew).map(entry => entry.summary)).toEqual(['change 0', 'change 1'])
     expect(WhatsNewModel.window({ value, lastSeen: later.newest }).newCount).toBe(0)
+  })
+
+  it('reads a change summary as a sentence', () => {
+    expect(WhatsNewModel.sentence('publish the thread-directories module')).toBe('Publish the thread-directories module')
+    expect(WhatsNewModel.sentence('')).toBe('')
   })
 
   it('slices by plugin, since and limit on the Host', () => {

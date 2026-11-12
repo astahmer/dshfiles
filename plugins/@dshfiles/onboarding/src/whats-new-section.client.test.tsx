@@ -2,7 +2,7 @@
 import { PluginQueryProvider, pluginQueryClient } from '@dshfiles/plugin-ui/query'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { WhatsNew } from './whats-new-model.js'
 import { WhatsNewSection } from './whats-new-section.js'
 
@@ -47,41 +47,31 @@ const ready: WhatsNew = {
 }
 
 /** The section as the page mounts it, with last-seen held in state the way the browser store holds it. */
-const Harness = (props: { readonly value: WhatsNew; readonly initialSeen: string | null; readonly showFeatures: (plugin: string) => void }) => {
+const Harness = (props: { readonly value: WhatsNew; readonly initialSeen: string | null }) => {
   const [lastSeen, setLastSeen] = useState(props.initialSeen)
-  return (
-    <WhatsNewSection
-      copy={async () => true}
-      lastSeen={lastSeen}
-      loadWhatsNew={async () => props.value}
-      markSeen={setLastSeen}
-      showFeatures={props.showFeatures}
-    />
-  )
+  return <WhatsNewSection copy={async () => true} lastSeen={lastSeen} loadWhatsNew={async () => props.value} markSeen={setLastSeen} />
 }
 
-const mount = (value: WhatsNew, initialSeen: string | null = null) => {
-  const showFeatures = vi.fn()
+const mount = (value: WhatsNew, initialSeen: string | null = null) =>
   render(
     <PluginQueryProvider>
-      <Harness initialSeen={initialSeen} showFeatures={showFeatures} value={value} />
+      <Harness initialSeen={initialSeen} value={value} />
     </PluginQueryProvider>,
   )
-  return { showFeatures }
-}
 
 describe('WhatsNewSection', () => {
-  it('lists changes by plugin with no New badge on a first visit, and links a plugin to its features', async () => {
-    const page = mount(ready)
+  it('reads each change as a sentence, newest first, with no commit type, plugin name or New badge on a first visit', async () => {
+    mount(ready)
     const section = await screen.findByRole('region', { name: /What's new/u })
-    const onboarding = section.querySelector('[data-whats-new-plugin="onboarding"]')
-    if (!(onboarding instanceof HTMLElement)) throw new Error('no onboarding group')
-    expect(within(onboarding).getByText('Getting started.')).toBeTruthy()
-    expect(within(onboarding).getByText('show what is new')).toBeTruthy()
+    const changes = within(section).getByRole('list', { name: 'Changes' })
+    expect([...changes.querySelectorAll('[data-whats-new-summary]')].map(line => line.textContent)).toEqual([
+      'Show what is new',
+      'Keep the order',
+      'Walk a feature',
+    ])
+    expect(within(changes).getAllByText('Fix')).toHaveLength(1)
+    expect(section.textContent).not.toMatch(/\bfeat\b|\bfix\b|Onboarding|Backlog|Getting started\./u)
     expect(within(section).queryAllByText('New')).toEqual([])
-    fireEvent.click(within(section).getByRole('button', { name: 'Features of Onboarding' }))
-    expect(page.showFeatures).toHaveBeenCalledWith('onboarding')
-    expect(within(section).queryByRole('button', { name: 'Features of Backlog' })).toBeNull()
   })
 
   it('marks what landed since the last visit as New until the user marks it seen, never on its own', async () => {
@@ -94,12 +84,16 @@ describe('WhatsNewSection', () => {
     expect(within(section).queryByRole('button', { name: 'Mark as seen' })).toBeNull()
   })
 
-  it('shows upstream changes as of the last fetch with the fetch command to copy', async () => {
+  it('folds upstream changes and the fetch status into a quiet detail with the fetch command to copy', async () => {
     mount(ready)
-    const upstream = await screen.findByRole('region', { name: 'main@fork-source' })
-    expect(within(upstream).getByText('only upstream has this')).toBeTruthy()
-    expect(upstream.textContent).toContain('not in your main, as of the last fetch')
-    expect(within(upstream).getByRole('button', { name: 'Copy jj git fetch --remote fork-source' })).toBeTruthy()
+    const section = await screen.findByRole('region', { name: /What's new/u })
+    const upstream = section.querySelector('details[data-whats-new-upstream="fork-source"]')
+    if (!(upstream instanceof HTMLDetailsElement)) throw new Error('no upstream detail')
+    expect(upstream.open).toBe(false)
+    expect(upstream.querySelector('summary')?.textContent).toBe('1 newer change not in your copy yet')
+    expect(within(upstream).getByText('Only upstream has this')).toBeTruthy()
+    expect(upstream.textContent).toContain('On main@fork-source as of the last fetch.')
+    expect(within(upstream).getByRole('button', { name: 'Copy jj git fetch --remote fork-source', hidden: true })).toBeTruthy()
   })
 
   it('says why history is missing and links the repository commits instead of a dead end', async () => {

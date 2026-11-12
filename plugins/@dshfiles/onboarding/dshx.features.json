@@ -5,7 +5,7 @@
     {
       "id": "getting-started",
       "title": "See what this setup can do and what it still needs on one page",
-      "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (an AI account connected, counted from AI accounts when it is installed, project added, project is a jj or git repository, GitHub CLI signed in) with a fix action for each open item, the eight plugin packs with every plugin enabled, disabled or not installed plus its prerequisites and key settings, and a curated-first search over every catalogued feature grouped by destination, with an Open button only where the route is registered. The onboarding_overview agent tool returns the same checklist, packs and rows. It changes nothing.",
+      "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (an AI account connected, counted from AI accounts when it is installed, project added, project is a jj or git repository, GitHub CLI signed in) with a fix action for each open item, the eight plugin packs with how many of their plugins are enabled plus their prerequisites and key settings, and a curated-first search over every catalogued feature grouped by destination, each row saying what the feature does for you, with an Open button only where the route is registered. The onboarding_overview agent tool returns the same checklist, packs and rows. It changes nothing.",
       "reach": ["click tab \"Knowledge\"", "click button \"Getting started\"", "expect heading \"Getting started\""],
       "reachNarrow": [
         "click button \"More\"",
@@ -448,7 +448,7 @@
     {
       "id": "whats-new",
       "title": "See what changed in your plugins since your last visit",
-      "summary": "Getting started's What's new lists every feat(<plugin>) and fix(<plugin>) change to an owned plugin, grouped by plugin with its catalog description, newest first, at most 50, each with its date. It is read on the Host from the jj (or git) history of the dshfiles checkout this profile links Getting started from, five seconds per command and cached a minute, while the page is open or the agent asks. A change reads New only after you pressed Mark as seen once (kept per browser); a first visit shows the list without badges. When a remote's bookmark of the trunk's name differs from the local one, its changes not yet in local history show as of the last fetch, with the fetch command to copy; nothing is fetched. A registry install says why there is no history and links the repository commits. Each plugin's Features button narrows the feature search to it. The onboarding_whats_new agent tool returns the same list. No network or model request.",
+      "summary": "Getting started's What's new lists every feat(<plugin>) and fix(<plugin>) change to an owned plugin as a sentence (the type and scope dropped, the first letter capitalized, a Fix or Breaking change badge, no plugin name), newest first, at most 50, each with its date. It is read on the Host from the jj (or git) history of the dshfiles checkout this profile links Getting started from, five seconds per command and cached a minute, while the page is open or the agent asks. A change reads New only after you pressed Mark as seen once (kept per browser); a first visit shows the list without badges. When a remote's bookmark of the trunk's name differs from the local one, its changes not yet in local history fold into one quiet line that opens to the remote bookmark, the changes as of the last fetch and the fetch command to copy; nothing is fetched. A registry install says why there is no history and links the repository commits. The onboarding_whats_new agent tool returns the same list. No network or model request.",
       "reach": ["click tab \"Knowledge\"", "click button \"Getting started\"", "expect region \"What's new*\""],
       "surfaces": ["client", "host", "api", "tool", "settings"],
       "surface": "detail",
@@ -522,6 +522,18 @@
           "id": "onboarding.whats-new-mark-seen",
           "file": "plugins/@dshfiles/onboarding/src/whats-new-section.client.test.tsx",
           "testName": "marks what landed since the last visit as New until the user marks it seen, never on its own"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.whats-new-readable",
+          "file": "plugins/@dshfiles/onboarding/src/whats-new-section.client.test.tsx",
+          "testName": "reads each change as a sentence, newest first, with no commit type, plugin name or New badge on a first visit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.whats-new-upstream-detail",
+          "file": "plugins/@dshfiles/onboarding/src/whats-new-section.client.test.tsx",
+          "testName": "folds upstream changes and the fetch status into a quiet detail with the fetch command to copy"
         },
         {
           "kind": "unit-test",

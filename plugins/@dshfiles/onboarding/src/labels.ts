@@ -1,7 +1,6 @@
 import type { StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
 import type { Prerequisite } from './catalog-model.js'
 import type { ChecklistItem } from './overview-model.js'
-import type { PluginState } from './pack-plan.js'
 
 /** Words a plugin slug spells in capitals when it is read as a name. */
 const ACRONYMS = new Map([
@@ -43,13 +42,3 @@ export const CHECKLIST_GLYPH = { done: 'done', todo: 'idle', unknown: 'stale', o
   StatusGlyphState
 >
 export const CHECKLIST_LABEL = { done: 'Done', todo: 'To do', unknown: 'Unknown', off: 'Off' } as const satisfies Record<ChecklistItem['state'], string>
-
-/** A plugin's state in a pack as a glyph; its name says the rest in neutral ink (no green or amber). */
-export const PLUGIN_GLYPH = { enabled: 'done', disabled: 'stopped', 'not-installed': 'idle', unknown: 'stale' } as const satisfies Record<
-  PluginState,
-  StatusGlyphState
->
-export const PLUGIN_STATE_LABEL = { enabled: 'enabled', disabled: 'disabled', 'not-installed': 'not installed', unknown: 'unknown' } as const satisfies Record<
-  PluginState,
-  string
->

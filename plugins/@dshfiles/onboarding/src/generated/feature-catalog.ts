@@ -18986,7 +18986,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "whats-new",
       "title": "See what changed in your plugins since your last visit",
-      "summary": "Getting started's What's new lists every feat(<plugin>) and fix(<plugin>) change to an owned plugin, grouped by plugin with its catalog description, newest first, at most 50, each with its date. It is read on the Host from the jj (or git) history of the dshfiles checkout this pr…",
+      "summary": "Getting started's What's new lists every feat(<plugin>) and fix(<plugin>) change to an owned plugin as a sentence (the type and scope dropped, the first letter capitalized, a Fix or Breaking change badge, no plugin name), newest first, at most 50, each with its date. It is read…",
       "destination": "knowledge",
       "currentSurface": "rail: Knowledge › Getting started › What's new",
       "reach": [

@@ -123,15 +123,11 @@ describe('GettingStartedPage', () => {
     expect(page.copy).toHaveBeenCalledWith('gh auth login')
 
     const packs = screen.getByRole('region', { name: /Packs/u })
-    const chip = (plugin: string) => packs.querySelector<HTMLElement>(`[data-plugin="${plugin}"]`)
-    // Display names and a status glyph in neutral ink; the package slug stays in data attributes only.
-    expect(chip('backlog')?.dataset.pluginState).toBe('enabled')
-    expect(chip('backlog')?.textContent).toBe('Backlog')
-    expect(within(chip('backlog') ?? packs).getByRole('img', { name: 'enabled' })).toBeTruthy()
-    expect(chip('backlog-jira')?.dataset.pluginState).toBe('not-installed')
-    expect(chip('backlog-jira')?.textContent).toBe('Backlog jira')
-    expect(chip('goal-tool')?.dataset.pluginState).toBe('disabled')
-    expect(within(packs).queryByText(/^[a-z]+(?:-[a-z]+)+$/u)).toBeNull()
+    // A pack names what it does and how much of it is on; package and plugin names stay in the change preview.
+    const pack = (id: string) => packs.querySelector<HTMLElement>(`[data-pack="${id}"]`)
+    expect(pack('planning')?.textContent).toMatch(/\d+ of \d+ enabled/u)
+    expect(packs.querySelector('[data-plugin]')).toBeNull()
+    expect(within(packs).queryByText(/^Backlog jira$|^Goal tool$|^[a-z]+(?:-[a-z]+)+$/u)).toBeNull()
     expect(packs.querySelector('[class*="text-success"], [class*="text-warning"], [data-variant="success"], [data-variant="warning"]')).toBeNull()
     fireEvent.click(within(packs).getByRole('button', { name: 'Isolate each new thread in its own workspace' }))
     expect(page.services.opened.at(-1)).toBe('settings:{"setting":{"entryId":"jj-integration","fieldPath":["isolateByDefault"]}}')
@@ -145,8 +141,9 @@ describe('GettingStartedPage', () => {
     fireEvent.click(within(backlogRow).getByRole('button', { name: /^Open / }))
     expect(page.services.opened.at(-1)).toBe('panel:dshfiles-backlog-panel')
     for (const unregistered of rowsOf('traces')) expect(within(unregistered).queryAllByRole('button', { name: /^Open / })).toEqual([])
-    // A row names where the feature lives, never its package.
+    // A row names where the feature lives and what it does for you, never its package or its developer surface note.
     expect(within(features).queryByText(/^backlog$|^traces$/u)).toBeNull()
+    expect(within(features).queryByText(/^left-nav: /u)).toBeNull()
 
     fireEvent.click(within(backlogRow).getByRole('button', { name: /^Show me where: / }))
     expect(page.showWhere).toHaveBeenCalledWith(backlogRow.dataset.feature)

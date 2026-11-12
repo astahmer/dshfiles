@@ -31,11 +31,13 @@ blocks the app, makes no model request, and changes the profile only when you co
       (on, signed in, configured) when that plugin is installed, and says it fell back to model provider routes when it
       is not; it reads the saved accounts only, never a provider or quota.
    2. **Packs**: eight named plugin sets (Core, Versioning workflow, GitHub & review, Backlog & planning, Accounts &
-      cost, Agents & orchestration, Observe & perf, Knowledge) with each plugin **enabled**, **disabled** or **not
-      installed**, the checklist items each pack needs, and a button per key setting. A plugin may sit in several packs.
-      Every pack but Core has **Enable pack** and **Disable pack** (see _Pack changes_).
+      cost, Agents & orchestration, Observe & perf, Knowledge) with what each does, how many of its plugins are
+      enabled, the checklist items it needs, and a button per key setting. Plugin names stay out of the card; the change
+      preview names each package. A plugin may sit in several packs. Every pack but Core has **Enable pack** and
+      **Disable pack** (see _Pack changes_).
    3. **Features**: every feature the owned catalogs declare, curated first, grouped by destination chips. Type to
-      search every feature (each word must match); `/` focuses the search, Escape clears it. **Open** appears only when
+      search every feature (each word must match); `/` focuses the search, Escape clears it. Each row says what the
+      feature does for you (its summary), never its developer surface note. **Open** appears only when
       the feature's page, command or Settings place is registered in this profile. **Show me where** appears when the
       feature's first `reach` step can be replayed here (see _Show me where_).
 2. **Setup wizard** — while an AI account or a project is still missing (read from the checklist) and no thread is
@@ -101,17 +103,18 @@ blocks the app, makes no model request, and changes the profile only when you co
 ## What's new
 
 1. **List.** Getting started's **What's new** lists each `feat(<plugin>): …` and `fix(<plugin>): …` change whose scope
-   names an owned plugin directory (a title scoping two plugins counts for each), grouped by plugin with its catalog
-   description, newest plugin first, at most 50 changes (12 until **Show all**), each with its date. `chore`, `docs`,
-   `test`, `refactor` and `perf` stay out: they rarely change what a user sees. **Features** narrows the feature search
-   to that plugin.
+   names an owned plugin directory (a title scoping two plugins counts for each), newest first, at most 50 changes (12
+   until **Show all**), each with its date. A change reads as a sentence: the `type(scope):` prefix is dropped and the
+   first letter capitalized; a fix carries a **Fix** badge and a breaking change **Breaking change**, and no plugin name
+   shows. `chore`, `docs`, `test`, `refactor` and `perf` stay out: they rarely change what a user sees.
 2. **Since your last visit.** A change reads **New** when it landed after the instant you last pressed **Mark as seen**
    (kept per browser, `dshfiles.onboarding.whats-new.v1`). Opening the page never moves it, and before the first press
    nothing reads New.
 3. **Upstream since your fork point.** For each remote whose bookmark (git: branch) of the local trunk's name points
    elsewhere — `main@upstream` against `main`, whatever the remote is called — the changes there not yet in local history.
    The trunk is git's checked-out branch, or jj's first local `main`, `master` or `trunk`. Nothing is fetched, so the list
-   is as of the last fetch; the card offers `jj git fetch --remote <name>` (or `git fetch <name>`) to copy.
+   is as of the last fetch. It stays folded into one quiet line (**3 newer changes not in your copy yet**); opening it
+   names the remote bookmark and offers `jj git fetch --remote <name>` (or `git fetch <name>`) to copy.
 4. **Source.** Read on the Host at request time from the dshfiles checkout this profile links Getting started from (the
    same lookup as pack installs): `jj --ignore-working-copy bookmark list` and `jj log`, or else git (`for-each-ref`,
    `remote`, `log`) when the checkout has no `.jj` or jj is not on DSH's PATH. Five seconds per command, cached 60 s (5 s
