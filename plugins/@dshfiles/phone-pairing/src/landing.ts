@@ -9,7 +9,7 @@ import type { RedeemRefusal } from './store.ts'
 export type GatewayRefusal = RedeemRefusal | 'invalid'
 
 /** What the phone page says for each refused code, with what to do next. */
-export const refusalMessage: Readonly<Record<GatewayRefusal, string>> = {
+export const refusalMessage = {
   used: 'This code was already used to pair a device. Open Pair a phone on your computer again for a new code, then type it.',
   expired: 'This code expired. Open Pair a phone on your computer again for a new code, then type it.',
   replaced: 'A newer code replaced this one. Type the code Pair a phone shows now on your computer.',
@@ -18,7 +18,7 @@ export const refusalMessage: Readonly<Record<GatewayRefusal, string>> = {
   'device-limit':
     'This DSH already has the most paired devices it allows. On your computer, ask the agent to list them (phone_pairing_status) and revoke one, then try again.',
   invalid: 'Pairing failed. Scan the QR code in Pair a phone again, or type its 6-digit code.',
-}
+} as const satisfies Readonly<Record<GatewayRefusal, string>>
 
 /** HTTP status for each refusal: 403 for a code that does not pair, 429 and 409 for the two limits. */
 const refusalStatusCode = {

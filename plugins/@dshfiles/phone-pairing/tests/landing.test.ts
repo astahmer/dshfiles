@@ -41,19 +41,20 @@ interface RedeemBody {
   readonly nonsense?: boolean
 }
 
-const redeem = (port: number, body: RedeemBody, cookie?: string) =>
-  call(port, '/pair/redeem', {
-    method: 'POST',
-    body: JSON.stringify(body),
-    headers: { 'content-type': 'application/json', ...(cookie === undefined ? {} : { cookie }) },
-  })
+const redeem = (port: number, body: RedeemBody, cookie?: string) => {
+  const json = { 'content-type': 'application/json' }
+  const headers = cookie === undefined ? json : { ...json, cookie }
+  return call(port, '/pair/redeem', { method: 'POST', body: JSON.stringify(body), headers })
+}
 
 const gatewayFixture = async () => {
   const directory = await mkdtemp(join(tmpdir(), 'pairing-landing-'))
   const upstream = http.createServer((_request, response) => response.end('native app'))
   upstream.listen(0, '127.0.0.1')
   await once(upstream, 'listening')
-  const upstreamPort = (upstream.address() as { port: number }).port
+  const address = upstream.address()
+  if (address === null || typeof address === 'string') throw new Error('the upstream fixture did not bind a TCP port')
+  const upstreamPort = address.port
   let time = 1_000
   const store = await createPairingStore({ path: join(directory, 'devices.json'), now: () => time, offerTtlMs: 60_000 })
   const gateway = createPairingGateway({
@@ -164,7 +165,12 @@ describe('landing script', () => {
   const run = async (answer: { status: number; body: object }, hash = '') => {
     document.body.innerHTML = /<main>([\s\S]*)<\/main>/u.exec(pairPage)?.[1] ?? ''
     window.history.replaceState(null, '', `/pair${hash}`)
-    const fetch = vi.fn(async () => new Response(JSON.stringify(answer.body), { status: answer.status, headers: { 'content-type': 'application/json' } }))
+    /** Every request the page made, as `[url, init]`. */
+    const requests: Parameters<typeof globalThis.fetch>[] = []
+    const fetch: typeof globalThis.fetch = async (...args) => {
+      requests.push(args)
+      return new Response(JSON.stringify(answer.body), { status: answer.status, headers: { 'content-type': 'application/json' } })
+    }
     vi.stubGlobal('fetch', fetch)
     new Function(landingScript)()
     if (hash === '') {
@@ -174,12 +180,12 @@ describe('landing script', () => {
       document.querySelector('form')?.dispatchEvent(new Event('submit', { cancelable: true }))
     }
     await vi.waitFor(() => expect(document.querySelector('#status')?.textContent).not.toBe('Pairing…'))
-    return { fetch, status: document.querySelector('#status') }
+    return { requests, status: document.querySelector('#status') }
   }
 
   it('redeems the QR link without following a redirect and opens DSH', async () => {
-    const { fetch, status } = await run({ status: 200, body: { paired: true, message: 'Paired. Opening DSH…' } }, '#id=a&secret=b')
-    expect(fetch).toHaveBeenCalledWith('/pair/redeem', expect.not.objectContaining({ redirect: 'error' }))
+    const { requests, status } = await run({ status: 200, body: { paired: true, message: 'Paired. Opening DSH…' } }, '#id=a&secret=b')
+    expect(requests).toEqual([['/pair/redeem', expect.not.objectContaining({ redirect: 'error' })]])
     expect(status?.textContent).toBe('Paired. Opening DSH…')
     expect(document.querySelector<HTMLAnchorElement>('#open')?.hidden).toBe(false)
   })

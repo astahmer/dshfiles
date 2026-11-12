@@ -18,7 +18,8 @@ import { renderTerminalQr } from './qr.ts'
 import { createRewriteProxy, type RouteClaim } from './rewrite-proxy.ts'
 import { tailnetCommands } from './tailnet-promise.ts'
 
-export interface Config {
+/** A type alias, not an interface, so it satisfies the record output a dshx `Config` schema must decode to. */
+export type Config = {
   /** Absolute HTTPS origins the phone reaches; empty means detect the Tailscale hostname. */
   origins?: string[]
   /** Loopback port the tunnel forwards to; the proxy rewrites Host/Origin to the DSH listener. */
@@ -33,9 +34,9 @@ export const Config: z<Config> = z.object({
   autoServe: z.boolean().default(true),
 })
 
-// SAFETY: schemastery implements Standard Schema with an `unknown` output, while an object schema always decodes a
-// record; the Loader keeps validating the row config with this same schemastery schema.
-const pluginConfig = Config as unknown as StandardSchemaV1<unknown, Readonly<Record<string, unknown>>>
+// SAFETY: schemastery implements Standard Schema with an `unknown` output, while this `z<Config>` object schema always
+// decodes a `Config`; the Loader keeps validating the row config with this same schemastery schema.
+const pluginConfig = Config as unknown as StandardSchemaV1<unknown, Readonly<Config>>
 
 interface Peer {
   /** Add the process launch token to an origin's clean URL. */
@@ -155,8 +156,7 @@ export default definePlugin({
   uses: ['rpc'],
   Config: pluginConfig,
   setup(api) {
-    // SAFETY: the Loader validated this row's config with `pluginConfig`, the schemastery `Config` schema above.
-    const edge = apply(api.raw.ctx, api.config as Config)
+    const edge = apply(api.raw.ctx, api.config)
     api.rpc.register(
       phoneEdgeApi.host({
         status: async () => {

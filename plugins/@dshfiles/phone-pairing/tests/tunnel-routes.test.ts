@@ -58,7 +58,7 @@ const provided = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   run(effect.pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, tracerLayer))) as Effect.Effect<A, E, never>)
 const table = async (routes: JsonValue) => writeFile(process.env.FAKE_TS_STATE ?? '', JSON.stringify(routes))
 const commands = async () => (await readFile(process.env.FAKE_TS_LOG ?? '', 'utf8')).trim().split('\n')
-const routes = async () => parseServeStatus(await readFile(process.env.FAKE_TS_STATE ?? '', 'utf8'))
+const routes = async () => run(parseServeStatus(await readFile(process.env.FAKE_TS_STATE ?? '', 'utf8')))
 
 describe('phone pairing on its own Tailscale route', () => {
   it('leaves Phone access QR’s https=443 alone: serves on 8443 and turns off only 8443', async () => {
@@ -95,11 +95,11 @@ describe('phone pairing on its own Tailscale route', () => {
     expect((await commands()).filter(line => line.startsWith('funnel --bg'))).toEqual([])
   })
 
-  it('reads the served ports and their targets from serve status', () => {
-    const parsed = parseServeStatus(JSON.stringify(phoneAccessRoute))
+  it('reads the served ports and their targets from serve status', async () => {
+    const parsed = await run(parseServeStatus(JSON.stringify(phoneAccessRoute)))
     expect([...parsed.ports]).toEqual([443])
     expect(parsed.proxyOf('machine.example.ts.net', 443)).toBe('http://127.0.0.1:3443')
     expect(freeServePort('serve', parsed)).toBe(8443)
-    expect(freeServePort('serve', parseServeStatus('{}'))).toBe(443)
+    expect(freeServePort('serve', await run(parseServeStatus('')))).toBe(443)
   })
 })

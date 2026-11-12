@@ -49,16 +49,20 @@ export interface ServeRoutes {
   readonly proxyOf: (host: string, port: number) => string | undefined
 }
 
-const parseServeStatus = (raw: string): ServeRoutes => {
-  const status = Schema.decodeUnknownSync(serveStatusSchema)(raw.trim() === '' ? {} : decodeJson(jsonValueSchema, raw))
+const decodeServeStatus = Schema.decodeUnknownEffect(Schema.fromJsonString(serveStatusSchema))
+
+const routesOf = (status: typeof serveStatusSchema.Type): ServeRoutes => {
   const web = status.Web ?? {}
   const ports = new Set<number>(Object.keys(status.TCP ?? {}).map(Number))
   for (const key of Object.keys(web)) ports.add(Number(key.slice(key.lastIndexOf(':') + 1)))
   return { ports, proxyOf: (host, port) => web[`${host}:${String(port)}`]?.Handlers?.['/']?.Proxy }
 }
 
+/** Decode `tailscale serve status --json`; an empty answer means nothing is served. */
+const parseServeStatus = (raw: string) => decodeServeStatus(raw.trim() === '' ? '{}' : raw).pipe(Effect.map(routesOf))
+
 const serveStatus = runCommand({ command: 'tailscale', args: ['serve', 'status', '--json'], timeout: '5 seconds' }).pipe(
-  Effect.flatMap(raw => Effect.try(() => parseServeStatus(raw))),
+  Effect.flatMap(parseServeStatus),
   Effect.option,
 )
 
