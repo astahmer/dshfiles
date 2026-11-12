@@ -60,7 +60,7 @@ export const scheduledSendApi = defineApi({
       input: Schema.Struct({ sessionId: Schema.optional(sessionIdSchema) }),
       output: sendListSchema,
       description:
-        'List the messages scheduled to be sent later, soonest first: one thread when sessionId is given (agents default to their own thread), else every thread. Read-only.',
+        'List the messages scheduled to be sent later, soonest first: one thread when sessionId is given, else every thread. Agents default to, and only reach, their own thread and its subagents. Read-only.',
       tool: {
         name: 'scheduled_send_list',
         readOnly: true,

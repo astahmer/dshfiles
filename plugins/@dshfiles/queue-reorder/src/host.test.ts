@@ -1,3 +1,9 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import Storage from '@deepseek-ai/dsh-storage'
+import * as StorageDomainPlugin from '@deepseek-ai/dsh-storage-domain'
+import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Schema } from 'effect'
@@ -54,11 +60,22 @@ type ToolArguments = Parameters<TestHost['runTool']>[0]['arguments']
 
 const mountedQueue = Effect.gen(function* () {
   const inbox = liveSession()
+  const home = yield* Effect.acquireRelease(
+    Effect.promise(() => mkdtemp(join(tmpdir(), 'queue-reorder-host-'))),
+    path => Effect.promise(() => rm(path, { recursive: true, force: true })),
+  )
   const host = yield* Effect.acquireRelease(
     Effect.promise(async () => {
       const created = await createTestHost()
+      await created.ctx.plugin(Storage)
+      await created.ctx.plugin(StorageJson, { root: join(home, 'storage') })
+      await created.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
       created.ctx.provide('settings', { configure: () => () => undefined, describe: () => [], update: async () => undefined, replace: async () => undefined })
-      created.ctx.provide('agents', { get: (sessionId: string) => (sessionId === 'live' ? { inbox } : undefined), list: () => [] })
+      const live = new Map<string, unknown>([
+        ['live', { inbox }],
+        ['child', { session: { header: { id: 'child', origin: 'subagent', parentSession: 'mine' } } }],
+      ])
+      created.ctx.provide('agents', { get: (sessionId: string) => live.get(sessionId), list: () => [] })
       created.ctx.provide('attachments', {
         readFileStream: async function* (ref: { readonly attachmentId: string }) {
           yield* fileContents.get(ref.attachmentId) ?? []
@@ -75,7 +92,15 @@ const mountedQueue = Effect.gen(function* () {
       return Schema.decodeUnknownSync(wireEnvelope)(await response.json()).result
     })
   const runTool = (args: ToolArguments) => Effect.promise(() => host.runTool({ name: 'queue_move', arguments: args }))
-  return { inbox, call, runTool }
+  const sendsCall = (method: string, input: ApiInput) =>
+    Effect.promise(async () => {
+      const response = await host.connection.requestApi({ packageId: '@dshfiles/queue-reorder', apiId: 'scheduled-sends', method, version: 1, input })
+      return Schema.decodeUnknownSync(wireEnvelope)(await response.json()).result
+    })
+  const agentTool = (sessionId: string, name: string, args: ToolArguments) =>
+    // SAFETY: the dshx tool edge reads only the Agent's id and its session header's cwd to name the caller.
+    Effect.promise(() => host.runTool({ name, arguments: args, agent: { id: sessionId, session: { header: {} } } as never }))
+  return { inbox, call, runTool, sendsCall, agentTool }
 })
 
 const attachment = (attachmentId: string, bytes: number) => ({ attachmentId, name: `${attachmentId}.txt`, bytes })
@@ -159,6 +184,43 @@ describe('queue-reorder Host', () => {
         expect(yield* queue.call('readFile', { sessionId: 'live', attachment: attachment('grows', 3) })).toEqual(tooLarge)
         queue.inbox.nextTurn.push({ id: 'd', content: [fileBlock('huge-declared', MAX_QUEUE_FILE_BYTES + 1)] })
         expect(yield* queue.call('readFile', { sessionId: 'live', attachment: attachment('huge-declared', 3) })).toEqual(tooLarge)
+      }),
+    ),
+  )
+
+  it.effect('keeps an agent to the scheduled sends of its own thread and its subagents', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const queue = yield* mountedQueue
+        const sendAt = Date.now() + 60 * 60 * 1000
+        const foreign = yield* queue.sendsCall('create', { sessionId: 'other', text: 'from the user', sendAt })
+        if (!foreign.ok) return expect.fail(foreign.error.message)
+        const foreignId = Schema.decodeUnknownSync(Schema.Struct({ id: Schema.String }))(foreign.value.output).id
+
+        const refusedCreate = yield* queue.agentTool('mine', 'scheduled_send_create', { sessionId: 'other', text: 'hijack', sendAt })
+        expect(refusedCreate).toMatchObject({ isError: true, content: [{ type: 'text', text: expect.stringContaining('other') }] })
+        expect(yield* queue.agentTool('mine', 'scheduled_send_create', { sessionId: 'child', text: 'for my subagent', sendAt })).not.toHaveProperty(
+          'isError',
+          true,
+        )
+        expect(yield* queue.agentTool('mine', 'scheduled_send_create', { text: 'for me', sendAt })).not.toHaveProperty('isError', true)
+
+        const listed = yield* queue.agentTool('mine', 'scheduled_send_list', {})
+        expect(listed.content).toEqual([{ type: 'text', text: expect.stringContaining('for me') }])
+        expect(JSON.stringify(listed.content)).not.toContain('from the user')
+        expect(yield* queue.agentTool('mine', 'scheduled_send_list', { sessionId: 'other' })).toMatchObject({ isError: true })
+
+        for (const [name, args] of [
+          ['scheduled_send_update', { id: foreignId, text: 'rewritten' }],
+          ['scheduled_send_cancel', { id: foreignId }],
+          ['scheduled_send_now', { id: foreignId }],
+        ] as const) {
+          expect(yield* queue.agentTool('mine', name, args)).toMatchObject({
+            isError: true,
+            content: [{ type: 'text', text: expect.stringContaining(`No scheduled message ${foreignId}`) }],
+          })
+        }
+        expect(yield* queue.sendsCall('cancel', { id: foreignId })).toMatchObject({ ok: true, value: { output: { text: 'from the user' } } })
       }),
     ),
   )

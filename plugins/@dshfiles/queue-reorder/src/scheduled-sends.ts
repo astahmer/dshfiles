@@ -36,6 +36,10 @@ export class ScheduledSendRefused extends Schema.TaggedError<ScheduledSendRefuse
   override get message(): string {
     return this.reason
   }
+
+  static notFound(id: string): ScheduledSendRefused {
+    return new ScheduledSendRefused({ reason: `No scheduled message ${id} exists; it was sent or cancelled. List the scheduled messages to see what is left.` })
+  }
 }
 
 const checkTime = (sendAt: number, now: number): Effect.Effect<void, ScheduledSendRefused> => {
@@ -44,9 +48,6 @@ const checkTime = (sendAt: number, now: number): Effect.Effect<void, ScheduledSe
   if (sendAt - now > MAX_SCHEDULE_AHEAD_MS) return Effect.fail(new ScheduledSendRefused({ reason: 'Pick a time within the next year.' }))
   return Effect.void
 }
-
-const notFound = (id: string) =>
-  new ScheduledSendRefused({ reason: `No scheduled message ${id} exists; it was sent or cancelled. List the scheduled messages to see what is left.` })
 
 /** The earliest moment a send may go out: its time, or its retry when that is later. */
 const dueAt = (send: ScheduledSend): number => Math.max(send.sendAt, send.retryAt ?? 0)
@@ -100,7 +101,7 @@ const make = Effect.gen(function* () {
     return yield* store.exclusive(
       Effect.gen(function* () {
         const current = Option.getOrUndefined(yield* store.get(input.id))
-        if (current === undefined) return yield* notFound(input.id)
+        if (current === undefined) return yield* ScheduledSendRefused.notFound(input.id)
         if (current.status === 'sending')
           return yield* new ScheduledSendRefused({ reason: 'This message is being sent right now and can no longer be changed.' })
         const base = withoutRetry(current)
@@ -123,7 +124,7 @@ const make = Effect.gen(function* () {
     return yield* store.exclusive(
       Effect.gen(function* () {
         const current = Option.getOrUndefined(yield* store.get(input.id))
-        if (current === undefined) return yield* notFound(input.id)
+        if (current === undefined) return yield* ScheduledSendRefused.notFound(input.id)
         if (current.status === 'sending')
           return yield* new ScheduledSendRefused({ reason: 'This message is being sent right now and can no longer be cancelled.' })
         yield* store.remove(input.id)
@@ -188,7 +189,7 @@ const make = Effect.gen(function* () {
     const moved = yield* store.exclusive(
       Effect.gen(function* () {
         const current = Option.getOrUndefined(yield* store.get(input.id))
-        if (current === undefined) return yield* notFound(input.id)
+        if (current === undefined) return yield* ScheduledSendRefused.notFound(input.id)
         if (current.status === 'sending') return current
         const next: ScheduledSend = { ...withoutRetry(current), sendAt: Math.min(current.sendAt, now), status: 'scheduled', attempts: 0 }
         yield* store.put(next)
