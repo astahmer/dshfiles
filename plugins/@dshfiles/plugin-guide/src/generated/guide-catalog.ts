@@ -1768,7 +1768,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "key": "module:@dshfiles/multi-host/interaction-feed",
       "kind": "module",
       "title": "@dshfiles/multi-host/interaction-feed",
-      "summary": "A connected event stream announces every change; this only covers a missed frame.",
+      "summary": "A connected event stream announces every change, and a stream that drops reports a non-live status and reads again once live, so this only covers a frame lost while the stream stayed up.",
       "publicSymbol": "watchRemoteInteractions",
       "importFrom": "@dshfiles/multi-host/interaction-feed",
       "owner": "@dshfiles/multi-host",

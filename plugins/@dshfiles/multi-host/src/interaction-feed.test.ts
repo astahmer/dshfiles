@@ -6,14 +6,19 @@ interface FeedClient {
   readonly sessionInteractions: () => Promise<FeedReply>
 }
 
-const events = vi.hoisted(() => ({
-  handlers: undefined as { readonly onEvent: () => void; readonly onStatus: (status: string) => void } | undefined,
-  stopped: 0,
-}))
+interface EventStreamFake {
+  handlers: { readonly onEvent: () => void; readonly onStatus: (status: string) => void } | undefined
+  stopped: number
+  /** The status the page stream reports the moment a listener subscribes, as dshx does. */
+  initialStatus: string | undefined
+}
+
+const events = vi.hoisted((): EventStreamFake => ({ handlers: undefined, stopped: 0, initialStatus: undefined }))
 
 vi.mock('@dshfiles/dshx/client', () => ({
   subscribeApiEvent: (_client: FeedClient, _event: string, handlers: { readonly onEvent: () => void; readonly onStatus: (status: string) => void }) => {
     events.handlers = handlers
+    if (events.initialStatus !== undefined) handlers.onStatus(events.initialStatus)
     return () => {
       events.stopped += 1
     }
@@ -38,6 +43,7 @@ describe('what remote threads wait on', () => {
     vi.useFakeTimers()
     events.handlers = undefined
     events.stopped = 0
+    events.initialStatus = undefined
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -73,6 +79,30 @@ describe('what remote threads wait on', () => {
     stop()
   })
 
+  it('reads once at boot: a stream still connecting is read when it turns live, or after two seconds without it', async () => {
+    events.initialStatus = 'connecting'
+    const first = fixture(async () => ({ ok: true as const, interactions: [] }))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(first.sessionInteractions).not.toHaveBeenCalled()
+    events.handlers?.onStatus('live')
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(first.sessionInteractions).toHaveBeenCalledTimes(1)
+    first.stop()
+
+    const second = fixture(async () => ({ ok: true as const, interactions: [] }))
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(second.sessionInteractions).toHaveBeenCalledTimes(1)
+    second.stop()
+  })
+
+  it('reads at once when the page stream is already live', async () => {
+    events.initialStatus = 'live'
+    const { sessionInteractions, stop } = fixture(async () => ({ ok: true as const, interactions: [] }))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sessionInteractions).toHaveBeenCalledTimes(1)
+    stop()
+  })
+
   it('polls without the event stream', async () => {
     const { sessionInteractions, stop } = fixture(async () => ({ ok: true as const, interactions: [] }))
     await vi.advanceTimersByTimeAsync(0)
@@ -95,6 +125,21 @@ describe('what remote threads wait on', () => {
     await vi.advanceTimersByTimeAsync(20_000)
     expect(sessionInteractions).toHaveBeenCalledTimes(failedReads)
     stop()
+  })
+
+  it('shares one read between the listeners of a page, and hands the feed on when its owner leaves', async () => {
+    const first = fixture(async () => ({ ok: true as const, interactions: [row] }))
+    await vi.advanceTimersByTimeAsync(0)
+    const second = fixture(async () => ({ ok: true as const, interactions: [] }))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(first.sessionInteractions).toHaveBeenCalledTimes(1)
+    expect(second.sessionInteractions).not.toHaveBeenCalled()
+    expect(second.seen).toEqual([[row]])
+    first.stop()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(second.sessionInteractions).toHaveBeenCalledTimes(1)
+    expect(second.seen).toEqual([[row], []])
+    second.stop()
   })
 
   it('stops for good on a Host without multi-host', async () => {
