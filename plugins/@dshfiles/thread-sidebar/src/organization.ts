@@ -184,6 +184,8 @@ export interface SidebarPreferences {
   /** Child threads listed under a parent before the "N more…" line. */
   maxChildren: number
   finishedSubagents: FinishedSubagentsMode
+  /** A working subagent above the composer draws as the compact run card instead of the one-line row. */
+  subagentRunCards: boolean
   /** Saved thread views and the controls around them; Host-synced so every browser reads the same set. */
   threadViews: ThreadViewSettings
   /** The Board page's group, filters and folded columns; Host-synced like the list views (productivity pass E9). */
@@ -275,6 +277,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   subscriptionDelivery: 'steer',
   maxChildren: 3,
   finishedSubagents: 'collapse',
+  subagentRunCards: true,
   threadViews: DEFAULT_THREAD_VIEW_SETTINGS,
   // Equal to DEFAULT_THREAD_BOARD_VIEW (a test holds them together); spelled out so this module needs no runtime import.
   boardView: { groupBy: 'status', statusFilters: [], sourceFilter: 'all', projectFilter: null, collapsedGroups: [], collapsedSections: [] },

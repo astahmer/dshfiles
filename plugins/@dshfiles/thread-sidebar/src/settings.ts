@@ -179,7 +179,7 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.finishedSubagents)
       .description('Finished subagents under a parent: list them, fold them into one "N finished" line, or hide them.'),
     subagentRunCards: Schema.boolean()
-      .default(true)
+      .default(DEFAULT_PREFERENCES.subagentRunCards)
       .description(
         'Show each working subagent above the composer as a compact run card: its current tool, route, elapsed time, a Stop that interrupts the child and Open thread. Off keeps the one-line row with its expandable live progress. A child whose open turn, route or tool is not known yet keeps the row.',
       ),

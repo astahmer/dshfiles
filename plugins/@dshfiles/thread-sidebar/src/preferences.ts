@@ -223,6 +223,7 @@ const preferencesInputFields = {
     () => DEFAULT_PREFERENCES.maxChildren,
   ),
   finishedSubagents: SchemaHelpers.withDecodedDefault(Schema.Literals(['show', 'collapse', 'hide']), () => DEFAULT_PREFERENCES.finishedSubagents),
+  subagentRunCards: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.subagentRunCards),
   threadViews: SchemaHelpers.withDecodedDefault(threadViewSettingsSchema, () => DEFAULT_PREFERENCES.threadViews),
   boardView: SchemaHelpers.withDecodedDefault(threadBoardViewSchema, () => DEFAULT_PREFERENCES.boardView),
   sidebarTree: SchemaHelpers.withDecodedDefault(Schema.Unknown, () => DEFAULT_PREFERENCES.sidebarTree),
