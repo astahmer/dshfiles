@@ -234,6 +234,7 @@ const repositoryInfoSchema = Schema.Struct({
 })
 
 export interface GitLabMergeRequestCreate {
+  readonly host: string
   readonly project: string
   readonly cwd: string
   readonly head: string
@@ -248,6 +249,9 @@ export interface GitLabRepositoryInfo {
   readonly project: string
   readonly defaultBranch: string | null
 }
+
+/** glab reads a bare `HOST/a/b` as a nested group path, so `--repo` gets the full project URL, which names the host. */
+const repoArgumentOf = (input: { readonly host: string; readonly project: string }): string => `https://${input.host}/${input.project}`
 
 const decodeGlabJson =
   <S extends Schema.Decoder<unknown>>(operation: GlabOperation, schema: S) =>
@@ -264,11 +268,13 @@ export class GitLabCli extends Context.Service<
     readonly authStatus: Effect.Effect<void, GlabCommandFailed>
     readonly repositoryInfo: (input: { readonly cwd: string }) => Effect.Effect<GitLabRepositoryInfo, GlabCommandFailed | GlabResponseInvalid>
     readonly mergeRequest: (input: {
+      readonly host: string
       readonly project: string
       readonly number: number
       readonly cwd: string
     }) => Effect.Effect<GitHubPullRequestView, GlabCommandFailed | GlabResponseInvalid>
     readonly openMergeRequestFor: (input: {
+      readonly host: string
       readonly project: string
       readonly cwd: string
       readonly head: string
@@ -299,11 +305,16 @@ export class GitLabCli extends Context.Service<
         return { host, project: decoded.path_with_namespace, defaultBranch: defaultBranch.length > 0 ? defaultBranch : null }
       })
 
-      const mergeRequest = Effect.fn('pull-requests glab view')(function* (input: { readonly project: string; readonly number: number; readonly cwd: string }) {
+      const mergeRequest = Effect.fn('pull-requests glab view')(function* (input: {
+        readonly host: string
+        readonly project: string
+        readonly number: number
+        readonly cwd: string
+      }) {
         const output = yield* provide(
           runGlab({
             operation: 'mr-view',
-            args: ['mr', 'view', String(input.number), '--repo', input.project, '--output', 'json'],
+            args: ['mr', 'view', String(input.number), '--repo', repoArgumentOf(input), '--output', 'json'],
             cwd: input.cwd,
             attributes: { ...pluginAttributes, 'gitlab.project': input.project, 'gitlab.merge_request.number': input.number },
           }),
@@ -312,6 +323,7 @@ export class GitLabCli extends Context.Service<
       })
 
       const openMergeRequestFor = Effect.fn('pull-requests glab list')(function* (input: {
+        readonly host: string
         readonly project: string
         readonly cwd: string
         readonly head: string
@@ -319,7 +331,7 @@ export class GitLabCli extends Context.Service<
         const output = yield* provide(
           runGlab({
             operation: 'mr-list',
-            args: ['mr', 'list', '--repo', input.project, '--source-branch', input.head, '--output', 'json', '--per-page', '1'],
+            args: ['mr', 'list', '--repo', repoArgumentOf(input), '--source-branch', input.head, '--output', 'json', '--per-page', '1'],
             cwd: input.cwd,
             attributes: { ...pluginAttributes, 'gitlab.project': input.project },
           }),
@@ -337,7 +349,7 @@ export class GitLabCli extends Context.Service<
               'mr',
               'create',
               '--repo',
-              input.project,
+              repoArgumentOf(input),
               '--source-branch',
               input.head,
               '--target-branch',

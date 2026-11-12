@@ -12,6 +12,8 @@ import { GitLabCli } from '../src/gitlab-cli.js'
 const fakeGlabScript = (log: string) => `#!/bin/sh
 printf '%s\\n' "$*" >> '${log}'
 case "$1 $2" in
+  "mr view") echo '{"iid":3,"state":"opened"}' ;;
+  "mr list") echo '[]' ;;
   "mr create") printf '\\nCreating merge request for feature into main in group/project\\n\\nhttps://gitlab.example.com/group/project/-/merge_requests/12\\n' ;;
   *) exit 1 ;;
 esac
@@ -42,9 +44,31 @@ const run = <A, E>(effect: (gitlab: GitLabCli['Service']) => Effect.Effect<A, E>
 describe('GitLab CLI', () => {
   it('finds the created merge-request URL among the lines glab prints', async () => {
     const url = await run(gitlab =>
-      gitlab.createMergeRequest({ project: 'group/project', cwd: root, head: 'feature', base: 'main', title: 'Add', body: 'Body', draft: false }),
+      gitlab.createMergeRequest({
+        host: 'gitlab.example.com',
+        project: 'group/project',
+        cwd: root,
+        head: 'feature',
+        base: 'main',
+        title: 'Add',
+        body: 'Body',
+        draft: false,
+      }),
     )
     expect(url).toBe('https://gitlab.example.com/group/project/-/merge_requests/12')
     expect(await readFile(log, 'utf8')).toContain('mr create')
+  })
+
+  it('names the self-hosted host in every --repo argument', async () => {
+    const target = { host: 'gitlab.example.com:8443', project: 'team/sub/project', cwd: root }
+    await run(gitlab => gitlab.mergeRequest({ ...target, number: 3 }))
+    await run(gitlab => gitlab.openMergeRequestFor({ ...target, head: 'feature' }))
+    await run(gitlab => gitlab.createMergeRequest({ ...target, head: 'feature', base: 'main', title: 'Add', body: 'Body', draft: false }))
+    const repos = (await readFile(log, 'utf8'))
+      .trim()
+      .split('\n')
+      .slice(-3)
+      .map(line => / --repo (\S+)/u.exec(line)?.[1])
+    expect(repos).toEqual(Array.from({ length: 3 }, () => 'https://gitlab.example.com:8443/team/sub/project'))
   })
 })

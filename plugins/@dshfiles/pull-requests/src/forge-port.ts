@@ -98,7 +98,7 @@ export class ForgePullRequests extends Context.Service<
         return { repo: `${gl.host}/${gl.project}`, kind: 'gitlab' as const, host: gl.host, project: gl.project, defaultBranch: gl.defaultBranch }
       })
 
-      const gitlabRead = (input: { readonly project: string; readonly number: number; readonly cwd: string }) =>
+      const gitlabRead = (input: { readonly host: string; readonly project: string; readonly number: number; readonly cwd: string }) =>
         gitlab.mergeRequest(input).pipe(
           Effect.map((view): PullRequestRead => ({ kind: 'read', view, fingerprint: null })),
           Effect.catch((error): Effect.Effect<PullRequestRead> =>
@@ -124,7 +124,7 @@ export class ForgePullRequests extends Context.Service<
           resolved,
           entry =>
             entry.forge?.kind === 'gitlab'
-              ? gitlabRead({ project: entry.forge.project, number: entry.target.number, cwd: entry.target.cwd })
+              ? gitlabRead({ host: entry.forge.host, project: entry.forge.project, number: entry.target.number, cwd: entry.target.cwd })
               : Effect.succeed(undefined),
           { concurrency: GITLAB_CONCURRENCY },
         )
@@ -148,7 +148,7 @@ export class ForgePullRequests extends Context.Service<
         const target = yield* targetOf(input.repo)
         return target.kind === 'github'
           ? yield* github.openPullRequestFor({ repo: target.project, cwd: input.cwd, head: input.head })
-          : yield* gitlab.openMergeRequestFor({ project: target.project, cwd: input.cwd, head: input.head })
+          : yield* gitlab.openMergeRequestFor({ host: target.host, project: target.project, cwd: input.cwd, head: input.head })
       })
 
       const createPullRequest = Effect.fn('pull-requests forge create')(function* (input: {
@@ -172,6 +172,7 @@ export class ForgePullRequests extends Context.Service<
               draft: input.draft,
             })
           : yield* gitlab.createMergeRequest({
+              host: target.host,
               project: target.project,
               cwd: input.cwd,
               head: input.head,
