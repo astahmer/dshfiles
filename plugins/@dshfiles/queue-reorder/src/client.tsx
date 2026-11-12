@@ -5,6 +5,7 @@ import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { ChevronDownIcon, ChevronUpIcon, ForwardIcon, GripVerticalIcon, ListOrderedIcon, PencilIcon, SendIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { ComposerRow } from '@dshfiles/plugin-ui/components/composer-row'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMutation } from '@dshfiles/plugin-ui/query'
@@ -275,7 +276,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     return (
       <li
         className={cn(
-          'dshx:group/row dshx:flex dshx:min-h-8 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-1 dshx:py-0.5 dshx:hover:bg-accent/50',
+          'dshx:group/row dshx:rounded-md',
           dragId === row.id && 'dshx:opacity-50',
           dropIndex === index && dragId !== row.id && 'dshx:bg-accent dshx:shadow-[inset_0_2px_0_var(--color-primary)]',
         )}
@@ -299,95 +300,103 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
           setDropIndex(null)
         }}
       >
-        <span
-          className={cn(
-            'dshx:grid dshx:h-6 dshx:w-4 dshx:flex-none dshx:place-items-center dshx:rounded-sm dshx:text-muted-foreground/60',
-            dragEnabled ? 'dshx:cursor-grab dshx:hover:text-foreground dshx:active:cursor-grabbing' : 'dshx:opacity-40',
-          )}
-          draggable={dragEnabled}
-          aria-hidden
-          onDragStart={event => {
-            setDragId(row.id)
-            event.dataTransfer.setData('text/plain', row.id)
-            event.dataTransfer.effectAllowed = 'move'
-          }}
-          onDragEnd={() => {
-            setDragId(null)
-            setDropIndex(null)
-          }}
-        >
-          <GripVerticalIcon className="dshx:size-3.5" />
-        </span>
-        <PreviewText tooltip={preview} className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm">
-          {text !== ''
-            ? props.renderFactorySlot('conversation.user.text', { text, facts: QUEUE_TEXT_FACTS, interactive: false, ellipsis: true })
-            : preview || (showAttachments && previews.length > 0 ? '' : (files ?? '—'))}
-        </PreviewText>
-        {showAttachments ? <QueuedAttachments sessionId={props.sessionId} previews={previews} readImage={props.readImage} /> : null}
-        {queueMutable ? (
-          <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-60 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
-            <RowAction
-              label={`Move queued message ${index + 1} up`}
-              tooltip="Move up"
-              disabled={queueEditActive || index === 0 || busy !== null}
-              onClick={() => void move(rowId, 'up')}
+        <ComposerRow
+          variant="plain"
+          icon={
+            <span
+              className={cn('dshx:grid dshx:place-items-center', dragEnabled ? 'dshx:cursor-grab dshx:active:cursor-grabbing' : 'dshx:opacity-40')}
+              draggable={dragEnabled}
+              aria-hidden
+              onDragStart={event => {
+                setDragId(row.id)
+                event.dataTransfer.setData('text/plain', row.id)
+                event.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragEnd={() => {
+                setDragId(null)
+                setDropIndex(null)
+              }}
             >
-              <ChevronUpIcon />
-            </RowAction>
-            <RowAction
-              label={`Move queued message ${index + 1} down`}
-              tooltip="Move down"
-              disabled={queueEditActive || index === rowCount - 1 || busy !== null}
-              onClick={() => void move(rowId, 'down')}
-            >
-              <ChevronDownIcon />
-            </RowAction>
-            <RowAction
-              label="Edit queued message"
-              tooltip={
-                editor === undefined
-                  ? 'This DSH version cannot hand queued messages to the composer'
-                  : row.editable
-                    ? 'Edit in the composer'
-                    : 'This message holds content the composer cannot edit'
-              }
-              disabled={editor === undefined || !row.editable || busy !== null || queueEditActive}
-              onClick={() => void editor?.begin(row)}
-            >
-              <PencilIcon />
-            </RowAction>
-            <RowAction
-              label="Move queued message to another thread"
-              tooltip={
-                !transfer.available
-                  ? 'This DSH version cannot hand queued messages to another thread'
-                  : row.editable
-                    ? 'Move to thread…'
-                    : 'This message holds content that cannot be moved'
-              }
-              disabled={!transfer.available || !row.editable || busy !== null || queueEditActive}
-              onClick={() => transfer.open(row)}
-            >
-              <ForwardIcon />
-            </RowAction>
-            <RowAction
-              label="Remove queued message"
-              tooltip="Remove"
-              disabled={busy !== null || queueEditActive || isBusy}
-              onClick={() => applyAction(rowId, { kind: 'remove' })}
-            >
-              <Trash2Icon />
-            </RowAction>
-            <RowAction
-              label="Steer with queued message"
-              tooltip="Steer"
-              disabled={busy !== null || queueEditActive || !running}
-              onClick={() => applyAction(rowId, { kind: 'steer' })}
-            >
-              <SendIcon />
-            </RowAction>
-          </span>
-        ) : null}
+              <GripVerticalIcon />
+            </span>
+          }
+          label={
+            text !== ''
+              ? props.renderFactorySlot('conversation.user.text', { text, facts: QUEUE_TEXT_FACTS, interactive: false, ellipsis: true })
+              : preview || (showAttachments && previews.length > 0 ? '' : (files ?? '—'))
+          }
+          meta={
+            <>
+              {showAttachments ? <QueuedAttachments sessionId={props.sessionId} previews={previews} readImage={props.readImage} /> : null}
+            </>
+          }
+          actions={
+            queueMutable ? (
+              <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-60 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
+                <RowAction
+                  label={`Move queued message ${index + 1} up`}
+                  tooltip="Move up"
+                  disabled={queueEditActive || index === 0 || busy !== null}
+                  onClick={() => void move(rowId, 'up')}
+                >
+                  <ChevronUpIcon />
+                </RowAction>
+                <RowAction
+                  label={`Move queued message ${index + 1} down`}
+                  tooltip="Move down"
+                  disabled={queueEditActive || index === rowCount - 1 || busy !== null}
+                  onClick={() => void move(rowId, 'down')}
+                >
+                  <ChevronDownIcon />
+                </RowAction>
+                <RowAction
+                  label="Edit queued message"
+                  tooltip={
+                    editor === undefined
+                      ? 'This DSH version cannot hand queued messages to the composer'
+                      : row.editable
+                        ? 'Edit in the composer'
+                        : 'This message holds content the composer cannot edit'
+                  }
+                  disabled={editor === undefined || !row.editable || busy !== null || queueEditActive}
+                  onClick={() => void editor?.begin(row)}
+                >
+                  <PencilIcon />
+                </RowAction>
+                <RowAction
+                  label="Move queued message to another thread"
+                  tooltip={
+                    !transfer.available
+                      ? 'This DSH version cannot hand queued messages to another thread'
+                      : row.editable
+                        ? 'Move to thread…'
+                        : 'This message holds content that cannot be moved'
+                  }
+                  disabled={!transfer.available || !row.editable || busy !== null || queueEditActive}
+                  onClick={() => transfer.open(row)}
+                >
+                  <ForwardIcon />
+                </RowAction>
+                <RowAction
+                  label="Remove queued message"
+                  tooltip="Remove"
+                  disabled={busy !== null || queueEditActive || isBusy}
+                  onClick={() => applyAction(rowId, { kind: 'remove' })}
+                >
+                  <Trash2Icon />
+                </RowAction>
+                <RowAction
+                  label="Steer with queued message"
+                  tooltip="Steer"
+                  disabled={busy !== null || queueEditActive || !running}
+                  onClick={() => applyAction(rowId, { kind: 'steer' })}
+                >
+                  <SendIcon />
+                </RowAction>
+              </span>
+            ) : undefined
+          }
+        />
       </li>
     )
   }
@@ -400,25 +409,23 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
       <div className="dshx-root" data-queue-dock="" style={QUEUE_DOCK_STYLE}>
         <div className="dshx:w-full dshx:overflow-hidden dshx:rounded-t-lg dshx:border dshx:border-b-0 dshx:bg-popover dshx:py-0.5 dshx:text-popover-foreground">
           {listCount > 1 ? (
-            <button
-              type="button"
-              className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-3 dshx:text-left dshx:outline-none dshx:hover:bg-accent/50 dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default dshx:disabled:hover:bg-transparent"
-              aria-controls={listId}
-              aria-expanded={expanded}
-              disabled={interactionActive}
-              onClick={() => setCollapsed(value => !value)}
-            >
-              <span className="dshx:grid dshx:place-items-center dshx:text-muted-foreground" aria-hidden>
-                <ListOrderedIcon className="dshx:size-3.5" />
-              </span>
-              <span className="dshx:text-sm dshx:font-medium">{listCount} queued</span>
-              <span className="dshx:text-xs dshx:text-muted-foreground">top runs first</span>
-              <span className="dshx:ml-auto dshx:grid dshx:place-items-center dshx:text-muted-foreground" aria-hidden>
-                {expanded ? <ChevronUpIcon className="dshx:size-3.5" /> : <ChevronDownIcon className="dshx:size-3.5" />}
-              </span>
-            </button>
+            <ComposerRow
+              variant="plain"
+              icon={<ListOrderedIcon />}
+              label={`${listCount} queued`}
+              meta="top runs first"
+              actions={
+                <span className="dshx:grid dshx:place-items-center dshx:text-muted-foreground" aria-hidden>
+                  {expanded ? <ChevronUpIcon className="dshx:size-3.5" /> : <ChevronDownIcon className="dshx:size-3.5" />}
+                </span>
+              }
+              expanded={expanded}
+              onSelect={interactionActive ? undefined : () => setCollapsed(value => !value)}
+              selectControls={listId}
+              selectLabel={`${listCount} queued, ${expanded ? 'hide' : 'show'} the queued messages`}
+            />
           ) : null}
-          <ul className="dshx:flex dshx:max-h-60 dshx:flex-col dshx:gap-px dshx:overflow-y-auto dshx:px-1 dshx:pb-0.5" id={listId} hidden={!listVisible}>
+          <ul className="dshx:flex dshx:max-h-60 dshx:flex-col dshx:gap-px dshx:overflow-y-auto dshx:pb-0.5" id={listId} hidden={!listVisible}>
             {listVisible ? listItems : null}
           </ul>
           {record !== null && editor !== undefined ? (
