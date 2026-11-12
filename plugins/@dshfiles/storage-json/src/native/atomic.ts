@@ -59,7 +59,11 @@ async function replaceFile(from: string, to: string): Promise<void> {
   }
 }
 
-/** fsync a POSIX directory so a just-renamed entry is crash-durable. */
+/**
+ * Persist directory-entry changes on POSIX; skip this unsupported operation on Windows.
+ * @param path - Absolute directory path.
+ * @returns resolution after the directory is synced, or immediately on Windows.
+ */
 /* v8 ignore start -- Windows rejects O_RDONLY directory opens; POSIX coverage exercises this. */
 export async function fsyncDirectory(path: string): Promise<void> {
   if (process.platform === 'win32') return

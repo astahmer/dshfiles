@@ -156,6 +156,15 @@ class CountingKvUnit implements KvUnit {
     this.medium.foreign.delete(`${table}\u0000${key}`)
   }
 
+  async deleteRecords(table: string, keys: readonly string[]): Promise<void> {
+    this.assertOpen()
+    this.pool.consumeInjectedFailure()
+    for (const key of keys) {
+      this.medium.tables.get(table)?.delete(key)
+      this.medium.foreign.delete(`${table}\u0000${key}`)
+    }
+  }
+
   async backupRecord(table: string, key: string): Promise<string> {
     this.assertOpen()
     this.pool.counts.backup += 1

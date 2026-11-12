@@ -7,8 +7,8 @@ multi-record `putMany` that is one durable publish on a backend that stores the 
 ## Upstream and license
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)
-- Package: `@deepseek-ai/dsh-storage-domain@0.2.1-rc.2` (MIT, [LICENSE](./LICENSE))
-- Pinned revision: tag `dsh-v0.2.1-rc.2`
+- Package: `@deepseek-ai/dsh-storage-domain@0.2.2-rc.1` (MIT, [LICENSE](./LICENSE))
+- Pinned revision: tag `dsh-v0.2.2-rc.1`
 - Vendored source: [`src/native`](./src/native) is upstream `packages/storage/storage-domain/src`
 - Provenance and delta files: [`native-fork.json`](./native-fork.json), checked by `node scripts/native-fork-diff.mjs`
 

@@ -590,6 +590,7 @@ class JsonlSessionPersistence extends SessionPersistence {
           ? SessionPersistenceRevision(`${fileRevision(metadata.identity)}:${await this.historicalCorpusRevision(options?.signal)}`)
           : fileRevision(metadata.identity),
         sizeBytes: Number(metadata.identity.size),
+        location: { kind: 'jsonl', path: selected.sourcePath },
       }
     } catch (error: unknown) {
       options?.signal?.throwIfAborted()
@@ -624,6 +625,7 @@ class JsonlSessionPersistence extends SessionPersistence {
           ? SessionPersistenceRevision(`${fileRevision(artifact.identity)}:${corpusRevision}`)
           : fileRevision(artifact.identity),
         sizeBytes: Number(artifact.identity.size),
+        location: { kind: 'jsonl', path: artifact.path },
       })
     }
     for (const [id, entry] of pending) {

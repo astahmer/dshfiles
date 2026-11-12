@@ -153,6 +153,29 @@ describe('lazy hydration', () => {
     await reopened.close()
   })
 
+  it('deletes a batch of indexed keys once, ignoring missing and duplicate keys', async () => {
+    const pool = seed(new CountingMediaPool(), [
+      ['a', { label: 'a', count: 1 }],
+      ['b', { label: 'b', count: 2 }],
+      ['c', { label: 'c', count: 3 }],
+    ])
+    const { facility, changes } = await harness({ pool })
+    const domain = await facility.open(disposableSpec())
+    const table = domain.table('items')
+    expect(table.get('a')).toEqual({ label: 'a', count: 1 })
+
+    expect(await table.deleteMany(['a', 'b', 'a', 'missing'])).toBe(2)
+    expect(table.get('a')).toBeUndefined()
+    expect([...table.keys()]).toEqual(['c'])
+    expect(changes.map(change => [change.key, change.operation])).toEqual([['a', 'deleted'], ['b', 'deleted']])
+    expect(await table.deleteMany(['a'])).toBe(0)
+
+    await domain.close()
+    const reopened = await facility.open(disposableSpec())
+    expect([...reopened.table('items').keys()]).toEqual(['c'])
+    await reopened.close()
+  })
+
   it('rejects an update of a record that is absent', async () => {
     const pool = seed(new CountingMediaPool(), [])
     const { facility } = await harness({ pool })
