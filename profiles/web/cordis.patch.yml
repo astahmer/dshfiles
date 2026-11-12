@@ -272,4 +272,12 @@
 # disabling a plugin in Settings now needs a restart. See docs/recovery.md.
 - id: hmr
   disabled: true
+# Each compaction checkpoint keeps the names of the skills its span loaded, so a long thread does not reload them after
+# every compaction. Replayed on five recorded threads it kept 37–100 % of loaded skills visible after a checkpoint
+# (11–34 % without it) for under 0.5 % more request tokens (plugins/@dshfiles/context-compaction/README.md, engine setup
+# comparison). A patch replaces the bundle row's whole config, so maxTokens is restated.
+- id: dshfiles-context-compaction
+  config:
+    maxTokens: 8192
+    loadedSkills: names
 # END NIX-MANAGED DSH PLUGINS
