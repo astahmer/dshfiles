@@ -314,18 +314,25 @@ test('details reuse a commit’s immutable content from the cache but reread evo
     return run(args, options)
   }
   const cache = makeRevisionDetailCache()
+  const fixedNow = Date.now()
 
-  const first = await Effect.runPromise(RevisionReads.details(counted, commitId, { cache, cacheKey: 'repo' }))
+  const first = await Effect.runPromise(
+    RevisionReads.details(counted, commitId, { cache, cacheKey: 'repo' }).pipe(Effect.provideService(Clock.Clock, clockAt(fixedNow))),
+  )
   assert.deepEqual([...verbs].sort(), ['diff', 'diff', 'evolog', 'log', 'log'])
   verbs.length = 0
-  const second = await Effect.runPromise(RevisionReads.details(counted, commitId, { cache, cacheKey: 'repo' }))
+  // A real clock would let the visibility `log` spawn outlive the 5 s freshness window on a loaded machine, so pin it:
+  // the case under test is a cache hit, not how slow the read that precedes it is.
+  const second = await Effect.runPromise(
+    RevisionReads.details(counted, commitId, { cache, cacheKey: 'repo' }).pipe(Effect.provideService(Clock.Clock, clockAt(fixedNow + 1_000))),
+  )
   assert.deepEqual(verbs, ['log'], 'only the visibility check runs while content and evolution are cached')
   assert.deepEqual(second, first)
   assert.equal(cache.stats().entries, 1)
 
   verbs.length = 0
   const later = await Effect.runPromise(
-    RevisionReads.details(counted, commitId, { cache, cacheKey: 'repo' }).pipe(Effect.provideService(Clock.Clock, clockAt(Date.now() + 6_000))),
+    RevisionReads.details(counted, commitId, { cache, cacheKey: 'repo' }).pipe(Effect.provideService(Clock.Clock, clockAt(fixedNow + 6_000))),
   )
   assert.deepEqual(verbs.sort(), ['evolog', 'log'], 'evolution can gain successors, so it is reread after its freshness window')
   assert.deepEqual(later.files, first.files)
