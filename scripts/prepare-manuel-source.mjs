@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
+import { runningHostPids } from './running-hosts.mjs'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -66,9 +67,13 @@ function main() {
     )
     return
   }
-  const running = spawnSync('pgrep', ['-u', String(process.getuid()), '-f', LauncherConfig.runningProfilePattern(config)], { stdio: 'ignore' })
-  if (running.status === 0) throw new Error('Stop the existing DSH before relinking its profile')
-  if (running.error || running.status !== 1) throw new Error('Could not establish that DSH is stopped; refusing profile writes')
+  let running
+  try {
+    running = runningHostPids({ home, profile: config.profile, coreEntry: config.coreEntry })
+  } catch {
+    throw new Error('Could not establish that DSH is stopped; refusing profile writes')
+  }
+  if (running.length > 0) throw new Error(`Stop the existing DSH (pid ${running.join(', ')}) before relinking its profile`)
   if (!changed && !patchChanged) return
   const parent = join(home, 'backups/source-link')
   mkdirSync(parent, { recursive: true, mode: 0o700 })

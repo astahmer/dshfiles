@@ -55,8 +55,21 @@ test('present config and explicit environment precedence never rewrite the local
   assert.equal(env.DSHFILES_PROFILE, 'chosen')
   assert.equal(env.NODE_COMPILE_CACHE, join(f.env.XDG_CACHE_HOME ?? join(f.home, '.cache'), 'dshfiles', 'node-compile-cache'))
   assert.equal(LauncherConfig.environment(config, { ...f.env, NODE_COMPILE_CACHE: '/chosen/cache' }).NODE_COMPILE_CACHE, '/chosen/cache')
-  assert.match(LauncherConfig.runningProfilePattern(config), /core\\\[1\\\]/)
   assert.equal(readFileSync(f.file, 'utf8'), original)
+})
+
+// 2026-11-12: run from an agent shell, the launcher took the Host's inherited DSH_HOME over launcher.json's scratch
+// dshHome and prepared the live home instead.
+test('a DSH_HOME inherited from a DSH shell never silently replaces the configured dshHome', t => {
+  const f = fixture(t)
+  const configured = join(f.home, 'configured')
+  writeFileSync(f.file, JSON.stringify({ dshHome: configured }))
+  for (const shell of [{ DSH_SESSION_ID: 'session-parent' }, { DSH_SHELL: '1' }]) {
+    assert.throws(() => LauncherConfig.load({ ...f.env, ...shell }), /inherited from a running DSH/)
+  }
+  // The same home from a DSH shell, or any explicit override from a plain terminal, keeps the documented precedence.
+  assert.equal(LauncherConfig.load({ ...f.env, DSH_HOME: `${configured}/`, DSH_SESSION_ID: 'session-parent' }).dshHome, `${configured}/`)
+  assert.equal(LauncherConfig.load(f.env).dshHome, f.env.DSH_HOME)
 })
 
 test('malformed configuration fails closed, including unknown keys and path/profile escapes', t => {

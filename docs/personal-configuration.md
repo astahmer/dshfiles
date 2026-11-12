@@ -36,6 +36,11 @@ Precedence for every key is **explicit environment > local JSON > generic defaul
 An empty override is invalid, not a request to fall back. All filesystem keys must be
 absolute paths; shell expansion (`~`, `$HOME`) is not performed in JSON.
 
+One exception: inside a DSH shell (`DSH_SESSION_ID` or `DSH_SHELL` set), `DSH_HOME`
+names the Host that runs the shell, not a choice for this launch. When it differs from
+the JSON `dshHome`, the launcher refuses and names both homes instead of preparing the
+inherited one. Run it from a plain terminal, or unset `DSH_HOME`.
+
 | JSON key               | Environment override              | Default / validation                                                                  |
 | ---------------------- | --------------------------------- | ------------------------------------------------------------------------------------- |
 | `sourceRoot`           | `DSHFILES_DIR`                    | Checkout containing the helper; absolute directory                                    |
@@ -55,9 +60,14 @@ are inherited, never reset to another person or machine. The shell bootstrap mus
 already find Node; a JSON `nodeBinary` choice takes effect after that bootstrap.
 
 With arguments, the launcher passes them unchanged to the configured core (including
-native explicit `--profile` options). Without arguments, it checks for an existing
-process, obtains a nonblocking per-DSH-home `flock`, then runs the configured source
-supervisor. It never stops an existing Host. The supervisor retains confirmed-request
+native explicit `--profile` options). Without arguments, it prints the home, profile and
+source it will prepare, refuses when a Host already serves that home and profile, obtains
+a nonblocking per-DSH-home lock, then runs the configured source supervisor. A Host is any
+of the user's processes running a dsh core (the configured entry, a `dsh` bin shim or
+`dsh/lib/bin.js`) for the profile (`dsh web`, `--profile web`), whose environment's
+`DSH_HOME` (or `HOME/.dsh`) is that home, however it was started. A Host whose home
+cannot be read counts as running. The preparation helper repeats this check before any
+profile write. It never stops an existing Host. The supervisor retains confirmed-request
 restart semantics; preparation failure prevents a new Host from starting.
 
 The source preparation helper retains its historical filename for callers, but uses
@@ -86,7 +96,7 @@ preparer expects an existing profile; it does not silently create one or import 
 ## Focused verification
 
 ```sh
-node --experimental-strip-types --test scripts/launcher-config.test.mjs scripts/launch-dsh.test.mjs scripts/prepare-manuel-source.test.mjs scripts/personal-configuration.test.mjs scripts/supervise-dsh.test.mjs scripts/network-startup-patch.test.mjs
+node --experimental-strip-types --test scripts/running-hosts.test.mjs scripts/launcher-config.test.mjs scripts/launch-dsh.test.mjs scripts/prepare-manuel-source.test.mjs scripts/personal-configuration.test.mjs scripts/supervise-dsh.test.mjs scripts/network-startup-patch.test.mjs
 node --check scripts/verify-manuel-candidate.mjs
 bash -n scripts/dsh-launcher
 ```
