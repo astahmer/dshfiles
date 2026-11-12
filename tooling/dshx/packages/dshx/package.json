@@ -229,6 +229,8 @@
     "@deepseek-ai/dsh-subprocess-local": "0.2.2-rc.1",
     "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-tool-cordis": "catalog:",
+    "@deepseek-ai/dsh-tool-executor-native": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-tool-executor-ptc": "0.2.2-rc.1",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@deepseek-ai/dsh-user-approval": "catalog:",
     "@deepseek-ai/dsh-web-app": "0.2.2-rc.1",
@@ -274,6 +276,8 @@
     "@deepseek-ai/dsh-subprocess": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-system-prompt": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-tool-cordis": ">=0.2.2-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-tool-executor-native": ">=0.2.2-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-tool-executor-ptc": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-user-approval": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-workspace": ">=0.2.2-rc.1 <0.3.0-0",
@@ -313,6 +317,12 @@
       "optional": true
     },
     "@deepseek-ai/dsh-tool-cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tool-executor-native": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tool-executor-ptc": {
       "optional": true
     },
     "@deepseek-ai/dsh-client-ui-renderer": {

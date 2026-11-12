@@ -382,11 +382,12 @@ plugin needs it yet.
 - **Side-call request hooks by purpose.** `llm/stream` hands inner listeners the
   original options (Cordis `waterfall`'s `next()` takes no arguments), but an
   outermost (`prepend: true`) listener can match `options.purpose`
-  (`'compaction' | 'session-title'`), skip `next()` and return
+  (a key of `LlmRequestPurposeMap` since DSH 0.2.2-rc.1, e.g. `'compaction'`), skip `next()` and return
   `ctx.llm.stream(rewritten)` marked in a WeakSet so its second pass calls
   `next()`. Cost: a small `sideRequest` hook. Prepared calls (the title's
   `prepareCall`) re-resolve the adapter, and owned side calls (memory,
-  `generate`) need their own marker because `purpose` is a closed union.
+  `generate`) borrow `'compaction'` today; a plugin can now declare its own
+  purpose key by augmenting `LlmRequestPurposeMap` in `@deepseek-ai/dsh-llm/types`.
 - **WebSocket endpoints.** A plugin can own one through
   `webServer.registerUpgrade({ path, handler })` with
   `connection.admitConnection` for auth. Intercepting existing upgrades (the

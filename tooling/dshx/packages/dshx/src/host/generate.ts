@@ -5,6 +5,13 @@ import { PluginApiError } from '../api/common.js'
 import { publishedJsonSchema } from '../api/json-schema.js'
 import { decodeJson, jsonValueSchema } from '../json.js'
 
+declare module '@deepseek-ai/dsh-llm/types' {
+  // generate() marks its side calls as compaction, the purpose usage recorders already keep out of a thread's own requests.
+  interface LlmRequestPurposeMap {
+    compaction: true
+  }
+}
+
 export interface GenerateModel {
   readonly provider: string
   readonly model: string

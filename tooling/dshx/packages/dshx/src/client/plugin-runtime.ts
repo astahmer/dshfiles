@@ -10,7 +10,7 @@ interface RuntimeHostContext {
   readonly fiber?: { readonly uid: number | null }
   effect?(execute: () => () => void, label?: string): unknown
   get(name: string): unknown
-  on?(name: string, listener: () => void): () => boolean
+  on?(name: string | symbol, listener: () => void): () => boolean
 }
 
 const isNativeSlots = (value: unknown): value is NativeSlots =>

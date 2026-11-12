@@ -19,8 +19,39 @@ export interface ToolEdit {
   readonly rename?: (name: string) => string
   /** Change the definition the agent sees and runs: description, parameters, or a wrapped `execute`. */
   readonly update?: (tool: ToolDefinition) => ToolDefinition
-  /** Present the agent's tools as code (DSH's `ptc` mode: one `run_code` tool calling the others from a script). */
+  /**
+   * Present the agent's tools as code: mounts DSH's PTC executor (`@deepseek-ai/dsh-tool-executor-ptc`) in the agent's
+   * scope, so the model sees one `run_code` tool that calls the others from a program. Needs the PTC runtime row.
+   */
   readonly codeMode?: true
+}
+
+type PtcExecutorModule = typeof import('@deepseek-ai/dsh-tool-executor-ptc')
+
+const PTC_EXECUTOR_PACKAGE = '@deepseek-ai/dsh-tool-executor-ptc'
+
+const isPtcExecutorModule = (value: unknown): value is PtcExecutorModule =>
+  typeof value === 'object' && value !== null && 'apply' in value && typeof value.apply === 'function'
+
+/**
+ * Resolved by the profile's Loader, as for its own rows: a bare import here would land in every dshx Host artifact
+ * and make the PTC executor a required peer of each plugin.
+ */
+const loadPtcExecutor = async (ctx: Context): Promise<PtcExecutorModule> => {
+  const loader = ctx.get('loader')
+  if (loader === undefined) throw new Error('the Host has no plugin Loader to import it from')
+  const loaded: unknown = loader.unwrapExports(await loader.import(PTC_EXECUTOR_PACKAGE))
+  if (!isPtcExecutorModule(loaded)) throw new Error(`${PTC_EXECUTOR_PACKAGE} exports no Cordis plugin`)
+  return loaded
+}
+
+const wantsCodeMode = (edits: readonly ToolEdit[], agent: Agent): boolean =>
+  edits.some(edit => edit.codeMode === true && (edit.agents === undefined || edit.agents(agent)))
+
+/** The nearest scope's executor wins, so an agent-scoped PTC executor overrides the deployment's native one. */
+const mountCodeMode = (agent: Agent, executor: PtcExecutorModule): (() => void) => {
+  const fiber = agent.ctx.plugin(executor)
+  return () => void fiber.dispose()
 }
 
 const matches = (pattern: string | RegExp, name: string): boolean => (typeof pattern === 'string' ? pattern === name : pattern.test(name))
@@ -47,7 +78,6 @@ const editAgent = (input: {
   const global = new Set(input.tools.schemas().map(schema => schema.name))
   for (const edit of input.edits) {
     if (edit.agents !== undefined && !edit.agents(input.agent)) continue
-    if (edit.codeMode === true) attempt('code mode', () => agentTools.presentAs('ptc'))
     const pattern = edit.tools
     if (pattern === undefined) continue
     const names = input.tools
@@ -82,7 +112,17 @@ const installToolEdits = (ctx: Context, packageId: string, edits: readonly ToolE
     const applied = new Map<Agent, Array<() => void>>()
     const install = (agent: Agent): void => {
       if (applied.has(agent)) return
-      applied.set(agent, editAgent({ tools, agent, edits, warn }))
+      const disposers = editAgent({ tools, agent, edits, warn })
+      applied.set(agent, disposers)
+      if (!wantsCodeMode(edits, agent)) return
+      if (agent.ctx.get('ptcRuntime') === undefined)
+        warn(`code mode for agent ${agent.id} waits for a PTC runtime: add the @deepseek-ai/dsh-ptc-runtime-node row to the profile`)
+      loadPtcExecutor(ctx).then(
+        executor => {
+          if (applied.get(agent) === disposers) disposers.push(mountCodeMode(agent, executor))
+        },
+        (cause: unknown) => warn(`code mode for agent ${agent.id}: add ${PTC_EXECUTOR_PACKAGE} to the profile (${describe(cause)})`),
+      )
     }
     const release = (agent: Agent): void => {
       for (const dispose of (applied.get(agent) ?? []).reverse()) {

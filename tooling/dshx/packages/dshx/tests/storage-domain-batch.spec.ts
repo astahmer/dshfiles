@@ -40,6 +40,7 @@ const fakeTable = (calls: TableCalls, options: { readonly batch: boolean }): Fak
       calls.puts.push(key)
     },
     delete: async () => true,
+    deleteMany: async () => 0,
     update: async (_key, f) => f(0),
   }
   if (options.batch) {

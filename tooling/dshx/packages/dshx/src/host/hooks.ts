@@ -4,7 +4,7 @@ import { safeCordisLogger } from './safe-logger.js'
 import type { Agent, PreStepDecision, RequestErrorAction } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type { LlmCallConfig, LlmFailure, ResolvedRetryPolicy, UserMessage } from '@deepseek-ai/dsh-llm'
-import type { PromptAssembly } from '@deepseek-ai/dsh-system-prompt'
+import type { PromptPresentation } from '@deepseek-ai/dsh-system-prompt'
 import type { PostToolDecision, PreToolDecision, ToolExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
 
@@ -33,15 +33,22 @@ export interface HostHooks {
     readonly turn: number
     readonly step: number
   }) => Maybe<{ readonly messages: readonly UserMessage[] } | 'reject'>
-  /** Each agent model request (`agent/request`): change provider, model or call controls. */
+  /**
+   * Each agent model request (`agent/request`): change call controls such as temperature or the output cap. Since DSH
+   * 0.2.2 the step's provider, model and reasoning effort are captured before prompt assembly and must stay unchanged;
+   * choose them through `agent.model.select()` instead. DSH deprecates this event.
+   */
   readonly request?: (input: {
     readonly agent: Agent
     readonly turn: number
     readonly step: number
     readonly config: Readonly<LlmCallConfig>
   }) => Maybe<Partial<LlmCallConfig>>
-  /** Each system-prompt assembly (`system-prompt/assemble`): sections, contexts and tool schemas. */
-  readonly systemPrompt?: (input: { readonly agent: Agent | undefined; readonly assembly: PromptAssembly }) => Maybe<PromptAssembly>
+  /**
+   * Each system-prompt assembly (`system-prompt/assemble`): sections, contexts and variables. Tool declarations belong
+   * to the selected tool executor since DSH 0.2.2; filter tools with `toolEdits` or a conditional registration.
+   */
+  readonly systemPrompt?: (input: { readonly agent: Agent | undefined; readonly assembly: PromptPresentation }) => Maybe<PromptPresentation>
   /** A failed agent request (`agent/request-error`): retry it, or stop retrying. */
   readonly retry?: (input: {
     readonly agent: Agent
@@ -109,7 +116,7 @@ const install = (ctx: Context, packageId: string, hooks: HostHooks): void => {
     })
   }
   if (systemPrompt !== undefined) {
-    ctx.on('system-prompt/assemble', async (assembly, context, next): Promise<PromptAssembly> => {
+    ctx.on('system-prompt/assemble', async (assembly, context, next): Promise<PromptPresentation> => {
       const assembled = await next()
       return (await safely('systemPrompt', () => systemPrompt({ agent: context.agent, assembly: assembled }))) ?? assembled
     })

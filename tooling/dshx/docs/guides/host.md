@@ -194,19 +194,20 @@ export default defineHost({
     { tools: 'bash', update: tool => ({ ...tool, description: `${tool.description} Prefer rg over grep.` }) },
     { tools: 'web_fetch', remove: true, agents: agent => agent.session.header.cwd?.startsWith('/secure') === true },
     { tools: /^jj_/, rename: name => `vcs_${name}` }, // a namespace: the old names disappear
-    { codeMode: true, agents: agent => agent.id === reviewerSessionId }, // DSH's `ptc` presentation: one run_code tool
+    { codeMode: true, agents: agent => agent.id === reviewerSessionId }, // DSH's PTC executor: one run_code tool
   ],
 })
 ```
 
-- Each edit applies per agent, in that agent's own tool scope (DSH's `tools.register`, `tools.restrict` and
-  `tools.presentAs` on `agent.ctx`), to every live agent and each one created later. The global registry and other
+- Each edit applies per agent, in that agent's own tool scope (DSH's `tools.register` and `tools.restrict` on
+  `agent.ctx`; `codeMode` mounts `@deepseek-ai/dsh-tool-executor-ptc` there, so the profile needs that package and a
+  PTC runtime such as `@deepseek-ai/dsh-ptc-runtime-node`), to every live agent and each one created later. The global registry and other
   agents are untouched, and every edit is lifted when the plugin unloads or the agent ends.
 - `update` returns the definition the agent sees and runs, so it may also wrap `execute`. `rename` keeps the original
   definition (or the updated one) under the new name.
 - Only global tools can be edited (`defineHost({ tools })`, API tools, MCP tools): a tool an agent preset registers in
   the agent's own scope is not restrictable or shadowable there. An edit that matches nothing, or that DSH refuses
-  (`codeMode` on a preset that already chose a presentation), is logged under `dshx:tool-edits` and skipped.
+  (`codeMode` on a preset that already mounted its own executor in the agent's scope), is logged under `dshx:tool-edits` and skipped.
 - Tools registered after an agent was created are not edited for that agent.
 
 ## Plugin storage: `pluginStorage(ctx, namespace)`

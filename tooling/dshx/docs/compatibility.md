@@ -17,7 +17,7 @@ ranges, selects the adapter, and reports capabilities.
 
 | Field                                | Value                                                    |
 | ------------------------------------ | -------------------------------------------------------- |
-| DSH range                            | `>=0.2.0-rc.1 <0.3.0-0`                                  |
+| DSH range                            | `>=0.2.0-rc.1 <0.3.0-0 \|\| >=0.2.1-rc.2 <0.3.0-0 \|\| >=0.2.2-rc.1 <0.3.0-0` |
 | Verified versions                    | `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.2`                 |
 | Node range                           | `^22.19.0 \|\| >=24.0.0`                                 |
 | Settings service                     | `configForms` from `@deepseek-ai/dsh-client-ui-settings` |
@@ -54,6 +54,37 @@ receive this stability promise.
 - `dshx/host` re-exports cordis's `Events` augmentation, so `ctx.on` accepts DSH
   event names. This only holds when the plugin and the toolchain resolve one
   cordis identity; see the repository AGENTS.md.
+
+## What DSH 0.2.2-rc.1 changed
+
+The workspace pins DSH `0.2.2-rc.1` (Cordis `4.1.0`). It stays inside
+protocol-2; these are the `@dshfiles/dshx/host` and `@dshfiles/dshx/testing`
+migrations it forced:
+
+- `hooks.systemPrompt` receives and returns a `PromptPresentation` (sections,
+  contexts, variables). Tool declarations left the `system-prompt/assemble`
+  waterfall and belong to the selected tool executor, so a hook that filtered
+  `assembly.tools` must move to `toolEdits` (`remove`) or a conditional
+  registration (`tools.register(definition, { when })`).
+- `hooks.request` (`agent/request`, deprecated by DSH) may only change call
+  controls. The step's provider, model and reasoning effort are captured before
+  prompt assembly; pick them through `agent.model.select()`.
+- `toolEdits: [{ codeMode: true }]` no longer calls the removed
+  `tools.presentAs('ptc')`. It mounts `@deepseek-ai/dsh-tool-executor-ptc` in
+  the agent's scope (the nearest executor wins), so the profile needs that
+  package and a PTC runtime row; both are optional peers of dshx. The executor's
+  `run_code` is not a registration: `tools.schemas(agent)` no longer lists it.
+- `ctx.tools.execute` takes a model batch (`{ calls: ToolCallBlock[], signal,
+  agent?, toolSet?, log? }`) and resolves `{ results: [{ callId, result }] }`,
+  and needs a mounted executor. `createTestHost()` now mounts the native
+  executor and adds `host.runTool({ name, arguments, agent?, signal? })`, which
+  returns the single call's `ToolExecutionResult`; replace
+  `host.tools.execute({ callId, name, arguments, signal })` with it.
+- `generate()` keeps marking its side calls `purpose: 'compaction'`; dshx now
+  declares that key on `LlmRequestPurposeMap`, which replaced the closed purpose
+  union.
+- The Client runtime context accepts Cordis 4.1's `ctx.on`, whose `Events` keys
+  include symbols.
 
 ## Live Slot Inspect
 

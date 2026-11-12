@@ -124,7 +124,7 @@ describe('dshx registry', () => {
     profileRoot = join(home, 'profiles/probe')
     registry = join(root, 'registry')
     calls = []
-    dshVersion = '0.2.1-rc.2'
+    dshVersion = '0.2.2-rc.1'
     writeFile(
       join(profileRoot, 'package.json'),
       JSON.stringify({ name: 'dsh-profile-probe', private: true, dependencies: {}, dsh: { profile: { bundles: [] } } }),
@@ -263,7 +263,7 @@ describe('dshx registry', () => {
 
     it('warns about engines but leaves the decision to DSH', async () => {
       const result = await profilePlugin('add', publishPlugin('old', '@acme/old', '1.0.0', { engines: { dsh: '<0.1.0' } }))
-      expect(result.output).toContain('excludes DSH 0.2.1-rc.2')
+      expect(result.output).toContain('excludes DSH 0.2.2-rc.1')
       expect(calls).toHaveLength(1)
     })
 

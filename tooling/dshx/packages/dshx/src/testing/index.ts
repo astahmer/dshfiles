@@ -2,7 +2,9 @@
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import { CommandRuntime } from '@deepseek-ai/dsh-commands'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
-import { ToolRuntime } from '@deepseek-ai/dsh-tools'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { ToolRuntime, type ToolBatchInput, type ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionFetchHandler, ConnectionFetchRoute, HostConnectionHandle, PeerScope } from '@deepseek-ai/dsh-client-connection'
 import { ApiDefinitionModel } from '../api/define.js'
@@ -27,6 +29,14 @@ export interface TestHost {
     get(name: string): ReturnType<CommandRuntime['find']>
   }
   readonly tools: ToolRuntime
+  /** Run one tool call through the native executor and its full pipeline, as an agent step would. */
+  runTool(call: {
+    readonly name: string
+    readonly arguments?: unknown
+    readonly agent?: ToolBatchInput['agent']
+    readonly toolSet?: ToolBatchInput['toolSet']
+    readonly signal?: AbortSignal
+  }): Promise<ToolExecutionResult>
   mount(definition: unknown, options?: { readonly packageId?: string; readonly native?: boolean; readonly config?: unknown }): Promise<MountedPlugin>
   dispose(): Promise<void>
 }
@@ -135,12 +145,26 @@ export async function createTestHost(): Promise<TestHost> {
   const connection = provideTestConnection(ctx)
   const providers = [ctx.plugin(CommandRuntime), ctx.plugin(SystemPrompt), ctx.plugin(ToolRuntime)]
   await Promise.all(providers)
+  await ctx.plugin(NativeToolExecutor)
   const commands = ctx.commands
   const agent = { ctx } as Parameters<CommandRuntime['find']>[0]
+  let calls = 0
   return {
     ctx,
     connection,
     tools: ctx.tools,
+    runTool: async call => {
+      calls += 1
+      const batch = await ctx.tools.execute({
+        calls: [{ type: 'tool-call', id: ToolCallId(`dshx-test-${calls}`), name: call.name, arguments: JSON.stringify(call.arguments ?? {}) }],
+        signal: call.signal ?? new AbortController().signal,
+        ...(call.agent === undefined ? undefined : { agent: call.agent }),
+        ...(call.toolSet === undefined ? undefined : { toolSet: call.toolSet }),
+      })
+      const settled = batch.results[0]
+      if (settled === undefined) throw new Error(`The tool executor settled no result for ${call.name}.`)
+      return settled.result
+    },
     commands: {
       find: (agent, name) => commands.find(agent, name),
       get: name => commands.find(agent, name),

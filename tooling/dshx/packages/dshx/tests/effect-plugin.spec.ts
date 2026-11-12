@@ -180,21 +180,21 @@ describe('DshxPlugin.make', () => {
         additionalProperties: false,
       })
       const read = yield* Effect.promise(() =>
-        host.tools.execute({ callId: 'call-1' as never, name: 'journal_entries', arguments: { limit: 1 }, signal: new AbortController().signal }),
+        host.runTool({ name: 'journal_entries', arguments: { limit: 1 }, signal: new AbortController().signal }),
       )
       expect(read).toMatchObject({ isError: false, content: [{ type: 'text', text: 'Tools' }] })
       const locked = yield* Effect.promise(() =>
-        host.tools.execute({ callId: 'call-2' as never, name: 'journal_entries', arguments: { limit: -1 }, signal: new AbortController().signal }),
+        host.runTool({ name: 'journal_entries', arguments: { limit: -1 }, signal: new AbortController().signal }),
       )
       expect(locked).toMatchObject({ isError: true })
       expect(JSON.stringify(locked.content)).toContain('The journal is locked: negative limit.')
       const invalid = yield* Effect.promise(() =>
-        host.tools.execute({ callId: 'call-3' as never, name: 'journal_entries', arguments: { limit: 1, extra: true }, signal: new AbortController().signal }),
+        host.runTool({ name: 'journal_entries', arguments: { limit: 1, extra: true }, signal: new AbortController().signal }),
       )
       expect(invalid.isError).toBe(true)
 
       const controller = new AbortController()
-      const pending = host.tools.execute({ callId: 'call-4' as never, name: 'journal_slow', arguments: { label: 'slow' }, signal: controller.signal })
+      const pending = host.runTool({ name: 'journal_slow', arguments: { label: 'slow' }, signal: controller.signal })
       yield* Deferred.await(started)
       controller.abort()
       yield* Effect.promise(() => pending)
@@ -258,15 +258,15 @@ describe('DshxPlugin.make', () => {
       yield* mount(DshxPlugin.make({ name: 'test-journal-h', layer: Layer.empty, tools: [card, plain] }), '@test/journal-h')
       expect(host.tools.get('journal_card')?.timeoutMs).toBe(5_000)
       const shown = yield* Effect.promise(() =>
-        host.tools.execute({ callId: 'call-1' as never, name: 'journal_card', arguments: { title: 'Revenue' }, signal: new AbortController().signal }),
+        host.runTool({ name: 'journal_card', arguments: { title: 'Revenue' }, signal: new AbortController().signal }),
       )
       expect(shown).toMatchObject({ isError: false, meta: { title: 'Revenue' }, content: [{ type: 'text', text: 'Card Revenue' }] })
       const denied = yield* Effect.promise(() =>
-        host.tools.execute({ callId: 'call-2' as never, name: 'journal_card', arguments: { title: 'x', deny: true }, signal: new AbortController().signal }),
+        host.runTool({ name: 'journal_card', arguments: { title: 'x', deny: true }, signal: new AbortController().signal }),
       )
       expect(denied).toMatchObject({ isError: true, error: { message: 'write denied by policy', info: { code: 'FS_SANDBOX_DENIED' } } })
       const refused = yield* Effect.promise(() =>
-        host.tools.execute({ callId: 'call-3' as never, name: 'journal_plain', arguments: {}, signal: new AbortController().signal }),
+        host.runTool({ name: 'journal_plain', arguments: {}, signal: new AbortController().signal }),
       )
       expect(refused).toMatchObject({ isError: true, error: { message: 'The journal refused the write.' } })
       expect(refused.isError && refused.error.info).toBeUndefined()
@@ -463,7 +463,7 @@ describe('DshxPlugin.make({ lazy: true })', () => {
       )
       expect(log).toEqual([])
       const result = yield* Effect.promise(() =>
-        host.tools.execute({ callId: 'call-1' as never, name: 'lazy_prefix_tool', arguments: {}, signal: new AbortController().signal }),
+        host.runTool({ name: 'lazy_prefix_tool', arguments: {}, signal: new AbortController().signal }),
       )
       expect(result).toMatchObject({ isError: false, content: [{ type: 'text', text: 'Tool' }] })
       expect(log).toEqual(['acquire @test/journal-lazy-c'])

@@ -315,7 +315,8 @@ when the entry carries a cause; `DshxPlugin.make` installs that logger for every
 Use `@effect/vitest` and real layers. A domain service that needs no Host is tested with `it.layer(Service.layer)`.
 Test the edge (`DshxPlugin.make`, `Api.bind`, `Tool.make`) against a real in-memory Host: build `createTestHost()`
 from `@dshfiles/dshx/testing` inside `Layer.effect` with `Effect.acquireRelease`, mount the definition, and call it
-through `createHostApiClient` or `host.tools.execute`. `host.mount` applies the definition directly; to cover what the
+through `createHostApiClient` or `host.runTool({ name, arguments })` (one call through the native executor and its
+pipeline; `host.tools.execute` takes a whole model batch since DSH 0.2.2). `host.mount` applies the definition directly; to cover what the
 Loader sees (the built `dist/index.js` namespace, disable and re-enable), build a fixture with `buildHost` and mount it
 through the real Loader, as `tests/host-entry-lifecycle.spec.ts` does. A layer that reads `HostContext` gets
 `HostContext.layer({ ctx: host.ctx, packageId })`. A test that reads `Config` without going through

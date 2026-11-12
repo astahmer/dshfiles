@@ -1,4 +1,3 @@
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
 import { defineApi, dshxRegistryApi, isApiOwnerMissing, method, type ApiCaller, type RegistryListing } from '../src/api/index.js'
@@ -132,7 +131,7 @@ describe('API registry', () => {
     await host.mount(ownerHost, { packageId: '@test/threads' })
     const names = host.tools.schemas().map(schema => schema.name)
     expect(names).toEqual(expect.arrayContaining(['test_thread_status', 'test_thread_land', 'test_thread_summary', 'dshx_capabilities']))
-    const summary = await host.tools.execute({ callId: 'call-0' as never, name: 'test_thread_summary', arguments: {}, signal: new AbortController().signal })
+    const summary = await host.runTool({ name: 'test_thread_summary', arguments: {}, signal: new AbortController().signal })
     expect(summary.content).toEqual([{ type: 'text', text: JSON.stringify({ threads: 3 }, null, 2) }])
     expect(names.some(name => name.includes('internal'))).toBe(false)
     expect(host.tools.schemas().find(schema => schema.name === 'test_thread_status')?.parameters).toEqual({
@@ -141,8 +140,7 @@ describe('API registry', () => {
       additionalProperties: false,
     })
 
-    const status = await host.tools.execute({
-      callId: 'call-1' as never,
+    const status = await host.runTool({
       name: 'test_thread_status',
       arguments: {},
       agent: agent('/work/thread') as never,
@@ -152,8 +150,7 @@ describe('API registry', () => {
     expect(status.content).toEqual([{ type: 'text', text: 'status {"path":"/work/thread","unlanded":2}' }])
     expect(callers).toEqual([{ kind: 'agent', sessionId: 'session-1', cwd: '/work/thread' }])
 
-    const invalid = await host.tools.execute({
-      callId: 'call-2' as never,
+    const invalid = await host.runTool({
       name: 'test_thread_land',
       arguments: { path: '' },
       signal: new AbortController().signal,
@@ -165,8 +162,7 @@ describe('API registry', () => {
       if (execution.name === 'test_thread_land') land(result.isError)
     })
     const release = host.tools.guard(execution => (execution.name === 'test_thread_land' ? 'Landing needs approval.' : undefined))
-    const denied = await host.tools.execute({
-      callId: 'call-3' as never,
+    const denied = await host.runTool({
       name: 'test_thread_land',
       arguments: { path: '/work/thread' },
       signal: new AbortController().signal,
@@ -291,7 +287,7 @@ describe('API registry', () => {
     expect(factoryCalls).toBe(0)
     const mounted = await host.mount(definition, { packageId: '@test/bound' })
     expect(factoryCalls).toBe(1)
-    const result = await host.tools.execute({ callId: ToolCallId('bound-call'), name: 'test_bound', arguments: {}, signal: new AbortController().signal })
+    const result = await host.runTool({ name: 'test_bound', arguments: {}, signal: new AbortController().signal })
     expect(result.isError).toBe(false)
     expect(result.content).toEqual([{ type: 'text', text: 'function' }])
     await host.mount(callerHost, { packageId: '@test/caller' })

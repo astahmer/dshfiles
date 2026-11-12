@@ -326,7 +326,7 @@ try {
 }
 ```
 
-The Host harness uses actual Cordis, CommandRuntime, ToolRuntime and SystemPrompt. It does not emulate a session, model execution or profile persistence. Register extra native providers through `host.ctx` when your plugin needs them.
+The Host harness uses actual Cordis, CommandRuntime, ToolRuntime, SystemPrompt and the native tool executor; `host.runTool({ name, arguments })` runs one call through it. It does not emulate a session, model execution or profile persistence. Register extra native providers through `host.ctx` when your plugin needs them.
 
 The same harness embeds a Host in a script: mount the plugins, then call their APIs in process with `createHostApiClient(host.ctx, contract, callerPackageId)`, or over their real Connection routes with `connectDshxApiClient(contract, { origin: 'http://dshx.test', fetch: host.connection.fetch })` from `@dshfiles/dshx/platform` (see [Typed API](../guides/api.md#from-a-script-a-cli-or-another-process)). `host.connection.fetch` answers as the admitted owner; there is no network listener, browser or launch URL.
 
