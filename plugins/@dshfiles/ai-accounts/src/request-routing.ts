@@ -378,7 +378,7 @@ export class RequestRouting extends Context.Service<
           source: { kind: 'user' },
         })
         const resume = Effect.gen(function* () {
-          yield* Effect.promise(() => agent.whenIdle())
+          yield* RequestRoutingHooks.whenIdle(agent)
           const current = agent.model.current()
           const userActed =
             input.signal.aborted ||

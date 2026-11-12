@@ -36,6 +36,10 @@ export interface AgentRoutingHandlers {
  * before DSH's provider-wide retry, which would otherwise spend its retries on an account that is already spent.
  */
 export class RequestRoutingHooks {
+  static whenIdle(agent: Agent): Effect.Effect<void> {
+    return Effect.promise(() => agent.whenIdle())
+  }
+
   static register(agent: Agent, services: Context.Context<never>, handlers: AgentRoutingHandlers): () => void {
     const run = Effect.runPromiseWith(services)
     const offClaimed = agent.ctx.on('agent/inbox/claimed', ({ message, turn }) =>
