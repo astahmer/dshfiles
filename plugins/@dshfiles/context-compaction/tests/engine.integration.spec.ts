@@ -143,6 +143,8 @@ const withAgent = async (
                 { type: 'text', text },
                 ...(image
                   ? [
+                      // SAFETY: a synthetic attachment id; its AttachmentId brand lives in @deepseek-ai/dsh-attachment, which this
+                      // package does not depend on, and the pricing path only counts image blocks.
                       {
                         type: 'image',
                         attachment: { attachmentId: 'image-1', mediaType: 'image/png', name: 'shot.png', bytes: 1, width: 1, height: 1 },
