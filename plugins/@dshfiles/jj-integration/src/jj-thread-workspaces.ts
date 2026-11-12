@@ -1,3 +1,4 @@
+import { redactGitStderr } from '@dshfiles/git-cli'
 import { JjViewReads, storeRootOf, type JjRunError } from '@dshfiles/jj-cli'
 import { KeyedMutex } from '@dshfiles/dshx/effect/keyed-mutex'
 import { commandAttributes } from '@dshfiles/dshx/tracing'
@@ -912,7 +913,8 @@ const make = Effect.gen(function* () {
         timeout: FETCH_BASE_TIMEOUT,
       })
       .pipe(
-        Effect.map(output => (output.exitCode === 0 ? undefined : output.stderr.trim().split('\n').slice(-2).join(' ').slice(0, 400))),
+        // jj relays git's remote errors, whose URL can carry credentials; the warning reaches the Host log.
+        Effect.map(output => (output.exitCode === 0 ? undefined : redactGitStderr(output.stderr).trim().split('\n').slice(-2).join(' ').slice(0, 400))),
         Effect.catch(error => Effect.succeed(error.message)),
         Effect.tap(failure => Effect.annotateCurrentSpan({ 'dshx.fetch.status': failure === undefined ? 'fetched' : 'failed' })),
         Effect.tap(failure =>

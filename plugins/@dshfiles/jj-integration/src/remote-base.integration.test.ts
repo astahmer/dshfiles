@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ThreadWorkspaceModel } from './thread-workspace-model.js'
 import { ThreadWorkspacesTestSupport, type JjExecutor } from './thread-workspaces-test-support.js'
 
@@ -100,6 +100,33 @@ describe.skipIf(!jjAvailable || !gitAvailable)('starting a jj thread workspace f
     const thread = await threads.provision(repo, 'main@origin')
 
     expect(jj(thread.path, 'log', '--no-graph', '-r', '@-', '-T', 'description.first_line()')).toBe('base')
+  })
+
+  it('redacts credentials from a failed fetch before logging it', async () => {
+    const failing = ThreadWorkspacesTestSupport.promiseThreads({
+      executor: async input =>
+        input.args.includes('fetch')
+          ? {
+              exitCode: 1,
+              stdout: '',
+              stderr: "Error: failed to fetch from 'https://bot:ghp_SECRETvalue@github.com/acme/repo.git': Authorization: Bearer SECRETbearer\n",
+            }
+          : executor(input),
+    })
+    const logged: string[] = []
+    const capture = (...args: unknown[]) => void logged.push(args.map(String).join(' '))
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map(level => vi.spyOn(console, level).mockImplementation(capture))
+    try {
+      const thread = await failing.provision(repo, 'main@origin')
+      expect(jj(thread.path, 'log', '--no-graph', '-r', '@-', '-T', 'description.first_line()')).toBe('base')
+    } finally {
+      for (const spy of spies) spy.mockRestore()
+      await failing.dispose()
+    }
+    const warning = logged.find(line => line.includes('Could not fetch main@origin'))
+    expect(warning).toBeDefined()
+    expect(warning).toContain('github.com/acme/repo.git')
+    expect(warning).not.toContain('SECRET')
   })
 
   it('never claims a spare made before the fetch at the old position', async () => {
