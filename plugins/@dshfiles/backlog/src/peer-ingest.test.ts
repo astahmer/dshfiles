@@ -6,11 +6,11 @@ import { BacklogRepo, type PeerOpWire } from './backlog-repo.js'
 import type { BacklogItem } from './item.js'
 import { BacklogOps, type BacklogOpRecord } from './op-log.js'
 import { BacklogStore } from './store.js'
-import { BacklogTestStore } from './test-support.js'
+import { BacklogTestStore, type BacklogTestRows } from './test-support.js'
 
 const user = { kind: 'user' } as const
 
-const open = (rows = BacklogTestStore.rows()) =>
+const open = (rows?: BacklogTestRows) =>
   Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => ({ store: Context.get(context, BacklogStore), repo: Context.get(context, BacklogRepo) }))
 type Host = Effect.Success<ReturnType<typeof open>>
 
