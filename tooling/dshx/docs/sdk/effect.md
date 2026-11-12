@@ -92,6 +92,9 @@ same message), and the Host log carries the `PluginActivationError` cause. Unloa
 interrupts it and refuses the calls that were waiting. v1 has no unload-on-idle: once built, a lazy plugin stays built
 until its row unloads.
 
+`lazy` defers the build, not the module graph: everything the layer imports is already loaded at boot. To keep the module
+graph out too, split the row into a facade (below).
+
 A failing build closes the Scope, logs `Cause.pretty` under `dshx:plugin` and rejects activation with a
 `PluginActivationError` whose `cause` is the Cause. The type checker refuses handlers, tools and a `main` that need a
 service the layer does not build.
@@ -109,6 +112,40 @@ Re-enabling builds a fresh layer in the same process. This depends on the built 
 function (see [Host lifecycle](../guides/host.md#the-built-apply-and-cordis)); a bundle built by dshx before 2026-11-11
 exports a function declaration, loses the disposer, and its re-enable fails with `PluginInactive … already active in
 this process` until DSH restarts. Rebuild such bundles.
+
+### `DshxPlugin.facade({ name, inject?, Config?, settings?, apis, load })` and `DshxPlugin.implementation({ layer, main?, apis })`
+
+A facade row registers its static surface at boot from a small entry and imports the rest on the first API call. Opt-in,
+for the same rows `lazy` suits (nothing needed before a panel or tool is used), when the layer's imports are what costs:
+
+```ts
+// src/host.ts: the Host entry, only the contract
+export default DshxPlugin.facade({ name: '@dshfiles/agentsview', apis: [agentSessionsApi], load: () => import('./host-implementation.js') })
+
+// src/host-implementation.ts: what `make` would take besides the static surface
+export default DshxPlugin.implementation({ layer: AgentSessionsLive, apis: [Api.bind(agentSessionsApi, handlers)] })
+```
+
+and `host: { codeSplitting: true }` in `dshx.config.ts`, so the build emits the import as its own chunk
+([build guide](../guides/build.md#host-code-splitting)). Without it the build inlines the implementation: the row still
+works, it just saves nothing.
+
+- **Static surface.** `apis` (contracts only, with their method tools), `settings`, `inject` and `Config` live in the
+  facade, so the registry, the tool-schema snapshot, `inject` and the Loader see them at boot. Agent tools come from
+  contract methods (`method({ tool })`); Effect `tools` are not part of a facade. A `Config` is decoded at activation, so
+  a bad row config fails the row at boot without importing anything; `implementation`'s `layer` may take the decoded
+  config, and the type checker refuses one that reads another shape.
+- **First call.** The first API or tool call runs `load` once, checks that the implementation serves exactly the declared
+  contract methods, builds its layer and starts its `main`, as a `lazy` row does. Concurrent first calls share that one
+  import and build. The `plugin activate` span carries `dshx.plugin.facade: true` and holds a `plugin load` span for the
+  import.
+- **Errors.** A failed import (`PluginLoadError`) or an implementation that serves other methods
+  (`PluginImplementationMismatch`, naming the missing and unexpected `contract.method` keys) fails the row like a failed
+  lazy build: the Host log has the cause, and that call and every later one answer `plugin-inactive` until DSH restarts.
+  A handler failure keeps its wire code. Unloading before the first call imports nothing.
+- **Rebuilds.** The implementation chunk is content-hashed. A Host that loaded an old entry imports the chunk that entry
+  names; when a rebuild replaced it, the first call fails with `PluginLoadError` (rebuild, restart DSH) instead of
+  linking new code against the old entry. An unchanged rebuild keeps the name.
 
 ### `Api.bind(contract, handlers)` and `Api.handlers(contract, handlers)`
 
