@@ -656,8 +656,10 @@ export const backlogApi = defineApi({
     aiActivity: method({
       input: Schema.Void,
       output: Schema.Struct({ active: Schema.Boolean }),
-      description: 'Whether Host-scheduled backlog AI work is currently running. Presentation-only status; not an agent tool.',
+      description:
+        'Whether Host-scheduled backlog AI work is currently running; the panel reads it again on each `aiActivityChanged` event. Presentation-only status; not an agent tool.',
       readOnly: true,
+      tags: ['ai-activity'],
     }),
     projects: method({
       /** Optional so a Client older than the agent-item filter still calls it with no input. */
@@ -1371,6 +1373,11 @@ export const backlogApi = defineApi({
       schema: Schema.Struct({ revision: Schema.Number.check(Schema.isFinite()) }),
       description: 'The backlog revision moved: an item was written, deleted or pulled from a peer.',
       invalidates: ['revision'],
+    }),
+    aiActivityChanged: event({
+      schema: Schema.Struct({ active: Schema.Boolean }),
+      description: 'Backlog AI work started while none ran, or the last running task finished.',
+      invalidates: ['ai-activity'],
     }),
   },
 })
