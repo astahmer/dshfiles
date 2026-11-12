@@ -64,6 +64,7 @@
     "plugins/@dshfiles/plugin-guide/src/generated/**",
     "plugins/@dshfiles/onboarding/src/generated/**",
     "tooling/dshx/e2e/fixtures/tool-schemas.json",
-    "tooling/dshx/packages/dshx/tests/fixtures/effect-api-tool-schema.json"
+    "tooling/dshx/packages/dshx/tests/fixtures/effect-api-tool-schema.json",
+    "plugins/@dshfiles/context-compaction/tests/fixtures/replay/**"
   ]
 }
