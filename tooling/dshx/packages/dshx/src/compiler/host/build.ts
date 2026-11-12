@@ -44,6 +44,7 @@ const HOST_WEB_STARTUP_PATH = fileURLToPath(new URL('../../host/web-startup.js',
 const HOST_OUTSIDE_RELOAD_PATH = fileURLToPath(new URL('../../host/outside-reload.js', import.meta.url))
 const HOST_SDK_PATH = fileURLToPath(new URL('../../sdk/host.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
+const API_TOOL_CATALOG_PATH = fileURLToPath(new URL('../../api/tool-catalog.js', import.meta.url))
 const API_ZOD_VIEW_PATH = fileURLToPath(new URL('../../api/zod-view.js', import.meta.url))
 const API_HOST_CLIENT_PATH = fileURLToPath(new URL('../../api/host-client.js', import.meta.url))
 const API_HOST_EVENTS_PATH = fileURLToPath(new URL('../../api/host-events.js', import.meta.url))
@@ -93,6 +94,7 @@ const RUNTIME_ENTRIES: readonly string[] = [
   HOST_OUTSIDE_RELOAD_PATH,
   HOST_SDK_PATH,
   API_DEFINE_PATH,
+  API_TOOL_CATALOG_PATH,
   API_ZOD_VIEW_PATH,
   API_HOST_CLIENT_PATH,
   API_HOST_EVENTS_PATH,
@@ -224,6 +226,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const event = ApiDefinitionModel.event',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           `export { zodSchemaFromEffect } from ${JSON.stringify(API_ZOD_VIEW_PATH)}`,
+          `export { pluginToolCatalog } from ${JSON.stringify(API_TOOL_CATALOG_PATH)}`,
           '',
         ].join('\n')
       }
