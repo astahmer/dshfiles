@@ -180,8 +180,7 @@ export const createPairingGateway = (options: GatewayOptions) => {
           const paired = await options.store.redeem(input)
           if (paired === undefined) return respond(response, 403)
           const maxAge = 365 * 24 * 3600
-          respond(response, 303, {
-            location: '/',
+          respond(response, 204, {
             'set-cookie': `${COOKIE}=${paired.token}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict${publicOrigin?.startsWith('https:') ? '; Secure' : ''}`,
           })
         })
