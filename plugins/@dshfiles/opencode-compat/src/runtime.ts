@@ -2,7 +2,7 @@ import { decodeJson } from '@dshfiles/dshx/json'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { Schema } from 'effect'
 import { createContext, type Domains } from './context.js'
-import { loadPlugin, type Cleanup } from './load-plugin.js'
+import { loadPlugin, type Cleanup } from './load-plugin-promise.js'
 import type { Registration, UnsupportedRecord } from './unsupported.js'
 
 export interface Entry {
