@@ -592,14 +592,15 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       platformArgs.push(token)
       continue
     }
-    if (isCliCommand(token)) {
-      if (command !== undefined) throw new CliUsageError('Only one command may be specified.')
-      command = token
-      continue
-    }
+    // An inspect target may share a command's name (`tools`), so it is matched first.
     if (command === 'inspect' && isCliInspectTarget(token)) {
       if (inspectTarget !== undefined) throw new CliUsageError('Only one inspect target may be specified.')
       inspectTarget = token
+      continue
+    }
+    if (isCliCommand(token)) {
+      if (command !== undefined) throw new CliUsageError('Only one command may be specified.')
+      command = token
       continue
     }
     if (command !== 'inspect' && cliInspectTargets.has(token)) {
