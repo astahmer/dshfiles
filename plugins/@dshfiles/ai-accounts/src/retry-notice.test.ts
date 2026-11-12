@@ -39,7 +39,8 @@ describe('the llm/retry rows ai-accounts writes', () => {
 
   test('keep the fail-over visible in the message and its own code', () => {
     expect(failover.failure).toEqual({
-      message: 'Switched from OpenCode Go Alex to OpenCode Go Mathias after: pi-ai stream idle timeout after 300000ms',
+      message:
+        'Switched from OpenCode Go Alex to OpenCode Go Mathias after: OpenCode Go Alex sent no data for 5 min (pi-ai stream idle timeout after 300000ms)',
       code: 'ACCOUNT_FAILOVER',
     })
     expect(failover.policyKey).toBe('ai-accounts:transport')
@@ -70,5 +71,56 @@ describe('the llm/retry rows ai-accounts writes', () => {
     expect(waited.delayMs).toBe(1_000)
     expect(waited.provider).toBe('codex-work')
     expect(waited.failure.code).toBe('TIMEOUT')
+  })
+
+  test('name the route and model that went silent and for how long on a stalled stream', () => {
+    const retried = retryNotice(
+      {
+        kind: 'retry',
+        step: { kind: 'retry', delayMs: 1_000 },
+        failureKind: 'transport',
+        account: 'opencode-go-alex',
+        attempt: 1,
+        plannedAttempts: 2,
+        retryId: 'retry-3',
+      },
+      {
+        retryId: retryId('retry-3'),
+        turn: 4,
+        step: 1,
+        provider: 'opencode-go-alex',
+        failure: { message: 'pi-ai stream idle timeout after 120000ms', code: 'TIMEOUT' },
+        model: 'glm-5.1',
+        label,
+      },
+    )
+    expect(retried.failure).toEqual({
+      message: 'OpenCode Go Alex · glm-5.1 sent no data for 2 min (pi-ai stream idle timeout after 120000ms)',
+      code: 'TIMEOUT',
+    })
+  })
+
+  test('keep other failures prefixed with the account only', () => {
+    const retried = retryNotice(
+      {
+        kind: 'retry',
+        step: { kind: 'retry', delayMs: 1_000 },
+        failureKind: 'transport',
+        account: 'opencode-go-alex',
+        attempt: 1,
+        plannedAttempts: 2,
+        retryId: 'retry-4',
+      },
+      {
+        retryId: retryId('retry-4'),
+        turn: 4,
+        step: 1,
+        provider: 'opencode-go-alex',
+        failure: { message: 'socket hang up', code: 'TRANSPORT' },
+        model: 'glm-5.1',
+        label,
+      },
+    )
+    expect(retried.failure.message).toBe('OpenCode Go Alex: socket hang up')
   })
 })

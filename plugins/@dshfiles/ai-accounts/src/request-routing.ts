@@ -284,6 +284,7 @@ export class RequestRouting extends Context.Service<
           step,
           provider: requestProvider,
           failure,
+          model: requestConfig()?.model,
           label: target => {
             // Chain targets are `provider/model`; account ids never hold a slash.
             const slash = target.indexOf('/')

@@ -3,6 +3,7 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
 import type { AccountPoolView } from './account-pool.js'
 import { decideRecovery, NO_PROGRESS, type FailureKind, type RecoveryPolicy, type RecoveryProgress, type RecoveryStep } from './failure-policy.js'
 import { declaredResetWaitMs, MAX_RESET_WAIT_MS } from './reset-hint.js'
+import { StalledStream } from './stalled-stream.js'
 
 const EXHAUSTED_CODES: ReadonlySet<string> = new Set([
   'QUOTA',
@@ -155,6 +156,7 @@ const createFailureRecovery = (deps: {
       readonly conversationKey: string
       readonly current: { readonly provider: string; readonly model: string | undefined }
       readonly now: number
+      readonly stalled: boolean
     }) => readonly string[] | undefined
     readonly bind: (input: { readonly conversationKey: string; readonly to: string }) => void
   }
@@ -237,7 +239,12 @@ const createFailureRecovery = (deps: {
         transportFailures.delete(account)
       }
       // Asked after cooling an account, so a chain never proposes the account that just failed.
-      const chainCandidates = deps.chain?.candidates({ conversationKey: input.conversationKey, current: { provider: input.provider, model: input.model }, now })
+      const chainCandidates = deps.chain?.candidates({
+        conversationKey: input.conversationKey,
+        current: { provider: input.provider, model: input.model },
+        now,
+        stalled: StalledStream.silentMs(input.failure) !== undefined,
+      })
       if (!deps.isAccountRoute(input.provider) && chainCandidates === undefined) return { kind: 'pass' }
       const policy = deps.readPolicy()[failureKind]
       const state = stateFor(input.conversationKey, input.turn, input.step)

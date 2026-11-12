@@ -400,8 +400,8 @@ describe('failure recovery through a model fallback chain', () => {
       failoverCandidates: () => ['codex_work'],
       lunaReserve: { available: () => false, engage: () => undefined },
       chain: {
-        candidates: ({ conversationKey, current }) =>
-          conversationKey === 'walks-chain'
+        candidates: ({ conversationKey, current, stalled }) =>
+          conversationKey === 'walks-chain' || (conversationKey === 'stall-chain' && stalled)
             ? ['claude/claude-opus-5-5', 'deepseek/deepseek-chat'].filter(key => !key.startsWith(`${current.provider}/`))
             : undefined,
         bind: ({ to }) => bound.push(to),
@@ -428,6 +428,17 @@ describe('failure recovery through a model fallback chain', () => {
     expect(bound).toEqual(['claude/claude-opus-5-5'])
     expect(pool.isHealthy('codex', NOW)).toBe(false)
     expect(recovery.routeFor('walks-chain', 'codex', NOW)).toBe('codex')
+  })
+
+  it('tells the chain a request stalled, so a silent stream fails over to it after the retries', () => {
+    const { recovery, bound } = chainSetup()
+    const stalled = { message: 'pi-ai stream idle timeout after 120000ms', code: 'TIMEOUT' }
+    const fail = () =>
+      recovery.recover({ conversationKey: 'stall-chain', turn: 1, step: 1, provider: 'codex', model: 'gpt-6', failure: stalled, canShrink: false, now: NOW })
+    expect(fail()).toMatchObject({ kind: 'retry', step: { kind: 'retry' } })
+    expect(fail()).toMatchObject({ kind: 'retry', step: { kind: 'retry' } })
+    expect(fail()).toMatchObject({ kind: 'retry', step: { kind: 'failover', to: 'claude/claude-opus-5-5' } })
+    expect(bound).toEqual(['claude/claude-opus-5-5'])
   })
 
   it('walks the chain from a provider it does not own and leaves other conversations on accounts', () => {

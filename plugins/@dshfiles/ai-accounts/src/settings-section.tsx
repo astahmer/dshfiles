@@ -934,6 +934,21 @@ const FailureRecoveryGroup = (props: { readonly readOnly: boolean; readonly writ
                 {id => <Switch checked={current.failover} disabled={props.readOnly} id={id} onCheckedChange={value => update(kind, 'failover', value)} />}
               </Row>
             ) : null}
+            {kind === 'transport' ? (
+              <Row
+                hint="When a model sends no data until its idle timeout, move to the thread's model fallback chain under any distribution, not only Priority."
+                label="Fall back on stalled streams"
+              >
+                {id => (
+                  <Switch
+                    checked={preferences.stalledStreamFallback}
+                    disabled={props.readOnly || !current.failover}
+                    id={id}
+                    onCheckedChange={value => props.write(preferences.settings.set('stalledStreamFallback', value))}
+                  />
+                )}
+              </Row>
+            ) : null}
             {shows('waitSeconds') ? (
               <Row hint="Waits out a provider-declared reset no longer than this, then retries once." label="Then wait up to">
                 {id => (

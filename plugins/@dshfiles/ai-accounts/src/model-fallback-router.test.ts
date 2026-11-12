@@ -32,7 +32,7 @@ const codex = { provider: 'codex-work', model: 'gpt-6', reasoningEffort: 'high' 
 const claude = { provider: 'claude-work', model: 'claude-opus-5-5', reasoningEffort: 'medium' }
 const opencode = { provider: 'opencode-go', model: 'glm-5.3' }
 
-const setup = async (options: { readonly distribution?: Distribution; readonly store?: ModelFallbackStore } = {}) => {
+const setup = async (options: { readonly distribution?: Distribution; readonly store?: ModelFallbackStore; readonly stalledStreamFallback?: boolean } = {}) => {
   const store =
     options.store ?? createModelFallbackStore({ tables: { chains: memoryTable(), active: memoryTable(), preferences: memoryTable() }, now: () => 1_000 })
   if (options.store === undefined) await store.setChain({ chain: [claude, opencode] })
@@ -41,6 +41,7 @@ const setup = async (options: { readonly distribution?: Distribution; readonly s
     store: () => store,
     distribution: () => options.distribution ?? 'priority',
     available: (route: FallbackRoute) => !unavailable.includes(route.provider),
+    stalledStreamFallback: () => options.stalledStreamFallback ?? false,
     onError: message => {
       throw new Error(message)
     },
@@ -59,6 +60,24 @@ describe('model fallback router', () => {
     const { router } = await setup({ distribution: 'sticky' })
     expect(router.candidates({ sessionId: 'thread', current: codex, now: 1_000 })).toBeUndefined()
     expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })).toBeUndefined()
+  })
+
+  it('keeps a stalled stream off the chain outside Priority unless stalled-stream fallback is on', async () => {
+    const { router } = await setup({ distribution: 'sticky' })
+    router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    expect(router.candidates({ sessionId: 'thread', current: codex, now: 1_000, stalled: true })).toBeUndefined()
+  })
+
+  it('walks the stored chain for a stalled stream under Sticky when stalled-stream fallback is on', async () => {
+    const { router } = await setup({ distribution: 'sticky', stalledStreamFallback: true })
+    router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    expect(router.candidates({ sessionId: 'thread', current: codex, now: 1_000 })).toBeUndefined()
+    expect(router.candidates({ sessionId: 'thread', current: codex, now: 1_000, stalled: true })).toEqual([
+      'claude-work/claude-opus-5-5',
+      'opencode-go/glm-5.3',
+    ])
+    expect(router.bind({ sessionId: 'thread', to: 'claude-work/claude-opus-5-5' })).toEqual(claude)
+    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })).toEqual(claude)
   })
 
   it('puts the fallback on a retry that still proposes the failed route and stays there by default', async () => {

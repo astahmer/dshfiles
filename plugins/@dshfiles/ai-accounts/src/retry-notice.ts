@@ -2,6 +2,7 @@ import type { LlmFailure } from '@deepseek-ai/dsh-llm'
 import type { LlmRetryEventData, RetryId } from '@deepseek-ai/dsh-llm-retry'
 
 import type { RecoveryAction } from './failure-recovery.js'
+import { StalledStream } from './stalled-stream.js'
 
 const NOTICE_MESSAGE_CHARS = 400
 
@@ -29,13 +30,18 @@ export const retryNotice = (
     readonly step: number
     readonly provider: string
     readonly failure: LlmFailure
+    /** The model the failed request asked for, so a stalled stream names what went silent. */
+    readonly model?: string | undefined
     readonly label: (accountId: string) => string
   },
 ): Extract<LlmRetryEventData, { mode: 'normal' }> => {
   const from = context.label(action.account)
-  const cause = context.failure.message.slice(0, NOTICE_MESSAGE_CHARS)
+  const raw = context.failure.message.slice(0, NOTICE_MESSAGE_CHARS)
+  const silentMs = StalledStream.silentMs(context.failure)
+  const subject = context.model === undefined || context.model === '' ? from : `${from} · ${context.model}`
+  const cause = silentMs === undefined ? raw : `${subject} sent no data for ${StalledStream.silenceLabel(silentMs)} (${raw})`
   const step = action.step
-  let failure: LlmFailure = { ...context.failure, message: `${from}: ${cause}` }
+  let failure: LlmFailure = { ...context.failure, message: silentMs === undefined ? `${from}: ${cause}` : cause }
   if (step.kind === 'failover') failure = { message: `Switched from ${from} to ${context.label(step.to)} after: ${cause}`, code: 'ACCOUNT_FAILOVER' }
   if (step.kind === 'luna-reserve') failure = { message: `Continuing ${from} on Luna Reserve after: ${cause}`, code: 'LUNA_RESERVE' }
   if (step.kind === 'shrink') failure = { message: `Retrying ${from} with earlier images as file placeholders after: ${cause}`, code: 'REQUEST_SHRUNK' }

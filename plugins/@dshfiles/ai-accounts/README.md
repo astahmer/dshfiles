@@ -449,7 +449,14 @@ thread's own chain). When a chain has routes it replaces the same-provider
 fail-over step above: a failure whose kind fails over (connection, rate limit,
 exhausted by default) moves the turn to the next enabled, healthy rung after the
 current one, never one the turn already tried. Sticky distribution never walks
-the chain. The fail-over selects the fallback for the Session like an account
+the chain, except for a stalled stream: with **Fall back on stalled streams**
+(Settings › AI Accounts › Failure recovery, `stalledStreamFallback`, off by
+default, needs transport fail-over on) a request that sends no data until its
+idle timeout (`pi-ai stream idle timeout after …ms`) moves to the thread's
+stored chain after its transport retries, under any distribution. Each retry row
+of a stalled stream names the route, model and how long it stayed silent; a turn
+it stops tells the user to Resume or pick another model, and how to turn the
+fallback on. The fail-over selects the fallback for the Session like an account
 fail-over does. **After a fallback answers** chooses whether the thread stays
 there (default; the provider's prompt cache stays warm) or returns to its
 selection when the turn ends; **Return to selection** goes back by hand. The

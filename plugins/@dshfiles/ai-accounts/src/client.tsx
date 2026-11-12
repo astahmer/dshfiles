@@ -39,6 +39,7 @@ import type { TurnUsageCostOwnerProps } from '@dshfiles/chat/turn-usage-cost'
 import type { SessionUsageCostOwnerProps } from '@dshfiles/chat/session-usage-cost'
 import { QuotaAutoResumeToggle } from './quota-auto-resume-toggle.js'
 import { QuotaRetryMessage } from './quota-retry-message.js'
+import { StalledStreamMessage } from './stalled-stream-message.js'
 import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
 
@@ -228,6 +229,11 @@ export default defineClientPlugin({
         <QuotaRetryMessage turn={props.turn} sessionId={props.sessionId} />
       </PluginQueryProvider>
     )
+    const StalledStreamMessageView = (props: { readonly turn: TurnLocation }): JSX.Element => (
+      <PluginQueryProvider>
+        <StalledStreamMessage turn={props.turn} />
+      </PluginQueryProvider>
+    )
     const QuotaAutoResumeToggleView = (props: { readonly sessionId: string; readonly seq: number }): JSX.Element => (
       <PluginQueryProvider>
         <QuotaAutoResumeToggle sessionId={props.sessionId} seq={props.seq} />
@@ -289,6 +295,10 @@ export default defineClientPlugin({
         inject: sessionId => ({ sessionId }),
       },
       QuotaRetryMessageView,
+    )
+    api.ui.register(
+      { name: 'conversation.chat.turnTail', id: 'ai-accounts-stalled-stream', order: 30, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
+      StalledStreamMessageView,
     )
     // Beside Resume on the failed turn itself, so the per-thread choice lives
     // where the user decides to resume. Declared by the owned Chat fork.

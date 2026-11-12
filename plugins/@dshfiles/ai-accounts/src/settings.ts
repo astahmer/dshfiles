@@ -71,6 +71,8 @@ export const aiAccountsSettings = defineSettings({
       auth: kindPolicySetting(DEFAULT_RECOVERY_POLICY.auth, 'Signed out, rejected or missing credentials.'),
       oversized: kindPolicySetting(DEFAULT_RECOVERY_POLICY.oversized, 'Request or context too large.'),
     }).description('Failure recovery'),
+    /** Move a turn whose model stream went silent to the thread's fallback chain under any distribution, not only Priority. */
+    stalledStreamFallback: Schema.boolean().default(false),
     /** Show the estimated session cost in the token stats or in its own dock entry. */
     costPlacement: Schema.union(['inside', 'separate']).default('inside'),
     /** Estimated session cost beside the composer stats, priced from models.dev. */
@@ -136,6 +138,7 @@ const liveSettingsSchema = EffectSchema.Struct({
   fastModeDefault: EffectSchema.optional(EffectSchema.Unknown),
   codexLunaReserve: EffectSchema.optional(EffectSchema.Unknown),
   failureRecovery: EffectSchema.optional(EffectSchema.Unknown),
+  stalledStreamFallback: EffectSchema.optional(EffectSchema.Unknown),
   hiddenUsageAccounts: EffectSchema.optional(EffectSchema.Unknown),
   autoRetryQuotaDefault: EffectSchema.optional(EffectSchema.Unknown),
   showQuotaRetryChoice: EffectSchema.optional(EffectSchema.Unknown),
@@ -167,6 +170,7 @@ export interface AccountSettingsSnapshot {
     readonly policy: typeof recoveryPolicySchema.Type
     readonly usageOrder: readonly string[]
     readonly hiddenUsageAccounts: readonly string[]
+    readonly stalledStreamFallback: boolean
   }
   readonly quotaRetry: { readonly autoRetryDefault: boolean; readonly showChoice: boolean }
   readonly promptCacheRetention: Readonly<Record<string, 'short' | 'long'>>
@@ -189,6 +193,7 @@ const fromLive = (live: AiAccountsSettingsValue): AccountSettingsSnapshot => {
       policy: decodeSetting(recoveryPolicySchema, fields.failureRecovery, DEFAULT_RECOVERY_POLICY),
       usageOrder: [],
       hiddenUsageAccounts: decodeSetting(EffectSchema.Array(EffectSchema.String), fields.hiddenUsageAccounts, []),
+      stalledStreamFallback: decodeSetting(EffectSchema.Boolean, fields.stalledStreamFallback, false),
     },
     quotaRetry: {
       autoRetryDefault: decodeSetting(EffectSchema.Boolean, fields.autoRetryQuotaDefault, true),

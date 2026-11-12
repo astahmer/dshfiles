@@ -421,6 +421,13 @@
           "constraints": "Boolean; enable Fast mode for supported Codex models unless the thread overrides that model route.",
           "choices": ["true", "false"],
           "coveredBy": ["ai-accounts.fast-mode-default"]
+        },
+        {
+          "key": "stalledStreamFallback",
+          "defaultValue": "false",
+          "constraints": "Boolean; a request whose stream sends no data until its idle timeout walks the thread's stored model fallback chain under any distribution, after its transport retries. Needs transport fail-over on.",
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.stalled-stream-fallback"]
         }
       ],
       "states": ["available", "cooling-down", "rebound", "no-eligible-account", "priority-order", "fallback-serving", "fallback-returned"],
@@ -429,6 +436,7 @@
         "All eligible accounts are cooling down and no route can be selected.",
         "Distribution never mixes provider kinds or models with incompatible request capabilities.",
         "Under Priority, a thread with a model fallback chain fails over along that chain (any provider, enabled and healthy routes only) instead of across compatible accounts.",
+        "A stream that sends no data until its idle timeout names its route, model and silence in the retry rows; a turn it stops tells the user to Resume or pick another model, and how to turn on stalled-stream fallback.",
         "Only manually added IDs absent from the provider catalog get a delete action; provider models remain provider-owned.",
         "A Mistral model offers only the reasoning efforts Mistral accepts for it, never an Off that would send a rejected `none`.",
         "A Mistral model that Mistral documents as reading images offers image input even when its catalog entry leaves vision out."
@@ -471,6 +479,12 @@
           "id": "ai-accounts.model-fallback-routing",
           "file": "plugins/@dshfiles/ai-accounts/src/model-fallback-router.test.ts",
           "testName": "puts the fallback on a retry that still proposes the failed route and stays there by default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.stalled-stream-fallback",
+          "file": "plugins/@dshfiles/ai-accounts/src/model-fallback-router.test.ts",
+          "testName": "walks the stored chain for a stalled stream under Sticky when stalled-stream fallback is on"
         },
         {
           "kind": "unit-test",

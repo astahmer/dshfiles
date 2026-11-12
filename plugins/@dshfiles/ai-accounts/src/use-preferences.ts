@@ -44,6 +44,7 @@ export const usePreferences = () => {
     autoRetryQuotaDefault: value?.autoRetryQuotaDefault ?? true,
     showQuotaRetryChoice: value?.showQuotaRetryChoice ?? true,
     failureRecovery: AiAccountsSchema.decode(recoveryPolicySchema, value?.failureRecovery),
+    stalledStreamFallback: value?.stalledStreamFallback ?? false,
     modelsPageAccounts: value?.modelsPageAccounts ?? DEFAULT_CLIENT_SETTINGS.modelsPageAccounts,
     costEstimates: value?.costEstimates ?? DEFAULT_CLIENT_SETTINGS.costEstimates,
     costPlacement: value?.costPlacement === 'separate' ? 'separate' : 'inside',

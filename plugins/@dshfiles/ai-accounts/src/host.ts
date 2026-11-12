@@ -478,6 +478,7 @@ const startAccountsHost = (input: {
     distribution: () => pool.distribution(),
     available: fallbackAvailable,
     siblings: familySiblings,
+    stalledStreamFallback: () => readSettings().recovery.stalledStreamFallback,
     onError: message => ctx.logger.warn(`ai-accounts: ${message}`),
   })
   runtime.modelFallbackRouter = fallbackRouter
@@ -515,7 +516,7 @@ const startAccountsHost = (input: {
       },
     },
     chain: {
-      candidates: ({ conversationKey, current, now }) => fallbackRouter.candidates({ sessionId: conversationKey, current, now }),
+      candidates: ({ conversationKey, current, now, stalled }) => fallbackRouter.candidates({ sessionId: conversationKey, current, now, stalled }),
       bind: ({ conversationKey, to }) => fallbackRouter.bind({ sessionId: conversationKey, to }),
     },
     newRetryId: () => randomUUID(),
