@@ -1,10 +1,12 @@
 import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { Context } from '@deepseek-ai/cordis'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { describe, expect, it } from 'vitest'
 import { ProjectionPatches } from '@dshfiles/session-source-port/projection-patch'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
-import { ControlQueue, ProjectionPatchEncoder } from './control.ts'
+import { ControlQueue, ProjectionPatchEncoder, SessionControlController } from './control.ts'
 
 const projection = (sessionId: string, key: string, value: string) => ({
   type: 'projection' as const,
@@ -79,5 +81,21 @@ describe('the control queue', () => {
     const sent = encoder.encode({ type: 'projection', sessionId: id, seq: 2, changes: [{ key: 'title', val: 'New' }, { key: 'turnOutline', val: list(41) }] })
     if (sent.type !== 'projection-patch') throw new Error(`expected a patch, got ${sent.type}`)
     expect(sent.changes.map(change => [change.key, 'patch' in change])).toEqual([['title', false], ['turnOutline', true]])
+  })
+})
+
+describe('the control controller', () => {
+  it('does not encode a projection change while no control stream is open', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionProjectionRegistry)
+    try {
+      const controller = new SessionControlController(ctx)
+      // JSON.stringify throws on a cycle, so encoding at all fails the publish.
+      const cyclic: Record<string, JsonValue> = {}
+      cyclic['self'] = cyclic
+      expect(() => controller.publishMirrored({ sessionId: SessionId('idle'), key: 'title', value: cyclic, seq: 1 })).not.toThrow()
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 })

@@ -88,6 +88,7 @@ export class SessionControlController {
   }
 
   private broadcast(frame: ProjectionFrame): void {
+    if (this.streams.size === 0) return
     const bytes = Buffer.byteLength(JSON.stringify(frame))
     for (const stream of this.streams) stream.push(frame, bytes)
   }
