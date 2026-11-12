@@ -31,6 +31,7 @@ const packageIdFromExternal = external => /^@dshfiles\/[^/]+/.exec(external)?.[0
 // conversation-cleanup permanently deletes conversation logs, so it stays out of the shared Web profile (see its README).
 // tool-bash and tool-fs replace the stock bash and filesystem tools; measured Sessions showed too little gain to seed
 // them (docs/tool-diet.md), so the web seed keeps the stock tools and a profile owner opts into the forks.
+// opencode-compat loads third-party OpenCode plugin code into the Host, so a profile owner selects it deliberately.
 const optInWebBundles = new Set([
   '@dshfiles/tool-search',
   '@dshfiles/resource-packs',
@@ -39,6 +40,7 @@ const optInWebBundles = new Set([
   '@dshfiles/conversation-cleanup',
   '@dshfiles/tool-bash',
   '@dshfiles/tool-fs',
+  '@dshfiles/opencode-compat',
 ])
 
 /** A seeded profile reconciles only this region, so a stock-row override above it never reaches an existing profile. */
