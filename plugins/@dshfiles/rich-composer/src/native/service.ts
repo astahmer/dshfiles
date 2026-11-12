@@ -36,6 +36,7 @@ import type {
 import type { InputSubmitMode } from './contract/composer-submission.ts'
 import { startInteraction } from '@dshfiles/dshx/tracing/client'
 import { TaskQueue } from '../file-upload-queue.ts'
+import { isImageMediaType } from './canonical-image-type.ts'
 
 const encodeBase64 = (bytes: Uint8Array): string => {
   let binary = ''
@@ -716,15 +717,6 @@ function imageMediaType(value: string): ImageMediaType {
     default:
       throw new UnsupportedImageMediaTypeError(value)
   }
-}
-
-/**
- * Whether a browser-declared MIME selects the image draft path (all other files upload verbatim).
- * @param value - the browser's declared MIME type.
- * @returns whether the file is an accepted raster image.
- */
-export function isImageMediaType(value: string): boolean {
-  return value === 'image/png' || value === 'image/jpeg' || value === 'image/webp' || value === 'image/gif'
 }
 
 function revokePreview(url: string): void {

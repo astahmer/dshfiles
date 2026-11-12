@@ -64,6 +64,8 @@
     "src/native/skeleton/ContextMeter.module.css"
   ],
   "added": [
+    "src/native/canonical-image-type.test.ts",
+    "src/native/canonical-image-type.ts",
     "src/native/conversation/live-bindings.test.ts",
     "src/native/conversation/live-bindings.ts",
     "src/native/image-attachment-references.test.ts",

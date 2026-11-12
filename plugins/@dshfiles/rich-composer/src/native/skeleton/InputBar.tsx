@@ -38,7 +38,7 @@ import { resolveSubmitMode } from '../input/submission-policy.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { parsePastedComposerText } from '../../paste-references.ts'
 import { LargePasteModel } from '../../large-paste.ts'
-import { isImageMediaType } from '../service.ts'
+import { isImageMediaType, withCanonicalImageType } from '../canonical-image-type.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { AnnotationsPill } from './AnnotationsPill.tsx'
 import { observeControlRow } from './control-row-layout.ts'
@@ -320,9 +320,10 @@ export const InputBar = memo(function InputBar({
   // client-side size or count limit and upload as soon as they are picked.
   // The host enforces the same image limits at submit for callers that bypass
   // this composer.
-  const intakeFiles = useCallback((files: readonly File[], directories?: ReadonlySet<File>): boolean => {
+  const intakeFiles = useCallback((intake: readonly File[], directories?: ReadonlySet<File>): boolean => {
     if (uploadDenied || locked || machineBusy || (subagent !== null && !continuable)
-      || addFiles === undefined || files.length === 0) return false
+      || addFiles === undefined || intake.length === 0) return false
+    const files = intake.map(file => directories?.has(file) === true ? file : withCanonicalImageType(file))
     const rejected = ((): string | null => {
       // Child prompts support images, but not generic file receipts or the
       // Desktop path-reference fallback. Refuse mixed batches before intake.
