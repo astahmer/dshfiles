@@ -92,7 +92,7 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 679,
+  "apiMethods": 680,
   "apiToolBindings": 477,
   "apiToolNameCount": 477,
   "apiToolSchemas": 476,
