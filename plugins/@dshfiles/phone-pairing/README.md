@@ -45,7 +45,9 @@ Devices live in `$DSH_HOME/plugins/phone-pairing/devices.json` as SHA-256 hashes
 7. Every later request is proxied to the native listener, which needs its own
    authority-bound cookie: the plugin exchanges the process launch URL for it and
    rewrites `Host`/`Origin` to `127.0.0.1:<native port>`. The native listener stays
-   loopback-only and is never exposed.
+   loopback-only and is never exposed. `GET /manifest.webmanifest` and `/pwa/*` pass without the
+   device cookie, since browsers fetch the manifest without cookies and the native listener serves
+   those files publicly; every other path needs a paired phone.
 
 ## Requirements and limitations
 

@@ -156,6 +156,33 @@ export const createPairingGateway = (options: GatewayOptions) => {
     return next
   }
 
+  /** Proxy one request to the native listener, never passing its cookies back to the phone. */
+  const forward = (input: {
+    readonly request: http.IncomingMessage
+    readonly response: http.ServerResponse
+    readonly path: string | undefined
+    readonly headers: http.IncomingHttpHeaders
+    readonly onStatus?: (status: number | undefined) => void
+  }): http.ClientRequest => {
+    const { request, response } = input
+    const outgoing = http.request(
+      { hostname: '127.0.0.1', port: options.upstream, method: request.method, path: input.path, headers: input.headers },
+      incoming => {
+        input.onStatus?.(incoming.statusCode)
+        const passthrough = { ...incoming.headers }
+        delete passthrough['set-cookie']
+        response.writeHead(incoming.statusCode ?? 502, passthrough)
+        incoming.pipe(response)
+      },
+    )
+    outgoing.on('error', () => {
+      if (!response.headersSent) response.writeHead(502, { 'content-type': 'text/plain' })
+      response.end('upstream unavailable')
+    })
+    request.pipe(outgoing)
+    return outgoing
+  }
+
   const server = http.createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://gateway.invalid')
     const publicOrigin = typeof options.publicOrigin === 'function' ? options.publicOrigin() : options.publicOrigin
@@ -209,6 +236,13 @@ export const createPairingGateway = (options: GatewayOptions) => {
       return
     }
 
+    // Browsers fetch the web app manifest and its icons without cookies; the native listener serves them publicly. The
+    // normalized path is forwarded, so `/pwa/../api` cannot pass this check and reach another route.
+    if ((request.method === 'GET' || request.method === 'HEAD') && (url.pathname === '/manifest.webmanifest' || url.pathname.startsWith('/pwa/'))) {
+      forward({ request, response, path: `${url.pathname}${url.search}`, headers: rewrite(request.headers) })
+      return
+    }
+
     const credential = authorised(request)
     if (credential === undefined) {
       // A page load gets a way back in; a fetch or script gets a plain 401 it can act on.
@@ -228,19 +262,7 @@ export const createPairingGateway = (options: GatewayOptions) => {
       const entry = { credential, sockets: new Set<{ destroy: () => void }>() }
       active.add(entry)
       response.once('close', () => active.delete(entry))
-      const outgoing = http.request({ hostname: '127.0.0.1', port: options.upstream, method: request.method, path: request.url, headers }, incoming => {
-        rejectedBy(incoming.statusCode, cookie)
-        const passthrough = { ...incoming.headers }
-        delete passthrough['set-cookie']
-        response.writeHead(incoming.statusCode ?? 502, passthrough)
-        incoming.pipe(response)
-      })
-      entry.sockets.add(outgoing)
-      outgoing.on('error', () => {
-        if (!response.headersSent) response.writeHead(502, { 'content-type': 'text/plain' })
-        response.end('upstream unavailable')
-      })
-      request.pipe(outgoing)
+      entry.sockets.add(forward({ request, response, path: request.url, headers, onStatus: status => rejectedBy(status, cookie) }))
     })
   })
 

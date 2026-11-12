@@ -97,6 +97,23 @@ describe('pairing gateway', () => {
     }
   })
 
+  it('serves the web app manifest and its icons without a device cookie, and gates everything else', async () => {
+    const upstream = http.createServer((request, response) => response.end(`native ${String(request.url)} ${String(request.headers.cookie)}`))
+    const paired = await pairedGateway(await listen(upstream), async () => ({ value: 'dsh-auth=fixture', expiresAt: Number.POSITIVE_INFINITY }))
+    try {
+      expect(await get(paired.port, '/manifest.webmanifest')).toEqual({ status: 200, body: 'native /manifest.webmanifest undefined' })
+      expect(await get(paired.port, '/pwa/icon-192.png?v=1')).toEqual({ status: 200, body: 'native /pwa/icon-192.png?v=1 undefined' })
+      expect((await get(paired.port, '/pwa/../api/sessions')).status).toBe(401)
+      expect((await get(paired.port, '/pwa/%2e%2e/api/sessions')).status).toBe(401)
+      expect((await get(paired.port, '/manifest.webmanifest.js')).status).toBe(401)
+      expect((await post(paired.port, '/manifest.webmanifest', {})).status).toBe(401)
+      expect((await get(paired.port, '/')).status).toBe(401)
+    } finally {
+      await paired.close()
+      await new Promise(resolve => upstream.close(resolve))
+    }
+  })
+
   it('mints the native cookie once for concurrent requests and again after a 401', async () => {
     const upstream = http.createServer((request, response) => {
       response.statusCode = request.url === '/expire' && request.headers.cookie === 'dsh-auth=1' ? 401 : 200
