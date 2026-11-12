@@ -33,6 +33,7 @@ it('maps skills, context hooks and durable plugin storage', async () => {
     await host.ctx.plugin(StorageJson, { root })
     await host.ctx.plugin(StorageDomain, { backend: 'json' })
     const removeSection = host.ctx.systemPrompt.section({ name: 'fixture', order: 1, text: 'original' })
+    const removeDropSection = host.ctx.systemPrompt.section({ name: 'fixture-drop', order: 2, text: 'drop me' })
     const removeTool = host.ctx.systemPrompt.tools(() => ({
       schemas: [
         { name: 'remove_me', description: 'Remove', parameters: {} },
@@ -52,7 +53,8 @@ it('maps skills, context hooks and durable plugin storage', async () => {
     expect(skill?.invocation.modelInvocable).toBe(false)
     const assembly = await host.ctx.systemPrompt.assemble()
     expect(assembly.sections.some(section => section.text === 'opencode-compat: hello')).toBe(true)
-    expect(assembly.sections.some(section => section.text === 'original')).toBe(true)
+    expect(assembly.sections.find(section => section.name === 'fixture')?.text).toBe('original edited')
+    expect(assembly.sections.some(section => section.text === 'drop me')).toBe(false)
     expect(assembly.tools.find(tool => tool.name === 'keep_me')?.description).toBe('changed description')
     expect(assembly.tools.map(tool => tool.name)).toContain('keep_me')
     expect(assembly.tools.map(tool => tool.name)).not.toContain('remove_me')
@@ -63,7 +65,7 @@ it('maps skills, context hooks and durable plugin storage', async () => {
       signal: new AbortController().signal,
     })
     expect(JSON.stringify(afterAssembly.content)).toContain('ctx.session.hook(context).messages')
-    expect(JSON.stringify(afterAssembly.content)).toContain('ctx.session.hook(context).system.edit')
+    expect(JSON.stringify(afterAssembly.content)).not.toContain('ctx.session.hook(context).system.edit')
     expect(fixture.state.value).toEqual({ value: 1 })
     const storage = fixture.state.storage
     await expect(storage.set('invalid', undefined)).rejects.toThrow()
@@ -81,10 +83,13 @@ it('maps skills, context hooks and durable plugin storage', async () => {
     const disposedAssembly = await host.ctx.systemPrompt.assemble()
     expect(disposedAssembly.tools.map(tool => tool.name)).toContain('remove_me')
     expect(disposedAssembly.sections.some(section => section.text === 'opencode-compat: hello')).toBe(false)
+    expect(disposedAssembly.sections.find(section => section.name === 'fixture')?.text).toBe('original')
+    expect(disposedAssembly.sections.some(section => section.text === 'drop me')).toBe(true)
     mounted = await host.mount(plugin, { packageId: '@dshfiles/opencode-compat' })
     expect(await fixture.state.storage.get('prefix/c')).toBe(3)
     await mounted.dispose()
     removeTool()
+    removeDropSection()
     removeSection()
   } finally {
     await host.dispose()

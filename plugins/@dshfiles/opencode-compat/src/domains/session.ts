@@ -24,12 +24,13 @@ export const sessionDomain = (config: { readonly ctx: Context; readonly input: D
         const indexForHook = hookIndex++
         const dispose = config.ctx.on('system-prompt/assemble', async (_assembly, assemblyContext, next) => {
           const assembly = await next()
-          const original = assembly.sections.map(section => section.text)
+          const parts = assembly.sections.map(section => ({ type: 'text' as const, text: section.text }))
+          const sectionOf = new Map(parts.map((part, index) => [part, assembly.sections[index]!]))
           const context: SessionContext = {
             sessionID: assemblyContext.agent?.session.id ?? '',
             agent: assemblyContext.agent?.id ?? '',
             model: assemblyContext.agent?.options.model ?? '',
-            system: original.map(text => ({ type: 'text', text })),
+            system: [...parts],
             messages: [],
             options: {},
             tools: Object.fromEntries(assembly.tools.map(tool => [tool.name, { description: tool.description, input: structuredClone(tool.parameters) }])),
@@ -37,14 +38,11 @@ export const sessionDomain = (config: { readonly ctx: Context; readonly input: D
           await callback(context)
           if (context.messages.length || Object.keys(context.options).length)
             await Promise.resolve(unsupported('session.hook(context).messages')()).catch(() => undefined)
-          if (original.some((text, index) => context.system[index]?.text !== text))
-            await Promise.resolve(unsupported('session.hook(context).system.edit')()).catch(() => undefined)
-          const sections = [
-            ...assembly.sections,
-            ...context.system
-              .slice(original.length)
-              .map((part, index) => ({ name: `opencode-compat:${config.input.pluginId}:${indexForHook}:${index}`, text: part.text, interpolate: false })),
-          ]
+          const sections = context.system.map((part, index) => {
+            const section = sectionOf.get(part)
+            if (section === undefined) return { name: `opencode-compat:${config.input.pluginId}:${indexForHook}:${index}`, text: part.text, interpolate: false }
+            return part.text === section.text ? section : { ...section, text: part.text }
+          })
           const tools = assembly.tools.flatMap(tool => {
             const edited = context.tools[tool.name]
             return edited === undefined ? [] : [{ ...tool, description: edited.description }]

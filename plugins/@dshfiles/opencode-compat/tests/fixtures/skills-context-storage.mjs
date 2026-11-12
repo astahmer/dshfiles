@@ -7,7 +7,9 @@ export default {
       editor.add({ id: 'compat-skill', name: 'compat-skill', description: 'A compatibility skill', content: 'Hello', autoinvoke: false })
     })
     await ctx.session.hook('context', context => {
-      if (context.system[0]) context.system[0].text = 'ignored edit'
+      const original = context.system.find(part => part.text === 'original')
+      if (original) original.text = 'original edited'
+      context.system = context.system.filter(part => part.text !== 'drop me')
       context.system.push({ type: 'text', text: 'opencode-compat: hello' })
       context.messages.push({ role: 'user', content: 'unsupported' })
       delete context.tools.remove_me
