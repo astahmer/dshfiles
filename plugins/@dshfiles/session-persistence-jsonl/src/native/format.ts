@@ -582,6 +582,51 @@ function parseHeaderRecord(record: Buffer): {
 }
 
 /**
+ * dshfiles: strings at least this long that one log repeats are kept once. A provider reasoning signature is written
+ * on the message source and, in logs older than the agent-loop fork, again on the terminal stream chunk; each
+ * `JSON.parse` gives every copy its own heap string, so a decoded log held two copies of every signature.
+ */
+const SHARED_STRING_MIN_LENGTH = 256
+
+/** One canonical heap string per long value of a scanned log; the values themselves never change. */
+class SharedStrings {
+  private pool: Map<string, string> | undefined = new Map()
+
+  /** Point every long string of a freshly parsed row at its canonical copy, in place. */
+  share(value: unknown): void {
+    if (this.pool === undefined || typeof value !== 'object' || value === null) return
+    // `===` compares string content, so a long string is reassigned without comparing it to its canonical copy.
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        const child: unknown = value[index]
+        if (typeof child !== 'string') this.share(child)
+        else if (child.length >= SHARED_STRING_MIN_LENGTH) value[index] = this.canonical(child)
+      }
+      return
+    }
+    // SAFETY: a JSON.parse result is a plain mutable object owned by this scanner.
+    const record = value as Record<string, unknown>
+    for (const key of Object.keys(record)) {
+      const child = record[key]
+      if (typeof child !== 'string') this.share(child)
+      else if (child.length >= SHARED_STRING_MIN_LENGTH) record[key] = this.canonical(child)
+    }
+  }
+
+  release(): void {
+    this.pool = undefined
+  }
+
+  private canonical(value: string): string {
+    if (this.pool === undefined) return value
+    const known = this.pool.get(value)
+    if (known !== undefined) return known
+    this.pool.set(value, value)
+    return value
+  }
+}
+
+/**
  * Incrementally scan complete JSONL event records after an independently
  * supplied header record. Newline search and byte offsets stay on raw buffers;
  * only complete records are decoded to UTF-8. A fragment crossing writes is
@@ -601,6 +646,7 @@ export class SessionLogScanner {
   private readonly toolCatalogs = new ToolCatalogCatalogs()
   private readonly marked: boolean
   private readonly committedCatalogs: (readonly unknown[])[] = []
+  private readonly sharedStrings = new SharedStrings()
 
   /**
    * Create an event scanner from exactly one newline-terminated header record.
@@ -672,6 +718,7 @@ export class SessionLogScanner {
    */
   finish(): SessionLogScan {
     this.finished = true
+    this.sharedStrings.release()
     const artifact = this.restore.finish()
     assertReleasedV4Relationships(artifact, KNOWN_SESSION_EVENT_TYPES)
     return {
@@ -705,6 +752,7 @@ export class SessionLogScanner {
       return
     }
 
+    this.sharedStrings.share(decoded)
     const catalog = heldToolCatalog(decoded)
     try {
       decoded = rehydrateToolCatalog(decoded, this.toolCatalogs)

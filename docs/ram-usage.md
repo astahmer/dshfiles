@@ -98,6 +98,16 @@ bytes sit: `request/header` 8.87 MB (34 events, mostly the 455-tool catalog), `a
 several times over, not that one event is huge; the next thing to attribute is the 12.2 M `{"type":"reasoning",…}`
 strings in the snapshot, which are raw adapter chunks and not the compact records this fork trims.
 
+Every decoded copy of a log still paid twice for each pre-fork signature: `JSON.parse` gives the message-source copy
+and the stream-chunk copy their own heap strings. Since 2026-11-12 the owned
+[`session-persistence-jsonl`](../plugins/@dshfiles/session-persistence-jsonl/README.md) scanner keeps one heap copy of
+each 256+ character string a log repeats, without changing any value, so every holder of a decoded log (`Session.log`,
+the cold-log memo, the prepared-session cache) shares it. Measured through the real forked persistence plugin in a
+Cordis context, after GC: a 400-message log with 3.3 MB of unique signatures retained **7.24 MB before, 3.93 MB after**
+(`tests/replay-string-sharing.test.ts`). The live Host itself read 441 MB RSS 34 min after its 2026-11-12 restart, so
+the 2.82 GB above is no longer the live state; the bounded caches named by the scratch probe below (`coldLogMemo`: 2
+logs, 30 s; `SessionObservationReader`: `preparedSessionCacheSize`, 1 in `profiles/web`) need no further bound.
+
 Two owners follow:
 
 - **Host:** the per-block replay duplicate is fixed by the

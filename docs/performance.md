@@ -3,6 +3,21 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Decoded logs share repeated replay signatures (2026-11-12, `b:rfp1`)
+
+A pre-fork `assistant/message` stores each provider reasoning signature on the message source and again on the terminal
+stream chunk; `JSON.parse` made each copy its own heap string, so every decoded log held two. The owned
+`session-persistence-jsonl` scanner now keeps one copy of each 256+ character string a log repeats; values are unchanged,
+so provider replay and transcripts read the same events. Same fixture, real forked persistence plugin, heap after GC:
+
+| 400 messages, 3.3 MB unique signatures | Before  | After   |
+| -------------------------------------- | ------- | ------- |
+| Decoded log retained                   | 7.24 MB | 3.93 MB |
+| `scanLog` alone                        | 7.39 MB | 4.07 MB |
+
+Not measured: a scratch Host A/B through `dshx dev` and the live Host (the change needs a Host restart; the live Host
+read 441 MB RSS on 2026-11-12, see [RAM usage](ram-usage.md#what-the-memory-was)).
+
 ## Session list cache-hit tail (2026-11-12, `b:17rs`)
 
 After the corpus cache, misses no longer cost anything; the tail sat on cache hits. Stored traces of the Host started

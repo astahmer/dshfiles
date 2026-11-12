@@ -32,7 +32,7 @@ events it always did.
 
 | File                   | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/native/format.ts` | `TOOL_CATALOG_MARKER` / `TOOL_CATALOG_REFERENCE`, `ToolCatalogWriter` (first row writes the catalog, later rows write a reference, staged per durable batch), `rehydrateToolCatalog` in `SessionLogScanner` (which also keeps the committed rows' catalogs as the reopen seed), and the marker-aware header line encode/parse                                                                                                                                                                                                                                                               |
+| `src/native/format.ts` | `TOOL_CATALOG_MARKER` / `TOOL_CATALOG_REFERENCE`, `ToolCatalogWriter` (first row writes the catalog, later rows write a reference, staged per durable batch), `rehydrateToolCatalog` in `SessionLogScanner` (which also keeps the committed rows' catalogs as the reopen seed), the marker-aware header line encode/parse, and `SharedStrings`: a scan keeps one heap copy of each string of 256+ characters its rows repeat (a reasoning signature on the message source and the stream chunk), values unchanged                                                                           |
 | `src/native/index.ts`  | one `ToolCatalogWriter` per session write handle, seeded on a write open from the catalogs the scan read from committed rows, committed only after its batch is durable; the header probes and the migration-publish header line carry/strip the marker; one-Session reads (`stat`, `resolveCurrentLog`, `open` for read) never wait for the root-wide encoding walk (a root it refused keeps refusing them), an id a complete listing under a minute old did not see reads as absent without probing every project directory, and an otherwise unknown id probes the projects 16 at a time |
 
 `src/host.ts`, `scripts/build-worker.mjs` and the tests are ours: the Host entry re-exports the native plugin class
@@ -93,9 +93,12 @@ artifact shrank and carries one catalog, asserts both reads return identical eve
 backend refuses a deduped artifact. A compressed variant covers the zstd container and a reopened writer that
 references the catalog the previous process wrote; two more cover a resumed pre-fork artifact (no reference, the stock
 backend still reads it) and a torn final frame whose recovered rows are rewritten with their catalog in full.
+`tests/replay-string-sharing.test.ts` reads 400 provider-shaped assistant messages whose signature appears twice and
+asserts the decoded log retains under 1.5× the unique signature bytes after GC (7.24 MB before, 3.93 MB after for
+3.3 MB of signatures).
 
 ## Update policy
 
-Copy the upstream `src` files, re-apply the two deltas, bump `upstream.version` / `upstream.ref` here and in
+Copy the upstream `src` files, re-apply the deltas, bump `upstream.version` / `upstream.ref` here and in
 `native-fork.json`, then run `native-fork-diff`, typecheck, test and build. The upstream README is kept as
 [`UPSTREAM.md`](./UPSTREAM.md).
