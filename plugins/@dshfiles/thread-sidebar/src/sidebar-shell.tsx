@@ -1818,7 +1818,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           if (!open) PaletteBridge.closeFanOut()
         }}
       >
-        <DialogContent className="dshx-root dshx:max-h-[85vh] dshx:overflow-y-auto dshx:max-w-xl">
+        <DialogContent className="dshx-root dshx:max-h-[85dvh] dshx:overflow-y-auto dshx:max-w-xl">
           <DialogHeader>
             <DialogTitle>{text(props.t, 'threadSidebarFanOutTitle')}</DialogTitle>
           </DialogHeader>

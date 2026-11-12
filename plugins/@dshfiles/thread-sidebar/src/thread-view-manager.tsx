@@ -293,7 +293,7 @@ export const ThreadViewManager = (props: ThreadViewManagerProps): JSX.Element =>
       }}
       open={props.open}
     >
-      <DialogContent className="dshx-root dshx:max-h-[85vh] dshx:overflow-y-auto dshx:sm:max-w-xl" closeLabel={props.t('threadSidebarClose')}>
+      <DialogContent className="dshx-root dshx:max-h-[85dvh] dshx:overflow-y-auto dshx:sm:max-w-xl" closeLabel={props.t('threadSidebarClose')}>
         {editingView !== null ? (
           <ThreadViewEditor
             key={editingView.id}

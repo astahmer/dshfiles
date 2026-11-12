@@ -547,6 +547,8 @@
       [data-slot='switch'],
       [data-slot='checkbox'],
       [data-slot='radio-group-item'],
+      button[data-slot='dialog-close'],
+      button[data-slot='sheet-close'],
       .dshx-root button:not([data-slot]):not([class*='after:']):not([data-slot^='conversation.'] *)
     ) {
       position: relative;
@@ -560,6 +562,8 @@
       [data-slot='switch'],
       [data-slot='checkbox'],
       [data-slot='radio-group-item'],
+      button[data-slot='dialog-close'],
+      button[data-slot='sheet-close'],
       .dshx-root button:not([data-slot]):not([class*='after:']):not([data-slot^='conversation.'] *)
     )::after {
       content: '';

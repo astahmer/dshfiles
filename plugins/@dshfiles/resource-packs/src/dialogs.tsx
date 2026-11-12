@@ -17,7 +17,7 @@ export function ResourceDialog(props: { heading: string; description: string; on
         if (!open) props.onClose()
       }}
     >
-      <DialogContent className="dshx-root dshx:@container dshx:max-h-[90vh] dshx:overflow-y-auto">
+      <DialogContent className="dshx-root dshx:@container dshx:max-h-[90dvh] dshx:overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{props.heading}</DialogTitle>
           <DialogDescription>{props.description}</DialogDescription>

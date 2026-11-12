@@ -48,7 +48,7 @@ export const AutomationDialog = (props: {
   })
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="dshx-root dshx:max-h-[90vh] dshx:overflow-y-auto dshx:sm:max-w-xl">
+      <DialogContent className="dshx-root dshx:max-h-[90dvh] dshx:overflow-y-auto dshx:sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{props.editing ? 'Edit automation' : 'New automation'}</DialogTitle>
           <DialogDescription>Each run sends this prompt to a thread in the project.</DialogDescription>

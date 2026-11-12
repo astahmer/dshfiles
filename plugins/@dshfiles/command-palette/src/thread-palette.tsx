@@ -589,7 +589,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             <CommandInput
               autoFocus
               aria-label={props.copy.searchLabel}
-              className="dshx:h-11"
+              className={cn('dshx:h-11 dshx:text-ellipsis', showAskEntry && 'dshx:pr-24 dshx:pointer-coarse:pr-16')}
               value={query}
               onValueChange={next => {
                 sendNavigation({ type: 'query.change', query: next })
@@ -607,7 +607,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 className="dshx:absolute dshx:right-2 dshx:top-1/2 dshx:flex dshx:-translate-y-1/2 dshx:items-center dshx:gap-2 dshx:rounded dshx:px-1.5 dshx:py-0.5 dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground"
               >
                 <span>{props.copy.ask}</span>
-                <KbdGroup>
+                <KbdGroup className="dshx:pointer-coarse:hidden">
                   <Kbd>Tab</Kbd>
                 </KbdGroup>
               </button>

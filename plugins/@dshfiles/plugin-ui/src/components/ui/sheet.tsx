@@ -54,16 +54,19 @@ function SheetContent({
           side === 'left' &&
             'dshx:inset-y-0 dshx:left-0 dshx:h-full dshx:w-3/4 dshx:border-r dshx:data-[state=closed]:slide-out-to-left dshx:data-[state=open]:slide-in-from-left dshx:sm:max-w-sm',
           side === 'top' &&
-            'dshx:inset-x-0 dshx:top-0 dshx:h-auto dshx:border-b dshx:data-[state=closed]:slide-out-to-top dshx:data-[state=open]:slide-in-from-top',
+            'dshx:inset-x-0 dshx:top-0 dshx:h-auto dshx:max-h-[85dvh] dshx:overflow-y-auto dshx:overscroll-contain dshx:border-b dshx:data-[state=closed]:slide-out-to-top dshx:data-[state=open]:slide-in-from-top',
           side === 'bottom' &&
-            'dshx:inset-x-0 dshx:bottom-0 dshx:h-auto dshx:border-t dshx:data-[state=closed]:slide-out-to-bottom dshx:data-[state=open]:slide-in-from-bottom',
+            'dshx:inset-x-0 dshx:bottom-0 dshx:h-auto dshx:max-h-[85dvh] dshx:overflow-y-auto dshx:overscroll-contain dshx:border-t dshx:data-[state=closed]:slide-out-to-bottom dshx:data-[state=open]:slide-in-from-bottom',
           className,
         )}
         {...props}
       >
         {children}
         {showCloseButton && (
-          <SheetPrimitive.Close className="dshx:absolute dshx:top-4 dshx:right-4 dshx:rounded-xs dshx:opacity-70 dshx:ring-offset-background dshx:transition-opacity dshx:hover:opacity-100 dshx:focus:ring-2 dshx:focus:ring-ring dshx:focus:ring-offset-2 dshx:focus:outline-hidden dshx:disabled:pointer-events-none dshx:data-[state=open]:bg-secondary">
+          <SheetPrimitive.Close
+            data-slot="sheet-close"
+            className="dshx:absolute dshx:top-4 dshx:right-4 dshx:rounded-xs dshx:opacity-70 dshx:ring-offset-background dshx:transition-opacity dshx:hover:opacity-100 dshx:focus:ring-2 dshx:focus:ring-ring dshx:focus:ring-offset-2 dshx:focus:outline-hidden dshx:disabled:pointer-events-none dshx:data-[state=open]:bg-secondary"
+          >
             <XIcon className="dshx:size-4" />
             <span className="dshx:sr-only">Close</span>
           </SheetPrimitive.Close>

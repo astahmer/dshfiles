@@ -140,7 +140,7 @@ export const AlertRuleDialog = (props: {
   const t = props.t
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="dshx-root dshx:max-h-[90vh] dshx:overflow-y-auto dshx:sm:max-w-xl">
+      <DialogContent className="dshx-root dshx:max-h-[90dvh] dshx:overflow-y-auto dshx:sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{props.rule === null ? t('createRuleTitle') : t('editRuleTitle')}</DialogTitle>
           <DialogDescription>{t('ruleFormDescription')}</DialogDescription>

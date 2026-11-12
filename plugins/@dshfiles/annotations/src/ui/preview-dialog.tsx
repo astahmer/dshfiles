@@ -89,7 +89,7 @@ export const PreviewDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="dshx-root dshx:flex dshx:h-[80vh] dshx:max-w-3xl dshx:flex-col dshx:gap-2">
+      <DialogContent className="dshx-root dshx:flex dshx:h-[80dvh] dshx:max-w-3xl dshx:flex-col dshx:gap-2">
         <DialogHeader>
           <DialogTitle>Annotate an HTML preview</DialogTitle>
           <DialogDescription>A workspace-relative path. The page&apos;s own scripts are removed and the frame is sandboxed.</DialogDescription>
