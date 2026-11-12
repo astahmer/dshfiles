@@ -305,12 +305,112 @@ const renderItemPreview = (item: (typeof detailSchema.Type)['item']): string => 
   return [`${BacklogReference.labelOf(item)} — ${item.title}`, `${status}${project}`, ...(body === '' ? [] : [body]), ...sections].join('\n')
 }
 
-const withGuidance = (detail: typeof detailSchema.Type): string =>
-  typeof detail.guidance !== 'string' ? renderItemPreview(detail.item) : `${renderItemPreview(detail.item)}\n\nProject guidance:\n${detail.guidance}`
+/** How many of an item's newest events, and how many characters of them, the model-facing render keeps. */
+const maxRenderedEvents = 200
+const maxRenderedEventChars = 40_000
+
+const renderEvent = (event: (typeof detailSchema.Type)['item']['events'][number]): string => {
+  const changes = (event.fieldChanges ?? []).map(change => `\n    ${change.field}: ${change.before} → ${change.after}`).join('')
+  const attachments = (event.attachments ?? []).map(attachment => `\n    attachment ${attachment.kind} ${attachment.name}`).join('')
+  const thread = event.threadId === undefined ? '' : ` · thread ${event.threadId}`
+  const text = event.detail === '' ? '(no text)' : event.detail
+  return `- ${new Date(event.at).toISOString()} (at ${String(event.at)}) · ${event.actor} · ${event.kind}${thread}: ${text}${changes}${attachments}`
+}
+
+/** The newest events a model-facing render lists, within both bounds; older ones are named, never dropped silently. */
+const renderEvents = (events: (typeof detailSchema.Type)['item']['events']): readonly string[] => {
+  const kept: string[] = []
+  let chars = 0
+  for (const event of events.toReversed()) {
+    const line = renderEvent(event)
+    if (kept.length > 0 && (kept.length >= maxRenderedEvents || chars + line.length > maxRenderedEventChars)) break
+    kept.unshift(line)
+    chars += line.length
+  }
+  const omitted = events.length - kept.length
+  return [
+    `Events (${String(events.length)}${omitted === 0 ? '' : `, newest ${String(kept.length)} shown`}, oldest first):`,
+    ...(omitted === 0 ? [] : [`- ${String(omitted)} earlier ${omitted === 1 ? 'event' : 'events'} not shown here; backlog_get_many returns the full history.`]),
+    ...kept,
+  ]
+}
+
+const renderRelated = (item: (typeof detailSchema.Type)['backlinks'][number]): string =>
+  `${BacklogReference.labelOf(item)} — ${item.title} (${item.kind} · ${item.status})`
+
+const titledSection = (title: string, lines: readonly string[]): readonly string[] => (lines.length === 0 ? [] : [title, ...lines])
+
+/** The full item for the agent: the transcript card is the native generic row, so `render` is model-facing only. */
+const renderItemForModel = (detail: typeof detailSchema.Type): string => {
+  const item = detail.item
+  const priority = item.priority ?? 'none'
+  const status = [
+    item.kind,
+    item.status,
+    ...(priority === 'none' ? [] : [priority]),
+    ...(item.project === null ? [] : [item.project]),
+    ...(item.due === undefined ? [] : [`due ${item.due}`]),
+    ...(item.recurrence === undefined ? [] : [`repeats ${item.recurrence}`]),
+    ...(item.freshness === 'fresh' ? [] : [item.freshness]),
+  ].join(' · ')
+  const rollup = BacklogItems.criteriaRollup(item.criteria)
+  const attributes = [
+    ...(item.pinned ? ['Pinned'] : []),
+    ...(item.attention === undefined || item.attention === 'none' ? [] : [`Attention: ${item.attention}`]),
+    ...(item.delegate === undefined ? [] : [`Delegated to ${item.delegate}`]),
+    ...(item.snoozedUntil === undefined || item.snoozedUntil === null ? [] : [`Snoozed until ${new Date(item.snoozedUntil).toISOString()}`]),
+  ]
+  const claim =
+    detail.lease === null
+      ? []
+      : [`Claimed by ${detail.lease.holder} until ${new Date(detail.lease.expiresAt).toISOString()}; any write by it renews the claim.`]
+  const gates = (item.gates ?? []).map(gate => `${gate.kind} ${gate.target} (${gate.resolvedAt === undefined ? 'open' : 'resolved'})`)
+  return [
+    `${BacklogReference.labelOf(item)} — ${item.title}`,
+    status,
+    ...attributes,
+    ...(item.tags.length === 0 ? [] : [`Tags: ${item.tags.map(tag => `#${tag}`).join(' ')}`]),
+    ...titledSection(
+      `Links (${String(item.links.length)}):`,
+      item.links.map(link => `- ${link.type} ${link.target}${link.relation === undefined ? '' : ` (${link.relation})`}`),
+    ),
+    ...titledSection(
+      `Attachments (${String(item.attachments.length)}):`,
+      item.attachments.map(attachment => `- ${attachment.kind} ${attachment.name} (${attachment.mediaType}, ${String(attachment.bytes)} bytes)`),
+    ),
+    ...titledSection(
+      `Criteria (${String(rollup.done)}/${String(rollup.total)}):`,
+      (item.criteria ?? []).map(criterion => `- [${criterion.done ? 'x' : ' '}] ${criterion.text} (${criterion.id})`),
+    ),
+    ...(item.plan === undefined ? [] : [`Plan${item.planApproval === undefined ? '' : ` (${item.planApproval})`}:`, item.plan]),
+    ...(item.summary === undefined ? [] : ['Summary:', item.summary]),
+    ...(item.body.trim() === '' ? [] : ['Body:', item.body]),
+    ...(item.events.length === 0 ? [] : renderEvents(item.events)),
+    ...titledSection(
+      'Gates:',
+      gates.map(gate => `- ${gate}`),
+    ),
+    ...(detail.parentItem === null ? [] : [`Parent: ${renderRelated(detail.parentItem)}`]),
+    ...titledSection(
+      `Children (${String(detail.children.length)}):`,
+      detail.children.map(child => `- ${renderRelated(child)}`),
+    ),
+    ...titledSection(
+      `Blocked by (${String(detail.blockedBy.length)}):`,
+      detail.blockedBy.map(blocker => `- ${renderRelated(blocker)}`),
+    ),
+    ...titledSection(
+      `Backlinks (${String(detail.backlinks.length)}):`,
+      detail.backlinks.map(backlink => `- ${renderRelated(backlink)}`),
+    ),
+    ...claim,
+    ...(typeof detail.guidance === 'string' ? ['Project guidance:', detail.guidance] : []),
+  ].join('\n')
+}
 
 const renderDetailPreview = (result: typeof detailResultSchema.Type): string => (result.ok ? renderItemPreview(result.value.item) : 'No backlog item found.')
 
-const renderGetPreview = (result: typeof detailResultSchema.Type): string => (result.ok ? withGuidance(result.value) : 'No backlog item found.')
+const renderGet = (result: typeof detailResultSchema.Type): string => (result.ok ? renderItemForModel(result.value) : 'No backlog item found.')
 
 const renderCreatedPreview = (detail: typeof detailSchema.Type): string => renderItemPreview(detail.item)
 
@@ -704,7 +804,7 @@ export const backlogApi = defineApi({
       output: detailResultSchema,
       description:
         'One backlog item `b:<ref>` with its body, links, event history and the items that link to it. Read-only. Use `backlog_get_many` for several at once.',
-      tool: { name: 'backlog_get', readOnly: true, render: renderGetPreview },
+      tool: { name: 'backlog_get', readOnly: true, render: renderGet },
     }),
     getMany: method({
       input: Schema.Struct({

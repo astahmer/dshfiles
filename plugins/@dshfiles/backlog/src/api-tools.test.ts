@@ -133,7 +133,7 @@ describe('backlog tool exposure', () => {
     ])
   })
 
-  test('item-returning tools render a compact linked preview instead of raw JSON', () => {
+  test('write tools render a compact linked preview, while backlog_get carries the whole item', () => {
     const item = {
       id: 42,
       title: 'A linked backlog item',
@@ -152,7 +152,7 @@ describe('backlog tool exposure', () => {
       events: [],
       freshness: 'fresh' as const,
     }
-    const render = backlogApi.methods.get.tool?.render
+    const render = backlogApi.methods.update.tool?.render
     expect(render).toBeTypeOf('function')
     expect(render?.({ ok: true, value: { item, backlinks: [] } })).toBe(['b:42 — A linked backlog item', 'task · doing', 'First line second line'].join('\n'))
     for (const name of ['capture', 'get', 'attachFile', 'removeFile', 'update', 'link', 'triage', 'applyProposal', 'dismissProposal', 'comment'] as const) {
