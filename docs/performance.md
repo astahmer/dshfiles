@@ -3,6 +3,31 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Inbox diff stats survive other workspaces' operations (2026-11-12)
+
+The live traces store (copied, 17:36–18:15, after the Host's last boot) put `jj diff` at 516 spawns in 39 minutes,
+13.2/min and 54 % of every jj process the Host started, all under `jj-integration attention reconcile`: each pass (2-minute
+safety tick plus Session settles) runs `jj --ignore-working-copy diff --stat -r <unlanded commit ids>` per ready thread.
+The view-read cache keyed them on the store's operation head, which other agents move every few seconds, so it almost
+never hit. Steady Host event-loop stalls in that window were rare (4 over 100 ms in 35 minutes, max 286 ms), so the
+measurable steady cost is spawned processes, not main-thread time.
+
+Fix: `@dshfiles/jj-cli`'s `JjViewReads` keys a `diff` whose every `-r`/`--from`/`--to` value is a union of full commit ids
+by its arguments alone (256-entry LRU): the ids fix the trees, so the output is the same at any head. Any other diff
+still keys on the head. Regression check: `jj-view-reads.test.ts` "answers a diff over full commit ids across
+operations, and re-reads a diff that names @" (two spawns before, one after).
+
+Probe: scratch Host (`dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/activity-timeline --project`)
+on a repository with 12 ready thread workspaces, a logging `jj` first on the Host's `PATH`, and a driver that lands one
+operation from a non-thread workspace every 15 s for 6.5 minutes (26 operations, three safety reconciles):
+
+| Host jj spawns in 6.5 min | Before | After |
+| ------------------------- | ------ | ----- |
+| `diff`                    | 36     | 0     |
+| `log`                     | 17     | 17    |
+| other                     | 11     | 11    |
+| total per minute          | 9.8    | 4.3   |
+
 ## "@Mention thread" resolves one Session, not the corpus (2026-11-12, `b:450`)
 
 The tab menu's **@Mention thread** item dispatches a client event; the mounted composer

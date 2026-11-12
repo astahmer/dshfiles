@@ -40,7 +40,9 @@ Every run:
 misses the cache. Entries the moved head made unreachable are invalidated for that store only, never globally, so a
 long-lived Host does not retain every result it ever computed (a `diff`/`show` read can be 1.16 MB). Concurrent
 identical reads share one process; it keeps running while any caller still waits and stops when the last one is
-interrupted. Only exit-0 results are cached.
+interrupted. Only exit-0 results are cached. A `diff` whose every `-r`/`--from`/`--to` value is a union of full
+commit ids is keyed by its arguments alone (256-entry LRU): those ids fix its trees, so another workspace's operation
+does not make it run again.
 
 `redactJjStderr` removes URL credentials, authorization values and secret-looking assignments: remote helpers can
 print credential-bearing URLs.

@@ -111,6 +111,45 @@ describe('JjViewReads against real jj', () => {
     }).pipe(Effect.scoped, Effect.provide(JjTestLayer)),
   )
 
+  it.live('answers a diff over full commit ids across operations, and re-reads a diff that names @', () =>
+    Effect.gen(function* () {
+      const jj = yield* Jj
+      const reads = yield* JjViewReads
+      const fileSystem = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const { repository } = yield* temporaryRepository
+      yield* fileSystem.writeFileString(path.join(repository, 'file.txt'), 'changed\n')
+      yield* jj.exec({ args: ['describe', '-m', 'feat: change'], cwd: repository })
+      const commitId = (yield* jj.exec({ args: ['log', '--no-graph', '-r', '@', '-T', 'commit_id'], cwd: repository })).stdout.trim()
+      const statOf = (revset: string) => ({ args: ['--ignore-working-copy', 'diff', '--stat', '-r', revset], cwd: repository })
+      const recorder = recordSpans()
+
+      const first = yield* recorder.trace(reads.read(statOf(`${commitId} | ${commitId}`)))
+      expect(first.stdout).toMatch(/1 file changed/u)
+      yield* jj.exec({ args: ['new', '-m', 'another operation'], cwd: repository })
+      expect((yield* recorder.trace(reads.read(statOf(`${commitId} | ${commitId}`)))).stdout).toBe(first.stdout)
+      expect(recorder.named('jj diff')).toHaveLength(1)
+
+      yield* recorder.trace(reads.read(statOf('@-')))
+      yield* jj.exec({ args: ['describe', '-m', 'moved again'], cwd: repository })
+      yield* recorder.trace(reads.read(statOf('@-')))
+      expect(recorder.named('jj diff')).toHaveLength(3)
+    }).pipe(Effect.scoped, Effect.provide(JjTestLayer)),
+  )
+
+  it('treats only a diff whose revisions are full commit ids as independent of the operation head', () => {
+    const id = 'a'.repeat(40)
+    expect(JjViewReads.isCommitAddressed(['--ignore-working-copy', 'diff', '--stat', '-r', `${id} | ${'b'.repeat(40)}`])).toBe(true)
+    expect(JjViewReads.isCommitAddressed(['--ignore-working-copy', 'diff', '--from', id, '--to', id])).toBe(true)
+    expect(JjViewReads.isCommitAddressed(['--ignore-working-copy', 'diff', '--stat'])).toBe(false)
+    expect(JjViewReads.isCommitAddressed(['--ignore-working-copy', 'diff', '-r', `${id} | @`])).toBe(false)
+    expect(JjViewReads.isCommitAddressed(['--ignore-working-copy', 'diff', '-r', 'a'.repeat(12)])).toBe(false)
+    expect(JjViewReads.isCommitAddressed(['--ignore-working-copy', 'diff', '-r', id, '-r', 'main'])).toBe(false)
+    expect(JjViewReads.isCommitAddressed(['--ignore-working-copy', 'diff', `--revisions=${id}`])).toBe(false)
+    expect(JjViewReads.isCommitAddressed(['--ignore-working-copy', 'log', '-r', id])).toBe(false)
+    expect(JjViewReads.isCommitAddressed(['diff', '-r', id])).toBe(false)
+  })
+
   it.live('does not cache a failed read or a command that is not a view read', () =>
     Effect.gen(function* () {
       const reads = yield* JjViewReads

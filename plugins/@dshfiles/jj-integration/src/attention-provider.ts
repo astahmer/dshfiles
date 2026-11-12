@@ -203,7 +203,7 @@ const make = Effect.gen(function* () {
   /** The first pass also resolves ready items stored before a restart whose workspace is gone. */
   const firstPass = yield* Ref.make(true)
 
-  /** One diff stat per workspace; jj answers a repeat at the same operation head from its view-read cache. */
+  /** One diff stat per workspace; a repeat over the same commit ids is answered from the view-read cache at any operation head. */
   const statOf = (thread: ThreadView) =>
     jj.read({ args: ['--ignore-working-copy', 'diff', '--stat', '-r', unlandedRevset(thread)], cwd: thread.path }).pipe(
       Effect.map(output => (output.exitCode === 0 ? parseDiffStat(output.stdout) : undefined)),
@@ -214,7 +214,7 @@ const make = Effect.gen(function* () {
     const sessionIds = [...threads, ...titledOnly].flatMap(thread => thread.sessionIds.slice(-1))
     const activity = sessionIds.length === 0 ? new Map() : yield* sessions.listActivity(sessionIds).pipe(Effect.orElseSucceed(() => new Map()))
     const facts = new Map<string, ReadyFacts>()
-    // One workspace after another: each stat is a jj process, and jj answers a repeat from its view-read cache.
+    // One workspace after another: each new stat is a jj process; unchanged unlanded work is answered from the cache.
     const stats = yield* Effect.forEach(threads, statOf)
     for (const [index, thread] of threads.entries()) {
       const sessionId = thread.sessionIds.at(-1)

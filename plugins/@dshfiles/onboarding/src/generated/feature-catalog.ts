@@ -13463,7 +13463,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-cli",
       "id": "jj-cli-view-reads",
       "title": "Operation-head cache for jj view reads",
-      "summary": "Answer repeated --ignore-working-copy view reads from the same operation head without spawning jj, share one in-flight read between callers, and miss as soon as an operation lands.",
+      "summary": "Answer repeated --ignore-working-copy view reads from the same operation head without spawning jj, share one in-flight read between callers, and miss as soon as an operation lands; a diff over full commit ids is kept across operations.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
