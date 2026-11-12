@@ -42,6 +42,11 @@ describe('forge targets', () => {
     expect(ForgeModel.targetOf('not a repo')).toBeUndefined()
   })
 
+  it('refuses a GitHub Enterprise host instead of routing it to glab', () => {
+    expect(ForgeModel.targetOf('github.example.com/acme/widget')).toBeUndefined()
+    expect(ForgeModel.targetOfRemoteUrl('git@github.acme.io:acme/widget.git')).toBeUndefined()
+  })
+
   it('round-trips the stored key and the pull-request URL for both forges', () => {
     const github = ForgeModel.targetOf('acme/widget')
     const gitlab = ForgeModel.targetOf('gitlab.com/group/project')

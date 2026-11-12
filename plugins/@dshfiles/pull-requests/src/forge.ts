@@ -29,7 +29,8 @@ const HOST_PREFIX = /^([A-Za-z0-9.-]+\.[A-Za-z]{2,}(?::\d{1,5})?)\/(.+)$/u
 const forgeOfHost = (host: string): ForgeKind | undefined => {
   const name = host.split(':')[0]?.toLowerCase() ?? ''
   if (name === 'github.com') return 'github'
-  if (name.length === 0) return undefined
+  // GitHub Enterprise is unsupported (gh calls assume github.com); refuse it rather than hand it to glab.
+  if (name.length === 0 || name.includes('github')) return undefined
   return 'gitlab'
 }
 

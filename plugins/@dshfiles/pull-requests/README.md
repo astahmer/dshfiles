@@ -40,7 +40,7 @@ Create reads only the thread's directory (none at all when `cwd` is passed), nev
 
 ## Runtime behavior and limits
 
-- Uses the installed `gh` (GitHub) or `glab` (GitLab) executable and its existing login. It never reads, prints, or stores an authentication token. GitHub Enterprise hosts are not supported; any https GitLab host is.
+- Uses the installed `gh` (GitHub) or `glab` (GitLab) executable and its existing login. It never reads, prints, or stores an authentication token. GitHub Enterprise hosts are not supported: a host whose name contains `github` (other than github.com) is refused, and any other https host is treated as GitLab.
 - GitLab: a bare `owner/name` repository key is GitHub (the same keys older records hold), and a dotted first segment names a forge host (`gitlab.com/group/sub/project`). Repository and merge-request URLs are parsed strictly (https only, no userinfo, `/-/merge_requests/<n>`); other hosts are refused with a message naming the supported forges. `glab mr view --output json` is decoded into the same normalized view the GitHub watcher stores: `detailed_merge_status`/`merge_status` map mergeability, `blocking_discussions_resolved` and conflicts map to BLOCKED, `head_pipeline.status` becomes one `pipeline` check entry, and `approvals_required` maps the review decision. `glab mr create --yes` creates the merge request; the push is the same `jj git push` as GitHub.
 - Verify GitLab on a host with `glab` installed: `glab auth status`, then `pnpm --dir plugins/@dshfiles/pull-requests test` covers parsing and normalization, and `link`/`watch` need a real merge-request URL.
 - Typing `#` in the composer lists recent GitHub issues and pull requests of the thread's repository. When `gh` is
