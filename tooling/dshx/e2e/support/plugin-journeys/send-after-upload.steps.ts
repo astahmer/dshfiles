@@ -1,8 +1,9 @@
-import { expect, type Page, type Route } from '@playwright/test'
+import { expect, test, type Page, type Route } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { startNewSession } from '../thread-composer.js'
 
 const ATTACHMENT_FIXTURES = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
@@ -10,7 +11,7 @@ const UPLOAD_ROUTE = '**/api/session/uploadFileBinary**'
 
 const held = new WeakMap<Page, Route[]>()
 const threadComposer = (page: Page) => page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true })
-const banner = (page: Page) => page.getByTestId('dshfiles-pending-send')
+const banner = (page: Page) => page.locator('[data-dshx-composer-pill="dshfiles-pending-send"]')
 // A sent user message, never the composer's own draft.
 const userBubble = (page: Page, text: string) => page.locator('[data-conversation-session]:visible [class*="_userRow"]').getByText(text, { exact: true })
 
@@ -27,12 +28,7 @@ const releaseUploads = async (page: Page): Promise<void> => {
 }
 
 When('a thread is started and its file upload is held', async ({ page }: { page: Page }) => {
-  await page
-    .getByRole('button', { name: /^New (thread|session)$/i })
-    .filter({ visible: true })
-    .first()
-    .click()
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = await startNewSession(page)
   await composer.fill('upload thread')
   await composer.press('Enter')
   await expect(threadComposer(page)).toBeVisible()
@@ -51,6 +47,24 @@ Then('the composer shows {string} and keeps the draft', async ({ page }: { page:
   await recordAssertion(page, 'send-after-upload-banner', async () => {
     await expect(banner(page)).toContainText(text)
     await expect(threadComposer(page)).not.toHaveText('')
+  })
+  // The reading the plugin README shows; the upload is held, so the wait is real and not timed. Cropped to the pill and
+  // the composer it sits above, which is the surface the plugin adds.
+  const pillBox = await banner(page).boundingBox()
+  const composerBox = await page.locator('[data-composer-card]:visible').first().boundingBox()
+  const viewport = page.viewportSize()
+  if (pillBox === null || composerBox === null || viewport === null) throw new Error('the queued-send reading is not on screen to capture')
+  const readingTop = Math.max(0, Math.min(pillBox.y, composerBox.y) - 16)
+  const readingLeft = Math.max(0, Math.min(pillBox.x, composerBox.x) - 12)
+  await page.screenshot({
+    path: test.info().outputPath('send-after-upload-queued-send.png'),
+    animations: 'disabled',
+    clip: {
+      x: readingLeft,
+      y: readingTop,
+      width: Math.min(viewport.width, Math.max(pillBox.x + pillBox.width, composerBox.x + composerBox.width) + 12) - readingLeft,
+      height: Math.min(viewport.height, composerBox.y + composerBox.height + 2) - readingTop,
+    },
   })
 })
 

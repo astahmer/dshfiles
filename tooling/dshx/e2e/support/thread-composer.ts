@@ -1,6 +1,36 @@
-import { expect, type Page, type TestInfo } from '@playwright/test'
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { confirmFolderSetupStep } from './threads.js'
+
+const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
+
+/** The Session that owns the visible composer; the conversation root carries its id. */
+const composerSessionId = (page: Page): Promise<string | null> =>
+  page
+    .locator('[data-conversation-session]:visible')
+    .first()
+    .getAttribute('data-conversation-session')
+    .catch(() => null)
+
+/**
+ * Start a blank Session and return the composer of the Session it opened.
+ *
+ * The click resolves before the view does: the previous Session's composer stays mounted long enough for a `fill` to
+ * type into it, and that draft dies with the view it is replaced by (b:kk6n). Wait for the composer of the Session the
+ * click opened instead.
+ */
+export const startNewSession = async (page: Page): Promise<Locator> => {
+  const previousSession = await composerSessionId(page)
+  await page
+    .getByRole('button', { name: /^(?:New thread|New session)$/i })
+    .filter({ visible: true })
+    .first()
+    .click()
+  await expect.poll(() => composerSessionId(page), { timeout: 15_000 }).not.toBe(previousSession)
+  const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
+  await expect(composer).toBeEditable()
+  return composer
+}
 
 /** M0 materializes a Host Session only after a real first submit. No step registration or profile side effects. */
 export const materializeNonblankThread = async (page: Page, prompt: string, testInfo: TestInfo): Promise<string> => {
