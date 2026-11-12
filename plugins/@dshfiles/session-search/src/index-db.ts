@@ -163,6 +163,7 @@ const FIND_SNIPPET_CHARS = 160
 const countRowSchema = Schema.Struct({ count: numberLike })
 const pageCountRowSchema = Schema.Struct({ page_count: numberLike })
 const freelistRowSchema = Schema.Struct({ freelist_count: numberLike })
+const pageSizeRowSchema = Schema.Struct({ page_size: numberLike })
 
 const documentRowidSchema = Schema.Struct({ document_rowid: numberLike })
 const insertedRowSchema = Schema.Struct({ lastInsertRowid: numberLike })
@@ -758,23 +759,40 @@ export class SearchIndex {
       yield* this.sql.unsafe('VACUUM')
     })
 
-  readonly freePageRatio = () =>
+  /**
+   * Compact only on real garbage, and remember when and at what density: an in-memory clock re-ran optimize + VACUUM
+   * (about twice the file in disk writes) on every Host start and in every cloned DSH home, and an index of long
+   * documents stays above a fixed bytes-per-document bar right after a compaction.
+   */
+  readonly compactIfDue = (now: number) =>
+    Effect.gen({ self: this }, function* () {
+      const compactedAt = Number((yield* this.meta('compacted_at')) ?? 0)
+      if (now - compactedAt < 60 * 60_000) return false
+      const space = yield* this.space()
+      const baseline = Number((yield* this.meta('compacted_bytes_per_document')) ?? 0)
+      const bloated = space.bytesPerDocument > 2_048 && (baseline === 0 || space.bytesPerDocument > baseline * 1.5)
+      if (space.freePageRatio <= 0.25 && !bloated) return false
+      yield* this.compact()
+      const compacted = yield* this.space()
+      yield* this.setMeta('compacted_at', String(now))
+      yield* this.setMeta('compacted_bytes_per_document', String(compacted.bytesPerDocument))
+      return true
+    })
+
+  private readonly space = () =>
     Effect.gen({ self: this }, function* () {
       const pageRows = yield* this.sql.unsafe('PRAGMA page_count')
       const pages = Schema.decodeUnknownSync(pageCountRowSchema)(pageRows[0]).page_count
-      if (pages === 0) return 0
       const freeRows = yield* this.sql.unsafe('PRAGMA freelist_count')
-      return Schema.decodeUnknownSync(freelistRowSchema)(freeRows[0]).freelist_count / pages
-    })
-
-  readonly bytesPerDocument = () =>
-    Effect.gen({ self: this }, function* () {
-      const rows = yield* this.sql.unsafe('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions')
-      const documents = Schema.decodeUnknownSync(countRowSchema)(rows[0]).count
-      if (documents === 0) return 0
-      let bytes = 0
-      for (const suffix of ['', '-wal', '-shm']) bytes += statSize(`${this.path}${suffix}`)
-      return bytes / documents
+      const freePages = Schema.decodeUnknownSync(freelistRowSchema)(freeRows[0]).freelist_count
+      const sizeRows = yield* this.sql.unsafe('PRAGMA page_size')
+      const pageSize = Schema.decodeUnknownSync(pageSizeRowSchema)(sizeRows[0]).page_size
+      const documentRows = yield* this.sql.unsafe('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions')
+      const documents = Schema.decodeUnknownSync(countRowSchema)(documentRows[0]).count
+      return {
+        freePageRatio: pages === 0 ? 0 : freePages / pages,
+        bytesPerDocument: documents === 0 ? 0 : (pages * pageSize) / documents,
+      }
     })
 
   readonly health = (input: Omit<IndexHealth, 'sessions' | 'documents' | 'indexBytes'>) =>

@@ -71,11 +71,9 @@ const Handlers = SearchWorkerRpcs.toLayer(
     const loop = yield* FiberHandle.make<never, SqlError>()
     // The user's archived Sessions: cold history, dropped from the index and only read back for a targeted search.
     const archived = yield* Ref.make<ReadonlySet<string>>(new Set())
-    // A large prune is reclaimed once per process; a second VACUUM would only rewrite an already-compact file.
-    // An hour between compactions: the index re-bloats as archived Sessions are pruned again, and a once-per-process
-    // flag left every later pass with the garbage the first one never saw.
+    // The index decides from its own stored stamp whether a compaction is due; this only spaces out the check.
     const COMPACTION_INTERVAL_MS = 60 * 60_000
-    let lastCompactionAt = 0
+    let lastCompactionCheckAt = 0
 
     const health = Effect.flatMap(Ref.get(progress), (current): Effect.Effect<IndexHealth, SearchWorkerFailed> =>
       readIndex
@@ -114,21 +112,15 @@ const Handlers = SearchWorkerRpcs.toLayer(
             archived: cold,
             isArchived: sessionId => Effect.map(Ref.get(archived), current => current.has(sessionId)),
           })
-          // Dropping archived Sessions empties most of the file; give the bytes back once, in a step of its own so a
-          // failure is reported instead of swallowed by the pass.
-          // Un-merged FTS5 segments are the real garbage after a prune (measured 1.82 GB of a 2.01 GB index), and the page
-          // freelist stays small, so the trigger is bytes per document as well as free pages.
-          if (Date.now() - lastCompactionAt > COMPACTION_INTERVAL_MS) {
-            const freePageRatio = yield* index.freePageRatio()
-            const bytesPerDocument = yield* index.bytesPerDocument()
-            if (freePageRatio > 0.25 || bytesPerDocument > 2_048) {
-              const reclaimed = yield* index.compact().pipe(
-                Effect.as(true),
-                Effect.catch(error => Effect.succeed(describeError(error))),
-              )
-              if (reclaimed === true) lastCompactionAt = Date.now()
-              else yield* Effect.logWarning('session-search: the index could not be compacted yet', reclaimed)
-            }
+          // Dropping archived Sessions empties most of the file; give the bytes back in a step of its own so a failure is
+          // reported instead of swallowed by the pass.
+          if (Date.now() - lastCompactionCheckAt > COMPACTION_INTERVAL_MS) {
+            const checked = yield* index.compactIfDue(Date.now()).pipe(
+              Effect.as(true),
+              Effect.catch(error => Effect.succeed(describeError(error))),
+            )
+            if (checked === true) lastCompactionCheckAt = Date.now()
+            else yield* Effect.logWarning('session-search: the index could not be compacted yet', checked)
           }
           return { backfilled: conversationReady && rowMapReady, result }
         }).pipe(
