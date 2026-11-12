@@ -16357,8 +16357,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "mcp-endpoint#mcp-endpoint-settings",
       "plugin": "mcp-endpoint",
       "id": "mcp-endpoint-settings",
-      "title": "Issue the MCP token and copy the Claude Code command",
-      "summary": "Settings › MCP endpoint shows the endpoint URL, generates or rotates the bearer token and shows it once with a copyable `claude mcp add --transport http dsh <url> --header \"Authorization: Bearer …\"` command, revokes it, and turns LAN access on or off. Only the token's SHA-256 is…",
+      "title": "Issue an MCP token and connect a client",
+      "summary": "Settings › MCP endpoint and the MCP endpoint: connect a client palette command open copyable setup instructions for Claude Code, Codex, Cursor, VS Code and generic JSON. The section generates, rotates and revokes a bearer token and controls LAN access; a freshly issued token app…",
       "destination": "settings",
       "currentSurface": "settings: MCP endpoint",
       "reach": [
@@ -16384,24 +16384,53 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Generate token\"",
-          "action": "click",
-          "by": "button",
-          "name": "Generate token",
-          "value": null
-        },
-        {
-          "text": "expect button \"Rotate\"",
+          "text": "expect tab \"Claude Code\"",
           "action": "expect",
-          "by": "button",
-          "name": "Rotate",
+          "by": "tab",
+          "name": "Claude Code",
           "value": null
         }
       ],
-      "reachNarrow": null,
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
+          "value": null
+        },
+        {
+          "text": "click option \"MCP endpoint\"",
+          "action": "click",
+          "by": "option",
+          "name": "MCP endpoint",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Claude Code\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Claude Code",
+          "value": null
+        }
+      ],
       "onboarding": {
         "firstAction": "Open Settings › MCP endpoint and generate a token.",
-        "doneWhen": "You copied the claude mcp add command that connects a terminal agent to DSH.",
+        "doneWhen": "You copied setup instructions for your MCP client.",
         "open": {
           "settings": {
             "section": "dshfiles-mcp-endpoint"

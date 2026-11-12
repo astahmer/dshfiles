@@ -119,8 +119,13 @@
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
         "click button \"MCP endpoint\"",
-        "click button \"Generate token\"",
-        "expect button \"Rotate\"",
+        "expect tab \"Claude Code\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click combobox \"Sections\"",
+        "click option \"MCP endpoint\"",
         "expect tab \"Claude Code\""
       ],
       "surfaces": ["client", "host", "settings", "api", "tool"],
