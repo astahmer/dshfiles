@@ -23,7 +23,7 @@ afterEach(async () => {
 
 const indexedSnapshot = () => ({ asOfSeq: -1, values: { sessionListMetadata: { blank: false, lastPromptAt: 200 } } })
 
-const hostContext = async (cachedSnapshot: () => unknown = indexedSnapshot): Promise<Context> => {
+const hostContext = async (cachedSnapshot: () => ReturnType<typeof indexedSnapshot> | undefined = indexedSnapshot): Promise<Context> => {
   const ctx = new Context()
   contexts.add(ctx)
   await ctx.plugin(SessionStore)
@@ -85,12 +85,17 @@ it('adds a created Session and keeps a disposed one without reading the corpus a
   expect(reads).toBe(1)
 })
 
+/** A probe's `stat` waits on `hold` while it is set. */
+interface StatGate {
+  hold?: Promise<void>
+}
+
 const storeFixture = async (ctx: Context) => {
   const root = await mkdtemp(join(tmpdir(), 'list-corpus-store-'))
   roots.add(root)
   const headers = new Map<string, SessionRecord['header']>()
   const statted: string[] = []
-  const gate: { hold: Promise<void> | undefined } = { hold: undefined }
+  const gate: StatGate = {}
   const store = (project: string, id: string): Promise<string | undefined> => {
     headers.set(id, fixtureSession(ctx, id).header)
     return mkdir(join(root, project, id), { recursive: true })
@@ -256,6 +261,7 @@ it('builds a cold row once until its Session changes', async () => {
   await list.list()
   // The background metadata fold settles the row once.
   await new Promise(resolve => setTimeout(resolve, 20))
+  // oxlint-disable-next-line antislop/no-passthrough-variable -- the count before the measured lists, not an alias
   const settled = snapshotReads
 
   const first = await list.list()

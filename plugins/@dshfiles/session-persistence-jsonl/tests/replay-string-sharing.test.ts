@@ -11,6 +11,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import * as ForkedJsonl from '../src/host.ts'
 
 setFlagsFromString('--expose-gc')
+// SAFETY: --expose-gc was set on the line above, so the fresh context's global `gc` is V8's collector.
 const collectGarbage = runInNewContext('gc') as () => void
 
 const MESSAGES = 400
