@@ -11,6 +11,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { TimerService } from '@deepseek-ai/cordis-plugin-timer'
 import type {
   ApprovalRequestId, CordisDynamicPluginId, DynamicCordisInvokeResult,
   DynamicCordisInventoryRow,
@@ -26,7 +27,6 @@ import { DynamicCordisPackageRunner } from './runtime.ts'
 import { CordisRunOrchestrator } from './orchestrator.ts'
 import { ClientCordisInspectRegistry, provideClientCordisInspect } from './inspect-registry.ts'
 import { clientInspectProviders } from './providers.ts'
-import { provideClientTimer } from './timer.ts'
 import type { CordisRunActivity, CordisRunFailure, CordisUserRunRequest } from './orchestrator.ts'
 import type { CordisObservable, DynamicCordisRenderFailure } from './runtime.ts'
 
@@ -49,7 +49,6 @@ export { DynamicCordisStyles, evaluateClientHalf, isDynamicCordisPlugin } from '
 export type { DynamicCordisClosureEnv, DynamicCordisEvaluatedPlugin } from './evaluator.ts'
 export { dynamicCordisContext } from './guard.ts'
 export type { DynamicCordisGuardEnv, DynamicCordisSlotLedgerRow } from './guard.ts'
-export { ClientTimerService } from './timer.ts'
 // Re-exported so consumers of the service face and the two events can name
 // their subjects without reaching into the wire contract themselves.
 export type {
@@ -208,7 +207,7 @@ export const inject = ['loader', 'modules', 'slots', 'remote', 'remote.dynamicCo
  * @param ctx - client root context.
  */
 export function apply(ctx: Context): void {
-  provideClientTimer(ctx)
+  new TimerService(ctx)
   // dshfiles: the page's first connected generation publishes the complete manifest, so the boot-time publish of
   // each registration before it would only send the same manifest twice.
   let connected = isConnected(ctx)

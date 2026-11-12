@@ -17,9 +17,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
+  HostObservable, InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import { BOTTOM_DEFAULT, BOTTOM_MAX_RATIO, BOTTOM_MIN, CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from './columns.ts'
+import { BOTTOM_DEFAULT, BOTTOM_MAX_RATIO, BOTTOM_MIN, CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, SIDEBAR_DRAWER_BREAKPOINT } from './columns.ts'
 import { DocumentTitle } from './DocumentTitle.tsx'
 import { StatusStrip } from './StatusStrip.tsx'
 import type { createLayoutStore } from './stores.ts'
@@ -28,28 +28,35 @@ import { MainSurfaceRendering } from '../../main-surface.ts'
 import type { MainSurfaceMode, RightPanelMode } from '../../regions.ts'
 import type { RightbarOwnerProps } from './index.ts'
 
-/** Full composed props: runtime share + child-slot render share + store share. */
+/** Browser posture supplied by the root registration. */
+export interface AppFrameInjected {
+  hooks: { foldedLandscape: HostObservable<boolean> }
+}
+
+/** Full composed props: runtime, child slots, store, locale, and injected posture. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
   & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.main' | 'shell.beforeMain' | 'shell.dock' | 'shell.bottom' | 'shell.overlay' | 'shell.leading'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'common'>
+  & InjectFace<AppFrameInjected>
 
 /**
  * The stable centre column survives mode changes: the `shell.beforeMain` rows
  * (the main-tabs strip) sit above the main surface, which an entry may hide
  * while keeping it mounted.
  */
-export function CenterColumn({ mode, renderSlot, children }: {
+export function CenterColumn({ mode, renderSlot, children, inert = false }: {
   mode: MainSurfaceMode
   children?: ReactNode
+  inert?: boolean
 } & PropsRenderSlots<'main' | 'shell.main' | 'shell.beforeMain'>) {
   const renderMain = useMemo(() => MainSurfaceRendering.createRenderer(renderSlot), [renderSlot])
   const [hiddenHolds, setHiddenHolds] = useState(0)
   const holdMainHidden = useCallback(() => MainSurfaceRendering.hold(delta => setHiddenHolds(count => count + delta)), [])
   const beforeMain = useMemo(() => renderSlot('shell.beforeMain', { mode, holdMainHidden }), [renderSlot, mode, holdMainHidden])
   return (
-    <div className={css.centerCol} data-main-column>
+    <div className={css.centerCol} data-main-column {...{ inert: inert ? '' : undefined }}>
       {beforeMain}
       <div className={css.mainSurface} data-slot="main" data-main-surface={mode} style={hiddenHolds > 0 ? { display: 'none' } : undefined}>
         {MainSurfaceRendering.render(mode, renderSlot, renderMain, children)}
@@ -61,7 +68,9 @@ export function CenterColumn({ mode, renderSlot, children }: {
 /** Subscribe to the main key without subscribing the column frame to each panel id. */
 function MainPanel({ usePanelInfo, renderSlot }: Pick<PropsRuntime<'root'>, 'usePanelInfo'> & PropsRenderSlots<'main'>) {
   const panelId = usePanelInfo(info => info.activePanelId)
-  return renderSlot('main', {}, { entryKey: panelId ?? 'conversation' })
+  return <div className={css.mainPanel} data-global-panel={panelId !== null || undefined}>
+    {renderSlot('main', {}, { entryKey: panelId ?? 'conversation' })}
+  </div>
 }
 
 /**
@@ -69,15 +78,16 @@ function MainPanel({ usePanelInfo, renderSlot }: Pick<PropsRuntime<'root'>, 'use
  * occupant's panel is positioned against the column's right edge, which never
  * moves, so it can hang over the centre when there is no track.
  */
-export function RightbarColumn({ mainMode, mode, owner, renderSlot }: {
+export function RightbarColumn({ mainMode, mode, owner, renderSlot, inert = false }: {
   mainMode: MainSurfaceMode
   mode: RightPanelMode
   owner: RightbarOwnerProps
+  inert?: boolean
 } & PropsRenderSlots<'rightbar' | 'shell.dock'>) {
   const dock = mode === 'dock'
   const carrier = dock || mainMode === 'workbench'
   return (
-    <div className={css.rightbarCol} data-rightbar-col>
+    <div className={css.rightbarCol} data-rightbar-col {...{ inert: inert ? '' : undefined }}>
       {/* Keep the dock's live views mounted while closed in Workbench mode. */}
       <div hidden={!dock} style={dock ? { display: 'contents' } : undefined} data-shell-dock-carrier>
         {dock || mainMode === 'workbench' ? renderSlot('shell.dock', { ...owner, shown: dock }) : null}
@@ -174,6 +184,7 @@ export function AppFrame({
   useStore,
   useSessions,
   usePanelInfo,
+  useFoldedLandscape,
   actions,
   renderSlot,
   t,
@@ -181,6 +192,7 @@ export function AppFrame({
   const layoutInfo = useStore(state => state.layoutInfo)
   const frameRef = useRef<HTMLDivElement | null>(null)
   const viewport = layoutInfo.viewportWidth
+  const foldedLandscape = useFoldedLandscape(matches => matches)
 
   // Track the frame's own box (not the window): rAF-throttled ResizeObserver.
   useLayoutEffect(() => {
@@ -210,7 +222,16 @@ export function AppFrame({
   }, [actions])
 
   const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
+  const windowsTitlebar = document.documentElement.hasAttribute('data-windows-titlebar')
+  const drawer = viewport < SIDEBAR_DRAWER_BREAKPOINT && !windowsTitlebar
+  const centeredSidebar = foldedLandscape && viewport >= SIDEBAR_DRAWER_BREAKPOINT
   const sidebarCollapsed = narrow ? !layoutInfo.narrowExpanded : layoutInfo.sidebar === 0
+  const drawerOpen = drawer && !sidebarCollapsed
+  // Entering drawer mode from a collapsed rail hides the backing immediately.
+  const [sidebarTransition, setSidebarTransition] = useState({ drawer, collapsed: sidebarCollapsed, instant: true })
+  if (sidebarTransition.drawer !== drawer || sidebarTransition.collapsed !== sidebarCollapsed) {
+    setSidebarTransition({ drawer, collapsed: sidebarCollapsed, instant: drawer && sidebarCollapsed && sidebarTransition.collapsed })
+  }
   const sidebarPreference = sidebarCollapsed
     ? 0
     : layoutInfo.sidebar === 0 ? SIDEBAR_DEFAULT : layoutInfo.sidebar
@@ -218,12 +239,15 @@ export function AppFrame({
   // Desktop reopen controls occupy the frame's shell.leading seat (macOS) or
   // the Windows caption row; neither platform keeps an icon rail.
   const darwin = document.documentElement.dataset.platform === 'darwin'
-  const collapsedWidth = darwin
-    || document.documentElement.hasAttribute('data-windows-titlebar') ? 0 : SIDEBAR_COLLAPSED
+  const collapsedWidth = drawer || darwin || windowsTitlebar ? 0 : SIDEBAR_COLLAPSED
   // Opening on a narrow frame collapses the left sidebar. Eligibility must
   // include that space before the occupant's first shown report arrives.
-  const normal = computeColumns(viewport, !layoutInfo.rightbarShown && narrow ? 0 : sidebarPreference, rightbarPreference, collapsedWidth)
-  const cols = computeColumns(viewport, sidebarPreference, layoutInfo.rightbarTrack ? rightbarPreference : 0, collapsedWidth)
+  const normal = computeColumns(
+    viewport, !layoutInfo.rightbarShown && narrow ? 0 : sidebarPreference, rightbarPreference, collapsedWidth, centeredSidebar,
+  )
+  const cols = computeColumns(
+    viewport, drawer ? 0 : sidebarPreference, layoutInfo.rightbarTrack ? rightbarPreference : 0, collapsedWidth, centeredSidebar,
+  )
   const colsRef = useRef(cols)
   colsRef.current = cols
   const rightbarWidth = useRef(normal.rightbar)
@@ -237,8 +261,8 @@ export function AppFrame({
   // Track-level transitions pause for the whole gesture: eased tracks would
   // detach the column edge from the pointer (AppFrame.module.css).
   const [dragging, setDragging] = useState(false)
-  // Track easing is scoped to a discrete open/close toggle: data-animating
-  // goes up when the collapse state or the rightbar track flips and comes down
+  // Track easing is scoped to discrete open/close and fold changes: data-animating
+  // goes up when the sidebar presentation or the rightbar track flips and comes down
   // at transition end (timeout as the reduced-motion/covered-frame fallback).
   // Steady-state viewport updates stay instant (AppFrame.module.css), and so
   // does a toggle arriving together with a viewport change — that is the
@@ -246,15 +270,21 @@ export function AppFrame({
   // chase the live window edge. The counter restarts the settle window when a
   // re-toggle interrupts a running transition.
   const [animating, setAnimating] = useState(0)
-  const trackToggle = `${sidebarCollapsed}:${layoutInfo.rightbarTrack}`
+  const trackToggle = `${sidebarCollapsed}:${layoutInfo.rightbarTrack}:${centeredSidebar}`
   const previousToggle = useRef(trackToggle)
   const previousViewport = useRef(viewport)
+  // Arm the transition before child layout effects measure the new column widths.
+  const animateTracks = previousViewport.current === viewport && (animating > 0 || previousToggle.current !== trackToggle)
   useLayoutEffect(() => {
     const viewportChanged = previousViewport.current !== viewport
     previousViewport.current = viewport
+    if (viewportChanged) {
+      previousToggle.current = trackToggle
+      setAnimating(0)
+      return
+    }
     if (previousToggle.current === trackToggle) return
     previousToggle.current = trackToggle
-    if (viewportChanged) return
     setAnimating(token => token + 1)
   }, [trackToggle, viewport])
   useEffect(() => {
@@ -299,10 +329,14 @@ export function AppFrame({
   // whole and was corrected two frames later — visible jitter. cols keeps only
   // the discrete decisions (track present, collapse state) and the drag base.
   const rightbarMax = cols.rightbar === 0 ? 0 : clampWidth(rightbarPreference, RIGHTBAR_MIN, viewport * RIGHTBAR_MAX_RATIO)
+  const sidebarWidth = drawer
+    ? Math.min(layoutInfo.sidebar || SIDEBAR_DEFAULT, Math.max(0, viewport - 48))
+    : cols.sidebar
   const sidebar = useMemo(() => renderSlot('sidebar', {
     collapsed: sidebarCollapsed,
-    width: cols.sidebar,
-  }), [renderSlot, sidebarCollapsed, cols.sidebar])
+    width: sidebarWidth,
+    drawer,
+  }), [renderSlot, sidebarCollapsed, sidebarWidth, drawer])
   const main = useMemo(() => (
     <MainPanel usePanelInfo={usePanelInfo} renderSlot={renderSlot} />
   ), [usePanelInfo, renderSlot])
@@ -327,22 +361,21 @@ export function AppFrame({
       mode={layoutInfo.rightPanelMode}
       owner={{ width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 }}
       renderSlot={renderSlot}
+      inert={drawerOpen}
     />
-  ), [renderSlot, layoutInfo.rightPanelMode, layoutInfo.mainSurfaceMode, normal.rightbar, viewport])
-  // Window-chrome seat over the main panels' top-left corner: only a fully
-  // hidden sidebar column on macOS desktop leaves window chrome without a
-  // home — the Windows zero-width collapse keeps its controls in the caption
-  // row (ui-sidebar). AppFrame.module.css publishes the matching
-  // --dsh-frame-leading-clearance under the same collapsed condition.
+  ), [renderSlot, layoutInfo.rightPanelMode, layoutInfo.mainSurfaceMode, normal.rightbar, viewport, drawerOpen])
+  // The leading seat serves drawers and fully hidden macOS sidebars.
+  // Windows native captions keep their controls in the caption row instead.
+  // AppFrame.module.css reserves clearance for the seat's rendered controls.
   const leading = useMemo(() => renderSlot('shell.leading', {}), [renderSlot])
-  const leadingMounted = darwin && sidebarCollapsed
+  const leadingMounted = drawer || darwin && sidebarCollapsed
 
   return (
     <div
       ref={frameRef}
       className={css.frame}
       style={{
-        ...(document.documentElement.hasAttribute('data-windows-titlebar')
+        ...(windowsTitlebar
           ? { '--dsh-windows-sidebar-width': `${cols.sidebar}px` } : {}),
         gridTemplateColumns:
           `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`,
@@ -351,26 +384,32 @@ export function AppFrame({
           : {}),
       }}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
+      data-sidebar-drawer={drawer || undefined}
+      data-sidebar-instant={drawer && sidebarCollapsed && sidebarTransition.instant || undefined}
       data-rightbar-collapsed={cols.rightbar === 0 || undefined}
       data-rightbar-fullscreen={layoutInfo.rightbarFullscreen || undefined}
       data-rightbar-instant={layoutInfo.rightbarInstant || undefined}
       data-dragging={dragging || undefined}
-      data-animating={animating > 0 || undefined}
+      data-animating={animateTracks || undefined}
     >
       <DocumentTitle
         productTitle={productTitle}
         useSessions={useSessions}
         usePanelInfo={usePanelInfo}
       />
-      <div className={css.sidebarCol}>
+      {drawer && <div className={css.drawerMask} data-sidebar-mask aria-hidden="true"
+        onClick={drawerOpen ? () => { actions.toggleSidebar() } : undefined} />}
+      <div className={css.sidebarCol}
+        style={drawer ? { width: sidebarWidth } : undefined}
+        {...{ inert: drawer && sidebarCollapsed ? '' : undefined }}>
         {sidebar}
       </div>
       <>
-        <CenterColumn mode={layoutInfo.mainSurfaceMode} renderSlot={renderSlot}>{main}</CenterColumn>
+        <CenterColumn mode={layoutInfo.mainSurfaceMode} renderSlot={renderSlot} inert={drawerOpen}>{main}</CenterColumn>
         {rightColumn}
       </>
       {bottomHeight.current > 0 && (
-        <div className={css.bottomRow} data-shell-bottom>
+        <div className={css.bottomRow} data-shell-bottom {...{ inert: drawerOpen ? '' : undefined }}>
           {bottomRow}
         </div>
       )}
@@ -380,12 +419,12 @@ export function AppFrame({
         {overlays}
       </div>
       {leadingMounted && (
-        <div className={css.leadingSeat} data-shell-leading>
+        <div className={css.leadingSeat} data-shell-leading {...{ inert: drawerOpen ? '' : undefined }}>
           {leading}
         </div>
       )}
       {/* The collapsed rail is fixed-width: no resize handle while closed. */}
-      {!sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
+      {!drawer && !centeredSidebar && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
       {layoutInfo.rightbarShown && !layoutInfo.rightbarFullscreen && normal.rightbar > 0 && (
         <DragHandle side="rightbar" left={viewport - normal.rightbar} onStart={onRightbarStart} onDrag={onRightbarDrag} onEnd={onDragEnd} />
       )}

@@ -44,7 +44,7 @@ DSH's three-column AppFrame, forked so the frame's dragged panel widths and coll
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)
 - Package: `packages/client/ui-layout` (`@deepseek-ai/dsh-client-ui-layout`)
-- Pinned revision: [`dsh-v0.2.1-rc.2`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.1-rc.2) (`687f282e8625c6b8d11ff58211a90524be2e4317`), release 0.2.1-rc.2
+- Pinned revision: [`dsh-v0.2.2-rc.1`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.1) (`66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`), release 0.2.2-rc.1
 - The complete client source is vendored in [`src/native`](./src/native) (upstream `src`), keeping the upstream relative
   layout: `src/native/client/*` mirrors upstream `src/client/*`, `src/native/index.ts` the upstream Host entry.
 - The native row is disabled in [`cordis.patch.yml`](./cordis.patch.yml). The replacement is not optional: both packages

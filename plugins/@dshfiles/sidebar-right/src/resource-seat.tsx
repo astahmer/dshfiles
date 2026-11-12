@@ -1,9 +1,9 @@
-import { useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useMemo, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { MoreHorizontalIcon } from '@dshfiles/plugin-ui/icons'
 import type { HostObservable, InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ContextMenuTarget, MenuPoint } from '@deepseek-ai/dsh-client-ui-context-menu/client'
 import { findTabPane, type TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { RightbarSeat, TabSlot, type RightbarSeatProps } from './native/client/shell/SidebarRight.tsx'
 import { SidebarResourcePanelModel, type SidebarResourceTarget } from './resource-panels.js'
@@ -13,6 +13,8 @@ export interface ResourceSeatInjected {
     readonly workbenchMode: HostObservable<boolean>
     readonly resourceTargets: HostObservable<readonly SidebarResourceTarget[]>
   }
+  /** Open the shared context menu for a tab from its header button. */
+  readonly openTabMenu: (target: ContextMenuTarget, point: MenuPoint) => void
 }
 
 type ResourceSeatProps = RightbarSeatProps & InjectFace<ResourceSeatInjected>
@@ -25,10 +27,11 @@ function AddressableTab({ props, tab }: { readonly props: ResourceSeatProps; rea
   const { retainTab } = props
   useLayoutEffect(() => retainTab(tab.id, occurrence.signal), [retainTab, tab.id, occurrence.signal])
   const shortcuts = props.useShortcuts(entries => entries)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const { getTriggerProps } = props.useContextMenu()
   const layout = props.useStore(state => state.bySession[props.sessionId]?.layout)
   if (target === undefined || layout === undefined) return null
   const pane = findTabPane(layout, tab.id)
+  const menuTarget: ContextMenuTarget = { kind: 'tab', value: { sessionId: props.sessionId, paneId: pane.id, tab } }
   const shared = {
     renderSlot: props.renderSlot,
     occurrence: props.occurrence,
@@ -59,14 +62,19 @@ function AddressableTab({ props, tab }: { readonly props: ResourceSeatProps; rea
         <div className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
           <TabSlot {...shared} seat="sidebar.right.pane.tab.title" fallback={tab.title} />
         </div>
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label={tab.title}>
-              <MoreHorizontalIcon />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>{props.renderSlot('sidebar.right.tab.menu.item', { tab, dismiss: () => setMenuOpen(false) })}</DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={tab.title}
+          aria-haspopup="menu"
+          {...getTriggerProps(menuTarget)}
+          onClick={event => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            props.openTabMenu(menuTarget, { x: rect.left, y: rect.bottom })
+          }}
+        >
+          <MoreHorizontalIcon />
+        </Button>
       </header>
       <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-hidden">
         <TabSlot {...shared} seat="sidebar.right.pane.tab" fallback={<p>{props.t('tab.unavailable')}</p>} />

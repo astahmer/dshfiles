@@ -19,7 +19,7 @@ import { TerminalTitle } from './TerminalTitle.tsx'
 import type { TerminalBodyInjected, TerminalInjected } from './face.ts'
 import { registerTerminalExcerptTarget, terminalExcerptTargetAt } from './excerpt-targets.ts'
 import { excerptOf, type TerminalExcerpt } from './excerpt.ts'
-import { en, zh } from './locales.ts'
+import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 import '@xterm/xterm/css/xterm.css'
 import terminalStyles from './terminal.module.css'
 
@@ -89,7 +89,7 @@ export function apply(ctx: Context, addExcerpt: (sessionId: SessionId, excerpt: 
       return { status: 'handled', run: () => { excerptTarget.attach() } }
     },
   }), 'ui-sidebar-terminal: excerpt shortcut')
-  ctx.effect(() => ctx.locale.register(namespace, { zh, en }), 'ui-sidebar-terminal.copy')
+  ctx.effect(() => ctx.locale.register(namespace, { zh, en, ja, es, fr, de, ru, pt }), 'ui-sidebar-terminal.copy')
   ctx.effect(() => ctx.sidebarRightTabs.register({
     id, kind: 'terminal', multiple: true, priority: 'builtin', title: () => t('title'),
     guide: [{ id: 'new', order: 20, title: () => t('new'), description: () => t('description'), icon: PluginArtworkTerminal }],

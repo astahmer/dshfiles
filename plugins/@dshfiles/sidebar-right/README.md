@@ -4,7 +4,7 @@
 
 ![Native preview, review and terminal resources hosted in the Workbench](docs/screenshots/addressable-resources.png)
 
-Owned whole-package fork of `@deepseek-ai/dsh-client-ui-sidebar-right` 0.2.1-rc.2, pinned to `dsh-v0.2.1-rc.2` (`packages/client/ui-sidebar-right`). Upstream MIT license is retained in [LICENSE](LICENSE); mapping and deliberate changes are in [native-fork.json](native-fork.json).
+Owned whole-package fork of `@deepseek-ai/dsh-client-ui-sidebar-right` 0.2.2-rc.1, pinned to `dsh-v0.2.2-rc.1` (`packages/client/ui-sidebar-right`). Upstream MIT license is retained in [LICENSE](LICENSE); mapping and deliberate changes are in [native-fork.json](native-fork.json).
 
 ## Why fork
 
@@ -57,7 +57,7 @@ The Workbench right pane spans the full frame height, independently of the botto
 
 DOM `data-*` occurrence markers support focused keyboard routing, not authentication: same-origin loaded plugins are trusted. The service additionally checks a committed adopted tab, the exact live occurrence object, navigation revision and visible resource root. File-provided interactive HTML stays in the native provider's opaque sandbox; the bridge does not grant that iframe parent DOM access.
 
-The original per-tab contribution slots still render in each panel, including live title and content-action menu registrations. The guide and the per-thread Workbench tab itself are excluded to avoid recursion.
+The original per-tab contribution slots still render in each panel, including live title registrations. Each panel's header menu button opens the shared tab context menu (close, close others, close right, plus `sidebar.right.tab.menu.item` rows), the same menu a right-click on a native tab opens. The guide and the per-thread Workbench tab itself are excluded to avoid recursion.
 
 ## Scope and verification
 

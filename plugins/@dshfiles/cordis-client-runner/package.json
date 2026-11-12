@@ -36,6 +36,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/cordis-plugin-loader": "catalog:",
+    "@deepseek-ai/cordis-plugin-timer": "1.2.0",
     "@deepseek-ai/dsh": "0.2.2-rc.1",
     "@deepseek-ai/dsh-api-remotes": "catalog:",
     "@deepseek-ai/dsh-client-modules": "catalog:",

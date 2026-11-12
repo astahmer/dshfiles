@@ -11,8 +11,10 @@
 import { ProjectAddFlow } from '@dshfiles/workspace-folder-picker/project-add-flow'
 import { PlusIcon } from '@dshfiles/plugin-ui/icons'
 import type { ReactNode, RefObject } from 'react'
-import { useCallback, useEffect, useReducer } from 'react'
-import { Button, IconFolderCloseRegular, Menu, Modal, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useCallback, useEffect, useMemo, useReducer } from 'react'
+import {
+  Button, IconFolderCloseRegular, IconPlusOutlineRegular, Menu, Modal, type MenuEntry,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   WorkspaceId, WorkspaceSnapshot, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -22,6 +24,7 @@ import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from './contract/s
 import {
   PICK_FLOW_MENU, pickFlowBusy, pickFlowError, pickFlowOpen, pickFlowPicking, pickFlowReduce,
 } from './workspace-pick-flow.ts'
+import { distinguishingPathSuffixes } from './path-suffix.ts'
 import css from './WorkspacePicker.module.css'
 
 const ADD_WORKSPACE = '::add-workspace'
@@ -119,10 +122,33 @@ export function WorkspacePickFlow({
   // With workspaces listed, the add action pins below the scroll region
   // (divider + always visible); otherwise it IS the menu.
   const pinAdd = !addOnly && workspaces.length > 0
-  const items: MenuEntry[] = pinAdd
-    ? workspaces.map(workspace => ({
+  // The resolved name, not `t`, is the memo dependency: the bound seat keeps
+  // its identity across a language switch.
+  const defaultWorkspaceName = t('workspace.defaultName')
+  const listed = useMemo(() => {
+    if (!pinAdd) return []
+    const rows = workspaces.map(workspace => ({
       id: workspace.workspaceId,
-      label: workspaceDisplayTitle(workspace.title, t('workspace.defaultName')),
+      title: workspaceDisplayTitle(workspace.title, defaultWorkspaceName),
+      path: workspace.path,
+    }))
+    const suffixes = distinguishingPathSuffixes(rows)
+    return rows.map(row => ({ ...row, suffix: suffixes.get(row.id) }))
+  }, [pinAdd, workspaces, defaultWorkspaceName])
+  const items: MenuEntry[] = pinAdd
+    ? listed.map(({ id, title, path, suffix }) => ({
+      id,
+      // The title gives way first, so the suffix that tells the rows apart
+      // stays visible; the native tooltip carries the full path.
+      label: suffix === undefined
+        ? title
+        : (
+          <span className={css.disambiguated} title={path}>
+            <span className={css.title}>{title}</span>
+            {' '}
+            <span className={css.pathSuffix}>{suffix}</span>
+          </span>
+        ),
       icon: <IconFolderCloseRegular size={16} />,
       disabled: flowBusy,
     }))

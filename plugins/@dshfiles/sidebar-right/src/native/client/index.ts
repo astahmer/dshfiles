@@ -1,3 +1,7 @@
+import { IconCloseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
+import { TabMenuContent } from './shell/TabMenuContent.tsx'
+import type {} from '@deepseek-ai/dsh-client-ui-context-menu/client'
 /**
  * Browser half: fill the frame's right column with the panel, put the expand
  * button in the conversation header, and own the seats a tab type registers
@@ -49,8 +53,9 @@ import { createSidebarRightController, DEFAULT_RESIDENT_THREADS } from './servic
 import { holdsSession } from './tab-domain.ts'
 import { SidebarRightTabRegistry } from './tab-registry.ts'
 import { createSidebarRightStore } from './stores.ts'
-import { en, zh } from './locales.ts'
+import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 import { GUIDE_ID, guideDefinition } from './tabs/guide/definition.ts'
+import { createGuidePins } from './tabs/guide/guide-pins.ts'
 import { guideTabInfoFactory, tabInfoFactory } from './tab-info.ts'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { defaultSeed } from './contract/seed.ts'
@@ -59,7 +64,7 @@ import { defaultSeed } from './contract/seed.ts'
 const NS = 'sidebarRight'
 
 /** Required browser services: the slot registry, the frame's panel actions, copy, and the resource model. */
-export const inject = ['slots', 'layout', 'locale', 'resources', 'sessions', 'uiSession', 'shortcuts']
+export const inject = ['contextMenus', 'slots', 'layout', 'locale', 'resources', 'sessions', 'uiSession', 'shortcuts']
 
 // The original public /client module owns Cordis type identities. Runtime services
 // below implement the same contract; importing both class augmentations would
@@ -170,6 +175,32 @@ export function apply(ctx: ClientContext): void {
       views.retainResourceSessions([])
     }
   }, 'sidebar-right: saved resource Session references')
+  ctx.effect(() => ctx.slots.inject('contextMenu.icon', () => ctx.slots.register({
+    name: 'contextMenu.icon', key: 'sidebar.close',
+  }, IconCloseOutlineRegular)), 'sidebar: menu icon')
+  ctx.effect(() => ctx.contextMenus.register({
+    id: 'sidebar.close', target: 'tab', order: 100,
+    resolve: ({ sessionId, paneId, tab }) => {
+      const tabId = tab.id
+      const tabs = controller.menuTabs(sessionId, paneId, tabId)
+      if (!tabs.close && tabs.all.length === 0) return []
+      const closeMany = (ids: readonly TabId[]) => {
+        for (const id of ids) {
+          if (controller.menuTabs(sessionId, paneId, tabId).all.includes(id)) controller.closeIn(sessionId, id)
+        }
+      }
+      return [
+        { id: 'close', commandId: 'page.close' as ShortcutCommandId, icon: { key: 'sidebar.close' }, label: t('menu.close'), disabled: !tabs.close, run: () => { if (controller.menuTabs(sessionId, paneId, tabId).close) controller.closeIn(sessionId, tabId) } },
+        { id: 'others', label: t('menu.closeOthers'), disabled: tabs.all.length === 0, run: () => { closeMany(tabs.all) } },
+        ...tabs.right.length === 0 ? [] : [{ id: 'right', label: t('menu.closeRight'), run: () => { closeMany(tabs.right) } }],
+      ]
+    },
+  }), 'sidebar: menu actions')
+  ctx.effect(() => ctx.slots.inject('contextMenu.content', () => ctx.slots.register({
+    name: 'contextMenu.content', key: 'tab',
+    children: { 'sidebar.right.tab.menu.item': { kind: 'list', scope: 'session' } },
+    inject: () => ({ hooks: { views: views.source } }),
+  }, TabMenuContent)), 'sidebar: menu extensions')
   // The Session on screen: the selected one while the Conversation fills the
   // main column. Both sources notify before React renders their change, so the
   // service names the arriving Session before any component of that commit
@@ -213,7 +244,7 @@ export function apply(ctx: ClientContext): void {
     'sidebar-right: Workbench page admission',
   )
 
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-sidebar-right: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-sidebar-right: dictionaries')
   ctx.effect(
     () =>
       registerSidebarShortcuts(ctx.shortcuts, controller, t, () => {
@@ -323,7 +354,9 @@ export function apply(ctx: ClientContext): void {
     // panel, a Session the native selection does not name). The persisted store
     // the seat reads later already holds the opened tab.
     mintStore = rendered.mint
-    const injected: Omit<SidebarRightInjected, 'keyedHooks' | 'occurrence' | 'closeTab' | 'measureRoom'> = {
+    const injected: Omit<SidebarRightInjected, 'keyedHooks' | 'occurrence' | 'closeTab' | 'measureRoom' | 'hooks'> & {
+      hooks: Omit<SidebarRightInjected['hooks'], 'contextMenuTarget' | 'flash'>
+    } = {
       syncPresentation({ shown, track, fullscreen }) {
         // The native seat's unmount cleanup can run after Workbench takes over.
         // It must not overwrite the global dock's presentation report.
@@ -370,12 +403,17 @@ export function apply(ctx: ClientContext): void {
           children: {
             'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: tabInfoFactory } } },
             'sidebar.right.pane.tab.title': { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: tabInfoFactory } } },
-            'sidebar.right.tab.menu.item': { kind: 'list', scope: 'session' },
           },
           store,
           inject: (sessionId): SidebarRightInjected & ResourceSeatInjected => ({
             ...injected,
-            hooks: { ...injected.hooks, workbenchMode, resourceTargets: resourcePanels.targets },
+            hooks: {
+              ...injected.hooks,
+              contextMenuTarget: ctx.contextMenus.active,
+              flash: controller.flashOf(sessionId),
+              workbenchMode,
+              resourceTargets: resourcePanels.targets,
+            },
             measureRoom: canSplitPane => {
               measure(sessionId, canSplitPane)
             },
@@ -386,6 +424,7 @@ export function apply(ctx: ClientContext): void {
                 console.error('Sidebar tab close failed:', error)
               }
             },
+            openTabMenu: (target, point) => ctx.contextMenus.open(target, point),
             keyedHooks: { tabNavigation: key => controller.tabDomain.occurrence(sessionId, { id: key as TabId }).navigation },
             occurrence: tab => controller.tabDomain.occurrence(sessionId, tab),
           }),
@@ -409,18 +448,27 @@ export function apply(ctx: ClientContext): void {
     )
     // Stage two for the guide: it declares the chain child it hosts and reads
     // the registry's entry boxes, which an ordinary type has no reason to do.
+    const guidePins = createGuidePins()
     const guideInjected: GuideInjected = {
       hooks: {
         shortcuts: ctx.shortcuts.catalog,
         guideEntries: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.guide() },
+        entryPins: guidePins.unpinned,
+        entryActions: {
+          getSnapshot: () => ctx.slots.entriesOfSlot('sidebar.right.tab.guide.actions').length > 0,
+          subscribe: listener => ctx.slots.subscribe('sidebar.right.tab.guide.actions', listener),
+        },
       },
+      setPinned: guidePins.setPinned,
     }
     const disposeGuide = ctx.slots.inject('sidebar.right.pane.tab', () =>
       ctx.slots.register(
         {
           name: 'sidebar.right.pane.tab',
           key: GUIDE_ID,
+          locale: NS,
           children: {
+            'sidebar.right.tab.guide.actions': { kind: 'list', scope: 'root' },
             'sidebar.right.tab.guide.entry': {
               kind: 'keyed',
               scope: 'session',

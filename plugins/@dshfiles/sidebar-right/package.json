@@ -45,6 +45,7 @@
     "@deepseek-ai/dsh-client-resources": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-shortcuts": "catalog:",
     "@deepseek-ai/dsh-client-store": "catalog:",
+    "@deepseek-ai/dsh-client-ui-context-menu": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-conversation": "catalog:",
     "@deepseek-ai/dsh-client-ui-dockkit": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-layout": "catalog:",
@@ -74,6 +75,7 @@
     "@deepseek-ai/dsh-api-session-controller": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-resources": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-shortcuts": ">=0.2.2-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-context-menu": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-dockkit": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.2-rc.1 <0.3.0-0",
@@ -97,7 +99,8 @@
         "@deepseek-ai/dsh-client-ui-session",
         "@deepseek-ai/dsh-client-shortcuts",
         "@deepseek-ai/dsh-client-ui-dockkit",
-        "@deepseek-ai/dsh-client-ui-settings"
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-context-menu"
       ],
       "external": [
         "@deepseek-ai/dsh-client-store",

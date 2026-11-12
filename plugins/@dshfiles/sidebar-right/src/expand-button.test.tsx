@@ -19,6 +19,7 @@ import { SidebarRightTabRegistry } from './native/client/tab-registry.ts'
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', async importOriginal => ({
   ...(await importOriginal<typeof import('@deepseek-ai/dsh-client-ui-primitives')>()),
   IconPanelLeftOutlineRegular: () => <svg aria-hidden />,
+  isMobileDevice: () => false,
 }))
 
 const releases: (() => void)[] = []
