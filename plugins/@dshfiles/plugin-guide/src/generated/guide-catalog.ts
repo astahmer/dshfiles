@@ -3,7 +3,7 @@ import type { GuideCatalog } from '../catalog-model.js'
 
 export const GUIDE_CATALOG: GuideCatalog = {
   "schemaVersion": 1,
-  "dshVersion": "0.2.2-rc.1",
+  "dshVersion": "0.2.2-rc.2",
   "slotFactsCheckedAgainst": "0.2.0-rc.2",
   "generatedFrom": [
     "tooling/dshx/packages/create-dshx/src/slot-capabilities.ts",

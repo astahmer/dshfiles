@@ -37,12 +37,12 @@
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/cordis-plugin-loader": "catalog:",
     "@deepseek-ai/cordis-plugin-timer": "1.2.0",
-    "@deepseek-ai/dsh": "0.2.2-rc.1",
+    "@deepseek-ai/dsh": "0.2.2-rc.2",
     "@deepseek-ai/dsh-api-remotes": "catalog:",
     "@deepseek-ai/dsh-client-modules": "catalog:",
     "@deepseek-ai/dsh-client-ui-renderer": "catalog:",
-    "@deepseek-ai/dsh-client-ui-theme": "0.2.2-rc.1",
-    "@deepseek-ai/dsh-util-values": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-theme": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-util-values": "0.2.2-rc.2",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
@@ -54,11 +54,11 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.1.0",
-    "@deepseek-ai/dsh": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-api-remotes": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-modules": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-theme": ">=0.2.2-rc.1 <0.3.0-0"
+    "@deepseek-ai/dsh": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-api-remotes": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-modules": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-theme": ">=0.2.2-rc.2 <0.3.0-0"
   },
   "dsh": {
     "bundle": {

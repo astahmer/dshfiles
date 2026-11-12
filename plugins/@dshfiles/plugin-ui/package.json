@@ -144,7 +144,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.2-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.2-rc.2 <0.3.0-0",
     "react": ">=18.2.0 <19",
     "react-dom": ">=18.2.0 <19"
   },

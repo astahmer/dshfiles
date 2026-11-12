@@ -33,12 +33,12 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
-    "@deepseek-ai/dsh": "0.2.2-rc.1",
+    "@deepseek-ai/dsh": "0.2.2-rc.2",
     "@deepseek-ai/dsh-commands": "catalog:",
     "@deepseek-ai/dsh-storage": "catalog:",
     "@deepseek-ai/dsh-storage-domain": "catalog:",
     "@deepseek-ai/dsh-storage-json": "catalog:",
-    "@deepseek-ai/dsh-subprocess-local": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.2-rc.2",
     "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
@@ -49,11 +49,11 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.0 <5.0.0",
-    "@deepseek-ai/dsh": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-commands": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-storage-domain": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-system-prompt": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.1 <0.3.0-0"
+    "@deepseek-ai/dsh": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-commands": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-storage-domain": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-system-prompt": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.2 <0.3.0-0"
   },
   "dsh": {
     "bundle": {

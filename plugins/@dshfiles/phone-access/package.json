@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
-    "@deepseek-ai/dsh": "0.2.2-rc.1",
+    "@deepseek-ai/dsh": "0.2.2-rc.2",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@effect/platform-node": "catalog:",
     "@standard-schema/spec": "1.1.0",
@@ -46,8 +46,8 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.1.0",
-    "@deepseek-ai/dsh": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": ">=3.19.0 <4.0.0"
   },
   "dsh": {

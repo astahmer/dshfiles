@@ -39,16 +39,16 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
-    "@deepseek-ai/dsh": "0.2.2-rc.1",
+    "@deepseek-ai/dsh": "0.2.2-rc.2",
     "@deepseek-ai/dsh-agent": "catalog:",
-    "@deepseek-ai/dsh-agent-loop": "0.2.2-rc.1",
-    "@deepseek-ai/dsh-attachment": "0.2.2-rc.1",
-    "@deepseek-ai/dsh-attachment-local": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-agent-loop": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-attachment": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-attachment-local": "0.2.2-rc.2",
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-session-projection": "catalog:",
-    "@deepseek-ai/dsh-subprocess-local": "0.2.2-rc.1",
-    "@deepseek-ai/dsh-token-meter": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-token-meter": "0.2.2-rc.2",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@effect/vitest": "catalog:",
@@ -60,10 +60,10 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.1.0",
-    "@deepseek-ai/dsh": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-attachment": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-llm": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.1 <0.3.0-0"
+    "@deepseek-ai/dsh": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-attachment": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.2 <0.3.0-0"
   },
   "dsh": {
     "bundle": {

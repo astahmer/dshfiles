@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
-    "@deepseek-ai/dsh": "0.2.2-rc.1",
+    "@deepseek-ai/dsh": "0.2.2-rc.2",
     "@deepseek-ai/dsh-agent": "catalog:",
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-skill": "catalog:",
@@ -47,9 +47,9 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.0 <5.0.0",
-    "@deepseek-ai/dsh": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-storage-domain": ">=0.2.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-storage-domain": ">=0.2.2-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "^3.19.0"
   },
   "dsh": {
