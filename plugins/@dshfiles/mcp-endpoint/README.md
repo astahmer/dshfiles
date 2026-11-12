@@ -41,7 +41,7 @@ Settings › MCP endpoint › Plugin tools defaults to **Off**. Choose **Read-on
 ## Transport
 
 `/mcp` is a raw route on the Web server (`webServer.register`), outside DSH's cookie-authenticated `/api`. It speaks
-MCP streamable HTTP through the official `@modelcontextprotocol/sdk` (1.30.0, `StreamableHTTPServerTransport`),
+MCP streamable HTTP through the official `@modelcontextprotocol/sdk` (`StreamableHTTPServerTransport`),
 stateless — a fresh server and transport per POST, no `Mcp-Session-Id` — and answers with JSON rather than SSE,
 because the Web server may gzip responses and would hold back an event stream. `GET` returns 405, as stateless
 servers do.
