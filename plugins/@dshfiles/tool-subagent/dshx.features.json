@@ -19,7 +19,7 @@
           "kind": "unit-test",
           "id": "tool-subagent.live-policy",
           "file": "plugins/@dshfiles/tool-subagent/src/live-model-selection.test.ts",
-          "testName": "allows a route added to the setting after the Session recorded its policy"
+          "testName": "follows a route added to the setting after the Session recorded its policy"
         },
         {
           "kind": "unit-test",

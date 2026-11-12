@@ -478,7 +478,7 @@
           "kind": "unit-test",
           "id": "ai-accounts.model-fallback-routing",
           "file": "plugins/@dshfiles/ai-accounts/src/model-fallback-router.test.ts",
-          "testName": "puts the fallback on a retry that still proposes the failed route and stays there by default"
+          "testName": "stands on the fallback the next step selects and stays there by default"
         },
         {
           "kind": "unit-test",
