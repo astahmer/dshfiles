@@ -101,9 +101,21 @@ it('refuses a tool edit that names no tool and sets no code mode', async () => {
 
 it('presents an agent’s tools as code when an edit asks for code mode', async () => {
   const { ctx, host, createAgent } = await fixture()
+  // A profile resolves the PTC executor through its Loader; no program runs here, so a PTC runtime only names its language.
+  ctx.provide('loader', { import: (name: string) => import(name), unwrapExports: (module: { default?: unknown }) => module.default ?? module })
+  ctx.provide('ptcRuntime', { language: 'typescript' })
   await host.mount(defineHost({ toolEdits: [{ codeMode: true, agents: agent => agent.id === 'coder' }] }), { packageId: '@acme/code-mode' })
   const coder = await createAgent('coder')
   const plain = await createAgent('plain')
-  expect(ctx.tools.schemas(coder).map(schema => schema.name)).toContain('run_code')
-  expect(ctx.tools.schemas(plain).map(schema => schema.name)).not.toContain('run_code')
+  // run_code is the PTC executor's own transport, not a registration, so the proof is the executor's refusal of a direct call.
+  const callDirectly = async (agent: typeof coder) => {
+    const ran = await ctx.tools.execute({
+      calls: [{ type: 'tool-call', id: ToolCallId('direct'), name: 'acme_status', arguments: '{}' }],
+      agent,
+      signal: new AbortController().signal,
+    })
+    return ran.results[0]?.result
+  }
+  await expect.poll(async () => JSON.stringify(await callDirectly(coder))).toContain('run_code')
+  expect(await callDirectly(plain)).toMatchObject({ isError: false, value: 'acme_status ran' })
 })
