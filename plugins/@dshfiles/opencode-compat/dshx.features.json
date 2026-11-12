@@ -84,9 +84,9 @@
           "testName": "runs and reloads compat tools and hooks in the real tool runtime"
         },
         {
-          "kind": "not-applicable",
-          "id": "opencode-compat.tools-browser",
-          "reason": "Host-only tools; the scratch-DSH journey that calls a plugin tool through a fake model lands with the representative-plugin slice."
+          "kind": "gherkin",
+          "id": "opencode-compat.plugin-tool",
+          "featureFile": "tooling/dshx/e2e/features/opencode-compat.feature"
         }
       ],
       "telemetry": [
