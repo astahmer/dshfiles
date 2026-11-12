@@ -1,4 +1,4 @@
-import { Clock, Context, Duration, Effect, Layer, Option, Ref } from 'effect'
+import { Clock, Context, Duration, Effect, Layer, Option, Ref, Stream, SubscriptionRef } from 'effect'
 import { RestartControl } from './restart.js'
 import { SidebarHost } from './sidebar-host-promise.js'
 
@@ -41,6 +41,8 @@ const NO_BUSY: AutoRestartBusy = { turns: 0, jobs: 0, questions: 0 }
 
 const isBusy = (busy: AutoRestartBusy): boolean => busy.turns > 0 || busy.jobs > 0 || busy.questions > 0
 
+const sameStatus = (left: AutoRestartStatus, right: AutoRestartStatus): boolean => JSON.stringify(left) === JSON.stringify(right)
+
 /** The supervised launcher this repository ships; `DSHFILES_DIR` names the checkout when the launcher set it. */
 export const supervisedLaunchCommand = (dshfilesDirectory: string | undefined): string =>
   `${dshfilesDirectory?.trim() || '<dshfiles checkout>'}/scripts/dsh-launcher`
@@ -56,6 +58,8 @@ export class AutoRestart extends Context.Service<
   AutoRestart,
   {
     readonly status: Effect.Effect<AutoRestartStatus>
+    /** Each status that differs from the one before it; an unchanged tick emits nothing. */
+    readonly statusChanges: Stream.Stream<AutoRestartStatus>
     /** Hold the automatic restart for `minutes`; the pending updates stay pending. */
     readonly postpone: (minutes: number) => Effect.Effect<{ readonly postponedUntil: number }>
     /** Drop a postponement, so the next idle quiet period restarts again. */
@@ -77,7 +81,7 @@ export class AutoRestart extends Context.Service<
         const idleSince = yield* Ref.make(Option.none<number>())
         const postponedUntil = yield* Ref.make(Option.none<number>())
         const restarting = yield* Ref.make(false)
-        const last = yield* Ref.make<AutoRestartStatus>({
+        const last = yield* SubscriptionRef.make<AutoRestartStatus>({
           phase: 'none',
           enabled: false,
           updates: [],
@@ -142,20 +146,21 @@ export class AutoRestart extends Context.Service<
           }
           return { ...base, phase: 'restarting' as const, busy: NO_BUSY, restartAt: now }
         }).pipe(
-          Effect.tap(status => Ref.set(last, status)),
+          Effect.tap(status => SubscriptionRef.set(last, status)),
           Effect.withSpan('auto restart check'),
         )
 
         yield* Effect.forkScoped(Effect.sleep(input.tick ?? TICK).pipe(Effect.andThen(evaluate), Effect.forever))
 
         return AutoRestart.of({
-          status: Ref.get(last),
+          status: SubscriptionRef.get(last),
+          statusChanges: SubscriptionRef.changes(last).pipe(Stream.changesWith(sameStatus), Stream.drop(1)),
           postpone: minutes =>
             Effect.gen(function* () {
               const until = (yield* Clock.currentTimeMillis) + Math.round(minutes * 60_000)
               yield* Ref.set(postponedUntil, Option.some(until))
               yield* Ref.set(idleSince, Option.none())
-              yield* Ref.update(last, (status): AutoRestartStatus =>
+              yield* SubscriptionRef.update(last, (status): AutoRestartStatus =>
                 status.phase === 'restarting' ? status : { ...status, phase: 'postponed', restartAt: null, postponedUntil: until },
               )
               return { postponedUntil: until }

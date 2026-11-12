@@ -12,6 +12,7 @@ import { Effect, Layer, Option } from 'effect'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { AutoRestart, DEFAULT_POSTPONE_MINUTES, supervisedLaunchCommand } from './auto-restart.js'
+import { autoRestartEvents } from './auto-restart-events.js'
 import { threadSidebarAttentionApi } from './attention-api.js'
 import { ThreadAttention } from './attention-store.js'
 import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
@@ -159,6 +160,7 @@ const workers = Layer.mergeAll(
   modelRouteProjection,
   subscriptionNoticer,
   subscriptionChangeEvents,
+  autoRestartEvents,
   FinishedTurnAttention.layer.pipe(Layer.provide(HostApis.layer)),
 )
 

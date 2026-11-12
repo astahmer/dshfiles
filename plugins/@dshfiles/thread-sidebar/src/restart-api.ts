@@ -1,4 +1,4 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, event, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 
 const count = Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))
@@ -62,6 +62,7 @@ export const threadSidebarRestartApi = defineApi({
       description:
         'The automatic restart that applies pending Host updates once DSH is idle: its phase, the pending updates, what keeps DSH busy, when it would restart and any postponement. Read-only.',
       tool: { name: 'auto_restart_status', readOnly: true, render: describeAutoRestart },
+      tags: ['auto-restart'],
     }),
     postponeAutoRestart: method({
       input: Schema.Struct({
@@ -83,5 +84,12 @@ export const threadSidebarRestartApi = defineApi({
     }),
     /** The tokenized launch URL the dsh-web supervisor recorded, to hand to an agent or `dshx`. */
     launchUrl: method({ input: Schema.Void, output: Schema.Struct({ url: Schema.NullOr(Schema.String) }) }),
+  },
+  events: {
+    autoRestartChanged: event({
+      schema: Schema.Struct({ phase: autoRestartStatusSchema.fields.phase }),
+      description: 'The automatic restart status changed (an update became pending, DSH went busy or idle, a countdown started); read it again.',
+      invalidates: ['auto-restart'],
+    }),
   },
 })

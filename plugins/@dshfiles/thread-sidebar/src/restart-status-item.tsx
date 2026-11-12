@@ -1,10 +1,11 @@
 import type { StatusItemProps } from '@dshfiles/frame-layout/status-strip'
-import { useApi, useApiQuery, useRegistry } from '@dshfiles/dshx/client'
+import { useApi, useRegistry, useResource } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { threadSidebarRestartApi, type AutoRestartStatusWire } from './restart-api.js'
 import { RestartBridge, type RestartRequest } from './restart-bridge.js'
+import { AUTO_RESTART_READ } from './restart-status-read.js'
 import { PendingRestartSources, type PendingRestartSource } from './restart-sources.js'
 
 export interface RestartStatusText {
@@ -20,8 +21,6 @@ export interface RestartStatusText {
   /** No supervisor can restart DSH: start it with this command. */
   readonly autoUnsupervised: string
 }
-
-const AUTO_RESTART_POLL_MS = 5_000
 
 /** What the strip item reads of the automatic restart. */
 interface AutoRestartView {
@@ -47,17 +46,11 @@ const useNow = (active: boolean): number => {
   return now
 }
 
-/** The Host's automatic-restart state, polled while the item is mounted; undefined on a Host without it. */
+/** The Host's automatic-restart state while the item is mounted; undefined on a Host without it. */
 const useAutoRestart = (): AutoRestartView => {
-  const query = useApiQuery(threadSidebarRestartApi, 'autoRestartStatus', { input: {} })
-  const refetch = query.refetch
-  const status = query.status === 'error' ? undefined : query.data
-  useEffect(() => {
-    const poll = window.setInterval(() => {
-      if (!document.hidden) refetch()
-    }, AUTO_RESTART_POLL_MS)
-    return () => window.clearInterval(poll)
-  }, [refetch])
+  const resource = useResource(threadSidebarRestartApi, 'autoRestartStatus', {}, AUTO_RESTART_READ)
+  const refetch = resource.refetch
+  const status = resource.status === 'error' ? undefined : resource.data
   const counting = status?.phase === 'countdown'
   const now = useNow(counting)
   // A page that saw the automatic restart begin reloads once the new Host answers: the Host halves it held back

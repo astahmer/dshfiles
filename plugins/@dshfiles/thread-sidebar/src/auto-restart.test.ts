@@ -1,7 +1,7 @@
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from '@effect/vitest'
-import { Effect, FileSystem, Layer, Path, PubSub, Ref } from 'effect'
+import { Effect, Fiber, FileSystem, Layer, Path, PubSub, Ref, Stream } from 'effect'
 import { TestClock } from 'effect/testing'
 import { AutoRestart, type AutoRestartPolicy } from './auto-restart.js'
 import { OpenToolCalls } from './open-tool-calls.js'
@@ -180,6 +180,28 @@ describe('automatic restart when idle', () => {
           entries => entries.length > 0,
         )
         expect(recorded.map(entry => [entry.sessionId, entry.reason])).toEqual([['raced', 'restart']])
+      }),
+    ),
+  )
+
+  it.effect('announces a status only when it changes, not on every tick', () =>
+    withAutoRestart({}, ({ updates }) =>
+      Effect.gen(function* () {
+        const auto = yield* AutoRestart
+        yield* advance(5)
+        const seen = yield* Ref.make<ReadonlyArray<string>>([])
+        const follower = yield* Effect.forkChild(
+          Stream.runForEach(auto.statusChanges, status => Ref.update(seen, phases => [...phases, status.phase])),
+          {
+            startImmediately: true,
+          },
+        )
+        yield* advance(60)
+        expect(yield* Ref.get(seen)).toEqual([])
+        yield* Ref.set(updates, ['@dshfiles/example'])
+        yield* advance(20)
+        expect(yield* Ref.get(seen)).toEqual(['quiet'])
+        yield* Fiber.interrupt(follower)
       }),
     ),
   )
