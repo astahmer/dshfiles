@@ -41,12 +41,16 @@
 # seconds to keep working while the question stays answerable; a later answer is
 # steered in as a user-question-reply message. Preset children are config data,
 # not Loader rows, and a patch replaces a row's whole `config`, so this restates
-# the shipped `preset-standard` declaration (@deepseek-ai/dsh-web-app 0.2.1-rc.2,
+# the shipped `preset-standard` declaration (@deepseek-ai/dsh-web-app 0.2.2-rc.1,
 # presets/standard.patch.yml) with only `tool-ask-user.config` added. Re-sync it
 # when DSH ships a new standard preset: 0.2.1 added the `time-context`,
 # `tool-schedule` and `tool-plugin-market` rows, dropped the subagent
 # `backgroundMode` option with its disabled provider rows, and dropped the
-# `{{cwd}}` persona suffix now that no prompt variable registers `cwd`.
+# `{{cwd}}` persona suffix now that no prompt variable registers `cwd`. 0.2.2
+# removed the `tool-subagent-control/list-agents` module (its row fails to
+# load), renamed the subagent `modelSelectionSettings` option to
+# `modelSelection` + `modelDiscovery`, added `tool-fs.applyPatch` (off), and
+# enables `tool-plugin-manager` whenever a profile context exists.
 - id: preset-standard
   name: '@deepseek-ai/dsh-agent-preset'
   config:
@@ -71,6 +75,9 @@
         disabled: !!js process.platform !== 'win32'
       - id: tool-fs
         name: '@deepseek-ai/dsh-tool-fs'
+        config:
+          # Set true to add the native apply_patch tool beside edit.
+          applyPatch: false
       - id: tool-fs-search
         name: '@deepseek-ai/dsh-tool-fs-search'
         config:
@@ -133,8 +140,6 @@
         config:
           - id: tool-subagent-control
             name: '@deepseek-ai/dsh-tool-subagent-control'
-          - id: tool-subagent-list-agents
-            name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
           # @dshfiles/tool-subagent: the model-selection policy follows the saved setting in running Sessions (b:rmkm).
           # Outside the managed region: an existing profile needs the same `name` edit on both delegation rows.
           - id: tool-subagent
@@ -142,7 +147,8 @@
             config:
               provider: spawn
               toolName: subagent
-              modelSelectionSettings: true
+              modelSelection: true
+              modelDiscovery: true
           - id: tool-subagent-fork
             name: '@dshfiles/tool-subagent'
             config:
@@ -175,7 +181,7 @@
         name: '@deepseek-ai/dsh-tool-present'
       - id: tool-plugin-manager
         name: '@deepseek-ai/dsh-plugin-manager/tools'
-        disabled: true
+        disabled: !!js "!ctx.get('profileContext')"
       - id: tool-plugin-market
         name: '@deepseek-ai/dsh-plugin-market/tools'
         disabled: true
