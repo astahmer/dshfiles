@@ -196,17 +196,36 @@ boot-to-boot noise, so the per-row cost is measured in-process. Two costs layer 
 remaining distance to the 80 MB lever: the **module graph** (importing `agentsview/dist/index.js` into a process that
 already loaded Effect, dshx and `@effect/platform-node` adds 3.0 MB of heap; 29.6 MB including those shared modules) and
 what an activation **enables downstream** (`session-search` registers the `sessionQuery` service at activation, 90 MB
-above). A facade row that imports the real bundle on first use would defer the module graph, but keeping tool and API
-registration static then needs a split build: a manifest module with tool names, schemas and API contracts separate from
-the layer's module graph. dshx emits one Host artifact per plugin, so that facade is a further primitive, not a flag on
-this one.
+above).
+
+## Facade Host rows, measured (2026-11-12)
+
+`DshxPlugin.facade` with `host: { codeSplitting: true }` now defers the module graph too: the Host entry carries only the
+contracts, and the first call imports the implementation chunk
+([effect guide](../tooling/dshx/docs/sdk/effect.md)). `@dshfiles/agentsview` and `@dshfiles/plugin-guide` are the
+proof rows: their `index.js` went from 55 KB and 168 KB to 3.6 KB each. Measured in-process, the way the per-row cost
+above was: each built entry is imported and mounted on a dshx test Host after Effect and the shared dshx runtime snapshot
+are loaded, `heapUsed` after four `gc()` calls, median of 7 fresh Node 22.23.3 processes. "Before" is the `main` bundle
+relinked to the same runtime snapshot.
+
+| Row, what the process had loaded already | Boot heap before → after | First call before → after | Heap once used (both) |
+| ---------------------------------------- | ------------------------ | ------------------------- | --------------------- |
+| agentsview, `@effect/platform-node` too  | 1.30 → 1.09 MB           | 81 → 117 ms               | 4.1 MB                |
+| agentsview, only Effect and dshx         | 13.94 → 1.18 MB          | 187 → 1,131 ms            | 16.7 MB               |
+| plugin-guide (catalog)                   | 1.65 → 0.99 MB           | 43 → 122 ms               | 4.2 MB                |
+
+The facade works as designed (absent from the boot heap, present after the first call, same heap once used), but on a
+Host where another row already loaded `@effect/platform-node` a row's own graph is small: 0.2–0.7 MB, far inside the
+±15 MB boot-to-boot noise, so a scratch-Host settle read cannot resolve it. The lever is a row whose dependencies nothing
+else loads (the second line: 12.8 MB, paid instead as a 1.1 s first call). `session-search` is not a candidate: it
+registers `sessionQuery` at activation, which other rows need at boot, and a facade cannot provide a Cordis service.
 
 ## Levers still open
 
 | Lever                                          | Measured                         | Needs                                                                                                                                                                                                                                                                                                                                                         |
 | ---------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Lazy storage-domain hydration                  | 67 MB                            | the `storage-domain`/`storage-json` forks hydrate per record with an LRU; the remaining cost is the core contract's `loadAll` for domains that do not declare lazy reads                                                                                                                                                                                      |
-| Lazy Host halves for panel rows                | 0.9 MB / 7 ms per unopened row   | the opt-in `lazy` mode keeps the layer out (§ above); the remaining 80 MB is each row's module graph (3.0 MB marginal) and the services an activation enables downstream, which need a facade row with a split manifest artifact                                                                                                                              |
+| Lazy Host halves for panel rows                | 0.9 MB / 7 ms per unopened row   | the opt-in `lazy` mode keeps the layer out and `DshxPlugin.facade` the module graph (§ above, 0.2–0.7 MB per row once shared dependencies are loaded); the rest of the 80 MB is the services an activation enables downstream, which a facade cannot defer                                                                                                     |
 | Per-session client state LRU                   | 100–110 MB per tab at 20 threads | the session-controller client fork keeps every opened thread resident                                                                                                                                                                                                                                                                                         |
 | One shared Effect `HostContext` per activation | 20–40 (est.)                     | dshx builds a fresh tracer/host layer per plugin                                                                                                                                                                                                                                                                                                              |
 | Byte-bounded prepared-session cache            | up to ~1.4 GB at count 5         | core `SessionQueryEngine` (Host gap 102); `profiles/web` caps the count at 1 meanwhile                                                                                                                                                                                                                                                                        |
