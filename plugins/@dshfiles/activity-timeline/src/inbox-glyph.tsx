@@ -1,25 +1,18 @@
-import { useApi, useApiEvent } from '@dshfiles/dshx/client'
-import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { attentionApi } from './attention-api.js'
+import { useResource } from '@dshfiles/dshx/client'
+import { useMemo } from 'react'
+import { ATTENTION_LIST_LIMIT, ATTENTION_READ, attentionApi } from './attention-api.js'
 import { InboxNotifications } from './inbox-notifications.js'
-import { inboxKeys, useInboxOpener, type Navigation } from './inbox-panel.js'
+import { useInboxOpener, type Navigation } from './inbox-panel.js'
 
 /**
  * The Inbox nav glyph and its one badge: the Needs you count, a projection of inbox state (plan §4.8). It also hosts
  * the opt-in blocking alerts, because the nav entry is mounted for as long as the sidebar is.
  */
 export const InboxGlyph = (props: { readonly size?: number; readonly navigation: Navigation }): JSX.Element => {
-  const api = useApi(attentionApi)
-  const queryClient = useQueryClient()
   const openSubject = useInboxOpener(props.navigation)
-  const eventStatus = useApiEvent(attentionApi, 'changed', () => void queryClient.invalidateQueries({ queryKey: inboxKeys.all }))
-  const needsYou = useQuery({
-    queryKey: inboxKeys.view('needs-you'),
-    queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.list({ view: 'needs-you', limit: 100 }, { signal: hostSignal }) }),
-    refetchInterval: eventStatus === 'live' ? 60_000 : 15_000,
-  })
-  InboxNotifications.useBlockingAlerts(needsYou.data?.items, item => void openSubject(item.subject))
+  const needsYou = useResource(attentionApi, 'list', { view: 'needs-you', limit: ATTENTION_LIST_LIMIT }, ATTENTION_READ)
+  const items = useMemo(() => needsYou.data?.items.slice(0, 100), [needsYou.data])
+  InboxNotifications.useBlockingAlerts(items, item => void openSubject(item.subject))
   const count = needsYou.data?.counts.needsYou ?? 0
   const size = props.size ?? 18
   return (

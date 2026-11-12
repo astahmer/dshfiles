@@ -102,8 +102,31 @@ Not changed, with the reason:
 - `graphPage`: the revision graph keys its page set by repository snapshot generation, so it reads again only when
   the graph changed and the viewport needs a top-up; correct invalidation, left alone.
 - `session-turn-admission/snapshot` every 3 s (10–16 per run): fixed on 2026-11-12, see below.
-- `attention/list` (activity-timeline, 12 per run, bursts on switch) and core `agentPresets/list` (10, one per
-  switch): next candidates.
+- `attention/list` (activity-timeline, 12 per run in the original census): addressed below.
+- Core `agentPresets/list` (10, one per switch): next candidate.
+
+### Shared attention reads (2026-11-12)
+
+The glyph and Inbox panel each invalidated a plugin-local Query cache on `attention.changed` and polled even while the
+channel was live. Thread Sidebar independently subscribed and read both Needs you and Other with a 200-item limit; the
+Inbox used a 100-item limit, preventing sharing across the two plugin caches. The explicit Next Waiting shortcut also
+reads on demand, but was not invoked in this workload. The list now carries an event-invalidated resource tag; the glyph,
+panel and sidebar share a page-wide resource per view at 200 items, with the Inbox's original 100-item display limit.
+One event subscription invalidates the views; a 15 s fallback runs only when that event is not live.
+
+A fresh full-profile scratch Host with four fake-provider thread seeds ran the census command above, with `--initiators`,
+before and after rebuilding the two plugins. Both captures completed; the Hosts were separately seeded, so total API
+traffic is not a controlled performance comparison. The scratch doctor reported an unrelated phone-access port-in-use
+error; all attention calls shown returned 200. Batched call payload digests identified the three baseline inputs as
+Needs you/100 (glyph), Needs you/200 and Other/200 (sidebar); the final two are the shared 200-item views. A later burst
+remains in both runs and may reflect a real change, not necessarily a duplicate. Batch transport does not expose a
+separate initiator stack per call.
+
+| Read / workload                | Before | After |
+| ------------------------------ | -----: | ----: |
+| `attention/list` calls         |      6 |     4 |
+| Distinct attention list inputs |      3 |     2 |
+| All `/api/` requests (context) |    115 |   121 |
 
 ### Waiting-turn admission pushes its changes (2026-11-12)
 

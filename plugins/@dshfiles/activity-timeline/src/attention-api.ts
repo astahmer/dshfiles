@@ -32,6 +32,9 @@ declare module '@deepseek-ai/cordis' {
 const text = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
 const timestamp = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 
+export const ATTENTION_READ = { staleTime: 30_000, pollInterval: 15_000 } as const
+export const ATTENTION_LIST_LIMIT = 200
+
 /** Fixed severities (plan §4.7): blocking and failed are "Needs you", ready is "Other", info only reaches the Activity log. */
 export const ATTENTION_SEVERITIES = ['blocking', 'failed', 'ready', 'info'] as const
 export const attentionSeveritySchema = Schema.Literals(ATTENTION_SEVERITIES)
@@ -185,6 +188,7 @@ export const attentionApi = defineApi({
         ),
       }),
       output: attentionListSchema,
+      tags: ['attention-list'],
       description:
         'List inbox items that need the user: one view at a time plus the count of every view and the muted sources. An item published about a subagent Session lists as its parent thread, the one the user acts on. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.',
       tool: { name: 'attention_list', readOnly: true, render: compactJson },
@@ -244,6 +248,7 @@ export const attentionApi = defineApi({
   events: {
     changed: event({
       schema: Schema.Struct({ revision: countSchema, needsYou: countSchema, blocking: countSchema }),
+      invalidates: ['attention-list'],
       description: 'The inbox changed; read the list again. Carries the new Needs you and blocking counts for badges.',
     }),
   },

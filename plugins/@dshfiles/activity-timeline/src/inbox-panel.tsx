@@ -1,7 +1,7 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { useApi, useApiEvent, useRegistry } from '@dshfiles/dshx/client'
+import { useApi, useRegistry, useResource } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -18,9 +18,11 @@ import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { ClockIcon, EllipsisIcon, MessagesSquareIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useState } from 'react'
 import {
+  ATTENTION_LIST_LIMIT,
+  ATTENTION_READ,
   attentionApi,
   type AttentionItem,
   type AttentionProviderVerb,
@@ -33,8 +35,6 @@ import { InboxNotifications } from './inbox-notifications.js'
 import type { InboxTranslate } from './inbox-locales.js'
 import { InboxView, type SnoozeChoice } from './inbox-view.js'
 import { ThreadReferences } from './thread-reference.js'
-
-export const inboxKeys = { all: ['activity-timeline', 'attention'] as const, view: (view: AttentionView) => ['activity-timeline', 'attention', view] as const }
 
 const PROVIDER_VERBS: readonly AttentionProviderVerb[] = ['Approve', 'Land', 'Retry', 'Resume']
 
@@ -258,21 +258,13 @@ const emptyCopy = (view: AttentionView, t: InboxTranslate): string => {
 export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): JSX.Element => {
   const api = useApi(attentionApi)
   const t = props.t
-  const queryClient = useQueryClient()
   const [view, setView] = useState<AttentionView>('needs-you')
   const [notice, setNotice] = useState<{ readonly tone: 'ok' | 'error'; readonly text: string } | null>(null)
   const openSubject = useInboxOpener(props)
   const sessionLabel = EntityLabels.useSessionLabel(props.sessions)
-  const eventStatus = useApiEvent(attentionApi, 'changed', () => void queryClient.invalidateQueries({ queryKey: inboxKeys.all }))
-  const listQuery = useQuery({
-    queryKey: inboxKeys.view(view),
-    queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.list({ view, limit: 100 }, { signal: hostSignal }) }),
-    // The changed event keeps the list current; polling only covers a disconnected event stream.
-    refetchInterval: eventStatus === 'live' ? 60_000 : 10_000,
-  })
+  const listQuery = useResource(attentionApi, 'list', { view, limit: ATTENTION_LIST_LIMIT }, ATTENTION_READ)
   const settle = (outcome: { readonly ok: boolean; readonly message: string } | null): void => {
     if (outcome !== null) setNotice({ tone: outcome.ok ? 'ok' : 'error', text: outcome.message })
-    void queryClient.invalidateQueries({ queryKey: inboxKeys.all })
   }
   const failed = (error: unknown): void => setNotice({ tone: 'error', text: errorMessage(error, t('actionFailed')) })
   const transition = useMutation({
@@ -323,10 +315,10 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
       setNotice({ tone: 'error', text: label === undefined ? t('sessionUnavailable') : t('subjectUnavailable', { label }) })
     }
   }
-  const data = listQuery.data
+  const data = listQuery.data === undefined ? undefined : { ...listQuery.data, items: listQuery.data.items.slice(0, 100) }
   const counts = data?.counts
   // Ages are read against the moment the list arrived, so a render never reads the clock.
-  const now = listQuery.dataUpdatedAt
+  const now = listQuery.updatedAt
   // Every open item that can be resumed moves at once: the inbox already lists only what needs the user.
   const resumableIds = data === undefined ? [] : InboxView.resumableIds(data.items)
   const resumeAllAction =
@@ -366,7 +358,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
           <AlertDescription>{notice.text}</AlertDescription>
         </Alert>
       )}
-      {listQuery.error === null ? null : (
+      {listQuery.status !== 'error' ? null : (
         <Alert variant="destructive">
           <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             <span>
