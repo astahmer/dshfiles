@@ -321,7 +321,7 @@ const renderEvent = (event: (typeof detailSchema.Type)['item']['events'][number]
 const renderEvents = (events: (typeof detailSchema.Type)['item']['events']): readonly string[] => {
   const kept: string[] = []
   let chars = 0
-  for (const event of events.toReversed()) {
+  for (const event of [...events].reverse()) {
     const line = renderEvent(event)
     if (kept.length > 0 && (kept.length >= maxRenderedEvents || chars + line.length > maxRenderedEventChars)) break
     kept.unshift(line)
