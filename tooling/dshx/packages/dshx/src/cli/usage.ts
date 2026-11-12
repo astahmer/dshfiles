@@ -220,6 +220,12 @@ const commandsHelp = actionHelpGroup('commands', {
   },
 })
 
+const toolsHelp = actionHelpGroup('tools', {
+  list: { description: 'List plugin tools.' },
+  describe: { description: 'Describe a plugin tool and its input schema.', positionals: { tool: positional('Tool name.') } },
+  call: { description: 'Call a plugin tool.', positionals: { tool: positional('Tool name.') } },
+})
+
 const configHelp = actionHelpGroup('config', {
   list: { description: 'List settings namespaces and their write and revision metadata.' },
   get: {
@@ -471,6 +477,7 @@ const helpCommands = {
   bundles: bundlesHelp,
   commands: commandsHelp,
   config: configHelp,
+  tools: toolsHelp,
   host: hostHelp,
   runtime: runtimeHelp,
   workspace: workspaceHelp,

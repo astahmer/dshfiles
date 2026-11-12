@@ -10,6 +10,9 @@ export interface CliArgs {
   readonly inspectTarget?: CliInspectTarget
   readonly addTarget?: CliAddTarget
   readonly platformArgs?: readonly string[]
+  readonly owner?: string
+  readonly input?: string
+  readonly write?: boolean
   readonly cwd?: string
   readonly root?: string
   readonly explain: boolean
@@ -98,6 +101,9 @@ const sharedArgs = {
     description: 'Typecheck the project before building; pass --no-typecheck to skip it.',
   },
   json: { type: 'boolean', description: 'Emit stable machine-readable JSON.' },
+  owner: { type: 'string', description: 'Filter tools by owner package.', valueHint: 'package' },
+  input: { type: 'string', description: 'JSON object input, or - to read stdin.', valueHint: 'json' },
+  write: { type: 'boolean', description: 'Allow a tool that changes state.' },
   runtime: {
     type: 'boolean',
     description: 'Require a linked and reachable DSH runtime when checking.',
@@ -319,6 +325,7 @@ export const cliCommandMetadata = {
   bundles: 'List, inspect, enable, and disable DSH bundles.',
   commands: 'Inspect and run Session-scoped DSH commands.',
   config: 'Read and update one DSH settings namespace.',
+  tools: 'List, describe and call plugin agent tools over the DSH launch URL.',
   host: 'Record, verify, and select execution machines and DSH runtimes.',
   runtime: 'Register, verify, select, and remove remote DSH runtimes.',
   workspace: 'Create or open remote Workspaces on a recorded host.',
@@ -343,6 +350,7 @@ const platformCommands: ReadonlySet<CliCommand> = new Set([
   'skills',
   'commands',
   'config',
+  'tools',
   'host',
   'runtime',
   'workspace',
@@ -451,6 +459,9 @@ const optionScopes: ReadonlyMap<string, OptionScope> = new Map([
       usage: '--host is only valid with sessions commands.',
     },
   ],
+  ['owner', { allows: platformAction('tools', 'list'), usage: '--owner is only valid with tools list.' }],
+  ['input', { allows: platformAction('tools', 'call'), usage: '--input is only valid with tools call.' }],
+  ['write', { allows: platformAction('tools', 'call'), usage: '--write is only valid with tools call.' }],
   ['local', { allows: platformAction('host', 'add'), usage: '--local is only valid with host add.' }],
   ['sshTarget', { allows: platformAction('host', 'add'), usage: '--ssh-target is only valid with host add.' }],
   ['launchUrlEnv', { allows: platformAction('runtime', 'add'), usage: '--launch-url-env is only valid with runtime add.' }],
@@ -572,6 +583,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       command === 'skills' ||
       command === 'commands' ||
       command === 'config' ||
+      command === 'tools' ||
       command === 'host' ||
       command === 'runtime' ||
       command === 'workspace' ||
@@ -705,6 +717,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   validateOptionScopes(
     {
       json,
+      owner: parsed.owner,
+      input: parsed.input,
+      write: parsed.write,
       open,
       port,
       dryRun,
@@ -839,6 +854,12 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     if (action === 'run' && line === undefined && platformArgs.length < 2) throw new CliUsageError('commands run requires a slash-prefixed line or --line.')
     if (action !== 'run' && (commandName !== undefined || extra.length > 0))
       throw new CliUsageError(`commands ${action} accepts no extra positional arguments.`)
+  }
+  if (command === 'tools' && !help) {
+    const [action, name, ...extra] = platformArgs
+    if (!['list', 'describe', 'call'].includes(action ?? '')) throw new CliUsageError('tools requires list, describe, or call.')
+    if (action !== 'list' && !name) throw new CliUsageError(`tools ${action} requires a tool name.`)
+    if (extra.length > 0 || (action === 'list' && name !== undefined)) throw new CliUsageError(`tools ${action} accepts no extra positional arguments.`)
   }
   if (command === 'config' && !help) {
     const [action, namespace, path, ...extra] = platformArgs
@@ -996,6 +1017,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(tail !== undefined && { tail }),
     ...(types !== undefined && { types }),
     ...(follow ? { follow } : undefined),
+    ...(parsed.owner !== undefined && { owner: parsed.owner }),
+    ...(parsed.input !== undefined && { input: parsed.input }),
+    ...(parsed.write ? { write: true } : {}),
   }
 }
 

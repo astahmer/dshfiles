@@ -134,6 +134,7 @@ const platformGroupsForRun = (): ReadonlySet<string> =>
     'skills',
     'commands',
     'config',
+    'tools',
     'host',
     'runtime',
     'workspace',
@@ -181,6 +182,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
       'skills',
       'commands',
       'config',
+      'tools',
       'host',
       'runtime',
       'workspace',
@@ -255,6 +257,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   }
   if (args.command === 'inspect' && args.inspectTarget === 'slots' && args.explain) return runSlotExplanation(args, io)
   const runtime = options.runtime ?? {}
+  if (args.command === 'tools') return (await import('./tools.js')).runToolsCli({ args, io })
   if (args.command !== undefined && platformGroupsForRun().has(args.command)) {
     const { runPlatformCli } = await import('./platform.js')
     return runPlatformCli(args, {

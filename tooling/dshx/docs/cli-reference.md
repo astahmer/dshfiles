@@ -187,21 +187,21 @@ Exit codes: 0 ok, 1 failed, 2 usage.
 
 ## Shared options
 
-| Option                | Commands                                                             | Effect                                                                    |
-| --------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `--cwd <path>`        | project commands; sessions create/start                              | Resolve another project or create a Session in a working directory        |
-| `--verbose`           | all                                                                  | Include underlying provider/process causes                                |
-| `--json`              | check, inspect, add, update, remove, init, registry, DSH platform commands | Stable machine-readable output                                      |
-| `--quiet`             | all                                                                  | Suppress human success output; preserve JSON and errors                   |
-| `--no-color`          | all                                                                  | Disable terminal styling                                                  |
-| `--url <launch-url>`  | DSH platform commands                                                | Override `DSHX_URL` for this invocation                                   |
-| `--title <title>`     | sessions start                                                       | Name the new Session; otherwise the Host titles it from its first message |
-| `--runtime`           | check                                                                | Enable Profile/Composition/runtime validation                             |
-| `--fix`               | check                                                                | Apply deterministic manifest repairs                                      |
-| `--dry-run`           | check --fix, add, update, remove, init, publish                      | Produce a plan/diff without writing                                       |
-| `--open`              | dev                                                                  | Open the development URL                                                  |
-| `--port <0-65535>`    | dev                                                                  | Select the DSH Web port; `0` allocates one                                |
-| `--help`, `--version` | all                                                                  | Print CLI metadata                                                        |
+| Option                | Commands                                                                   | Effect                                                                    |
+| --------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `--cwd <path>`        | project commands; sessions create/start                                    | Resolve another project or create a Session in a working directory        |
+| `--verbose`           | all                                                                        | Include underlying provider/process causes                                |
+| `--json`              | check, inspect, add, update, remove, init, registry, DSH platform commands | Stable machine-readable output                                            |
+| `--quiet`             | all                                                                        | Suppress human success output; preserve JSON and errors                   |
+| `--no-color`          | all                                                                        | Disable terminal styling                                                  |
+| `--url <launch-url>`  | DSH platform commands                                                      | Override `DSHX_URL` for this invocation                                   |
+| `--title <title>`     | sessions start                                                             | Name the new Session; otherwise the Host titles it from its first message |
+| `--runtime`           | check                                                                      | Enable Profile/Composition/runtime validation                             |
+| `--fix`               | check                                                                      | Apply deterministic manifest repairs                                      |
+| `--dry-run`           | check --fix, add, update, remove, init, publish                            | Produce a plan/diff without writing                                       |
+| `--open`              | dev                                                                        | Open the development URL                                                  |
+| `--port <0-65535>`    | dev                                                                        | Select the DSH Web port; `0` allocates one                                |
+| `--help`, `--version` | all                                                                        | Print CLI metadata                                                        |
 
 ## DSH platform control plane
 
@@ -261,7 +261,17 @@ dshx config set <namespace> <path> <json-value>
 dshx config unset <namespace> <path>
 ```
 
-Add `--json` to get the versioned platform result envelope:
+### Plugin tools
+
+```sh
+dshx tools list [--owner <package>] [--json]
+dshx tools describe <tool> [--json]
+dshx tools call <tool> [--input <json>|--input -] [--write] [--json]
+```
+
+Tool calls accept a JSON object; `--input -` reads it from stdin. Write tools require `--write` and retain their own required confirmation arguments. Tool JSON output is the direct catalog entry, list, or result, not the platform envelope.
+
+Add `--json` to other platform commands to get the versioned platform result envelope:
 
 ```json
 {
