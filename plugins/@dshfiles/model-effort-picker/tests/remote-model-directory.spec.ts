@@ -99,4 +99,11 @@ describe('RemoteModelDirectory status', () => {
     expect(fetches).toBe(1)
     expect(remote.store.getSnapshot()).toMatchObject({ status: 'ready', routable: true })
   })
+
+  it('keeps the default choices when the Session the Host does not have rejected a selection', async () => {
+    const { base, remote } = fixture(async () => catalog)
+    await remote.load()
+    base.store.set(baseState({ status: 'error', error: 'session/not-found: session "session-1" not found' }))
+    expect(remote.store.getSnapshot()).toMatchObject({ status: 'ready', error: null, groups: catalog.groups })
+  })
 })

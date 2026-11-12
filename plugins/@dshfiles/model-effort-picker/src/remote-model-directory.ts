@@ -2,6 +2,7 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/typ
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ModelDirectory, ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
+import { isSessionNotFound } from './session-presence.js'
 
 type RemoteModelCatalog = Pick<ModelDirectoryState, 'groups' | 'failures'>
 
@@ -140,7 +141,9 @@ export class RemoteModelDirectory {
   /** The combined status: a selection in flight or failed wins over the remote catalog's own load state. */
   private applyStatus(state: ModelDirectoryState, selection: { readonly selecting: boolean; readonly selectionError: string | null }): void {
     const catalogError = this.catalogState.kind === 'error' ? this.catalogState.error : null
-    state.error = selection.selectionError ?? catalogError
+    // A Session the Host does not have yet (or any more) has nothing to configure: show the catalog's defaults.
+    const selectionError = selection.selectionError === null || isSessionNotFound(selection.selectionError) ? null : selection.selectionError
+    state.error = selectionError ?? catalogError
     if (selection.selecting) state.status = 'selecting'
     else if (state.error !== null) state.status = 'error'
     else state.status = this.catalogState.kind

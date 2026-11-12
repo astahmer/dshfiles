@@ -19,6 +19,7 @@ import { ModelRow } from './model-row.js'
 import { PROVIDER_LABEL } from './provider-labels.js'
 import { requestFanOut } from '@dshfiles/thread-sidebar/fan-out-request'
 import { modelEffortPickerSettings } from './settings.js'
+import { selectionFailureNotice } from './session-presence.js'
 
 type Props = ModelSelectInjected & { readonly locked: boolean; readonly sessionId: string }
 type FastModeRoute = { readonly sessionId: string; readonly provider: string; readonly model: string }
@@ -165,9 +166,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     setSelectionError(null)
     try {
       const result = await select(selection)
-      if (result !== undefined && !result.ok) setSelectionError(result.error.message)
+      if (result !== undefined && !result.ok) setSelectionError(selectionFailureNotice(result.error.message))
     } catch (error) {
-      setSelectionError(error instanceof Error ? error.message : String(error))
+      setSelectionError(selectionFailureNotice(error instanceof Error ? error.message : String(error)))
     }
   }
 
