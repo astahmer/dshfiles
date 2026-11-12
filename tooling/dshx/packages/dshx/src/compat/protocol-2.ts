@@ -18,7 +18,7 @@ export const PROTOCOL_2_COMPATIBILITY: DshCompatibility = {
   version: '0.2.0-rc.1',
   // Package managers admit a prerelease only when a comparator names that exact patch, so every verified patch
   // prerelease needs its own lower bound.
-  dshRange: '>=0.2.0-rc.1 <0.3.0-0 || >=0.2.1-rc.2 <0.3.0-0',
+  dshRange: '>=0.2.0-rc.1 <0.3.0-0 || >=0.2.1-rc.2 <0.3.0-0 || >=0.2.2-rc.1 <0.3.0-0',
   verified: {
     minimum: VERIFIED_PROTOCOL_2_VERSIONS[0],
     latest: VERIFIED_PROTOCOL_2_VERSIONS[1],
