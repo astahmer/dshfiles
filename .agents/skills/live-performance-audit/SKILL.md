@@ -60,6 +60,23 @@ side panel, which is what makes keep-mounted bodies accumulate.
 LAUNCH_URL=<scratch launch url> ASIDE=1 node $S/session-residency-probe.mjs 14
 ```
 
+A long-lived tab and the client work each switch repeats, also scratch-only. Seed representative threads first (copying
+private logs needs the person's authorization; the copy and what it yields stay out of the repository), then switch
+through the same ids before and after a fix:
+
+```sh
+STATE=$TMPDIR/dshx-dev/<name>/state.json
+node $S/seed-session-logs.mjs --from ~/.dsh/sessions/--<project>-- --source-cwd <project dir the logs recorded> \
+  --home "$(node -p "require('$STATE').home")" --project "$(node -p "require('$STATE').project.path")" > $SCRATCH/ids.txt
+export LAUNCH_URL="$(node -p "require('$STATE').launchUrl")" IDS=$SCRATCH/ids.txt
+node $S/registry-churn-probe.mjs 10                 # dshx registry notifications, entry writes, Workbench replacements
+OUT=$SCRATCH/heap node $S/long-tab-heap-probe.mjs   # 2 × 40 switches, settle, GC: heap, DOM, POSTs, heap snapshot
+node --max-old-space-size=4096 $S/heap-snapshot-retainers.mjs $SCRATCH/heap/final.heapsnapshot   # who holds the bytes
+```
+
+An unchanged palette, slot or panel list writes nothing on a switch. Entry writes that grow with the switch count name
+an effect whose inputs change identity while their content does not.
+
 Use Node from `.node-version`. Discover the actual live URL/profile rather than assuming a particular port.
 The probes accept `LAUNCH_URL`; keep that token-bearing value in private process configuration and out of logs/source.
 The profiler attaches to the live process without restarting it; tell the user before
