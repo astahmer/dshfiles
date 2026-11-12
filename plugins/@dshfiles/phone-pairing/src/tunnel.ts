@@ -89,15 +89,21 @@ const startTailscale = Effect.fnUntraced(function* (input: { readonly mode: 'fun
   if (name === undefined) return undefined
   const before = yield* serveStatus
   if (Option.isNone(before)) return undefined
-  const https = freeServePort(input.mode, before.value)
-  if (https === undefined) return undefined
   const target = `http://127.0.0.1:${String(input.port)}`
-  const started = yield* runCommand({ command: 'tailscale', args: [input.mode, '--bg', `--https=${String(https)}`, target] }).pipe(
-    Effect.as(true),
-    Effect.orElseSucceed(() => false),
-  )
-  if (!started) return undefined
+  // A Host that died without stopping (a crash, a frozen machine) leaves its serve route behind; it already
+  // delivers to this gateway, so take it over instead of refusing every port. It is not ours to turn off.
+  const kept = input.mode === 'serve' ? candidatePorts('serve').find(port => before.value.proxyOf(name, port) === target) : undefined
+  const https = kept ?? freeServePort(input.mode, before.value)
+  if (https === undefined) return undefined
+  if (kept === undefined) {
+    const started = yield* runCommand({ command: 'tailscale', args: [input.mode, '--bg', `--https=${String(https)}`, target] }).pipe(
+      Effect.as(true),
+      Effect.orElseSucceed(() => false),
+    )
+    if (!started) return undefined
+  }
   const stop = Effect.gen(function* () {
+    if (kept !== undefined) return
     const after = yield* serveStatus
     if (Option.isNone(after) || after.value.proxyOf(name, https) !== target) return
     yield* runCommand({ command: 'tailscale', args: [input.mode, `--https=${String(https)}`, 'off'] })

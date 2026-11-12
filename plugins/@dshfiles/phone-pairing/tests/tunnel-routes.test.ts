@@ -95,6 +95,16 @@ describe('phone pairing on its own Tailscale route', () => {
     expect((await commands()).filter(line => line.startsWith('funnel --bg'))).toEqual([])
   })
 
+  it('takes over a Serve route a crashed Host left on its own gateway, and leaves it on stop', async () => {
+    const ports = ['443', '8443', '9443', '10443']
+    const leftovers = Object.fromEntries(ports.map(port => [`machine.example.ts.net:${port}`, { Handlers: { '/': { Proxy: 'http://127.0.0.1:5557' } } }]))
+    await table({ TCP: Object.fromEntries(ports.map(port => [port, { HTTPS: true }])), Web: leftovers })
+    const tunnel = await provided(startTunnel(5557, 'tailscale-serve'))
+    expect(tunnel?.origin).toBe('https://machine.example.ts.net')
+    await provided(tunnel?.stop ?? Effect.void)
+    expect((await commands()).filter(line => line.startsWith('serve --bg') || line.endsWith(' off'))).toEqual([])
+  })
+
   it('reads the served ports and their targets from serve status', async () => {
     const parsed = await run(parseServeStatus(JSON.stringify(phoneAccessRoute)))
     expect([...parsed.ports]).toEqual([443])
