@@ -41,7 +41,7 @@ Owned by `frame-layout`, state per browser (`dshfiles.frame-layout.zen.v1`), a r
 
 | Step | Work                                                                                                                                                 |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Z1   | Zen seat, attribute, ⌘K command and chord: hides sidebar, right panel, status strip, main tabs; thread and composer stay                             |
+| Z1   | Zen seat, attribute, ⌘K command and chord: hides sidebar, right panel, status strip, main tabs; thread and composer stay. **Done 2026-11-12**: jj:qpotrwto (frame-layout `ctx.zen`, `data-dshfiles-zen`, Zen mode + Mod+Shift+., Escape, Leave zen mode), jj:knkxplux (Workbench tab rows), jj:zqtzkwzr (catalog, README, screenshots). Chord free in `@dshfiles/shortcuts` and the Host catalog. Below 768 px zen keeps navigation and hides only the status pill. No agent tool (presentation state). Browser proof by scratch captures, no Gherkin yet |
 | Z2   | Header pills, non-blocking composer rows (`ComposerRow` gains `blocking`) and the attention glyph hide; a blocking question or approval always shows |
 
 ### D. Progressive disclosure
