@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { openKeyboardShortcutsEditor } from './keyboard-shortcuts-editor.js'
 import { alternateModifierFor, primaryModifierFor } from './platform-modifier.js'
 
 const collapsedSidebar = (page: Page) => page.locator('[data-sidebar-collapsed]')
@@ -104,9 +105,7 @@ When('a plugin contributes the editable command {string} on {string}', async ({ 
 
 When('{string} is rebound to primary+Shift+U in Keyboard shortcuts', async ({ page }: { page: Page }, title: string) => {
   const primary = await primaryModifierFor(page)
-  await page.keyboard.press(`${primary}+Slash`)
-  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
-  await expect(dialog).toBeVisible()
+  const dialog = await openKeyboardShortcutsEditor(page)
   await recordAssertion(page, 'editable-command-is-listed-unbound', () =>
     expect(dialog.getByRole('button', { name: `Edit shortcut for ${title}` })).toBeVisible(),
   )
