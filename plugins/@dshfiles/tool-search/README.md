@@ -2,7 +2,7 @@
 
 Opt-in Native Tool Mode plugin for per-agent progressive disclosure of global tools.
 
-Inspired by and adapted from [`vibeinging/dsh-tool-search`](https://github.com/vibeinging/dsh-tool-search), an experimental MIT-licensed implementation. This plugin retains its MIT license in [LICENSE](LICENSE). The upstream README describes a private experimental repository; no upstream version or commit was vendored. Search ranking and the Host integration here are adapted to the installed DSH 0.2.1-rc.2 APIs. Update policy: re-check the upstream design and the installed DSH tool/session contracts before updating this adaptation.
+Inspired by and adapted from [`vibeinging/dsh-tool-search`](https://github.com/vibeinging/dsh-tool-search), an experimental MIT-licensed implementation. This plugin retains its MIT license in [LICENSE](LICENSE). The upstream README describes a private experimental repository; no upstream version or commit was vendored. Search ranking and the Host integration here are adapted to the installed DSH 0.2.2-rc.2 APIs. Update policy: re-check the upstream design and the installed DSH tool/session contracts before updating this adaptation.
 
 ## Opt-in installation
 

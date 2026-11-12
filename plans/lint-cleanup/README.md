@@ -10,38 +10,32 @@ path is excluded.
 
 ## Where it stands
 
-### Resume here (2026-11-11, after upstream #250 and #251)
+### Resume here (2026-11-12)
 
-The clean `main` snapshot `1ac2f08f` was red again. After the current chunk,
-Oxlint is 1,036 → 1,034, ast-grep is 155 → 151, Effect anti-slop remains
-36 (baseline 33), and formatting drift is 10 → 0. No caps were raised or
-lowered in this chunk: the rules still above cap need real fixes first.
+`pnpm run lint` passes and every cap in
+[`scripts/lint-ratchet.json`](../../scripts/lint-ratchet.json) equals its
+measured count: Oxlint 896 findings across 7 rules, ast-grep 139 across 2,
+Effect anti-slop 31. The `fix-gates` chunk fixed the conditional spreads,
+known-value widening, unknown parameter and direct `JSON.parse` that had put
+four rules over cap; no cap was raised.
 
-| Rule | Before | After | Cap |
-| --- | ---: | ---: | ---: |
-| `require-safety-comment-for-type-assertion` | 305 | 305 | 297 |
-| `no-unknown-parameters` | 237 | 237 | 226 |
-| `no-unsafe-dictionary-type` | 179 | 179 | 169 |
-| `no-unknown-returns` | 118 | 118 | 117 |
-| `no-known-value-widening` | 101 | 101 | 95 |
-| `ui-guidance(no-native-title)` | 64 | 64 | 64 |
-| `no-runtime-typeof` | 26 | 26 | 26 |
-| `no-conditional-empty-object-spread` | 2 | 0 | 0 |
-| Oxlint errors | 4 | 4 | 0 |
-| `no-deeply-nested-ternary` | 3 | 0 | 0 |
-| `no-direct-json-parse` | 151 | 150 | 147 |
-| `no-direct-json-parse-tsx` | 1 | 1 | 1 |
+| Rule                                        | Cap |
+| ------------------------------------------- | --: |
+| `require-safety-comment-for-type-assertion` | 280 |
+| `no-unknown-parameters`                     | 197 |
+| `no-unsafe-dictionary-type`                 | 149 |
+| `no-direct-json-parse`                      | 138 |
+| `no-unknown-returns`                        |  96 |
+| `no-known-value-widening`                   |  86 |
+| `ui-guidance(no-native-title)`              |  62 |
+| `no-runtime-typeof`                         |  26 |
+| `no-direct-json-parse-tsx`                  |   1 |
+| every other ratcheted rule                  |   0 |
 
-The two conditional spreads now preserve omission and metadata semantics;
-GitLab merge-state precedence is explicit, and one MCP test uses the shared JSON
-boundary. The 10 drifted committed files are formatted. Remaining errors are
-`pull-requests`' forge export bag and passthrough alias, and the idle scheduler
-and raw error in `context-compaction`. The scheduler must preserve 60-second
-fixed ticks, overlap protection, abort/disposal, and process-liveness behavior;
-it needs lifecycle tests rather than a mechanical lint rewrite. Remaining new
-MCP transport findings also need typed boundaries, not casts or suppressions.
-Re-measure on the then-current clean `main`, fix the over-cap rules and three
-Effect findings, and lower caps only after the gates pass.
+Next: remove the remaining baseline with real fixes and lower each cap as a
+rule empties. The `context-compaction` idle scheduler still needs lifecycle
+tests (60-second fixed ticks, overlap protection, abort/disposal,
+process-liveness) before a lint rewrite.
 
 ### Previous milestone
 

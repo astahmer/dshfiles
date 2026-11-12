@@ -75,7 +75,7 @@ Anyone adopting dshfiles — the whole setup, one plugin, a pack or one feature 
    2. **A2 Self-ticking checklist** from real state: GitHub CLI signed in, project is a jj or git repository, an AI account is configured, a project is added (P1).
    3. **A3 `onboarding` block** per feature in `dshx.features.json` (prerequisites, first action, done-when check, where to open it) read by the gallery, packs and the agent tool. No per-plugin framework (P1 schema; P5 makes it required for UI plugins).
    4. **A4 Show me where** — replay a feature's `reach` steps in the live UI by role and accessible name and highlight each control step by step (P2).
-   5. **A5 What's new** — generated at build time from `feat(<plugin>): …` titles; "since your last visit" per browser and "upstream since your fork point" for forks (P3).
+   5. **A5 What's new** — read at runtime from `feat(<plugin>): …` titles in jj/git history; "since your last visit" per browser and "upstream since your fork point" for forks (P3).
    6. **A6 Suggestions from usage** — opt-in, rate-limited, local tool-call history only, no model call (P3).
    7. **A7 Agent-led demo** — "Try it" in a scratch thread, off by default because it spends tokens (P4).
    8. **A8 Outside the app** — `dshx init` interactive profile composer from packs; generated docs page per pack (P4).
@@ -307,10 +307,10 @@ Decisions above, 2026-11-11.
 
 ### P3 — What's new, usage suggestions
 
-1. A build step reads `feat(<plugin>): …` titles from jj/git history into a generated list; the page shows "since your last visit" (browser-local timestamp) and, when an upstream remote exists, "upstream since your fork point".
+1. The Host reads `feat(<plugin>): …` titles from jj/git history at request time (no generated list); the page shows "since your last visit" (browser-local timestamp) and, when an upstream remote exists, "upstream since your fork point".
 2. Opt-in suggestions from local tool-call history (no model call), at most one per day, dismissible, off by default.
 
-**Acceptance:** the list regenerates from history only; a stale list fails a test; suggestions never appear while off; no network or model request.
+**Acceptance:** the list comes from history at request time only; suggestions never appear while off; no network or model request.
 
 ### P4 — Agent-led demo, `dshx init`, docs per pack
 

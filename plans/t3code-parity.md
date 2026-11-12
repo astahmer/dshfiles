@@ -35,13 +35,13 @@ Cursor harnesses as threads), A9 (simulator/emulator devices, desktop SnapShots)
 VSX themes, voice dictation), D4 (desktop app, background service, self-update). D5 (Effect
 Schema RPC contracts) needs no action: dshx has an opt-in Effect layer.
 
-C1 is closed: GitLab ships behind the forge port and the other forges are on demand, not planned. Review comments, reviewers, merge,
+C1 is nearly closed: GitLab merge requests link, watch and settle behind the forge port; creating one and self-hosted GitLab hosts are being fixed. The other forges are on demand, not planned. Review comments, reviewers, merge,
 auto-merge, revert, bulk close and stacks remain separate forge-loop work.
 
 ## Suggested order
 
-1. **C5** viewed marks and the forge loop's review verbs, now that GitHub and GitLab create, link,
-   watch and settle exist.
+1. **C5** viewed marks and the forge loop's review verbs, now that GitHub creates, links, watches
+   and settles, and GitLab does once its create and self-hosted fixes land.
 2. **A3** `wait_for` and `resize` in preview.
 3. **C4** stored review guides on top of pulls-review scopes.
 4. **A2** MCP Apps, once a fork-or-proxy decision for the MCP client is made.
@@ -64,7 +64,7 @@ auto-merge, revert, bulk close and stacks remain separate forge-loop work.
 | B5  | Webhooks into an existing thread and GitHub `X-Hub-Signature-256`: [project-automations](../plugins/@dshfiles/project-automations/README.md)                                                                                                                                               |
 | B6  | MCP endpoint for outside agents: [mcp-endpoint](../plugins/@dshfiles/mcp-endpoint/README.md)                                                                                                                                                                                               |
 | B7  | `request_secret`: [secret-catalog](../plugins/@dshfiles/secret-catalog/README.md)                                                                                                                                                                                                          |
-| C1  | GitLab merge requests behind the forge port: [pull-requests](../plugins/@dshfiles/pull-requests/README.md) (`glab`, `src/forge-port.ts`). Forgejo/Gitea (`tea`), Bitbucket and Azure DevOps are on demand: add one only when a real project needs it, behind the same port                 |
+| C1  | GitLab merge requests behind the forge port: [pull-requests](../plugins/@dshfiles/pull-requests/README.md) (`glab`, `src/forge-port.ts`); create and self-hosted hosts are being fixed. Forgejo/Gitea (`tea`), Bitbucket and Azure DevOps are on demand, behind the same port              |
 | C2  | Thread↔PR links: [pull-requests](../plugins/@dshfiles/pull-requests/README.md)                                                                                                                                                                                                             |
 | C3  | Host-owned auto-settle ([thread-sidebar](../plugins/@dshfiles/thread-sidebar/README.md), `auto-settle-host.ts`); pull-requests calls `requestSettle` on merge or close (`src/monitor.ts`)                                                                                                  |
 | C6  | New project, local clone, publish: workspace-folder-picker (`project_create`, `project_clone`, `project_publish`)                                                                                                                                                                          |

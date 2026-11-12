@@ -13,19 +13,18 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 
 ## Product and plugin work
 
-| Plan                                              | Open work                                                                                                                                                                      |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [Agent session history](agent-session-history.md) | Bounded, permission-scoped Session search and read for Agents beyond live descendants; JJ change associations; orchestration-write authorization.                              |
-| [Async Agent questions](async-agent-questions.md) | Real-provider cold resume across a Host restart (needs a user-approved restart), Markdown feedback linked to element annotations, two design questions.                        |
-| [Multi-host](multi-host/README.md)                | Target and service owner, owner-side durable service, supervisor token boundary, Linux release acceptance.                                                                     |
-| [Fleet DX](fleet-dx/README.md)                    | Host-aware core `subagent` / `backlog_start_thread`, real-SSH proof of origin grouping and fetch-before-thread, browser proof of the version-drift line.                       |
-| [Verification evidence](verification-evidence.md) | Browser proof only: re-run the journey, plus a peer-fallback and rebase-stage scratch journey.                                                                                 |
-| [Backlog](backlog/README.md)                      | Rich-composer body editing, settled-thread item return, paging and Inbox journeys, `Closes b:` from PR bodies, cross-host error details, Linear delegate mapping, screenshots. |
-| [Inline chat UI](inline-chat-ui.md)               | Open P2 cards: approval card restyle, source citations, the jj revision a turn produced.                                                                                       |
-| [ADE: remaining work](ade-ux/README.md)           | Native question forms in the Inbox, git-worktree scopes, a physical iPhone pass, e2e re-runs; design in [docs/ade-ux](../docs/ade-ux/README.md).                               |
-| [Thread sharing](thread-share/README.md)          | v1 shipped as `@dshfiles/thread-share` (opt-in, not seeded); open: v2 collaborative threads (design only), opentunnel revisit.                                                 |
-| [Browser preview panel](browser-preview-panel.md) | Agent ↔ user hand-off (P5): an element highlight in the Agent browser and user annotations sent to the thread.                                                                 |
-| [t3code parity](t3code-parity.md)                 | Remaining t3code gaps (push, MCP Apps, preview recording, PR picker, other forges, OAuth); a closed-rows index maps shipped IDs to their plugin docs.                          |
+| Plan                                              | Open work                                                                                                                                                |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Agent session history](agent-session-history.md) | Bounded, permission-scoped Session search and read for Agents beyond live descendants; JJ change associations; orchestration-write authorization.        |
+| [Async Agent questions](async-agent-questions.md) | Real-provider cold resume across a Host restart (needs a user-approved restart), Markdown feedback linked to element annotations, two design questions.  |
+| [Multi-host](multi-host/README.md)                | Target and service owner, owner-side durable service, supervisor token boundary, Linux release acceptance.                                               |
+| [Fleet DX](fleet-dx/README.md)                    | Host-aware core `subagent` / `backlog_start_thread`, real-SSH proof of origin grouping and fetch-before-thread, browser proof of the version-drift line. |
+| [Verification evidence](verification-evidence.md) | Browser proof only: re-run the journey, plus a peer-fallback and rebase-stage scratch journey.                                                           |
+| [Backlog](backlog/README.md)                      | Nothing to build: live checks after a user-owned Host restart (model triage, Notion and Jira, peer replication) and tuning questions.                    |
+| [ADE: remaining work](ade-ux/README.md)           | Native question forms in the Inbox, git-worktree scopes, a physical iPhone pass, e2e re-runs; design in [docs/ade-ux](../docs/ade-ux/README.md).         |
+| [Thread sharing](thread-share/README.md)          | v1 shipped as `@dshfiles/thread-share` (opt-in, not seeded); open: v2 collaborative threads (design only), opentunnel revisit.                           |
+| [Browser preview panel](browser-preview-panel.md) | Agent ↔ user hand-off (P5): an element highlight in the Agent browser and user annotations sent to the thread.                                           |
+| [t3code parity](t3code-parity.md)                 | Remaining t3code gaps (push, MCP Apps, preview recording, PR picker, other forges, OAuth); a closed-rows index maps shipped IDs to their plugin docs.    |
 
 ## Testing, research and housekeeping
 
