@@ -132,7 +132,8 @@ const userActivitiesSince = async (
   const activities: SessionUserActivity[] = []
   let beforeSeq: number | undefined
   for (;;) {
-    const page = await controller.events({ address: { kind: 'session', sessionId }, ...(beforeSeq === undefined ? {} : { beforeSeq }) }, signal)
+    const address = { kind: 'session', sessionId } as const
+    const page = await controller.events(beforeSeq === undefined ? { address } : { address, beforeSeq }, signal)
     const events = page.records.map(record => record.event)
     activities.push(...collectUserActivities(events, wireUserActivity))
     const oldest = events[0]

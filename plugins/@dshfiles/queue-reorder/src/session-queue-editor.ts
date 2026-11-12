@@ -81,17 +81,20 @@ const restoreComposerReferences = (composer: SessionInput | ReferenceRestoringCo
 const isAttachmentId = (value: string): value is AttachmentIdType => value.length > 0
 const isReceiptId = (value: string): value is ReceiptId => value.length > 0
 
-const imageReference = (attachment: QueuedImageAttachment, attachmentId: AttachmentIdType): ImageAttachmentRef => ({
-  attachmentId,
-  mediaType: attachment.mediaType,
-  bytes: attachment.bytes,
-  width: attachment.width,
-  height: attachment.height,
-  ...(attachment.name === undefined ? {} : { name: attachment.name }),
-  ...(attachment.originalDimensions === undefined
-    ? {}
-    : { originalDimensions: { width: attachment.originalDimensions.width, height: attachment.originalDimensions.height } }),
-})
+const imageReference = (attachment: QueuedImageAttachment, attachmentId: AttachmentIdType): ImageAttachmentRef => {
+  const reference: ImageAttachmentRef = {
+    attachmentId,
+    mediaType: attachment.mediaType,
+    bytes: attachment.bytes,
+    width: attachment.width,
+    height: attachment.height,
+  }
+  if (attachment.name !== undefined) reference.name = attachment.name
+  if (attachment.originalDimensions !== undefined) {
+    reference.originalDimensions = { width: attachment.originalDimensions.width, height: attachment.originalDimensions.height }
+  }
+  return reference
+}
 
 /** One upload wait never outlives a stuck network: Cancel reports the failure and stays retryable. */
 const UPLOAD_TIMEOUT_MS = 5 * 60_000

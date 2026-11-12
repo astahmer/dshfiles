@@ -6,19 +6,12 @@ import { WebController } from '../../src/native/web/controller.ts'
 import type { SessionEventsPage, SessionFollowFrame, SessionFollowRequest, SessionPageRequest } from '../../src/native/types.ts'
 
 /** The Session Controller's history Remote surface (`page`, `follow`) over the controllers it delegates to. */
-export const historyHarness = (
-  ctx: Context,
-  promote: (observation: SessionObservation) => void,
-): {
-  readonly page: (request: SessionPageRequest, signal: AbortSignal) => Promise<SessionEventsPage>
-  readonly follow: (request: SessionFollowRequest, signal: AbortSignal) => AsyncIterable<SessionFollowFrame>
-  readonly isFollowed: (sessionId: SessionId) => boolean
-} => {
+export const historyHarness = (ctx: Context, promote: (observation: SessionObservation) => void) => {
   const history = new HistoryController(ctx)
   const web = new WebController(ctx, history, promote)
   return {
-    page: (request, signal) => history.events(request, signal),
-    follow: (request, signal) => web.follow(request, signal),
-    isFollowed: sessionId => web.isFollowed(sessionId),
+    page: (request: SessionPageRequest, signal: AbortSignal): Promise<SessionEventsPage> => history.events(request, signal),
+    follow: (request: SessionFollowRequest, signal: AbortSignal): AsyncIterable<SessionFollowFrame> => web.follow(request, signal),
+    isFollowed: (sessionId: SessionId): boolean => web.isFollowed(sessionId),
   }
 }

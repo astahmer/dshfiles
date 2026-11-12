@@ -10,6 +10,8 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { ScheduleId, createAfterScheduleRecord, type ScheduleCatalogEntry, type ScheduleService } from '@deepseek-ai/dsh-schedule'
 import type { SessionController } from '@deepseek-ai/dsh-api-session-controller'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import { decodeJson } from '@dshfiles/dshx/json'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { createQuotaContinuationService, type QuotaFailureAgent } from './quota-continuation.js'
 import { QuotaContinuationMessage } from './quota-continuation-message.js'
@@ -18,9 +20,10 @@ import { quotaContinuationDomain } from './quota-continuation-store.js'
 type SchedulePort = Pick<ScheduleService, 'create' | 'edit' | 'list'>
 type SessionPromptRequest = Parameters<SessionController['prompt']>[0]
 type WireEventData = Awaited<ReturnType<SessionController['events']>>['records'][number]['event']['data']
+type SessionEventData = ReturnType<Session['ownEvents']>[number]['data']
 
 /** The Session Controller sends committed event data as JSON; the round trip is that wire encoding. */
-const wireData = (data: unknown): WireEventData => JSON.parse(JSON.stringify(data))
+const wireData = (data: SessionEventData): WireEventData => decodeJson(Schema.MutableJson, JSON.stringify(data))
 
 const openContext = async (root: string) => {
   const context = new Context()
