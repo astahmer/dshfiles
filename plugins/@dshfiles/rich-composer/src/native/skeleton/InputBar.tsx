@@ -497,9 +497,14 @@ export const InputBar = memo(function InputBar({
     // The menu is a combobox over the editor, so the keyboard has to be there
     // before the launcher opens it: activating the button from the keyboard
     // leaves focus on the button, and restoring it afterwards would re-track an
-    // empty draft and close the menu again.
-    if (editor !== null) focusDraftEditor(editor, revealSelection)
-    toggleCommandMenu?.(keyboard.caretSpan())
+    // empty draft and close the menu again. A touch device has no keyboard to
+    // drive it with: its on-screen keyboard would cover half the menu, so the
+    // editor gives up focus instead and the keyboard drops.
+    const caret = keyboard.caretSpan()
+    if (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) {
+      editor?.getRootElement()?.blur()
+    } else if (editor !== null) focusDraftEditor(editor, revealSelection)
+    toggleCommandMenu?.(caret)
   }
 
   // The no-session Workspace trigger: the resident editable div acts as the
