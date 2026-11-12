@@ -114,7 +114,8 @@ resolve into Closed once.
 **New-thread cards.** The new-thread screen (rich-composer's `conversation.hero.suggestions` slot) shows up to three
 flat cards from the same sources as the list: **Resume** the most recent quiet thread (or one stopped and waiting to be
 resumed), **Review** a thread whose Inbox item offers Land (it opens the thread and its Changes view), and **Inbox** with
-the number of threads that need you. A card with no real data is not shown, so a fresh profile sees none.
+the number of threads that need you. A card with no real data is not shown, so a fresh profile sees none of these;
+onboarding's first tasks fill the row until the first thread has a message.
 
 ## Notification history
 

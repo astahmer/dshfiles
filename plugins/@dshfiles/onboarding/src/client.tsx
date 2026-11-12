@@ -2,6 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type {} from '@dshfiles/rich-composer/conversation-contract'
 import { Command, Composer, defineClient, useApi, useContract, useSettings, type PluginContext } from '@dshfiles/dshx/client'
 import { CompassIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
@@ -18,6 +19,7 @@ import { Routes, type RouteServices } from './routes.js'
 import { ONBOARDING_DEFAULTS, onboardingSettings, type OnboardingSettings } from './settings.js'
 import { SetupWizard } from './setup-wizard.js'
 import { ShowMeWhere, WalkUnreadable } from './show-me-where.js'
+import { StarterTaskCards, StarterTasks } from './starter-tasks.js'
 import { WalkStore } from './walk-store.js'
 import { WizardStore } from './wizard-store.js'
 
@@ -230,6 +232,26 @@ export default defineClient({
       </PluginQueryProvider>
     )
     ctx.slots.inject('settings.onboarding', () => ctx.slots.register({ name: 'settings.onboarding', id: WIZARD_STEP_ID, order: 10 }, decorate(FirstRunStep)))
+
+    // The new-thread hero's first tasks for the project on screen, until the first thread has a message.
+    const HeroStarterTasks = (): ReactNode => {
+      const settings = useOnboardingSettings()
+      const sessions = useSyncExternalStore(subscribeSessions, readSessions, readSessions)
+      const project = useOnScreenProject()
+      const insert = useInsertPrompt()
+      if (!settings.starterTasks) return null
+      return <StarterTaskCards beforeFirstThread={StarterTasks.beforeFirstThread(sessions)} insert={insert} project={project?.title ?? null} />
+    }
+    ctx.slots.inject('conversation.hero.suggestions', () =>
+      ctx.slots.register(
+        { name: 'conversation.hero.suggestions', id: 'dshfiles-onboarding-starter-tasks', order: 20 },
+        decorate(() => (
+          <PluginQueryProvider>
+            <HeroStarterTasks />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
 
     // Show me where outlives the page: its first click usually navigates away from Getting started.
     ctx.slots.inject('shell.overlay', () =>

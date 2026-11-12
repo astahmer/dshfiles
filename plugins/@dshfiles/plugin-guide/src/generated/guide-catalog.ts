@@ -3438,7 +3438,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-preset › draft-preset-selection"
       ],
       "details": [
-        "Used by 69 catalog feature(s)",
+        "Used by 70 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

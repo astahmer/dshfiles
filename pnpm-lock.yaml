@@ -5525,6 +5525,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
       '@dshfiles/settings-shell':
         specifier: workspace:*
         version: link:../settings-shell

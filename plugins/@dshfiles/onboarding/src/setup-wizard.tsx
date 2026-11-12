@@ -9,6 +9,7 @@ import { CHECKLIST_GLYPH, CHECKLIST_LABEL } from './labels.js'
 import type { ChecklistItem, Overview, OverviewInput } from './overview-model.js'
 import { PHONE_QUERY } from './reach-model.js'
 import { Routes, type RouteServices } from './routes.js'
+import { StarterTasks } from './starter-tasks.js'
 
 export type WizardOutcome = 'done' | 'skipped'
 
@@ -24,11 +25,7 @@ const STEPS = [
   { id: 'first-task', title: 'Start a first task', items: [] },
 ] as const satisfies readonly { readonly id: WizardStep; readonly title: string; readonly items: readonly Prerequisite[] }[]
 
-export const STARTER_PROMPTS = [
-  'Explain how this project is organised and where I should start reading.',
-  'Find one small bug or rough edge in this project and propose a fix before changing anything.',
-  'Add a test for the most important function in this project that has none.',
-] as const
+export const STARTER_PROMPTS = StarterTasks.list({ project: undefined }).map(task => task.prompt)
 
 const Item = (props: { readonly item: ChecklistItem; readonly routes: RouteServices; readonly go: (route: Route) => void }): ReactNode => {
   const route = props.item.fix.route
@@ -90,7 +87,7 @@ export const SetupWizard = (props: SetupWizardProps): ReactNode => {
   const phone = props.phone ?? viewportPhone
   const titleId = useId()
   const positionId = useId()
-  const [prompt, setPrompt] = useState<string>(STARTER_PROMPTS[0])
+  const [prompt, setPrompt] = useState(STARTER_PROMPTS[0] ?? '')
   const [inserted, setInserted] = useState(false)
   const overview = useQuery({
     queryKey: ['onboarding', 'overview', '', null],

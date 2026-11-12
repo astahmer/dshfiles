@@ -9,6 +9,11 @@ export const onboardingSettings = defineSettings({
       .description(
         'Open the three-step setup wizard (account, project, first task) by itself while an AI account or a project is still missing. A profile that has both never gets it on its own; ⌘K Show the setup wizard replays it.',
       ),
+    starterTasks: Schema.boolean()
+      .default(true)
+      .description(
+        'Offer three first tasks for the project on the new-thread screen until your first thread has a message. A task goes into the composer and is never sent.',
+      ),
     checklist: Schema.boolean()
       .default(true)
       .description('Show the self-ticking setup checklist on Getting started. Off skips every Host check, the GitHub one included.'),
@@ -41,6 +46,7 @@ export type OnboardingSettings = SettingsValue<typeof onboardingSettings.schema>
 /** Schema defaults, for a Client that renders before the namespace loads or on a Host that predates it. */
 export const ONBOARDING_DEFAULTS: OnboardingSettings = {
   wizard: true,
+  starterTasks: true,
   checklist: true,
   githubCheck: true,
   packs: true,

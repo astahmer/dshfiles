@@ -354,7 +354,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "onboarding",
       "description": "Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs, what changed in owned plugins since your last visit and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and read-only onboarding_overview and…",
       "ui": true,
-      "features": 8
+      "features": 9
     },
     {
       "name": "opencode-compat",
@@ -18863,6 +18863,26 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "command": "@dshfiles/onboarding.wizard"
         }
       }
+    },
+    {
+      "key": "onboarding#starter-tasks",
+      "plugin": "onboarding",
+      "id": "starter-tasks",
+      "title": "First tasks for your project on the new-thread screen",
+      "summary": "Until the first thread has a message, the new-thread screen says one sentence and offers three first tasks for the project on screen (explain it, find a rough edge, add a missing test) beside the other suggestion cards. A task puts its prompt in the composer and never sends it.…",
+      "destination": "composer",
+      "currentSurface": "new-thread screen: suggestion cards",
+      "reach": [
+        {
+          "text": "expect button \"Explain the project\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Explain the project",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
     },
     {
       "key": "onboarding#show-me-where",

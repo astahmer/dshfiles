@@ -4,6 +4,8 @@
 
 ![Get set up in three steps: account, project, first task](docs/screenshots/setup-wizard.png)
 
+![First tasks for your project on the new-thread screen](docs/screenshots/starter-tasks.png)
+
 ![Getting started at 390 px: stacked packs, 44 px controls, scrolling destination chips](docs/screenshots/getting-started-390.png)
 
 ![Enable or disable a plugin pack after an exact preview](docs/screenshots/pack-change.png)
@@ -49,6 +51,11 @@ blocks the app, makes no model request, and changes the profile only when you co
    3. **Don't show again**, Back and Next on every step. Escape or the close button put it away for now (it may open by
       itself again on a later load while setup is missing); only Done and Don't show again are kept per browser.
       **Show the setup wizard** (⌘K) or **Start setup** on the page replays it on any profile.
+
+3. **First tasks** — until the first thread has a message, the new-thread screen says one sentence and offers three
+   first tasks for the project on screen (**Explain the project**, **Find a rough edge**, **Add a missing test**) in
+   rich-composer's suggestion row. A task puts its prompt in the composer and never sends it; nothing shows without a
+   project on screen. The wizard's First task step offers the same prompts for "this project".
 
 ## Pack changes
 
@@ -200,16 +207,17 @@ thread**) opens the setting.
 
 All apply live; none needs a restart.
 
-| Key           | Default | Effect                                                                                                |
-| ------------- | ------- | ----------------------------------------------------------------------------------------------------- |
-| `wizard`      | `true`  | Show the setup wizard while no thread is open. The palette command still replays it when off.         |
-| `checklist`   | `true`  | Show the checklist; off skips every Host check, the GitHub one included.                              |
-| `githubCheck` | `true`  | Run `gh auth status --hostname github.com` on the Host (5 s timeout, cached 60 s); off reports `off`. |
-| `packs`       | `true`  | Show the packs section.                                                                               |
-| `curatedOnly` | `true`  | List only curated features until you search.                                                          |
-| `whatsNew`    | `true`  | Show What's new; off hides it and reads no history, for the page and `onboarding_whats_new` alike.    |
-| `suggestions` | `false` | Suggest unused features from local tool use (Usage plugin counts, 10 min cache); off reads nothing.   |
-| `tryIt`       | `false` | Offer Try it, a demo thread that spends tokens once you confirm; off hides it and the tool refuses.   |
+| Key            | Default | Effect                                                                                                 |
+| -------------- | ------- | ------------------------------------------------------------------------------------------------------ |
+| `wizard`       | `true`  | Show the setup wizard while no thread is open. The palette command still replays it when off.          |
+| `starterTasks` | `true`  | Offer three first tasks for the project on the new-thread screen until the first thread has a message. |
+| `checklist`    | `true`  | Show the checklist; off skips every Host check, the GitHub one included.                               |
+| `githubCheck`  | `true`  | Run `gh auth status --hostname github.com` on the Host (5 s timeout, cached 60 s); off reports `off`.  |
+| `packs`        | `true`  | Show the packs section.                                                                                |
+| `curatedOnly`  | `true`  | List only curated features until you search.                                                           |
+| `whatsNew`     | `true`  | Show What's new; off hides it and reads no history, for the page and `onboarding_whats_new` alike.     |
+| `suggestions`  | `false` | Suggest unused features from local tool use (Usage plugin counts, 10 min cache); off reads nothing.    |
+| `tryIt`        | `false` | Offer Try it, a demo thread that spends tokens once you confirm; off hides it and the tool refuses.    |
 
 ## Agent tools
 

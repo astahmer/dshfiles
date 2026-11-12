@@ -303,6 +303,55 @@
       ]
     },
     {
+      "id": "starter-tasks",
+      "title": "First tasks for your project on the new-thread screen",
+      "summary": "Until the first thread has a message, the new-thread screen says one sentence and offers three first tasks for the project on screen (explain it, find a rough edge, add a missing test) beside the other suggestion cards. A task puts its prompt in the composer and never sends it. Nothing shows without a project on screen or after a thread has a message.",
+      "reach": ["expect button \"Explain the project\""],
+      "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "new-thread screen: suggestion cards",
+      "configuration": [
+        {
+          "key": "starterTasks",
+          "defaultValue": "true",
+          "constraints": "Boolean; off hides the first tasks on the new-thread screen.",
+          "coveredBy": ["onboarding.starter-tasks"]
+        }
+      ],
+      "states": ["before-first-thread", "inserted", "after-first-thread", "no-project"],
+      "failureModes": [
+        "No project on screen: the cards stay hidden, since the composer needs a project first; the project chip asks for one.",
+        "Without rich-composer's hero the slot is not drawn, and the setup wizard's First task step offers the same prompts."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "onboarding.starter-tasks",
+          "file": "plugins/@dshfiles/onboarding/src/starter-tasks.test.tsx",
+          "testName": "offers three first tasks for the project on screen and inserts the chosen prompt without sending it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.starter-tasks-quiet",
+          "file": "plugins/@dshfiles/onboarding/src/starter-tasks.test.tsx",
+          "testName": "stays quiet once a thread has a message or when no project is on screen"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "onboarding.starter-tasks-browser",
+          "reason": "The cards need a fresh profile with a registered project and no sent thread, which the onboarding journey profile does not hold; the cards are unit-tested and the reach steps walk them on a seeded scratch DSH (dshx dev open onboarding/starter-tasks)."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the cards read the Session and project lists already on the page and insert text; they start no Host work."
+        }
+      ]
+    },
+    {
       "id": "show-me-where",
       "title": "Show me where a feature lives, one step at a time",
       "summary": "Each Getting started feature row whose first reach step the app can replay has Show me where. It opens a non-modal walk: a ring around the next control (by ARIA role and accessible name, text, label or title; an exact name first, a substring only for a name ending in *, the first visible match), a chip such as Step 2 of 5 · Click \"Settings\", the feature title and a footer with Next and End. It never clicks, types, hovers or presses for the user: a step advances when that control is clicked, pointed at, changed or the key is pressed, an expect passes when its target shows, and Next always advances. Seed, attach, right-click and shift-click steps are E2E-only: the walk stops there, says why and links the plugin docs. A target missing for 10 s names the destination and offers Open through the row's registered route. Below 640 px it walks the feature's reachNarrow steps (More and the destination row, the Settings Sections combobox) when it has them, reach otherwise. Escape or End ends it; nothing is stored and nothing is sent.",

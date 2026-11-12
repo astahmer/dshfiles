@@ -92,9 +92,10 @@ describe('SetupWizard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     expect(screen.getByRole('dialog', { name: 'Start a first task' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: STARTER_PROMPTS[1] }))
+    const second = STARTER_PROMPTS[1] ?? ''
+    fireEvent.click(screen.getByRole('button', { name: second }))
     fireEvent.click(screen.getByRole('button', { name: 'Insert prompt' }))
-    expect(insertPrompt).toHaveBeenCalledWith(STARTER_PROMPTS[1])
+    expect(insertPrompt).toHaveBeenCalledWith(second)
     expect(screen.getByRole('status').textContent).toBe('In the composer. Send it when ready.')
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
