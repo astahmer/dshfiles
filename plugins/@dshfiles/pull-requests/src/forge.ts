@@ -80,9 +80,6 @@ const pullRequestUrlOf = (target: ForgeTarget, number: number): string =>
     ? `https://${target.host}/${target.project}/pull/${String(number)}`
     : `https://${target.host}/${target.project}/-/merge_requests/${String(number)}`
 
-/** The webhook/CLI project argument a forge command takes (`owner/name`, or the full GitLab group path). */
-const projectArgumentOf = (target: ForgeTarget): string => target.project
-
 const unsupportedForgeMessage = (repo: string): string =>
   `${repo} does not name a GitHub or GitLab repository. Use a GitHub pull-request URL or a GitLab merge-request URL, or run the command in a checkout whose origin is one of those.`
 
@@ -112,6 +109,5 @@ export class ForgeModel {
   static readonly targetOfRemoteUrl = forgeTargetOfRemoteUrl
   static readonly repositoryKeyOf = repositoryKeyOf
   static readonly pullRequestUrlOf = pullRequestUrlOf
-  static readonly projectArgumentOf = projectArgumentOf
   static readonly unsupportedMessage = unsupportedForgeMessage
 }
