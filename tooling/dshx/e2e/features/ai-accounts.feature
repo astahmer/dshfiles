@@ -218,3 +218,16 @@ Feature: AI Accounts
     And the reasoning-effort slider is adjusted one step
     Then the picker reflects the adjusted reasoning effort
     And Fast mode works for supported Codex models and stays hidden for Spark
+
+  @scenario:ai-accounts.stalled-stream-recovery
+  Scenario: Explain a turn stopped by a stalled model stream
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread turn fails on a stalled model stream
+    Then the failed turn explains how to recover from the stall
+
+  @scenario:ai-accounts.stalled-stream-fallback-setting
+  Scenario: Turn on the fallback chain for stalled streams
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When the AI Accounts settings section is opened
+    Then the stalled-stream fallback switch can be turned on and off

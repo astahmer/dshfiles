@@ -1365,6 +1365,86 @@
       ]
     },
     {
+      "id": "stalled-stream-recovery",
+      "title": "Explain turns stopped by a stalled model stream",
+      "summary": "When a model sends no data until its idle timeout and the retries run out, the failed turn says how long it stayed silent and how to recover: Resume, another model, or the stalled-stream fallback.",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"commands, @ files or sessions*\" \"[[fail pi-ai stream idle timeout after 120000ms]]\"",
+        "click button \"Send message\"",
+        "expect text \"The model sent no data for 2 min*\""
+      ],
+      "surfaces": ["client", "settings"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: failed turn › stalled-stream advice",
+      "configuration": [],
+      "states": ["hidden-for-other-failures", "fallback-off-advice", "fallback-on-advice"],
+      "failureModes": [
+        "Only a stream idle timeout shows this advice; other failures keep their own recovery.",
+        "With stalled-stream fallback off, the advice names the setting that turns it on."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.stalled-stream-advice",
+          "file": "plugins/@dshfiles/ai-accounts/src/stalled-stream.test.ts",
+          "testName": "tells the user how to retry and how to turn on the automatic fallback"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.stalled-stream-recovery",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the stalled-stream advice renders browser state from the failed turn and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "stalled-stream-fallback-setting",
+      "title": "Turn on the fallback chain for stalled streams",
+      "summary": "A transport Failure recovery switch that lets a stalled stream walk the thread's model fallback chain under any distribution.",
+      "reach": [
+        "click text \"More\"",
+        "click text \"Settings\"",
+        "click text \"AI Accounts\"",
+        "hover switch \"Fall back on stalled streams\"",
+        "expect switch \"Fall back on stalled streams\""
+      ],
+      "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: AI Accounts › Failure recovery › Fall back on stalled streams",
+      "configuration": [],
+      "states": ["off", "on", "disabled-without-transport-failover"],
+      "failureModes": ["The switch is disabled while transport fail-over is off, because no fallback can be taken then."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.stalled-stream-fallback-off",
+          "file": "plugins/@dshfiles/ai-accounts/src/model-fallback-router.test.ts",
+          "testName": "keeps a stalled stream off the chain outside Priority unless stalled-stream fallback is on"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.stalled-stream-fallback-setting",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the settings switch writes a dshx setting; the routing it changes is covered by the request routing feature."
+        }
+      ]
+    },
+    {
       "id": "quota-inbox-items",
       "title": "Quota-blocked threads in the Inbox, resumable in place",
       "summary": "Every waiting quota continuation (a turn stopped by an exhausted account limit) is a blocking Inbox item about its thread, with when the quota resets and whether it resumes by itself. Resume runs the same stored continuation as the Usage page's Resume, only when the user chooses it; Open goes to the thread to switch account or model first. Done dismisses the stored continuation with the item, and a boot retires one an earlier build left waiting under a done item, so no thread keeps offering a Resume for a recovery the user set aside. The item resolves once the continuation is resumed, dismissed or superseded.",

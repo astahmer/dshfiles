@@ -6,6 +6,10 @@
 
 ![Unavailable quota stays visible in the sidebar](docs/screenshots/sidebar-unavailable-accounts.png)
 
+![A turn stopped by a stalled model stream explains how to recover](docs/screenshots/stalled-stream-recovery.png)
+
+[Stalled-stream advice at 390 px](docs/screenshots/stalled-stream-recovery-mobile.png) · [Fall back on stalled streams setting](docs/screenshots/stalled-stream-fallback-setting.png)
+
 AI Accounts runs several subscription accounts side by side. Codex, Claude,
 Mistral, OpenCode Go and Command Code accounts each become their own route in the
 model picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor

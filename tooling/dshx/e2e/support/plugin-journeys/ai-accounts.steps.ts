@@ -2310,3 +2310,35 @@ Then('the quota forecast shows its account and forecast views', async ({ page }:
 After(async ({ page }: { page: Page }) => {
   await stopFakeCommandCode(page)
 })
+
+When('a thread turn fails on a stalled model stream', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await page.getByRole('button', { name: /^Select model/ }).click()
+  await selectAccountModel(page, 'commandcode_work/gpt-6-luna')
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill('[[fail pi-ai stream idle timeout after 120000ms]]')
+  await composer.press('Enter')
+  await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 60_000 })
+})
+
+Then('the failed turn explains how to recover from the stall', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-stalled-stream-advice', async () => {
+    const advice = page.getByRole('status').filter({ hasText: 'The model sent no data for 2 min' })
+    await expect(advice).toBeVisible()
+    await expect(advice).toContainText('Resume to retry it')
+    await expect(advice).toContainText('Fall back on stalled streams')
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the stalled-stream fallback switch can be turned on and off', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-stalled-stream-fallback-setting', async () => {
+    const fallback = page.getByRole('switch', { name: 'Fall back on stalled streams', exact: true })
+    await expect(fallback).not.toBeChecked()
+    await fallback.click()
+    await expect(fallback).toBeChecked()
+    await fallback.click()
+    await expect(fallback).not.toBeChecked()
+  })
+  await finishJourneyAssertions(page)
+})
