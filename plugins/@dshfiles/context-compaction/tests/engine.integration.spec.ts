@@ -1,6 +1,14 @@
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import { createUserMessage, LlmAdapter, LlmRuntime, type GenerateOptions, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import {
+  createUserMessage,
+  LlmAdapter,
+  LlmRuntime,
+  type ContentBlock,
+  type GenerateOptions,
+  type LlmResolvedModelInfo,
+  type StreamChunk,
+} from '@deepseek-ai/dsh-llm'
 import { SessionStore } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -24,6 +32,10 @@ class ScriptedAdapter extends LlmAdapter {
   readonly compactions: GenerateOptions[] = []
   agentRequests = 0
   overflowsLeft = 0
+  pricedImages = false
+  override imageRequestPricing() {
+    return this.pricedImages ? { priceImages: (images: readonly ContentBlock[]) => images.map(() => ({ visualTokens: 100, text: '' })) } : undefined
+  }
   private release: (() => void) | undefined
   private gate: Promise<void> = Promise.resolve()
 
@@ -91,7 +103,7 @@ const withAgent = async (
   config: CompactionRowConfig,
   run: (input: {
     readonly adapter: ScriptedAdapter
-    readonly send: (text: string) => Promise<void>
+    readonly send: (text: string, image?: boolean) => Promise<void>
     readonly summaries: () => number
     /** Compactions that started and ended with an error instead of a checkpoint. */
     readonly failedCompactions: () => number
@@ -99,6 +111,7 @@ const withAgent = async (
     readonly addLargeTool: (bytes: number) => () => void
     /** The `/compact` command's engine call: the whole history up to the newest exchange. */
     readonly compactNow: () => Promise<void>
+    readonly imageEvents: () => number
   }) => Promise<void>,
 ) => {
   const host = await createTestHost()
@@ -123,8 +136,23 @@ const withAgent = async (
       }
       await run({
         adapter,
-        send: async text => {
-          await handle.agent.followup(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
+        send: async (text, image) => {
+          await handle.agent.followup(
+            createUserMessage({
+              content: [
+                { type: 'text', text },
+                ...(image
+                  ? [
+                      {
+                        type: 'image',
+                        attachment: { attachmentId: 'image-1', mediaType: 'image/png', name: 'shot.png', bytes: 1, width: 1, height: 1 },
+                      } as ContentBlock,
+                    ]
+                  : []),
+              ],
+              source: { kind: 'user' },
+            }),
+          )
           await handle.agent.whenIdle()
         },
         summaries: () =>
@@ -146,6 +174,10 @@ const withAgent = async (
         compactNow: async () => {
           await host.ctx.compaction.compactNow(handle.agent, new AbortController().signal)
         },
+        imageEvents: () =>
+          session()
+            .snapshotEvents()
+            .filter(event => event.type === 'user/message' && event.data.content.some(block => block.type === 'image')).length,
       })
     } finally {
       await handle.dispose()
@@ -159,6 +191,46 @@ const withAgent = async (
 const note = (index: number) => `Note ${String(index)}: ${'long project detail '.repeat(300)}`
 
 describe('the compaction engine in a real agent loop', () => {
+  it('summarizes images without image pricing while preserving live history', async () => {
+    await withAgent({}, async ({ adapter, send, summaries, compactNow, imageEvents }) => {
+      await send(note(0), true)
+      await send('Another message')
+      await compactNow()
+      expect(summaries()).toBe(1)
+      const messages = adapter.compactions.flatMap(request => request.messages)
+      expect(JSON.stringify(messages)).toContain('[image: shot.png, omitted from summary]')
+      expect(messages.flatMap(message => message.content).some(block => block.type === 'image')).toBe(false)
+      expect(imageEvents()).toBe(1)
+      await send('Continue')
+    })
+  })
+
+  it('keeps images in requests to routes with image pricing', async () => {
+    await withAgent({}, async ({ adapter, send, compactNow }) => {
+      adapter.pricedImages = true
+      await send(note(0), true)
+      await send('Another message')
+      await compactNow()
+      expect(
+        adapter.compactions
+          .flatMap(request => request.messages)
+          .flatMap(message => message.content)
+          .some(block => block.type === 'image'),
+      ).toBe(true)
+    })
+  })
+
+  it('recovers overflow with images on an unpriced route', async () => {
+    await withAgent({}, async ({ adapter, send, summaries }) => {
+      await send(note(0), true)
+      await send(note(1))
+      adapter.overflowsLeft = 1
+      await send('Continue')
+      expect(summaries()).toBe(1)
+      expect(JSON.stringify(adapter.compactions)).toContain('[image: shot.png, omitted from summary]')
+    })
+  })
+
   it('compacts a route whose headroom buffer leaves no room', async () => {
     await withAgent({}, async ({ send, summaries }) => {
       for (let index = 0; index < 16 && summaries() === 0; index += 1) await send(note(index))

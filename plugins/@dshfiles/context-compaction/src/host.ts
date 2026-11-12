@@ -73,19 +73,16 @@ const idlePolicyOf = (config: typeof CompactionConfig.Type): IdleCompactionPolic
 const failureMessages = {
   'model-info': 'Could not read the summarization model’s context capacity.',
   'input-capacity': 'The selected summarization model has too little safe input capacity.',
-  'image-pricing': 'Cannot safely size an image-bearing summary without model-declared image pricing.',
 } as const
 
 class ContextCompactionFailure extends Schema.TaggedError<ContextCompactionFailure>()('ContextCompactionFailure', {
-  reason: Schema.Literals(['model-info', 'input-capacity', 'image-pricing']),
+  reason: Schema.Literals(['model-info', 'input-capacity']),
   cause: Schema.optional(Schema.Defect()),
 }) {
   override get message(): string {
     return failureMessages[this.reason]
   }
 }
-
-const hasImages = (message: Message) => message.content.some(block => block.type === 'image')
 
 const summarizeBounded = Effect.fn('context compaction run')(function* (request: SummaryRequest) {
   const llm = yield* Llm
@@ -99,9 +96,20 @@ const summarizeBounded = Effect.fn('context compaction run')(function* (request:
   if (maxInputBytes < MIN_REQUEST_BUDGET_BYTES) return yield* new ContextCompactionFailure({ reason: 'input-capacity' })
 
   const imagePricing = route === undefined ? undefined : yield* llm.imagePricing(route)
-  const textOnlyRoute = modelInfo?.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')
-  if (imagePricing === undefined && !textOnlyRoute && request.input.messages.some(hasImages))
-    return yield* new ContextCompactionFailure({ reason: 'image-pricing' })
+  const input =
+    imagePricing === undefined
+      ? {
+          ...request.input,
+          messages: request.input.messages.map(message => ({
+            ...message,
+            content: message.content.map(block =>
+              block.type === 'image'
+                ? { type: 'text' as const, text: `[image: ${block.attachment.name || block.attachment.mediaType}, omitted from summary]` }
+                : block,
+            ),
+          })),
+        }
+      : request.input
   const messageBytes = (message: Message) => {
     const images = message.content.filter((block): block is ImageBlock => block.type === 'image')
     if (images.length === 0 || imagePricing === undefined) return serializedMessageBytes(message)
@@ -110,7 +118,7 @@ const summarizeBounded = Effect.fn('context compaction run')(function* (request:
   }
 
   return yield* summarizeInChunks({
-    input: request.input,
+    input,
     maxInputBytes,
     messageBytes,
     summarize: candidate =>
