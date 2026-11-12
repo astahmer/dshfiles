@@ -3,6 +3,37 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Session list cache-hit tail (2026-11-12, `b:17rs`)
+
+After the corpus cache, misses no longer cost anything; the tail sat on cache hits. Stored traces of the Host started
+2026-11-12 00:56 (read-only `traces.db` query, 75 `session list read` hits after the first 90 s, 3,194 rows, 3,181
+cold) named two owners, both in `@dshfiles/session-controller`'s `ApiSessionList`:
+
+1. **Every hit waited on the store probe.** Once a second a list first re-stamped the store's 805 project directories
+   (`session corpus revalidate`) and awaited it: 54 ms on average, but 616-1,263 ms in the slowest reads, which it
+   dominated. The probe issued all 805 `stat`s at once, queueing them on libuv's four-thread pool ahead of every Session
+   log read and append the Host made meanwhile.
+2. **The list loop itself spent ~25 ms of CPU** rebuilding each cold row's summary (projection view, metadata lookup,
+   object spreads) on every call, more than the 16 ms work slice, so a busy Host stretched it over yields: one hit spent
+   1,084 ms outside the probe. Boot-time hits (4.3 s and 8.1 s while plugins activated) are the same loop plus the
+   first projection views and metadata recovery.
+
+Fix: a list waits at most 100 ms on a due probe, then serves the cached corpus while the probe finishes and announces
+what it finds with `api-session/added` (span attribute `revalidation: settled | background`); the probe keeps eight
+`stat`s in flight; each cold row's full summary is memoized per record and dropped on the Session's events and when its
+metadata settles. Regression tests in `tests/host/list-corpus-cache.test.ts` (a blocked probe no longer blocks the list;
+a warm list reuses the row) fail on the previous `list.ts`.
+
+| Measure                                         | Before              | After                             |
+| ----------------------------------------------- | ------------------- | --------------------------------- |
+| Live hits, p50 / p95 / max                      | 42 / 864 / 1,486 ms | not measured (needs Host restart) |
+| Same reads with the probe wait capped at 100 ms | —                   | 42 / 474 / 1,184 ms (projection)  |
+| Warm list CPU, 3,200 cold rows (scratch, A/B)   | 25.0 / 23.0 ms p50  | 8.6 / 7.1 ms p50                  |
+
+The projection only subtracts the probe time above 100 ms from each stored read; the CPU A/B ran both implementations
+in one vitest process (`process.cpuUsage` per list, 40 lists, load average ~100 on the machine). Live after numbers need
+a Host restart, which is the user's call.
+
 ## Pull-request watcher GitHub budget (2026-11-11)
 
 `@dshfiles/pull-requests` read each watched pull request with its own `gh pr view`: one process and one GraphQL query

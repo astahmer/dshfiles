@@ -47,6 +47,12 @@ const UNKNOWN_METADATA: SessionListMetadata = { blank: false, lastPromptAt: null
  * 3,018 Sessions. Only moved project directories are read, and only unknown Session ids are stat'ed.
  */
 const CORPUS_PROBE_EVERY_MS = 1_000
+/**
+ * How long a list waits on a due probe before it serves the cached corpus and leaves the probe to announce what it
+ * finds with `api-session/added`. Live traces (2026-11-12): the probe took 54 ms on average but up to 1.26 s while other
+ * Host work held the filesystem thread pool, and every cache-hit list waited on all of it.
+ */
+const REVALIDATION_GRACE_MS = 100
 
 /** A caller's projection allowlist; `undefined` reads every registered column. */
 type ProjectionSelection = ReadonlySet<string> | undefined
@@ -126,6 +132,13 @@ export class ApiSessionList {
   private readonly coldMetadata = new Map<string, SessionListMetadata | undefined>()
 
   /**
+   * The full-column summary of each cold row, for the record it was built from. Building ~3,200 of them took 40 ms per
+   * list, so a busy Host stretched every list over several yields (live p95 ~400 ms on cache hits, 2026-11-12). Dropped
+   * with the row's projections and whenever its metadata is settled.
+   */
+  private readonly coldSummaries = new Map<string, { readonly record: SessionRecord; readonly summary: SessionSummary }>()
+
+  /**
    * Cold rows waiting for that fold. A list never waits on it: reading every checkpoint-less log inline kept the first
    * list of a 793-Session home (2.9 GB of logs) loading for minutes, so one background reader works through this queue
    * and pushes each corrected row with `api-session/added`.
@@ -173,6 +186,7 @@ export class ApiSessionList {
     const forgetProjections = (session: Session): void => {
       this.coldProjections.delete(session.id)
       this.coldMetadata.delete(session.id)
+      this.coldSummaries.delete(session.id)
       this.recovered?.delete(session.id)
     }
     ctx.on('session/created', session => {
@@ -248,14 +262,17 @@ export class ApiSessionList {
     } }))
     const selection = projectionSelectionOf(request.projections)
     signal?.throwIfAborted()
-    const records = await this.persistedSessions(signal)
+    const records = await this.persistedSessions(signal, revalidation => {
+      span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { revalidation } }))
+    })
     signal?.throwIfAborted()
     const items: SessionSummary[] = []
     const cold: SessionRecord[] = []
     let yieldDeadline = performance.now() + this.workSliceMs
+    const sessions = this.ctx.sessions
     for (const record of records.values()) {
       signal?.throwIfAborted()
-      const live = this.ctx.sessions.get(record.header.id)
+      const live = sessions.get(record.header.id)
       if (live !== undefined) {
         items.push(this.summaryFor(live, selection))
       } else if (record.header.cwd !== undefined) {
@@ -292,12 +309,17 @@ export class ApiSessionList {
    * @param signal - caller's cancellation, which stops this caller waiting but not the shared read.
    * @returns the persisted Session records.
    */
-  private async persistedSessions(signal: AbortSignal | undefined): Promise<ReadonlyMap<string, SessionRecord>> {
+  private async persistedSessions(
+    signal: AbortSignal | undefined,
+    onRevalidation: (outcome: 'settled' | 'background') => void,
+  ): Promise<ReadonlyMap<string, SessionRecord>> {
     signal?.throwIfAborted()
     const persisted = this.persisted
     if (persisted !== undefined) {
       const revalidation = this.revalidatePersisted(persisted)
-      if (revalidation !== undefined) await (signal === undefined ? revalidation : abortable(revalidation, signal))
+      if (revalidation === undefined) return persisted
+      const settled = settlesWithin(revalidation, REVALIDATION_GRACE_MS)
+      onRevalidation(await (signal === undefined ? settled : abortable(settled, signal)) ? 'settled' : 'background')
       return persisted
     }
     const read = this.persistedRead ?? this.startPersistedRead()
@@ -430,7 +452,22 @@ export class ApiSessionList {
     })
   }
 
+  private settleColdMetadata(id: string, metadata: SessionListMetadata | undefined): void {
+    this.coldMetadata.set(id, metadata)
+    this.coldSummaries.delete(id)
+  }
+
   private summarizeCold(record: SessionRecord, selection?: ProjectionSelection): SessionSummary {
+    if (selection !== undefined) return this.buildColdSummary(record, selection)
+    const cached = this.coldSummaries.get(record.header.id)
+    if (cached?.record === record) return cached.summary
+    const summary = this.buildColdSummary(record, undefined)
+    // Until the projection cache service is up, a row has no columns yet; it must not keep that answer.
+    if (this.ctx.get('sessionProjectionCache') !== undefined) this.coldSummaries.set(record.header.id, { record, summary })
+    return summary
+  }
+
+  private buildColdSummary(record: SessionRecord, selection: ProjectionSelection): SessionSummary {
     const { header, formatStatus } = record
     // A cold row always reads its whole block once and every selection is cut from it, so a filtered list neither re-reads
     // the checkpoint per call nor memoizes a partial block a later full read would trust. A miss stays unmemoized so the
@@ -491,7 +528,7 @@ export class ApiSessionList {
         }
         const known = this.storedRecovery(record.header)
         if (known?.revision === null) {
-          this.coldMetadata.set(id, undefined)
+          this.settleColdMetadata(id, undefined)
           skipped += 1
           continue
         }
@@ -501,7 +538,7 @@ export class ApiSessionList {
           const persistence = this.ctx.get('sessionPersistence')
           const stored = await persistence?.stat(record.header.id, { signal: this.lifetime.signal })
           if (persistence === undefined || stored?.sizeBytes === undefined || stored.sizeBytes > DRAFT_LOG_MAX_BYTES) {
-            this.coldMetadata.set(id, undefined)
+            this.settleColdMetadata(id, undefined)
             if (stored?.sizeBytes !== undefined) remember(id, { createdAt: record.header.createdAt, revision: null, metadata: null })
             skipped += 1
             continue
@@ -524,7 +561,7 @@ export class ApiSessionList {
         await scheduler.yield()
         // The Session attached while its log was read: it now owns a live projection cut, so this fold is stale.
         if (this.lifetime.signal.aborted || this.ctx.sessions.get(record.header.id) !== undefined) continue
-        this.coldMetadata.set(id, metadata)
+        this.settleColdMetadata(id, metadata)
         const shown = metadata ?? UNKNOWN_METADATA
         if (shown.blank === served.blank && shown.lastPromptAt === served.lastPromptAt) continue
         corrected += 1
@@ -761,6 +798,19 @@ function hintsOf(
  * @param signal - caller's cancellation.
  * @returns the shared result, or throws the caller's abort reason.
  */
+/** Whether `promise` settles within `ms`; the promise keeps running either way. */
+async function settlesWithin(promise: Promise<void>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<false>(resolve => {
+    timer = setTimeout(resolve, ms, false)
+  })
+  try {
+    return await Promise.race([promise.then(() => true), late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function abortable<Value>(promise: Promise<Value>, signal: AbortSignal): Promise<Value> {
   signal.throwIfAborted()
   let onAbort = (): void => {}

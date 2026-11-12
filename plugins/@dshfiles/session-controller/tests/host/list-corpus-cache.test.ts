@@ -21,17 +21,16 @@ afterEach(async () => {
   roots.clear()
 })
 
-const hostContext = async (): Promise<Context> => {
+const indexedSnapshot = () => ({ asOfSeq: -1, values: { sessionListMetadata: { blank: false, lastPromptAt: 200 } } })
+
+const hostContext = async (cachedSnapshot: () => unknown = indexedSnapshot): Promise<Context> => {
   const ctx = new Context()
   contexts.add(ctx)
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
   // SAFETY: the cold path calls only cachedSnapshot and cachedPredecessorTitle.
-  ctx.provide('sessionProjectionCache', {
-    cachedSnapshot: () => ({ asOfSeq: -1, values: { sessionListMetadata: { blank: false, lastPromptAt: 200 } } }),
-    cachedPredecessorTitle: () => undefined,
-  } as never)
+  ctx.provide('sessionProjectionCache', { cachedSnapshot, cachedPredecessorTitle: () => undefined } as never)
   return ctx
 }
 
@@ -91,6 +90,7 @@ const storeFixture = async (ctx: Context) => {
   roots.add(root)
   const headers = new Map<string, SessionRecord['header']>()
   const statted: string[] = []
+  const gate: { hold: Promise<void> | undefined } = { hold: undefined }
   const store = (project: string, id: string): Promise<string | undefined> => {
     headers.set(id, fixtureSession(ctx, id).header)
     return mkdir(join(root, project, id), { recursive: true })
@@ -100,11 +100,12 @@ const storeFixture = async (ctx: Context) => {
     root,
     stat: async (id: string) => {
       statted.push(id)
+      await gate.hold
       const header = headers.get(id)
       return header === undefined ? undefined : { header, revision: 'r1' }
     },
   } as never)
-  return { root, headers, statted, store }
+  return { root, headers, statted, store, gate }
 }
 
 const listedIds = async (list: ApiSessionList): Promise<string[]> => (await list.list()).map(item => item.sessionId).sort()
@@ -186,6 +187,41 @@ it('probes the store at most once a second and reads only unknown Session direct
   expect(recorder.named('session corpus revalidate')[1]?.attributes).toMatchObject({ 'dshx.session-controller.changed_projects': 0 })
 })
 
+it('serves the cached corpus while a slow store probe finishes in the background', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  const ctx = await hostContext()
+  const store = await storeFixture(ctx)
+  await store.store('project-a', 'cold-first')
+  const first = coldRecord(ctx, 'cold-first')
+  // SAFETY: list() reads only listSessions from the query service.
+  ctx.provide('sessionQuery', { listSessions: async () => [first] } as never)
+  const announced: string[] = []
+  ctx.on('api-session/added', summary => {
+    announced.push(summary.sessionId)
+  })
+  const list = new ApiSessionList(ctx, 8)
+  using recorder = recordSpans()
+  await list.list()
+
+  let releaseStat: () => void = () => {}
+  store.gate.hold = new Promise<void>(resolve => {
+    releaseStat = resolve
+  })
+  await store.store('project-b', 'slow-behind')
+  vi.setSystemTime(Date.now() + 2_000)
+
+  const served = await Promise.race([
+    listedIds(list),
+    new Promise<'blocked'>(resolve => setTimeout(resolve, 1_000, 'blocked')),
+  ])
+  expect(served).toEqual(['cold-first'])
+  expect(recorder.named('session list read').at(-1)?.attributes).toMatchObject({ 'dshx.session-controller.revalidation': 'background' })
+
+  releaseStat()
+  await expect.poll(() => announced).toEqual(['slow-behind'])
+  expect(await listedIds(list)).toEqual(['cold-first', 'slow-behind'])
+})
+
 it('scans a Session directory again until its log is stored', async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   const ctx = await hostContext()
@@ -205,6 +241,31 @@ it('scans a Session directory again until its log is stored', async () => {
   vi.setSystemTime(Date.now() + 2_000)
   expect(await listedIds(list)).toEqual(['cold-first', 'half-written'])
   expect(store.statted).toEqual(['half-written', 'half-written'])
+})
+
+it('builds a cold row once until its Session changes', async () => {
+  let snapshotReads = 0
+  const ctx = await hostContext(() => {
+    snapshotReads += 1
+    return undefined
+  })
+  const record = coldRecord(ctx, 'cold-unindexed')
+  // SAFETY: list() reads only listSessions from the query service.
+  ctx.provide('sessionQuery', { listSessions: async () => [record] } as never)
+  const list = new ApiSessionList(ctx, 8)
+  await list.list()
+  // The background metadata fold settles the row once.
+  await new Promise(resolve => setTimeout(resolve, 20))
+  const settled = snapshotReads
+
+  const first = await list.list()
+  const second = await list.list()
+  expect(second[0]).toBe(first[0])
+  expect(snapshotReads).toBe(settled + 1)
+
+  ctx.emit('session/created', fixtureSession(ctx, 'cold-unindexed'))
+  await list.list()
+  expect(snapshotReads).toBe(settled + 2)
 })
 
 it('drops a disposed Session persistence never stored', async () => {

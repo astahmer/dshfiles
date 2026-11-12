@@ -19,6 +19,15 @@ export const corpusRootOf = (persistence: unknown): string | undefined =>
 const isMissing = (error: unknown): boolean => error instanceof Error && 'code' in error && error.code === 'ENOENT'
 
 /**
+ * Directory stats in flight at once. All of them at once queued ~800 requests on libuv's four-thread pool every probe,
+ * ahead of each Session log read and append the Host issued meanwhile.
+ */
+const STAT_CONCURRENCY = 8
+
+const projectStamp = (root: string, name: string): Promise<readonly [string, number] | undefined> =>
+  stat(join(root, name)).then(stats => [name, stats.mtimeMs] as const, () => undefined)
+
+/**
  * The project directories under `root` with their modification times. A root not created yet (a new home) has none;
  * `undefined` when it cannot be read.
  */
@@ -26,9 +35,19 @@ export const readProjectStamps = async (root: string): Promise<ProjectStamps | u
   try {
     const entries = await readdir(root, { withFileTypes: true })
     const projects = entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
-    // A project removed between the two reads is simply absent.
-    const stamps = await Promise.all(projects.map(name => stat(join(root, name)).then(stats => [[name, stats.mtimeMs] as const], () => [])))
-    return new Map(stamps.flat())
+    const stamps = new Map<string, number>()
+    let next = 0
+    const worker = async (): Promise<void> => {
+      while (next < projects.length) {
+        const name = projects[next++]
+        if (name === undefined) return
+        // A project removed between the two reads is simply absent.
+        const stamp = await projectStamp(root, name)
+        if (stamp !== undefined) stamps.set(stamp[0], stamp[1])
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(STAT_CONCURRENCY, projects.length) }, worker))
+    return stamps
   } catch (error) {
     return isMissing(error) ? new Map() : undefined
   }
