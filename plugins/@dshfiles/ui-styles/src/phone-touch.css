@@ -27,4 +27,32 @@
     height: 44px;
     background: transparent;
   }
+
+  [role='dialog'][aria-modal='true'][class*='_dialog'] [class*='_header'] > button[class*='_close'] {
+    width: 44px;
+    height: 44px;
+    margin: -8px -8px -8px 0;
+  }
+}
+
+/*
+ * Native dialogs (`dsh-client-ui-primitives` Modal: the Host release reload prompt, native confirms). Its card clips
+ * overflow without a height cap, so on a short phone viewport a tall body ran off-screen with no way to scroll to its
+ * footer. The card now stops at the layer's padding box and scrolls; a phone keeps 12px of air instead of 24px and
+ * lets the footer buttons wrap.
+ */
+[role='dialog'][aria-modal='true'][class*='_dialog'] {
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 28rem) {
+  [role='presentation']:has(> [role='dialog'][aria-modal='true'][class*='_dialog']) {
+    padding-inline: 12px;
+  }
+
+  [role='dialog'][aria-modal='true'][class*='_dialog'] > [class*='_footer'] {
+    flex-wrap: wrap;
+  }
 }

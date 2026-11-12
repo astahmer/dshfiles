@@ -20,7 +20,7 @@ const transitionText = (from: Release, to: Release, unknown: string): readonly [
 /** One labelled transition line. A completed transition fades its start; a pending one fades its end. */
 const Transition = (props: { readonly label: string; readonly from: string; readonly to: string; readonly done: boolean }): JSX.Element => (
   <>
-    <span className="dshx:text-(--dsw-alias-label-secondary)">{props.label}</span>
+    <span className="dshx:text-(--dsw-alias-label-secondary) dshx:max-sm:col-span-3">{props.label}</span>
     <span className={cn('dshx:font-mono dshx:break-words', props.done ? 'dshx:text-(--dsw-alias-label-tertiary)' : 'dshx:text-(--dsw-alias-label-primary)')}>
       {props.from}
     </span>
@@ -74,7 +74,7 @@ export const HostReleasePrompt = (props: {
       open
       title={props.t('hostRelease.title')}
     >
-      <div className="dshx:grid dshx:grid-cols-[max-content_minmax(0,max-content)_56px_minmax(0,max-content)] dshx:items-center dshx:justify-start dshx:gap-x-3 dshx:gap-y-2 dshx:text-sm dshx:leading-5">
+      <div className="dshx:grid dshx:grid-cols-[minmax(0,1fr)_32px_minmax(0,1fr)] dshx:sm:grid-cols-[max-content_minmax(0,max-content)_56px_minmax(0,max-content)] dshx:items-center dshx:justify-start dshx:gap-x-3 dshx:gap-y-2 dshx:text-sm dshx:leading-5">
         <Transition done from={serviceFrom} label={props.t('hostRelease.service')} to={serviceTo} />
         <Transition done={false} from={pageFrom} label={props.t('hostRelease.page')} to={pageTo} />
       </div>
