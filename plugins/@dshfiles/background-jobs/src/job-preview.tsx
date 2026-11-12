@@ -4,6 +4,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { ComposerRow } from '@dshfiles/plugin-ui/components/composer-row'
 import { ChevronRightIcon, SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
 import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -148,33 +149,35 @@ const JobPreviewCard = (
     <section
       aria-label={`${t('previewKind')}: ${view.label}`}
       className={cn(
-        'dshx-root dshx:@container dshx:my-1 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:text-xs',
-        props.seat === 'dock' ? 'dshx:bg-background' : 'dshx:ml-1',
+        'dshx-root dshx:@container dshx:my-1 dshx:text-xs',
+        props.seat === 'tool-card' && 'dshx:ml-1 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background',
       )}
       data-dshfiles-live-preview="job"
       data-dshfiles-live-preview-seat={props.seat}
       data-job-id={view.id}
       data-state={view.status}
     >
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-label={t('previewToggle', { label: view.label })}
-        className="dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-left dshx:hover:bg-accent"
-        onClick={disclosure.toggle}
-      >
-        <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', open && 'dshx:rotate-90')} />
-        <SquareTerminalIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-        <span className="dshx:shrink-0 dshx:text-muted-foreground dshx:@max-pane-narrow:sr-only">{t('previewKind')}</span>
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono!">{view.label}</span>
-        {view.progress === undefined ? null : (
-          <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{view.progress}</span>
-        )}
-        <span role="status" className="dshx:shrink-0">
-          <Badge variant={statusVariant(view.status)}>{t(STATUS_KEY[view.status])}</Badge>
-        </span>
-        <Elapsed startedAt={view.startedAt} finishedAt={view.finishedAt} live={live} />
-      </button>
+      <ComposerRow
+        icon={<SquareTerminalIcon />}
+        label={<span className="dshx:font-mono!">{view.label}</span>}
+        meta={
+          <>
+            <span className="dshx:shrink-0 dshx:@max-pane-narrow:sr-only">{t('previewKind')}</span>
+            {view.progress === undefined ? null : (
+              <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:hidden">{view.progress}</span>
+            )}
+            <span role="status" className="dshx:shrink-0">
+              <Badge variant={statusVariant(view.status)}>{t(STATUS_KEY[view.status])}</Badge>
+            </span>
+            <Elapsed startedAt={view.startedAt} finishedAt={view.finishedAt} live={live} />
+            <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:transition-transform', open && 'dshx:rotate-90')} />
+          </>
+        }
+        expanded={open}
+        onSelect={disclosure.toggle}
+        selectLabel={t('previewToggle', { label: view.label })}
+        variant={props.seat === 'dock' ? 'card' : 'plain'}
+      />
       {open ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:p-2">
           {view.detail === undefined ? null : <p className="dshx:text-muted-foreground">{view.detail}</p>}
@@ -241,7 +244,7 @@ export const JobPreviewDock = (props: JobPreviewBindings & { readonly sessionId:
     <div
       aria-label={props.t('previewDock')}
       role="region"
-      className="dshx-root dshx:mx-auto dshx:flex dshx:max-h-72 dshx:w-[calc(100%-var(--dsh-composer-side-clearance,0px)*2)] dshx:max-w-(--dsh-composer-card-max-width) dshx:flex-col dshx:overflow-y-auto"
+      className="dshx-root dshx:mx-auto dshx:flex dshx:max-h-72 dshx:w-full dshx:flex-none dshx:flex-col dshx:overflow-y-auto"
       data-dshfiles-live-preview-dock="jobs"
     >
       {ids.split(ID_SEPARATOR).map(jobId => (
