@@ -1,4 +1,4 @@
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useResource } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
@@ -6,15 +6,15 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState } from 'react'
 import { turnAdmissionApi, type TurnAdmissionPolicy } from '@dshfiles/session-controller/turn-admission-api'
+import { TURN_ADMISSION_READ } from './turn-admission-read.ts'
 
 const SNAPSHOT_KEY = ['session-controller', 'turn-admission'] as const
 
-const useAdmissionSnapshot = (refetchInterval: number | false) => {
+const useAdmissionSnapshot = () => {
   const api = useApi(turnAdmissionApi)
   return useQuery({
     queryKey: SNAPSHOT_KEY,
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.snapshot({}, { signal: hostSignal }) }),
-    refetchInterval,
     retry: false,
   })
 }
@@ -23,7 +23,7 @@ const useAdmissionSnapshot = (refetchInterval: number | false) => {
 export const TurnAdmissionSettingsRow = (): JSX.Element | null => {
   const api = useApi(turnAdmissionApi)
   const queryClient = useQueryClient()
-  const snapshot = useAdmissionSnapshot(false)
+  const snapshot = useAdmissionSnapshot()
   const saved = snapshot.data?.policy
   const [limit, setLimit] = useState('')
   useEffect(() => {
@@ -94,14 +94,15 @@ export const TurnAdmissionSettingsRow = (): JSX.Element | null => {
 /** Above the composer: this thread's turn waits for a free slot, with how many start first and a way past the limit. */
 export const TurnAdmissionDock = (props: { readonly sessionId: string }): JSX.Element | null => {
   const api = useApi(turnAdmissionApi)
-  const queryClient = useQueryClient()
-  const snapshot = useAdmissionSnapshot(3_000)
-  const waiting = snapshot.data?.waiting.find(held => held.sessionId === props.sessionId)
+  const snapshot = useResource(turnAdmissionApi, 'snapshot', {}, TURN_ADMISSION_READ)
+  const data = snapshot.status === 'error' ? undefined : snapshot.data
+  const waiting = data?.waiting.find(held => held.sessionId === props.sessionId)
+  const refetch = snapshot.refetch
   const start = useMutation({
     mutationFn: () => api.forceStart({ sessionId: props.sessionId }),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: SNAPSHOT_KEY }),
+    onSettled: () => refetch(),
   })
-  if (waiting === undefined || snapshot.data === undefined) return null
+  if (waiting === undefined || data === undefined) return null
   return (
     <div
       role="status"
@@ -109,7 +110,7 @@ export const TurnAdmissionDock = (props: { readonly sessionId: string }): JSX.El
       className="dshx-root dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-3 dshx:py-1.5 dshx:text-xs"
     >
       <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-        Waiting for a free slot · {waiting.ahead} ahead · {snapshot.data.running}/{snapshot.data.policy.maxRunningThreads} running
+        Waiting for a free slot · {waiting.ahead} ahead · {data.running}/{data.policy.maxRunningThreads} running
       </span>
       <Button size="sm" variant="outline" className="dshx:min-h-11 dshx:shrink-0" disabled={start.isPending} onClick={() => start.mutate()}>
         Start now

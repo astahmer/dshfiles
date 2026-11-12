@@ -93,6 +93,11 @@ export class TurnAdmissionQueue {
     return started
   }
 
+  /** Announce a changed running count, which a waiting turn's position line shows; with nothing waiting nobody reads it. */
+  runningChanged(): void {
+    if (this.waiting.length > 0) this.publish()
+  }
+
   /** Forget a thread's waiting prompts, when its Agent left. */
   drop(sessionId: string): void {
     const before = this.waiting.length

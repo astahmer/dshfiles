@@ -34,6 +34,8 @@ import { installModelSelectionProjection } from './model-selection-projection.ts
 import { threadModelPolicyProjection } from '../thread-model-policy.ts'
 import { threadModelPolicySchema, type ThreadModelSelect, type ThreadModelSnapshot } from '../thread-model-api.ts'
 import { PluginApiError } from '@dshfiles/dshx/api'
+import { publishApiEvent } from '@dshfiles/dshx/host'
+import { turnAdmissionApi } from '../turn-admission-api.ts'
 import { hasApiSessionSubagentOwner } from './agent.ts'
 import { SessionSkillCatalog } from './skill-catalog.ts'
 import { SessionMediaReferences } from './media-references.ts'
@@ -176,7 +178,12 @@ export class SessionController extends TypertRemoteService {
     installModelSelectionProjection(ctx)
     ctx.sessionProjections.register(threadModelPolicyProjection)
     this.agents = new ApiSessionAgentController(ctx)
-    this.turnAdmission = installTurnAdmission(ctx)
+    // The waiting-turn dock re-reads on this event instead of polling the snapshot every 3 s.
+    this.turnAdmission = installTurnAdmission(ctx, snapshot => {
+      publishApiEvent(ctx, turnAdmissionApi, 'changed', { running: snapshot.running, waiting: snapshot.waiting.length }).catch((error: unknown) => {
+        ctx.logger.warn(`session-turn-admission: the changed event was not published: ${String(error)}`)
+      })
+    })
     this.commands = new SessionCommandController(ctx, this.agents, process.cwd(), this.turnAdmission)
     ctx.effect(() => ctx.fileUploads.registerAgentResolver(async (sessionId) => {
       const result = await this.agents.resolveAgent(sessionId)

@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { TurnAdmissionQueue } from '../turn-admission.ts'
+import { TurnAdmissionQueue, type TurnAdmissionSnapshot } from '../turn-admission.ts'
 import { hasApiSessionSubagentOwner } from './agent.ts'
 
 /**
@@ -7,9 +7,13 @@ import { hasApiSessionSubagentOwner } from './agent.ts'
  * policy counts them); a held prompt starts by leaving the inbox and entering it again through a waking delivery;
  * every Agent going idle or leaving pumps the queue.
  * @param ctx - Host context holding the Agent registry.
+ * @param changed - told each queue change, and each running-count change while turns wait.
  * @returns the admission queue the prompt command consults.
  */
-export const installTurnAdmission = (ctx: Context): TurnAdmissionQueue => {
+export const installTurnAdmission = (
+  ctx: Context,
+  changed: (snapshot: TurnAdmissionSnapshot) => void = () => {},
+): TurnAdmissionQueue => {
   const queue = new TurnAdmissionQueue({
     running: countSubagents => ctx.agents.list().filter(agent => agent.status === 'running'
       && (countSubagents || !hasApiSessionSubagentOwner(ctx, agent.session, agent))).length,
@@ -21,10 +25,11 @@ export const installTurnAdmission = (ctx: Context): TurnAdmissionQueue => {
       else agent.followup(message)
       return true
     },
-    changed: () => {},
+    changed,
   })
   ctx.on('agent/status', ({ status }) => {
     if (status === 'idle') queue.pump()
+    queue.runningChanged()
   })
   ctx.on('agent/disposed', ({ agent }) => {
     queue.drop(agent.id)

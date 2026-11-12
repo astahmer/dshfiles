@@ -91,10 +91,25 @@ Not changed, with the reason:
   (`readCredential`), which `@dshfiles/settings-web-search` replaces in `profiles/web`.
 - `graphPage`: the revision graph keys its page set by repository snapshot generation, so it reads again only when
   the graph changed and the viewport needs a top-up; correct invalidation, left alone.
-- `session-turn-admission/snapshot` every 3 s (10–16 per run): `@dshfiles/session-controller`, owned by another lane;
-  recorded on b:510.
+- `session-turn-admission/snapshot` every 3 s (10–16 per run): fixed on 2026-11-12, see below.
 - `attention/list` (activity-timeline, 12 per run, bursts on switch) and core `agentPresets/list` (10, one per
   switch): next candidates.
+
+### Waiting-turn admission pushes its changes (2026-11-12)
+
+Chat's waiting-turn dock (`TurnAdmissionDock`, mounted with every open thread's composer) refetched
+`session-turn-admission/snapshot` every 3 s. The session-controller Host now publishes `session-turn-admission`
+`changed` on every queue change (hold, release, force start, drop, limit change) and, while a turn waits, on each
+running-count change; `snapshot` carries the `turn-admission` tag the event invalidates, and the dock reads through
+`useResource` with a 30 s fallback poll only while the event is not live (an older Host). Scratch census, same
+workload both times (`dshx dev up` with session-controller, chat, thread-sidebar, rich-composer and their cooperators,
+14 seeded threads, `har-capture.mjs --seconds 30 --switches 6`; the after run needed a scratch Host restart for the
+new Host code):
+
+| Read                                | Before | After |
+| ----------------------------------- | -----: | ----: |
+| `session-turn-admission/snapshot`   |     16 |     1 |
+| all `/api/` requests, same workload |     66 |    51 |
 
 ## Pull-request watcher GitHub budget (2026-11-11)
 

@@ -21,6 +21,7 @@ import { ApiSessionAgentController } from '../../src/native/agent.ts'
 import { SessionCommandController } from '../../src/native/commands.ts'
 import { installModelSelectionProjection } from '../../src/native/model-selection-projection.ts'
 import { installTurnAdmission } from '../../src/native/turn-admission-ports.ts'
+import type { TurnAdmissionSnapshot } from '../../src/turn-admission.ts'
 import type { SessionRequestId } from '../../src/native/types.ts'
 
 const cleanups: Array<() => Promise<void>> = []
@@ -91,7 +92,8 @@ const fixture = async () => {
     })
     return handle.agent
   }
-  const admission = installTurnAdmission(ctx)
+  const announced: TurnAdmissionSnapshot[] = []
+  const admission = installTurnAdmission(ctx, snapshot => announced.push(snapshot))
   const commands = new SessionCommandController(ctx, owner, root, admission)
   let requestCount = 0
   const prompt = (sessionId: string, text: string) =>
@@ -104,7 +106,7 @@ const fixture = async () => {
       },
       { kind: 'user' },
     )
-  return { model, thread, admission, prompt }
+  return { model, thread, admission, prompt, announced }
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 50))
@@ -133,6 +135,25 @@ it('holds a second thread while one runs under a limit of one, then starts it wh
   expect(second.inbox.nextTurn).toHaveLength(0)
   expect(admission.snapshot().waiting).toEqual([])
   expect(model.requests).toHaveLength(2)
+})
+
+it('announces each change a waiting-turn dock shows, so it needs no poll', async () => {
+  const { model, thread, admission, prompt, announced } = await fixture()
+  const first = await thread('thread-a')
+  await thread('thread-b')
+  admission.configure({ maxRunningThreads: 1, countSubagents: false })
+  await prompt('thread-a', 'First')
+  await settle()
+  const beforeHold = announced.length
+
+  await prompt('thread-b', 'Second')
+  await settle()
+  expect(announced.slice(beforeHold).at(-1)?.waiting).toEqual([expect.objectContaining({ sessionId: 'thread-b' })])
+
+  model.finishNext()
+  await first.whenIdle()
+  await settle()
+  expect(announced.at(-1)?.waiting).toEqual([])
 })
 
 it('starts a waiting thread at once when the user forces it, past the limit', async () => {

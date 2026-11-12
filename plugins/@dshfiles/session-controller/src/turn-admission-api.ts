@@ -1,4 +1,4 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, event, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import { turnAdmissionPolicySchema, turnAdmissionSnapshotSchema } from './turn-admission.ts'
 
@@ -21,6 +21,7 @@ export const turnAdmissionApi = defineApi({
         'Read the running-thread limit (maxRunningThreads, 0 = unlimited; countSubagents), how many threads run now, and the threads whose new turn waits for a free slot, oldest first with how many are ahead. Read-only.',
       input: Schema.Struct({}),
       output: turnAdmissionSnapshotSchema,
+      tags: ['turn-admission'],
       tool: { name: 'thread_admission_status', readOnly: true, render: describeSnapshot },
     }),
     configure: method({
@@ -38,6 +39,14 @@ export const turnAdmissionApi = defineApi({
         name: 'thread_admission_force_start',
         render: output => (output.started === 0 ? 'That thread has no waiting turn.' : 'Started.'),
       },
+    }),
+  },
+  events: {
+    changed: event({
+      schema: Schema.Struct({ running: Schema.Number, waiting: Schema.Number }),
+      description:
+        'The running-thread limit, its waiting turns, or the running count while turns wait changed; read the snapshot again.',
+      invalidates: ['turn-admission'],
     }),
   },
 })
