@@ -21,6 +21,11 @@ export interface DshxHostConfig extends DshxFaceConfig {
    * Defaults to `inline`.
    */
   readonly dshxRuntime?: 'inline' | 'snapshot'
+  /**
+   * Emit each dynamic `import()` of a project module as its own content-hashed chunk beside `index.js` instead of
+   * inlining it, so a `DshxPlugin.facade` row loads its implementation only on first use. Defaults to `false`.
+   */
+  readonly codeSplitting?: boolean
 }
 
 /** Client face options, including the opt-in shared runtime on either side. */
@@ -100,6 +105,7 @@ export interface ResolvedDshxConfig {
   readonly hostVitePlugins?: readonly PluginOption[]
   readonly hostBundleDependencies?: readonly string[]
   readonly hostDshxRuntime?: 'inline' | 'snapshot'
+  readonly hostCodeSplitting?: boolean
   readonly clientBundleDependencies?: readonly string[]
   readonly clientVitePlugins?: readonly PluginOption[]
   readonly clientShared?: string

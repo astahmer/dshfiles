@@ -83,7 +83,8 @@ function isHostExternal(source: string): boolean {
 }
 
 /** Enforce the stable single-file Host artifact surface. */
-function singleHostChunkPlugin(expectedEntry: string | ((fileName: string) => boolean) = 'index.js'): Plugin {
+/** One entry chunk with the Host module protocol; `lazyChunks` also admits the non-entry chunks of its dynamic imports. */
+function singleHostChunkPlugin(expectedEntry: string | ((fileName: string) => boolean) = 'index.js', lazyChunks = false): Plugin {
   const matchesEntry = typeof expectedEntry === 'function' ? expectedEntry : (fileName: string): boolean => fileName === expectedEntry
   const expectedLabel = typeof expectedEntry === 'function' ? 'content-addressed' : expectedEntry
   return {
@@ -92,8 +93,12 @@ function singleHostChunkPlugin(expectedEntry: string | ((fileName: string) => bo
     generateBundle: {
       order: 'post',
       handler(_options, bundle) {
-        const chunks = Object.values(bundle).filter(output => output.type === 'chunk')
+        const allChunks = Object.values(bundle).filter(output => output.type === 'chunk')
+        const chunks = lazyChunks ? allChunks.filter(output => output.isEntry) : allChunks
         const assets = Object.values(bundle).filter(output => output.type === 'asset')
+        if (lazyChunks && allChunks.some(output => !output.isEntry && containsPrivateDshxImport(output.code))) {
+          throw new DshxError('DSHX1302', 'A DSH Host chunk retained a private DSHX runtime import.')
+        }
         if (chunks.length !== 1 || chunks[0]?.isEntry !== true || !matchesEntry(chunks[0].fileName)) {
           throw new DshxError('DSHX1302', `A DSH Host build must emit exactly one ${expectedLabel} entry chunk.`)
         }

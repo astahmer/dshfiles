@@ -37,6 +37,7 @@ const host = (target: FaceTarget & { readonly hostHmr: boolean }): BuildHostOpti
     declarations: project.build.declarations ?? true,
     bundleDependencies: project.hostBundleDependencies ?? [],
     ...(project.hostDshxRuntime !== undefined && { dshxRuntime: project.hostDshxRuntime }),
+    ...(project.hostCodeSplitting === true && { codeSplitting: true }),
     ...(project.hostVitePlugins !== undefined && { vite: { plugins: project.hostVitePlugins } }),
     compatibility: target.compatibility,
     ...(target.hostHmr && project.dev.hostHmr !== undefined && { generation: { hostContractVersion: project.dev.hostHmr.hostContractVersion } }),

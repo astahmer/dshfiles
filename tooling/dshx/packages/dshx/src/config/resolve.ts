@@ -12,7 +12,7 @@ const CONFIG_FILENAME = 'dshx.config.ts'
 const PACKAGE_FILENAME = 'package.json'
 const TOP_LEVEL_KEYS = new Set(['name', 'host', 'client', 'modules', 'profile', 'dev', 'build', 'compatibility'])
 const FACE_KEYS = new Set(['entry', 'vite'])
-const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies', 'dshxRuntime'])
+const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies', 'dshxRuntime', 'codeSplitting'])
 const CLIENT_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies', 'shared', 'sharedRuntime', 'dshxRuntime'])
 const VITE_KEYS = new Set(['plugins'])
 
@@ -203,6 +203,12 @@ function checkConfig(value: unknown, file: string): DshxConfig {
       throw new DshxError('DSHX4004', 'host.dshxRuntime must be "inline" or "snapshot".', {
         file,
         hint: 'Use host: { dshxRuntime: "snapshot" } to share one immutable DSHX runtime between Host bundles.',
+      })
+    }
+    if (field === 'host' && candidate.codeSplitting !== undefined && typeof candidate.codeSplitting !== 'boolean') {
+      throw new DshxError('DSHX4004', 'host.codeSplitting must be a boolean.', {
+        file,
+        hint: 'Use host: { codeSplitting: true } to load a facade implementation as its own chunk.',
       })
     }
     if (candidate.vite !== undefined) {
@@ -453,6 +459,7 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     ...(clientEntry !== undefined && { clientEntry }),
     hostBundleDependencies,
     ...(loaded.config.host !== false && loaded.config.host?.dshxRuntime !== undefined && { hostDshxRuntime: loaded.config.host.dshxRuntime }),
+    ...(loaded.config.host !== false && loaded.config.host?.codeSplitting === true && { hostCodeSplitting: true }),
     ...(modules.length !== 0 && { modules }),
     clientBundleDependencies: loaded.config.client === false ? [] : (loaded.config.client?.bundleDependencies ?? []),
     ...(!(loaded.config.client === false || loaded.config.client?.shared === undefined) && { clientShared: loaded.config.client.shared }),

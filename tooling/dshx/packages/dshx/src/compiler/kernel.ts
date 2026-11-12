@@ -156,6 +156,8 @@ const dependencyManifestPlugin = (options: {
   readonly root: string
   readonly outDir: string
   readonly entryFile: string
+  /** Also record the modules of every non-entry chunk: a split Host loads them on demand from the same build. */
+  readonly lazyChunks?: boolean
   /** Modules the entry loads from its lazy chunks, which a change to them also rebuilds. */
   readonly extraModules?: () => readonly string[]
 }): Plugin => {
@@ -164,8 +166,8 @@ const dependencyManifestPlugin = (options: {
     name: `dshx-${options.face}-dependency-manifest`,
     enforce: 'post',
     generateBundle(_bundleOptions, bundle) {
-      const chunk = Object.values(bundle).find(item => item.type === 'chunk' && item.isEntry)
-      modules = [...(chunk === undefined || chunk.type !== 'chunk' ? [] : Object.keys(chunk.modules)), ...(options.extraModules?.() ?? [])]
+      const chunks = Object.values(bundle).filter(item => item.type === 'chunk' && (item.isEntry || options.lazyChunks === true))
+      modules = [...chunks.flatMap(chunk => (chunk.type === 'chunk' ? Object.keys(chunk.modules) : [])), ...(options.extraModules?.() ?? [])]
     },
     async writeBundle() {
       const sources = [...new Set(modules.flatMap(id => (id.startsWith('\0') || !isAbsolute(id) ? [] : [relative(options.root, id)])))].sort()

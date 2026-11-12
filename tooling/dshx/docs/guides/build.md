@@ -38,6 +38,7 @@ interface DshxConfig {
     | {
         readonly entry?: string
         readonly vite?: { readonly plugins?: readonly PluginOption[] }
+        readonly codeSplitting?: boolean
       }
   readonly client?:
     | false
@@ -77,7 +78,18 @@ DSHX reads only `dshx.config.ts`; it does not read `vite.config.*` and does not 
 
 The choice follows the boundaries in other plugin reload systems: OpenCode V2 scopes plugin lifetimes and restores failed activation; Pi stages extension registration, but neither offers the declared schema contracts DSHX must preserve. DSHX therefore swaps one Cordis generation at a time and requires the explicit version boundary for schema changes.
 
-The feature is development-only and opt-in. `dshx build` still emits one self-contained `dist/index.js`, because `dev` is not read outside `dshx dev`. Disposal cancels nothing by itself: a plugin that owns timers, sockets, or subscriptions must register them through `ctx.effect` so the replaced generation releases them.
+The feature is development-only and opt-in. `dshx build` still emits one `dist/index.js` (plus its chunks under `host.codeSplitting`) without a generation wrapper, because `dev` is not read outside `dshx dev`. Disposal cancels nothing by itself: a plugin that owns timers, sockets, or subscriptions must register them through `ctx.effect` so the replaced generation releases them.
+
+## Host code splitting
+
+A Host build emits one `dist/index.js` and inlines every dynamic `import()` of a project module. `host.codeSplitting:
+true` (opt-in, default `false`) emits each such import as its own content-hashed chunk beside it instead
+(`dist/host-implementation-<hash>.js`, plus a shared chunk for modules both sides import), so a
+[`DshxPlugin.facade`](../sdk/effect.md)
+row loads its implementation on first use. Bare imports stay external and `host.dshxRuntime: 'snapshot'` applies to
+every chunk, so both halves share one dshx runtime. The entry keeps the Loader exports; `index.js.deps.json` lists the
+sources of every chunk, so a change to the implementation still marks the row as changed. A rebuilt chunk gets a new
+name only when its content changed.
 
 ## Build phases
 

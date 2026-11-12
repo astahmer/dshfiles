@@ -162,6 +162,16 @@ describe('resolveDshxConfig', () => {
     await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ hostDshxRuntime: 'snapshot' })
   })
 
+  it('keeps the Host a single chunk unless it opts into code splitting', async () => {
+    const { root } = await temporaryProject()
+    await source(root, 'src/host.ts')
+    await expect(resolveDshxConfig({ cwd: root })).resolves.not.toHaveProperty('hostCodeSplitting')
+    await writeFile(resolve(root, 'dshx.config.ts'), 'export default { host: { codeSplitting: false } }\n')
+    await expect(resolveDshxConfig({ cwd: root })).resolves.not.toHaveProperty('hostCodeSplitting')
+    await writeFile(resolve(root, 'dshx.config.ts'), 'export default { host: { codeSplitting: true } }\n')
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ hostCodeSplitting: true })
+  })
+
   it('rejects Host bundle subpaths, duplicates, and Cordis identity', async () => {
     for (const dependencies of ["['@test/local-core/subpath']", "['@test/local-core', '@test/local-core']", "['@deepseek-ai/cordis']"]) {
       const { root } = await temporaryProject()
@@ -307,6 +317,8 @@ describe('resolveDshxConfig', () => {
     ["export default { compatibility: { allowUnsupported: 'yes' } }\n", 'allowUnsupported'],
     ['export default { host: { bundleDependencies: [7] } }\n', 'unique bare package roots'],
     ["export default { host: { dshxRuntime: 'shared' } }\n", 'dshxRuntime'],
+    ["export default { host: { codeSplitting: 'yes' } }\n", 'host.codeSplitting'],
+    ['export default { client: { codeSplitting: true } }\n', 'unknown field'],
     ["export default { client: { dshxRuntime: 'snapshot' } }\n", 'client.dshxRuntime'],
     ["export default { client: { dshxRuntime: 'shared' } }\n", 'requires client.shared'],
     ["export default { client: { sharedRuntime: { provide: ['zod'], dshxRuntime: 'yes' } } }\n", 'client.sharedRuntime.dshxRuntime'],

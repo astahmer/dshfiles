@@ -138,6 +138,8 @@ export interface BuildHostOptions {
   readonly schemaSnapshotAliases?: readonly { readonly find: string; readonly replacement: string }[]
   /** `snapshot` imports the DSHX runtime from an immutable content-addressed store shared by every Host built with the same DSHX; it falls back to `inline` when this project cannot use one. */
   readonly dshxRuntime?: 'inline' | 'snapshot'
+  /** Emit each dynamic `import()` of a project module as a content-hashed chunk instead of inlining it; the entry stays `index.js`. */
+  readonly codeSplitting?: boolean
 }
 
 export type HostBuildResult = BuildReport & { readonly dshxRuntime?: RuntimeSnapshotOutcome }
@@ -356,7 +358,7 @@ function hostGenerationPublishPlugin(outDir: string, generation: HostGenerationB
     name: 'dshx-host-generation-publish',
     enforce: 'post',
     async writeBundle(_options, bundle) {
-      const chunk = Object.values(bundle).find(item => item.type === 'chunk')
+      const chunk = Object.values(bundle).find(item => item.type === 'chunk' && item.isEntry)
       if (chunk === undefined) {
         throw new DshxError('DSHX1306', 'A Host generation build emitted no entry chunk.')
       }
@@ -417,10 +419,13 @@ async function hostConfig(
   const assetsInlineLimit = (): boolean => true
   const generation = options.generation
   const generationOutDir = generation === undefined ? paths.outDir : resolve(paths.outDir, HOST_GENERATION_DIRECTORY)
+  const codeSplitting = options.codeSplitting === true
   const output = {
     format: 'es',
     entryFileNames: generation === undefined ? 'index.js' : '[hash].js',
-    codeSplitting: false,
+    // Content-hashed: a Host that loaded the old entry never links a rebuilt chunk; an unchanged rebuild keeps its name.
+    ...(codeSplitting && { chunkFileNames: '[name]-[hash].js' }),
+    codeSplitting,
     exports: 'named',
   } as const
   const userPlugins = await CompilerKernel.resolveUserPlugins(options.vite?.plugins, watch)
@@ -449,6 +454,7 @@ async function hostConfig(
               root: paths.root,
               outDir: paths.outDir,
               entryFile: 'index.js',
+              lazyChunks: codeSplitting,
               extraModules: () => runtimeSnapshot?.sourceFiles() ?? [],
             }),
           ]
@@ -463,7 +469,7 @@ async function hostConfig(
         external,
         output,
       }),
-      HostCompilerGuards.singleHostChunkPlugin(generation === undefined ? 'index.js' : () => true),
+      HostCompilerGuards.singleHostChunkPlugin(generation === undefined ? 'index.js' : () => true, codeSplitting),
       ...(generation === undefined ? [] : [hostGenerationPublishPlugin(paths.outDir, generation)]),
     ],
     ssr: { noExternal: [...bundleDependencies] },

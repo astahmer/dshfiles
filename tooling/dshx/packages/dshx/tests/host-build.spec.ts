@@ -427,6 +427,39 @@ describe('host compiler', () => {
     expect(await readFile(resolve(root, 'dist/index.d.ts'), 'utf8')).toContain('export declare function apply(ctx: Context')
   })
 
+  it('inlines a dynamic import by default and emits it as a hashed chunk with codeSplitting', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/host.ts'),
+      [
+        "import { defineHost } from '@dshfiles/dshx/host'",
+        "export const load = () => import('./host-implementation.ts')",
+        "export default defineHost({ name: 'split-host' })",
+        '',
+      ].join('\n'),
+    )
+    await writeFile(resolve(root, 'src/host-implementation.ts'), "export default 'heavy-implementation-marker'\n")
+    const options = { packageId: '@dshx/fixture-plugin', root, entry: 'src/host.ts', outDir: 'dist' } as const
+
+    const inlined = await buildHost(options)
+    expect(inlined.output.filter(item => item.type === 'chunk').map(item => item.fileName)).toEqual(['index.js'])
+    expect(await readFile(resolve(root, 'dist/index.js'), 'utf8')).toContain('heavy-implementation-marker')
+
+    await rm(resolve(root, 'dist'), { recursive: true, force: true })
+    const split = await buildHost({ ...options, codeSplitting: true })
+    const chunks = split.output.filter(item => item.type === 'chunk').map(item => item.fileName)
+    const lazy = chunks.find(fileName => /^host-implementation-[\w-]+\.js$/.test(fileName))
+    expect(chunks).toContain('index.js')
+    expect(lazy).toBeDefined()
+    const entry = await readFile(resolve(root, 'dist/index.js'), 'utf8')
+    expect(entry).not.toContain('heavy-implementation-marker')
+    expect(entry).toContain(`import("./${lazy}")`)
+    const implementation: { readonly default: unknown } = await import(pathToFileURL(resolve(root, 'dist', lazy!)).href)
+    expect(implementation.default).toBe('heavy-implementation-marker')
+    const manifest = decodeJson(Schema.Struct({ sources: Schema.Array(Schema.String) }), await readFile(resolve(root, 'dist/index.js.deps.json'), 'utf8'))
+    expect(manifest.sources).toEqual(expect.arrayContaining(['src/host.ts', 'src/host-implementation.ts']))
+  })
+
   it('bundles selected Host package roots and leaves other packages external', async () => {
     const root = await temporaryProject()
     const selectedPackage = resolve(root, 'node_modules/@test/local-core')
