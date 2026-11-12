@@ -102,7 +102,33 @@ const SessionHooks = Layer.effectDiscard(
   }),
 )
 
-const sessionUndoLayer = SessionHooks.pipe(
+/** Tell browsers which thread's history changed, so its controls read it again instead of polling. */
+const HistoryEvents = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const host = yield* HostContext
+    const changed = yield* Queue.unbounded<string>()
+    yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        host.ctx.on('domain/changed', change => {
+          if (change.domain === UndoHistory.domain.name) Queue.offerUnsafe(changed, change.key)
+        }),
+      ),
+      dispose => Effect.sync(dispose),
+    )
+    yield* DshxPlugin.worker(
+      Queue.take(changed).pipe(
+        Effect.flatMap(sessionId =>
+          Api.publish({ contract: sessionUndoApi, event: 'historyChanged', payload: { sessionId } }).pipe(
+            Effect.catchTag('PublishEventError', error => Effect.logWarning('session-undo: history change event refused', error.message)),
+          ),
+        ),
+        Effect.forever,
+      ),
+    )
+  }),
+)
+
+const sessionUndoLayer = Layer.mergeAll(SessionHooks, HistoryEvents).pipe(
   Layer.provideMerge(SessionUndo.layer),
   Layer.provide(Layer.mergeAll(UndoFiles.layer, undoSessionsLayer, StorageDomain.layer)),
   Layer.provide(VcsProviderService.layer),

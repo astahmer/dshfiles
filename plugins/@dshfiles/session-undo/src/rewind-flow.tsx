@@ -1,6 +1,6 @@
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import { isApiError, type ApiClient, type ApiContract } from '@dshfiles/dshx/api'
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useApiEvent } from '@dshfiles/dshx/client'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,22 +46,32 @@ type SessionUndoClient = typeof sessionUndoApi extends ApiContract<infer Methods
 export const historyQueryKey = (sessionId: string) => ['session-undo', 'history', sessionId] as const
 
 /**
- * Main tabs keep every visited thread's composer mounted, and each polled its own history, so a page with four open
- * threads read four histories every 15 s. A thread off screen still reads once on mount, so a side-panel composer
- * shows its controls; only the thread the main view shows keeps polling.
+ * The `historyChanged` event reads a thread's history again when a checkpoint lands. Without that stream it polls, and
+ * only for the thread the main view shows: main tabs keep every visited thread's composer mounted, so polling each
+ * read four histories every 15 s on a page with four open threads. A thread off screen still reads once on mount, so a
+ * side-panel composer shows its controls.
  */
-export const undoHistoryQuery = (input: { readonly api: Pick<SessionUndoClient, 'history'>; readonly sessionId: string; readonly onScreen: boolean }) =>
+export const undoHistoryQuery = (input: {
+  readonly api: Pick<SessionUndoClient, 'history'>
+  readonly sessionId: string
+  readonly onScreen: boolean
+  readonly eventsLive: boolean
+}) =>
   queryOptions({
     queryKey: historyQueryKey(input.sessionId),
     queryFn: ({ signal }) => input.api.history({ sessionId: input.sessionId }, { signal }),
-    refetchInterval: input.onScreen ? 15_000 : false,
+    refetchInterval: input.onScreen && !input.eventsLive ? 15_000 : false,
     retry: false,
   })
 
 /** The thread's recorded turns; every control of one thread shares this query. */
 export const useUndoHistory = (sessionId: string) => {
   const api = useApi(sessionUndoApi)
-  return useQuery(undoHistoryQuery({ api, sessionId, onScreen: useSessionOnScreen(sessionId) }))
+  const queryClient = useQueryClient()
+  const events = useApiEvent(sessionUndoApi, 'historyChanged', payload => {
+    if (payload.sessionId === sessionId) void queryClient.invalidateQueries({ queryKey: historyQueryKey(sessionId) })
+  })
+  return useQuery(undoHistoryQuery({ api, sessionId, onScreen: useSessionOnScreen(sessionId), eventsLive: events === 'live' }))
 }
 
 /**

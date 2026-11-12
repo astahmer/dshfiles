@@ -1,4 +1,4 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, event, method } from '@dshfiles/dshx/api'
 import { Schema } from 'effect'
 
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
@@ -82,6 +82,12 @@ export const sessionUndoApi = defineApi({
         name: 'session_redo',
         render: output => `Redid the turn; the thread continues as ${output.sessionId}${output.filesRestored ? ' with its files restored' : ''}.`,
       },
+    }),
+  },
+  events: {
+    historyChanged: event({
+      schema: Schema.Struct({ sessionId: sessionIdSchema }),
+      description: 'A thread recorded, named or dropped a turn checkpoint. Read its history again.',
     }),
   },
 })
