@@ -132,7 +132,7 @@ export const scratchUp = async (
   readonly warned: readonly WarnedScratch[]
   readonly orphans: readonly SweepAction[]
 }> => {
-  const executable = await resolveDshExecutable()
+  const executable = await resolveDshExecutable(undefined, process.env, DSHFILES_ROOT)
   if (options.port === LIVE_DSH_PORT) {
     throw new ScratchError('live-port', `Port ${LIVE_DSH_PORT} belongs to the live DSH.`, 'Omit --port to take a free port.')
   }
