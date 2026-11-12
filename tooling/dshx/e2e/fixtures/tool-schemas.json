@@ -1,5 +1,5 @@
 {
-  "hostBundles": 88,
+  "hostBundles": 90,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -42,6 +42,7 @@
     "@dshfiles/model-effort-picker",
     "@dshfiles/multi-host",
     "@dshfiles/onboarding",
+    "@dshfiles/opencode-compat",
     "@dshfiles/phone-access",
     "@dshfiles/phone-pairing",
     "@dshfiles/plugin-guide",
@@ -51,6 +52,7 @@
     "@dshfiles/project-checks",
     "@dshfiles/prompt-stash",
     "@dshfiles/pull-requests",
+    "@dshfiles/pwa",
     "@dshfiles/queue-reorder",
     "@dshfiles/references",
     "@dshfiles/resource-packs",
@@ -90,12 +92,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 675,
-  "apiToolBindings": 474,
-  "apiToolNameCount": 474,
-  "apiToolSchemas": 473,
+  "apiMethods": 679,
+  "apiToolBindings": 477,
+  "apiToolNameCount": 477,
+  "apiToolSchemas": 476,
   "definedTools": 24,
-  "tools": 497,
+  "tools": 500,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -3442,6 +3444,22 @@
       }
     },
     {
+      "name": "backlog_regenerate_title",
+      "description": "Name an item from its image with the configured triage vision model: it writes a short title unless the title changed while the model ran. Runs only when the user asked; the capture-time automatic pass is the `imageTitle` setting.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Item ref (`b:k3f9`, `k3f9`, legacy `b:12`) or number."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "backlog_release",
       "description": "Give up a claim without finishing: the lease ends, the delegate is cleared and an item still `doing` returns to `todo` so it is ready again. Only the holder may release a live claim; the user can release any from the panel. Say in a backlog_comment what is left. Only for the user's request or this thread's own task.",
       "parameters": {
@@ -6328,6 +6346,27 @@
       }
     },
     {
+      "name": "mcp_endpoint_set_plugin_tools",
+      "description": "Set which plugin tools MCP clients may use. Call only when the user asked for this.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "read-only",
+              "read-write"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "mcp_endpoint_status",
       "description": "The MCP endpoint path and URLs, whether a bearer token exists (never the token) and whether LAN clients may connect. Read-only.",
       "parameters": {
@@ -8390,6 +8429,15 @@
             "type": "string"
           }
         },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "opencode_plugins_status",
+      "description": "List configured OpenCode plugins, load errors, contributions and unsupported API calls. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
         "additionalProperties": false
       }
     },
