@@ -1932,6 +1932,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [recoveryReasonBySessionId],
   )
   const accountsApi = useApi(aiAccountsApi)
+  const quotaContinuationEvents = useApiEvent(aiAccountsApi, 'quotaContinuationsChanged', () => {
+    void queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
+  })
   const usageLimitQuery = useQuery({
     queryKey: usageLimitQueryKey,
     queryFn: ({ signal }) => accountsApi.quotaContinuations(undefined, { signal }),
@@ -1940,6 +1943,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         primarySurface: isPrimarySurface,
         ownerMissing: isApiOwnerMissing(query.state.error),
         errored: query.state.status === 'error',
+        eventsLive: quotaContinuationEvents === 'live',
+        waiting: query.state.data?.continuations.some(continuation => continuation.state === 'waiting') === true,
       }),
     retry: false,
   })

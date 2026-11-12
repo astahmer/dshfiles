@@ -68,6 +68,8 @@ type ServiceOptions = {
 }
 type QuotaContinuationService = {
   start(): () => void
+  /** Calls `listener` after each durable write to the stored recoveries; returns the unsubscribe. */
+  onChange(listener: () => void): () => void
   close(): Promise<void>
   list(): Promise<{ scheduleAvailable: boolean; continuations: QuotaContinuationSummary[] }>
   recordFailure(
@@ -761,6 +763,11 @@ const createQuotaContinuationService = ({
     return [...activity, ...(await next())]
   }
 
+  const onChange = (listener: () => void): (() => void) =>
+    context.on('domain/changed', change => {
+      if (change.domain === quotaContinuationDomain.name) listener()
+    })
+
   const start = (): (() => void) => {
     if (started) return () => undefined
     started = true
@@ -810,7 +817,7 @@ const createQuotaContinuationService = ({
     await closing
   }
 
-  return { start, close, list, recordFailure, resume, setAutoRetry, snooze, dismiss }
+  return { start, onChange, close, list, recordFailure, resume, setAutoRetry, snooze, dismiss }
 }
 
 export { createQuotaContinuationService, type QuotaContinuationService, type QuotaFailureAgent, type SnoozeDuration }

@@ -6,6 +6,8 @@ import { threadAccountHostApi } from './thread-account-host.js'
 import { configFromAccountsFile } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
+import { publishApiEvent } from '@dshfiles/dshx/host'
+import { aiAccountsApi } from './api.js'
 import { AccountsHostApiModel, accountsHostApi } from './accounts-host-api.js'
 import { AccountLoginHostModel, accountLoginHostApi, installAccountLogin } from './account-login-host.js'
 import { accountSessionHostApi } from './account-session-host.js'
@@ -245,7 +247,14 @@ const startAccountsHost = (input: {
   })
   runtime.quotaContinuations = quotaContinuations
   const stopQuotaContinuations = quotaContinuations.start()
+  // Browsers read the recoveries again on this event instead of polling for one that may never come.
+  const stopContinuationEvents = quotaContinuations.onChange(() => {
+    publishApiEvent(ctx, aiAccountsApi, 'quotaContinuationsChanged', {}).catch((error: unknown) =>
+      ctx.logger.warn(`ai-accounts: quota recovery change event refused: ${String(error)}`),
+    )
+  })
   onRelease(() => {
+    stopContinuationEvents()
     stopQuotaContinuations()
     if (runtime.quotaContinuations === quotaContinuations) delete runtime.quotaContinuations
     void quotaContinuations.close().catch(() => ctx.logger.warn('ai-accounts: quota recovery storage could not close cleanly'))

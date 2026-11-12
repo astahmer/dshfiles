@@ -1,4 +1,4 @@
-import { defineApi } from '@dshfiles/dshx/api'
+import { defineApi, event } from '@dshfiles/dshx/api'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import * as SchemaGetter from 'effect/SchemaGetter'
@@ -890,6 +890,12 @@ export const aiAccountsApi = defineApi({
         name: 'ai_accounts_dismiss_continuation',
         render: output => (output.dismissed ? 'Dismissed the stored continuation.' : 'That continuation was not waiting.'),
       },
+    }),
+  },
+  events: {
+    quotaContinuationsChanged: event({
+      schema: Schema.Struct({}),
+      description: 'A quota recovery was stored, changed or removed. Read quotaContinuations again.',
     }),
   },
 })

@@ -192,6 +192,41 @@ describe('quota continuation service', () => {
     }
   })
 
+  it('announces each stored, changed and dismissed recovery so browsers read again instead of polling', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-changes-'))
+    const now = () => 3_000_000
+    const sessionId = SessionId('quota-changes-session')
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+    let stop: (() => void) | undefined
+
+    try {
+      context = await openContext(root)
+      service = createQuotaContinuationService({ context, readResetAt: async () => now() + 90_000, now })
+      const log: string[] = []
+      stop = service.onChange(() => log.push('changed'))
+      await service.recordFailure(createFailureAgent(sessionId), 'codex_work', false)
+      log.push('stored')
+      const [continuation] = (await service.list()).continuations
+      if (continuation === undefined) throw new Error('Quota continuation was not stored.')
+      await service.dismiss(continuation.continuationId)
+      log.push('dismissed')
+      stop()
+      stop = undefined
+      await service.recordFailure(createFailureAgent(sessionId, 20), 'codex_work', false)
+      const stored = log.indexOf('stored')
+      const dismissed = log.indexOf('dismissed')
+      expect(log.slice(0, stored)).toContain('changed')
+      expect(log.slice(stored, dismissed)).toContain('changed')
+      expect(log.slice(dismissed + 1)).toEqual([])
+    } finally {
+      stop?.()
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('lets one waiting continuation opt into and out of retry-at-reset', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-quota-opt-in-'))
     const now = () => 3_000_000
