@@ -10,7 +10,20 @@
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: dshfiles-opencode-compat",
-      "configuration": [],
+      "configuration": [
+        {
+          "key": "plugins",
+          "defaultValue": "[]",
+          "constraints": "Absolute module paths with JSON object options and an enabled flag.",
+          "coveredBy": ["opencode-compat.load"]
+        },
+        {
+          "key": "onUnsupported",
+          "defaultValue": "report",
+          "constraints": "Report unsupported calls or fail setup.",
+          "coveredBy": ["opencode-compat.unsupported"]
+        }
+      ],
       "states": ["loaded", "failed", "disabled"],
       "failureModes": ["Invalid configuration or setup failure prevents the plugin from loading."],
       "externalDependencies": [],
@@ -22,12 +35,31 @@
           "testName": "loads a plugin with frozen options and awaits cleanup"
         },
         {
+          "kind": "unit-test",
+          "id": "opencode-compat.unsupported",
+          "file": "plugins/@dshfiles/opencode-compat/src/runtime.test.ts",
+          "testName": "records unsupported calls in report mode and fails in fail mode"
+        },
+        {
+          "kind": "host-test",
+          "id": "opencode-compat.host-status",
+          "file": "plugins/@dshfiles/opencode-compat/src/host.test.ts",
+          "testName": "reloads plugins when settings change and disposes them when unmounted"
+        },
+        {
           "kind": "not-applicable",
           "id": "opencode-compat.no-browser",
           "reason": "Host-only adapter has no client surface or browser journey in this slice."
         }
       ],
-      "telemetry": [{ "kind": "not-applicable", "reason": "Load telemetry is deferred to the next slice." }]
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "opencode-plugin load",
+          "file": "plugins/@dshfiles/opencode-compat/src/runtime.test.ts",
+          "testName": "records a load span with identity and counts but no options"
+        }
+      ]
     }
   ]
 }

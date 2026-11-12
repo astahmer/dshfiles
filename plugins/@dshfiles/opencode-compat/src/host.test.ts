@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { expect, it, vi } from 'vitest'
 import plugin from './host.js'
@@ -26,6 +27,15 @@ it('reloads plugins when settings change and disposes them when unmounted', asyn
   try {
     const mounted = await host.mount(plugin, { packageId: '@dshfiles/opencode-compat' })
     expect(fixture.events).toHaveLength(1)
+    const result = await host.tools.execute({
+      callId: ToolCallId('status-call'),
+      name: 'opencode_plugins_status',
+      arguments: {},
+      signal: new AbortController().signal,
+    })
+    expect(result.isError).toBe(false)
+    expect(JSON.stringify(result.content)).toContain('basic')
+    expect(JSON.stringify(result.content)).toContain('loaded')
     document = { ...document, value: { ...document.value, plugins: [{ ...document.value.plugins[0]!, options: '{"revision":2}' }] }, revision: 2 }
     host.ctx.emit('settings/document-updated', namespace, 2)
     await vi.waitFor(() => expect(fixture.events).toHaveLength(3))

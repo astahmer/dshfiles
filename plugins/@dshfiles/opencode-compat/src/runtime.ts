@@ -1,5 +1,6 @@
+import { withSpan } from '@dshfiles/dshx/tracing'
 import { Schema } from 'effect'
-import { createContext } from './context.js'
+import { createContext, type Domains } from './context.js'
 import { loadPlugin } from './load-plugin.js'
 import type { Registration, UnsupportedRecord } from './unsupported.js'
 
@@ -21,7 +22,7 @@ export interface PluginStatus {
 const optionsSchema = Schema.Record(Schema.String, Schema.Unknown)
 const isCleanup = Schema.is(Schema.declare((value): value is () => unknown => typeof value === 'function'))
 
-export const start = async (input: { readonly entries: readonly Entry[]; readonly onUnsupported: 'report' | 'fail' }) => {
+export const start = async (input: { readonly entries: readonly Entry[]; readonly onUnsupported: 'report' | 'fail'; readonly domains: Domains }) => {
   const statuses: PluginStatus[] = []
   const disposers: Array<() => Promise<void>> = []
   const ids = new Set<string>()
@@ -57,43 +58,51 @@ export const start = async (input: { readonly entries: readonly Entry[]; readonl
         }
       }
     }
-    try {
-      let options: Record<string, unknown>
+    await withSpan('opencode-plugin load', {}, async span => {
       try {
-        options = Schema.decodeUnknownSync(optionsSchema)(JSON.parse(entry.options))
-      } catch {
-        throw new Error('Invalid options JSON object. Set options to a valid JSON object in Settings › dshfiles-opencode-compat.')
+        let options: Record<string, unknown>
+        try {
+          options = Schema.decodeUnknownSync(optionsSchema)(JSON.parse(entry.options))
+        } catch {
+          throw new Error('Invalid options JSON object. Set options to a valid JSON object in Settings › dshfiles-opencode-compat.')
+        }
+        const plugin = await loadPlugin({ specifier: entry.specifier })
+        status.id = plugin.id
+        if (ids.has(plugin.id)) throw new Error(`Duplicate plugin id ${plugin.id}. Disable or remove the duplicate in settings.`)
+        ids.add(plugin.id)
+        const context = createContext({
+          pluginId: plugin.id,
+          options,
+          onUnsupported: input.onUnsupported,
+          records: status.unsupported,
+          contributions: status.contributions,
+          domains: input.domains,
+          register: registration => {
+            let active = true
+            const wrapped: Registration = {
+              dispose: async () => {
+                if (!active) return
+                active = false
+                await registration.dispose()
+              },
+            }
+            registrations.push(wrapped)
+            return wrapped
+          },
+        })
+        const result = await plugin.setup(context)
+        if (isCleanup(result)) cleanup = result
+        status.state = 'loaded'
+        disposers.push(dispose)
+      } catch (error) {
+        status.error = `${error instanceof Error ? error.message : String(error)} Check the plugin path and settings, then retry.`
+        await dispose()
+      } finally {
+        if (status.id !== null) span.setAttribute('opencode.plugin.id', status.id)
+        span.setAttribute('opencode.plugin.state', status.state)
+        span.setAttribute('opencode.plugin.unsupported_count', status.unsupported.length)
       }
-      const plugin = await loadPlugin({ specifier: entry.specifier })
-      status.id = plugin.id
-      if (ids.has(plugin.id)) throw new Error(`Duplicate plugin id ${plugin.id}. Disable or remove the duplicate in settings.`)
-      ids.add(plugin.id)
-      const context = createContext({
-        pluginId: plugin.id,
-        options,
-        onUnsupported: input.onUnsupported,
-        records: status.unsupported,
-        register: registration => {
-          let active = true
-          const wrapped: Registration = {
-            dispose: async () => {
-              if (!active) return
-              active = false
-              await registration.dispose()
-            },
-          }
-          registrations.push(wrapped)
-          return wrapped
-        },
-      })
-      const result = await plugin.setup(context)
-      if (isCleanup(result)) cleanup = result
-      status.state = 'loaded'
-      disposers.push(dispose)
-    } catch (error) {
-      status.error = `${error instanceof Error ? error.message : String(error)} Check the plugin path and settings, then retry.`
-      await dispose()
-    }
+    })
   }
   let disposed = false
   return {

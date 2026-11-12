@@ -1,19 +1,29 @@
-import { DshxPlugin } from '@dshfiles/dshx/effect'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
-import { Effect, Layer, Stream } from 'effect'
-import { start } from './runtime.js'
+import { Context, Effect, Layer, Stream } from 'effect'
+import { compatApi } from './api.js'
+import type { Domains } from './context.js'
+import { start, type PluginStatus } from './runtime.js'
 import { compatSettings } from './settings.js'
 
 const CompatSettings = Settings.Tag<SettingsValue<typeof compatSettings.schema>>(compatSettings.namespace)
 
-const Runtime = Layer.effectDiscard(
+const createDomains = (_input: { readonly ctx: CordisContext }): Domains => ({})
+
+class Runtime extends Context.Service<Runtime, { readonly status: Effect.Effect<readonly PluginStatus[]> }>()('@dshfiles/opencode-compat/Runtime') {}
+
+const RuntimeLayer = Layer.effect(
+  Runtime,
   Effect.gen(function* () {
     const settings = yield* CompatSettings
+    const host = yield* HostContext
+    const domains = createDomains({ ctx: host.ctx })
     const initial = yield* settings.get
     const manager = yield* Effect.acquireRelease(
       Effect.promise(async () => ({
-        current: await start({ entries: initial.plugins, onUnsupported: initial.onUnsupported }),
+        current: await start({ entries: initial.plugins, onUnsupported: initial.onUnsupported, domains }),
         key: JSON.stringify(initial),
         pending: Promise.resolve(),
         stopped: false,
@@ -34,7 +44,7 @@ const Runtime = Layer.effectDiscard(
               if (manager.stopped || key === manager.key) return
               await manager.current.dispose()
               if (manager.stopped) return
-              manager.current = await start({ entries: value.plugins, onUnsupported: value.onUnsupported })
+              manager.current = await start({ entries: value.plugins, onUnsupported: value.onUnsupported, domains })
               manager.key = key
             })
             return manager.pending
@@ -42,11 +52,13 @@ const Runtime = Layer.effectDiscard(
         ),
       ),
     )
+    return Runtime.of({ status: Effect.sync(() => manager.current.status()) })
   }),
 )
 
 export default DshxPlugin.make({
   name: '@dshfiles/opencode-compat',
   settings: [compatSettings],
-  layer: Runtime.pipe(Layer.provide(Settings.layer(compatSettings))),
+  layer: RuntimeLayer.pipe(Layer.provide(Settings.layer(compatSettings))),
+  apis: [Api.bind(compatApi, { status: () => Runtime.use(runtime => Effect.map(runtime.status, plugins => ({ plugins: [...plugins] }))) })],
 })

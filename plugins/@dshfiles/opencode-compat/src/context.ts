@@ -12,6 +12,7 @@ export interface DomainInput {
   readonly onUnsupported: 'report' | 'fail'
   readonly records: UnsupportedRecord[]
   readonly register: (registration: Registration) => Registration
+  readonly contributions: { readonly tools: string[]; readonly skills: string[]; readonly hooks: string[] }
 }
 
 const domains = [
@@ -39,12 +40,15 @@ const domains = [
   'websearch',
   'worktree',
   'location',
-]
+] as const
 
-export const domainTable: Record<string, (input: DomainInput) => unknown> = {}
+export type DomainName = (typeof domains)[number]
+export type Domains = Partial<Record<DomainName, (input: DomainInput) => unknown>>
 
-export const createContext = (input: DomainInput & { readonly options: Record<string, unknown>; readonly version?: string }): PluginContext => {
-  const members = Object.fromEntries(domains.map(domain => [domain, domainTable[domain]?.(input) ?? unsupportedDomain({ ...input, domain })]))
+export const createContext = (
+  input: DomainInput & { readonly options: Record<string, unknown>; readonly domains: Domains; readonly version?: string },
+): PluginContext => {
+  const members = Object.fromEntries(domains.map(domain => [domain, input.domains[domain]?.(input) ?? unsupportedDomain({ ...input, domain })]))
   return {
     ...members,
     options: Object.freeze(input.options),
