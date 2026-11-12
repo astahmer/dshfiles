@@ -16,7 +16,7 @@ import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
 import { afterEach, expect, it } from 'vitest'
-import { claudeCommand } from './claude-command.js'
+import { clientSetups } from './client-setup.js'
 import { mcpEndpointApi } from './endpoint-api.js'
 import endpointHost from './host.js'
 import { isLocalAddress } from './local-address.js'
@@ -259,8 +259,27 @@ it('treats only loopback and this machine’s own addresses as local', () => {
   expect(isLocalAddress(undefined)).toBe(false)
 })
 
-it('builds the Claude Code command with the endpoint URL and bearer header', () => {
-  expect(claudeCommand({ url: 'http://127.0.0.1:3080/mcp', token: 'dshmcp_abc' })).toBe(
-    'claude mcp add --transport http dsh http://127.0.0.1:3080/mcp --header "Authorization: Bearer dshmcp_abc"',
-  )
+it('builds client setup instructions with and without an issued token', () => {
+  const url = 'http://127.0.0.1:3080/mcp'
+  const token = 'dshmcp_example'
+  const without = clientSetups({ url, token: undefined })
+  const withToken = clientSetups({ url, token })
+  expect(without.map(client => client.id)).toEqual(['claude', 'codex', 'cursor', 'vscode', 'json'])
+  expect(JSON.stringify(without)).not.toContain(token)
+  expect(without.every(client => !('installUrl' in client))).toBe(true)
+  expect(without[0]?.snippet).toContain('Bearer $DSH_MCP_TOKEN')
+  expect(without[1]?.snippet).toBe(`codex mcp add dsh --url ${url} --bearer-token-env-var DSH_MCP_TOKEN`)
+  expect(without[2]?.snippet).toContain('${env:DSH_MCP_TOKEN}')
+  expect(without[3]?.snippet).toContain('${env:DSH_MCP_TOKEN}')
+  expect(without[4]?.snippet).toContain('${env:DSH_MCP_TOKEN}')
+  expect(withToken[0]?.snippet).toContain(`Bearer ${token}`)
+  expect(withToken[1]?.snippet).toBe(`export DSH_MCP_TOKEN=${token}\n${without[1]?.snippet}`)
+  expect(withToken[3]?.snippet).toContain(`Bearer ${token}`)
+  expect(withToken[4]?.snippet).toContain(`Bearer ${token}`)
+  const cursor = withToken[2]
+  expect(cursor?.snippet).toContain(`Bearer ${token}`)
+  const link = cursor && 'installUrl' in cursor ? cursor.installUrl : undefined
+  expect(link).toBeDefined()
+  const encoded = new URL(link ?? '').searchParams.get('config')
+  expect(JSON.parse(atob(encoded ?? ''))).toEqual({ url, headers: { Authorization: `Bearer ${token}` } })
 })

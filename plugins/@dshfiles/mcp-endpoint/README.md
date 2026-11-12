@@ -5,11 +5,17 @@
 An [MCP](https://modelcontextprotocol.io) server on the DSH Web server, so an agent in a terminal (Claude Code, Codex,
 any MCP client) can drive DSH threads: list them, read them, start one, message it, wait for its turn and stop it.
 
-```sh
-claude mcp add --transport http dsh http://127.0.0.1:3080/mcp --header "Authorization: Bearer dshmcp_…"
-```
+## Connect a client
 
-Settings › **MCP endpoint** generates the token and shows this command, with the real URL and token, once.
+Open Settings › **MCP endpoint**, or use the palette command **MCP endpoint: connect a client**. This is a Settings section, not a reusable view, so it has no New tab chooser entry. Generate a token and copy it immediately: DSH stores only its hash. The client tabs always show instructions, and insert the token only immediately after Generate or Rotate.
+
+1. **Claude Code:** `claude mcp add --transport http dsh <url> --header "Authorization: Bearer $DSH_MCP_TOKEN"`.
+2. **Codex:** `codex mcp add dsh --url <url> --bearer-token-env-var DSH_MCP_TOKEN`; Codex reads the variable at runtime. The freshly issued token is supplied as an export line.
+3. **Cursor:** add the displayed `mcpServers.dsh` URL and headers JSON to `~/.cursor/mcp.json`, or use the install link immediately after issuing a token.
+4. **VS Code:** run the displayed `code --add-mcp` command for the editor-managed profile configuration.
+5. **JSON:** copy the generic `mcpServers.dsh` HTTP configuration.
+
+Without a freshly issued token, set `DSH_MCP_TOKEN` in the client's environment: Claude expands `$DSH_MCP_TOKEN`, while the JSON examples use `${env:DSH_MCP_TOKEN}` where supported by the client. Generic clients may require their own substitution syntax. For scripts on this machine use `dshx tools` without a token.
 
 ## Tools
 

@@ -4599,12 +4599,18 @@ importers:
 
   plugins/@dshfiles/mcp-endpoint:
     dependencies:
+      '@dshfiles/command-palette':
+        specifier: workspace:*
+        version: link:../command-palette
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/session-controller':
         specifier: workspace:*
         version: link:../session-controller
+      '@dshfiles/settings-shell':
+        specifier: workspace:*
+        version: link:../settings-shell
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime

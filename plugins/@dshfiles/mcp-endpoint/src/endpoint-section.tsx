@@ -13,11 +13,12 @@ import {
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Schema } from 'effect'
 import { useId, useState } from 'react'
-import { claudeCommand } from './claude-command.js'
+import { clientSetups } from './client-setup.js'
 import { endpointStatusSchema, mcpEndpointApi, pluginToolsSchema, type EndpointStatus, type PluginToolsMode } from './endpoint-api.js'
 
 const statusKey = ['mcp-endpoint', 'status'] as const
@@ -28,7 +29,9 @@ const CopyField = (props: { readonly label: string; readonly value: string }): J
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
       <span className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.label}</span>
       <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-2">
-        <code className="dshx:min-w-0 dshx:flex-1 dshx:break-all dshx:rounded-md dshx:bg-muted dshx:px-2 dshx:py-1.5 dshx:text-xs">{props.value}</code>
+        <code className="dshx:min-w-0 dshx:flex-1 dshx:whitespace-pre-wrap dshx:break-all dshx:rounded-md dshx:bg-muted dshx:px-2 dshx:py-1.5 dshx:text-xs">
+          {props.value}
+        </code>
         <Button type="button" size="sm" variant="outline" aria-label={`Copy ${props.label}`} onClick={() => void copy(props.value)}>
           {copied ? 'Copied' : 'Copy'}
         </Button>
@@ -145,9 +148,33 @@ const EndpointControls = (props: { readonly status: EndpointStatus }): JSX.Eleme
               Copy it now: DSH keeps only its hash and cannot show it again.
             </p>
             <CopyField label="Token" value={issuedToken} />
-            <CopyField label="Claude Code" value={claudeCommand({ url, token: issuedToken })} />
           </div>
         )}
+      </section>
+      <section aria-label="Connect a client" className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3">
+        <h3 className="dshx:m-0 dshx:text-sm dshx:font-medium">Connect a client</h3>
+        <Tabs defaultValue="claude" className="dshx:min-w-0">
+          <TabsList aria-label="Client" className="dshx:h-auto! dshx:max-w-full dshx:flex-wrap dshx:justify-start">
+            {clientSetups({ url, token: issuedToken }).map(client => (
+              <TabsTrigger className="dshx:min-h-11" key={client.id} value={client.id}>
+                {client.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {clientSetups({ url, token: issuedToken }).map(client => (
+            <TabsContent key={client.id} value={client.id} className="dshx:min-w-0 dshx:space-y-2">
+              <CopyField label={client.label} value={client.snippet} />
+              {'installUrl' in client && client.installUrl !== undefined ? (
+                <Button asChild variant="outline" className="dshx:min-h-11">
+                  <a href={client.installUrl}>Add to {client.label}</a>
+                </Button>
+              ) : null}
+            </TabsContent>
+          ))}
+        </Tabs>
+        <p className="dshx:m-0 dshx:text-sm">
+          Use <code>dshx tools</code> for scripts on this machine; no token is needed.
+        </p>
       </section>
       <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-4">
         <label className="dshx:text-sm dshx:font-medium" htmlFor={lanId}>

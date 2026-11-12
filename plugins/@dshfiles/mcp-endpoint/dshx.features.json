@@ -113,14 +113,15 @@
     },
     {
       "id": "mcp-endpoint-settings",
-      "title": "Issue the MCP token and copy the Claude Code command",
-      "summary": "Settings › MCP endpoint shows the endpoint URL, generates or rotates the bearer token and shows it once with a copyable `claude mcp add --transport http dsh <url> --header \"Authorization: Bearer …\"` command, revokes it, and turns LAN access on or off. Only the token's SHA-256 is stored. The agent can read the status, revoke the token (explicit confirm) and switch LAN access; it cannot issue a token, so a token never enters a transcript.",
+      "title": "Issue an MCP token and connect a client",
+      "summary": "Settings › MCP endpoint and the MCP endpoint: connect a client palette command open copyable setup instructions for Claude Code, Codex, Cursor, VS Code and generic JSON. The section generates, rotates and revokes a bearer token and controls LAN access; a freshly issued token appears once and only its SHA-256 is stored. The agent can read status, revoke a token and switch LAN access but cannot issue a token.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
         "click button \"MCP endpoint\"",
         "click button \"Generate token\"",
-        "expect button \"Rotate\""
+        "expect button \"Rotate\"",
+        "expect tab \"Claude Code\""
       ],
       "surfaces": ["client", "host", "settings", "api", "tool"],
       "surface": "settingsSection",
@@ -152,7 +153,7 @@
       ],
       "onboarding": {
         "firstAction": "Open Settings › MCP endpoint and generate a token.",
-        "doneWhen": "You copied the claude mcp add command that connects a terminal agent to DSH.",
+        "doneWhen": "You copied setup instructions for your MCP client.",
         "open": {
           "settings": {
             "section": "dshfiles-mcp-endpoint"
@@ -173,9 +174,9 @@
         },
         {
           "kind": "unit-test",
-          "id": "mcp-endpoint.claude-command",
+          "id": "mcp-endpoint.client-setups",
           "file": "plugins/@dshfiles/mcp-endpoint/src/mcp-endpoint.test.ts",
-          "testName": "builds the Claude Code command with the endpoint URL and bearer header"
+          "testName": "builds client setup instructions with and without an issued token"
         }
       ]
     }
