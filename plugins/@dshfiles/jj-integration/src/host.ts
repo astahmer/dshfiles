@@ -11,6 +11,7 @@ import { jjIntegrationApi } from './api.js'
 import { LandAttention } from './attention-provider.js'
 import { AutoIntegration } from './auto-integration.js'
 import { Cleanup } from './cleanup.js'
+import { DshUpdate } from './dsh-update.js'
 import { Executables } from './executables-promise.js'
 import { HostEdgesLive } from './host-edges-promise.js'
 import { HostHooksLive, rebaseCommand } from './host-hooks-promise.js'
@@ -64,7 +65,9 @@ const BaseLive = Layer.mergeAll(
 )
 
 const JjIntegrationLive = Layer.mergeAll(MaintenanceLive, HostHooksLive, IntegrationQueue.layer).pipe(
-  Layer.provideMerge(Layer.mergeAll(AutoIntegration.layer, Cleanup.layer, ThreadLifecycle.layer, LandAttention.layer, WorkspaceSetupService.layer)),
+  Layer.provideMerge(
+    Layer.mergeAll(AutoIntegration.layer, Cleanup.layer, ThreadLifecycle.layer, LandAttention.layer, WorkspaceSetupService.layer, DshUpdate.layer),
+  ),
   Layer.provideMerge(Landing.layer),
   Layer.provideMerge(Layer.mergeAll(RepositoryViews.layer, WorkspaceSync.layer)),
   Layer.provideMerge(SessionActivity.layer),
@@ -118,6 +121,9 @@ const handlers = Api.handlers(jjIntegrationApi, {
   setProjectBookmark: input => ThreadLifecycle.use(lifecycle => lifecycle.setProjectBookmark(input)),
   landThread: (input, call) => ThreadLifecycle.use(lifecycle => lifecycle.landThread(input, call.caller)),
   workspaceSync: () => WorkspaceSync.use(sync => Effect.map(sync.current, current => ({ sync: current }))),
+  updateCheck: input => DshUpdate.use(update => update.check({ fetch: input.fetch ?? true })),
+  updateApply: () => DshUpdate.use(update => update.apply),
+  landImpact: input => DshUpdate.use(update => update.landImpact(input.path)),
   workspaceSetup: input => WorkspaceSetupService.use(setup => setup.ensure(input)),
   cancelWorkspaceSetup: input => WorkspaceSetupService.use(setup => setup.cancel(input)),
   discard: input => ThreadLifecycle.use(lifecycle => lifecycle.discard(input)),

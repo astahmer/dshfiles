@@ -195,6 +195,20 @@ const make = Effect.gen(function* () {
     })
   })
 
+  /** Close every Ready item that went unseen past the expiry window; answers how many closed. */
+  const expireUnseen = Effect.gen(function* () {
+    const closed = yield* apply('write', (current, now) => {
+      const muted = mutedSet(current)
+      const put = [...current.items.values()].flatMap(item => {
+        const outcome = AttentionModel.expireUnseen(item, muted, now)
+        return outcome.changed ? [outcome.item] : []
+      })
+      return { result: put.length, put }
+    })
+    yield* Effect.annotateCurrentSpan({ 'attention.expired': closed })
+    return closed
+  }).pipe(Effect.withSpan('attention expire unseen'))
+
   type TransitionResult =
     | { readonly kind: 'missing' }
     | { readonly kind: 'refused'; readonly outcome: Extract<UserTransition, { ok: false }> }
@@ -237,6 +251,7 @@ const make = Effect.gen(function* () {
     publish,
     resolve,
     reconcile,
+    expireUnseen,
     done,
     snooze,
     reopen,
@@ -260,6 +275,8 @@ export class AttentionInbox extends Context.Service<
       readonly source: string
       readonly items: ReadonlyArray<AttentionDraft>
     }) => Effect.Effect<{ readonly published: number; readonly resolved: number }, StoreError>
+    /** Close Ready items unseen for 72 hours (plan E2); Needs you and Failed never expire. Answers how many closed. */
+    readonly expireUnseen: Effect.Effect<number, StoreError>
     readonly done: (input: { readonly id: string }) => Effect.Effect<AttentionItem, UserError>
     readonly snooze: (input: { readonly id: string; readonly until?: number; readonly untilChange?: boolean }) => Effect.Effect<AttentionItem, UserError>
     readonly reopen: (input: { readonly id: string }) => Effect.Effect<AttentionItem, UserError>

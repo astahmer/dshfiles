@@ -9,11 +9,16 @@ export interface RestartNotice {
   readonly available: boolean
   /** Set while a "restart when idle" waits for running turns. */
   readonly waitingLabel: string | null
+  /**
+   * The rail's DSH actions show Restart (b:kgcc), which carries the same state and verbs, so the status strip draws no
+   * second restart control. False while `showRailActions` is off or no supervisor can restart DSH.
+   */
+  readonly onRail: boolean
 }
 
-export type RestartRequest = 'restart' | 'restart-when-idle'
+export type RestartRequest = 'restart' | 'restart-when-idle' | 'turn-off-auto-restart'
 
-const EMPTY_NOTICE: RestartNotice = { hostPlugins: [], available: false, waitingLabel: null }
+const EMPTY_NOTICE: RestartNotice = { hostPlugins: [], available: false, waitingLabel: null, onRail: false }
 
 let current: RestartNotice = EMPTY_NOTICE
 const listeners = new Set<() => void>()
@@ -21,6 +26,7 @@ const handlers = new Set<(request: RestartRequest) => void>()
 
 const sameNotice = (left: RestartNotice, right: RestartNotice): boolean =>
   left.available === right.available &&
+  left.onRail === right.onRail &&
   left.waitingLabel === right.waitingLabel &&
   left.hostPlugins.length === right.hostPlugins.length &&
   left.hostPlugins.every((plugin, index) => plugin === right.hostPlugins[index])

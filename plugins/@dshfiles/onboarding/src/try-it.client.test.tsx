@@ -66,7 +66,7 @@ const renderPage = (tryIt: boolean, project: OnScreenProject | null = null) => {
 const featureRow = async (): Promise<HTMLElement> => {
   const features = await screen.findByRole('list', { name: 'Features' })
   const title = await within(features).findByText(FEATURE_TITLE)
-  const row = title.closest('li')
+  const row = title.closest<HTMLElement>('[data-feature]')
   if (row === null) throw new Error('no feature row')
   return row
 }
@@ -86,7 +86,7 @@ describe('Try it', () => {
     fireEvent.click(within(await featureRow()).getByRole('button', { name: `Try it: ${FEATURE_TITLE}` }))
     const dialog = await screen.findByRole('dialog', { name: `Try it: ${FEATURE_TITLE}` })
     expect(within(dialog).getByText(TRY_IT_COST)).toBeTruthy()
-    expect(within(dialog).getByText('Starts in the Host default directory.')).toBeTruthy()
+    expect(within(dialog).getByText("Starts in DSH's default folder.")).toBeTruthy()
     expect(TRY_IT_COST).toMatch(/spends tokens on your current AI account/u)
     expect(page.started).toEqual([])
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))

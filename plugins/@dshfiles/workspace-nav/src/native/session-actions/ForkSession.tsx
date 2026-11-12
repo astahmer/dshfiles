@@ -1,5 +1,6 @@
 /** The fork action: one `sidebar.workspaces.session.menu.item` row. */
-import { IconBranchOutlineRegular, MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
+import { GitBranchIcon } from '@dshfiles/plugin-ui/icons'
+import { MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ForkSessionInjected, SessionMenuItemProps } from '../contract/slots.ts'
 
 /**
@@ -19,7 +20,7 @@ export function ForkSessionMenuItem({
   return (
     <MenuItemButton
       shortcut={shortcut}
-      icon={<IconBranchOutlineRegular />}
+      icon={<GitBranchIcon size={14} strokeWidth={1.5} />}
       onSelect={() => {
         setMenuOpen(false)
         forkSession(sessionId)

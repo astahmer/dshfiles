@@ -17,7 +17,7 @@ const runPaletteAction = async (page: Page, query: string, option: RegExp): Prom
 const transferDialog = (page: Page) => page.locator('[data-thread-transfer="dialog"]')
 
 When('the thread is exported from the command palette', async ({ page }: { page: Page }) => {
-  await expect(page.getByRole('status').filter({ hasText: /^Completed$/ })).toHaveCount(1, { timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed)$/ })).toHaveCount(1, { timeout: 30_000 })
   const download = page.waitForEvent('download', { timeout: 30_000 })
   await runPaletteAction(page, 'export thread', /^Export this thread/u)
   const file = await download

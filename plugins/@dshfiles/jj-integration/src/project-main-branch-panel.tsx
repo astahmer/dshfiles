@@ -1,6 +1,7 @@
 import { useApi } from '@dshfiles/dshx/client'
 import type { ProjectSettingsPanelProps } from '@dshfiles/workspace-folder-picker/project-settings-panels'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -77,17 +78,19 @@ export const ProjectMainBranchPanel = (props: ProjectSettingsPanelProps): JSX.El
     )
   if (query.isError)
     return frame(
-      <div role="alert" className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
-        <p className="dshx:m-0">
-          {errorMessage(
-            query.error,
-            'The Host could not read this project’s main branch. Check that the folder is a jj or git repository; after updating DSH, restart it to load this setting.',
-          )}
-        </p>
-        <Button type="button" size="sm" variant="outline" onClick={() => void query.refetch()}>
-          Retry
-        </Button>
-      </div>,
+      <Alert variant="destructive">
+        <AlertDescription className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-2">
+          <span>
+            {errorMessage(
+              query.error,
+              'The Host could not read this project’s main branch. Check that the folder is a jj or git repository; after updating DSH, restart it to load this setting.',
+            )}
+          </span>
+          <Button type="button" size="sm" variant="outline" onClick={() => void query.refetch()}>
+            Retry
+          </Button>
+        </AlertDescription>
+      </Alert>,
     )
 
   const resolved = query.data
@@ -120,9 +123,17 @@ export const ProjectMainBranchPanel = (props: ProjectSettingsPanelProps): JSX.El
         <Badge variant={resolved.source === 'project' ? 'secondary' : 'muted'}>{sourceLabels[resolved.source]}</Badge>
       </div>
       {resolved.override !== null && !resolved.bookmarks.includes(resolved.override) ? (
-        <p role="alert" className="dshx:m-0 dshx:text-xs dshx:text-warning">
-          No local bookmark {resolved.override} exists. Fetch it or create it, or pick another branch; new threads cannot start until it exists.
-        </p>
+        // b:ysaj: new threads cannot start, so this is an error with a direct way out, not an amber note.
+        <Alert variant="destructive" data-main-branch-missing={resolved.override}>
+          <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            <span>
+              No local bookmark <code>{resolved.override}</code> exists, so new threads cannot start. Fetch or create it, or go back to the automatic branch.
+            </span>
+            <Button type="button" size="sm" variant="outline" disabled={save.isPending} onClick={() => save.mutate(null)}>
+              Use {automatic.bookmark}
+            </Button>
+          </AlertDescription>
+        </Alert>
       ) : null}
       {save.isError ? (
         <p role="alert" className="dshx:m-0 dshx:text-xs dshx:text-destructive">

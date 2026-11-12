@@ -280,7 +280,7 @@ function ContextGraphDemo() {
             label: (
               <span className="dshx:flex dshx:flex-col">
                 <span className="dshx:truncate">{repo.name}</span>
-                <span className="dshx:truncate dshx:text-[10px] dshx:text-muted-foreground">{repo.commit}</span>
+                <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{repo.commit}</span>
               </span>
             ),
           },

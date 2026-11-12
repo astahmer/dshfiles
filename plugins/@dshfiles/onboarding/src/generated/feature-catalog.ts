@@ -12,7 +12,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "activity-timeline",
       "description": "Unified chronological activity timeline across agents, sessions, communication, and jj workspaces.",
       "ui": true,
-      "features": 6
+      "features": 7
     },
     {
       "name": "agent-communication",
@@ -132,7 +132,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "chat",
       "description": "Owned fork of DSH's native Chat plugin that mounts only the transcript rows near the viewport.",
       "ui": true,
-      "features": 10
+      "features": 15
     },
     {
       "name": "command-palette",
@@ -429,6 +429,12 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "features": 2
     },
     {
+      "name": "pwa",
+      "description": "Install the Web UI as an app on a phone: PNG icons, a harder manifest, and the head tags iOS needs for a standalone launch.",
+      "ui": false,
+      "features": 1
+    },
+    {
       "name": "queue-reorder",
       "description": "Drag-to-reorder the DSH message queue, using the durable inbox splice rather than remove-and-resend.",
       "ui": true,
@@ -550,9 +556,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "shortcuts",
-      "description": "Capture-phase keyboard shortcuts that claim their chords before the browser does",
+      "description": "Capture-phase keyboard shortcuts in layers (chords, single keys, sequences) and the ? shortcut sheet",
       "ui": true,
-      "features": 3
+      "features": 5
     },
     {
       "name": "sidebar-right",
@@ -606,7 +612,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "thread-sidebar",
       "description": "Replace the DSH sidebar with project-scoped thread groups and customizable navigation.",
       "ui": true,
-      "features": 50
+      "features": 55
     },
     {
       "name": "thread-transfer",
@@ -660,7 +666,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "turn-summary",
       "description": "A one-line summary under each finished turn: commands run and which failed, files edited, reads and searches. Every part can be switched off.",
       "ui": true,
-      "features": 2
+      "features": 3
     },
     {
       "name": "tweet-context",
@@ -670,9 +676,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "ui-styles",
-      "description": "The one bundle that compiles and injects the shared plugin-ui Tailwind stylesheet, the ordered union of every owned plugin's classes",
+      "description": "The one bundle that compiles and injects the shared plugin-ui Tailwind stylesheet (the ordered union of every owned plugin's classes) and owns the Appearance theme: presets, palette and font settings, and the theme agent tools",
       "ui": true,
-      "features": 2
+      "features": 3
     },
     {
       "name": "usage",
@@ -996,6 +1002,47 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "activity-timeline#inbox-push",
+      "plugin": "activity-timeline",
+      "id": "inbox-push",
+      "title": "Push blocking Inbox items to a device",
+      "summary": "Below the in-tab alerts, the Inbox offers Push blocking items to this device. Turning it on asks for notification permission, registers a service worker the Host serves from its own origin (/dshfiles-web-push/sw.js, scope its own folder, so it controls no page), subscribes the b…",
+      "destination": "inbox",
+      "currentSurface": "left-nav: Inbox › Push blocking items to this device",
+      "reach": [
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "click button \"Needs you\"",
+          "action": "click",
+          "by": "button",
+          "name": "Needs you",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect text \"Push blocking items to this device\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Push blocking items to this device",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "agent-communication#agent-directory",
       "plugin": "agent-communication",
       "id": "agent-directory",
@@ -1153,10 +1200,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "jev-setup-chat-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"pending\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"pending\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[call todo_write {\"todos\":[{\"content\":\"Read the pricing module\",\"status\":\"in_progress\"},{\"content\":\"Fix the rounding bug\",\"status\":\"pending\"},{\"content\":\"Run the cart tests\",\"status\":\"pending\"}]}]]"
         },
         {
@@ -1174,10 +1221,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[call todo_write {\"todos\":[{\"content\":\"Read the pricing module\",\"status\":\"completed\"},{\"content\":\"Fix the rounding bug\",\"status\":\"in_progress\"},{\"content\":\"Run the cart tests\",\"status\":\"pending\"}]}]]"
         },
         {
@@ -1235,10 +1282,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "jev-setup-chat-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[call todo_write {\"todos\":[{\"content\":\"Read the pricing module\",\"status\":\"completed\"},{\"content\":\"Fix the rounding bug\",\"status\":\"in_progress\"},{\"content\":\"Run the cart tests\",\"status\":\"pending\"}]}]]"
         },
         {
@@ -1276,10 +1323,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "jev-setup-chat-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call bash {\\\"command\\\":\\\"sleep 20\\\",\\\"description\\\":\\\"Wait twenty seconds\\\"}]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call bash {\\\"command\\\":\\\"sleep 20\\\",\\\"description\\\":\\\"Wait twenty seconds\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[call bash {\"command\":\"sleep 20\",\"description\":\"Wait twenty seconds\"}]]"
         },
         {
@@ -1317,10 +1364,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "jev-setup-chat-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[fail The fake provider rejected this request]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[fail The fake provider rejected this request]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[fail The fake provider rejected this request]]"
         },
         {
@@ -1346,7 +1393,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-plan",
       "id": "compaction-meter",
       "title": "Tokens left before automatic compaction",
-      "summary": "In the composer's meter line, after the native context ring and before the cost estimate, a chip says how many tokens remain before automatic compaction (\"compacts in ~40K\", then \"compacts next step\"); its tooltip gives the trigger and window. The trigger comes from the running…",
+      "summary": "In the composer's context meter panel, under the occupancy breakdown, a row says how many tokens remain before automatic compaction (\"Compacts in ~40K\", then \"Compacts next step\") and gives the trigger and window, so the meter line carries one context item. The trigger comes fro…",
       "destination": "composer",
       "currentSurface": "composer: meter line",
       "reach": [
@@ -1358,10 +1405,38 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "jev-setup-chat-thread"
         },
         {
-          "text": "expect text \"compacts in*\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Summarize the pricing module [[usage 40000]] [[answer The pricing module rounds each line item.]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or threads",
+          "value": "Summarize the pricing module [[usage 40000]] [[answer The pricing module rounds each line item.]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"The pricing module rounds each line item.\"",
           "action": "expect",
           "by": "text",
-          "name": "compacts in*",
+          "name": "The pricing module rounds each line item.",
+          "value": null
+        },
+        {
+          "text": "click button \"31% of context used\"",
+          "action": "click",
+          "by": "button",
+          "name": "31% of context used",
+          "value": null
+        },
+        {
+          "text": "expect text \"Compacts in*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Compacts in*",
           "value": null
         }
       ],
@@ -1375,7 +1450,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Choose an agent preset before typing",
       "summary": "The native new-task preset chip changes a client-local draft's metadata without creating a Host Session or calling agentPresets.select for a nonexistent id. Settings defaults and both Creator routes use the same controller. Materialized blank Sessions retain the native Host sele…",
       "destination": "composer",
-      "currentSurface": "composer: Standard mode chip",
+      "currentSurface": "composer: agent mode chip, shown for a non-default preset or from ⋯ › Agent mode… (b:4v6p)",
       "reach": [
         {
           "text": "click button \"New thread\"",
@@ -1385,17 +1460,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Standard mode\"",
-          "action": "expect",
+          "text": "click button \"More composer actions\"",
+          "action": "click",
           "by": "button",
-          "name": "Standard mode",
+          "name": "More composer actions",
           "value": null
         },
         {
-          "text": "click button \"Standard mode\"",
+          "text": "click menuitem \"Agent mode…\"",
           "action": "click",
-          "by": "button",
-          "name": "Standard mode",
+          "by": "menuitem",
+          "name": "Agent mode…",
           "value": null
         },
         {
@@ -1408,24 +1483,31 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "New",
+          "name": "Back to Threads",
           "value": null
         },
         {
-          "text": "expect button \"Standard mode\"",
-          "action": "expect",
+          "text": "click button \"New thread\"",
+          "action": "click",
           "by": "button",
-          "name": "Standard mode",
+          "name": "New thread",
           "value": null
         },
         {
-          "text": "click button \"Standard mode\"",
+          "text": "click button \"More composer actions\"",
           "action": "click",
           "by": "button",
-          "name": "Standard mode",
+          "name": "More composer actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Agent mode…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Agent mode…",
           "value": null
         },
         {
@@ -1923,10 +2005,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"commands, @ files or sessions*\" \"[[once call ai_accounts_native_providers {}]] [[once call subagent {\\\"description\\\":\\\"Child trace\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022echo child-trace\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Child trace\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[once call ai_accounts_native_providers {}]] [[once call subagent {\\\"description\\\":\\\"Child trace\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022echo child-trace\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Child trace\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or sessions*",
+          "name": "commands, @ files or threads*",
           "value": "[[once call ai_accounts_native_providers {}]] [[once call subagent {\"description\":\"Child trace\",\"prompt\":\"\\u005b\\u005bonce call bash \\u007b\\u0022command\\u0022:\\u0022echo child-trace\\u0022,\\u0022description\\u0022:\\u0022Child trace\\u0022\\u007d\\u005d\\u005d\"}]]"
         },
         {
@@ -2040,10 +2122,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "click tab \"Traces\"",
+          "text": "click button \"More thread actions\"",
           "action": "click",
-          "by": "tab",
-          "name": "Traces",
+          "by": "button",
+          "name": "More thread actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Open Traces\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Open Traces",
           "value": null
         },
         {
@@ -2185,10 +2274,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Toolkit thread\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Toolkit thread\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Toolkit thread"
         },
         {
@@ -2247,10 +2336,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"context check\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"context check\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "context check"
         },
         {
@@ -2370,10 +2459,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "composer: @agent mention",
       "reach": [
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@agent:\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@agent:\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "@agent:"
         },
         {
@@ -3192,10 +3281,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "credential-recovery"
         },
         {
-          "text": "fill textbox \"commands, @ files or sessions*\" \"Reproduce missing credential recovery.\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"Reproduce missing credential recovery.\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or sessions*",
+          "name": "commands, @ files or threads*",
           "value": "Reproduce missing credential recovery."
         },
         {
@@ -3416,20 +3505,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Pick an element and add it to the draft",
       "summary": "Pick an element in DSH, write a bounded note, and insert a source-linked block into the composer draft without sending it.",
       "destination": "composer",
-      "currentSurface": "composer: Annotate an element",
+      "currentSurface": "composer: ⋯ › Point at UI… (/annotate); a count chip while annotations are open",
       "reach": [
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
-          "action": "expect",
-          "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
           "value": null
         },
         {
-          "text": "click button \"Annotate an element\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or threads",
+          "value": null
+        },
+        {
+          "text": "click button \"More composer actions\"",
           "action": "click",
           "by": "button",
-          "name": "Annotate an element",
+          "name": "More composer actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Point at UI…*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Point at UI…*",
           "value": null
         },
         {
@@ -3475,10 +3578,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Annotated UI feedback (1)\"",
+          "text": "expect text \"Annotated UI feedback (1)*\"",
           "action": "expect",
           "by": "text",
-          "name": "Annotated UI feedback (1)",
+          "name": "Annotated UI feedback (1)*",
           "value": null
         },
         {
@@ -3636,7 +3739,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Pick on any page in a DSH-owned Chrome",
       "summary": "Launch a Chrome profile with a loopback debugging port, open a configured start URL, and inject the same bounded picker over the DevTools protocol — on the focused tab by default, or on a listed tab.",
       "destination": "composer",
-      "currentSurface": "composer: Annotate an element › DSH-owned Chrome",
+      "currentSurface": "composer: ⋯ › Point at UI… › DSH-owned Chrome",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -3756,10 +3859,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "New",
+          "name": "Back to Threads",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
           "value": null
         },
         {
@@ -3972,10 +4082,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call bash {\\\"command\\\":\\\"sleep 900\\\",\\\"description\\\":\\\"Hold a job past its turn\\\",\\\"run_in_background\\\":true}]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call bash {\\\"command\\\":\\\"sleep 900\\\",\\\"description\\\":\\\"Hold a job past its turn\\\",\\\"run_in_background\\\":true}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[call bash {\"command\":\"sleep 900\",\"description\":\"Hold a job past its turn\",\"run_in_background\":true}]]"
         },
         {
@@ -4090,11 +4200,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "click button \"New tab\"",
-          "action": "click",
-          "by": "button",
-          "name": "New tab",
-          "value": null
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
           "text": "click button \"Jobs*\"",
@@ -4131,10 +4241,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"for i in 1 2 3 4 5 6 7 8 9 10; do echo compiled module $i; sleep 1; done; sleep 300\\\",\\\"description\\\":\\\"Build\\\",\\\"run_in_background\\\":true}]]\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[call bash {\\\"command\\\":\\\"for i in 1 2 3 4 5 6 7 8 9 10; do echo compiled module $i; sleep 1; done; sleep 300\\\",\\\"description\\\":\\\"Build\\\",\\\"run_in_background\\\":true}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or sessions*",
+          "name": "commands, @ files or threads*",
           "value": "[[call bash {\"command\":\"for i in 1 2 3 4 5 6 7 8 9 10; do echo compiled module $i; sleep 1; done; sleep 300\",\"description\":\"Build\",\"run_in_background\":true}]]"
         },
         {
@@ -4174,7 +4284,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "capture-and-triage",
       "title": "Capture anything and let it sort itself",
-      "summary": "One capture box and one agent tool take free text; kind, title, tags and links (items, threads, jj revisions, branches, URLs) are derived from it, and an agent capture links its thread and project.",
+      "summary": "One capture box and one agent tool take free text; kind, title, tags and links (items, threads, jj revisions, branches, URLs) are derived from it, and an agent capture links its thread and project. With its setting on, an image-only capture is named by the vision model of the tr…",
       "destination": "work",
       "currentSurface": "left-nav: Backlog",
       "reach": [
@@ -5487,9 +5597,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "backlinks",
       "title": "See the backlog items that link to a thread or revision",
-      "summary": "A thread's header shows how many backlog items link to it; clicking the count lists each item's chip, with the shared preview card on hover. A revision's details in the jj panel list the items that link to it under Backlog, where a `jj:` change or commit id prefix of four or mor…",
+      "summary": "A thread's header ⋯ menu has Linked backlog items (N) when items link to it; its submenu lists each item by title and reference, and choosing one opens it in Backlog. A revision's details in the jj panel list the items that link to it under Backlog, where a `jj:` change or commi…",
       "destination": "work",
-      "currentSurface": "thread header utilities count chip; jj panel revision details (jj-integration RevisionSections)",
+      "currentSurface": "thread header ⋯ submenu (thread-sidebar ThreadMenuSections); jj panel revision details (jj-integration RevisionSections)",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -5499,7 +5609,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "quote-reply",
       "title": "Quote a finished reply into a new backlog item",
-      "summary": "A finished reply's action row offers Add to backlog: the Backlog capture opens with the reply's first line as the title, the reply as a Markdown quote and the thread's session id, which capture turns into a thread link. The user edits it and presses Enter as with any capture.",
+      "summary": "A finished reply's More actions menu offers Add to backlog: the Backlog capture opens with the reply's first line as the title, the reply as a Markdown quote and the thread's session id, which capture turns into a thread link. The user edits it and presses Enter as with any capt…",
       "destination": "work",
       "currentSurface": "conversation.chat.assistant-actions: Add to backlog",
       "reach": [],
@@ -5600,10 +5710,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Working on b:#1\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Working on b:#1\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Working on b:#1"
         },
         {
@@ -5698,10 +5808,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Following b:#1\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Following b:#1\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "Following b:#1"
         },
         {
@@ -10319,10 +10429,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Side question thread\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Side question thread\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Side question thread"
         },
         {
@@ -10480,10 +10590,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         }
       ],
@@ -10548,6 +10658,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "otlp-session-turns"
         },
         {
+          "text": "click button \"More actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "More actions",
+          "value": null
+        },
+        {
           "text": "click button \"Open the trace of turn*\"",
           "action": "click",
           "by": "button",
@@ -10569,10 +10686,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect tab \"Chat\"",
+          "text": "expect button \"More thread actions\"",
           "action": "expect",
-          "by": "tab",
-          "name": "Chat",
+          "by": "button",
+          "name": "More thread actions",
           "value": null
         }
       ],
@@ -10604,13 +10721,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
-      "key": "chat#find-in-thread",
+      "key": "chat#folded-work",
       "plugin": "chat",
-      "id": "find-in-thread",
-      "title": "Find in thread across the whole transcript",
-      "summary": "Mod+F, or Find in thread in the command palette, opens a find bar over the thread: it asks the session-search index for every matching event of the whole Session, jumps to the Turn that holds each one (loading older history into the window first), marks the typed words there and…",
+      "id": "folded-work",
+      "title": "A finished turn folds its work under one Worked for row",
+      "summary": "While a turn runs, its tail reads \"Working for 12s\" with a shimmer (paused off screen, none under reduced motion). Once it settles, its tool calls fold under one \"Worked for 1m 12s\" row; a failed call (an error result or a shell command that exited non-zero), a question and any…",
       "destination": "transcript",
-      "currentSurface": "transcript: find bar",
+      "currentSurface": "transcript: turn process row",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -10620,24 +10737,99 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "press ControlOrMeta+f",
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        },
+        {
+          "text": "expect text \"Worked for*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Worked for*",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "chat#view-mode",
+      "plugin": "chat",
+      "id": "view-mode",
+      "title": "Choose Summary, Normal or Verbose for tool work",
+      "summary": "Settings › General › View mode: Summary folds every turn’s tool work under one row, Normal folds finished turns, Verbose keeps every call open. Without a saved choice a touch phone gets Summary and other browsers Normal. The Agent reads it with transcript_view_get and sets or cl…",
+      "destination": "settings",
+      "currentSurface": "settings: general › view mode",
+      "reach": [
+        {
+          "text": "click button \"Settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "expect text \"View mode\"",
+          "action": "expect",
+          "by": "text",
+          "name": "View mode",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "chat#find-in-thread",
+      "plugin": "chat",
+      "id": "find-in-thread",
+      "title": "Find text anywhere in a long thread",
+      "summary": "⌘F in a thread (or Find in thread in its ⋯ menu, the phone's way in) opens a find bar: it asks session-search's index for every match in the whole thread, shows \"n of N\" counted from the newest, steps with ↵ (older) and ⇧↵ (newer), pages an unloaded Turn in, opens the Worked for…",
+      "destination": "transcript",
+      "currentSurface": "transcript: find bar over the thread",
+      "reach": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Message or run a task*\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Message or run a task*",
+          "value": null
+        },
+        {
+          "text": "press ControlOrMeta+KeyF",
           "action": "press",
           "by": null,
           "name": null,
-          "value": "ControlOrMeta+f"
+          "value": "ControlOrMeta+KeyF"
         },
         {
-          "text": "fill textbox \"Find in thread\" \"bash\"",
+          "text": "fill searchbox \"Find in thread\" \"tool\"",
           "action": "fill",
-          "by": "textbox",
+          "by": "searchbox",
           "name": "Find in thread",
-          "value": "bash"
+          "value": "tool"
         },
         {
-          "text": "expect text \"Tool call\"",
+          "text": "expect text \"1 of*\"",
           "action": "expect",
           "by": "text",
-          "name": "Tool call",
+          "name": "1 of*",
           "value": null
         }
       ],
@@ -10646,9 +10838,81 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         "firstAction": "Press Cmd+F (Ctrl+F elsewhere) in a thread and type a word.",
         "doneWhen": "The thread jumps to each match, older history included.",
         "open": {
-          "command": "dshfiles-chat.find-in-thread"
+          "command": "@dshfiles/chat.find"
         }
       }
+    },
+    {
+      "key": "chat#turn-map",
+      "plugin": "chat",
+      "id": "turn-map",
+      "title": "Typed turn map with filters and Turn keys",
+      "summary": "The turn rail marks each Turn by what happened: a question (accent), a failure (danger), an edit (muted fill) or a plain prompt; a band shows the Turns on screen; previous / next buttons and [ / ] (or ⌥↑ / ⌥↓) step between Turns of the current filter (All, Questions, Errors, Edi…",
+      "destination": "transcript",
+      "currentSurface": "transcript: turn rail and Turns sheet",
+      "reach": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        },
+        {
+          "text": "click button \"More thread actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "More thread actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Turns\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Turns",
+          "value": null
+        },
+        {
+          "text": "expect text \"Turns\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Turns",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "chat#since-you-left",
+      "plugin": "chat",
+      "id": "since-you-left",
+      "title": "Since you left: divider and recap above the first unseen Turn",
+      "summary": "When a thread opens with Turns that finished while the user was away (its unread record, read before opening clears it), a divider marks the first unseen Turn and one card above it says what happened: \"3 turns · 7 files +120 −14 · 1 failed · 1 question waiting\", with chips that…",
+      "destination": "transcript",
+      "currentSurface": "transcript: divider above the first unseen Turn",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "chat#run-folds",
+      "plugin": "chat",
+      "id": "run-folds",
+      "title": "Runs of background jobs and subagents fold into one summary row",
+      "summary": "Two or more consecutive background-job or subagent rows fold into one row: \"4 background jobs · 1 failed · 2 running · 1 done · longest 4m 10s\", \"3 subagents · 2 working · 1 finished\", or one combined row when both kinds stand together. The row keeps live state (phase-synced spi…",
+      "destination": "transcript",
+      "currentSurface": "transcript: summary row in place of the first row of the run",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
     },
     {
       "key": "chat#route-change-markers",
@@ -10688,10 +10952,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Say hello\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Say hello\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "Say hello"
         },
         {
@@ -10729,10 +10993,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         }
       ],
@@ -11106,10 +11370,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "conversation-cleanup#conversation-cleanup",
       "plugin": "conversation-cleanup",
       "id": "conversation-cleanup",
-      "title": "Permanently clean up settled or archived conversations",
-      "summary": "Preview cold local settled OR archived conversations, confirm the exact snapshot, and permanently delete their JSONL generations under native exclusive write leases. Loaded sessions and historical formats needing migration are protected. No automatic cleanup, restart or remote d…",
+      "title": "Permanently clean up done or archived threads",
+      "summary": "Preview cold local done (settled) OR archived threads, listed by title, confirm the exact snapshot, and permanently delete their JSONL generations under native exclusive write leases. Loaded threads and historical formats needing migration are protected. No automatic cleanup, re…",
       "destination": "settings",
-      "currentSurface": "Settings: Conversation cleanup",
+      "currentSurface": "Settings: Thread cleanup",
       "reach": [
         {
           "text": "click button \"Account menu\"",
@@ -11126,10 +11390,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Conversation cleanup\"",
+          "text": "click button \"Thread cleanup\"",
           "action": "click",
           "by": "button",
-          "name": "Conversation cleanup",
+          "name": "Thread cleanup",
           "value": null
         },
         {
@@ -11140,10 +11404,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Conversations to delete\"",
+          "text": "expect text \"Threads to delete\"",
           "action": "expect",
           "by": "text",
-          "name": "Conversations to delete",
+          "name": "Threads to delete",
           "value": null
         }
       ],
@@ -11391,17 +11655,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "rebase-ready-thread"
         },
         {
-          "text": "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Message or run a task, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": null
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"/pulls\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "/pulls"
         },
         {
@@ -11993,7 +12257,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Edit thread artifacts",
       "summary": "Create and edit durable Markdown and HTML documents owned by a thread, with revision-checked saves shared with agent tools.",
       "destination": "thread-panel",
-      "currentSurface": "main-tabs: New tab › Editor: Artifacts",
+      "currentSurface": "main-tabs: New tab › Artifacts",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -12017,17 +12281,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Editor: Artifacts\"",
+          "text": "click button \"Artifacts\"",
           "action": "click",
           "by": "button",
-          "name": "Editor: Artifacts",
+          "name": "Artifacts",
           "value": null
         },
         {
-          "text": "click button \"New artifact\"",
+          "text": "click button \"New\"",
           "action": "click",
           "by": "button",
-          "name": "New artifact",
+          "name": "New",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Markdown\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Markdown",
           "value": null
         },
         {
@@ -12054,7 +12325,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Browse and edit workspace files",
       "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview whose code fences go through Chat's registry (a ```mermaid block is a diagram with @dshfiles/mermaid-diagrams), and save through Host fil…",
       "destination": "thread-panel",
-      "currentSurface": "main-tabs: New tab › Editor: Files",
+      "currentSurface": "main-tabs: New tab › Files",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -12071,17 +12342,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"New tab\"",
-          "action": "click",
-          "by": "button",
-          "name": "New tab",
-          "value": null
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
-          "text": "click button \"Editor: Files\"",
+          "text": "click button \"Files\"",
           "action": "click",
           "by": "button",
-          "name": "Editor: Files",
+          "name": "Files",
           "value": null
         },
         {
@@ -12146,11 +12417,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"New tab\"",
-          "action": "click",
-          "by": "button",
-          "name": "New tab",
-          "value": null
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
           "text": "click button \"Workspace files*\"",
@@ -12650,10 +12921,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render {\\\"title\\\":\\\"Sales dashboard\\\",\\\"html\\\":\\\"<style>body{display:grid;gap:12px}.bars{display:flex;align-items:end;gap:8px;height:140px}.bars div{flex:1;background:var(--dsh-accent);border-radius:4px 4px 0 0}</style><h2>Q3 revenue</h2><div class='bars'><div style='height:40%'></div><div style='height:65%'></div><div style='height:52%'></div><div style='height:90%'></div></div><p id='status' style='color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Rendered by an inline script'</script>\\\",\\\"height\\\":300}]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call html_render {\\\"title\\\":\\\"Sales dashboard\\\",\\\"html\\\":\\\"<style>body{display:grid;gap:12px}.bars{display:flex;align-items:end;gap:8px;height:140px}.bars div{flex:1;background:var(--dsh-accent);border-radius:4px 4px 0 0}</style><h2>Q3 revenue</h2><div class='bars'><div style='height:40%'></div><div style='height:65%'></div><div style='height:52%'></div><div style='height:90%'></div></div><p id='status' style='color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Rendered by an inline script'</script>\\\",\\\"height\\\":300}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[call html_render {\"title\":\"Sales dashboard\",\"html\":\"<style>body{display:grid;gap:12px}.bars{display:flex;align-items:end;gap:8px;height:140px}.bars div{flex:1;background:var(--dsh-accent);border-radius:4px 4px 0 0}</style><h2>Q3 revenue</h2><div class='bars'><div style='height:40%'></div><div style='height:65%'></div><div style='height:52%'></div><div style='height:90%'></div></div><p id='status' style='color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Rendered by an inline script'</script>\",\"height\":300}]]"
         },
         {
@@ -12697,10 +12968,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call write {\\\"file_path\\\":\\\"index.html\\\",\\\"content\\\":\\\"<h2>Workspace page</h2><p style='color:var(--dsh-accent)'>Shown from the thread workspace</p>\\\"}]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call write {\\\"file_path\\\":\\\"index.html\\\",\\\"content\\\":\\\"<h2>Workspace page</h2><p style='color:var(--dsh-accent)'>Shown from the thread workspace</p>\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[call write {\"file_path\":\"index.html\",\"content\":\"<h2>Workspace page</h2><p style='color:var(--dsh-accent)'>Shown from the thread workspace</p>\"}]]"
         },
         {
@@ -12718,10 +12989,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_preview {\\\"path\\\":\\\"index.html\\\",\\\"title\\\":\\\"Workspace page\\\"}]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call html_preview {\\\"path\\\":\\\"index.html\\\",\\\"title\\\":\\\"Workspace page\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[call html_preview {\"path\":\"index.html\",\"title\":\"Workspace page\"}]]"
         },
         {
@@ -12759,10 +13030,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render {\\\"title\\\":\\\"Screenshot target\\\",\\\"html\\\":\\\"<h2 style='color:var(--dsh-accent)'>Screenshot target</h2>\\\"}]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call html_render {\\\"title\\\":\\\"Screenshot target\\\",\\\"html\\\":\\\"<h2 style='color:var(--dsh-accent)'>Screenshot target</h2>\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[call html_render {\"title\":\"Screenshot target\",\"html\":\"<h2 style='color:var(--dsh-accent)'>Screenshot target</h2>\"}]]"
         },
         {
@@ -12780,10 +13051,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render_screenshot {}]]\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call html_render_screenshot {}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "[[call html_render_screenshot {}]]"
         },
         {
@@ -12833,10 +13104,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"deploy\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"deploy\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "deploy"
         },
         {
@@ -12868,10 +13139,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"fix the deploy script\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"fix the deploy script\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "fix the deploy script"
         },
         {
@@ -12910,10 +13181,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@fix\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@fix\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "@fix"
         },
         {
@@ -13006,10 +13277,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Working on b:#1\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Working on b:#1\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "Working on b:#1"
         },
         {
@@ -13097,10 +13368,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Keep this draft\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Keep this draft\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Keep this draft"
         },
         {
@@ -13188,10 +13459,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click option \"In place*\"",
+          "text": "click option \"In the project*\"",
           "action": "click",
           "by": "option",
-          "name": "In place*",
+          "name": "In the project*",
           "value": null
         },
         {
@@ -13262,10 +13533,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
@@ -13325,10 +13596,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"previous workspace thread\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"previous workspace thread\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "previous workspace thread"
         },
         {
@@ -13353,17 +13624,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         },
         {
-          "text": "expect button \"Choose workspace\"",
+          "text": "expect button \"Choose project\"",
           "action": "expect",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
@@ -13401,10 +13672,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"prepared while writing\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"prepared while writing\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "prepared while writing"
         },
         {
@@ -13425,7 +13696,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Thread workspace control in the conversation header",
       "summary": "One header control shows the thread's jj workspace name, a badge with revisions ready to integrate, and a menu holding Integrate, the Thread workspaces side panel, and Download session log. A thread that works in the shared project checkout keeps the control and says so, instead…",
       "destination": "thread-panel",
-      "currentSurface": "thread-header: Current thread workspace menu",
+      "currentSurface": "thread-header: Own workspace menu",
       "reach": [
         {
           "text": "seed rebase-ready-thread",
@@ -13435,17 +13706,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "rebase-ready-thread"
         },
         {
-          "text": "expect button \"Current thread workspace: thread-*\"",
+          "text": "expect button \"Own workspace actions\"",
           "action": "expect",
           "by": "button",
-          "name": "Current thread workspace: thread-*",
+          "name": "Own workspace actions",
           "value": null
         },
         {
-          "text": "click button \"Current thread workspace: thread-*\"",
+          "text": "click button \"Own workspace actions\"",
           "action": "click",
           "by": "button",
-          "name": "Current thread workspace: thread-*",
+          "name": "Own workspace actions",
           "value": null
         },
         {
@@ -13487,7 +13758,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Integrate a thread into the bookmark",
       "summary": "One conversation-header control names the current thread's jj workspace, how many revisions are ready to integrate, and whether integration is blocked; its menu holds Integrate, the Thread workspaces side panel, and Download session log. Hovering the current-thread workspace chi…",
       "destination": "thread-panel",
-      "currentSurface": "thread-header: Current thread workspace › Integrate",
+      "currentSurface": "thread-header: Own workspace › Integrate",
       "reach": [
         {
           "text": "seed rebase-ready-thread",
@@ -13497,10 +13768,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "rebase-ready-thread"
         },
         {
-          "text": "hover button \"Current thread workspace: thread-*\"",
+          "text": "hover button \"Own workspace actions\"",
           "action": "hover",
           "by": "button",
-          "name": "Current thread workspace: thread-*",
+          "name": "Own workspace actions",
           "value": null
         },
         {
@@ -13518,10 +13789,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
-          "text": "click button \"Current thread workspace: thread-*\"",
+          "text": "click button \"Own workspace actions\"",
           "action": "click",
           "by": "button",
-          "name": "Current thread workspace: thread-*",
+          "name": "Own workspace actions",
           "value": null
         },
         {
@@ -13546,10 +13817,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/rebase\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"/rebase\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "/rebase"
         },
         {
@@ -13642,10 +13913,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "rebase-ready-thread"
         },
         {
-          "text": "click button \"Current thread workspace: thread-*\"",
+          "text": "click button \"Own workspace actions\"",
           "action": "click",
           "by": "button",
-          "name": "Current thread workspace: thread-*",
+          "name": "Own workspace actions",
           "value": null
         },
         {
@@ -13839,10 +14110,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "rebase-ready-thread"
         },
         {
-          "text": "click button \"Current thread workspace: thread-*\"",
+          "text": "click button \"Own workspace actions\"",
           "action": "click",
           "by": "button",
-          "name": "Current thread workspace: thread-*",
+          "name": "Own workspace actions",
           "value": null
         },
         {
@@ -13968,7 +14239,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Pick a New-thread project",
       "summary": "The New-thread project picker opens on registered projects only with No folder pinned first; Everything lists No folder, then up to five projects of the latest threads (a thread workspace counts as its project), then the other projects, then JJ thread workspaces, and Workspaces…",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace",
+      "currentSurface": "composer: Choose project",
       "reach": [
         {
           "text": "seed rebase-ready-thread",
@@ -13985,10 +14256,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
@@ -14014,7 +14285,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "land-inbox-items",
       "title": "Blocked and ready-to-land workspaces in the Inbox",
-      "summary": "A thread workspace whose revisions conflict, or whose queued land stopped, is a Failed Inbox item (Land blocked) with Retry; an idle workspace with described revisions not on the bookmark is a Ready item with Land. Land and Retry run the same guarded land as the Land view, only…",
+      "summary": "A thread workspace whose revisions conflict, or whose queued land stopped, is a Failed Inbox item (Land blocked) with Retry; a workspace with described revisions not on the bookmark is one Ready item, keyed by the workspace and updated in place: its headline names the thread (“<…",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land",
       "reach": [
@@ -14068,10 +14339,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"setup my workspace\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"setup my workspace\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "setup my workspace"
         },
         {
@@ -14688,10 +14959,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jujutsu#composer-context",
       "plugin": "jujutsu",
       "id": "composer-context",
-      "title": "See the Jujutsu workspace and bookmark in the composer run summary",
-      "summary": "The change bar labels the net file diff as changes since branching from the selected base, reports revisions present only on @ or only on that base, and lets the base be a local or remote bookmark.",
+      "title": "See project and Jujutsu workspace context in the composer",
+      "summary": "The Changes pill in the thread header (and the phone top bar) reads the net file diff since branching from the selected base as +N −M, names the revisions present only on @ or only on that base in its tooltip, and opens the Changes view; the composer itself carries no changes ba…",
       "destination": "thread-panel",
-      "currentSurface": "composer: Changes since branching from main",
+      "currentSurface": "thread header: Changes pill",
       "reach": [
         {
           "text": "seed rebase-ready-thread",
@@ -15901,11 +16172,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"New tab\"",
-          "action": "click",
-          "by": "button",
-          "name": "New tab",
-          "value": null
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
           "text": "expect region \"Choose a view\"",
@@ -16399,17 +16670,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"More\"",
+          "text": "click button \"Account menu\"",
           "action": "click",
           "by": "button",
-          "name": "More",
+          "name": "Account menu",
           "value": null
         },
         {
-          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "text": "click menuitem \"Settings\"",
           "action": "click",
-          "by": "button",
-          "name": "Settings Accounts, tools, secrets and plugins.",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -16640,10 +16911,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"MCP autocomplete tool context\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"MCP autocomplete tool context\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "MCP autocomplete tool context"
         },
         {
@@ -16661,10 +16932,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"@echo\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"@echo\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "@echo"
         },
         {
@@ -16675,10 +16946,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"@e2e\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"@e2e\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "@e2e"
         },
         {
@@ -16872,10 +17143,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"memory: n:1\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"memory: n:1\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "memory: n:1"
         },
         {
@@ -17066,10 +17337,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Seed a mention target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Seed a mention target"
         },
         {
@@ -17087,10 +17358,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@t:\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "@t:"
         },
         {
@@ -17103,17 +17374,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "New",
+          "name": "Back to Threads",
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Seed a mention target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Seed a mention target"
         },
         {
@@ -17124,17 +17402,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "New",
+          "name": "Back to Threads",
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@t:\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "@t:"
         },
         {
@@ -17174,10 +17459,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@t:\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "@t:"
         },
         {
@@ -17300,10 +17585,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "model-effort-picker#account-swap",
       "plugin": "model-effort-picker",
       "id": "account-swap",
-      "title": "Swap to the next account offering the same model",
-      "summary": "A swap button beside the composer model picker moves the Session to the next provider route, in catalog order, that offers the selected model id, keeping the reasoning effort when the target advertises it.",
+      "title": "Switch the thread to another account offering the same model",
+      "summary": "The model menu's Account section (b:4qjm) names the thread's account and lists every other account offering the selected model id; choosing one moves the Session there, keeping the reasoning effort when the target advertises it. The chip names the account only off the default ac…",
       "destination": "composer",
-      "currentSurface": "composer: model picker › account swap",
+      "currentSurface": "composer: model picker › Account section",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -17367,8 +17652,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "model-effort-picker#model-fan-out-gesture",
       "plugin": "model-effort-picker",
       "id": "model-fan-out-gesture",
-      "title": "Shift-click models to fan out",
-      "summary": "Shift-click a model row to collect it for fan-out instead of switching this thread's model; a bar above the list counts the selection and Fan out… opens thread-sidebar's fan-out dialog with those routes preselected once two are collected. Scratch has one advertised model, so the…",
+      "title": "Select several models to fan out",
+      "summary": "Turn on Select several below the list (or shift-click, or long-press on touch) so a model row collects it for fan-out instead of switching this thread's model; the bar counts the selection and Fan out… opens thread-sidebar's fan-out dialog with those routes preselected once two…",
       "destination": "composer",
       "currentSurface": "composer: model picker fan-out selection",
       "reach": [
@@ -17401,10 +17686,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"2 models selected\"",
+          "text": "expect text \"2 selected\"",
           "action": "expect",
           "by": "text",
-          "name": "2 models selected",
+          "name": "2 selected",
           "value": null
         },
         {
@@ -17442,10 +17727,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
@@ -17547,10 +17832,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "New",
+          "name": "Back to Threads",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
           "value": null
         },
         {
@@ -18028,10 +18320,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@t:\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "@t:"
         },
         {
@@ -18082,9 +18374,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "thread-header: Open mirrored thread on its host",
       "reach": [
         {
-          "text": "click button \"Sidebar settings\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Sidebar settings\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Sidebar settings",
           "value": null
         },
@@ -18243,7 +18542,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "See what this setup can do and what it still needs on one page",
       "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (an AI account connected, counted from AI accounts when it is installed, project added, project is a jj or git repository, GitHub C…",
       "destination": "knowledge",
-      "currentSurface": "rail: Knowledge › Getting started; palette: Onboarding: Getting started",
+      "currentSurface": "rail: Knowledge › Getting started; palette: Getting started",
       "reach": [
         {
           "text": "click tab \"Knowledge\"",
@@ -18393,9 +18692,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "setup-wizard",
       "title": "Get set up in three steps: account, project, first task",
-      "summary": "While no thread is open, a three-step setup wizard links to AI accounts, Settings › Projects and workspace isolation, ticks each step from the live checklist, and ends by inserting a starter prompt into the composer without sending it. Skip, Back and Next on every step; the outc…",
+      "summary": "While an AI account or a project is still missing (the live checklist) and no thread is open, a three-step setup wizard links to AI accounts, Settings › Projects and workspace isolation, ticks each step from the live checklist, and ends by inserting a starter prompt into the com…",
       "destination": "threads",
-      "currentSurface": "empty thread view (first run); palette: Onboarding: Show the setup wizard",
+      "currentSurface": "empty thread view (first run); palette: Show the setup wizard",
       "reach": [
         {
           "text": "click button \"Open command palette\"",
@@ -18412,16 +18711,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Show the setup wizard"
         },
         {
-          "text": "click option \"Onboarding: Show the setup wizard*\"",
+          "text": "click option \"Show the setup wizard*\"",
           "action": "click",
           "by": "option",
-          "name": "Onboarding: Show the setup wizard*",
+          "name": "Show the setup wizard*",
           "value": null
         },
         {
-          "text": "expect region \"Connect an AI account\"",
+          "text": "expect dialog \"Connect an AI account\"",
           "action": "expect",
-          "by": "region",
+          "by": "dialog",
           "name": "Connect an AI account",
           "value": null
         }
@@ -18432,7 +18731,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "account",
           "project"
         ],
-        "firstAction": "Run Onboarding: Show the setup wizard from the command palette.",
+        "firstAction": "Run Show the setup wizard from the command palette.",
         "doneWhen": "A starter prompt waits in the composer.",
         "open": {
           "command": "@dshfiles/onboarding.wizard"
@@ -19131,10 +19430,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"/project-checks\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"/project-checks\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "/project-checks"
         },
         {
@@ -19263,10 +19562,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Deploy the quartz service to staging\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Deploy the quartz service to staging\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "Deploy the quartz service to staging"
         },
         {
@@ -19331,10 +19630,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Attachment draft thread\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Attachment draft thread\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Attachment draft thread"
         },
         {
@@ -19345,10 +19644,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Draft with attachments\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Draft with attachments\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "Draft with attachments"
         },
         {
@@ -19380,10 +19679,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Other thread\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Other thread\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Other thread"
         },
         {
@@ -19394,10 +19693,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Message or run a task, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": null
         },
         {
@@ -19454,10 +19753,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Open a pull request\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Open a pull request\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Open a pull request"
         },
         {
@@ -19506,6 +19805,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         "firstAction": "Run Create pull request from this thread from the command palette.",
         "doneWhen": "After you confirm, the pull request opens on GitHub, linked to the thread."
       }
+    },
+    {
+      "key": "pwa#installable-app",
+      "plugin": "pwa",
+      "id": "installable-app",
+      "title": "Install the Web UI as an app on the phone",
+      "summary": "The Host serves its own manifest with PNG icons (any and maskable) and a splash color, and injects the head tags Safari on iOS needs for a standalone home-screen launch with its own icon instead of a page screenshot. Registered on the Host Web server, so the Tailscale tunnel, th…",
+      "destination": "none",
+      "currentSurface": "host: served manifest, icon routes and index head",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
     },
     {
       "key": "queue-reorder#queue-ordering",
@@ -19691,7 +20002,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Send a message later",
       "summary": "Schedule the composer's message from Send later (presets or a picked time); it waits above the composer with its time and optional model and effort, can be edited, sent now or cancelled back into the composer, survives a Host restart in plugin storage, and is sent once through t…",
       "destination": "composer",
-      "currentSurface": "composer: Send later; dock: Scheduled messages",
+      "currentSurface": "composer ⋯: Send later…; dock: Scheduled messages",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -19701,17 +20012,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Ship the weekly report\"",
+          "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Ship the weekly report\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
+          "name": "Message or run a task, / commands, @ files or threads",
           "value": "Ship the weekly report"
         },
         {
-          "text": "click button \"Send later\"",
+          "text": "click button \"More composer actions\"",
           "action": "click",
           "by": "button",
-          "name": "Send later",
+          "name": "More composer actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Send later…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Send later…",
           "value": null
         },
         {
@@ -19830,26 +20148,33 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         }
       ],
       "reachNarrow": [
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "New",
+          "name": "Back to Threads",
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         }
       ],
@@ -19872,10 +20197,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         },
         {
@@ -19895,17 +20220,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "New",
+          "name": "Back to Threads",
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         },
         {
@@ -19942,10 +20274,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         },
         {
@@ -19965,17 +20297,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "New",
+          "name": "Back to Threads",
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         },
         {
@@ -20072,26 +20411,33 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         }
       ],
       "reachNarrow": [
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "New",
+          "name": "Back to Threads",
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         }
       ],
@@ -20117,26 +20463,33 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         }
       ],
       "reachNarrow": [
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "New",
+          "name": "Back to Threads",
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         }
       ],
@@ -20146,16 +20499,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "rich-composer#composer-run-row",
       "plugin": "rich-composer",
       "id": "composer-run-row",
-      "title": "Run row and meter line",
-      "summary": "A new thread shows one run row above its input: project · host · workspace · agent mode · file access · model and account. Each segment is the owner plugin’s own control placed through the composer’s slots, with its jargon explained in a tooltip; defaults come from each owner: h…",
+      "title": "Run row, send states and meter line",
+      "summary": "A new thread carries its pre-send choices inside the composer card as quiet ghost pickers in the bottom bar: project · host · workspace · agent mode · file access after the + control, model and account beside Send. Each segment is the owner plugin’s own control placed through th…",
       "destination": "composer",
-      "currentSurface": "composer: run row above the new-thread input; summary chip on the meter line",
+      "currentSurface": "composer: pickers in the card’s bottom bar of a new thread; summary chip on the meter line",
       "reach": [
         {
-          "text": "click button \"New session\"",
+          "text": "click button \"New thread\"",
           "action": "click",
           "by": "button",
-          "name": "New session",
+          "name": "New thread",
           "value": null
         },
         {
@@ -20166,10 +20519,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Choose workspace\"",
+          "text": "expect button \"Choose project\"",
           "action": "expect",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
@@ -20185,45 +20538,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "by": "button",
           "name": "Workspace: *",
           "value": null
-        }
-      ],
-      "reachNarrow": [
-        {
-          "text": "click button \"New\"",
-          "action": "click",
-          "by": "button",
-          "name": "New",
-          "value": null
         },
         {
-          "text": "expect group \"Run settings\"",
-          "action": "expect",
-          "by": "group",
-          "name": "Run settings",
-          "value": null
-        },
-        {
-          "text": "expect button \"Choose workspace\"",
+          "text": "expect button \"Send message\"",
           "action": "expect",
           "by": "button",
-          "name": "Choose workspace",
-          "value": null
-        },
-        {
-          "text": "expect button \"Run on Local\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Run on Local",
-          "value": null
-        },
-        {
-          "text": "expect button \"Workspace: *\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Workspace: *",
+          "name": "Send message",
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20702,10 +21026,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"[[call request_secret {\\\"alias\\\":\\\"SYNTHETIC_REQUESTED_TOKEN\\\",\\\"purpose\\\":\\\"Call the synthetic API.\\\"}]]\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"[[call request_secret {\\\"alias\\\":\\\"SYNTHETIC_REQUESTED_TOKEN\\\",\\\"purpose\\\":\\\"Call the synthetic API.\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "[[call request_secret {\"alias\":\"SYNTHETIC_REQUESTED_TOKEN\",\"purpose\":\"Call the synthetic API.\"}]]"
         },
         {
@@ -20906,10 +21230,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         }
       ],
@@ -20945,10 +21269,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         }
       ],
@@ -20999,9 +21323,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-search",
       "id": "find-in-thread",
       "title": "Find every match in one thread",
-      "summary": "Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the thread_find agent tool. An archived Session is indexed for that request.",
+      "summary": "Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the session_find_in_thread agent tool. An archived Session is indexed for that request.",
       "destination": "none",
-      "currentSurface": "host: session-search findInThread API and thread_find tool",
+      "currentSurface": "host: session-search findInThread API and session_find_in_thread tool",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -21095,10 +21419,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"commands, @ files or sessions*\" \"Add a second turn to rewind past\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"Add a second turn to rewind past\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or sessions*",
+          "name": "commands, @ files or threads*",
           "value": "Add a second turn to rewind past"
         },
         {
@@ -21138,9 +21462,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-undo",
       "id": "turn-checkpoint",
       "title": "Each turn names the jj revision its edits left, with Restore to here",
-      "summary": "When a turn ends in a jj workspace, session-undo snapshots the files again and records the revision holding them (@, or its parent past an empty undescribed change) when it differs from the turn's start. The turn's action row shows it as a jj: reference the Jujutsu panel opens,…",
+      "summary": "When a turn ends in a jj workspace, session-undo snapshots the files again and records the revision holding them (@, or its parent past an empty undescribed change) when it differs from the turn's start. The reply's More actions menu shows it as a muted change name (a jj: refere…",
       "destination": "transcript",
-      "currentSurface": "transcript: turn action row",
+      "currentSurface": "transcript: reply More actions menu",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -21150,10 +21474,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"echo one > reach-1.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[call bash {\\\"command\\\":\\\"echo one > reach-1.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or sessions*",
+          "name": "commands, @ files or threads*",
           "value": "[[call bash {\"command\":\"echo one > reach-1.txt\",\"description\":\"Checkpoint reach\"}]]"
         },
         {
@@ -21164,10 +21488,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"echo two > reach-2.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[call bash {\\\"command\\\":\\\"echo two > reach-2.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or sessions*",
+          "name": "commands, @ files or threads*",
           "value": "[[call bash {\"command\":\"echo two > reach-2.txt\",\"description\":\"Checkpoint reach\"}]]"
         },
         {
@@ -21310,11 +21634,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"New tab\"",
-          "action": "click",
-          "by": "button",
-          "name": "New tab",
-          "value": null
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
           "text": "click button \"Settings\"",
@@ -22343,6 +22667,52 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "shortcuts#scoped-key-layers",
+      "plugin": "shortcuts",
+      "id": "scoped-key-layers",
+      "title": "Single keys, sequences and scoped keys",
+      "summary": "Binds every dshx Command key by scope (global, not-typing, list, triage, changes, composer): chords, single keys (J, Shift+J, ?), ⌥ letters and two-step sequences (G then I within 1.2 s), matched by physical key. A list, triage or changes key fires only inside its region (or the…",
+      "destination": "none",
+      "currentSurface": "keyboard: J / K / E / ? / G then I",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "shortcuts#shortcut-cheat-sheet",
+      "plugin": "shortcuts",
+      "id": "shortcut-cheat-sheet",
+      "title": "Keyboard shortcut sheet",
+      "summary": "? or ⌘/ opens a sheet of every bound key grouped by where it works (Global, Go to, Lists, Triage, Changes, Composer, App), generated from the dshx Command registry and the Host shortcut catalog, with the Single-key shortcuts switch beside the keys it turns off.",
+      "destination": "none",
+      "currentSurface": "keyboard: ? / Mod+/",
+      "reach": [
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "press Shift+Slash",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Shift+Slash"
+        },
+        {
+          "text": "expect dialog \"Keyboard shortcuts\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Keyboard shortcuts",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "sidebar-right#addressable-resources",
       "plugin": "sidebar-right",
       "id": "addressable-resources",
@@ -22774,10 +23144,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
@@ -22858,7 +23228,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "workbench-sidebar-assemblies",
       "title": "Dock the actual sidebar content assemblies",
-      "summary": "The owned stack always uses Workbench tabs with no native-layout opt-out. The actual New tab chooser tab offers Thread Sidebar: Threads, Thread Sidebar: Navigation, AI Accounts: Preview and AI Accounts: Controls alongside the Settings Shell: Settings hub, without a separate Rich…",
+      "summary": "The owned stack always uses Workbench tabs with no native-layout opt-out. The actual New tab chooser tab offers Threads, Navigation, Quota and AI Accounts: Controls alongside the Settings Shell: Settings hub, without a separate Rich Composer/current-conversation entry. Mixed or…",
       "destination": "none",
       "currentSurface": "main-tabs: New tab › Thread Sidebar views",
       "reach": [
@@ -22953,13 +23323,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Group: Status\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Group: Status",
-          "value": null
-        },
-        {
           "text": "click tab \"Threads\"",
           "action": "click",
           "by": "tab",
@@ -22967,9 +23330,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Board\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Group: Status\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Group: Status",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Board\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Board",
           "value": null
         },
@@ -22988,10 +23365,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Group: Status\"",
+          "text": "expect button \"Group: *\"",
           "action": "expect",
           "by": "button",
-          "name": "Group: Status",
+          "name": "Group: *",
           "value": null
         }
       ],
@@ -23021,10 +23398,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Group: Status\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "Group: Status",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Group: *\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Group: *",
           "value": null
         },
         {
@@ -23042,57 +23426,14 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
-          "text": "expect button \"Group: Status\"",
+          "text": "expect button \"Filter: *\"",
           "action": "expect",
           "by": "button",
-          "name": "Group: Status",
+          "name": "Filter: *",
           "value": null
         }
       ],
-      "reachNarrow": [
-        {
-          "text": "click button \"Threads\"",
-          "action": "click",
-          "by": "button",
-          "name": "Threads",
-          "value": null
-        },
-        {
-          "text": "expect region \"Threads\"",
-          "action": "expect",
-          "by": "region",
-          "name": "Threads",
-          "value": null
-        },
-        {
-          "text": "click button \"Group: Status\"",
-          "action": "click",
-          "by": "button",
-          "name": "Group: Status",
-          "value": null
-        },
-        {
-          "text": "expect text \"Arrange manually\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Arrange manually",
-          "value": null
-        },
-        {
-          "text": "press Escape",
-          "action": "press",
-          "by": null,
-          "name": null,
-          "value": "Escape"
-        },
-        {
-          "text": "expect button \"Group: Status\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Group: Status",
-          "value": null
-        }
-      ],
+      "reachNarrow": null,
       "onboarding": {
         "firstAction": "Open Threads and read the groups.",
         "doneWhen": "Your threads are grouped as Needs you, Working, Ready, Idle and Done."
@@ -23106,6 +23447,26 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "The status strip shows \"N working\" for top-level threads with a running turn, colourless, and hides it while nothing runs. On a phone it is one line in the Status chip's list.",
       "destination": "none",
       "currentSurface": "status-strip: N working",
+      "reach": [
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "thread-sidebar#live-working-activity",
+      "plugin": "thread-sidebar",
+      "id": "live-working-activity",
+      "title": "See what a working thread is doing right now",
+      "summary": "A working thread's row trades its static meta line for a live one: its current step (\"Running pnpm test\", \"Editing 3 files\", \"Thinking\", or the subagent rollup) in the working shimmer, then the elapsed time (\"· 1m 12s\"); without a known step it reads \"Working · 1m 12s\". The thre…",
+      "destination": "threads",
+      "currentSurface": "thread-list: working row second line; session header utilities; document title",
       "reach": [
         {
           "text": "expect region \"Threads\"",
@@ -23135,10 +23496,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
@@ -23163,10 +23524,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Project header example\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Project header example\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Project header example"
         },
         {
@@ -23184,17 +23545,31 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"All threads\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
           "value": null
         },
         {
-          "text": "click button \"Group: Status\"",
+          "text": "click menuitemradio \"All threads*\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All threads*",
+          "value": null
+        },
+        {
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "Group: Status",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Group: *\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Group: *",
           "value": null
         },
         {
@@ -23219,17 +23594,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "expect",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unsent project prompt\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Unsent project prompt\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Unsent project prompt"
         },
         {
@@ -23240,17 +23615,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click text \"Project header example\" at 16,8",
+          "text": "click button \"Project header example*\" at 8,8",
           "action": "click",
-          "by": "text",
-          "name": "Project header example",
+          "by": "button",
+          "name": "Project header example*",
           "value": null
         },
         {
-          "text": "click text \"Draft: Unsent project prompt\" at 16,8",
+          "text": "click button \"Draft: Unsent project prompt*\" at 8,8",
           "action": "click",
-          "by": "text",
-          "name": "Draft: Unsent project prompt",
+          "by": "button",
+          "name": "Draft: Unsent project prompt*",
           "value": null
         },
         {
@@ -23281,10 +23656,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
@@ -23309,10 +23684,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Archive me later\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Archive me later\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Archive me later"
         },
         {
@@ -23378,37 +23753,37 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "thread-list: Thread list settings › Manage views",
       "reach": [
         {
-          "text": "expect group \"Thread list view\"",
-          "action": "expect",
-          "by": "group",
-          "name": "Thread list view",
-          "value": null
-        },
-        {
-          "text": "click button \"All threads\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
           "value": null
         },
         {
-          "text": "expect button \"All threads\"",
+          "text": "expect menuitemradio \"Done*\"",
           "action": "expect",
-          "by": "button",
-          "name": "All threads",
+          "by": "menuitemradio",
+          "name": "Done*",
           "value": null
         },
         {
-          "text": "expect button \"Done\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Done",
+          "text": "click menuitemradio \"All threads*\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All threads*",
           "value": null
         },
         {
-          "text": "click button \"Thread list settings\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Thread list settings\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Thread list settings",
           "value": null
         },
@@ -23466,6 +23841,107 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "thread-sidebar#filter-presets",
+      "plugin": "thread-sidebar",
+      "id": "filter-presets",
+      "title": "Save and switch thread list filter presets",
+      "summary": "The thread list's Filter menu opens on a Presets section: the saved views (All threads, Working, Done and the user's own) as one-click radios, Save current filters as preset…, Save changes and Discard changes once a filter was changed after applying one, and Preset options (Rena…",
+      "destination": "threads",
+      "currentSurface": "thread-list: Filter menu › Presets",
+      "reach": [
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click button \"Filter: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "expect group \"Presets\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Presets",
+          "value": null
+        },
+        {
+          "text": "expect menuitemradio \"All threads*\"",
+          "action": "expect",
+          "by": "menuitemradio",
+          "name": "All threads*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Save current filters as preset…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Save current filters as preset…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Save filters as a preset\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Save filters as a preset",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Preset name\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Preset name",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Back to Threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Back to Threads",
+          "value": null
+        },
+        {
+          "text": "click button \"Filter: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "expect group \"Presets\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Presets",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Save current filters as preset…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Save current filters as preset…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Save filters as a preset\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Save filters as a preset",
+          "value": null
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Set the thread list's filters, then choose Filter › Save current filters as preset… and name it.",
+        "doneWhen": "The Filter button shows your preset's name and one click in its Presets section brings the filters back."
+      }
+    },
+    {
       "key": "thread-sidebar#idle-archive-policy",
       "plugin": "thread-sidebar",
       "id": "idle-archive-policy",
@@ -23475,10 +23951,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "settings: Thread sidebar › idle policy",
       "reach": [
         {
-          "text": "click button \"All threads\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"All threads*\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All threads*",
           "value": null
         },
         {
@@ -23489,10 +23972,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Idle policy target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Idle policy target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Idle policy target"
         },
         {
@@ -23510,10 +23993,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "rightclick text \"Idle policy target\" at 8,8",
+          "text": "rightclick button \"Idle policy target*\" at 8,8",
           "action": "rightclick",
-          "by": "text",
-          "name": "Idle policy target",
+          "by": "button",
+          "name": "Idle policy target*",
           "value": null
         },
         {
@@ -23545,9 +24028,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
-          "text": "click button \"Thread list settings\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Thread list settings\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Thread list settings",
           "value": null
         },
@@ -23572,24 +24062,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "thread-list: Thread list settings › Remote group",
       "reach": [
         {
-          "text": "click button \"All threads\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
           "value": null
         },
         {
-          "text": "expect button \"All threads\"",
+          "text": "click menuitemradio \"All threads*\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All threads*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Filter: *\"",
           "action": "expect",
           "by": "button",
-          "name": "All threads",
-          "value": null
-        },
-        {
-          "text": "click button \"All threads\"",
-          "action": "click",
-          "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
           "value": null
         },
         {
@@ -23600,9 +24090,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Thread list settings\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Thread list settings\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Thread list settings",
           "value": null
         },
@@ -23616,31 +24113,31 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"Threads\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "Threads",
+          "name": "Back to Threads",
           "value": null
         },
         {
-          "text": "click button \"All threads\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
           "value": null
         },
         {
-          "text": "expect button \"All threads\"",
+          "text": "click menuitemradio \"All threads*\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All threads*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Filter: *\"",
           "action": "expect",
           "by": "button",
-          "name": "All threads",
-          "value": null
-        },
-        {
-          "text": "click button \"All threads\"",
-          "action": "click",
-          "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
           "value": null
         },
         {
@@ -23651,9 +24148,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Thread list settings\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Thread list settings\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Thread list settings",
           "value": null
         },
@@ -23677,10 +24181,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "settings: Thread sidebar › settled archive delay",
       "reach": [
         {
-          "text": "click button \"All threads\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"All threads*\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All threads*",
           "value": null
         },
         {
@@ -23691,10 +24202,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Settled archive target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Settled archive target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Settled archive target"
         },
         {
@@ -23733,9 +24244,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Thread list settings\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Thread list settings\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Thread list settings",
           "value": null
         },
@@ -23760,10 +24278,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "thread-list: row menu › Mute",
       "reach": [
         {
-          "text": "click button \"All threads\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"All threads*\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All threads*",
           "value": null
         },
         {
@@ -23774,10 +24299,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mute target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Mute target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Mute target"
         },
         {
@@ -23795,10 +24320,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "rightclick text \"Mute target\" at 8,8",
+          "text": "rightclick button \"Mute target*\" at 8,8",
           "action": "rightclick",
-          "by": "text",
-          "name": "Mute target",
+          "by": "button",
+          "name": "Mute target*",
           "value": null
         },
         {
@@ -23836,10 +24361,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "thread-list: row menu › Mark unread",
       "reach": [
         {
-          "text": "click button \"All threads\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"All threads*\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All threads*",
           "value": null
         },
         {
@@ -23850,10 +24382,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Unread target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Unread target"
         },
         {
@@ -23878,10 +24410,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread neighbour\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Unread neighbour\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Unread neighbour"
         },
         {
@@ -23899,10 +24431,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "rightclick text \"Unread target\" at 8,8",
+          "text": "rightclick button \"Unread target*\" at 8,8",
           "action": "rightclick",
-          "by": "text",
-          "name": "Unread target",
+          "by": "button",
+          "name": "Unread target*",
           "value": null
         },
         {
@@ -23940,10 +24472,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"thread sidebar finished turn e2e target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"thread sidebar finished turn e2e target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "thread sidebar finished turn e2e target"
         },
         {
@@ -24072,113 +24604,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "reachNarrow": [
-        {
-          "text": "click button \"More\"",
-          "action": "click",
-          "by": "button",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
-          "action": "click",
-          "by": "button",
-          "name": "Settings Accounts, tools, secrets and plugins.",
-          "value": null
-        },
-        {
-          "text": "click combobox \"Sections\"",
-          "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Thread notifications\"",
-          "action": "click",
-          "by": "option",
-          "name": "Thread notifications",
-          "value": null
-        },
-        {
-          "text": "expect group \"Thread notifications\"",
-          "action": "expect",
-          "by": "group",
-          "name": "Thread notifications",
-          "value": null
-        },
-        {
-          "text": "expect button \"Approval needed: Off\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Approval needed: Off",
-          "value": null
-        },
-        {
-          "text": "expect button \"Turn stopped: Off\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Turn stopped: Off",
-          "value": null
-        },
-        {
-          "text": "expect button \"Agent messages: In-app and system\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Agent messages: In-app and system",
-          "value": null
-        },
-        {
-          "text": "expect button \"Snooze notifications\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Snooze notifications",
-          "value": null
-        },
-        {
-          "text": "click button \"Snooze notifications\"",
-          "action": "click",
-          "by": "button",
-          "name": "Snooze notifications",
-          "value": null
-        },
-        {
-          "text": "expect button \"Resume notifications\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Resume notifications",
-          "value": null
-        },
-        {
-          "text": "click button \"Resume notifications\"",
-          "action": "click",
-          "by": "button",
-          "name": "Resume notifications",
-          "value": null
-        },
-        {
-          "text": "expect button \"Snooze notifications\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Snooze notifications",
-          "value": null
-        },
-        {
-          "text": "expect button \"In-app notification position\"",
-          "action": "expect",
-          "by": "button",
-          "name": "In-app notification position",
-          "value": null
-        },
-        {
-          "text": "expect button \"In-app notification timeout\"",
-          "action": "expect",
-          "by": "button",
-          "name": "In-app notification timeout",
-          "value": null
-        }
-      ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -24191,9 +24617,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "thread-list: Sidebar settings › Customize sidebar",
       "reach": [
         {
-          "text": "click button \"Sidebar settings\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Sidebar settings\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Sidebar settings",
           "value": null
         },
@@ -24232,17 +24665,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "sidebar-footer: More menu",
       "reach": [
         {
-          "text": "click button \"New tab\"",
-          "action": "click",
-          "by": "button",
-          "name": "New tab",
-          "value": null
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
-          "text": "click button \"Thread Sidebar: Navigation\"",
+          "text": "click button \"Navigation\"",
           "action": "click",
           "by": "button",
-          "name": "Thread Sidebar: Navigation",
+          "name": "Navigation",
           "value": null
         },
         {
@@ -24257,6 +24690,33 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "option",
           "name": "Settings",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "thread-sidebar#rail-actions",
+      "plugin": "thread-sidebar",
+      "id": "rail-actions",
+      "title": "Restart DSH, Copy DSH URL and Pair a phone on the rail above Settings",
+      "summary": "The DSH actions sit in a small group at the bottom of the rail, directly above Settings and below the folders and + New folder, expanded and collapsed alike: Restart DSH (only while the supervisor offers a restart; amber with a slow pulse while updates or a restart wait), a pend…",
+      "destination": "none",
+      "currentSurface": "rail: DSH actions above Settings; phone: More › DSH",
+      "reach": [
+        {
+          "text": "expect tab \"Settings\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "expect button \"Copy DSH URL for agents\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Copy DSH URL for agents",
           "value": null
         }
       ],
@@ -24292,10 +24752,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Palette search target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Palette search target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Palette search target"
         },
         {
@@ -24347,9 +24807,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "thread-list: child threads",
       "reach": [
         {
-          "text": "click button \"Thread list settings\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Thread list settings\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Thread list settings",
           "value": null
         },
@@ -24370,16 +24837,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"Threads\"",
+          "text": "click button \"Back to Threads\"",
           "action": "click",
           "by": "button",
-          "name": "Threads",
+          "name": "Back to Threads",
           "value": null
         },
         {
-          "text": "click button \"Thread list settings\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Thread list settings\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Thread list settings",
           "value": null
         },
@@ -24417,10 +24891,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
@@ -24445,10 +24919,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Header actions target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Header actions target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Header actions target"
         },
         {
@@ -24536,7 +25010,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "auto-restart-when-idle",
       "title": "Restart by itself to apply updates when idle",
-      "summary": "With autoRestartWhenIdle (on by default), a pending Host update (a plugin whose Host files changed since boot, which is what hmr-gate holds back, or a changed profile manifest after a profile sync) restarts DSH through the supervisor once no turn, subagent, background job or ope…",
+      "summary": "With autoRestartWhenIdle (off by default in this fork; it acts on its own), a pending Host update (a plugin whose Host files changed since boot, which is what hmr-gate holds back, or a changed profile manifest after a profile sync) restarts DSH through the supervisor once no tur…",
       "destination": "none",
       "currentSurface": "status-strip: Restarting to apply updates",
       "reach": [],
@@ -24577,10 +25051,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "thread-list: row menu › Mention",
       "reach": [
         {
-          "text": "click button \"All threads\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"All threads*\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All threads*",
           "value": null
         },
         {
@@ -24591,10 +25072,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Mention target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Mention target"
         },
         {
@@ -24619,10 +25100,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention source\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Mention source\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Mention source"
         },
         {
@@ -24640,10 +25121,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "rightclick text \"Mention target\" at 8,8",
+          "text": "rightclick button \"Mention target*\" at 8,8",
           "action": "rightclick",
-          "by": "text",
-          "name": "Mention target",
+          "by": "button",
+          "name": "Mention target*",
           "value": null
         },
         {
@@ -24661,10 +25142,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "rightclick text \"Mention source\" at 8,8",
+          "text": "rightclick button \"Mention source*\" at 8,8",
           "action": "rightclick",
-          "by": "text",
-          "name": "Mention source",
+          "by": "button",
+          "name": "Mention source*",
           "value": null
         },
         {
@@ -24695,10 +25176,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "composer: @ skills",
       "reach": [
         {
-          "text": "click button \"All threads\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "All threads",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"All threads*\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All threads*",
           "value": null
         },
         {
@@ -24716,17 +25204,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@e2e-skill-mentions\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@e2e-skill-mentions\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "@e2e-skill-mentions"
         },
         {
-          "text": "click textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "text": "click textbox \"Describe what you want to build, / commands, @ files or threads\"",
           "action": "click",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": null
         },
         {
@@ -24792,10 +25280,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Group: Status\"",
+          "text": "click button \"Filter: *\"",
           "action": "click",
           "by": "button",
-          "name": "Group: Status",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Group: *\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Group: *",
           "value": null
         },
         {
@@ -24840,10 +25335,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Hover actions target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Hover actions target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Hover actions target"
         },
         {
@@ -25148,64 +25643,21 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Board\"",
-          "action": "expect",
+          "text": "click button \"Filter: *\"",
+          "action": "click",
           "by": "button",
+          "name": "Filter: *",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Board\"",
+          "action": "expect",
+          "by": "menuitem",
           "name": "Board",
           "value": null
         }
       ],
-      "reachNarrow": [
-        {
-          "text": "click button \"More\"",
-          "action": "click",
-          "by": "button",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
-          "action": "click",
-          "by": "button",
-          "name": "Observe Usage, activity, traces, jobs and hosts.",
-          "value": null
-        },
-        {
-          "text": "expect navigation \"Observe pages\"",
-          "action": "expect",
-          "by": "navigation",
-          "name": "Observe pages",
-          "value": null
-        },
-        {
-          "text": "click button \"Traces\"",
-          "action": "click",
-          "by": "button",
-          "name": "Traces",
-          "value": null
-        },
-        {
-          "text": "expect heading \"Traces\"",
-          "action": "expect",
-          "by": "heading",
-          "name": "Traces",
-          "value": null
-        },
-        {
-          "text": "click button \"Threads\"",
-          "action": "click",
-          "by": "button",
-          "name": "Threads",
-          "value": null
-        },
-        {
-          "text": "expect button \"Board\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Board",
-          "value": null
-        }
-      ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -25236,30 +25688,113 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#layout-mode",
       "plugin": "thread-sidebar",
       "id": "layout-mode",
-      "title": "Choose a fixed or free-docking left column",
-      "summary": "Settings › Layout (and the palette's Layout commands) switch the left column between the fixed rail-and-list layout, the default, and free docking, which mounts the movable Workbench panes again. The Workbench's saved left layout and named layouts are not touched while fixed is…",
+      "title": "One sidebar layout: the rail and list as a movable pane",
+      "summary": "The Fixed and Free docking left columns are one docking region (b:952m). Its default is the rail of destinations and the selected destination's list, as one Sidebar pane whose tab row is hidden; that pane moves, splits and floats like any Workbench pane, and Reset layout (⌘K) br…",
       "destination": "settings",
-      "currentSurface": "settings: Thread sidebar › Layout",
+      "currentSurface": "sidebar: the rail and list (Workbench Sidebar pane)",
       "reach": [
         {
-          "text": "click tab \"Settings\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Settings",
-          "value": null
-        },
-        {
-          "text": "click radio \"Free docking\"",
-          "action": "click",
-          "by": "radio",
-          "name": "Free docking",
-          "value": null
-        },
-        {
-          "text": "expect tab \"Thread Sidebar: Threads\"",
+          "text": "expect tab \"Threads\"",
           "action": "expect",
           "by": "tab",
-          "name": "Thread Sidebar: Threads",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "expect navigation \"Observe pages\"",
+          "action": "expect",
+          "by": "navigation",
+          "name": "Observe pages",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "thread-sidebar#sidebar-folders",
+      "plugin": "thread-sidebar",
+      "id": "sidebar-folders",
+      "title": "Folders of plugin panels on the rail",
+      "summary": "The rail is a list of folders (b:952m): the eight destinations are built-in folders (hidden, never deleted) and a person adds folders of their own and files any addable panel (a page, a thread facet, a plugin view) in any folder. Only their changes are stored (sidebarTree in the…",
+      "destination": "none",
+      "currentSurface": "sidebar: the rail's folders (agent tools sidebar_*)",
+      "reach": [
+        {
+          "text": "click button \"New sidebar folder\"",
+          "action": "click",
+          "by": "button",
+          "name": "New sidebar folder",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Folder name\" \"Review\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Folder name",
+          "value": "Review"
+        },
+        {
+          "text": "click radio \"eye\"",
+          "action": "click",
+          "by": "radio",
+          "name": "eye",
+          "value": null
+        },
+        {
+          "text": "click button \"Create folder\"",
+          "action": "click",
+          "by": "button",
+          "name": "Create folder",
+          "value": null
+        },
+        {
+          "text": "click tab \"Review\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Review",
+          "value": null
+        },
+        {
+          "text": "click button \"Add panel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add panel",
+          "value": null
+        },
+        {
+          "text": "click option \"Changes\"",
+          "action": "click",
+          "by": "option",
+          "name": "Changes",
+          "value": null
+        },
+        {
+          "text": "click button \"Add panel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add panel",
+          "value": null
+        },
+        {
+          "text": "click option \"Backlog\"",
+          "action": "click",
+          "by": "option",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect navigation \"Review pages\"",
+          "action": "expect",
+          "by": "navigation",
+          "name": "Review pages",
           "value": null
         }
       ],
@@ -25271,22 +25806,29 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "moved-to-map",
       "title": "Find where a former sidebar page went",
-      "summary": "Where did a page go? (palette, or the link under every destination list) lists each former left-nav entry with the destination and section that holds it now and an Open button. The list is generated from the catalogs' migration map, and a test fails when an entry has no section.…",
+      "summary": "Where did a page go? (a palette command; the sidebar keeps no link to it since b:hbtt) lists each former left-nav entry with the destination and section that holds it now and an Open button. The list is generated from the catalogs' migration map, and a test fails when an entry h…",
       "destination": "none",
       "currentSurface": "palette: Where did a page go?",
       "reach": [
         {
-          "text": "click tab \"Land\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Land",
-          "value": null
+          "text": "press Meta+Shift+P",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Meta+Shift+P"
         },
         {
-          "text": "click button \"Where did a page go?\"",
+          "text": "fill combobox \"Search the command palette\" \"Where did a page go\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Where did a page go"
+        },
+        {
+          "text": "click option \"Where did a page go?*\"",
           "action": "click",
-          "by": "button",
-          "name": "Where did a page go?",
+          "by": "option",
+          "name": "Where did a page go?*",
           "value": null
         },
         {
@@ -25331,7 +25873,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "phone-tab-bar",
       "title": "Navigate from a bottom tab bar on a phone",
-      "summary": "Below 640px the rail becomes a bottom tab bar (Threads, Inbox, New, More). Threads and Inbox open their list full screen; opening a thread or page closes it, so the stage is pushed; a second tap on the open tab goes back. More lists the other destinations and the moved-to help.…",
+      "summary": "Below 640px the rail becomes a bottom tab bar (Threads, Inbox, New, More). Threads and Inbox open their list full screen; opening a thread or page closes it, so the stage is pushed; a second tap on the open tab goes back. More lists the other destinations. The frame then gives t…",
       "destination": "threads",
       "currentSurface": "shell: collapsed icon rail at phone width",
       "reach": [],
@@ -25369,29 +25911,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "reachNarrow": [
-        {
-          "text": "click button \"Inbox\"",
-          "action": "click",
-          "by": "button",
-          "name": "Inbox",
-          "value": null
-        },
-        {
-          "text": "click button \"Waiting threads\"",
-          "action": "click",
-          "by": "button",
-          "name": "Waiting threads",
-          "value": null
-        },
-        {
-          "text": "expect heading \"Waiting threads\"",
-          "action": "expect",
-          "by": "heading",
-          "name": "Waiting threads",
-          "value": null
-        }
-      ],
+      "reachNarrow": null,
       "onboarding": {
         "firstAction": "Open Inbox › Waiting threads.",
         "doneWhen": "Each thread waiting on you is listed once, with Open and Done.",
@@ -25417,10 +25937,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"commands, @ files or sessions*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or sessions*",
+          "name": "commands, @ files or threads*",
           "value": "[[once call subagent {\"description\":\"Long child\",\"prompt\":\"\\u005b\\u005bonce call bash \\u007b\\u0022command\\u0022:\\u0022sleep 300\\u0022,\\u0022description\\u0022:\\u0022Busy\\u0022\\u007d\\u005d\\u005d\"}]]"
         },
         {
@@ -25462,7 +25982,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Opt-in completion notices between threads",
       "summary": "A thread can subscribe to another thread's turn completions. While subscribed, that thread's turn end sends ONE compact notice into the subscriber (status: finished, landed, failed, blocked, stopped, truncated or waiting-on-question, plus a 320-character preview of the turn that…",
       "destination": "threads",
-      "currentSurface": "threads: row context menu → Notify “…” when this thread finishes",
+      "currentSurface": "threads: row context menu → Notify…",
       "reach": [
         {
           "text": "click button \"All threads\"",
@@ -25479,10 +25999,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify spare\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Notify spare\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Notify spare"
         },
         {
@@ -25507,10 +26027,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Notify target\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Notify target"
         },
         {
@@ -25535,10 +26055,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify supervisor\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Notify supervisor\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Notify supervisor"
         },
         {
@@ -25570,10 +26090,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Notify “Notify supervisor” when this thread finishes\"",
+          "text": "click menuitem \"Notify…\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Notify “Notify supervisor” when this thread finishes",
+          "name": "Notify…",
           "value": null
         },
         {
@@ -25596,6 +26116,40 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool notify_user; in-app toast and system notification",
       "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "thread-sidebar#hero-suggestions",
+      "plugin": "thread-sidebar",
+      "id": "hero-suggestions",
+      "title": "Resume, Review and Inbox cards on the new-thread screen",
+      "summary": "The new-thread screen offers up to three flat cards under the composer (above it on a phone): Resume the most recent quiet thread (or one stopped and waiting to be resumed), Review a thread whose work is ready to land (it opens the thread and its Changes view), and the Inbox cou…",
+      "destination": "composer",
+      "currentSurface": "new-thread screen: suggestion cards",
+      "reach": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect button \"Resume*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Resume*",
+          "value": null
+        }
+      ],
       "reachNarrow": null,
       "onboarding": null
     },
@@ -25744,10 +26298,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "click text \"Completed in*\"",
+          "text": "click text \"Worked for*\"",
           "action": "click",
           "by": "text",
-          "name": "Completed in*",
+          "name": "Worked for*",
           "value": null
         },
         {
@@ -25947,10 +26501,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "traces#thread-traces-tab",
       "plugin": "traces",
       "id": "thread-traces-tab",
-      "title": "Per-thread Traces tab",
-      "summary": "A Traces tab in the conversation view, after Trajectory, shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent turn, model and tool spans and the plugin spans nested under them), a summary of spans, errors, model and tool calls, total and…",
+      "title": "Per-thread Traces facet",
+      "summary": "A Traces facet of the thread panel (opened from the thread header's More thread actions, a turn's Trace button or Choose a view; productivity pass Q5 moved it out of the header tabs) shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent tu…",
       "destination": "thread-panel",
-      "currentSurface": "conversation-view: Traces / Requests tabs",
+      "currentSurface": "thread-panel: Traces / Requests facets",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -25967,10 +26521,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "otlp-session-turns"
         },
         {
-          "text": "click tab \"Traces\"",
+          "text": "click button \"More thread actions\"",
           "action": "click",
-          "by": "tab",
-          "name": "Traces",
+          "by": "button",
+          "name": "More thread actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Open Traces\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Open Traces",
           "value": null
         },
         {
@@ -25981,10 +26542,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Requests\"",
+          "text": "click button \"More thread actions\"",
           "action": "click",
-          "by": "tab",
-          "name": "Requests",
+          "by": "button",
+          "name": "More thread actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Open Requests\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Open Requests",
           "value": null
         },
         {
@@ -26388,10 +26956,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Second thread for a switch\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Second thread for a switch\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Second thread for a switch"
         },
         {
@@ -26485,6 +27053,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "otlp-session-turns"
         },
         {
+          "text": "click button \"More actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "More actions",
+          "value": null
+        },
+        {
           "text": "click button \"Open the trace of turn*\"",
           "action": "click",
           "by": "button",
@@ -26526,10 +27101,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "otlp-session-turns"
         },
         {
-          "text": "click tab \"Traces\"",
+          "text": "click button \"More thread actions\"",
           "action": "click",
-          "by": "tab",
-          "name": "Traces",
+          "by": "button",
+          "name": "More thread actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Open Traces\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Open Traces",
           "value": null
         },
         {
@@ -26719,6 +27301,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "turn-summary#turn-marks-projection",
+      "plugin": "turn-summary",
+      "id": "turn-marks-projection",
+      "title": "Per-Turn facts for the turn map and Since you left",
+      "summary": "A whole-log session projection (dshfilesTurnMarks, contract @dshfiles/chat/turn-marks): for every Turn, whether it asked a question (and whether one is still open), whether it failed, and the files its accepted edits wrote with lines added and removed, counted like the turn foot…",
+      "destination": "none",
+      "currentSurface": "host: session projection",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "tweet-context#public-post-context",
       "plugin": "tweet-context",
       "id": "public-post-context",
@@ -26735,12 +27329,56 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ui-styles",
       "id": "one-shared-stylesheet",
       "title": "One shared plugin stylesheet",
-      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner.",
+      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner. The same sheet carries the generated default visual-refresh theme block (th…",
       "destination": "none",
       "currentSurface": "client: shared stylesheet",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
+    },
+    {
+      "key": "ui-styles#appearance-theme",
+      "plugin": "ui-styles",
+      "id": "appearance-theme",
+      "title": "Appearance theme: presets, palette and fonts",
+      "summary": "Settings › General › Appearance picks a colour preset (Warm stone default, Neutral, High contrast, Slate blue, Moss), optional hue, tint, accent and contrast overrides, and the UI and code fonts. The client regenerates the palette with the plugin-ui generator and injects it over…",
+      "destination": "settings",
+      "currentSurface": "Settings › General › Appearance; agent tools theme_get / theme_set",
+      "reach": [
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "click button \"Appearance\"",
+          "action": "click",
+          "by": "button",
+          "name": "Appearance",
+          "value": null
+        },
+        {
+          "text": "expect text \"Colour preset for every surface*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Colour preset for every surface*",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": {
+        "firstAction": "Open Settings › General › Appearance and pick a preset, or change the accent and the interface font.",
+        "doneWhen": "The whole app takes the new colours and fonts at once, light and dark."
+      }
     },
     {
       "key": "ui-styles#touch-platform-baseline",
@@ -26783,10 +27421,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a usage request\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Seed a usage request\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "name": "Describe what you want to build, / commands, @ files or threads",
           "value": "Seed a usage request"
         },
         {
@@ -27307,17 +27945,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "click button \"New tab\"",
-          "action": "click",
-          "by": "button",
-          "name": "New tab",
-          "value": null
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
-          "text": "click button \"Cost*\"",
+          "text": "click button \"route, cost per turn*\"",
           "action": "click",
           "by": "button",
-          "name": "Cost*",
+          "name": "route, cost per turn*",
           "value": null
         },
         {
@@ -27348,10 +27986,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"commands, @ files or sessions*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"question\\\":\\\"Which layout should the release notes use?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin\\\"},{\\\"label\\\":\\\"One flat list\\\"}]}],\\\"timeout\\\":-1}]]\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"question\\\":\\\"Which layout should the release notes use?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin\\\"},{\\\"label\\\":\\\"One flat list\\\"}]}],\\\"timeout\\\":-1}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or sessions*",
+          "name": "commands, @ files or threads*",
           "value": "[[once call ask_user_question {\"questions\":[{\"id\":\"layout\",\"question\":\"Which layout should the release notes use?\",\"options\":[{\"label\":\"Grouped by plugin\"},{\"label\":\"One flat list\"}]}],\"timeout\":-1}]]"
         },
         {
@@ -27389,10 +28027,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"commands, @ files or sessions*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"header\\\":\\\"Release notes\\\",\\\"question\\\":\\\"Pick a layout for [the 0.2 release notes](https://example.test/notes)\\\\n\\\\nBoth drafts list the same **12 changes**:\\\\n\\\\n| Layout | Lines |\\\\n| --- | ---: |\\\\n| Grouped | 48 |\\\\n| Flat | 31 |\\\\n\\\\n```html preview Lines per layout\\\\n<style>body{margin:8px;display:grid;gap:8px}.bars{display:flex;align-items:end;gap:8px;height:110px}.bars div{flex:1;border-radius:4px 4px 0 0;background:var(--dsh-accent)}</style><div class='bars'><div style='height:100%'></div><div style='height:64%'></div></div><p id='status' style='margin:0;color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Grouped 48 lines, flat 31 lines'</script>\\\\n```\\\\n\\\\nWhich one should ship?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin (Recommended)\\\",\\\"description\\\":\\\"Each plugin gets a heading, in the order of `profiles/web/package.json`.\\\"},{\\\"label\\\":\\\"One flat list\\\",\\\"description\\\":\\\"Shorter, but **no grouping**; see [the draft](https://example.test/flat).\\\"}]}],\\\"timeout\\\":-1}]]\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"header\\\":\\\"Release notes\\\",\\\"question\\\":\\\"Pick a layout for [the 0.2 release notes](https://example.test/notes)\\\\n\\\\nBoth drafts list the same **12 changes**:\\\\n\\\\n| Layout | Lines |\\\\n| --- | ---: |\\\\n| Grouped | 48 |\\\\n| Flat | 31 |\\\\n\\\\n```html preview Lines per layout\\\\n<style>body{margin:8px;display:grid;gap:8px}.bars{display:flex;align-items:end;gap:8px;height:110px}.bars div{flex:1;border-radius:4px 4px 0 0;background:var(--dsh-accent)}</style><div class='bars'><div style='height:100%'></div><div style='height:64%'></div></div><p id='status' style='margin:0;color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Grouped 48 lines, flat 31 lines'</script>\\\\n```\\\\n\\\\nWhich one should ship?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin (Recommended)\\\",\\\"description\\\":\\\"Each plugin gets a heading, in the order of `profiles/web/package.json`.\\\"},{\\\"label\\\":\\\"One flat list\\\",\\\"description\\\":\\\"Shorter, but **no grouping**; see [the draft](https://example.test/flat).\\\"}]}],\\\"timeout\\\":-1}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or sessions*",
+          "name": "commands, @ files or threads*",
           "value": "[[once call ask_user_question {\"questions\":[{\"id\":\"layout\",\"header\":\"Release notes\",\"question\":\"Pick a layout for [the 0.2 release notes](https://example.test/notes)\\n\\nBoth drafts list the same **12 changes**:\\n\\n| Layout | Lines |\\n| --- | ---: |\\n| Grouped | 48 |\\n| Flat | 31 |\\n\\n```html preview Lines per layout\\n<style>body{margin:8px;display:grid;gap:8px}.bars{display:flex;align-items:end;gap:8px;height:110px}.bars div{flex:1;border-radius:4px 4px 0 0;background:var(--dsh-accent)}</style><div class='bars'><div style='height:100%'></div><div style='height:64%'></div></div><p id='status' style='margin:0;color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Grouped 48 lines, flat 31 lines'</script>\\n```\\n\\nWhich one should ship?\",\"options\":[{\"label\":\"Grouped by plugin (Recommended)\",\"description\":\"Each plugin gets a heading, in the order of `profiles/web/package.json`.\"},{\"label\":\"One flat list\",\"description\":\"Shorter, but **no grouping**; see [the draft](https://example.test/flat).\"}]}],\"timeout\":-1}]]"
         },
         {
@@ -27557,7 +28195,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "conversation-header",
       "title": "Keep the original conversation toolbar and child views inside each thread",
-      "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and thread actions, and native Chat/Trajectory/Traces/Requests navigation when those providers are present. The original hea…",
+      "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and one thread actions `⋯` whose Open Trajectory/Traces/Requests items open those views as thread-panel facets (productivity…",
       "destination": "none",
       "currentSurface": "thread-header: conversation toolbar",
       "reach": [
@@ -27569,24 +28207,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "expect button \"More thread actions\"",
-          "action": "expect",
+          "text": "click button \"More thread actions\"",
+          "action": "click",
           "by": "button",
           "name": "More thread actions",
           "value": null
         },
         {
-          "text": "expect tab \"Chat\"",
+          "text": "expect menuitem \"Open Traces\"",
           "action": "expect",
-          "by": "tab",
-          "name": "Chat",
-          "value": null
-        },
-        {
-          "text": "expect tab \"Trajectory\"",
-          "action": "expect",
-          "by": "tab",
-          "name": "Trajectory",
+          "by": "menuitem",
+          "name": "Open Traces",
           "value": null
         }
       ],
@@ -27688,15 +28319,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "single-tab-rows",
       "title": "Hide a single tab row without hiding its view",
-      "summary": "Right-click the sole tab or blank row space and choose Hide tab row. Its original docked content and input stay mounted; a hover/keyboard Show tab row control and the global Workbench: Show tab rows command recover it. Native hideHeader persists in the existing layout JSON. A se…",
+      "summary": "Right-click the sole tab or blank row space and choose Hide tab row. Its original docked content and input stay mounted; a hover/keyboard Show tab row control and the global Show tab rows command recover it. Native hideHeader persists in the existing layout JSON. A second tab ad…",
       "destination": "none",
       "currentSurface": "workbench: Hide tab row",
       "reach": [
         {
-          "text": "rightclick tab \"Thread Sidebar: Threads\"",
+          "text": "rightclick tab \"Threads\"",
           "action": "rightclick",
           "by": "tab",
-          "name": "Thread Sidebar: Threads",
+          "name": "Threads",
           "value": null
         },
         {
@@ -27728,10 +28359,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect tab \"Thread Sidebar: Threads\"",
+          "text": "expect tab \"Threads\"",
           "action": "expect",
           "by": "tab",
-          "name": "Thread Sidebar: Threads",
+          "name": "Threads",
           "value": null
         }
       ],
@@ -27745,20 +28376,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Account Preview is a regular movable docked view",
       "summary": "The existing footer.above assembly is seated once as an ordinary left Workbench tab, preserving the real account preview owner and actions. Existing saved placements in any root/nested region win; moving or explicitly closing it never creates a duplicate or resurrects it on relo…",
       "destination": "none",
-      "currentSurface": "workbench: AI Accounts: Preview tab",
+      "currentSurface": "workbench: Quota tab",
       "reach": [
         {
-          "text": "expect tab \"AI Accounts: Preview\"",
+          "text": "expect tab \"Quota\"",
           "action": "expect",
           "by": "tab",
-          "name": "AI Accounts: Preview",
+          "name": "Quota",
           "value": null
         },
         {
-          "text": "rightclick tab \"AI Accounts: Preview\"",
+          "text": "rightclick tab \"Quota\"",
           "action": "rightclick",
           "by": "tab",
-          "name": "AI Accounts: Preview",
+          "name": "Quota",
           "value": null
         },
         {
@@ -27789,10 +28420,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "workbench: Float panel",
       "reach": [
         {
-          "text": "rightclick tab \"Thread Sidebar: Threads\"",
+          "text": "rightclick tab \"Threads\"",
           "action": "rightclick",
           "by": "tab",
-          "name": "Thread Sidebar: Threads",
+          "name": "Threads",
           "value": null
         },
         {
@@ -27837,10 +28468,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Into the Unknown\"",
+          "text": "expect text \"What should we build*\"",
           "action": "expect",
           "by": "text",
-          "name": "Into the Unknown",
+          "name": "What should we build*",
           "value": null
         }
       ],
@@ -27852,16 +28483,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "main-panel-sources",
       "title": "Choose plugin views and one Settings hub",
-      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use qualified destination names when available, such as Agents › Directory; their tab captions stay short. Conversations open only from the thread list or New thread, never as a separate Rich C…",
+      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use qualified destination names when available, such as Agents › Directory, and producer-declared names otherwise (Quota, Files); their tab captions stay short. Conversations open only from the…",
       "destination": "none",
       "currentSurface": "main-tabs: New tab chooser",
       "reach": [
         {
-          "text": "click button \"New tab\"",
-          "action": "click",
-          "by": "button",
-          "name": "New tab",
-          "value": null
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
           "text": "expect region \"Choose a view\"",
@@ -27994,11 +28625,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "click button \"New tab\"",
-          "action": "click",
-          "by": "button",
-          "name": "New tab",
-          "value": null
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
           "text": "fill textbox \"Search views\" \"Terminal\"",
@@ -28042,11 +28673,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "click button \"New tab\"",
-          "action": "click",
-          "by": "button",
-          "name": "New tab",
-          "value": null
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
           "text": "expect group \"Thread panels\"",
@@ -28319,7 +28950,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Add workspaces from the folder browser",
       "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the works…",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Add workspace",
+      "currentSurface": "composer: Choose project › Add folder",
       "reach": [
         {
           "text": "click button \"New session\"",
@@ -28329,17 +28960,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
-          "text": "click menuitem \"Add workspace*\"",
+          "text": "click menuitem \"Add folder*\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Add workspace*",
+          "name": "Add folder*",
           "value": null
         },
         {
@@ -28361,9 +28992,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workspace-folder-picker",
       "id": "project-clone",
       "title": "Add a project by cloning a repository",
-      "summary": "New → Clone repository… in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the c…",
+      "summary": "Clone repository… in the Add a project dialog (also in ⌘K) clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, regist…",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Add workspace › Clone repository",
+      "currentSurface": "composer: Choose project › Add folder › Clone repository",
       "reach": [
         {
           "text": "click button \"New session\"",
@@ -28373,30 +29004,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
-          "text": "click menuitem \"Add workspace*\"",
+          "text": "click menuitem \"Add folder*\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Add workspace*",
+          "name": "Add folder*",
           "value": null
         },
         {
-          "text": "click button \"New\"",
+          "text": "click button \"Clone repository…\"",
           "action": "click",
           "by": "button",
-          "name": "New",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Clone repository…\"",
-          "action": "click",
-          "by": "menuitem",
           "name": "Clone repository…",
           "value": null
         },
@@ -28418,13 +29042,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Remove a project registration",
       "summary": "Remove a project from the New thread picker without deleting its folder or files; threads lose their project grouping.",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Remove",
+      "currentSurface": "composer: Choose project › Remove",
       "reach": [
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
@@ -28443,9 +29067,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workspace-folder-picker",
       "id": "project-create",
       "title": "Create a new project",
-      "summary": "New → New project… in the Add workspace flow creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when…",
+      "summary": "New project… (the composer's and the thread list's project pickers, ⌘K, or the Add a project dialog; productivity pass Q5) creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a…",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Add workspace › New project",
+      "currentSurface": "composer: Choose project › Add folder › New project",
       "reach": [
         {
           "text": "click button \"New session\"",
@@ -28455,30 +29079,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Choose workspace\"",
+          "text": "click button \"Choose project\"",
           "action": "click",
           "by": "button",
-          "name": "Choose workspace",
+          "name": "Choose project",
           "value": null
         },
         {
-          "text": "click menuitem \"Add workspace*\"",
+          "text": "click menuitem \"Add folder*\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Add workspace*",
+          "name": "Add folder*",
           "value": null
         },
         {
-          "text": "click button \"New\"",
+          "text": "click button \"New project…\"",
           "action": "click",
           "by": "button",
-          "name": "New",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"New project…\"",
-          "action": "click",
-          "by": "menuitem",
           "name": "New project…",
           "value": null
         },
@@ -28500,7 +29117,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Search projects and browse folder paths",
       "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host (drive and UNC paths too on a Windows Host), automatically enter one unique matching folder, open on a Projects scope that leaves JJ thread workspaces out, offer Ev…",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › search",
+      "currentSurface": "composer: Choose project › search",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -28512,7 +29129,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Select project folders with keyboard navigation",
       "summary": "Move through result rows with wrapped selection and handle empty lists without selecting an invalid row.",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › keyboard rows",
+      "currentSurface": "composer: Choose project › keyboard rows",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -28524,7 +29141,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Offer recent folders not yet registered as projects",
       "summary": "List recent folders in order on their own scope and first on Everything (before projects, then JJ thread workspaces, each folder once), show a registered recent as its project, and keep an unregistered folder's canonical path distinct from registered project identity.",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Recent",
+      "currentSurface": "composer: Choose project › Recent",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

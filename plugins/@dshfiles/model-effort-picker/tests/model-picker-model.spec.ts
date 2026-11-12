@@ -116,7 +116,12 @@ describe('model picker selection rules', () => {
     expect(ModelPickerModel.effortName(nova, { ...currentSelection, reasoningEffort: 'retired' })).toBe('retired')
   })
 
-  it('drops the account prefix from the trigger and names the provider only when the model name is shared', () => {
+  it('names no effort when the provider decides it, instead of saying "Provider default" (b:v9yh)', () => {
+    const plain = { id: 'plain-1', name: 'Plain 1' }
+    expect(ModelPickerModel.effortName(plain, { provider: 'northstar', model: 'plain-1' })).toBeUndefined()
+  })
+
+  it('names the account in the trigger only when the thread is off the default account for its model (b:4qjm)', () => {
     const alex = { id: 'opencode-go-alex', name: 'OpenCode Go Alex', models: [{ id: 'deepseek-v4', name: 'opencode-go-alex/DeepSeek V4' }] }
     const work = { id: 'opencode-go-work', name: 'OpenCode Go Work', models: [{ id: 'deepseek-v4', name: 'opencode-go-work/DeepSeek V4' }] }
     const alexSelection: ModelSelection = { provider: 'opencode-go-alex', model: 'deepseek-v4' }
@@ -125,7 +130,12 @@ describe('model picker selection rules', () => {
       model: 'DeepSeek V4',
       title: 'OpenCode Go Alex · DeepSeek V4',
     })
+    // Alex is the first account offering the model: the default, so unnamed.
     expect(ModelPickerModel.triggerLabel({ groups: [alex, work], current: alexSelection })).toEqual({
+      model: 'DeepSeek V4',
+      title: 'OpenCode Go Alex · DeepSeek V4',
+    })
+    expect(ModelPickerModel.triggerLabel({ groups: [work, alex], current: alexSelection })).toEqual({
       model: 'DeepSeek V4',
       providerTag: 'OGA',
       title: 'OpenCode Go Alex · DeepSeek V4',
@@ -169,6 +179,18 @@ describe('model picker selection rules', () => {
       expect(ModelPickerModel.nextAccountSelection({ groups: accounts, current: { ...onAlex2, provider: 'codex-alex3' }, routes: [] })?.group.id).toBe(
         'codex-alex1',
       )
+    })
+
+    it("lists one row per model and provider, standing for the thread's account or the first account (b:16yr)", () => {
+      const providerOf = (id: string): string | undefined => (id.startsWith('codex-') ? 'Codex' : 'OpenCode')
+      const rows = ModelPickerModel.modelRows({ groups: accounts, current: onAlex2, providerOf })
+      expect(rows.map(row => `${row.group.id}:${row.model.id}:${String(row.accounts.length)}`)).toEqual(['codex-alex2:gpt-6-luna:3', 'opencode:kimi:1'])
+      expect(rows[0]?.active).toBe(true)
+      const fresh = ModelPickerModel.modelRows({ groups: accounts, current: { provider: 'opencode', model: 'kimi' }, providerOf })
+      expect(fresh.map(row => row.group.id)).toEqual(['opencode', 'codex-alex1'])
+      // The same model id from another service stays its own row.
+      const twoServices = ModelPickerModel.modelRows({ groups: [alex1, { ...other, models: [luna] }], current: null, providerOf })
+      expect(twoServices).toHaveLength(2)
     })
 
     it('rotates only through the configured routes, and offers nothing when no other route qualifies', () => {

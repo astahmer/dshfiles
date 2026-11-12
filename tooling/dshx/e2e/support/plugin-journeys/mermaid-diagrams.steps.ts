@@ -5,7 +5,7 @@ import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const PLUGIN_DIRECTORY = join(DSHFILES_ROOT, 'plugins/@dshfiles/mermaid-diagrams')
 const FLOWCHART = ['flowchart LR', '  A[Plan] --> B{Ship?}', '  B -->|yes| C[Done]', '  B -->|no| A'].join('\n')
 const answer = (source: string): string => `[[answer Here is the flow:\n\n\`\`\`mermaid\n${source}\n\`\`\`\n]]`

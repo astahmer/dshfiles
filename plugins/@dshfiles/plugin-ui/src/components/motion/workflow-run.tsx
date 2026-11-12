@@ -166,7 +166,7 @@ function StepCard({ step, active }: { readonly step: FlowStep; readonly active: 
             typeof part === 'string' ? (
               <span key={index}>{part}</span>
             ) : (
-              <span key={index} className="dshx:rounded-md dshx:bg-muted dshx:px-1.5 dshx:text-[13px] dshx:leading-6 dshx:font-medium">
+              <span key={index} className="dshx:rounded-md dshx:bg-muted dshx:px-1.5 dshx:text-sm dshx:leading-6 dshx:font-medium">
                 {part.token}
               </span>
             ),
@@ -174,7 +174,7 @@ function StepCard({ step, active }: { readonly step: FlowStep; readonly active: 
         </p>
       </div>
       {step.note !== undefined ? (
-        <div className="dshx:ml-[5.5rem] dshx:rounded-lg dshx:bg-muted/70 dshx:px-3 dshx:py-2 dshx:text-[13px] dshx:text-muted-foreground dshx:@max-pane-narrow:ml-0">
+        <div className="dshx:ml-[5.5rem] dshx:rounded-lg dshx:bg-muted/70 dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground dshx:@max-pane-narrow:ml-0">
           {step.note}
         </div>
       ) : null}
@@ -190,7 +190,7 @@ function StepCard({ step, active }: { readonly step: FlowStep; readonly active: 
             >
               <span
                 className={cn(
-                  'dshx:text-[11px] dshx:font-medium dshx:tracking-wide dshx:uppercase',
+                  'dshx:text-2xs dshx:font-medium dshx:tracking-wide dshx:uppercase',
                   step.taken === index ? 'dshx:text-warning' : 'dshx:text-muted-foreground',
                 )}
               >

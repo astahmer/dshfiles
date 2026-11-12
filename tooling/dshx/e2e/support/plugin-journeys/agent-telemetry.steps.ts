@@ -30,7 +30,7 @@ When('a new thread asks the model for a plugin tool and a subagent', async ({ pa
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await page.getByRole('button', { name: /^Select model/ }).click()
   await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill(turnDirective)
   await composer.press('Enter')
   await expect(page.getByText(/^Answered by /).first()).toBeVisible({ timeout: 60_000 })

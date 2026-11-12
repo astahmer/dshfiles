@@ -9,8 +9,11 @@
 .root {
   display: flex;
   flex-direction: column;
-  font-size: var(--dsh-content-font-size, 14px);
-  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  /* dshfiles (visual refresh T2.1): plain prose at the density's prose size (14px, 15px on a phone), never below
+     the Settings font-size preference. */
+  font-size: max(var(--dsh-content-font-size, 14px), var(--dshx-density-text-prose, 14px));
+  /* dshfiles (productivity pass T1.1): 14/23 on desktop, 15/24 on a phone (the prose step plus 9px leading). */
+  line-height: calc(var(--dshx-density-text-prose, 14px) + 9px + var(--dsh-content-font-delta, 0px));
   color: var(--dsw-alias-label-primary);
 }
 
@@ -20,9 +23,87 @@
   gap: 16px;
 }
 
-/* Markdown soft breaks arrive as newlines in text nodes; preserve them. */
-.body :global(.markdown) {
-  white-space: pre-wrap;
+/* dshfiles (productivity pass T1.1): readable replies. The native root carries a hashed class, so Chat marks it
+   `data-dsh-markdown` (`src/markdown-prose.tsx`) and the reading rules hang off that hook.
+   - Size: the primitive's `.markdown { font: var(--dsw-font-markdown-base) }` reset the size to 14px under the
+     15px phone prose step (and the bubble); inherit the root's size and leading instead.
+   - Soft breaks: the native renderer already joins them; upstream's `white-space: pre-wrap` here never matched the
+     hashed class, so it is gone rather than kept as a dead rule.
+   - Measure: prose stops at 34em (about 75 Geist characters; `ch` would allow about 96). Code, tables, cards and
+     images keep the whole column.
+   - Rhythm: 12px between paragraphs and lists, 4px between list items, headings 17/24, 16/24 and 14/22 at 600 with
+     24px above and 8px below (h1 takes the chat's top step instead of a page title's 21px). */
+.body :global([data-dsh-markdown]) {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.body :global([data-dsh-markdown]) > :where(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, details) {
+  max-inline-size: 34em;
+}
+
+.body :global([data-dsh-markdown]) :where(p, ul, ol) {
+  margin-block: 12px;
+}
+
+.body :global([data-dsh-markdown]) :where(ul, ol) {
+  padding-inline-start: 1.25em;
+}
+
+/* A preflight upstream of the transcript leaves lists with `list-style: none`, so a reply's bullets and numbers never
+   showed; markers keep the muted colour the primitive gives `li::marker`. */
+.body :global([data-dsh-markdown]) ul {
+  list-style-type: disc;
+}
+
+.body :global([data-dsh-markdown]) :where(ul, ol) ul {
+  list-style-type: circle;
+}
+
+.body :global([data-dsh-markdown]) ol {
+  list-style-type: decimal;
+}
+
+.body :global([data-dsh-markdown]) :global(.contains-task-list) {
+  list-style-type: none;
+  padding-inline-start: 0;
+}
+
+.body :global([data-dsh-markdown]) li:not(:first-child) {
+  margin-top: 4px;
+}
+
+.body :global([data-dsh-markdown]) li > p {
+  margin-block: 4px;
+}
+
+.body :global([data-dsh-markdown]) :where(h1, h2, h3, h4, h5, h6) {
+  margin: 24px 0 8px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.body :global([data-dsh-markdown]) :where(h1, h2) {
+  font-size: calc(17px + var(--dsh-content-font-delta, 0px));
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+}
+
+.body :global([data-dsh-markdown]) h2 {
+  font-size: calc(16px + var(--dsh-content-font-delta, 0px));
+}
+
+.body :global([data-dsh-markdown]) :where(h3, h4, h5, h6) {
+  font-size: inherit;
+  line-height: calc(22px + var(--dsh-content-font-delta, 0px));
+  letter-spacing: 0;
+}
+
+.body :global([data-dsh-markdown]) :where(h4, h5, h6) {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.body :global([data-dsh-markdown]) :where(h1, h2, h3, h4, h5, h6) + :where(p, ul, ol) {
+  margin-top: 0;
 }
 
 /* Wide markdown tables (the renderer's ≥4-column md-table-wide hook) span
@@ -80,4 +161,15 @@
   margin-top: 16px;
   /* Optical align with the 28px action hit targets. */
   margin-left: -6px;
+}
+
+/* dshfiles (productivity pass T1.5): a reply that only acknowledges its tools reads as a muted meta line. */
+.root[data-filler] {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dshx-density-text-meta, 12px);
+  line-height: 18px;
+}
+
+.root[data-filler] :global([data-dsh-markdown]) {
+  color: inherit;
 }

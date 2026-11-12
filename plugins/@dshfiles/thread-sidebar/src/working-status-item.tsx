@@ -1,5 +1,6 @@
 import type { StatusItemProps } from '@dshfiles/frame-layout/status-strip'
 import { SHOW_DESTINATION_EVENT } from './destination-shell.js'
+import { useWorkingTabTitle } from './header-live-activity.js'
 
 /** Selects the Working view of the thread list (client.tsx listens). */
 export const SHOW_WORKING_THREADS_EVENT = 'dshfiles:thread-sidebar-show-working'
@@ -29,6 +30,8 @@ const workingCount = (state: {
  */
 export const WorkingStatusItem = (props: StatusItemProps & { readonly label: (count: number) => string }): JSX.Element | null => {
   const count = props.useSessions(workingCount)
+  // The strip is mounted on every layout and phone screen, so it also keeps the tab title's "⟳ N ·" (polish pass b:r4et).
+  useWorkingTabTitle(count, true)
   if (count === 0) return null
   return (
     <span className="dshx-root" data-testid="status-item-working">

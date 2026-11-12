@@ -68,8 +68,8 @@ export const AgentAvatar = React.forwardRef<HTMLSpanElement, AgentAvatarProps>(f
       className={cn(
         'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:font-semibold dshx:leading-none dshx:select-none',
         round ? 'dshx:rounded-full' : 'dshx:rounded-md',
-        size === 'xs' && 'dshx:size-4 dshx:text-[9px] dshx:[&_svg]:size-2.5',
-        size === 'sm' && 'dshx:size-6 dshx:text-[11px] dshx:[&_svg]:size-3.5',
+        size === 'xs' && 'dshx:size-4 dshx:text-2xs dshx:[&_svg]:size-2.5',
+        size === 'sm' && 'dshx:size-6 dshx:text-2xs dshx:[&_svg]:size-3.5',
         size === 'md' && 'dshx:size-8 dshx:text-xs dshx:[&_svg]:size-4',
         agentToneSoft[tone],
         className,

@@ -21,7 +21,7 @@ blocks the app, makes no model request, and changes the profile only when you co
 
 ## Use
 
-1. **Knowledge › Getting started** — also **Onboarding: Getting started** in the command palette and in the New tab
+1. **Knowledge › Getting started** — also **Getting started** in the command palette and in the New tab
    view chooser.
    1. **Setup checklist**, read live from the Host on each open: a model provider is set up, a project is added, a
       project is a jj or git repository, the GitHub CLI is signed in. Each open item has its fix: open AI accounts,
@@ -36,13 +36,17 @@ blocks the app, makes no model request, and changes the profile only when you co
       search every feature (each word must match); `/` focuses the search, Escape clears it. **Open** appears only when
       the feature's page, command or Settings place is registered in this profile. **Show me where** appears when the
       feature's first `reach` step can be replayed here (see _Show me where_).
-2. **Setup wizard** — while no thread is open, a card at the top right walks **Account → Project → First task**.
+2. **Setup wizard** — while an AI account or a project is still missing (read from the checklist) and no thread is
+   open, a dialog (a bottom sheet on a phone) walks **Account → Project → First task**. A profile that has both never opens it by
+   itself (fork default: an existing user met it in every new browser).
    1. Account and Project tick from the same checklist and link to the pages that own the setup; Project also opens
       the `jj-integration` **Isolate new threads** setting.
    2. First task offers three starter prompts; **Insert prompt** puts one in the composer (or a new thread draft when
       no composer is on screen) and never sends it.
-   3. Skip, Back and Next on every step; Escape skips. The outcome is kept per browser. **Onboarding: Show the setup
-      wizard** or **Start setup** on the page replays it.
+   3. **Don't show again**, Back and Next on every step. Escape, the close button or a link to a setup page put it
+      away for now (it may open by itself again on a later load while setup is missing); only Done and Don't show
+      again are kept per browser. **Show the setup wizard** (⌘K)
+      or **Start setup** on the page replays it on any profile.
 
 ## Pack changes
 

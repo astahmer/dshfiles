@@ -5,7 +5,7 @@ import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const HTML_RENDER_DIRECTORY = join(DSHFILES_ROOT, 'plugins/@dshfiles/html-render')
 const PAGE_TITLE = 'Isolation probe'
 const PROBE_HTML = [
@@ -28,7 +28,7 @@ When('the fake model publishes an isolation probe page with html_render', async 
   await composer.fill(PUBLISH_DIRECTIVE)
   await composer.press('Enter')
   await expect(page.getByText('Tool finished.', { exact: true })).toBeVisible({ timeout: 60_000 })
-  await expect(page.getByText(/^Completed in /).last()).toBeVisible()
+  await expect(page.getByText(/^Worked for /).last()).toBeVisible()
 })
 
 const expectIsolatedPage = async (page: Page): Promise<void> => {
@@ -68,7 +68,7 @@ Then('the card expands to full screen and is still there after a reload', async 
   await recordAssertion(page, 'html-render-card-survives-reload', async () => {
     await page.reload()
     await expect(page.getByText('Tool finished.', { exact: true })).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText(/^Completed in /).last()).toBeVisible()
+    await expect(page.getByText(/^Worked for /).last()).toBeVisible()
     await expectIsolatedPage(page)
   })
 })

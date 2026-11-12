@@ -6,7 +6,7 @@ import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { startNewSession } from '../thread-composer.js'
 
 const ATTACHMENT_FIXTURES = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
-const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 const UPLOAD_ROUTE = '**/api/session/uploadFileBinary**'
 
 const held = new WeakMap<Page, Route[]>()

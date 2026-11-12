@@ -6,7 +6,7 @@ import { GRAPH_DENSITY, graphWidthFor, RevisionGraphCell, RevisionGraphLayout } 
 
 const METRICS = GRAPH_DENSITY.compact
 
-const chipClass = 'dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:font-mono! dshx:text-[10px] dshx:leading-none'
+const chipClass = 'dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:font-mono! dshx:text-2xs dshx:leading-none'
 
 /**
  * The chat reference preview drawn like the Jujutsu panel's graph, reduced to what a glance needs: lanes, the change
@@ -49,7 +49,7 @@ export const ReferenceGraphView = (props: {
               style={{ height: METRICS.rowHeight }}
             >
               <RevisionGraphCell height={METRICS.rowHeight} layout={layout} metrics={METRICS} revision={revision} width={width} />
-              <code className={cn('dshx:shrink-0 dshx:font-mono! dshx:text-[11px]', referenced ? 'dshx:font-semibold' : 'dshx:text-muted-foreground')}>
+              <code className={cn('dshx:shrink-0 dshx:font-mono! dshx:text-2xs', referenced ? 'dshx:font-semibold' : 'dshx:text-muted-foreground')}>
                 {revision.shortestChangeId}
               </code>
               {revision.workingCopy ? <span className={cn(chipClass, 'dshx:bg-info/15 dshx:text-info')}>@</span> : null}
@@ -63,7 +63,7 @@ export const ReferenceGraphView = (props: {
                 </Tooltip>
               ))}
               {revision.bookmarks.length > 3 ? (
-                <span className="dshx:shrink-0 dshx:text-[10px] dshx:text-muted-foreground">+{revision.bookmarks.length - 3}</span>
+                <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">+{revision.bookmarks.length - 3}</span>
               ) : null}
               <Tooltip>
                 <TooltipTrigger asChild>

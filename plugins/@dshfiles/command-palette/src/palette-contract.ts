@@ -36,11 +36,20 @@ export interface PaletteAction {
   readonly id: string
   readonly label: string | (() => string)
   readonly aliases?: readonly string[]
+  /** Key specs that run the same verb (`Mod+K`, `E`, `G I`); every row shows them as keycaps. */
   readonly keys?: readonly string[]
+  /** A Host shortcut registry id (`commandPalette.newThread`) whose current binding the row shows when it has no `keys`. */
+  readonly shortcutId?: string
   /** Listed before anything is typed, like a recently used command. */
   readonly suggested?: boolean
   readonly icon?: ReactNode
-  readonly group?: 'destination' | 'command' | 'action'
+  /**
+   * `thread` rows act on the thread the user is on (the focused or selected list row, else the open thread) and list
+   * first, under their `heading` ("Actions for “Fix auth”").
+   */
+  readonly group?: 'destination' | 'command' | 'action' | 'thread'
+  /** The section title a `thread` row lists under; the first available row's heading names the section. */
+  readonly heading?: string | (() => string)
   readonly isAvailable?: (context: PaletteActionContext) => boolean
   readonly isSelected?: (context: PaletteActionContext) => boolean
   readonly run: (context: PaletteActionContext) => void | Promise<void>

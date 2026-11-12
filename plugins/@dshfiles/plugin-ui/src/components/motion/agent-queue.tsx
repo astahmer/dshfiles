@@ -221,7 +221,7 @@ function LiveBadge({ paused }: { readonly paused: boolean }) {
 function Stat({ label, children }: { readonly label: string; readonly children: React.ReactNode }) {
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:px-3 dshx:first:pl-0 dshx:@max-pane-narrow:px-0">
-      <dt className="dshx:text-[11px] dshx:font-medium dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">{label}</dt>
+      <dt className="dshx:text-2xs dshx:font-medium dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">{label}</dt>
       <dd className="dshx:flex dshx:items-baseline dshx:text-base dshx:font-medium dshx:tabular-nums">{children}</dd>
     </div>
   )
@@ -229,7 +229,7 @@ function Stat({ label, children }: { readonly label: string; readonly children: 
 
 function SectionLabel({ label, count, total }: { readonly label: string; readonly count: number; readonly total?: number }) {
   return (
-    <div className="dshx:flex dshx:items-baseline dshx:gap-1.5 dshx:text-[11px] dshx:font-medium dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
+    <div className="dshx:flex dshx:items-baseline dshx:gap-1.5 dshx:text-2xs dshx:font-medium dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
       {label}
       <span className="dshx:flex dshx:text-foreground">
         <RollingNumber value={count} />
@@ -248,7 +248,7 @@ function JobIcon({ job }: { readonly job: AgentQueueJob }) {
         agentToneSoft[job.tone ?? 'violet'],
       )}
     >
-      {Icon ? <Icon /> : <span className="dshx:text-[10px] dshx:font-semibold">{job.label.charAt(0)}</span>}
+      {Icon ? <Icon /> : <span className="dshx:text-2xs dshx:font-semibold">{job.label.charAt(0)}</span>}
     </span>
   )
 }
@@ -282,7 +282,7 @@ function OverflowTiles({ jobs }: { readonly jobs: readonly AgentQueueJob[] }) {
   return (
     <div ref={ref} aria-label={`${jobs.length} more waiting`} role="img" className="dshx:flex dshx:flex-wrap dshx:gap-1 dshx:px-1 dshx:pt-1">
       {jobs.slice(0, 24).map(job => (
-        <span key={job.id} data-flip-key={job.id} className={cn('dshx:size-3 dshx:rounded-[3px] dshx:opacity-70', agentToneSolid[job.tone ?? 'violet'])} />
+        <span key={job.id} data-flip-key={job.id} className={cn('dshx:size-3 dshx:rounded-xs dshx:opacity-70', agentToneSolid[job.tone ?? 'violet'])} />
       ))}
     </div>
   )
@@ -396,7 +396,7 @@ function Tally({ kind, value }: { readonly kind: 'done' | 'failed'; readonly val
   const done = kind === 'done'
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/30 dshx:p-2.5 dshx:@max-pane-narrow:flex-1">
-      <div className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:font-medium dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
+      <div className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:font-medium dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
         <span
           ref={chip}
           className={cn(
@@ -492,10 +492,10 @@ function DepthChart({
 
   return (
     <figure className="dshx:flex dshx:flex-col dshx:gap-1.5">
-      <figcaption className="dshx:text-[11px] dshx:font-medium dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">Queue depth</figcaption>
+      <figcaption className="dshx:text-2xs dshx:font-medium dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">Queue depth</figcaption>
       <div className="dshx:flex dshx:gap-2">
         <div
-          className="dshx:flex dshx:flex-col dshx:justify-between dshx:py-0.5 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground"
+          className="dshx:flex dshx:flex-col dshx:justify-between dshx:py-0.5 dshx:text-2xs dshx:tabular-nums dshx:text-muted-foreground"
           style={{ height: CHART_HEIGHT }}
         >
           <span>{max}</span>
@@ -533,7 +533,7 @@ function DepthChart({
           ) : null}
         </div>
       </div>
-      <div className="dshx:flex dshx:justify-between dshx:pl-6 dshx:text-[11px] dshx:text-muted-foreground">
+      <div className="dshx:flex dshx:justify-between dshx:pl-6 dshx:text-2xs dshx:text-muted-foreground">
         <span>{historySeconds}s ago</span>
         <span>now</span>
       </div>

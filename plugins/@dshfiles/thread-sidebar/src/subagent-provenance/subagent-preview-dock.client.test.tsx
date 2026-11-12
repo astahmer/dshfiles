@@ -79,6 +79,7 @@ const dockProps = (input: {
 
 const rows = () => document.querySelectorAll('[data-dshfiles-live-preview="agent"]')
 const cardOf = () => screen.getByRole('region', { name: /^Agent run: Review/ })
+const fold = () => document.querySelector('[data-dshfiles-live-preview-fold="subagents"]')
 
 describe('SubagentPreviewDock', () => {
   it('lists working children only, and clears as they go idle', () => {
@@ -96,27 +97,29 @@ describe('SubagentPreviewDock', () => {
     expect(bindings.retainChild).toHaveBeenCalledOnce()
   })
 
-  it('shows a single working child without a group header', () => {
+  it('shows a single working child without a fold row', () => {
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'] })} />)
-    expect(screen.queryByRole('button', { name: 'subagentPreviewDockToggle' })).toBeNull()
+    expect(fold()).toBeNull()
     expect(rows()).toHaveLength(1)
   })
 
-  it('collapses every working child under one header and keeps it collapsed as children come and go', () => {
-    const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'] })} />)
-    const header = screen.getByRole('button', { name: 'subagentPreviewDockToggle' })
-    expect(header.getAttribute('aria-expanded')).toBe('true')
-    expect(header.textContent).toContain('2')
-    expect(rows()).toHaveLength(2)
-    fireEvent.click(header)
-    expect(header.getAttribute('aria-expanded')).toBe('false')
+  it("folds two or more working children into one closed row and keeps the reader's choice as children come and go", () => {
+    const count = (n: number): string => `${n} subagents`
+    const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'] })} count={count} />)
+    expect(fold()?.textContent).toBe('2 subagents subagentpreviewworking')
+    expect(fold()?.getAttribute('aria-expanded')).toBe('false')
     expect(rows()).toHaveLength(0)
-    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-b'] })} />)
-    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'] })} />)
-    expect(screen.getByRole('button', { name: 'subagentPreviewDockToggle' }).getAttribute('aria-expanded')).toBe('false')
-    expect(rows()).toHaveLength(0)
-    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewDockToggle' }))
+    fireEvent.click(screen.getByRole('button', { name: '2 subagents subagentpreviewworking' }))
+    expect(fold()?.getAttribute('aria-expanded')).toBe('true')
     expect(rows()).toHaveLength(2)
+    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-b'] })} count={count} />)
+    expect(fold()).toBeNull()
+    expect(rows()).toHaveLength(1)
+    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'] })} count={count} />)
+    expect(fold()?.getAttribute('aria-expanded')).toBe('true')
+    expect(rows()).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: '2 subagents subagentpreviewworking' }))
+    expect(rows()).toHaveLength(0)
   })
 
   it('shows the compact run card for a working child whose turn, route and tool are known', async () => {

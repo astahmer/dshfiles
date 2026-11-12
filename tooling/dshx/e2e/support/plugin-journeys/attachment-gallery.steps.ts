@@ -8,7 +8,7 @@ import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const newThreadComposer = (page: Page) =>
   page.getByRole('textbox', {
-    name: 'Describe what you want to build, / commands, @ files or sessions',
+    name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u,
     exact: true,
   })
 const lightbox = (page: Page) => page.getByRole('dialog', { name: 'Image preview', exact: true })

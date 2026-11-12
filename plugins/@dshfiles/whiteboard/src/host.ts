@@ -1,5 +1,5 @@
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, hostService, WebRoutes } from '@dshfiles/dshx/effect'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
 import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
 import { Context, Effect, type FileSystem, Layer, Option, type Path } from 'effect'
@@ -32,10 +32,7 @@ class EditorAssetRoute extends Context.Service<EditorAssetRoute, { readonly path
         const server = webServer.value
         const services = yield* DshxPlugin.detachedContext<FileSystem.FileSystem | Path.Path>()
         const handler = createEditorAssetHandler({ directory, run: Effect.runPromiseWith(services) })
-        yield* Effect.acquireRelease(
-          Effect.sync(() => server.register({ kind: 'prefix', path: EDITOR_ASSET_ROUTE, handler })),
-          unregister => Effect.sync(unregister),
-        )
+        yield* WebRoutes.register(server, { kind: 'prefix', path: EDITOR_ASSET_ROUTE, handler })
         return EditorAssetRoute.of({ path: EDITOR_ASSET_ROUTE })
       }),
     )

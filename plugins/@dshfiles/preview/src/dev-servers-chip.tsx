@@ -11,6 +11,8 @@ import * as Schema from 'effect/Schema'
 import { previewApi, type DevServerView, type PreviewPageView } from './api.js'
 import { DevServerPoll } from './dev-server-poll.js'
 import { PreviewOpener } from './preview-opener.js'
+import { LoopbackNoticeView } from './loopback-notice.js'
+import type { ListeningPort } from './remote-reach.js'
 import { PreviewReveal, type RevealRequest } from './preview-reveal.js'
 import { previewSettings } from './settings.js'
 
@@ -136,9 +138,17 @@ export const DevServersChip = (props: {
     },
     onError: () => setOpen(true),
   })
-  const openUrl = (url: string): void => {
-    if (hostOnly(url)) watchUrl.mutate(url)
-    else opener.open(url)
+  // dshfiles: a loopback port the viewer can still reach (bound to every interface) opens as a real tab; only when it
+  // is loopback-only does the Host load it in a preview page instead of showing the loopback notice.
+  const watchInstead = (url: string): void => {
+    opener.dismissNotice()
+    watchUrl.mutate(url)
+  }
+  const openUrl = (url: string, ports: readonly ListeningPort[] = []): void => {
+    if (opener.open(url, ports) === null && hostOnly(url)) watchInstead(url)
+  }
+  const openPort = (port: ListeningPort): void => {
+    if (opener.openPort(port) === null && hostOnly(port.url)) watchInstead(port.url)
   }
 
   const servers = serversQuery.data?.servers ?? []
@@ -169,6 +179,7 @@ export const DevServersChip = (props: {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="dshx-root dshx:w-96 dshx:max-w-[90vw] dshx:p-2">
+        <LoopbackNoticeView notice={opener.notice} onDismiss={opener.dismissNotice} />
         <section aria-label="Dev servers" className="dshx:flex dshx:flex-col dshx:gap-1">
           {servers.map(server => (
             <div key={server.pid} className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:py-1 dshx:hover:bg-accent">
@@ -188,7 +199,7 @@ export const DevServersChip = (props: {
                     disabled={watchUrl.isPending}
                     onClick={() => {
                       recordHandled(PreviewReveal.serverKey({ sessionId: props.sessionId, server }))
-                      openUrl(port.url)
+                      openPort(port)
                     }}
                   >
                     <OpenGlyph url={port.url} paneAvailable={opener.paneAvailable} />
@@ -229,7 +240,17 @@ export const DevServersChip = (props: {
                 Watch
               </Button>
               {hostOnly(page.url) ? null : (
-                <Button variant="outline" size="sm" className="dshx:h-6 dshx:px-2 dshx:text-xs" onClick={() => opener.open(page.url)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="dshx:h-6 dshx:px-2 dshx:text-xs"
+                  onClick={() =>
+                    opener.open(
+                      page.url,
+                      servers.flatMap(server => server.ports),
+                    )
+                  }
+                >
                   <OpenGlyph url={page.url} paneAvailable={opener.paneAvailable} />
                   Open
                 </Button>

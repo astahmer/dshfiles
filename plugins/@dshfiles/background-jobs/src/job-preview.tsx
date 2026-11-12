@@ -6,6 +6,8 @@ import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ComposerRow } from '@dshfiles/plugin-ui/components/composer-row'
 import { ChevronRightIcon, SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
+import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
@@ -237,7 +239,16 @@ export const JobPreviewDock = (props: JobPreviewBindings & { readonly sessionId:
     [jobs, sessionId],
   )
   const ids = useSyncExternalStore(useJobsSubscribe(jobs), read)
+  const readSince = useCallback(
+    () => Math.min(...(jobs.state.getSnapshot().rows[sessionId] ?? []).filter(row => JobPreviewModel.isLive(row.status)).map(row => row.startedAt)),
+    [jobs, sessionId],
+  )
+  const since = useSyncExternalStore(useJobsSubscribe(jobs), readSince)
+  // Two or more running jobs fold into one row (b:7rv2); the reader's choice holds while the thread is open.
+  const [expanded, setExpanded] = useState(false)
   if (ids === '') return null
+  const list = ids.split(ID_SEPARATOR)
+  const folded = list.length >= 2
   return (
     <div
       aria-label={props.t('previewDock')}
@@ -245,9 +256,39 @@ export const JobPreviewDock = (props: JobPreviewBindings & { readonly sessionId:
       className="dshx-root dshx:mx-auto dshx:flex dshx:max-h-72 dshx:w-full dshx:flex-none dshx:flex-col dshx:overflow-y-auto"
       data-dshfiles-live-preview-dock="jobs"
     >
-      {ids.split(ID_SEPARATOR).map(jobId => (
-        <DockPreview key={jobId} {...props} jobId={jobId} />
-      ))}
+      {folded ? (
+        <DockFoldRow
+          expanded={expanded}
+          onToggle={() => setExpanded(value => !value)}
+          label={`${props.t('foldCountOther', { count: list.length })} ${props.t('foldActive')}`}
+          since={Number.isFinite(since) ? since : undefined}
+          longest={duration => props.t('foldLongest', { duration })}
+        />
+      ) : null}
+      {!folded || expanded ? list.map(jobId => <DockPreview key={jobId} {...props} jobId={jobId} />) : null}
     </div>
   )
 }
+
+/** The dock's summary row: the running jobs as one line, its spinner and the oldest job's elapsed time. */
+const DockFoldRow = (props: {
+  readonly expanded: boolean
+  readonly onToggle: () => void
+  readonly label: string
+  readonly since: number | undefined
+  readonly longest: (duration: string) => string
+}): JSX.Element => (
+  <button
+    type="button"
+    aria-expanded={props.expanded}
+    className="dshx:sticky dshx:top-0 dshx:z-10 dshx:my-1 dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background dshx:px-2 dshx:text-left dshx:text-xs dshx:hover:bg-accent dshx:pointer-coarse:h-11"
+    data-dshfiles-live-preview-fold="jobs"
+    onClick={props.onToggle}
+  >
+    <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', props.expanded && 'dshx:rotate-90')} />
+    <SquareTerminalIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
+    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.label}</span>
+    {props.since === undefined ? null : <LiveElapsed since={props.since} active format={props.longest} className="dshx:shrink-0 dshx:text-muted-foreground" />}
+    <StatusGlyph status="working" decorative />
+  </button>
+)

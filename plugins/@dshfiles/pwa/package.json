@@ -22,7 +22,8 @@
     "build": "node ../../../tooling/dshx/packages/dshx/dist/cli/bin.js build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "3.18.5",

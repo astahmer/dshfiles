@@ -174,7 +174,7 @@ const FiringList = (props: {
               <span className="dshx:text-xs dshx:text-muted-foreground">{conditionOf(rule, t)}</span>
               {AlertBadges.muted(rule, props.now, t)}
             </div>
-            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:text-[11px] dshx:text-muted-foreground">
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:text-2xs dshx:text-muted-foreground">
               {rule.state.since === null ? null : (
                 <span>
                   {t('statusFiring')} {TraceFormat.clock(rule.state.since)}
@@ -238,7 +238,7 @@ const RulesTable = (props: {
                   ) : null}
                   {AlertBadges.muted(rule, props.now, t)}
                 </span>
-                <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">{filterOf(rule, t)}</span>
+                <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{filterOf(rule, t)}</span>
               </div>
             </TableCell>
             <TableCell className="dshx:text-xs dshx:@max-pane-compact:hidden">{conditionOf(rule, t)}</TableCell>

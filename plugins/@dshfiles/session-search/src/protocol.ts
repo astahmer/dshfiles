@@ -59,6 +59,8 @@ const findInSessionRequestSchema = Schema.Struct({
   sessionId: Schema.String.check(Schema.isMinLength(1)),
   query: Schema.String.check(Schema.isMinLength(1)),
   limit: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(FIND_LIMIT_MAX)),
+  /** The newest `limit` matches instead of the oldest, still handed back in seq order. */
+  newest: Schema.optional(Schema.Boolean),
 })
 export type FindInSessionRequest = typeof findInSessionRequestSchema.Type
 

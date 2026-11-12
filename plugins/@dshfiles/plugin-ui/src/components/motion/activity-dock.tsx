@@ -67,7 +67,7 @@ const ChangeFileRow = ({ file }: { readonly file: DockFileChange }) => {
     <>
       <span
         aria-hidden
-        className="dshx:grid dshx:h-4 dshx:shrink-0 dshx:place-items-center dshx:rounded-[3px] dshx:bg-info/15 dshx:px-0.5 dshx:font-mono dshx:text-[9px] dshx:font-semibold dshx:text-info"
+        className="dshx:grid dshx:h-4 dshx:shrink-0 dshx:place-items-center dshx:rounded-xs dshx:bg-info/15 dshx:px-0.5 dshx:font-mono dshx:text-2xs dshx:font-semibold dshx:text-info"
       >
         {extension(file.path)}
       </span>

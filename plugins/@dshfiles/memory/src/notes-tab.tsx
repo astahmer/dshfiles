@@ -134,10 +134,10 @@ const NoteRow = (props: {
         <tone.Icon className="dshx:size-[18px]" />
       </span>
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-        <span className="dshx:line-clamp-2 dshx:text-[13px] dshx:font-medium dshx:leading-snug">{title}</span>
+        <span className="dshx:line-clamp-2 dshx:text-sm dshx:font-medium dshx:leading-snug">{title}</span>
         {body.length === 0 ? null : <span className="dshx:line-clamp-2 dshx:text-xs dshx:leading-snug dshx:text-muted-foreground">{body}</span>}
       </span>
-      <span className="dshx:flex dshx:w-24 dshx:shrink-0 dshx:flex-col dshx:items-end dshx:gap-0.5 dshx:text-[11px] dshx:text-muted-foreground">
+      <span className="dshx:flex dshx:w-24 dshx:shrink-0 dshx:flex-col dshx:items-end dshx:gap-0.5 dshx:text-2xs dshx:text-muted-foreground">
         <span className={cn('dshx:font-medium', tone.accent)}>{tone.label}</span>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -151,7 +151,7 @@ const NoteRow = (props: {
           {props.note.citations}
         </span>
         {props.note.status === 'valid' ? null : (
-          <span className={cn('dshx:mt-0.5 dshx:rounded-full dshx:px-1.5 dshx:py-px dshx:text-[10px]', noteStatusBadge[props.note.status])}>
+          <span className={cn('dshx:mt-0.5 dshx:rounded-full dshx:px-1.5 dshx:py-px dshx:text-2xs', noteStatusBadge[props.note.status])}>
             {noteStatusLabels[props.note.status]}
           </span>
         )}
@@ -177,12 +177,12 @@ const NoteGridCard = (props: { readonly note: PanelNote; readonly selected: bool
         <span className={cn('dshx:flex dshx:size-7 dshx:items-center dshx:justify-center dshx:rounded-lg', tone.iconTile)}>
           <tone.Icon className="dshx:size-4" />
         </span>
-        <span className={cn('dshx:text-[11px] dshx:font-medium', tone.accent)}>{tone.label}</span>
-        <span className="dshx:ml-auto dshx:text-[11px] dshx:text-muted-foreground">{PanelFormat.formatDay(props.note.updatedAt)}</span>
+        <span className={cn('dshx:text-2xs dshx:font-medium', tone.accent)}>{tone.label}</span>
+        <span className="dshx:ml-auto dshx:text-2xs dshx:text-muted-foreground">{PanelFormat.formatDay(props.note.updatedAt)}</span>
       </span>
-      <span className="dshx:line-clamp-2 dshx:text-[13px] dshx:font-medium dshx:leading-snug">{title}</span>
+      <span className="dshx:line-clamp-2 dshx:text-sm dshx:font-medium dshx:leading-snug">{title}</span>
       {body.length === 0 ? null : <span className="dshx:line-clamp-3 dshx:text-xs dshx:leading-snug dshx:text-muted-foreground">{body}</span>}
-      <span className="dshx:mt-auto dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
+      <span className="dshx:mt-auto dshx:flex dshx:items-center dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
         <span>{PanelFormat.projectName(props.note.project)}</span>
         <span>·</span>
         <span className="dshx:flex dshx:items-center dshx:gap-0.5">
@@ -277,8 +277,8 @@ const RelatedNotes = (props: {
                   <tone.Icon className="dshx:size-3.5" />
                 </span>
                 <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-xs">{PanelFormat.noteExcerpt(note.text, 90)}</span>
-                <span className={cn('dshx:shrink-0 dshx:rounded-full dshx:px-1.5 dshx:py-px dshx:text-[10px]', tone.badge)}>{tone.label}</span>
-                <span className="dshx:shrink-0 dshx:text-[10px] dshx:text-muted-foreground">{PanelFormat.formatDay(note.updatedAt)}</span>
+                <span className={cn('dshx:shrink-0 dshx:rounded-full dshx:px-1.5 dshx:py-px dshx:text-2xs', tone.badge)}>{tone.label}</span>
+                <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">{PanelFormat.formatDay(note.updatedAt)}</span>
               </button>
             </li>
           )
@@ -396,7 +396,7 @@ const NoteDetail = (props: {
         <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Source and evidence">
           <div className="dshx:flex dshx:items-center dshx:justify-between">
             <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">Source &amp; evidence</h4>
-            <span className="dshx:text-[11px] dshx:text-muted-foreground">
+            <span className="dshx:text-2xs dshx:text-muted-foreground">
               {note.citations} citation{note.citations === 1 ? '' : 's'}
             </span>
           </div>
@@ -418,7 +418,7 @@ const NoteDetail = (props: {
               </Button>
             </div>
           )}
-          <p className="dshx:text-[11px] dshx:text-muted-foreground">
+          <p className="dshx:text-2xs dshx:text-muted-foreground">
             {originLabels[note.origin]} · {PanelFormat.formatStamp(note.createdAt)}
             {note.sourceSeq === null ? '' : ` · message #${String(note.sourceSeq)}`}
           </p>
@@ -428,7 +428,7 @@ const NoteDetail = (props: {
           <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">Metadata</h4>
           <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-2 dshx:text-xs">
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Project</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Project</dt>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <dd className="dshx:truncate">{PanelFormat.projectName(note.project)}</dd>
@@ -437,23 +437,23 @@ const NoteDetail = (props: {
               </Tooltip>
             </div>
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Type</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Type</dt>
               <dd>{tone.label}</dd>
             </div>
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Status</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Status</dt>
               <dd>{noteStatusLabels[note.status]}</dd>
             </div>
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Scope</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Scope</dt>
               <dd className="dshx:truncate">{note.scope}</dd>
             </div>
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Created</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Created</dt>
               <dd>{PanelFormat.formatStamp(note.createdAt)}</dd>
             </div>
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Updated</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Updated</dt>
               <dd>{PanelFormat.formatStamp(note.updatedAt)}</dd>
             </div>
           </dl>
@@ -494,7 +494,7 @@ const NoteDetail = (props: {
         <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Note history">
           <div className="dshx:flex dshx:items-center dshx:justify-between">
             <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">History</h4>
-            <span className="dshx:text-[11px] dshx:text-muted-foreground">
+            <span className="dshx:text-2xs dshx:text-muted-foreground">
               {versions.length} version{versions.length === 1 ? '' : 's'}
             </span>
           </div>
@@ -514,7 +514,7 @@ const NoteDetail = (props: {
                   >
                     n:{version.id}
                   </button>
-                  <span className="dshx:text-[11px] dshx:text-muted-foreground">
+                  <span className="dshx:text-2xs dshx:text-muted-foreground">
                     {PanelFormat.formatStamp(version.updatedAt)} · {noteStatusLabels[version.status]} · {originLabels[version.origin]}
                   </span>
                   <span className="dshx:text-xs">{PanelFormat.noteExcerpt(version.text, 160)}</span>
@@ -657,7 +657,7 @@ export const NotesTab = (props: {
                   onChange={event => setSearch(event.currentTarget.value)}
                   className="dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:bg-transparent dshx:text-sm dshx:outline-none dshx:placeholder:text-muted-foreground"
                 />
-                <kbd className="dshx:rounded dshx:border dshx:border-border dshx:px-1 dshx:text-[10px] dshx:text-muted-foreground">/</kbd>
+                <kbd className="dshx:rounded dshx:border dshx:border-border dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">/</kbd>
               </div>
               <div className="dshx:flex dshx:items-center dshx:gap-0.5">
                 <Button
@@ -763,9 +763,9 @@ export const NotesTab = (props: {
               </Tooltip>
             </div>
             <div className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-2 dshx:pt-0.5">
-              <span className="dshx:text-[13px] dshx:font-semibold">{PanelFormat.formatCount(visibleNotes.length)} memories</span>
+              <span className="dshx:text-sm dshx:font-semibold">{PanelFormat.formatCount(visibleNotes.length)} memories</span>
               <span className="dshx:flex-1" />
-              <span className="dshx:text-[11px] dshx:text-muted-foreground">
+              <span className="dshx:text-2xs dshx:text-muted-foreground">
                 Active {PanelFormat.formatCount(counts.data?.active ?? 0)} · Archived {PanelFormat.formatCount(counts.data?.archived ?? 0)} · Superseded{' '}
                 {PanelFormat.formatCount(counts.data?.superseded ?? 0)} · Forgotten {PanelFormat.formatCount(counts.data?.forgotten ?? 0)}
               </span>
@@ -810,14 +810,14 @@ export const NotesTab = (props: {
                   Close
                 </Button>
               </div>
-              <p className="dshx:text-[11px] dshx:text-muted-foreground">
+              <p className="dshx:text-2xs dshx:text-muted-foreground">
                 Jev sees note text and can only suggest; it never archives automatically. Unknown results need manual review.
               </p>
               {review.data.results.map(result => (
                 <div key={result.id} className="dshx:flex dshx:items-start dshx:gap-3 dshx:border-t dshx:border-border dshx:pt-2">
                   <div className="dshx:min-w-0 dshx:flex-1">
                     <p className="dshx:line-clamp-3 dshx:text-xs">{result.text}</p>
-                    <p className="dshx:mt-1 dshx:text-[11px] dshx:text-muted-foreground">
+                    <p className="dshx:mt-1 dshx:text-2xs dshx:text-muted-foreground">
                       {result.probability === null ? 'Unknown — review manually' : `Likely relevant: ${Math.round(result.probability * 100)}%`}
                       {result.candidate ? ' · may be outdated' : ''}
                     </p>
@@ -880,7 +880,7 @@ export const NotesTab = (props: {
                 ))}
           </div>
           {selection.ids.length === 0 ? null : (
-            <div className="dshx:sticky dshx:bottom-0 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:border-border dshx:bg-popover dshx:p-2 dshx:pl-3 dshx:text-[13px]">
+            <div className="dshx:sticky dshx:bottom-0 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:border-border dshx:bg-popover dshx:p-2 dshx:pl-3 dshx:text-sm">
               <span className="dshx:mr-2 dshx:tabular-nums">{selection.ids.length} selected</span>
               <Button
                 size="xs"

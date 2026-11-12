@@ -17,6 +17,7 @@ import {
 import { SUBSCRIPTION_DELIVERY_MODES, SUBSCRIPTION_NOTICE_LEVELS } from './subscription-levels.js'
 import { THREAD_DELAYS } from './thread-delays.js'
 import { threadViewSettingsSchema } from './thread-view-preferences.js'
+import { threadBoardViewSchema } from './thread-board-view.js'
 import {
   DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
   THREAD_NOTIFICATION_PLACEMENTS,
@@ -128,8 +129,11 @@ const preferencesInputFields = {
   ),
   workspaceFilter: SchemaHelpers.withDecodedDefault(Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))), () => DEFAULT_PREFERENCES.workspaceFilter),
   layoutMode: SchemaHelpers.withDecodedDefault(Schema.Literals(['fixed', 'docking']), () => DEFAULT_PREFERENCES.layoutMode),
+  layoutMerge: SchemaHelpers.withDecodedDefault(Schema.NullOr(Schema.Literals(['fixed', 'docking'])), () => DEFAULT_PREFERENCES.layoutMerge),
   headerMode: Schema.Literals(['compact', 'expanded']),
   hideBrandLogo: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.hideBrandLogo),
+  showFooter: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.showFooter),
+  showRailActions: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.showRailActions),
   headerRegionHeight: SchemaHelpers.withDecodedDefault(
     Schema.NullOr(
       Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(40)).check(Schema.isLessThanOrEqualTo(10000)),
@@ -220,6 +224,8 @@ const preferencesInputFields = {
   ),
   finishedSubagents: SchemaHelpers.withDecodedDefault(Schema.Literals(['show', 'collapse', 'hide']), () => DEFAULT_PREFERENCES.finishedSubagents),
   threadViews: SchemaHelpers.withDecodedDefault(threadViewSettingsSchema, () => DEFAULT_PREFERENCES.threadViews),
+  boardView: SchemaHelpers.withDecodedDefault(threadBoardViewSchema, () => DEFAULT_PREFERENCES.boardView),
+  sidebarTree: SchemaHelpers.withDecodedDefault(Schema.Unknown, () => DEFAULT_PREFERENCES.sidebarTree),
 }
 
 const preferencesInputSchema = SchemaHelpers.strictStruct(Schema.Struct(preferencesInputFields))

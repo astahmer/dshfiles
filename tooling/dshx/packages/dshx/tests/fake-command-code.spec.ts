@@ -57,6 +57,52 @@ describe('fake Command Code provider', () => {
     }
   })
 
+  it('reports the prompt tokens a usage directive names after the answer', async () => {
+    const fake = await startFakeCommandCode()
+    try {
+      const response = await requestCompletion(fake.baseUrl, '[[usage 76800]] [[answer Reading the codebase.]]')
+      const lines = (await response.text()).split(/\r?\n/u).filter(line => line.startsWith('data: {'))
+      const usageChunk = lines.find(line => line.includes('"usage"'))
+      expect(usageChunk).toContain('"prompt_tokens":76800')
+      expect(lines.join('\n')).toContain('Reading the codebase.')
+    } finally {
+      await fake.close()
+    }
+  })
+
+  it('reports the weekly use a -USED key names', async () => {
+    const fake = await startFakeCommandCode()
+    try {
+      const read = async (key: string) => await (await fetch(`${fake.baseUrl}/alpha/billing/credits`, { headers: { authorization: `Bearer ${key}` } })).text()
+      expect(await read('dshx-dev-fake-key-USED37')).toContain('"weekly":{"used":37,"cap":100')
+      expect(await read('dshx-dev-fake-key')).toContain('"weekly":{"used":90,"cap":100')
+    } finally {
+      await fake.close()
+    }
+  })
+
+  it('answers the after directive once the turn has a tool result', async () => {
+    const fake = await startFakeCommandCode()
+    try {
+      const message = '[[call write {"file_path":"a.ts","content":"x"}]] [[after Wrote `a.ts:1`.]]'
+      const response = await fetch(`${fake.baseUrl}/provider/v1/chat/completions`, {
+        method: 'POST',
+        headers: { authorization: 'Bearer TEST-ALPHA1', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'user', content: message },
+            { role: 'assistant', content: '' },
+            { role: 'tool', content: 'ok' },
+          ],
+        }),
+      })
+      const chunks = await readCompletionChunks(response)
+      expect(chunks.flatMap(chunk => chunk.choices.map(choice => choice.delta.content ?? '')).join('')).toBe('Wrote `a.ts:1`.')
+    } finally {
+      await fake.close()
+    }
+  })
+
   it('uses distinct completion IDs and emits bounded word-sized chunks', async () => {
     const fake = await startFakeCommandCode()
     try {

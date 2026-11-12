@@ -9,6 +9,7 @@ import * as Schema from 'effect/Schema'
 import { SqlClient } from 'effect/sql'
 import * as SchemaGetter from 'effect/SchemaGetter'
 import type { HistoryPrompt, IndexHealth, PromptHistoryRequest } from './api-schemas.js'
+import { FtsQuery } from './fts-query.js'
 import { withoutUndefined } from './optional-fields.js'
 import type { EventFilters, FindInSessionRequest, SearchMatch, SessionEventSearchRequest, SessionHeaderRow, SessionSearchRequest } from './protocol.js'
 import { sessionHeaderSchema } from './protocol.js'
@@ -568,6 +569,7 @@ export class SearchIndex {
 
   readonly rankedRows = (input: {
     readonly table: DocumentTable
+    /** An FTS5 expression built by `FtsQuery.of`, never raw user text. */
     readonly query: string
     readonly filters: readonly string[]
     readonly bindings: readonly (string | number)[]
@@ -635,6 +637,10 @@ export class SearchIndex {
 
   readonly searchSessions = (request: SessionSearchRequest) =>
     Effect.gen({ self: this }, function* () {
+      // dshfiles: typed text is searched literally (FtsQuery), never parsed as FTS5 syntax.
+      const revision = yield* this.revision()
+      const match = FtsQuery.of(request.query)
+      if (match === null) return { matches: [], hasMore: false, revision }
       const filters: string[] = []
       const bindings: (string | number)[] = []
       if (request.sessionIds !== undefined && request.sessionIds.length > 0) {
@@ -645,7 +651,6 @@ export class SearchIndex {
         filters.push('s.cwd = ?')
         bindings.push(request.cwd)
       }
-      const revision = yield* this.revision()
       const route = yield* this.route(request.filters)
       const events = eventFilterClauses(route.filters)
       const rows = yield* this.rankedRows({
@@ -655,7 +660,7 @@ export class SearchIndex {
         limit: request.limit + 1,
         offset: request.cursor ?? 0,
         sessionId: undefined,
-        query: request.query,
+        query: match,
       })
       return { matches: rows.slice(0, request.limit).map(this.match), hasMore: rows.length > request.limit, revision }
     })
@@ -674,6 +679,8 @@ export class SearchIndex {
   readonly searchEvents = (request: SessionEventSearchRequest) =>
     Effect.gen({ self: this }, function* () {
       const revision = yield* this.revision()
+      const match = FtsQuery.of(request.query)
+      if (match === null) return { header: yield* this.sessionHeader(request.sessionId), matches: [], hasMore: false, revision }
       const route = yield* this.route(request.filters)
       const events = eventFilterClauses(route.filters)
       const rows = yield* this.rankedRows({
@@ -683,7 +690,7 @@ export class SearchIndex {
         limit: request.limit + 1,
         offset: request.cursor ?? 0,
         sessionId: request.sessionId,
-        query: request.query,
+        query: match,
       })
       const first = rows[0]
       return {
@@ -699,11 +706,13 @@ export class SearchIndex {
       this.sql.unsafe(
         `SELECT d.seq AS seq, d.type AS type, d.time AS time, snippet(session_documents, 0, ?, ?, '…', 24) AS marked_text
       FROM session_documents AS d WHERE session_documents MATCH ? AND d.session_id = ? AND d.surface = 'current'
-      ORDER BY d.seq ASC, d.rowid ASC LIMIT ?`,
+      ORDER BY d.seq ${request.newest === true ? 'DESC' : 'ASC'}, d.rowid ${request.newest === true ? 'DESC' : 'ASC'} LIMIT ?`,
         [MARKER_START, MARKER_END, request.query, request.sessionId, request.limit + 1],
       ),
       values => {
-        const rows = values.map(value => Schema.decodeUnknownSync(findRowSchema)(value))
+        const decoded = values.map(value => Schema.decodeUnknownSync(findRowSchema)(value))
+        // `newest` reads from the tail; the page it keeps is still handed back oldest first.
+        const rows = request.newest === true ? [...decoded.slice(0, request.limit).reverse(), ...decoded.slice(request.limit)] : decoded
         return {
           matches: rows
             .slice(0, request.limit)

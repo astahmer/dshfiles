@@ -323,25 +323,30 @@ Then('find in thread jumps to an unmounted turn and steps through every match', 
   await expect(page.getByText('Transcript answer 180', { exact: true })).toBeVisible()
   await expect(page.getByText('Transcript question 42', { exact: true })).toHaveCount(0)
   await page.keyboard.press('ControlOrMeta+f')
+  // The fork's find bar (productivity pass Q4; the merge of 2026-11-11 kept it over upstream's): numbered from the newest.
   const bar = page.getByRole('search', { name: 'Find in thread', exact: true })
-  const field = bar.getByRole('textbox', { name: 'Find in thread', exact: true })
-  const count = bar.locator('[data-chat-find-count]')
+  const field = bar.getByRole('searchbox', { name: 'Find in thread', exact: true })
+  const count = bar.locator('[data-thread-find-count]')
   await expect(field).toBeFocused()
   await field.fill('question 42')
   await recordAssertion(page, 'chat-find-in-thread-jumps-to-unmounted-turn', async () => {
-    await expect(count).toHaveText('1/1', { timeout: 20_000 })
+    await expect(count).toHaveText('1 of 1', { timeout: 20_000 })
     await expect(page.getByText('Transcript question 42', { exact: true })).toBeVisible({ timeout: 15_000 })
   })
-  // "4" is a prefix of turns 4 and 40-49: eleven user messages, the newest selected first.
+  // "4" is a prefix of turns 4 and 40-49: eleven user messages. The bar lands on the newest one at or above the reader
+  // (turn 42 is on screen), so step newer (Shift+Enter) to the newest, numbered 1.
   await field.fill('question 4')
-  await expect(count).toHaveText('11/11', { timeout: 20_000 })
-  await field.press('Enter')
+  await expect(count).toHaveText(/^\d+ of 11$/u, { timeout: 20_000 })
+  for (let step = 0; step < 11 && (await count.textContent()) !== '1 of 11'; step += 1) await field.press('Shift+Enter')
+  await expect(count).toHaveText('1 of 11')
+  // Shift+Enter wraps from the newest to the oldest match, turn 4.
+  await field.press('Shift+Enter')
   await recordAssertion(page, 'chat-find-in-thread-steps-through-matches', async () => {
-    await expect(count).toHaveText('1/11')
+    await expect(count).toHaveText('11 of 11')
     await expect(page.getByText('Transcript question 4', { exact: true })).toBeVisible({ timeout: 15_000 })
   })
-  await field.press('Shift+Enter')
-  await expect(count).toHaveText('11/11')
+  await field.press('Enter')
+  await expect(count).toHaveText('1 of 11')
   await field.press('Escape')
   await recordAssertion(page, 'chat-find-in-thread-closes', async () => {
     await expect(bar).toHaveCount(0)
@@ -389,7 +394,7 @@ const openImageLinkFixture = async (page: Page): Promise<void> => {
     .toBeGreaterThan(0)
   await fixture.first().click()
   await page
-    .getByText(/^Completed in /)
+    .getByText(/^Worked for /)
     .last()
     .click()
 }
@@ -461,7 +466,7 @@ Then('the image link opens in the gallery rather than a side panel', async ({ pa
   const backToBottom = page.getByRole('button', { name: 'Back to bottom', exact: true })
   const rightSidebar = page.getByRole('button', { name: 'Open right sidebar', exact: true })
   const leftSidebarGroup = page.getByRole('treeitem', { name: 'Ungrouped', exact: true })
-  const composer = page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })
   const pointIsInsideLightbox = async (element: Locator): Promise<boolean> =>
     element.evaluate(target => {
       const bounds = target.getBoundingClientRect()

@@ -159,8 +159,9 @@ describe('onboarding Host', () => {
           signal: new AbortController().signal,
         }),
       )
-      expect(text).toContain('1. Click \\"All threads\\" (button)')
-      expect(text).toContain('Right-click \\"Idle policy target\\" (text) — not replayable here')
+      // The fork's thread-sidebar reaches its list views through the Filter menu.
+      expect(text).toContain('1. Click \\"Filter: \\" (button)')
+      expect(text).toContain('Right-click \\"Idle policy target\\" (button) — not replayable here')
       expect(text).toContain('Docs: https://github.com/astahmer/dshfiles/blob/main/plugins/@dshfiles/thread-sidebar/README.md')
       const phone = JSON.stringify(
         await host.tools.execute({

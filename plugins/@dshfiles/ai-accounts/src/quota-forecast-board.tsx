@@ -35,7 +35,7 @@ const Cell = (props: { readonly cell: ForecastCell }): JSX.Element => {
   return (
     <div
       className={cn(
-        'dshx:relative dshx:h-full dshx:rounded-[3px]',
+        'dshx:relative dshx:h-full dshx:rounded-xs',
         cell.kind === 'projected' && shadeOf(cell.used),
         cell.kind === 'runs-out' && 'dshx:bg-destructive/30',
         cell.kind === 'locked' && 'dshx:bg-destructive/10 dshx:text-destructive/60',
@@ -51,7 +51,7 @@ const Cell = (props: { readonly cell: ForecastCell }): JSX.Element => {
       )}
       {cell.resetOffset === null ? null : (
         <span className="dshx:absolute dshx:-inset-y-1 dshx:z-10 dshx:w-0.5 dshx:bg-foreground" style={{ left: `${String(cell.resetOffset * 100)}%` }}>
-          <span className="dshx:absolute dshx:top-1/2 dshx:left-1.5 dshx:-translate-y-1/2 dshx:text-[10px] dshx:text-muted-foreground">reset</span>
+          <span className="dshx:absolute dshx:top-1/2 dshx:left-1.5 dshx:-translate-y-1/2 dshx:text-2xs dshx:text-muted-foreground">reset</span>
         </span>
       )}
     </div>
@@ -63,7 +63,7 @@ const DayHeader = (props: { readonly cellStarts: readonly number[]; readonly now
   const starts = props.cellStarts.flatMap((start, index) => (index === 0 || new Date(start).getHours() === 0 ? [index] : []))
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:text-xs">
-      <span className="dshx:text-[11px] dshx:font-medium">Now</span>
+      <span className="dshx:text-2xs dshx:font-medium">Now</span>
       <div className="dshx:grid dshx:grid-cols-[repeat(28,minmax(0,1fr))] dshx:text-muted-foreground">
         {starts.map((index, position) => {
           const span = (starts[position + 1] ?? props.cellStarts.length) - index
@@ -106,7 +106,7 @@ const BoardRow = (props: {
         <span aria-hidden className="dshx:absolute dshx:-inset-y-2 dshx:left-0 dshx:border-l dshx:border-dashed dshx:border-muted-foreground/60" />
         {account.status === 'forecast'
           ? account.cells.map(cell => <Cell cell={cell} key={cell.start} />)
-          : Array.from({ length: 28 }, (_, index) => <span className="dshx:rounded-[3px] dshx:border dshx:border-dashed dshx:border-border/70" key={index} />)}
+          : Array.from({ length: 28 }, (_, index) => <span className="dshx:rounded-xs dshx:border dshx:border-dashed dshx:border-border/70" key={index} />)}
       </span>
       <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:text-sm">
         {line === null ? (
@@ -130,7 +130,7 @@ const BoardRow = (props: {
 }
 
 const LegendSwatch = (props: { readonly className?: string; readonly style?: CSSProperties }): JSX.Element => (
-  <span aria-hidden className={cn('dshx:inline-block dshx:h-2.5 dshx:w-4 dshx:rounded-[2px]', props.className)} style={props.style} />
+  <span aria-hidden className={cn('dshx:inline-block dshx:h-2.5 dshx:w-4 dshx:rounded-xs', props.className)} style={props.style} />
 )
 
 const BoardLegend = (): JSX.Element => (
@@ -276,9 +276,9 @@ const RecentPace = (props: { readonly window: WindowForecast; readonly now: numb
           const over = allowedPerDay !== null && day.used > allowedPerDay
           return (
             <div className="dshx:flex dshx:h-full dshx:flex-col dshx:items-center dshx:justify-end dshx:gap-1" key={day.day}>
-              <span className="dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">{Math.round(day.used)}</span>
+              <span className="dshx:text-2xs dshx:tabular-nums dshx:text-muted-foreground">{Math.round(day.used)}</span>
               <span
-                className={cn('dshx:w-full dshx:max-w-8 dshx:rounded-t-[3px]', over ? 'dshx:bg-warning' : 'dshx:bg-muted-foreground/50')}
+                className={cn('dshx:w-full dshx:max-w-8 dshx:rounded-t-xs', over ? 'dshx:bg-warning' : 'dshx:bg-muted-foreground/50')}
                 style={{ height: `${String((day.used / top) * 100)}%` }}
               />
             </div>

@@ -21,6 +21,17 @@ Feature: Queued message dock
     When the held turn finishes
     Then the provider receives the queued messages in the reordered order
 
+  @scenario:queue-reorder.steer-queued
+  Scenario: Steer one queued message into the running turn, then the rest with Cmd+Enter
+    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread on the fake model is kept busy by a held turn
+    And the messages "first queued", "second queued" and a long third one are queued
+    And the queued message "second queued" is steered from its row
+    Then "second queued" leaves the queue and joins the running turn
+    When the rest of the queue is steered with Cmd+Enter
+    Then the queue is empty and the running turn continues with every steered message
+
   @scenario:queue-reorder.busy-locks
   Scenario: Edit a queued message in the composer and cancel it back into place
     Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/ai-accounts" is booted

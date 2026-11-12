@@ -66,14 +66,14 @@ export const threadSidebarNavigationApi = defineApi({
       description: 'Count one rail destination or section open. Records ids and counts only, never content.',
     }),
     counts: method({
-      input: SchemaHelpers.strictStruct(Schema.Struct({})),
+      input: SchemaHelpers.toolInput({}),
       output: navigationCountsSchema,
       description:
         'Read how often each rail destination and section was opened in the DSH GUI, and from which surface (rail, phone tab bar, list index, palette, moved-to help, phone Back). Ids and counts only. Read-only.',
       tool: { name: 'shell_navigation_counts', readOnly: true, render },
     }),
     reset: method({
-      input: SchemaHelpers.strictStruct(Schema.Struct({ confirm: Schema.Literal(true) })),
+      input: SchemaHelpers.toolInput({ confirm: Schema.Literal(true) }),
       output: navigationCountsSchema,
       description: 'Clear the navigation counts and start counting again. Call only when the user asked to reset them; confirm must be true.',
       tool: { name: 'shell_navigation_reset', render },

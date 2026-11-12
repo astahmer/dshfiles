@@ -36,9 +36,7 @@ const renderProjectOption = (option: ComboboxOption): ReactNode => {
     <>
       <ItemGlyphs.ProjectDot project={option.value} />
       <span className="dshx:min-w-0 dshx:truncate">{ItemGlyphs.projectName(option.value)}</span>
-      <span className="dshx:ml-auto dshx:max-w-32 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
-        {ItemGlyphs.displayProjectPath(option.value)}
-      </span>
+      <span className="dshx:ml-auto dshx:max-w-32 dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{ItemGlyphs.displayProjectPath(option.value)}</span>
     </>
   )
 }
@@ -123,21 +121,21 @@ export const ProjectFilterPicker = (props: {
           <CommandList>
             <CommandEmpty>No project matches.</CommandEmpty>
             <CommandGroup>
-              <CommandItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.onPick([])} value={ALL_PROJECTS}>
+              <CommandItem className="dshx:gap-2 dshx:text-sm" onSelect={() => props.onPick([])} value={ALL_PROJECTS}>
                 <FolderIcon aria-hidden />
                 <span className="dshx:min-w-0 dshx:flex-1">All projects</span>
                 {props.selection.length === 0 ? <CheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" /> : null}
               </CommandItem>
             </CommandGroup>
             <CommandGroup heading="Project">
-              <CommandItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => toggle(null)} value={NO_PROJECT}>
+              <CommandItem className="dshx:gap-2 dshx:text-sm" onSelect={() => toggle(null)} value={NO_PROJECT}>
                 <FolderIcon aria-hidden className="dshx:text-muted-foreground/50" />
                 <span className="dshx:min-w-0 dshx:flex-1 dshx:text-muted-foreground">No project</span>
                 {props.selection.includes(null) ? <CheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" /> : null}
               </CommandItem>
               {projects.map(project => (
                 <CommandItem
-                  className="dshx:gap-2 dshx:text-[13px]"
+                  className="dshx:gap-2 dshx:text-sm"
                   key={project}
                   keywords={[project, ItemGlyphs.displayProjectPath(project), ItemGlyphs.projectName(project)]}
                   onSelect={() => toggle(project)}
@@ -145,7 +143,7 @@ export const ProjectFilterPicker = (props: {
                 >
                   <ItemGlyphs.ProjectDot project={project} />
                   <span className="dshx:min-w-0 dshx:truncate">{ItemGlyphs.projectName(project)}</span>
-                  <span className="dshx:ml-auto dshx:max-w-40 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
+                  <span className="dshx:ml-auto dshx:max-w-40 dshx:truncate dshx:text-2xs dshx:text-muted-foreground">
                     {ItemGlyphs.displayProjectPath(project)}
                   </span>
                   {props.selection.includes(project) ? <CheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" /> : null}

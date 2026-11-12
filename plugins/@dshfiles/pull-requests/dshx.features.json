@@ -144,7 +144,7 @@
       "currentSurface": "palette: Create pull request from this thread (dialog)",
       "reach": [
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Open a pull request\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Open a pull request\"",
         "press Enter",
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"pull request\"",

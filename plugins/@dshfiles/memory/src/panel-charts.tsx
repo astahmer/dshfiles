@@ -33,7 +33,7 @@ const Sparkline = (props: { readonly values: readonly number[]; readonly tone?: 
       {props.values.map((value, index) => (
         <span
           key={index}
-          className={cn('dshx:w-[3px] dshx:rounded-[1px] dshx:bg-primary/70', props.tone)}
+          className={cn('dshx:w-[3px] dshx:rounded-xs dshx:bg-primary/70', props.tone)}
           style={{ height: value === 0 ? '0%' : `${String(Math.max(Math.round((value / max) * 100), 8))}%` }}
         />
       ))}
@@ -63,7 +63,7 @@ export const StatCard = (props: {
           <props.Icon className="dshx:size-4" />
         </span>
       )}
-      <span className="dshx:min-w-0 dshx:flex-1 dshx:text-[11px] dshx:leading-tight dshx:text-muted-foreground">{props.label}</span>
+      <span className="dshx:min-w-0 dshx:flex-1 dshx:text-2xs dshx:leading-tight dshx:text-muted-foreground">{props.label}</span>
       {props.spark === undefined ? null : <Sparkline values={props.spark} tone={props.sparkTone} />}
     </div>
     <Tooltip>
@@ -72,7 +72,7 @@ export const StatCard = (props: {
       </TooltipTrigger>
       {props.hint === undefined ? null : <TooltipContent>{props.hint}</TooltipContent>}
     </Tooltip>
-    {props.detail === undefined ? null : <span className="dshx:min-h-4 dshx:text-[11px] dshx:text-muted-foreground">{props.detail}</span>}
+    {props.detail === undefined ? null : <span className="dshx:min-h-4 dshx:text-2xs dshx:text-muted-foreground">{props.detail}</span>}
   </div>
 )
 

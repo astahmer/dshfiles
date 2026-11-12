@@ -218,7 +218,7 @@
           "source": "agent-tool"
         }
       ],
-      "reach": ["fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@agent:\"", "expect text \"@dsh\""]
+      "reach": ["fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@agent:\"", "expect text \"@dsh\""]
     },
     {
       "id": "agent-mention-preview",

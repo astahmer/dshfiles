@@ -116,11 +116,11 @@ export const StartThreadDialog = (props: {
           {props.items.length < 2 ? null : (
             <fieldset className="dshx:flex dshx:flex-col dshx:gap-2">
               <legend className={labelClass}>Thread count</legend>
-              <label className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-[13px]">
+              <label className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-sm">
                 <input type="radio" name="backlog-thread-mode" checked={mode === 'together'} onChange={() => setMode('together')} />
                 <span>One thread for all {String(props.items.length)} items</span>
               </label>
-              <label className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-[13px]">
+              <label className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-sm">
                 <input type="radio" name="backlog-thread-mode" checked={mode === 'per-item'} onChange={() => setMode('per-item')} />
                 <span>One thread per item ({String(props.items.length)} threads)</span>
               </label>
@@ -144,7 +144,7 @@ export const StartThreadDialog = (props: {
                     {project === undefined ? null : <StatusDot className={StartThreadForm.projectTone(projectIndex(project.id))} />}
                     <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{option.label}</span>
                     {option.description === undefined ? null : (
-                      <span className="dshx:max-w-40 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{option.description}</span>
+                      <span className="dshx:max-w-40 dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{option.description}</span>
                     )}
                   </>
                 )
@@ -165,7 +165,7 @@ export const StartThreadDialog = (props: {
               value={agentHandle}
             />
             {chosenAgent === undefined ? null : (
-              <span className="dshx:text-[11px] dshx:text-muted-foreground">
+              <span className="dshx:text-2xs dshx:text-muted-foreground">
                 {chosenAgent.route === null ? 'Harness default model' : `${chosenAgent.route.provider}/${chosenAgent.route.model}`} ·{' '}
                 {chosenAgent.preset ?? 'Host default tools'}
                 {chosenAgent.instructions.trim() === '' ? '' : ' · instructions applied'}
@@ -221,13 +221,13 @@ export const StartThreadDialog = (props: {
               onChange={event => (mode === 'per-item' ? setInstructions(event.currentTarget.value) : setMessage(event.currentTarget.value))}
               rows={4}
               placeholder={mode === 'per-item' ? 'Optional; each thread gets its own item reference' : 'Leave empty to create an empty thread'}
-              className="dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:p-2 dshx:text-[13px] dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+              className="dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:p-2 dshx:text-sm dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
             />
-            <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[13px]">
+            <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
               <input type="checkbox" aria-label="Open the thread when it is created" checked={open} onChange={event => setOpen(event.currentTarget.checked)} />
               Open the thread when it is created
             </label>
-            <span className="dshx:text-[11px] dshx:text-muted-foreground">
+            <span className="dshx:text-2xs dshx:text-muted-foreground">
               {mode === 'per-item'
                 ? `Each thread is linked to one item, gets its own b: reference, and uses its project by default. `
                 : props.items.length > 1

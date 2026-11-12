@@ -6,13 +6,14 @@ import { useRegistry } from '@dshfiles/dshx/client'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { EyeOffIcon } from '@dshfiles/plugin-ui/icons'
-import { Component, createContext, memo, useContext, useMemo, useState } from 'react'
+import { Component, createContext, memo, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType, ErrorInfo, ReactNode } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { openStatusBarSettings } from '../../status-bar.ts'
 import { StatusItems, type StatusItem } from '../../status-strip.ts'
 import { DEFAULT_STATUS_STRIP_PREFERENCES, StatusStripPreferencesModel } from '../../status-strip-preferences.ts'
 import { useStatusStripSettings, type StatusStripSettings } from '../../status-strip-settings.ts'
+import { StatusSummaryModel } from '../../status-summary.ts'
 import css from './AppFrame.module.css'
 
 export interface StatusStripProps {
@@ -116,6 +117,19 @@ const StatusItemView = (props: {
   )
 }
 
+/**
+ * An item's visible words, one space between adjacent elements ("CC1" and "56%" stay two words). A subtree marked
+ * `data-status-detail` belongs to the opened list only, so the pill skips it.
+ */
+const textOf = (element: Element): string => {
+  const parts: string[] = []
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+    acceptNode: node => (node.parentElement?.closest('[data-status-detail]') === null ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+  })
+  while (walker.nextNode() !== null) parts.push(walker.currentNode.textContent ?? '')
+  return parts.join(' ')
+}
+
 /** Renders nothing until a plugin adds a visible item, so a profile without providers keeps the frame exactly as before. */
 const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStripSettings }): ReactNode => {
   const items = useRegistry(StatusItems)
@@ -124,6 +138,25 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
   const hidden = useMemo(() => StatusStripPreferencesModel.hiddenItems(items, preferences), [items, preferences])
   const [open, setOpen] = useState(false)
   const count = arranged.global.length + arranged.thread.length
+  // The phone pill reads what its items say ("1 working · Quota 56%"), never a bare "Status": the items render once
+  // more, hidden, and the pill reads their text in strip order.
+  const measureRef = useRef<HTMLDivElement | null>(null)
+  const [summary, setSummary] = useState('')
+  useEffect(() => {
+    const measure = measureRef.current
+    if (!props.narrow || measure === null) return
+    const read = (): void => {
+      setSummary(
+        StatusSummaryModel.summarize(
+          Array.from(measure.children, child => ({ label: child.getAttribute('data-status-label') ?? '', text: textOf(child) })),
+        ),
+      )
+    }
+    const observer = new MutationObserver(read)
+    observer.observe(measure, { subtree: true, childList: true, characterData: true })
+    read()
+    return () => observer.disconnect()
+  }, [props.narrow, count])
   const renderItem = (item: StatusItem, compact: boolean): ReactNode => (
     <StatusItemView key={item.id} item={item} compact={compact} useSessions={props.useSessions} settings={props.settings} hidden={hidden} />
   )
@@ -140,10 +173,25 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
   if (props.narrow) {
     return (
       <div className={css.statusStrip} data-status-strip="compact" role="status">
-        <button type="button" className={css.statusChip} aria-expanded={open} onClick={() => setOpen(current => !current)}>
+        <div ref={measureRef} hidden>
+          {[...arranged.global, ...arranged.thread].map(item => (
+            <span key={item.id} data-status-label={item.summaryLabel === false ? '' : item.label}>
+              <ItemBoundary id={item.id}>
+                <item.component compact useSessions={props.useSessions} />
+              </ItemBoundary>
+            </span>
+          ))}
+        </div>
+        <button
+          type="button"
+          className={css.statusChip}
+          aria-expanded={open}
+          aria-label={summary === '' ? 'Status' : `Status: ${summary}`}
+          data-status-summary={summary}
+          onClick={() => setOpen(current => !current)}
+        >
           <span aria-hidden="true" className={css.statusChipDot} />
-          {/* Phone: the chip is a 44px dot in the top bar, its label kept for assistive tech (AppFrame.module.css). */}
-          <span className={css.statusChipLabel}>Status</span>
+          <span className={css.statusChipLabel}>{summary === '' ? 'Status' : summary}</span>
         </button>
         {open ? (
           <div className={css.statusSheet} role="list" aria-label="Status">

@@ -213,7 +213,7 @@ function NodeCard({
           <div className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:px-1.5 dshx:py-1 dshx:text-xs dshx:text-muted-foreground dshx:[&_svg]:size-3.5">
             {node.icon}
             <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{node.label}</span>
-            {node.count !== undefined ? <span className="dshx:rounded dshx:bg-muted dshx:px-1.5 dshx:text-[10px] dshx:tabular-nums">{node.count}</span> : null}
+            {node.count !== undefined ? <span className="dshx:rounded dshx:bg-muted dshx:px-1.5 dshx:text-2xs dshx:tabular-nums">{node.count}</span> : null}
           </div>
           {node.items !== undefined && node.items.length > 0 ? (
             <ul className="dshx:flex dshx:flex-col dshx:gap-0.5">
@@ -248,7 +248,7 @@ function NodeItem({ item, onPick }: { readonly item: GraphNodeItem; readonly onP
       <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{item.label}</span>
       {item.selected === true ? <CheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-foreground" /> : null}
       {item.meta !== undefined ? (
-        <span className="dshx:shrink-0 dshx:rounded dshx:bg-muted dshx:px-1.5 dshx:text-[10px] dshx:text-muted-foreground dshx:tabular-nums">{item.meta}</span>
+        <span className="dshx:shrink-0 dshx:rounded dshx:bg-muted dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">{item.meta}</span>
       ) : null}
     </>
   )

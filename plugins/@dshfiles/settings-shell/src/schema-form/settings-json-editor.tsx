@@ -142,7 +142,7 @@ const InsertSetting = (props: {
                 >
                   <span className="dshx:flex dshx:min-w-0 dshx:flex-col">
                     <span className="dshx:truncate">{field.title}</span>
-                    <code className="dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">{field.path.join('.')}</code>
+                    <code className="dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{field.path.join('.')}</code>
                     {field.description !== '' && <span className="dshx:line-clamp-2 dshx:text-xs dshx:text-muted-foreground">{field.description}</span>}
                   </span>
                 </CommandItem>

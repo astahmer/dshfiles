@@ -6,7 +6,7 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const PAGE_TEXT = 'Hello from the preview fixture'
 const SERVER_SOURCE = `import { createServer } from 'node:http'
 createServer((_request, response) => {
@@ -95,7 +95,7 @@ Then('the preview page is listed beside the server and its snapshot holds the pa
   await recordAssertion(page, 'preview-snapshot-holds-page-text', async () => {
     await page.keyboard.press('Escape')
     await page
-      .getByRole('button', { name: /^Completed in / })
+      .getByRole('button', { name: /^Worked for / })
       .last()
       .click()
     await page.getByRole('button', { name: 'Called tools', exact: true }).last().click()

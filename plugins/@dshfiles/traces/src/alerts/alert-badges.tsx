@@ -7,7 +7,7 @@ import type { TracesAlertsTranslate } from './alerts-locale.js'
 /** The attention marker on the Alerts tab: the number of firing rules, nothing while none fire. */
 export const FiringAlertsCount = (props: { readonly firing: number | null }): JSX.Element | null =>
   props.firing === null || props.firing === 0 ? null : (
-    <Badge variant="destructive" className="dshx:ml-1 dshx:h-4 dshx:min-w-4 dshx:px-1 dshx:text-[10px]" data-testid="traces-alerts-firing-count">
+    <Badge variant="destructive" className="dshx:ml-1 dshx:h-4 dshx:min-w-4 dshx:px-1 dshx:text-2xs" data-testid="traces-alerts-firing-count">
       {props.firing}
     </Badge>
   )

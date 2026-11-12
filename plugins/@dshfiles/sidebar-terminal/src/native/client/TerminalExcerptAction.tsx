@@ -1,6 +1,6 @@
 /** The excerpt action that appears only while the terminal holds a selection. */
 import type { ReactNode } from 'react'
-import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import type { TerminalExcerpt } from './excerpt.ts'
 
 /** Copy and state the terminal screen supplies for its one excerpt action. */
@@ -24,7 +24,7 @@ export interface TerminalExcerptActionProps {
 export function TerminalExcerptAction({ excerpt, attach, failed, label, failedLabel, styles }: TerminalExcerptActionProps): ReactNode {
   if (excerpt === undefined) return null
   return (
-    <div className={styles.excerptAction}>
+    <div className={`dshx-root ${styles.excerptAction ?? ''}`}>
       {/* Keeping focus in the terminal holds its selection while the click lands. */}
       <Button variant="outline" size="sm" onMouseDown={event => { event.preventDefault() }} onClick={() => { attach(excerpt) }}>{label}</Button>
       {failed && <p className={styles.excerptFailed} role="alert">{failedLabel}</p>}

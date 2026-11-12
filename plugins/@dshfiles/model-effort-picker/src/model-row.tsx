@@ -3,15 +3,12 @@ import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selec
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { aiAccountsFastModeApi } from '@dshfiles/ai-accounts/model-fast-mode-api'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@dshfiles/plugin-ui/components/ui/hover-card'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { accountColor } from './account-color.js'
-import { effortGlyph } from './effort-levels.js'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
-import { AccountBadge, BrandMark, EffortBars, ProviderLabel, QuotaText } from './picker-atoms.js'
+import { BrandMark, ProviderLabel, QuotaText } from './picker-atoms.js'
 
 type CatalogGroup = ModelDirectoryState['groups'][number]
 type CatalogModel = CatalogGroup['models'][number]
@@ -72,81 +69,6 @@ const FastModeToggle = ({
   )
 }
 
-type EffortPickerProps = {
-  readonly efforts: NonNullable<CatalogModel['reasoning']>['efforts']
-  readonly effortIndex: number
-  readonly busy: boolean
-  readonly onSelect: (index: number) => void
-}
-
-const EffortPicker = ({ efforts, effortIndex, busy, onSelect }: EffortPickerProps) => {
-  const [open, setOpen] = useState(false)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const total = efforts.length
-  // A wheel scroll does not move the pointer off the trigger, so the card stayed open and followed its row up the
-  // list, then stuck to the top of the window once the row scrolled out. Close it when anything around it scrolls.
-  useEffect(() => {
-    if (!open) return
-    const close = (event: Event) => {
-      if (event.target instanceof Node && event.target.contains(triggerRef.current)) setOpen(false)
-    }
-    window.addEventListener('scroll', close, { capture: true, passive: true })
-    return () => window.removeEventListener('scroll', close, { capture: true })
-  }, [open])
-  return (
-    <HoverCard closeDelay={80} onOpenChange={setOpen} open={open} openDelay={120}>
-      <HoverCardTrigger asChild>
-        <button
-          aria-label={total === 0 ? 'No reasoning levels' : `Reasoning effort: ${efforts[effortIndex]?.name ?? 'Default'}`}
-          className="dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:outline-none dshx:hover:bg-muted dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
-          data-model-effort-trigger
-          disabled={total === 0}
-          onClick={() => setOpen(true)}
-          ref={triggerRef}
-          type="button"
-        >
-          <EffortBars glyph={effortGlyph({ index: effortIndex, total })} />
-        </button>
-      </HoverCardTrigger>
-      <HoverCardContent
-        align="end"
-        className="dshx-root dshx:w-auto dshx:p-1.5"
-        collisionPadding={8}
-        data-model-effort-popover
-        hideWhenDetached
-        side="bottom"
-        sideOffset={4}
-      >
-        <p className="dshx:px-1 dshx:pb-1.5 dshx:text-[10px] dshx:font-medium dshx:text-muted-foreground">Reasoning effort</p>
-        <div className="dshx:flex dshx:items-stretch dshx:gap-0.5">
-          {efforts.map((effort, index) => (
-            <button
-              aria-label={effort.name}
-              aria-pressed={index === effortIndex}
-              className={cn(
-                'dshx:flex dshx:min-w-10 dshx:flex-col dshx:items-center dshx:gap-1 dshx:rounded dshx:px-1 dshx:py-1 dshx:text-[10px] dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-                index === effortIndex && 'dshx:bg-info/10 dshx:font-semibold dshx:text-foreground dshx:ring-1 dshx:ring-info/60',
-              )}
-              data-model-effort-option
-              disabled={busy}
-              key={effort.id}
-              onClick={() => {
-                onSelect(index)
-                setOpen(false)
-                triggerRef.current?.focus()
-              }}
-              type="button"
-            >
-              <EffortBars className="dshx:h-4 dshx:w-3.5" glyph={effortGlyph({ index, total })} />
-              <span className="dshx:whitespace-nowrap">{effort.name}</span>
-            </button>
-          ))}
-        </div>
-      </HoverCardContent>
-    </HoverCard>
-  )
-}
-
 export const ModelRow = (props: {
   readonly group: CatalogGroup
   readonly model: CatalogModel
@@ -154,25 +76,25 @@ export const ModelRow = (props: {
   readonly busy: boolean
   readonly sessionId: string
   readonly quota: ModelQuota | undefined
-  readonly accountAccent: string | undefined
   readonly providerLabel: string | undefined
   readonly current: ModelSelection | null
   readonly fanOutSelected: boolean
   readonly onSelect: (selection: ModelSelection) => void
   readonly onFanOut: (selection: ModelSelection) => void
   readonly onInspect: () => void
-  readonly onEffort: (selection: ModelSelection) => void
+  /** Select several is on: a click collects the route for a fan-out instead of switching the model. */
+  readonly selectSeveral?: boolean
 }) => {
   const [revealed, setRevealed] = useState(false)
-  const efforts = props.model.reasoning?.efforts ?? []
-  const selectedEffort = props.active ? (props.current?.reasoningEffort ?? props.model.reasoning?.defaultEffort) : props.model.reasoning?.defaultEffort
-  const effortIndex = Math.max(
-    0,
-    efforts.findIndex(effort => effort.id === selectedEffort),
-  )
+  // A long press on touch collects the route (b:ysaj), and the click it ends with is swallowed.
+  const press = useRef<{ timer: ReturnType<typeof setTimeout> | undefined; fired: boolean }>({ timer: undefined, fired: false })
+  const cancelPress = (): void => {
+    if (press.current.timer !== undefined) clearTimeout(press.current.timer)
+    press.current.timer = undefined
+  }
+  useEffect(() => cancelPress, [])
   const name = ModelPickerModel.displayName({ group: props.group, model: props.model })
   const brand = ModelPickerModel.brandFor({ model: props.model })
-  const accountLabel = ModelPickerModel.accountTag({ name: props.group.name, provider: props.providerLabel })
 
   return (
     <div
@@ -193,17 +115,37 @@ export const ModelRow = (props: {
         data-model-picker-option
         disabled={props.busy}
         onClick={event => {
+          if (press.current.fired) {
+            press.current.fired = false
+            return
+          }
           const selection = ModelPickerModel.selectionForModel(props.group, props.model, props.current)
-          if (event.shiftKey) props.onFanOut(selection)
+          if (event.shiftKey || props.selectSeveral === true) props.onFanOut(selection)
           else props.onSelect(selection)
         }}
+        onContextMenu={event => {
+          if (press.current.fired) event.preventDefault()
+        }}
+        onPointerCancel={cancelPress}
+        onPointerDown={event => {
+          press.current.fired = false
+          if (event.pointerType !== 'touch') return
+          cancelPress()
+          press.current.timer = setTimeout(() => {
+            press.current.timer = undefined
+            press.current.fired = true
+            props.onFanOut(ModelPickerModel.selectionForModel(props.group, props.model, props.current))
+          }, 500)
+        }}
+        onPointerLeave={cancelPress}
+        onPointerUp={cancelPress}
         type="button"
       >
         <BrandMark brand={brand} className="dshx:size-4" name={name} />
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1 dshx:overflow-hidden">
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[11px] dshx:font-medium" data-model-picker-name>
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-2xs dshx:font-medium" data-model-picker-name>
                 {name}
               </span>
             </TooltipTrigger>
@@ -211,7 +153,7 @@ export const ModelRow = (props: {
           </Tooltip>
           {props.providerLabel === undefined ? null : (
             <>
-              <span aria-hidden="true" className="dshx:shrink-0 dshx:text-[10px] dshx:text-muted-foreground/50">
+              <span aria-hidden="true" className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground/50">
                 ·
               </span>
               <ProviderLabel className="dshx:max-w-[7rem]" label={props.providerLabel} />
@@ -219,26 +161,11 @@ export const ModelRow = (props: {
           )}
         </span>
       </button>
-      <AccountBadge
-        className="dshx:max-w-[9rem] dshx:shrink"
-        color={accountColor({ accentColor: props.accountAccent, instanceId: props.group.id })}
-        label={accountLabel}
-        name={props.group.name}
-      />
-      <span className="dshx:flex dshx:w-7 dshx:shrink-0 dshx:justify-end">
+      {/* b:16yr: one row per model, so no account badge or per-row effort glyph: the account and the reasoning effort are
+          chosen in the detail panel. What stays is what is left on the account a click would use, quiet unless low. */}
+      <span className="dshx:flex dshx:w-8 dshx:shrink-0 dshx:justify-end" data-model-picker-quota>
         {props.quota === undefined ? null : <QuotaText label={props.quota.label} onReserve={props.quota.onReserve} percent={props.quota.percent} />}
       </span>
-      <EffortPicker
-        busy={props.busy}
-        effortIndex={effortIndex}
-        efforts={efforts}
-        onSelect={index => {
-          const effort = efforts[index]
-          if (effort === undefined) return
-          const target = props.active && props.current !== null ? props.current : ModelPickerModel.selectionForModel(props.group, props.model, props.current)
-          props.onEffort(ModelPickerModel.selectionForEffort(target, effort.id))
-        }}
-      />
       <span
         className="dshx:flex dshx:min-w-6 dshx:shrink-0 dshx:items-center dshx:justify-center"
         onClick={event => event.stopPropagation()}

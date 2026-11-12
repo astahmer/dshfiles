@@ -480,3 +480,61 @@ describe('Threads tab project scope', () => {
     expect(screen.getByRole('option', { name: /Here work/ })).toBeTruthy()
   })
 })
+
+describe('ThreadPalette thread actions and keycaps', () => {
+  it('lists the thread the user is on first, under its heading, and shows the keys of every row as keycaps', async () => {
+    const disposers = [
+      PaletteApi.registerAction({
+        id: '@journey/test/toggle',
+        label: 'Toggle sidebar',
+        group: 'command',
+        keys: ['Mod+B'],
+        suggested: true,
+        run: () => undefined,
+      }),
+      PaletteApi.registerAction({
+        id: '@journey/test/thread-done',
+        label: 'Settle',
+        group: 'thread',
+        heading: () => 'Actions for “Fix auth callback”',
+        keys: ['E'],
+        run: () => undefined,
+      }),
+      PaletteApi.registerAction({
+        id: '@journey/test/new',
+        label: 'New thread',
+        group: 'action',
+        shortcutId: 'commandPalette.newThread',
+        run: () => undefined,
+      }),
+    ]
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        hostKeys={id => (id === 'commandPalette.newThread' ? ['⌘', '⇧', 'O'] : undefined)}
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    const heading = await screen.findByText('Actions for “Fix auth callback”')
+    const options = screen.getAllByRole('option')
+    expect(options[0]?.textContent).toContain('Settle')
+    expect(heading).toBeTruthy()
+    const settle = options.find(option => option.textContent?.includes('Settle'))
+    expect(settle?.querySelector('[data-slot="key-hint"]')?.getAttribute('aria-label')).toBe('E')
+    const toggle = options.find(option => option.textContent?.includes('Toggle sidebar'))
+    expect(toggle?.querySelector('[data-slot="key-hint"]')?.getAttribute('aria-label')).toBe('⌘B')
+    const newThread = options.find(option => option.textContent?.includes('New thread'))
+    expect(newThread?.textContent).toContain('⌘⇧O')
+    for (const dispose of disposers) dispose()
+  })
+})

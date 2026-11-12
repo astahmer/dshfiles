@@ -20,7 +20,7 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
   (_Open Settings_, or _Settings: <entry>_ for each entry), or another plugin (below). Every one of them opens the same
   page; with `@dshfiles/main-tabs` it gets a tab like any other page. Picking that tab, or a reload that lands on it,
   reopens Settings; leaving it closes Settings. With no other tab left, main-tabs keeps showing Settings.
-- **Task groups**: the navigation lists **General** (appearance, language, Layout fixed/free docking, shortcuts, the
+- **Task groups**: the navigation lists **General** (appearance, language, shortcuts, the
   thread list), **Models & accounts**, **Agents**, **Tools & MCP**, **Projects & workspaces**, **Hosts & network**,
   **Security**, **Notifications**, **Plugins**, **About**, and **Other** for anything not placed yet. The map lives in
   [`src/settings-groups.ts`](src/settings-groups.ts): native `settings.section` ids, plugin settings namespaces, and the
@@ -37,9 +37,9 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
 - The former dialog, expanded dialog and side-panel presentations are gone. A `dshfiles:open-settings` request that
   still names `surface: 'modal'` opens the page.
 
-### Free docking
+### As a Workbench pane
 
-With Layout › Free docking, Workbench's **New tab** chooser offers one **Settings** hub: the same grouped page in a
+Workbench's **New tab** chooser offers one **Settings** hub: the same grouped page in a
 pane, with its own navigation and search. The shell remains the authorized `settings.section` renderer with genuine
 owner props and the shared ConfigForm; it invents no `settings.page` slot. Leaf registrations remain available for
 saved layouts and explicit deep links, but are hidden from primary chooser suggestions.

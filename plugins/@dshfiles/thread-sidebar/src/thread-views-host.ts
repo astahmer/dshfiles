@@ -13,6 +13,12 @@ import { DEFAULT_THREAD_VIEW_SETTINGS, ThreadViewPreferencesModel, threadViewSet
 const MAX_ISSUE = 500
 
 /** No saved view has this id. */
+
+/** What a delete removed, filled in by the write step once the view is found. */
+interface DeleteOutcome {
+  deleted?: { readonly view: ThreadView; readonly position: number }
+}
+
 export class ThreadViewNotFound extends Schema.TaggedError<ThreadViewNotFound>()(
   'ThreadViewNotFound',
   { id: Schema.String.check(Schema.isMaxLength(64)), cause: Schema.optional(Schema.Defect()) },
@@ -70,9 +76,17 @@ export class ThreadViewsConflict extends Schema.TaggedError<ThreadViewsConflict>
 }
 
 type ThreadView = ThreadViewSettings['views'][number]
-type ViewRead = { readonly settings: ThreadViewSettings; readonly revision: number }
+type ViewRead = {
+  readonly settings: ThreadViewSettings
+  readonly revision: number
+  /** The list's project scope (the project picker), stored beside the views in the same namespace. */
+  readonly projectFilter: string | null
+  readonly edited: boolean
+}
 type ViewFailure = ThreadViewNotFound | ThreadViewExists | ThreadViewRefused | ThreadViewsInvalid
 type ViewWriteFailure = ViewFailure | ThreadViewsConflict | SidebarSettingsWriteFailed
+/** What a change writes: the views, and the project scope when applying a preset that names one. */
+type ViewChange = { readonly settings: ThreadViewSettings; readonly workspaceFilter?: string | null }
 
 const decodeSettings = Schema.decodeUnknownEffect(threadViewSettingsSchema)
 
@@ -86,9 +100,16 @@ const viewOf = (settings: ThreadViewSettings, id: string): Effect.Effect<ThreadV
 
 const enabledCount = (settings: ThreadViewSettings): number => settings.views.filter(candidate => candidate.enabled).length
 
+const readOf = (settings: ThreadViewSettings, revision: number, projectFilter: string | null): ViewRead => ({
+  settings,
+  revision,
+  projectFilter,
+  edited: ThreadViewPreferencesModel.isThreadViewEdited(settings, projectFilter),
+})
+
 /**
- * The saved thread views in the sidebar settings. Changes are serialized and each one writes against the revision it
- * read, so a concurrent edit from a browser fails as a conflict instead of being overwritten.
+ * The saved thread views (filter presets) in the sidebar settings. Changes are serialized and each one writes against
+ * the revision it read, so a concurrent edit from a browser fails as a conflict instead of being overwritten.
  */
 export class ThreadViews extends Context.Service<
   ThreadViews,
@@ -97,7 +118,9 @@ export class ThreadViews extends Context.Service<
     readonly get: (input: { readonly id: string }) => Effect.Effect<{ readonly view: ThreadView; readonly revision: number }, ViewFailure>
     readonly create: (input: typeof threadViewCreateSchema.Type) => Effect.Effect<ViewRead, ViewWriteFailure>
     readonly update: (input: typeof threadViewUpdateSchema.Type) => Effect.Effect<ViewRead, ViewWriteFailure>
-    readonly delete: (input: typeof threadViewDeleteSchema.Type) => Effect.Effect<ViewRead, ViewWriteFailure>
+    readonly delete: (
+      input: typeof threadViewDeleteSchema.Type,
+    ) => Effect.Effect<ViewRead & { readonly deleted: { readonly view: ThreadView; readonly position: number } }, ViewWriteFailure>
     readonly move: (input: typeof threadViewMoveSchema.Type) => Effect.Effect<ViewRead, ViewWriteFailure>
     readonly select: (input: typeof threadViewSelectSchema.Type) => Effect.Effect<ViewRead, ViewWriteFailure>
   }
@@ -115,21 +138,25 @@ export class ThreadViews extends Context.Service<
         const own = yield* Ref.get(ownWrite)
         if (Option.isSome(own) && own.value.revision > snapshot.revision) return own.value
         const views = yield* decodeSettings(snapshot.value.threadViews ?? DEFAULT_THREAD_VIEW_SETTINGS).pipe(Effect.mapError(invalid('stored')))
-        return { settings: views, revision: snapshot.revision }
+        return readOf(views, snapshot.revision, snapshot.value.workspaceFilter ?? null)
       })
 
-      const change = (operation: (settings: ThreadViewSettings) => Effect.Effect<ThreadViewSettings, ViewFailure>) =>
+      const change = (operation: (current: ViewRead) => Effect.Effect<ThreadViewSettings | ViewChange, ViewFailure>) =>
         exclusive(
           Effect.gen(function* () {
             const current = yield* list
-            const next = yield* operation(current.settings).pipe(Effect.flatMap(changed => decodeSettings(changed).pipe(Effect.mapError(invalid('change')))))
-            yield* settings.update({ threadViews: next }, current.revision).pipe(
+            const result = yield* operation(current)
+            const changed: ViewChange = 'settings' in result ? result : { settings: result }
+            const next = yield* decodeSettings(changed.settings).pipe(Effect.mapError(invalid('change')))
+            const workspaceFilter = changed.workspaceFilter === undefined ? current.projectFilter : changed.workspaceFilter
+            const patch = changed.workspaceFilter === undefined ? { threadViews: next } : { threadViews: next, workspaceFilter }
+            yield* settings.update(patch, current.revision).pipe(
               Effect.catchTags({
                 SettingsConflict: cause => Effect.fail(new ThreadViewsConflict({ expected: cause.expected, actual: cause.actual, cause })),
                 SettingsWriteFailed: cause => Effect.fail(new SidebarSettingsWriteFailed({ cause })),
               }),
             )
-            const written = { settings: next, revision: current.revision + 1 }
+            const written = readOf(next, current.revision + 1, workspaceFilter)
             yield* Ref.set(ownWrite, Option.some(written))
             return written
           }),
@@ -141,55 +168,77 @@ export class ThreadViews extends Context.Service<
           const current = yield* list
           return { view: yield* viewOf(current.settings, input.id), revision: current.revision }
         }),
-        create: Effect.fn('thread views create')(function* (view) {
-          return yield* change(current =>
-            current.views.some(candidate => candidate.id === view.id)
-              ? Effect.fail(new ThreadViewExists({ id: view.id }))
-              : Effect.succeed(ThreadViewPreferencesModel.saveThreadView(current, view)),
-          )
+        create: Effect.fn('thread views create')(function* (input) {
+          return yield* change(({ settings: current }) => {
+            if (current.views.some(candidate => candidate.id === input.id)) return Effect.fail(new ThreadViewExists({ id: input.id }))
+            const filters = ThreadViewPreferencesModel.currentThreadViewFilters(current)
+            const base: ThreadView = {
+              id: input.id,
+              name: input.name,
+              enabled: input.enabled ?? true,
+              groupBy: input.groupBy ?? filters.groupBy,
+              statusFilters: input.statusFilters ?? filters.statusFilters,
+              sourceFilter: input.sourceFilter ?? filters.sourceFilter,
+            }
+            const view = input.projectFilter === undefined ? base : { ...base, projectFilter: input.projectFilter }
+            const inserted = ThreadViewPreferencesModel.insertThreadView(current, view, input.position)
+            return Effect.succeed(input.select === true && view.enabled ? ThreadViewPreferencesModel.applyThreadViewPreset(inserted, view.id) : inserted)
+          })
         }),
         update: Effect.fn('thread views update')(function* (patch) {
-          return yield* change(current =>
+          return yield* change(({ settings: current, projectFilter: workspaceFilter }) =>
             Effect.gen(function* () {
               const view = yield* viewOf(current, patch.id)
               if (patch.enabled === false && view.enabled && enabledCount(current) === 1) return yield* new ThreadViewRefused({ reason: 'last-enabled' })
-              const enabled = patch.enabled === undefined ? current : ThreadViewPreferencesModel.setThreadViewEnabled(current, view.id, patch.enabled)
+              const fromCurrent =
+                patch.fromCurrent === true ? ThreadViewPreferencesModel.saveCurrentFiltersToPreset(current, view.id, workspaceFilter) : current
+              const enabled = patch.enabled === undefined ? fromCurrent : ThreadViewPreferencesModel.setThreadViewEnabled(fromCurrent, view.id, patch.enabled)
               const currentView = yield* viewOf(enabled, view.id)
-              return ThreadViewPreferencesModel.saveThreadView(enabled, {
-                id: view.id,
+              const projectFilter = patch.projectFilter === undefined ? currentView.projectFilter : patch.projectFilter
+              const { projectFilter: _previous, ...rest } = currentView
+              const saved: ThreadView = {
+                ...rest,
                 name: patch.name === undefined ? currentView.name : patch.name,
-                enabled: currentView.enabled,
                 groupBy: patch.groupBy ?? currentView.groupBy,
                 statusFilters: patch.statusFilters ?? currentView.statusFilters,
                 sourceFilter: patch.sourceFilter ?? currentView.sourceFilter,
-              })
+              }
+              return ThreadViewPreferencesModel.saveThreadView(enabled, projectFilter === undefined ? saved : { ...saved, projectFilter })
             }),
           )
         }),
         delete: Effect.fn('thread views delete')(function* (input) {
-          return yield* change(current =>
+          const removed: DeleteOutcome = {}
+          const written = yield* change(({ settings: current }) =>
             Effect.gen(function* () {
               const view = yield* viewOf(current, input.id)
               if (current.views.length === 1 || (view.enabled && enabledCount(current) === 1)) return yield* new ThreadViewRefused({ reason: 'last-enabled' })
+              removed.deleted = { view, position: current.views.findIndex(candidate => candidate.id === view.id) }
               return ThreadViewPreferencesModel.removeThreadView(current, view.id)
             }),
           )
+          if (removed.deleted === undefined) return yield* new ThreadViewNotFound({ id: input.id })
+          return { ...written, deleted: removed.deleted }
         }),
         move: Effect.fn('thread views move')(function* (input) {
-          return yield* change(current =>
+          return yield* change(({ settings: current }) =>
             viewOf(current, input.id).pipe(Effect.as(ThreadViewPreferencesModel.moveThreadView(current, input.id, input.direction === 'earlier' ? -1 : 1))),
           )
         }),
         select: Effect.fn('thread views select')(function* (input) {
-          return yield* change(current =>
+          return yield* change(({ settings: current }) =>
             Effect.gen(function* () {
               if (input.id !== undefined && !(yield* viewOf(current, input.id)).enabled) return yield* new ThreadViewRefused({ reason: 'disabled' })
-              const selected = input.id === undefined ? current : ThreadViewPreferencesModel.selectThreadView(current, input.id)
-              return {
-                ...selected,
-                showGroupControl: input.showGroupControl ?? selected.showGroupControl,
-                showFilterControl: input.showFilterControl ?? selected.showFilterControl,
+              const applied: ViewChange = input.id === undefined ? { settings: current } : ThreadViewPreferencesModel.applyThreadViewPreset(current, input.id)
+              const presets =
+                input.showPresets === undefined ? applied.settings : ThreadViewPreferencesModel.setPresetsEnabled(applied.settings, input.showPresets)
+              const visibility = {
+                ...presets,
+                showGroupControl: input.showGroupControl ?? applied.settings.showGroupControl,
+                showFilterControl: input.showFilterControl ?? applied.settings.showFilterControl,
+                showPresetChips: input.showPresetChips ?? applied.settings.showPresetChips,
               }
+              return applied.workspaceFilter === undefined ? { settings: visibility } : { settings: visibility, workspaceFilter: applied.workspaceFilter }
             }),
           )
         }),

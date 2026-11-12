@@ -6,6 +6,7 @@
 import { CodeBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import { memo, type ComponentProps, type ReactNode } from 'react'
 import { CodeFenceModel } from './code-fence-transform.js'
+import { MarkdownProse } from './markdown-prose.js'
 
 /** The native renderer's own function: calling it keeps its streaming cache, whose frozen blocks reach the fence cache. */
 const renderMarkdownText = MarkdownText.type
@@ -13,5 +14,6 @@ const renderMarkdownText = MarkdownText.type
 /** `MarkdownText` with fences a code-fence renderer claims handed to that renderer; the same props. */
 export const FencedMarkdown = memo(function FencedMarkdown(props: ComponentProps<typeof MarkdownText>): ReactNode {
   const fences = CodeFenceModel.useState(CodeBlock)
-  return CodeFenceModel.transform(renderMarkdownText(props), fences)
+  const prose = MarkdownProse.useState(CodeBlock)
+  return MarkdownProse.transform(CodeFenceModel.transform(renderMarkdownText(props), fences), prose, 'fenced')
 })

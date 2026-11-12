@@ -240,7 +240,8 @@ export default defineClient({
             ? undefined
             : candidate.cwd === undefined
               ? t('noCwd')
-              : FileMentions.abbreviateHome(candidate.cwd, ctx.remote.$host.home)
+              : // A thread workspace reads as the project it was cut from, never its `thread-xxxxxx` folder (b:212a).
+                FileMentions.abbreviateHome(candidate.cwd.replace(/-threads\/[^/]+\/?$/u, ''), ctx.remote.$host.home)
           const sameProject = ownCwd !== undefined && candidate.cwd !== undefined && (isInside(candidate.cwd, ownCwd) || isInside(ownCwd, candidate.cwd))
           const value: PickValue = { kind: 'session', label, mention: candidate.mention }
           threadRows.set(

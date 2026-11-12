@@ -4,11 +4,13 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { GitPullRequestIcon } from '@dshfiles/plugin-ui/icons'
+import { LandCardActions } from '@dshfiles/diffs-review/land-card-actions'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { pullRequestApi } from './api.js'
 import { ForgeMentions } from './forge-mentions.js'
 import { CreatePullRequestDialog, type CreateDialogApi, type Translate } from './create-dialog.js'
+import { createLandCardAction } from './land-card-action.js'
 import { PULL_REQUESTS_LOCALE_NAMESPACE, pullRequestsLocale } from './locales.js'
 
 interface CreateTarget {
@@ -48,11 +50,13 @@ export default defineClient({
     const forgeMentions = ForgeMentions.create({
       search: async (sessionId, query, signal) => {
         const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate?.id === sessionId)
-        if (session?.cwd === undefined || !/^[\p{L}\p{N} _.-]*$/u.test(query)) return []
+        if (session?.cwd === undefined || !/^[\p{L}\p{N} _.-]*$/u.test(query)) return { items: [] }
         try {
-          return (await api.search({ cwd: session.cwd, query }, { signal })).items
+          // gh missing or signed out comes back as `unavailable`, which the picker turns into one recovery row; any
+          // other failure (no GitHub remote: not a forge) and an older Host's error keep the list empty.
+          return await api.search({ cwd: session.cwd, query }, { signal })
         } catch {
-          return []
+          return { items: [] }
         }
       },
     })
@@ -83,6 +87,20 @@ export default defineClient({
         ),
       'dshfiles-pull-requests: create dialog',
     )
+
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) {
+      // Open PR beside Land on diffs-review's Land card; the card renders nothing of ours when this plugin is absent.
+      const OpenPullRequestAction = createLandCardAction({
+        list: async (sessionId, signal) => (await api.list({ sessionId }, { signal })).links,
+        openCreate: next => target.set(next),
+        dialogOpen: { subscribe: target.subscribe, get: () => target.getSnapshot() !== null },
+      })
+      ctx.effect(
+        () => plugin.add(LandCardActions, { id: '@dshfiles/pull-requests', order: 10, component: plugin.bind(OpenPullRequestAction) }),
+        'dshfiles-pull-requests: Open PR on the Land card',
+      )
+    }
 
     metadata?.plugin?.add(PaletteActions, {
       id: '@dshfiles/pull-requests/create',

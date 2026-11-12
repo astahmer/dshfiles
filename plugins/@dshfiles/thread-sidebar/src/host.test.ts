@@ -146,7 +146,7 @@ describe('thread-sidebar Host event wiring', () => {
     expect(threadSidebarSettings.schema({}).resumeAfterRestart).toBe(false)
     expect(threadSidebarSettings.schema({}).resumeAfterRestartMaxThreads).toBe(5)
     expect(threadSidebarSettings.schema({}).resumeAfterRestartDelaySeconds).toBe(10)
-    expect(threadSidebarSettings.schema({}).autoRestartWhenIdle).toBe(true)
+    expect(threadSidebarSettings.schema({}).autoRestartWhenIdle).toBe(false)
     expect(threadSidebarSettings.schema({}).autoRestartQuietSeconds).toBe(60)
   })
 

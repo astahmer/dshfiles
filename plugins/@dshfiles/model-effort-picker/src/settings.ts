@@ -5,9 +5,9 @@ export const modelEffortPickerSettings = defineSettings({
   namespace: 'dshfiles-model-effort-picker',
   schema: Schema.object({
     accountSwap: Schema.boolean()
-      .default(true)
+      .default(false)
       .description(
-        'Show a swap button beside the model picker that moves the Session to the next account offering the same model. It only appears when another account offers it.',
+        'Also show a swap button beside the model picker that moves the thread to the next account offering the same model. Off: the model menu’s Account section switches accounts.',
       ),
     accountSwapRoutes: Schema.array(Schema.string())
       .default([])

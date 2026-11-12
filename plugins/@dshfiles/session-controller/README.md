@@ -119,7 +119,8 @@ never held, since delegation starts them.
 
 Once the cap is reached, a new turn for an idle thread is accepted but parked in that thread's inbox
 (`agent.send(…, 'next-turn', false)`), so it is durable and visible in the native queue. Its composer shows
-**Waiting for a free slot · N ahead · running/limit** with **Start now**, which starts it past the limit. Waiting
+**Waits to start · N ahead · R of L running** with **Start now**, which starts it past the limit; when that
+fails, the button reads **Try again** and the notice links to Settings › General, where the limit lives. Waiting
 turns start first in, first out whenever an Agent goes idle or leaves, or when the limit is raised or set to 0. A
 follow-up to a thread that is already running is never held: the native queue runs it after the current turn.
 

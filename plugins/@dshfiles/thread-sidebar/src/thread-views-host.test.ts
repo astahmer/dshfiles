@@ -37,6 +37,8 @@ const settingsWithFaults = (initial: SidebarSettingsValue) =>
 
 const viewsLayer = (initial = defaults()) => ThreadViews.layer.pipe(Layer.provideMerge(settingsWithFaults(initial)), Layer.provideMerge(Faults.layer))
 
+const WORKING_ID = DEFAULT_THREAD_VIEW_SETTINGS.views[1]?.id ?? 'working'
+
 const custom = (id = 'custom') => ({ id, name: id, enabled: true, groupBy: 'status' as const, statusFilters: [], sourceFilter: 'all' as const })
 
 const failureMessage = <A, E extends { readonly message: string }, R>(effect: Effect.Effect<A, E, R>) => Effect.map(Effect.flip(effect), error => error.message)
@@ -146,6 +148,62 @@ describe('Host saved thread views', () => {
       expect((yield* views.get({ id: 'one' })).view.id).toBe('one')
       yield* views.update({ id: 'one', name: 'recovered' })
       expect((yield* views.get({ id: 'one' })).view.name).toBe('recovered')
+    }).pipe(Effect.provide(viewsLayer())),
+  )
+
+  it.effect('filter presets: saves the current filters, applies with its project scope, saves changes, deletes and restores in place', () =>
+    Effect.gen(function* () {
+      const views = yield* ThreadViews
+      const stored = yield* ThreadSidebarSettings
+      // The user narrowed the list without saving: a draft on All threads, scoped to one project.
+      yield* stored.update({
+        workspaceFilter: 'workspace-1',
+        threadViews: { ...DEFAULT_THREAD_VIEW_SETTINGS, draft: { groupBy: 'project', statusFilters: ['attention'], sourceFilter: 'main' } },
+      })
+      const listed = yield* views.list
+      expect(listed).toMatchObject({ edited: true, projectFilter: 'workspace-1' })
+
+      // { id, name } saves what the list shows; select applies it and the draft goes.
+      const created = yield* views.create({ id: 'needs-you', name: 'Needs you', projectFilter: 'workspace-1', select: true })
+      expect(created.settings.views.find(view => view.id === 'needs-you')).toEqual({
+        id: 'needs-you',
+        name: 'Needs you',
+        enabled: true,
+        groupBy: 'project',
+        statusFilters: ['attention'],
+        sourceFilter: 'main',
+        projectFilter: 'workspace-1',
+      })
+      expect(created).toMatchObject({ edited: false, settings: { activeViewId: 'needs-you' } })
+      expect(created.settings.draft).toBeUndefined()
+
+      // Applying All threads, then the preset again, brings its project scope back.
+      yield* stored.update({ workspaceFilter: null })
+      yield* views.select({ id: 'needs-you' })
+      expect((yield* stored.get).workspaceFilter).toBe('workspace-1')
+
+      // Save changes: fromCurrent writes the draft into the preset and clears it.
+      const current = yield* stored.get
+      yield* stored.update({
+        // SAFETY: the steps above wrote this document's threadViews, so it is the stored view-settings object.
+        threadViews: { ...(current.threadViews as object), draft: { groupBy: 'date', statusFilters: ['attention'], sourceFilter: 'main' } },
+      })
+      expect((yield* views.list).edited).toBe(true)
+      const saved = yield* views.update({ id: 'needs-you', fromCurrent: true })
+      expect(saved).toMatchObject({ edited: false })
+      expect((yield* views.get({ id: 'needs-you' })).view.groupBy).toBe('date')
+
+      // Delete names what it removed; create with it and the position restores the preset in place (the inverse).
+      const before = (yield* views.list).settings.views.map(view => view.id)
+      const deleted = yield* views.delete({ id: WORKING_ID, confirm: true })
+      expect(deleted.deleted).toMatchObject({ view: { id: WORKING_ID }, position: 1 })
+      const { view, position } = deleted.deleted
+      yield* views.create({ ...view, position })
+      expect((yield* views.list).settings.views.map(candidate => candidate.id)).toEqual(before)
+
+      // Visibility switches for the Presets section and the chips row.
+      yield* views.select({ showPresetChips: true, showPresets: true })
+      expect((yield* views.list).settings).toMatchObject({ showPresetChips: true, showPresets: true, activeViewId: 'needs-you' })
     }).pipe(Effect.provide(viewsLayer())),
   )
 

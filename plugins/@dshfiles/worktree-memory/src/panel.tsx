@@ -130,7 +130,7 @@ export const MemoryGlyph = (props: { readonly size?: number; readonly t: Worktre
       {detachedBytes > 0 ? (
         <span
           aria-hidden
-          className="dshx:absolute dshx:-bottom-1.5 dshx:-left-0.5 dshx:rounded-sm dshx:bg-destructive dshx:px-0.5 dshx:text-[8px] dshx:leading-[10px] dshx:font-semibold dshx:text-white dshx:tabular-nums"
+          className="dshx:absolute dshx:-bottom-1.5 dshx:-left-0.5 dshx:rounded-sm dshx:bg-destructive dshx:px-0.5 dshx:text-2xs dshx:leading-none dshx:font-semibold dshx:text-white dshx:tabular-nums"
         >
           {compactGigabytes(detachedBytes)}
         </span>
@@ -179,7 +179,7 @@ export const MemoryBadge = (props: { readonly t: WorktreeMemoryTranslate }): JSX
             {detachedBytes > 0 ? (
               <span
                 aria-hidden
-                className="dshx:absolute dshx:-bottom-1.5 dshx:-left-0.5 dshx:rounded-sm dshx:bg-destructive dshx:px-0.5 dshx:text-[8px] dshx:leading-[10px] dshx:font-semibold dshx:text-white dshx:tabular-nums"
+                className="dshx:absolute dshx:-bottom-1.5 dshx:-left-0.5 dshx:rounded-sm dshx:bg-destructive dshx:px-0.5 dshx:text-2xs dshx:leading-none dshx:font-semibold dshx:text-white dshx:tabular-nums"
               >
                 {compactGigabytes(detachedBytes)}
               </span>
@@ -374,7 +374,7 @@ const GroupCard = (props: {
                 .join(' · ')}
             </span>
             {latestThread === undefined ? null : (
-              <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
+              <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">
                 {latestThread.title ?? props.threadLabel(latestThread.sessionId)}
                 {latestThread.createdAt == null ? '' : ` · ${t('created')} ${formatDate(latestThread.createdAt)}`}
                 {latestThread.updatedAt === null ? '' : ` · ${t('updated')} ${formatAge(latestThread.updatedAt, props.now, t)} ${t('ago')}`}
@@ -426,7 +426,7 @@ const GroupCard = (props: {
                     </span>
                   </div>
                   {thread.createdAt == null && thread.updatedAt === null ? null : (
-                    <div className="dshx:flex dshx:flex-wrap dshx:gap-x-3 dshx:text-[11px] dshx:text-muted-foreground">
+                    <div className="dshx:flex dshx:flex-wrap dshx:gap-x-3 dshx:text-2xs dshx:text-muted-foreground">
                       {thread.createdAt == null ? null : (
                         <time dateTime={new Date(thread.createdAt).toISOString()}>
                           {t('created')} {formatDate(thread.createdAt)}

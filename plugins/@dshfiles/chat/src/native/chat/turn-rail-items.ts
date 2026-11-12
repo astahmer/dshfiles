@@ -9,6 +9,7 @@
 import type {} from '@deepseek-ai/dsh-session-turn-outline/client'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { TurnNavigationItem } from '../contract/snapshot.ts'
+import { TurnMarksModel, type TurnMark, type TurnMarkKind } from '../../turn-marks.ts'
 
 /** One rail mark: a loaded Turn scrolls to its row; an unloaded one pages history through its seq first. */
 export interface TurnRailItem {
@@ -17,6 +18,12 @@ export interface TurnRailItem {
   readonly prompt: string
   /** Bounded response preview (loaded window first, outline fallback). */
   readonly response: string
+  /** The Turn's `turn/start` sequence when the outline knows it; find and "Since you left" map events to Turns by it. */
+  readonly seq: SessionSeq | null
+  /** dshfiles (productivity pass T4.2): how the mark is drawn and filtered, from the `dshfilesTurnMarks` projection. */
+  readonly kind: TurnMarkKind
+  /** The Turn's facts (files, question, failure) when the projection carries them. */
+  readonly mark: TurnMark | undefined
   /** How the rail reaches the Turn. */
   readonly anchor:
     | { readonly kind: 'loaded'; readonly key: string }
@@ -63,24 +70,34 @@ function outlineEntries(outline: unknown): readonly unknown[] {
 export function mergeTurnRailItems(
   loaded: readonly TurnNavigationItem[],
   outline: unknown,
+  marks: ReadonlyMap<number, TurnMark> = new Map(),
 ): readonly TurnRailItem[] {
   const byTurn = new Map<number, TurnRailItem>()
   for (const raw of outlineEntries(outline)) {
     const entry = outlineEntry(raw)
     if (entry === undefined) continue
+    const mark = marks.get(entry.turn)
     byTurn.set(entry.turn, {
       turn: entry.turn,
       prompt: entry.prompt,
       response: entry.response,
+      seq: entry.seq,
+      kind: TurnMarksModel.kindOf(mark),
+      mark,
       anchor: { kind: 'unloaded', seq: entry.seq },
     })
   }
   for (const item of loaded) {
     const preview = byTurn.get(item.turn)
+    const mark = marks.get(item.turn)
+    const markSeq = mark === undefined ? null : SessionSeq(mark.seq)
     byTurn.set(item.turn, {
       turn: item.turn,
       prompt: item.prompt !== '' ? item.prompt : preview?.prompt ?? '',
       response: item.response !== '' ? item.response : preview?.response ?? '',
+      seq: preview?.seq ?? markSeq,
+      kind: TurnMarksModel.kindOf(mark),
+      mark,
       anchor: { kind: 'loaded', key: item.anchorKey },
     })
   }

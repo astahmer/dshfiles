@@ -318,8 +318,9 @@
   border-top: 0.5px solid var(--dsw-alias-border-l3);
 }
 
-/* Local delta (dshfiles): the status strip (plans/ade-ux §4.1 R5), one 24 px row across every column. Text first,
-   muted: items carry their own emphasis only when they need the user. */
+/* Local delta (dshfiles): the status strip (plans/ade-ux §4.1 R5), one row across every column. Visual refresh T1.6:
+   the compact control height token, 12px meta text, the recessive panel fill and one hairline; items are quiet
+   segments split by short hairlines and carry their own emphasis only when they need the user. */
 .statusStrip {
   grid-area: 3 / 1 / 4 / -1;
   position: relative;
@@ -328,22 +329,40 @@
   justify-content: space-between;
   gap: 12px;
   min-width: 0;
-  height: 24px;
-  padding: 0 10px;
-  font-size: 11.5px;
-  line-height: 1;
-  color: var(--dsw-alias-text-l2, currentColor);
-  background: var(--dsw-alias-bg-base);
-  border-top: 0.5px solid var(--dsw-alias-border-l3);
+  height: var(--dshx-size-control-compact, 24px);
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-secondary, currentColor);
+  background: var(--dshx-tone-panel, var(--dsw-alias-bg-base));
+  border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l3));
   z-index: 12;
 }
 
 .statusSide {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 0;
   min-width: 0;
   overflow: hidden;
+}
+
+/* Quiet segments: each item pads itself; a short hairline sits between neighbours. */
+.statusSide > .statusItem {
+  position: relative;
+  padding: 0 8px;
+}
+
+.statusSide > .statusItem + .statusItem::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 1px;
+  height: 12px;
+  transform: translateY(-50%);
+  background: var(--dshx-tone-line, var(--dsw-alias-border-l3));
 }
 
 .statusSide[data-side='thread'] {
@@ -379,7 +398,7 @@
   margin: 0 -4px;
   padding: 0 4px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--dsw-radius-xs, 4px);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -402,7 +421,7 @@
   gap: 6px;
   height: 20px;
   padding: 0 8px;
-  border: 0.5px solid var(--dsw-alias-border-l3);
+  border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l3));
   border-radius: 999px;
   background: transparent;
   color: inherit;
@@ -415,7 +434,16 @@
   outline-offset: 1px;
 }
 
+/* The pill names its first items ("1 working · Quota 56%"); a long summary ellipsizes, the list has the rest. */
+.statusChipLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .statusChipDot {
+  flex: none;
   width: 6px;
   height: 6px;
   border-radius: 999px;
@@ -433,10 +461,10 @@
   max-height: 50vh;
   overflow: auto;
   padding: 10px 12px;
-  border: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: 10px;
-  background: var(--dsw-alias-bg-base);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l3));
+  border-radius: var(--dsw-radius-lg, 12px);
+  background: var(--dshx-tone-raised, var(--dsw-alias-bg-base));
+  box-shadow: var(--dshx-elevation-2, 0 8px 24px rgb(0 0 0 / 0.18));
 }
 
 .statusSheetRow {
@@ -501,46 +529,38 @@
     height: calc(100dvh - var(--dsh-phone-top-height, 0px) - var(--dsh-keyboard-inset, 0px));
   }
 
-  /* The status strip becomes one chip in the top bar's trailing corner (plan §4.1 R5 compact; prior-art §3.2 rule 6):
-     it leaves the grid, so no 24px row sits between the stage and the tab bar. The occupant keeps that corner free. */
+  /* The status strip becomes one pill just above the tab bar (visual refresh T1.6; plan §4.1 R5 compact): a quiet
+     row on the stage's background, the pill centred, its 44pt hit area wider than its drawn 24px. Its list opens
+     upward from it. The top bar's trailing corner is left to the thread's `⋯` menu. */
   :global([data-shell-phone-nav]) .statusStrip[data-status-strip='compact'] {
-    position: fixed;
-    top: env(safe-area-inset-top, 0px);
-    right: max(4px, env(safe-area-inset-right, 0px));
-    height: 44px;
+    justify-content: center;
+    height: 32px;
     padding: 0;
     border-top: none;
     background: transparent;
-    z-index: 46;
+  }
+
+  /* While the software keyboard is up the composer sits on it; the pill would only push it up (T3.5). */
+  :global([data-shell-phone-nav][data-phone-keyboard]) .statusStrip[data-status-strip='compact'] {
+    display: none;
   }
 
   :global([data-shell-phone-nav]) .statusChip {
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: none;
-    border-radius: 10px;
+    position: relative;
+    max-width: min(80vw, 320px);
+    height: 24px;
+    padding: 0 12px;
+    background: var(--dshx-tone-panel, var(--dsw-alias-bg-base));
+    color: var(--dsw-alias-label-secondary, currentColor);
   }
 
-  :global([data-shell-phone-nav]) .statusChipLabel {
+  :global([data-shell-phone-nav]) .statusChip::after {
+    content: '';
     position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  :global([data-shell-phone-nav]) .statusChipDot {
-    width: 8px;
-    height: 8px;
+    inset: -10px -4px;
   }
 
   :global([data-shell-phone-nav]) .statusSheet {
-    position: fixed;
-    top: calc(var(--dsh-phone-top-height, 44px) + 4px);
-    bottom: auto;
     left: 8px;
     right: 8px;
     max-height: 60dvh;

@@ -184,7 +184,7 @@ export const RequestLog = (props: {
                     }}
                   >
                     <span className="dshx:truncate dshx:font-medium">{row.model.length === 0 ? 'unknown model' : row.model}</span>
-                    <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
+                    <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">
                       {row.provider}
                       {row.purpose === 'agent' ? '' : ` · ${UsageFormattingModel.purposeLabels[row.purpose]}`}
                     </span>
@@ -213,7 +213,7 @@ export const RequestLog = (props: {
                       <StatusDot className={STATUS_DOT[row.status]} />
                       {STATUS_LABEL[row.status]}
                     </span>
-                    <span className="dshx:text-[11px] dshx:text-muted-foreground">{row.errorCode ?? row.stopReason ?? ''}</span>
+                    <span className="dshx:text-2xs dshx:text-muted-foreground">{row.errorCode ?? row.stopReason ?? ''}</span>
                   </span>
                 </TableCell>
               </TableRow>

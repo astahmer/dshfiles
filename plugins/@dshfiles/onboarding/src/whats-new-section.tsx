@@ -2,10 +2,9 @@ import { PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { CheckCheckIcon, CopyIcon, ExternalLinkIcon, ListIcon } from '@dshfiles/plugin-ui/icons'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
-import { TOUCH } from './touch.js'
+import { pluginLabel } from './labels.js'
 import { WhatsNewModel, type Upstream, type WhatsNew, type WhatsNewEntry, type WhatsNewInput } from './whats-new-model.js'
 
 const FIRST_SHOWN = 12
@@ -27,9 +26,13 @@ const EntryLine = (props: { readonly entry: WhatsNewEntry; readonly isNew: boole
       data-whats-new-entry={entry.commit}
       data-new={props.isNew ? '' : undefined}
     >
-      <Badge variant={entry.kind === 'feat' ? 'info' : 'muted'}>{entry.breaking ? `${entry.kind}!` : entry.kind}</Badge>
-      {props.isNew ? <Badge variant="success">New</Badge> : null}
-      {props.showPlugin ? <span className="dshx:text-xs dshx:text-muted-foreground">{entry.plugin}</span> : null}
+      <Badge variant={entry.kind === 'feat' ? 'outline' : 'muted'}>{entry.breaking ? `${entry.kind}!` : entry.kind}</Badge>
+      {props.isNew ? (
+        <Badge className="dshx:font-semibold" variant="secondary">
+          New
+        </Badge>
+      ) : null}
+      {props.showPlugin ? <span className="dshx:text-xs dshx:text-muted-foreground">{pluginLabel(entry.plugin)}</span> : null}
       <span className="dshx:min-w-0 dshx:flex-1 dshx:text-sm">{entry.summary}</span>
       <time className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" dateTime={entry.date}>
         {entry.date.slice(0, 10)}
@@ -66,7 +69,7 @@ const UpstreamList = (props: { readonly upstream: Upstream; readonly copy: (text
       <div>
         <Button
           aria-label={`Copy ${target.fetchCommand}`}
-          className={cn('dshx:shrink', TOUCH)}
+          className="dshx:shrink"
           onClick={async () => setCopied(await props.copy(target.fetchCommand))}
           size="sm"
           variant="ghost"
@@ -79,7 +82,7 @@ const UpstreamList = (props: { readonly upstream: Upstream; readonly copy: (text
 }
 
 const CommitsLink = (props: { readonly href: string }): ReactNode => (
-  <Button asChild className={TOUCH} size="sm" variant="outline">
+  <Button asChild size="sm" variant="outline">
     <a href={props.href} rel="noopener noreferrer" target="_blank">
       <ExternalLinkIcon /> Open the commits on GitHub
     </a>
@@ -101,11 +104,10 @@ export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
     return (
       <PageSection data-whats-new="error" heading="What's new">
         <p className="dshx:text-sm dshx:text-muted-foreground">
-          What's new could not read this Host. If onboarding was updated since DSH started, restart DSH; otherwise check that the plugin is enabled in Settings
-          › Plugins, then try again.
+          What's new could not be loaded. Try again; if Getting started was updated since DSH started, restart DSH from the bottom of the rail first.
         </p>
         <div>
-          <Button className={TOUCH} onClick={() => void history.refetch()} size="sm" variant="outline">
+          <Button onClick={() => void history.refetch()} size="sm" variant="outline">
             Try again
           </Button>
         </div>
@@ -119,7 +121,7 @@ export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
         <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
           <CommitsLink href={value.commitsUrl} />
           {value.state === 'unreadable' ? (
-            <Button className={TOUCH} onClick={() => void history.refetch()} size="sm" variant="ghost">
+            <Button onClick={() => void history.refetch()} size="sm" variant="ghost">
               Try again
             </Button>
           ) : null}
@@ -143,7 +145,7 @@ export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
     <PageSection
       actions={
         unseen ? (
-          <Button className={TOUCH} onClick={() => props.markSeen(newest)} size="sm" variant="outline">
+          <Button onClick={() => props.markSeen(newest)} size="sm" variant="outline">
             <CheckCheckIcon /> Mark as seen
           </Button>
         ) : null
@@ -160,13 +162,13 @@ export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
             <li className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:py-2" data-whats-new-plugin={group.plugin} key={group.plugin}>
               <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-start dshx:gap-x-3 dshx:gap-y-1">
                 <div className="dshx:min-w-0 dshx:flex-1">
-                  <h3 className="dshx:text-sm dshx:font-semibold">{group.plugin}</h3>
+                  <h3 className="dshx:text-sm dshx:font-semibold">{pluginLabel(group.plugin)}</h3>
                   <p className="dshx:line-clamp-2 dshx:text-xs dshx:text-muted-foreground">{group.description}</p>
                 </div>
                 {group.features > 0 ? (
                   <Button
-                    aria-label={`Features of ${group.plugin}`}
-                    className={cn('dshx:shrink-0', TOUCH)}
+                    aria-label={`Features of ${pluginLabel(group.plugin)}`}
+                    className="dshx:shrink-0"
                     onClick={() => props.showFeatures(group.plugin)}
                     size="sm"
                     variant="ghost"
@@ -186,7 +188,7 @@ export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
       )}
       {hidden > 0 || (expanded && value.entries.length > FIRST_SHOWN) ? (
         <div>
-          <Button aria-expanded={expanded} className={TOUCH} onClick={() => setExpanded(!expanded)} size="sm" variant="ghost">
+          <Button aria-expanded={expanded} onClick={() => setExpanded(!expanded)} size="sm" variant="ghost">
             {expanded ? 'Show fewer' : `Show all ${String(value.entries.length)}`}
           </Button>
         </div>

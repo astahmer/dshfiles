@@ -628,6 +628,13 @@
           "constraints": "Boolean; enable the edge quota overlay (hidden while no account is set up).",
           "choices": ["true", "false"],
           "coveredBy": ["ai-accounts.quota-display"]
+        },
+        {
+          "key": "showResetTimes",
+          "defaultValue": "true",
+          "constraints": "Boolean; each status-bar segment ends with its binding window's reset (“51% · 1d 21h”, “limit · 2h 40m”), dropped first from healthy accounts when the strip is full; the phone pill names it only at the limit.",
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.status-strip-reset-times", "ai-accounts.status-strip-reset-fit"]
         }
       ],
       "states": ["loading", "available", "limited", "reset-known", "failed", "hidden"],
@@ -661,6 +668,18 @@
           "kind": "gherkin",
           "id": "ai-accounts.usage-refresh",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.status-strip-reset-times",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-status-line.test.tsx",
+          "testName": "hides reset times when Show reset times is off (b:jaz6)"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.status-strip-reset-fit",
+          "file": "plugins/@dshfiles/ai-accounts/src/usage-overview-model.test.ts",
+          "testName": "drops resets from healthy accounts first, then falls back to +N"
         },
         {
           "kind": "unit-test",
@@ -1325,7 +1344,7 @@
       "summary": "Offer an inline route to AI Accounts when a failed turn reports missing or rejected provider credentials.",
       "reach": [
         "seed credential-recovery",
-        "fill textbox \"commands, @ files or sessions*\" \"Reproduce missing credential recovery.\"",
+        "fill textbox \"commands, @ files or threads*\" \"Reproduce missing credential recovery.\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
         "expect button \"Add or fix credentials\"",

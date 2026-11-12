@@ -10,8 +10,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** Render the original header inside the caller's inherited Session binding. */
     'dshfiles.workbench.conversation-header': {
       scope: 'session-maybe'
-      /** Keep the host's top-right tab-row recovery affordance off the original toolbar. */
-      props: { readonly reserveHostCorner?: boolean }
+      /**
+       * reserveHostCorner: keep the host's top-right tab-row recovery affordance off the original toolbar.
+       * seated: the header sits in its Dockview group's tab row (one header row, visual refresh T1.4) and
+       * should draw as a compact, borderless band there.
+       */
+      props: { readonly reserveHostCorner?: boolean; readonly seated?: boolean }
       children: {
         'conversation.header': { kind: 'single'; scope: 'session-maybe' }
       }

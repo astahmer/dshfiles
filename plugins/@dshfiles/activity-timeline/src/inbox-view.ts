@@ -1,4 +1,5 @@
 import type { AttentionItem, AttentionSeverity, AttentionView } from './attention-api.js'
+import type { RowSwipeSide } from '@dshfiles/plugin-ui/hooks/row-gestures'
 
 /** Sources the inbox names in words; any other source shows its own id. */
 const SOURCE_LABELS = new Map([
@@ -82,3 +83,15 @@ export class InboxView {
   static readonly undoOf = undoOf
   static readonly resumableIds = resumableIds
 }
+
+/**
+ * The verb a phone swipe commits on an Inbox item (T6.1): left is Done, right is Snooze for an hour. Never Land, Approve
+ * or an answer: those change code or speak for the user, so they stay a deliberate tap.
+ */
+export const InboxSwipe = {
+  verb: (item: { readonly verbs: readonly string[] }, view: AttentionView, side: RowSwipeSide | undefined): 'done' | 'snooze' | undefined => {
+    if (side === undefined || view === 'closed' || view === 'muted') return undefined
+    if (side === 'left') return item.verbs.includes('Done') ? 'done' : undefined
+    return item.verbs.includes('Snooze') && view !== 'snoozed' ? 'snooze' : undefined
+  },
+} as const

@@ -14,6 +14,7 @@ import { Changes, createApiClient, defineClient, useApi } from '@dshfiles/dshx/c
 import { multiHostApi } from '@dshfiles/multi-host/api'
 // Type-only: `ctx.rightPanel`, the frame's right-column seat.
 import type {} from '@dshfiles/frame-layout/regions'
+import type {} from '@dshfiles/rich-composer/conversation-contract'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { keepPreviousData, PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/workspace-folder-picker/picker'
@@ -29,7 +30,7 @@ import { ChatReferenceTitleStore } from './chat-reference-titles.js'
 import { sessionProjectPath } from './session-project-path.js'
 import { JujutsuPanel } from './client.js'
 import type {} from '@dshfiles/rich-composer/conversation-contract'
-import { ComposerChangesBar, ComposerLocation, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
+import { ChangesPill, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
 import { DEFAULT_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
@@ -116,11 +117,23 @@ export default defineClient({
       const opened = sessionId === undefined ? changes.value.reviewRevisions?.(input) : changes.value.reviewRevisions?.({ ...input, sessionId })
       return opened ?? false
     }
+    /** A thread workspace is named by its thread (b:212a): the title of the newest titled Session working in that folder. */
+    const threadTitleOf = (path: string): string | undefined => {
+      const folder = path.replace(/\/+$/u, '')
+      let best: { readonly title: string; readonly updatedAt: number } | undefined
+      for (const session of Object.values(ctx.sessions.list.getSnapshot().byId)) {
+        const title = session.title?.trim()
+        if (title === undefined || title === '' || session.cwd?.replace(/\/+$/u, '') !== folder) continue
+        if (best === undefined || session.updatedAt > best.updatedAt) best = { title, updatedAt: session.updatedAt }
+      }
+      return best?.title
+    }
     const panel = (options: SurfacePanelOptions): JSX.Element => (
       <PluginQueryProvider>
         <JujutsuPanelSession sessionId={options.sessionId ?? null}>
           <ProjectsBoundPanel
             workspaces={ctx.workspaces}
+            threadTitleOf={threadTitleOf}
             // Remounting per scope is what gives each tab, thread or the dock its own state; the scope's state outlives it.
             key={options.scope}
             scope={options.scope}
@@ -253,7 +266,9 @@ export default defineClient({
       toggleJujutsu,
       openWorkspaceReview: (workspacePath, sessionId) => {
         const changes = metadata?.plugin?.use(Changes).get()
-        if (changes?.status === 'active') changes.value.review({ workspacePath, sessionId })
+        if (changes?.status !== 'active') return false
+        changes.value.review({ workspacePath, sessionId })
+        return true
       },
       openJujutsuReference: (path, reference) => {
         sidePanelRepository.request({ path, reference })
@@ -266,16 +281,25 @@ export default defineClient({
           <Component {...props} />
         </PluginQueryProvider>
       ))
-    ctx.slots.inject('conversation.input.dock', () =>
+    // Visual refresh T3.2: the Changes pill in the thread header and the phone top bar replaces the changed-files bar
+    // that sat above the composer; it opens the Changes facet (or this panel without a Changes owner).
+    ctx.slots.inject('conversation.session.header.changes', () =>
       ctx.slots.register(
-        { name: 'conversation.input.dock', id: 'dshfiles-jujutsu-changes', order: 40, inject: sessionId => ({ sessionId, jujutsu: composerServices }) },
-        composerSlot(ComposerChangesBar),
+        {
+          name: 'conversation.session.header.changes',
+          id: 'dshfiles-jujutsu-changes',
+          order: 40,
+          inject: sessionId => ({ sessionId, jujutsu: composerServices }),
+        },
+        composerSlot(ChangesPill),
       ),
     )
-    ctx.slots.inject('conversation.composer.location', () =>
+    // dshfiles (b:212a): the location chip stays our own meter-line entry after the run summary ("Own workspace · 1 ahead
+    // of main"); upstream's conversation.composer.location seat was removed from rich-composer (b:ysaj).
+    ctx.slots.inject('conversation.composer.dock', () =>
       ctx.slots.register(
-        { name: 'conversation.composer.location', id: 'dshfiles-jujutsu-chips', order: 40, inject: sessionId => ({ sessionId, jujutsu: composerServices }) },
-        composerSlot(ComposerLocation),
+        { name: 'conversation.composer.dock', id: 'dshfiles-jujutsu-chips', order: 40, inject: sessionId => ({ sessionId, jujutsu: composerServices }) },
+        composerSlot(ComposerChips),
       ),
     )
     ctx.slots.inject('conversation.session.header.utilities', () =>

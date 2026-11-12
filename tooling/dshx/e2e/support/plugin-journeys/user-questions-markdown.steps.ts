@@ -5,7 +5,7 @@ import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const PROJECT_DIRECTORY = join(DSHFILES_ROOT, 'plugins/@dshfiles/user-questions')
 const PREVIEW_TITLE = 'Lines per layout'
 const PREVIEW_HTML = [

@@ -14,17 +14,22 @@ export interface LandPorts {
   readonly queue: (thread: ThreadView) => Promise<{ readonly queuedAt: number }>
   readonly unqueue: (thread: ThreadView) => Promise<{ readonly status: string }>
   readonly refresh: () => void
+  /** Opens a thread on screen; "Land & next" calls it with the next ready thread once this one landed. */
+  readonly openThread?: ((sessionId: string) => void) | undefined
 }
 
 interface LandContext extends LandPorts {
   readonly thread: ThreadView | null
   readonly notice: LandNotice | null
+  /** The thread "Land & next" chose when the user confirmed; opened only after a land that moved work. */
+  readonly next: string | null
 }
 
 type LandEvent =
   | { readonly type: 'ask'; readonly thread: ThreadView }
   | { readonly type: 'cancel' }
-  | { readonly type: 'confirm' }
+  /** `next` is the thread to open after landing ("Land & next"); absent for plain Land. */
+  | { readonly type: 'confirm'; readonly next?: string | undefined }
   | { readonly type: 'queue'; readonly thread: ThreadView }
   | { readonly type: 'unqueue'; readonly thread: ThreadView }
   | { readonly type: 'xstate.done.actor.land'; readonly output: LandResult }
@@ -74,6 +79,12 @@ export const landCardMachine = setup({
   actions: {
     captureThread: assign(({ event }) => ('thread' in event ? { thread: event.thread } : {})),
     clearNotice: assign({ notice: null }),
+    captureNext: assign(({ event }) => (event.type === 'confirm' ? { next: event.next ?? null } : {})),
+    clearNext: assign({ next: null }),
+    openNext: ({ context, event }) => {
+      if (event.type !== 'xstate.done.actor.land' || event.output.status !== 'landed' || context.next === null) return
+      context.openThread?.(context.next)
+    },
     recordLanded: assign(({ event }) => (event.type === 'xstate.done.actor.land' ? { notice: landedNotice(event.output) } : {})),
     recordLandFailure: assign(({ event }) =>
       event.type === 'xstate.error.actor.land' ? { notice: failedNotice(event.error, 'Landing failed. Refresh the card and try again.') } : {},
@@ -91,7 +102,7 @@ export const landCardMachine = setup({
 }).createMachine({
   id: 'landCard',
   initial: 'idle',
-  context: ({ input }) => ({ ...input, thread: null, notice: null }),
+  context: ({ input }) => ({ ...input, thread: null, notice: null, next: null }),
   states: {
     idle: {
       on: {
@@ -104,7 +115,7 @@ export const landCardMachine = setup({
       on: {
         cancel: { target: 'idle', actions: 'clearNotice' },
         ask: { actions: ['captureThread', 'clearNotice'] },
-        confirm: { target: 'landing' },
+        confirm: { target: 'landing', actions: 'captureNext' },
       },
     },
     landing: {
@@ -112,8 +123,8 @@ export const landCardMachine = setup({
         id: 'land',
         src: 'land',
         input: ({ context }) => ({ thread: context.thread, ports: context }),
-        onDone: { target: 'idle', actions: ['recordLanded', 'refreshCard'] },
-        onError: { target: 'idle', actions: ['recordLandFailure', 'refreshCard'] },
+        onDone: { target: 'idle', actions: ['recordLanded', 'refreshCard', 'openNext', 'clearNext'] },
+        onError: { target: 'idle', actions: ['recordLandFailure', 'refreshCard', 'clearNext'] },
       },
     },
     queuing: {

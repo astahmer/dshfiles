@@ -48,6 +48,9 @@ const astGrepBoundaries = [
   'plugins/@dshfiles/jj-integration/src/revision-graph.ts',
   // The `thread-directories` dshx module of thread-sidebar: the thread-folder API and hook other plugins group by.
   'plugins/@dshfiles/thread-sidebar/src/thread-directories.ts',
+  // The `destinations` and `api` dshx modules also publish the section registry and update views they compose.
+  'plugins/@dshfiles/thread-sidebar/src/destinations.ts',
+  'plugins/@dshfiles/jj-integration/src/api.ts',
   'plugins/@dshfiles/input-trigger/src/client/index.ts',
   'plugins/@dshfiles/main-tabs/src/workbench-tabs.ts',
   'plugins/@dshfiles/rich-composer/src/conversation-contract.ts',
@@ -83,6 +86,8 @@ const astGrepVendored = [
   'plugins/@dshfiles/agent-preset/src/native/**',
   'plugins/@dshfiles/rich-composer/src/native/**',
   'plugins/@dshfiles/chat/src/native/**',
+  // Chat's settings module keeps the native package's import surface for the forked views; oxlint ignores it too.
+  'plugins/@dshfiles/chat/src/chat-settings.ts',
   'plugins/@dshfiles/session-controller/src/native/**',
   'plugins/@dshfiles/subprocess-local/src/native/**',
   'plugins/@dshfiles/goal-tool/src/native/**',

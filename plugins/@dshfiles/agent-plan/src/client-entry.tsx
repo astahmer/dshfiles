@@ -1,3 +1,5 @@
+// The `conversation.composer.context` seat this plugin fills (b:ysaj).
+import type {} from '@dshfiles/rich-composer/conversation-contract'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ChatNodeViewProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -163,8 +165,8 @@ export default defineClientPlugin({
     api.ui.register({ name: 'conversation.input.plan', priority: FALLBACK_PRIORITY, registrant: REGISTRANT }, PlanPinSeat)
     api.ui.register({ name: 'conversation.input.activity', priority: FALLBACK_PRIORITY, registrant: REGISTRANT }, ActivitySeat)
 
-    // The composer meter line, before the AI Accounts cost estimate (order 10).
-    api.ui.register({ name: 'conversation.composer.dock', id: 'agent-plan-compaction', order: 5 }, api.bind(views.CompactionSeat))
+    // Inside the context meter's panel (rich-composer, b:ysaj): the meter line keeps one context item.
+    api.ui.register({ name: 'conversation.composer.context', id: 'agent-plan-compaction', order: 5 }, api.bind(views.CompactionSeat))
 
     // Failure rows: the native row stays as drawn; the retry count and actions go under it.
     for (const kind of ['turn-error', 'model-retry'] as const) {

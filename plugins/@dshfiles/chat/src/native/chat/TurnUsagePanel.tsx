@@ -1,8 +1,8 @@
 /** Completed-Turn token usage action and its accounting details dialog. */
 
+import { DatabaseIcon } from '@dshfiles/plugin-ui/icons'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
-import { IconDatabaseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TurnTokenUsage } from '../contract/chat-nodes.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { formatCacheHitPercent, formatExactTokens, formatTokens } from './token-format.ts'
@@ -48,7 +48,7 @@ export function TurnUsagePanel({ usage, estimatedCost, t }: TurnUsagePanelProps)
         aria-expanded={open}
         onClick={() => { setOpen(!open) }}
       >
-        <IconDatabaseOutlineRegular />
+        <DatabaseIcon size={14} strokeWidth={1.5} />
         <span className={css.label}>{t('message.turnUsage.consumed', { total })}</span>
       </button>
       {open && createPortal(
@@ -61,7 +61,7 @@ export function TurnUsagePanel({ usage, estimatedCost, t }: TurnUsagePanelProps)
         >
           <div className={dialogCss.title}>
             <span className={dialogCss.titleLabel}>
-              <IconDatabaseOutlineRegular />
+              <DatabaseIcon size={14} strokeWidth={1.5} />
               {t('message.turnUsage.title')}
             </span>
             <span className={dialogCss.titleValue}>{formatExactCount(usage.totalTokens, t)}</span>

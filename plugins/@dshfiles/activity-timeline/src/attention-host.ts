@@ -1,5 +1,5 @@
 import { Api, DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
-import { Clock, Effect, Layer, Option, Schema, Stream } from 'effect'
+import { Clock, Effect, Layer, Option, Schedule, Schema, Stream } from 'effect'
 import { workspaceActivity } from './adapters.js'
 import { ActivityTimeline } from './activity-timeline.js'
 import { attentionActOutcomeSchema, attentionApi, type AttentionActOutcome, type AttentionActRequest } from './attention-api.js'
@@ -11,6 +11,8 @@ import { ThreadLineageModel } from './thread-lineage.js'
 /** Announce at most four changes a second; badges read the counts the event carries. */
 const CHANGE_EVENT_INTERVAL = '250 millis'
 const DEFAULT_LIST_LIMIT = 100
+/** How often unseen Ready items are checked against the 72-hour window; an item closes at most this late. */
+const EXPIRY_SWEEP_INTERVAL = '10 minutes'
 
 export class AttentionProviderOnly extends Schema.TaggedError<AttentionProviderOnly>()(
   'AttentionProviderOnly',
@@ -132,6 +134,13 @@ const make = Effect.gen(function* () {
           }).pipe(Effect.catchTag('PublishEventError', error => Effect.logWarning('attention: change event refused', error.message))),
       }),
     ),
+    DshxPlugin.detached,
+    Effect.forkScoped,
+  )
+  // Ready items unseen for 72 hours close by themselves (plan E2), once at start and then on a slow timer.
+  yield* inbox.expireUnseen.pipe(
+    Effect.catch(error => Effect.logWarning('attention: unseen items were not expired', error.message)),
+    Effect.repeat(Schedule.spaced(EXPIRY_SWEEP_INTERVAL)),
     DshxPlugin.detached,
     Effect.forkScoped,
   )

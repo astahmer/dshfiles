@@ -218,6 +218,13 @@ test('a Host namespace from before the brand-logo setting keeps the logo shown',
   assert.equal(SidebarPreferencesModel.decode({ ...older, hideBrandLogo: true })?.hideBrandLogo, true)
 })
 
+test('a Host namespace from before the rail actions setting shows the DSH actions on the rail (b:kgcc)', () => {
+  const { showRailActions, ...older } = DEFAULT_PREFERENCES
+  assert.equal(showRailActions, true)
+  assert.equal(SidebarPreferencesModel.decode(older)?.showRailActions, true)
+  assert.equal(SidebarPreferencesModel.decode({ ...older, showRailActions: false })?.showRailActions, false)
+})
+
 test('settings saved before the finished-subagents choice collapse them and reject unknown modes', () => {
   const { finishedSubagents, ...older } = DEFAULT_PREFERENCES
   assert.equal(SidebarPreferencesModel.decode(older)?.finishedSubagents, finishedSubagents)

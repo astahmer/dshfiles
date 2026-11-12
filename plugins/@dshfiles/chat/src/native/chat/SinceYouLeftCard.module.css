@@ -1,0 +1,138 @@
+/* dshfiles (productivity pass T4.3): the divider above the first unseen Turn and its recap card. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-block: 8px 16px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.divider::before,
+.divider::after {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--dsw-alias-border-l2);
+  content: '';
+}
+
+.dividerLabel {
+  flex: none;
+  font-weight: 600;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-strong-13);
+  font-variant-numeric: tabular-nums;
+}
+
+.dismiss {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.dismiss:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.chip:focus-visible,
+.dismiss:focus-visible {
+  outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+
+/* Colour only where the reader must act or recover: a question (accent), a failure (danger), each as a status trio. */
+.chip[data-tone='danger'] {
+  border-color: var(--dshx-tone-danger-border, var(--dsw-alias-state-error-primary));
+  color: var(--dsw-alias-state-error-primary);
+  background: var(--dshx-tone-danger-bg, transparent);
+}
+
+.chip[data-tone='accent'] {
+  border-color: var(--dshx-tone-accent-border, var(--dsw-alias-state-business-primary));
+  color: var(--dsw-alias-state-business-primary);
+  background: var(--dshx-tone-accent-bg, transparent);
+}
+
+.fileName {
+  overflow: hidden;
+  min-width: 0;
+  font-family: var(--dsh-font-family-code, var(--ds-font-family-code));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lines {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.more {
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}

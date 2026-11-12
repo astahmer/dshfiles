@@ -1,11 +1,7 @@
 /** Stable process container; display policy changes visibility, never member parents. */
-import { memo, useCallback, useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import {
-  IconAgentPresetOutlineRegular, IconApiOutlineRegular, IconBrowseOutlineRegular, IconChevronDownOutlineRegular,
-  IconChevronUpOutlineRegular, IconCodeOutlineRegular, IconEditOutlineRegular, IconGlobeOutlineRegular,
-  IconPlanOutlineRegular, IconQuestionOutlineRegular, IconSearchOutlineRegular, IconSparkleRegular,
-  IconThinkOutlineRegular, TextShimmer,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { ChevronDownIcon, ChevronUpIcon, CircleHelpIcon, CodeIcon, GlobeIcon, PencilIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { IconAgentPresetOutlineRegular, IconApiOutlineRegular, IconBrowseOutlineRegular, IconPlanOutlineRegular, IconSparkleRegular, IconThinkOutlineRegular, TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { GroupKey, NodeReference } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ProcessActivity } from '../contract/process-groups.ts'
 import type { ChatStoreState } from '../contract/store.ts'
@@ -14,12 +10,13 @@ import { turnProcessOpen } from '../stores.ts'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { hiddenOrCollapsing } from './flow-motion.ts'
 import { chatRenderKey } from './render-entry.ts'
+import { useRunFoldPlacements } from './RunFold.tsx'
 import { processTitle } from './step-process.ts'
 import { useDisclosure } from './use-disclosure.ts'
 import { useProcessScroll } from './use-process-scroll.ts'
 import css from './ChatGroupSeat.module.css'
 
-type SeatProps = Omit<ComponentProps<typeof ChatNodeSeat>, 'nodeKey' | 'groupPart'>
+type SeatProps = Omit<ComponentProps<typeof ChatNodeSeat>, 'nodeKey' | 'groupPart' | 'runFold'>
 type ChatGroupSeatProps = SeatProps & {
   readonly groupKey: GroupKey
   readonly useChatGroup: ChatFlowSlotProps['useChatGroup']
@@ -39,16 +36,16 @@ const PROCESS_ICONS: Record<ProcessTitleActivity, ReactNode> = {
   thinking: <IconThinkOutlineRegular />,
   read: <IconBrowseOutlineRegular size={14} />,
   readImage: <IconBrowseOutlineRegular size={14} />,
-  search: <IconSearchOutlineRegular size={14} />,
-  edit: <IconEditOutlineRegular size={14} />,
-  write: <IconEditOutlineRegular size={14} />,
+  search: <SearchIcon strokeWidth={1.5} size={14} />,
+  edit: <PencilIcon strokeWidth={1.5} size={14} />,
+  write: <PencilIcon strokeWidth={1.5} size={14} />,
   commands: <IconApiOutlineRegular />,
-  code: <IconCodeOutlineRegular size={14} />,
-  webSearch: <IconGlobeOutlineRegular />,
+  code: <CodeIcon strokeWidth={1.5} size={14} />,
+  webSearch: <GlobeIcon size={14} strokeWidth={1.5} />,
   webFetch: <IconBrowseOutlineRegular size={14} />,
   subagents: <IconAgentPresetOutlineRegular size={14} />,
   plan: <IconPlanOutlineRegular />,
-  questions: <IconQuestionOutlineRegular />,
+  questions: <CircleHelpIcon size={14} strokeWidth={1.5} />,
   tools: <IconSparkleRegular size={14} />,
 }
 
@@ -85,7 +82,11 @@ function useStableLiveProcessTitle(desired: LiveProcessTitle, active: boolean): 
 const GroupMembers = memo(function GroupMembers({ members, ...props }: SeatProps & {
   readonly members: readonly NodeReference[]
 }) {
-  return members.map(member => <ChatNodeSeat {...props} key={chatRenderKey(member)} nodeKey={member.key}
+  // dshfiles (b:7rv2): consecutive background-job and subagent rows fold into one summary row.
+  const keys = useMemo(() => members.map(member => member.groupPart === undefined ? member.key : undefined), [members])
+  const placements = useRunFoldPlacements(props.nodeStore, keys)
+  return members.map((member, index) => <ChatNodeSeat {...props} key={chatRenderKey(member)} nodeKey={member.key}
+    runFold={placements[index]}
     {...member.groupPart === undefined ? {} : { groupPart: member.groupPart }} />)
 })
 
@@ -118,7 +119,7 @@ const ProcessGroupHeader = memo(function ProcessGroupHeader({ groupKey, useChatG
       <span className={css.leading} aria-hidden="true">
         <span className={css.activityIcon} data-step-process-icon>{PROCESS_ICONS[activity]}</span>
         <span className={css.chevron} data-step-process-chevron>
-          {open ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}
+          {open ? <ChevronUpIcon size={14} strokeWidth={1.5} /> : <ChevronDownIcon size={14} strokeWidth={1.5} />}
         </span>
       </span>
       <TextShimmer active={!data.closed}>

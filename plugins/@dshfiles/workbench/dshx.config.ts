@@ -12,6 +12,7 @@ export default defineConfig({
     'close-button-position': 'src/close-button-position.ts',
     'conversation-header': 'src/conversation-header.ts',
     'thread-on-screen': 'src/thread-on-screen.ts',
+    'shell-merge': 'src/shell-merge.ts',
   },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: { entry: 'src/client.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite(), dockviewCssVite()] } },

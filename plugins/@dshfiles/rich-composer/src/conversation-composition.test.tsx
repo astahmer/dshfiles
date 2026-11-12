@@ -3,6 +3,7 @@ import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { createTestClient } from '@dshfiles/dshx/testing'
 import { PhoneThreadMenu, usePhoneThreadTool } from './phone-thread-menu.tsx'
 import { createPhoneThreadMenu } from './phone-thread-menu-service.ts'
+import { ThreadViewsModel } from './thread-views.ts'
 import { act, type ReactNode, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createEditor } from 'lexical'
@@ -43,7 +44,13 @@ const selected =
   selector =>
     selector(value)
 const dispose: Array<() => void> = []
+/** jsdom draws no boxes: a test conversation is on screen unless a test says otherwise (Q6 phone bar seat). */
+let conversationOnScreen = true
+Element.prototype.checkVisibility = function checkVisibility() {
+  return conversationOnScreen
+}
 afterEach(() => {
+  conversationOnScreen = true
   for (const release of dispose.splice(0).reverse()) release()
   document.body.replaceChildren()
   vi.unstubAllGlobals()
@@ -315,13 +322,119 @@ describe('fixed Conversation content factory composition', () => {
     expect(titleInput()).toBeNull()
   })
 
-  it.each([false, true])('opens only its own phone menu with hideChrome=%s', async hideChrome => {
-    const slotMarker: ConversationSessionHeaderSlotProps['renderSlot'] = name => <span data-test-slot={name} />
-    const chat = fixture('menu-chat')
-    const other = fixture('menu-other', 'other')
-    const toolInput = document.createElement('input')
-    document.body.append(toolInput)
-    const openPrompts = vi.fn(() => toolInput.focus())
+  it('keeps Chat on the stage of two fixed Sessions, whatever view a Session stored, with no view tabs in the header', () => {
+    // A thread panel hosts the other views as facets (productivity pass Q5).
+    const releaseHost = ThreadViewsModel.host()
+    dispose.push(releaseHost)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    )
+    Object.defineProperty(document, 'fonts', { configurable: true, value: new EventTarget() })
+    const a = fixture('view-a')
+    const b = fixture('view-b', 'other')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    const draw = () =>
+      root.render(
+        <>
+          <section data-bound-session="view-a">
+            <ConversationSessionHeader {...a.header} />
+            <ConversationContent {...a.props} />
+          </section>
+          <section data-bound-session="view-b">
+            <ConversationSessionHeader {...b.header} />
+            <ConversationContent {...b.props} />
+          </section>
+        </>,
+      )
+    act(draw)
+    const editorA = a.editor.getRootElement()
+    const editorB = b.editor.getRootElement()
+    // Productivity pass Q5 (E5): the stage is Chat even for a Session whose stored selection names another view; the
+    // other views are thread-panel facets, so the header carries no tab row.
+    expect(element.querySelector('[data-chat-session="view-a"]')?.textContent).toBe('chat')
+    expect(element.querySelector('[data-chat-session="view-b"]')?.textContent).toBe('chat')
+    expect(element.querySelectorAll('[role="tab"]')).toHaveLength(0)
+    expect(element.querySelector('[data-conversation-tabs]')).toBeNull()
+    act(draw)
+    expect(a.editor.getRootElement()).toBe(editorA)
+    expect(b.editor.getRootElement()).toBe(editorB)
+    expect(element.querySelectorAll('[data-composer-input]')).toHaveLength(2)
+    expect(a.props.inputActions?.persistDraft).toHaveBeenCalledTimes(1)
+    expect(b.props.inputActions?.persistDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives up the header row in the phone shell and moves its actions into one menu sheet', () => {
+    // A thread panel hosts the other views as facets (productivity pass Q5).
+    const releaseHost = ThreadViewsModel.host()
+    dispose.push(releaseHost)
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }))
+    document.documentElement.setAttribute('data-shell-phone-nav', '')
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      vi.unstubAllGlobals()
+    })
+    const a = fixture('phone-a')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() => root.render(<ConversationSessionHeader {...a.header} />))
+    // Nothing of the header stays in the stage: no crumbs, no tab row.
+    expect(element.querySelector('[role="tab"]')).toBeNull()
+    const menu = document.body.querySelector<HTMLButtonElement>('[data-conversation-phone-bar] button[aria-label="session.menu"]')
+    expect(menu).not.toBeNull()
+    expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
+    act(() => menu?.click())
+    const sheet = document.body.querySelector('[data-conversation-phone-sheet]')
+    expect(sheet?.getAttribute('role')).toBe('dialog')
+    // b:ppd0: the bar is transformed (it follows the visual viewport), so a fixed sheet or scrim inside it is laid out
+    // against the 44px bar, not the screen. Both sit directly in the body, outside the bar.
+    const scrim = document.body.querySelector('[aria-label="session.closeMenu"]')
+    expect(sheet?.parentElement).toBe(document.body)
+    expect(scrim?.parentElement).toBe(document.body)
+    expect(sheet?.closest('[data-conversation-phone-bar]')).toBeNull()
+    // No view switch (Q5): the thread's other views open from the thread `⋯` items the sheet holds.
+    expect(sheet?.querySelector('[role="tab"]')).toBeNull()
+    act(() => document.body.querySelector<HTMLButtonElement>('[aria-label="session.closeMenu"]')?.click())
+    expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
+  })
+
+  it('portals no phone bar for a conversation that is not on screen (kept-alive panels stacked their pills)', () => {
+    const releaseHost = ThreadViewsModel.host()
+    dispose.push(releaseHost)
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }))
+    document.documentElement.setAttribute('data-shell-phone-nav', '')
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      vi.unstubAllGlobals()
+    })
+    conversationOnScreen = false
+    const hidden = fixture('phone-hidden')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() => root.render(<ConversationSessionHeader {...hidden.header} />))
+    expect(document.body.querySelector('[data-conversation-phone-bar]')).toBeNull()
+    expect(element.querySelector('[data-conversation-phone-anchor]')).not.toBeNull()
+  })
+
+  it('lists phone thread menu tools in the ⋯ sheet, which is their launcher while its bar is on screen', async () => {
+    const releaseHost = ThreadViewsModel.host()
+    dispose.push(releaseHost)
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }))
+    document.documentElement.setAttribute('data-shell-phone-nav', '')
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      vi.unstubAllGlobals()
+    })
     const menu = createPhoneThreadMenu()
     const client = await createTestClient()
     await client.mount(defineClientPlugin({ id: 'phone-menu', uses: ['ui'], setup: api => void api.provide(PhoneThreadMenu, menu) }), {
@@ -331,74 +444,31 @@ describe('fixed Conversation content factory composition', () => {
       void client.dispose()
     })
     const Scope = menu.scope.Provider
-    const Tool = () => {
-      const props = usePhoneThreadTool({ id: 'test/prompts', label: 'Saved prompts', open: openPrompts })
-      return <button type="button" {...props.triggerProps} />
-    }
+    const opened = vi.fn()
+    const Tool = () => <button {...usePhoneThreadTool({ id: 'test/prompts', label: 'Saved prompts', open: opened }).triggerProps}>Prompts</button>
+    const a = fixture('phone-tools')
     const element = document.createElement('div')
     document.body.append(element)
     const root = createRoot(element)
     dispose.push(() => act(() => root.unmount()))
-    const html = document.documentElement
-    dispose.push(() => {
-      html.removeAttribute('data-shell-phone-nav')
-    })
-    act(() =>
+    await act(async () =>
       root.render(
-        <>
-          <Scope value="chat-reader">
-            <section data-bound-session="menu-chat">
-              <ConversationSessionHeader {...chat.header} hideChrome={hideChrome} renderSlot={slotMarker} />
-              <Tool />
-            </section>
-          </Scope>
-          <section data-bound-session="menu-other">
-            <ConversationSessionHeader {...other.header} renderSlot={slotMarker} />
-          </section>
-        </>,
+        <Scope value="phone-tools-reader">
+          <ConversationSessionHeader {...a.header} />
+          <Tool />
+        </Scope>,
       ),
     )
-    await act(async () => {
-      const release = menu.attachLauncher('chat-reader')
-      dispose.push(() => act(release))
-    })
-    const inChat = (selector: string) => element.querySelector(`[data-bound-session="menu-chat"] ${selector}`)
-    const inOther = (selector: string) => element.querySelector(`[data-bound-session="menu-other"] ${selector}`)
-    const slot = (name: string) => `[data-test-slot="conversation.session.header.${name}"]`
-    expect(inChat(slot('utilities')) === null).toBe(hideChrome)
-
-    await act(async () => html.setAttribute('data-shell-phone-nav', ''))
-    expect(Array.from(element.querySelectorAll('button'), button => button.textContent)).not.toContain('menu-chat')
-    for (const name of ['actions', 'utilities', 'corner']) expect(inChat(slot(name))).toBeNull()
-    expect(inChat('[data-conversation-tabs]')).toBeNull()
-    expect(inOther('[data-conversation-tabs]')).not.toBeNull()
-
-    const opener = document.createElement('button')
-    document.body.append(opener)
-    opener.focus()
-    await act(async () => menu.toggle('chat-reader'))
-    expect(document.activeElement).toBe(inChat('[role="dialog"]'))
-    await act(async () => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-    expect(inChat('[role="dialog"]')).toBeNull()
-    expect(document.activeElement).toBe(opener)
-    await act(async () => menu.toggle('chat-reader'))
-    for (const name of ['actions', 'utilities', 'corner']) expect(inChat(`[data-phone-thread-menu] ${slot(name)}`) === null).toBe(hideChrome)
-    const views = Array.from(element.querySelectorAll('[data-bound-session="menu-chat"] [data-phone-thread-menu] [role="tab"]'), tab => tab.textContent)
-    expect(views).toEqual(hideChrome ? [] : ['Chat', 'Other'])
-    expect(inOther('[data-phone-thread-tool-proxy]')).toBeNull()
-    expect(inOther('[data-phone-thread-menu]')).toBeNull()
-    const proxy = inChat('[data-phone-thread-tool-proxy]')
+    // The on-screen bar attaches the sheet as the launcher, so the tool hides in place.
+    expect(menu.state.get().launcherReader).toBe('phone-tools-reader')
+    expect(element.querySelector('button[data-phone-thread-tool]')?.hasAttribute('data-phone-thread-tool-hidden')).toBe(true)
+    act(() => document.body.querySelector<HTMLButtonElement>('[data-conversation-phone-bar] button[aria-label="session.menu"]')?.click())
+    expect(menu.state.get().openReader).toBe('phone-tools-reader')
+    const proxy = document.body.querySelector<HTMLButtonElement>('[data-conversation-phone-sheet] [data-phone-thread-tool-proxy]')
     expect(proxy?.textContent).toBe('Saved prompts')
-
-    await act(async () => {
-      if (proxy instanceof HTMLButtonElement) proxy.click()
-      await new Promise(resolve => requestAnimationFrame(resolve))
-    })
-    expect(menu.state.get().openReader).toBeNull()
-    expect(inChat('[data-phone-thread-menu]')).toBeNull()
-    expect(inChat('[data-phone-thread-tool]')?.hasAttribute('data-phone-thread-tool-hidden')).toBe(true)
-    expect(openPrompts).toHaveBeenCalledTimes(1)
-    expect(document.activeElement).toBe(toolInput)
+    act(() => proxy?.click())
+    expect(opened).toHaveBeenCalledOnce()
+    expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
   })
 
   it('keeps draft tools visible without a reachable menu launcher', async () => {
@@ -428,7 +498,7 @@ describe('fixed Conversation content factory composition', () => {
     expect(element.querySelector('button')?.hasAttribute('data-phone-thread-tool-hidden')).toBe(false)
   })
 
-  it('selects native child views independently in two fixed Sessions without replacing either editor', () => {
+  it('without a thread panel, selects native child views independently in two fixed Sessions without replacing either editor', () => {
     vi.stubGlobal(
       'ResizeObserver',
       class {
@@ -485,6 +555,34 @@ describe('fixed Conversation content factory composition', () => {
     expect(element.querySelectorAll('[data-composer-input]')).toHaveLength(2)
     expect(a.props.inputActions?.persistDraft).toHaveBeenCalledTimes(1)
     expect(b.props.inputActions?.persistDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it('without a thread panel, gives up the header row in the phone shell and moves the view switch into one menu sheet', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }))
+    document.documentElement.setAttribute('data-shell-phone-nav', '')
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      vi.unstubAllGlobals()
+    })
+    const a = fixture('phone-a')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() => root.render(<ConversationSessionHeader {...a.header} />))
+    // Nothing of the header stays in the stage: no crumbs, no tab row.
+    expect(element.querySelector('[role="tab"]')).toBeNull()
+    const menu = document.body.querySelector<HTMLButtonElement>('[data-conversation-phone-bar] button[aria-label="session.menu"]')
+    expect(menu).not.toBeNull()
+    expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
+    act(() => menu?.click())
+    const sheet = document.body.querySelector('[data-conversation-phone-sheet]')
+    expect(sheet?.getAttribute('role')).toBe('dialog')
+    const other = Array.from(sheet?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []).find(tab => tab.textContent === 'Other')
+    expect(other).toBeDefined()
+    act(() => other?.click())
+    // Picking a view closes the sheet.
+    expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
   })
 
   it('publishes a draft to the dock without re-rendering the Conversation view', () => {

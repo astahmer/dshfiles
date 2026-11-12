@@ -1,5 +1,5 @@
 import { DshxPlugin } from '@dshfiles/dshx/effect'
-import { Clock, Context, Duration, Effect, FileSystem, Layer, Option, Path, Queue, Ref, Schema, Stream } from 'effect'
+import { Clock, Context, Duration, Effect, FileSystem, Layer, Option, Path, Queue, Ref, Schema, Semaphore, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import type { WorkspaceSyncView } from './api.js'
 import { ActivityLog } from './host-edges-promise.js'
@@ -43,6 +43,27 @@ interface WorkspaceSyncInput extends WorkspaceSyncRequest {
   readonly workspace: string
 }
 
+/** A sync someone waits on (Update DSH): the workspace is explicit and each `dshx checkout sync:` progress line is reported. */
+export interface WorkspaceSyncNowRequest extends WorkspaceSyncRequest {
+  readonly workspace: string
+  readonly onProgress?: ((line: string) => Effect.Effect<void>) | undefined
+}
+
+const PROGRESS_PREFIX = 'dshx checkout sync: '
+
+/** stderr text, also handing each `dshx checkout sync:` progress line to `onProgress` as it arrives. */
+const collectProgress = (stream: Stream.Stream<Uint8Array, unknown>, maxBytes: number, onProgress: ((line: string) => Effect.Effect<void>) | undefined) =>
+  stream.pipe(
+    Stream.decodeText(),
+    Stream.splitLines,
+    Stream.tap(line => (onProgress !== undefined && line.startsWith(PROGRESS_PREFIX) ? onProgress(line.slice(PROGRESS_PREFIX.length)) : Effect.void)),
+    Stream.runFold(
+      () => '',
+      (text, line) => (text.length >= maxBytes ? text : `${text}${line}\n`.slice(0, maxBytes)),
+    ),
+    Effect.orElseSucceed(() => ''),
+  )
+
 const collectText = (stream: Stream.Stream<Uint8Array, unknown>, maxBytes: number) =>
   stream.pipe(
     Stream.decodeText(),
@@ -61,6 +82,8 @@ export class WorkspaceSync extends Context.Service<
   WorkspaceSync,
   {
     readonly enqueue: (request: WorkspaceSyncRequest) => Effect.Effect<void>
+    /** Run one sync now, after any sync already running, and return its result; it shows as the current sync too. */
+    readonly syncNow: (request: WorkspaceSyncNowRequest) => Effect.Effect<WorkspaceSyncView>
     readonly current: Effect.Effect<WorkspaceSyncView | null>
   }
 >()('@dshfiles/jj-integration/WorkspaceSync') {
@@ -75,8 +98,13 @@ export class WorkspaceSync extends Context.Service<
       const pending = yield* Ref.make<ReadonlyMap<string, WorkspaceSyncInput>>(new Map())
       const view = yield* Ref.make<WorkspaceSyncView | null>(null)
       const wakes = yield* Queue.sliding<void>(1)
+      // Land-driven and Update DSH syncs touch the same checkout: one at a time.
+      const lock = yield* Semaphore.make(1)
 
-      const run = Effect.fn('jj-integration workspace sync')(function* (input: WorkspaceSyncInput) {
+      const run = Effect.fn('jj-integration workspace sync')(function* (
+        input: WorkspaceSyncInput,
+        onProgress?: ((line: string) => Effect.Effect<void>) | undefined,
+      ) {
         yield* Effect.annotateCurrentSpan({ 'dshx.checkout.workspace': input.workspace, 'dshx.checkout.bookmark': input.bookmark })
         const now = yield* Clock.currentTimeMillis
         const failed = (message: string) => syncView(input, 'failed', message, now)
@@ -86,9 +114,12 @@ export class WorkspaceSync extends Context.Service<
         const [executable = '', ...args] = argv.value
         const output = yield* spawner.spawn(ChildProcess.make(executable, args, { cwd: input.repoRoot, stdin: 'ignore', forceKillAfter: KILL_GRACE })).pipe(
           Effect.flatMap(handle =>
-            Effect.all([collectText(handle.stdout, MAX_OUTPUT_BYTES), collectText(handle.stderr, MAX_STDERR_BYTES), Effect.ignore(handle.exitCode)], {
-              concurrency: 'unbounded',
-            }),
+            Effect.all(
+              [collectText(handle.stdout, MAX_OUTPUT_BYTES), collectProgress(handle.stderr, MAX_STDERR_BYTES, onProgress), Effect.ignore(handle.exitCode)],
+              {
+                concurrency: 'unbounded',
+              },
+            ),
           ),
           Effect.scoped,
           Effect.timeoutOption(SYNC_TIMEOUT),
@@ -129,13 +160,19 @@ export class WorkspaceSync extends Context.Service<
         return [first, rest]
       })
 
+      const runAndRecord = (input: WorkspaceSyncInput, onProgress?: ((line: string) => Effect.Effect<void>) | undefined) =>
+        Effect.gen(function* () {
+          yield* Ref.set(view, syncView(input, 'running', null, 0))
+          const result = yield* run(input, onProgress)
+          yield* Ref.set(view, result)
+          yield* activity.emit({ ...workspaceSyncActivity(result), path: input.repoRoot, sessionId: input.sessionId, correlationId: input.correlationId })
+          return result
+        })
+
       const drain: Effect.Effect<void> = Effect.gen(function* () {
         const next = yield* takeNext
         if (next === undefined) return
-        yield* Ref.set(view, syncView(next, 'running', null, 0))
-        const result = yield* run(next)
-        yield* Ref.set(view, result)
-        yield* activity.emit({ ...workspaceSyncActivity(result), path: next.repoRoot, sessionId: next.sessionId, correlationId: next.correlationId })
+        yield* lock.withPermits(1)(runAndRecord(next))
         yield* drain
       })
 
@@ -152,6 +189,10 @@ export class WorkspaceSync extends Context.Service<
           yield* Ref.update(view, current => queuedSyncView(current, input))
           yield* Queue.offer(wakes, undefined)
         }),
+        syncNow: (request: WorkspaceSyncNowRequest) => {
+          const { onProgress, ...input } = request
+          return lock.withPermits(1)(runAndRecord(input, onProgress))
+        },
         current: Ref.get(view),
       })
     }),

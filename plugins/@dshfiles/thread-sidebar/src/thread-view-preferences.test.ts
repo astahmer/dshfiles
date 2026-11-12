@@ -31,6 +31,9 @@ describe('thread view preferences', () => {
       activeViewId: ALL_THREADS_VIEW_ID,
       showGroupControl: true,
       showFilterControl: true,
+      // Filter presets (b:xpvk): on by default, chips off so the header stays calm.
+      showPresets: true,
+      showPresetChips: false,
     })
   })
 
@@ -53,6 +56,8 @@ describe('thread view preferences', () => {
     const migrated = ThreadViewPreferencesModel.upgradeShippedViewFilters(ThreadViewPreferencesModel.migrateDoneViewSettings(decoded))
     expect(migrated).toEqual({
       ...JSON.parse(raw),
+      showPresets: true,
+      showPresetChips: false,
       views: [
         // The stored grouping is honoured: only a new profile starts on the status grouping.
         { ...DEFAULT_THREAD_VIEW_PRESETS[0], groupBy: 'status' },

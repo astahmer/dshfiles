@@ -28,9 +28,9 @@ export const InboxFilters = (props: {
     value={props.filter}
   >
     {filters.map(entry => (
-      <ToggleGroupItem className="dshx:gap-1 dshx:text-[13px]" key={entry.value} value={entry.value}>
+      <ToggleGroupItem className="dshx:gap-1 dshx:text-sm" key={entry.value} value={entry.value}>
         {entry.label}
-        {props.countOf(entry.value) === 0 ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{props.countOf(entry.value)}</span>}
+        {props.countOf(entry.value) === 0 ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.countOf(entry.value)}</span>}
       </ToggleGroupItem>
     ))}
   </ToggleGroup>

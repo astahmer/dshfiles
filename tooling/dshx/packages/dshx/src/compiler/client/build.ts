@@ -58,6 +58,7 @@ const CLIENT_APP_SERVICES_PATH = fileURLToPath(new URL('../../client/app-service
 const CLIENT_APP_CONTRACTS_PATH = fileURLToPath(new URL('../../client/app-contracts.js', import.meta.url))
 const CLIENT_LINKS_PATH = fileURLToPath(new URL('../../client/links.js', import.meta.url))
 const CLIENT_COMMAND_CHORDS_PATH = fileURLToPath(new URL('../../client/command-chords.js', import.meta.url))
+const CLIENT_COMMAND_KEYS_PATH = fileURLToPath(new URL('../../client/command-keys.js', import.meta.url))
 const CLIENT_REGISTRIES_PATH = fileURLToPath(new URL('../../client/registries.js', import.meta.url))
 const CLIENT_STORE_PATH = fileURLToPath(new URL('../../client/store.js', import.meta.url))
 const CLIENT_HOOKS_PATH = fileURLToPath(new URL('../../client/hooks.js', import.meta.url))
@@ -269,6 +270,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const createApiClient = ApiRuntimeModel.createClient',
           'export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient',
           `export { observeSettings, useSettings } from ${JSON.stringify(VIRTUAL_CLIENT_SETTINGS_HOOK)}`,
+          `export { createSettingsClientRuntime } from ${JSON.stringify(SETTINGS_CLIENT_PATH)}`,
           `import { SettingsPageRendererModel } from ${JSON.stringify(SETTINGS_PAGE_RENDERER_PATH)}`,
           'export const provideSettingsPageRenderer = SettingsPageRendererModel.provide',
           `import { BrowserBroker } from ${JSON.stringify(CLIENT_BROKER_PATH)}`,
@@ -283,6 +285,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `export { Browser, Changes, Files } from ${JSON.stringify(CLIENT_APP_CONTRACTS_PATH)}`,
           `export { ComposerAction, ComposerPill, ComposerTool, ComposerTools, FileViewer, HeaderAction, MenuItem, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
           `export { CommandChords } from ${JSON.stringify(CLIENT_COMMAND_CHORDS_PATH)}`,
+          `export { CommandKeys } from ${JSON.stringify(CLIENT_COMMAND_KEYS_PATH)}`,
           `import { StoreModel } from ${JSON.stringify(CLIENT_STORE_PATH)}`,
           'export const defineStore = StoreModel.define',
           `import { PluginHooksModel } from ${JSON.stringify(CLIENT_HOOKS_PATH)}`,

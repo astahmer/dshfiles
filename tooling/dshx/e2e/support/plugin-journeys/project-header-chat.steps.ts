@@ -1,3 +1,4 @@
+import { ThreadListFilter } from '../thread-list-filter.js'
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -26,7 +27,8 @@ const journeys = new WeakMap<Page, HeaderJourney>()
 const sidebar = (page: Page): Locator => page.getByRole('region', { name: 'Threads', exact: true })
 const selectedThread = (page: Page): string | null => new URL(page.url()).searchParams.get('thread')
 const projectHeader = (page: Page, name: string): Locator => sidebar(page).getByRole('region', { name, exact: true })
-const composer = (page: Page): Locator => page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+const composer = (page: Page): Locator =>
+  page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
 const row = (page: Page, id: string): Locator => sidebar(page).locator(`article[data-thread-id="${id}"]`)
 const openRow = async (page: Page, id: string): Promise<void> => {
   await row(page, id)
@@ -52,12 +54,14 @@ const waitForSidebarLayout = async (page: Page): Promise<void> => {
 /**
  * The thread list at any width. On a desktop it is the sidebar's own panel, opened by its "Expand sidebar" toggle when
  * collapsed; on a phone the frame hides that column and its toggle, and the list is the phone stack's Threads page,
- * opened from the Destinations tab bar.
+ * opened from the Destinations tab bar, or, inside a thread (where the tab bar steps aside), by the top bar's Back.
  */
 const openThreadList = async (page: Page): Promise<void> => {
   if (!(await sidebar(page).isVisible())) {
     const phoneThreads = page.getByRole('navigation', { name: 'Destinations', exact: true }).getByRole('button', { name: 'Threads', exact: true })
+    const phoneBack = page.getByRole('button', { name: 'Back to Threads', exact: true })
     if (await phoneThreads.isVisible()) await phoneThreads.click()
+    else if (await phoneBack.isVisible()) await phoneBack.click()
     else {
       const expandSidebar = page.getByRole('button', { name: 'Expand sidebar', exact: true })
       if (await expandSidebar.isVisible()) await expandSidebar.click()
@@ -100,9 +104,8 @@ When('two local projects have conversations and the sidebar is grouped by projec
   const beta = Schema.decodeUnknownSync(projectSchema)(await call('projectRegister', { path: betaPath, title: 'Beta project' })).projectId
   await call('create', { projectId: alpha, text: 'Alpha project conversation' })
   const betaThread = Schema.decodeUnknownSync(createdSchema)(await call('create', { projectId: beta, text: 'Beta project conversation' })).sessionId
-  await sidebar(page).getByRole('group', { name: 'Thread list view', exact: true }).getByRole('button', { name: 'All threads', exact: true }).click()
-  await sidebar(page).getByRole('button', { name: 'Group: Status', exact: true }).click()
-  await page.getByRole('menuitemradio', { name: 'Project', exact: true }).click()
+  await ThreadListFilter.selectView(page, sidebar(page), 'All threads')
+  await ThreadListFilter.selectGroup(page, sidebar(page), 'Project')
   await openRow(page, betaThread)
   await expect(sidebar(page).getByRole('button', { name: 'New chat in Alpha project', exact: true })).toBeVisible()
   journeys.set(page, { call, alpha, beta, betaThread })
@@ -123,7 +126,7 @@ Then('the project header plus creates in its own project without toggling collap
     try {
       const sessionId = await createFromHeader(page, group.getByRole('button', { name: 'New chat in Alpha project', exact: true }))
       await expect(collapsed).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText('Alpha project')
+      await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toHaveText('Alpha project')
       expect(Schema.decodeUnknownSync(listedSchema)(await journey.call('list', {})).threads.some(thread => thread.sessionId === sessionId)).toBe(false)
       await collapsed.click()
       await expect(row(page, sessionId)).toContainText('New chat')
@@ -296,7 +299,11 @@ Then('model and preset choices remain local until typing creates the chat', asyn
       if (modelName === null) throw new Error('The catalog model has no label.')
       await alternate.click()
       await expect(modelTrigger).toHaveAttribute('aria-label', new RegExp(modelName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-      await page.getByRole('button', { name: 'Standard mode', exact: true }).click()
+      // The default preset's chip is hidden (b:4v6p); the composer's ⋯ › Agent mode… opens its menu, and the chosen
+      // non-default preset keeps the chip in view.
+      await expect(page.getByRole('button', { name: 'Standard mode', exact: true }).filter({ visible: true })).toHaveCount(0)
+      await page.getByRole('button', { name: 'More composer actions', exact: true }).filter({ visible: true }).first().click()
+      await page.getByRole('menuitem', { name: /^Agent mode/u }).click()
       await page.getByRole('menuitem').filter({ hasText: 'Creator mode' }).click()
       await expect(page.getByRole('button', { name: 'Creator mode', exact: true })).toBeVisible()
       expect(requests).toEqual([])

@@ -60,7 +60,7 @@ test('real profile relink preserves user edits/accounts and never adds unselecte
   mkdirSync(join(dshHome, 'plugins/ai-accounts'), { recursive: true })
   const accounts = '{"accounts":[{"instanceId":"fixture-user-choice"}]}\n'
   writeFileSync(join(dshHome, 'plugins/ai-accounts/accounts.json'), accounts)
-  writeFileSync(join(bin, 'pgrep'), '#!/bin/sh\nexit 1\n', { mode: 0o700 })
+  writeFileSync(join(bin, 'ps'), '#!/bin/sh\nprintf "%s" "$FAKE_PS_OUTPUT"\n', { mode: 0o700 })
   writeFileSync(join(bin, 'pnpm'), '#!/bin/sh\nprintf x >> "$DSH_HOME/installed"\n', { mode: 0o700 })
   const env = {
     ...process.env,
@@ -74,6 +74,16 @@ test('real profile relink preserves user edits/accounts and never adds unselecte
   }
   delete env.DSHFILES_LAUNCHER_CONFIG
   const run = (...args) => spawnSync(process.execPath, [join(import.meta.dirname, 'prepare-manuel-source.mjs'), ...args], { env, encoding: 'utf8' })
+  // A Host started by hand on this home (2026-11-12: `node dsh-runtime/node_modules/.bin/dsh web`) blocks every write.
+  const manual = `4242 ${process.getuid()} node dsh-runtime/node_modules/.bin/dsh custom DSH_HOME=${dshHome} HOME=${home}\n`
+  const refused = spawnSync(process.execPath, [join(import.meta.dirname, 'prepare-manuel-source.mjs')], {
+    env: { ...env, FAKE_PS_OUTPUT: manual },
+    encoding: 'utf8',
+  })
+  assert.notEqual(refused.status, 0)
+  assert.match(refused.stderr, /Stop the existing DSH/)
+  assert.deepEqual(JSON.parse(readFileSync(join(profile, 'package.json'), 'utf8')), original)
+  assert.throws(() => readdirSync(join(dshHome, 'backups')), /ENOENT/)
   const check = run('--check')
   assert.equal(check.status, 0, check.stderr)
   assert.deepEqual(JSON.parse(readFileSync(join(profile, 'package.json'), 'utf8')), original)

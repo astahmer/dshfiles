@@ -27,8 +27,13 @@ preview and extension halves here reuse their _ideas_ (instrumented renderer,
 
 - **Pick**: the crosshair action in a composer, or the panel it opens. It joins
   every composer that offers tools: the conversation, and Backlog's capture box,
-  item description and replies. Hover highlights the element under the pointer; click captures it;
-  `Esc` leaves pick mode without storing anything.
+  item description and replies. In the conversation composer the crosshair is not
+  permanent (composer redesign b:v9yh): open the panel with **Point at UI…** in the
+  composer's More (⋯) menu or `/annotate` from its + menu; the crosshair comes back
+  as a count chip while annotations are open, and while a pick runs. With the
+  composer extras pinned into the bar it stays as before. Hover highlights the
+  element under the pointer; click captures it; `Esc` leaves pick mode without
+  storing anything.
 - **Note**: the popover collects the note plus an optional intent (`fix`,
   `change`, `question`, `approve`) and severity (`blocking`, `important`,
   `suggestion`).

@@ -38,6 +38,12 @@ export interface HostWorkspace {
   readonly sessionIds: readonly SessionId[]
 }
 
+/** A stored Session's header fields the subagent roll-up reads. */
+export interface StoredSessionHeader {
+  readonly subagent: boolean
+  readonly parentSessionId: string | undefined
+}
+
 export type QueueAction = { readonly kind: 'remove' } | { readonly kind: 'steer' } | { readonly kind: 'edit'; readonly text: string }
 
 const PROMPT_TIMEOUT = '15 seconds'
@@ -83,6 +89,10 @@ export class SidebarHost extends Context.Service<
     readonly rebasedThreads: Effect.Effect<Option.Option<ReadonlyArray<RebasedThread>>, HostCallFailed>
     /** The DSH process exit hook, present only where DSH may exit on a plugin's request. */
     readonly appExit: Option.Option<(code: number) => void>
+    /** A stored Session's header; none without Session persistence or before the Session is written. */
+    readonly sessionHeader: (sessionId: string) => Effect.Effect<Option.Option<StoredSessionHeader>, HostCallFailed>
+    /** The non-empty titles of every listed Session, from one list read that names the title projection. */
+    readonly sessionTitles: Effect.Effect<ReadonlyMap<string, string>, HostCapabilityMissing | HostCallFailed>
     /** Stop every running job these Sessions own, through the job registry's owner fence; answers the ids stopped. */
     readonly stopJobs: (input: { readonly sessionIds: ReadonlyArray<string>; readonly reason: string }) => Effect.Effect<ReadonlyArray<string>>
   }
@@ -131,6 +141,34 @@ export class SidebarHost extends Context.Service<
             projectPaths: WorkspacePaths.projects({ rows: ctx.workspaceRegistry.list() }).map(workspace => workspace.path),
           }),
         ),
+        sessionHeader: sessionId =>
+          Effect.suspend(() => {
+            const persistence = ctx.get('sessionPersistence')
+            if (persistence === undefined) return Effect.succeed(Option.none())
+            return call('stat session', signal => persistence.stat(SessionId(sessionId), { signal })).pipe(
+              Effect.map(snapshot =>
+                Option.fromUndefinedOr(snapshot?.header).pipe(
+                  Option.map(header => ({
+                    subagent: header.origin === 'subagent',
+                    parentSessionId: header.parentSession === undefined ? undefined : String(header.parentSession),
+                  })),
+                ),
+              ),
+            )
+          }),
+        sessionTitles: Effect.gen(function* () {
+          const service = yield* controller
+          // The controller fills only the projections a request names (jj-integration asks the same way); the request type
+          // does not list the field, so it travels as a plain object.
+          const request: Parameters<typeof service.list>[0] & { readonly projections: readonly string[] } = { projections: ['title'] }
+          const listed = yield* call('list session titles', signal => service.list(request, signal))
+          return new Map(
+            listed.items.flatMap(item => {
+              const title = item.projections?.values.title
+              return typeof title === 'string' && title.trim() !== '' ? [[String(item.sessionId), title.trim()] as const] : []
+            }),
+          )
+        }),
         archivedSessionIds: Effect.sync(() => [...ctx.workspaceRegistry.archivedSessionIds]),
         pinnedSessionIds: Effect.sync(() => [...ctx.workspaceRegistry.pinnedSessionIds]),
         flushPersistence: Effect.suspend((): Effect.Effect<void, HostCapabilityMissing | HostCallFailed> => {

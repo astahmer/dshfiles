@@ -29,6 +29,10 @@ combination eventually is. The rules, and the reasoning, live in
 - A machine owns all of its flow. When a component wraps one, its parallel flags, refs and effects move in; a
   second source of truth beside a machine is the bug.
 - Per-key state is per key: anything fed by events from several Sessions, accounts or paths keys by that id.
+- A Host write that creates something (mint a code, start a job, open a session) never runs from an effect keyed
+  on props or a callback built from them: panel adapters and slot renderers pass a new props object on every
+  render. Run it from a user event or a machine state's entry, once per open. Phone pairing minted a code per
+  sidebar render until the Host refused more.
 - Reproduce first, and leave a flow alone with one line saying why when it is already contained.
 
 ## Query

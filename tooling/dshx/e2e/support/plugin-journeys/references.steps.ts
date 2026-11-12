@@ -6,7 +6,7 @@ import { fakeCommandCodeFor } from '../fake-command-code.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { createScratchDirectory, selectModelForNewThread, sendMessage } from '../threads.js'
 
-const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 const referenceFolders = new WeakMap<Page, string>()
 
 When('a new thread on the fake model answers a first message', async ({ page }: { page: Page }) => {

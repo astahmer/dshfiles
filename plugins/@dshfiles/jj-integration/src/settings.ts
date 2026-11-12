@@ -59,6 +59,11 @@ export const jjIntegrationSettings = defineSettings({
       .description(
         'After Land advances the bookmark, bring this jj workspace (the checkout running DSH) onto it in the background with `dshx checkout sync`, keeping its local edits and rebuilding what changed. Empty disables it.',
       ),
+    updateCheckout: Schema.string()
+      .default('')
+      .description(
+        'Update DSH: the folder of the jj checkout DSH runs from (its workspace is the one named above, `default` when empty). Empty uses the checkout this plugin is loaded from. Set it on each machine; it is never shared.',
+      ),
     removeFinishedThreads: Schema.boolean()
       .default(true)
       .description('Automatically remove landed thread workspaces once all their threads are archived and they hold no unlanded revisions.'),

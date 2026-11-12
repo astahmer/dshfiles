@@ -5,16 +5,17 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { FAKE_COMMAND_CODE_MODEL } from '../../../packages/dshx/src/scratch/fake-command-code.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
+import { chooseComposerMore, composerMoreRow, waitForComposerVerb } from '../composer-more.js'
 import { selectModelForNewThread } from '../threads.js'
 
-const COMPOSER_LABEL = 'Describe what you want to build, / commands, @ files or sessions'
+const COMPOSER_LABEL = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
 
 const composerInput = ({ page }: { page: Page }) => page.getByRole('textbox', { name: COMPOSER_LABEL, exact: true })
 
 const promptOption = ({ page, title }: { page: Page; title: string }) => page.getByRole('option', { name: title, exact: false })
 
 const openPromptLibrary = async ({ page }: { page: Page }): Promise<void> => {
-  await page.getByRole('button', { name: 'Prompts', exact: true }).click()
+  await chooseComposerMore(page, 'Saved prompts', 'Prompts')
   await expect(page.getByRole('button', { name: 'Saved drafts', exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Saved prompts', exact: true })).toBeVisible()
 }
@@ -49,7 +50,7 @@ When('the composer text {string} is saved as a prompt', async ({ page }: { page:
   const composer = composerInput({ page })
   await composer.click()
   await composer.fill(text)
-  await page.getByRole('button', { name: 'Prompts', exact: true }).click()
+  await chooseComposerMore(page, 'Saved prompts', 'Prompts')
   await page.getByRole('button', { name: 'Save current', exact: true }).click()
 })
 
@@ -127,7 +128,7 @@ When(
     const otherTab = await page.context().newPage()
     try {
       await otherTab.goto(page.url(), { waitUntil: 'domcontentloaded' })
-      await otherTab.getByRole('button', { name: 'Prompts', exact: true }).waitFor({ state: 'visible' })
+      await waitForComposerVerb(otherTab, 'Prompts')
 
       const previewNotice = otherTab.getByRole('dialog', { name: 'Preview Notice', exact: true })
       if (await previewNotice.isVisible()) {
@@ -196,19 +197,19 @@ When('the recent messages tab is opened', async ({ page }: { page: Page }) => {
 Then('the recent list explains that no sent text prompts are loaded', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'recent-prompts-explain-empty-loaded-conversation', async () => {
     await expect(page.getByRole('tab', { name: 'Recent here (0)', exact: true })).toBeVisible()
-    await expect(page.getByText('No sent text prompts are loaded from this conversation.', { exact: true })).toBeVisible()
+    await expect(page.getByText('No sent text prompts are loaded from this thread.', { exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
 
-const THREAD_COMPOSER_LABEL = 'Message or run a task, / commands, @ files or sessions'
+const THREAD_COMPOSER_LABEL = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 const ATTACHMENT_FIXTURES = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const threadComposer = ({ page }: { page: Page }) => page.getByRole('textbox', { name: THREAD_COMPOSER_LABEL, exact: true })
 const removeAttachment = ({ page, name }: { page: Page; name: string }) => page.getByRole('button', { name, exact: true })
 
 const startThread = async ({ page, text }: { page: Page; text: string }): Promise<void> => {
   await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
-  const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
+  const projectButton = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
   if ((await projectButton.textContent())?.trim() !== 'Default workspace') {
     await projectButton.click()
     await page.getByRole('menuitem', { name: 'Default workspace', exact: true }).click()
@@ -325,6 +326,29 @@ When('the prompt history is opened from the command palette at phone width', asy
 
 When('the sent prompt {string} is inserted', async ({ page }: { page: Page }, text: string) => {
   await historyRow({ page, text }).click()
+})
+
+When('{string} is chosen in the composer More menu', async ({ page }: { page: Page }, label: string) => {
+  // The menu row, never the bar button: the bug (b:2cep) lived in the menu's hand-off to the panel.
+  await (await composerMoreRow(page, label)).click()
+  await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible()
+})
+
+const assertionSlug = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-|-$/gu, '')
+
+Then('the {string} panel is still open 3 seconds later', async ({ page }: { page: Page }, heading: string) => {
+  await recordAssertion(page, `prompt-stash-more-menu-${assertionSlug(heading)}-stays-open`, async () => {
+    // The panel used to close itself within a second of opening; the thread's sidebar and composer keep ticking meanwhile.
+    await page.waitForTimeout(3_000)
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+    await expect(page.getByRole('menu')).toHaveCount(0)
+  })
+})
+
+Then('the thread composer holds {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, `prompt-stash-more-menu-inserts-${assertionSlug(text)}`, async () => {
+    await expect(threadComposer({ page })).toContainText(text)
+  })
 })
 
 Then('the composer holds {string} without sending it', async ({ page }: { page: Page }, text: string) => {

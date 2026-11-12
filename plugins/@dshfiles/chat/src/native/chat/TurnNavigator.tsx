@@ -4,7 +4,14 @@ import {
   type CSSProperties, type ForwardedRef,
 } from 'react'
 import { defaultRangeExtractor, elementScroll, observeElementOffset, useVirtualizer, type Range } from '@tanstack/react-virtual'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { ChevronDownIcon, ChevronUpIcon, ListFilterIcon } from '@dshfiles/plugin-ui/icons'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
+
+type ChatKey = Parameters<ChatViewSlotProps['t']>[0]
+import { TURN_MARK_FILTERS, type TurnMarkFilter } from '../../turn-marks.ts'
 import type { TurnRailItem } from './turn-rail-items.ts'
 import css from './TurnNavigator.module.css'
 
@@ -15,6 +22,33 @@ interface TurnNavigatorProps {
   readonly busyTurn: number | null
   readonly onNavigate: (item: TurnRailItem) => void
   readonly t: ChatViewSlotProps['t']
+  /** dshfiles (productivity pass T4.2): the turn-map filter, Turns per filter, the Turns on screen and stepping. */
+  readonly filter?: TurnMarkFilter
+  readonly filterCounts?: Readonly<Record<TurnMarkFilter, number>>
+  readonly onFilterChange?: (filter: TurnMarkFilter) => void
+  readonly inView?: { readonly first: number; readonly last: number } | null
+  readonly onStep?: (direction: 'previous' | 'next') => void
+}
+
+const KIND_CLASS: Record<TurnRailItem['kind'], string | undefined> = {
+  prompt: undefined,
+  question: css.markQuestion,
+  failed: css.markFailed,
+  edited: css.markEdited,
+}
+
+const KIND_LABEL: Record<TurnRailItem['kind'], ChatKey | undefined> = {
+  prompt: undefined,
+  question: 'chat.turnMap.kind.question',
+  failed: 'chat.turnMap.kind.failed',
+  edited: 'chat.turnMap.kind.edited',
+}
+
+const FILTER_LABEL: Record<TurnMarkFilter, ChatKey> = {
+  all: 'chat.turnMap.all',
+  questions: 'chat.turnMap.questions',
+  errors: 'chat.turnMap.errors',
+  edits: 'chat.turnMap.edits',
 }
 
 /** Imperative controls for known turns; unknown turn numbers are ignored. */
@@ -53,6 +87,9 @@ const TurnMark = memo(function TurnMark({
   item, index, active, busy, previewId, registerElement, onNavigate, onPreview, onFocusChange, t,
 }: TurnMarkProps) {
   const classes = [css.mark]
+  const kindLabel = KIND_LABEL[item.kind]
+  const kindClass = KIND_CLASS[item.kind]
+  if (kindClass !== undefined) classes.push(kindClass)
   if (item.anchor.kind === 'unloaded') classes.push(css.markUnloaded)
   if (active) classes.push(css.markActive)
   else if (previewId !== undefined) classes.push(css.markPreview)
@@ -63,10 +100,11 @@ const TurnMark = memo(function TurnMark({
       data-index={index}
       type="button"
       className={classes.join(' ')}
-      aria-label={t(
-        item.anchor.kind === 'loaded' ? 'chat.turnNavigation.jump' : 'chat.turnNavigation.jumpLoad',
-        { turn: item.turn },
-      )}
+      data-turn-kind={item.kind}
+      aria-label={[
+        t(item.anchor.kind === 'loaded' ? 'chat.turnNavigation.jump' : 'chat.turnNavigation.jumpLoad', { turn: item.turn }),
+        ...kindLabel === undefined ? [] : [t(kindLabel)],
+      ].join(', ')}
       aria-current={active ? 'true' : undefined}
       aria-busy={busy ? 'true' : undefined}
       aria-describedby={previewId}
@@ -79,7 +117,7 @@ const TurnMark = memo(function TurnMark({
 })
 
 function TurnNavigatorRail(
-  { items, activeTurn, busyTurn, onNavigate, t }: TurnNavigatorProps,
+  { items, activeTurn, busyTurn, onNavigate, t, filter = 'all', filterCounts, onFilterChange, inView = null, onStep }: TurnNavigatorProps,
   ref: ForwardedRef<TurnNavigatorHandle>,
 ) {
   const [previewTurn, setPreviewTurn] = useState<number | null>(null)
@@ -224,9 +262,20 @@ function TurnNavigatorRail(
     scrollToIndex(activeIndex, 'if-needed', behavior)
   }, [activeIndex, items.length, viewHeight, scrollToIndex])
 
-  if (items.length < 2) return null
+  if (items.length < 2 && filter === 'all') return null
   const preview = previewIndex === undefined ? undefined : items[previewIndex]
+  const previewKind = preview === undefined ? undefined : KIND_LABEL[preview.kind]
   const previewPosition = virtualItems.find(item => item.index === previewIndex)
+  // The Turns on screen, as one band behind their marks (rail coordinates: index × pitch).
+  let band: { top: number; height: number } | null = null
+  if (inView !== null) {
+    const first = items.findIndex(item => item.turn >= inView.first)
+    let last = -1
+    for (let index = items.length - 1; index >= 0; index -= 1) {
+      if ((items[index]?.turn ?? Number.POSITIVE_INFINITY) <= inView.last) { last = index; break }
+    }
+    if (first !== -1 && last >= first) band = { top: RAIL_INSET_PX + first * TURN_SPACING_PX - TURN_SPACING_PX / 2, height: (last - first + 1) * TURN_SPACING_PX }
+  }
   const fadeClasses = [css.scroller]
   if (scrollTop > 1) fadeClasses.push(css.fadeTop)
   if (scrollTop < virtualizer.getTotalSize() - viewHeight - 1) fadeClasses.push(css.fadeBottom)
@@ -234,6 +283,8 @@ function TurnNavigatorRail(
     <div className={css.slot}>
       <nav
         className={css.frame}
+        data-turn-map=""
+        data-filtered={filter === 'all' ? undefined : ''}
         aria-label={t('chat.turnNavigation.label')}
         onPointerEnter={() => { pointerInsideRef.current = true }}
         onPointerLeave={() => {
@@ -241,8 +292,44 @@ function TurnNavigatorRail(
           setPreviewTurn(null)
         }}
       >
+        {(onFilterChange !== undefined || onStep !== undefined) && (
+          <div className={css.controls}>
+            {onFilterChange !== undefined && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={css.control}
+                    data-turn-map-filter=""
+                    data-active={filter === 'all' ? undefined : ''}
+                    aria-label={t('chat.turnMap.filter', { filter: t(FILTER_LABEL[filter]) })}
+                  >
+                    <ListFilterIcon size={12} strokeWidth={1.75} aria-hidden="true" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="left" align="start" className="dshx-root dshx:min-w-40">
+                  <DropdownMenuLabel>{t('chat.turnNavigation.label')}</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup value={filter} onValueChange={value => onFilterChange(value as TurnMarkFilter)}>
+                    {TURN_MARK_FILTERS.map(option => (
+                      <DropdownMenuRadioItem key={option} value={option} disabled={option !== 'all' && (filterCounts?.[option] ?? 0) === 0}>
+                        <span className="dshx:flex-1">{t(FILTER_LABEL[option])}</span>
+                        {filterCounts !== undefined && <span className="dshx:text-muted-foreground dshx:tabular-nums">{filterCounts[option]}</span>}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {onStep !== undefined && (
+              <button type="button" className={css.control} aria-label={t('chat.turnMap.previous')} onClick={() => onStep('previous')}>
+                <ChevronUpIcon size={12} strokeWidth={1.75} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        )}
         <div ref={scrollerRef} className={fadeClasses.join(' ')}>
           <div ref={virtualizer.containerRef} className={css.marks}>
+            {band !== null && <div className={css.band} aria-hidden="true" style={{ top: band.top, height: band.height }} />}
             {virtualItems.map(({ index, key }) => {
               const item = items[index]
               if (item === undefined) return null
@@ -264,6 +351,13 @@ function TurnNavigatorRail(
             })}
           </div>
         </div>
+        {onStep !== undefined && (
+          <div className={css.controls}>
+            <button type="button" className={css.control} aria-label={t('chat.turnMap.next')} onClick={() => onStep('next')}>
+              <ChevronDownIcon size={12} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+          </div>
+        )}
         {preview !== undefined && previewPosition !== undefined && (
           <div
             id={previewId}
@@ -273,6 +367,7 @@ function TurnNavigatorRail(
               '--turn-preview-center': `${String(previewPosition.start + previewPosition.size / 2 - scrollTop)}px`,
             } as CSSProperties}
           >
+            {previewKind !== undefined && <div className={css.previewKind} data-turn-kind={preview.kind}>{t(previewKind)}</div>}
             <div className={css.previewPrompt}>
               {preview.prompt || t('chat.turnNavigation.turn', { turn: preview.turn })}
             </div>

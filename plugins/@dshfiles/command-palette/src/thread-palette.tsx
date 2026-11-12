@@ -3,7 +3,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
-import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { Kbd, KbdGroup, KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
@@ -87,7 +87,7 @@ export interface ThreadPaletteCopy {
   readonly askFailed: string
 }
 
-type PaletteActionOption = Omit<PaletteAction, 'label'> & { readonly label: string }
+type PaletteActionOption = Omit<PaletteAction, 'label' | 'heading'> & { readonly label: string; readonly heading?: string }
 
 interface ThreadPaletteProps {
   readonly mode: PaletteMode
@@ -98,6 +98,8 @@ interface ThreadPaletteProps {
   readonly additionalActions: readonly PaletteAction[]
   readonly recentLimit: number
   readonly mac: boolean
+  /** The keycaps the Host shortcut registry presents for one of its command ids, for rows that name a `shortcutId`. */
+  readonly hostKeys?: (shortcutId: string) => readonly string[] | undefined
   readonly copy: ThreadPaletteCopy
   readonly searchContent: ContentSearch | null
   readonly onOpenThread: (sessionId: string) => void
@@ -242,19 +244,36 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     // Several bundles register the same command ("New thread" comes from this palette, the sidebar header and the
     // Host shortcut catalog); list it once, keeping an action or destination over its bare shortcut-command twin.
     const registeredLabels = new Set<string>()
-    const byKind = [...registeredActions.filter(action => action.group !== 'command'), ...registeredActions.filter(action => action.group === 'command')]
+    const textOf = (value: string | (() => string)): string => (typeof value === 'function' ? value() : value)
+    // Thread rows act on one thread and carry their own heading; they never stand in for a same-named command.
+    const threadActions = registeredActions.flatMap(action =>
+      action.group !== 'thread' || action.isAvailable?.(props.context) === false
+        ? []
+        : [
+            action.heading === undefined
+              ? { ...action, label: textOf(action.label) }
+              : { ...action, label: textOf(action.label), heading: textOf(action.heading) },
+          ],
+    )
+    const byKind = [
+      ...registeredActions.filter(action => action.group !== 'command' && action.group !== 'thread'),
+      ...registeredActions.filter(action => action.group === 'command'),
+    ]
     const registered = byKind.flatMap(action => {
       if (action.isAvailable?.(props.context) === false) return []
       const label = typeof action.label === 'function' ? action.label() : action.label
       const key = SAME_COMMAND_AS.get(action.id) ?? label.trim().toLowerCase()
       if (registeredLabels.has(key)) return []
       registeredLabels.add(key)
-      return [{ ...action, label }]
+      const { heading: _heading, ...rest } = action
+      return [{ ...rest, label }]
     })
-    const additional = props.additionalActions.flatMap(action =>
-      action.isAvailable?.(props.context) === false ? [] : [{ ...action, label: typeof action.label === 'function' ? action.label() : action.label }],
-    )
-    return [...registered, ...additional]
+    const additional = props.additionalActions.flatMap(action => {
+      if (action.isAvailable?.(props.context) === false) return []
+      const { heading: _heading, ...rest } = action
+      return [{ ...rest, label: textOf(action.label) }]
+    })
+    return [...threadActions, ...registered, ...additional]
   }, [props.additionalActions, props.context, registeredActions])
 
   const workspaceFiles = useWorkspaceFiles(mode === 'files')
@@ -355,11 +374,20 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     }),
     [props.copy.goToFile],
   )
+  // The thread the user is on comes first: its own verbs, under "Actions for …" (plan Q2 T2.4).
+  const threadActionRows = useMemo(
+    () =>
+      view === 'all' || view === 'commands'
+        ? PaletteRules.rankActions({ actions: actionOptions.filter(action => action.group === 'thread'), query: deferredQuery, boost: () => 0 })
+        : [],
+    [actionOptions, deferredQuery, view],
+  )
+  const threadActionHeading = threadActionRows.find(action => action.heading !== undefined)?.heading
   const destinationRows = useMemo(
     () =>
       view === 'all' || view === 'commands'
         ? PaletteRules.rankActions({
-            actions: [goToFile, ...actionOptions.filter(action => action.group !== 'command')],
+            actions: [goToFile, ...actionOptions.filter(action => action.group !== 'command' && action.group !== 'thread')],
             query: deferredQuery,
             boost: id => boosts.get(id) ?? 0,
           })
@@ -387,12 +415,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       ...helpRows.map((help): PaletteRow => ({ kind: 'help', ...help })),
       ...(line === null ? [] : [{ kind: 'line', line } satisfies PaletteRow]),
       ...contentRows.map((hit): PaletteRow => ({ kind: 'content', ...hit })),
+      ...threadActionRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...destinationRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...commandRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...fileRows.map((path): PaletteRow => ({ kind: 'file', path })),
       ...threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
     ],
-    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadRows],
+    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadActionRows, threadRows],
   )
   const numbered = rows.slice(0, 9)
   // Until the pointer or arrows pick a row, the first match is active, so Enter runs it right after typing.
@@ -471,13 +500,17 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const shortcut = (row: PaletteRow): JSX.Element | null => {
     const index = numbered.findIndex(candidate => rowValue(candidate) === rowValue(row))
     const keys = row.kind === 'destination' ? (row.destination.keys ?? []) : []
-    if (index < 0 && keys.length === 0) return null
+    // A Host-registry row shows the binding the user has now, already presented by the Host (⌘ ⇧ P).
+    const hostCaps =
+      row.kind === 'destination' && keys.length === 0 && row.destination.shortcutId !== undefined ? (props.hostKeys?.(row.destination.shortcutId) ?? []) : []
+    if (index < 0 && keys.length === 0 && hostCaps.length === 0) return null
     return (
       <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
-        {keys.length > 0 ? (
+        {keys.length > 0 ? <KeyHint keys={keys} mac={props.mac} className="dshx:opacity-70" /> : null}
+        {hostCaps.length > 0 ? (
           <KbdGroup className="dshx:opacity-70">
-            {keys.map(key => (
-              <Kbd key={key}>{key}</Kbd>
+            {hostCaps.map(cap => (
+              <Kbd key={cap}>{cap}</Kbd>
             ))}
           </KbdGroup>
         ) : null}
@@ -706,6 +739,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 })}
               </CommandGroup>
             ) : null}
+            {threadActionRows.length > 0 ? (
+              <>
+                <CommandGroup heading={threadActionHeading ?? props.copy.commands} data-palette-thread-actions="">
+                  {threadActionRows.map(destinationItem)}
+                </CommandGroup>
+                <CommandSeparator className="dshx:my-1" />
+              </>
+            ) : null}
             {destinationRows.length > 0 ? <CommandGroup heading={props.copy.destinations}>{destinationRows.map(destinationItem)}</CommandGroup> : null}
             {commandRows.length > 0 ? (
               <>
@@ -743,7 +784,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                     <CommandItem key={thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
                       <span
                         className={cn(
-                          'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
+                          'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-2xs dshx:font-semibold',
                           thread.project.length > 0 ? ProjectTone.glyph(project) : 'dshx:bg-muted dshx:text-muted-foreground',
                         )}
                         aria-hidden="true"

@@ -40,6 +40,18 @@ export class LauncherConfig {
     for (const key of Object.keys(local)) {
       if (!Object.hasOwn(environmentKeys, key)) throw new Error('Unknown launcher config key')
     }
+    // Inside a DSH shell, DSH_HOME names the Host that runs the shell, not a choice made for this launch. Refuse rather than
+    // let it silently replace the configured home (2026-11-12: a scratch launch from an agent shell prepared the live home).
+    if (
+      (env.DSH_SESSION_ID || env.DSH_SHELL) &&
+      env.DSH_HOME &&
+      local.dshHome !== undefined &&
+      typeof local.dshHome === 'string' &&
+      resolve(env.DSH_HOME) !== resolve(local.dshHome)
+    )
+      throw new Error(
+        `DSH_HOME=${env.DSH_HOME} is inherited from a running DSH shell, but the launcher config selects dshHome ${local.dshHome}. Run from a plain terminal or unset DSH_HOME; nothing started`,
+      )
     const config = {
       sourceRoot: resolve(fileURLToPath(new URL('..', import.meta.url))),
       dshHome: join(home, '.dsh'),
@@ -86,10 +98,5 @@ export class LauncherConfig {
   static requireCoreEntry(config) {
     if (!config.coreEntry) throw new Error('Configure coreEntry or DSH_CORE_ENTRY with the installed DSH core entry; nothing started')
     return config.coreEntry
-  }
-
-  static runningProfilePattern(config) {
-    const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    return `${escape(LauncherConfig.requireCoreEntry(config))}.*--profile(=| )${escape(config.profile)}( |$)`
   }
 }

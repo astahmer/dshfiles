@@ -289,15 +289,16 @@
       "currentSurface": "Host contract: attention-api module and attention_* agent tools",
       "surfaces": ["host", "tool", "storage", "integration"],
       "configuration": [],
-      "states": ["needs-you", "other", "snoozed", "closed", "muted", "resolved", "reopened", "deduplicated", "info-to-activity-log"],
+      "states": ["needs-you", "other", "snoozed", "closed", "muted", "resolved", "reopened", "deduplicated", "info-to-activity-log", "expired-unseen"],
       "failureModes": [
         "A repeat with the same source and dedupe key merges into one item instead of stacking; an unchanged repeat writes nothing.",
-        "A changed repeat lifts a snooze-until-change and a Done; a timed snooze holds until its time.",
+        "A changed repeat lifts a snooze-until-change; it lifts a Done only when the headline changed (reason, severity, verbs, choices, subject), so a refreshed detail updates the item in place; a timed snooze holds until its time.",
         "A resolved item reopens only when its source publishes it again; Reopen on a resolved item is refused with the reason.",
         "Browsers and agents cannot publish, resolve or reconcile; those calls are refused as provider-only.",
         "A provider verb with no loaded owner returns an outcome telling the user to open the thread instead of failing silently.",
         "Info items never reach the inbox; they become one Activity log entry.",
-        "Closed items are pruned after seven days and the store is bounded at 2000 items."
+        "Closed items are pruned after seven days and the store is bounded at 2000 items.",
+        "A Ready item left unopened for 72 hours (no provider change, reopen or ended snooze) moves to Done on a ten-minute sweep; Reopen brings it back for another 72 hours, and Needs you and Failed items never expire."
       ],
       "externalDependencies": [
         {
@@ -332,6 +333,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "activity-timeline.attention-detail-in-place",
+          "file": "plugins/@dshfiles/activity-timeline/src/attention-model.test.ts",
+          "testName": "updates a Done item in place when only its detail changes, and reopens it when its headline changes"
+        },
+        {
+          "kind": "unit-test",
           "id": "activity-timeline.attention-reopen",
           "file": "plugins/@dshfiles/activity-timeline/src/attention-model.test.ts",
           "testName": "reopens a done item and a snoozed item, and refuses to reopen a resolved one"
@@ -347,6 +354,12 @@
           "id": "activity-timeline.attention-reconcile",
           "file": "plugins/@dshfiles/activity-timeline/src/attention-store.test.ts",
           "testName": "reconcile publishes the listed items and resolves every other open item of the source"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.attention-expire-unseen",
+          "file": "plugins/@dshfiles/activity-timeline/src/attention-store.test.ts",
+          "testName": "closes Ready items unseen for 72 hours, never Needs you or Failed, and reopen brings one back for another window"
         },
         {
           "kind": "unit-test",
@@ -380,7 +393,7 @@
     {
       "id": "inbox-panel",
       "title": "Inbox page with one Needs you badge",
-      "summary": "An Inbox entry in the left navigation opens one page with Needs you and Other tabs (plus Snoozed, Done and Muted when they hold items). Each row leads with the thread or item it is about, then the sentence saying what it is about and its detail, with one direct action (Review thread, Open thread, or Open <subject>) and its verbs inline: answer choices, Land, Done, Snooze and Mute source, with Reopen and Unmute on the history tabs. Needs you leads with one Resume all for every open item whose provider marks it resumable. The nav glyph carries the only badge, the Needs you count, and can raise opt-in browser alerts for blocking items. Option-J (Jump to next waiting, listed in Settings › Key bindings and the palette) opens the next Needs you item's thread, cycling; with nothing waiting it opens the Inbox.",
+      "summary": "An Inbox entry in the left navigation opens one page with Needs you and Other tabs (plus Snoozed, Done and Muted when they hold items). Each row leads with the thread or item it is about, then the sentence saying what it is about and its detail, with one direct action (Review thread, Open thread, or Open <subject>) and its verbs inline: answer choices, Land, Done, Snooze and Mute source, with Reopen and Unmute on the history tabs. Land asks first, showing what will land, and an item that can Land also offers Review, which opens the thread's Changes view (dshx Changes contract). Other notes that Ready items left unopened for three days move to Done. Needs you leads with one Resume all for every open item whose provider marks it resumable. The nav glyph carries the only badge, the Needs you count, and can raise opt-in browser alerts for new Needs you items (a question or a failure): the thread's title is the notification title, the question or the failure (with its first recovery line) the body, and a click opens that item's thread or page. Option-J (Jump to next waiting, listed in Settings › Key bindings and the palette) opens the next Needs you item's thread, cycling; with nothing waiting it opens the Inbox.",
       "surface": "destinationSection",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox",
@@ -405,6 +418,18 @@
         }
       },
       "verification": [
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.inbox-notification-content",
+          "file": "plugins/@dshfiles/activity-timeline/src/inbox-notifications.test.ts",
+          "testName": "titles a notification with the thread and says the question in its body"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.inbox-notification-once",
+          "file": "plugins/@dshfiles/activity-timeline/src/inbox-notifications.test.ts",
+          "testName": "announces new questions and failures once, never Ready items, and nothing from the first list"
+        },
         {
           "kind": "gherkin",
           "id": "activity-timeline.jump-next-waiting",
@@ -477,6 +502,66 @@
           "kind": "not-applicable",
           "id": "activity-timeline.inbox-opens-subject-browser",
           "reason": "The rows it changes need inbox items in a Host store the scratch profile only gets from another plugin's provider; the behaviour is the registry lookup and the thread reference the unit test covers."
+        }
+      ]
+    },
+    {
+      "id": "inbox-push",
+      "title": "Push blocking Inbox items to a device",
+      "summary": "Below the in-tab alerts, the Inbox offers Push blocking items to this device. Turning it on asks for notification permission, registers a service worker the Host serves from its own origin (/dshfiles-web-push/sw.js, scope its own folder, so it controls no page), subscribes the browser with the Host's VAPID key and records the device. The Host keeps its VAPID keys and every device's subscription in the dshfiles_web_push storage domain and pushes each new Needs you or Failed item once to every device (Ready items never push; the first read after a Host start only seeds, so a restart replays nothing), encrypted aes128gcm with Node crypto. A click opens the item's thread. A subscription the push service forgot (404/410) is dropped; another failure stays on the device with what to do. Send test proves the path. On an iPhone, push needs DSH on the Home Screen (iOS 16.4+); the Inbox says so. Agents list devices (inbox_push_devices), send a test (inbox_push_test) and remove a device with confirm: true (inbox_push_remove); a device subscribes only itself, so subscribing has no agent tool.",
+      "surface": "destinationSection",
+      "destination": "inbox",
+      "currentSurface": "left-nav: Inbox › Push blocking items to this device",
+      "reach": ["click tab \"Inbox\"", "click button \"Needs you\"", "expect heading \"Inbox\"", "expect text \"Push blocking items to this device\""],
+      "surfaces": ["client", "host", "tool", "storage"],
+      "configuration": [],
+      "states": ["off", "on", "ios-needs-home-screen", "denied", "delivery-failed", "subscription-expired"],
+      "failureModes": [
+        "Notifications blocked: the Inbox says how to allow them and turn push on again.",
+        "A push service that forgot the subscription (404/410) drops the device and says to turn push on again there.",
+        "Any other refusal or an unreachable push service is kept on the device with its recovery and retried on the next item.",
+        "Safari on an iPhone outside the Home Screen has no Push API: the Inbox explains Add to Home Screen (iOS 16.4+)."
+      ],
+      "externalDependencies": [
+        {
+          "id": "browser-push-service",
+          "boundary": "One HTTPS POST per device to the push service its browser chose (Apple, Google, Mozilla), aes128gcm-encrypted with a VAPID JWT; the endpoint and payload never enter spans or logs.",
+          "deterministicFake": "src/web-push-send.test.ts injects fetch and decrypts the body with the subscription key in src/web-push-crypto.test.ts."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.web-push-crypto",
+          "file": "plugins/@dshfiles/activity-timeline/src/web-push-crypto.test.ts",
+          "testName": "encrypts a payload the subscription can decrypt (RFC 8291 aes128gcm)"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.web-push-send",
+          "file": "plugins/@dshfiles/activity-timeline/src/web-push-send.test.ts",
+          "testName": "pushes only new Needs you and Failed items, and the first read only seeds"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "activity-timeline.inbox-push-browser",
+          "reason": "A headless browser has no push service: subscribing needs a real Apple, Google or Mozilla endpoint and a granted permission. The control and its iOS Home Screen notice are walked in the Q6 phone evidence (productivity pass q6); the Host path (keys, encryption, delivery, expiry) is covered by the unit tests with an injected fetch."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "web-push send",
+          "file": "plugins/@dshfiles/activity-timeline/src/web-push-send.test.ts",
+          "testName": "records a web-push send span with the push service host and status, never the endpoint or payload"
         }
       ]
     }

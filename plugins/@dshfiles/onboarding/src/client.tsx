@@ -3,21 +3,21 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { Command, Composer, defineClient, useApi, useContract, useSettings, type PluginContext } from '@dshfiles/dshx/client'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { CompassIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { DestinationSections } from '@dshfiles/thread-sidebar/destinations'
 import { useThreadDirectories } from '@dshfiles/thread-sidebar/thread-directories'
-import { useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { onboardingApi } from './api.js'
+import { FirstRun } from './first-run.js'
 import { GettingStartedPage, type GettingStartedProps } from './getting-started-page.js'
 import { OnScreenProjects, type OnScreenProject } from './on-screen-project.js'
 import type { Overview, OverviewInput } from './overview-model.js'
 import { Routes, type RouteServices } from './routes.js'
-import { TOUCH } from './touch.js'
 import { ONBOARDING_DEFAULTS, onboardingSettings, type OnboardingSettings } from './settings.js'
 import { SetupWizard } from './setup-wizard.js'
-import { ShowMeWhere } from './show-me-where.js'
+import { ShowMeWhere, WalkUnreadable } from './show-me-where.js'
 import { WalkStore } from './walk-store.js'
 import { WizardStore } from './wizard-store.js'
 
@@ -47,27 +47,6 @@ const useLoadSuggestions = (): GettingStartedProps['loadSuggestions'] => {
   return useCallback((input, signal) => api.suggestions(input, { signal }), [api])
 }
 
-const WalkUnreadable = (props: { readonly onRetry: () => void }): ReactNode => (
-  <section
-    aria-label="Show me where"
-    className="dshx-root dshx:fixed dshx:right-3 dshx:bottom-3 dshx:z-[999] dshx:flex dshx:w-96 dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-3 dshx:text-popover-foreground dshx:shadow-lg dshx:max-sm:inset-x-2 dshx:max-sm:w-auto"
-    data-onboarding-walk=""
-    role="alert"
-  >
-    <p className="dshx:text-sm">
-      Show me where could not read this feature's steps from the Host. Check that the onboarding plugin is enabled, then try again.
-    </p>
-    <div className="dshx:flex dshx:justify-end dshx:gap-2">
-      <Button className={TOUCH} onClick={props.onRetry} size="sm">
-        Try again
-      </Button>
-      <Button className={TOUCH} onClick={WalkStore.end} size="sm" variant="ghost">
-        End
-      </Button>
-    </div>
-  </section>
-)
-
 /** One feature's steps, read from the Host when a walk starts: the catalog never ships in this bundle. */
 const WalkOverlay = (props: { readonly featureKey: string; readonly routes: RouteServices }): ReactNode => {
   const api = useApi(onboardingApi)
@@ -81,7 +60,7 @@ const WalkOverlay = (props: { readonly featureKey: string; readonly routes: Rout
   useEffect(() => {
     if (reach.isSuccess && (feature === null || !feature.walkable)) WalkStore.end()
   }, [reach.isSuccess, feature])
-  if (reach.isError) return <WalkUnreadable onRetry={() => void reach.refetch()} />
+  if (reach.isError) return <WalkUnreadable onEnd={WalkStore.end} onRetry={() => void reach.refetch()} />
   if (feature === null || !feature.walkable) return null
   return <ShowMeWhere onEnd={WalkStore.end} reach={feature} routes={props.routes} />
 }
@@ -106,7 +85,9 @@ export default defineClient({
       destination: 'knowledge',
       label: 'Getting started',
       description: 'Setup checklist, plugin packs and every feature.',
-      order: 0,
+      // dshfiles: last in Knowledge, so the destination opens on Memory; ⌘K Getting started, the New tab chooser and
+      // Start setup reach it from anywhere (upstream UI fit).
+      order: 6,
     })
 
     const routes: RouteServices = {
@@ -141,13 +122,20 @@ export default defineClient({
       }
     }
 
-    const Wizard = (props: { readonly open: boolean; readonly onFinish: (outcome: 'done' | 'skipped') => void }): ReactNode => (
-      <SetupWizard insertPrompt={useInsertPrompt()} loadOverview={useLoadOverview()} onFinish={props.onFinish} open={props.open} routes={routes} />
+    const Wizard = (props: { readonly open: boolean; readonly onFinish: (outcome: 'done' | 'skipped') => void; readonly onClose: () => void }): ReactNode => (
+      <SetupWizard
+        insertPrompt={useInsertPrompt()}
+        loadOverview={useLoadOverview()}
+        onClose={props.onClose}
+        onFinish={props.onFinish}
+        open={props.open}
+        routes={routes}
+      />
     )
 
     plugin?.add(Command, {
       id: '@dshfiles/onboarding.open',
-      title: 'Onboarding: Getting started',
+      title: 'Getting started',
       keywords: ['onboarding', 'setup', 'checklist', 'packs', 'features', 'tour', 'help'],
       run: () => {
         plugin.layout.openPanel(PANEL_ID)
@@ -155,7 +143,7 @@ export default defineClient({
     })
     plugin?.add(Command, {
       id: '@dshfiles/onboarding.wizard',
-      title: 'Onboarding: Show the setup wizard',
+      title: 'Show the setup wizard',
       keywords: ['onboarding', 'setup', 'wizard', 'tour', 'first run'],
       run: () => WizardStore.request(),
     })
@@ -187,29 +175,59 @@ export default defineClient({
       ),
     )
 
-    // First run: settings-shell mounts this step only while no thread is open; it completes at once when seen or off.
-    const FirstRunStep = (props: { readonly complete: () => void; readonly explicit?: boolean | undefined }): ReactNode => {
+    // dshfiles: the wizard opens by itself only while its own setup (an AI account, a project) is still missing, so an
+    // existing user is not greeted by it in every new browser; ⌘K and Getting started still replay it (first-run.ts).
+    const FirstRunGate = (props: { readonly complete: () => void; readonly explicit?: boolean | undefined }): ReactNode => {
       const settings = useOnboardingSettings()
       const outcome = WizardStore.useOutcome()
       const requested = WizardStore.useRequested()
-      const show = props.explicit === true || (settings.wizard && outcome === null)
+      const closed = WizardStore.useClosed()
+      const candidate = props.explicit !== true && settings.wizard && outcome === null && !requested && !closed
+      const loadOverview = useLoadOverview()
+      const overview = useQuery({
+        queryKey: ['onboarding', 'first-run', 'overview'],
+        queryFn: ({ signal }) => loadOverview({}, signal),
+        enabled: candidate,
+        retry: false,
+      })
+      // A read that has not answered within FirstRun.waitMs counts as failed: the wizard then opens as upstream's does.
+      const [slow, setSlow] = useState(false)
+      useEffect(() => {
+        if (!candidate) return
+        const timer = window.setTimeout(() => setSlow(true), FirstRun.waitMs)
+        return () => window.clearTimeout(timer)
+      }, [candidate])
+      const setup = candidate ? FirstRun.setup({ overview: overview.data, failed: overview.isError || (slow && overview.data === undefined) }) : 'done'
+      const waiting = candidate && setup === 'pending'
+      const show = props.explicit === true || (candidate && setup === 'open')
       const complete = props.complete
       useEffect(() => {
+        if (waiting) return
         if (!show || requested) complete()
-      }, [show, requested, complete])
-      if (!show || requested) return null
-      return (
-        <PluginQueryProvider>
-          <Wizard
-            onFinish={next => {
-              WizardStore.finish(next)
-              complete()
-            }}
-            open
-          />
-        </PluginQueryProvider>
+      }, [waiting, show, requested, complete])
+      if (waiting || !show || requested || (closed && props.explicit !== true)) return null
+      // settings-shell mounts onboarding steps inside its settings trigger row, which this fork hides (b:4v6p): the kit
+      // dialog portals to the body on its own; the portal keeps the step's React tree out of that hidden row too.
+      return createPortal(
+        <Wizard
+          onClose={() => {
+            WizardStore.close()
+            complete()
+          }}
+          onFinish={next => {
+            WizardStore.finish(next)
+            complete()
+          }}
+          open
+        />,
+        document.body,
       )
     }
+    const FirstRunStep = (props: { readonly complete: () => void; readonly explicit?: boolean | undefined }): ReactNode => (
+      <PluginQueryProvider>
+        <FirstRunGate {...props} />
+      </PluginQueryProvider>
+    )
     ctx.slots.inject('settings.onboarding', () => ctx.slots.register({ name: 'settings.onboarding', id: WIZARD_STEP_ID, order: 10 }, decorate(FirstRunStep)))
 
     // Show me where outlives the page: its first click usually navigates away from Getting started.
@@ -237,7 +255,7 @@ export default defineClient({
           if (!requested) return null
           return (
             <PluginQueryProvider>
-              <Wizard onFinish={WizardStore.finish} open />
+              <Wizard onClose={WizardStore.close} onFinish={WizardStore.finish} open />
             </PluginQueryProvider>
           )
         }),

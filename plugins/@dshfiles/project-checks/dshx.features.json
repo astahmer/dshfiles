@@ -11,7 +11,7 @@
       "currentSurface": "composer: Project checks",
       "reach": [
         "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"/project-checks\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"/project-checks\"",
         "expect option \"Project checks*\"",
         "click option \"Project checks*\"",
         "expect heading \"Project checks\""

@@ -349,6 +349,18 @@ const rowGroupOf = (category: ThreadIntegrationCategory): RowGroup => {
   return 'blocked'
 }
 
+/**
+ * A thread workspace named by its thread (b:212a): the main Session's title, else the newest revision's description,
+ * else the fallback. Never the folder name, which a Session's displayTitle falls back to.
+ */
+const threadLabelOf = (thread: ThreadView, sessionById: ReadonlyMap<string, SessionSummary>, fallback: string): string => {
+  const sessionTitle = ThreadSessionSelection.mainSessionOf({ sessionIds: thread.sessionIds, sessionById })?.title?.trim()
+  if (sessionTitle !== undefined && sessionTitle !== '') return sessionTitle
+  const tip = thread.unlanded[0]
+  if (tip !== undefined && !ThreadIntegrationModel.isPlaceholderRevisionDescription(tip.description)) return tip.description.trim().split('\n')[0] ?? fallback
+  return fallback
+}
+
 const workspaceTitlePrefix = (title: string | undefined): string | undefined => {
   if (title === undefined) return undefined
   const [prefix] = title.split(' · ')
@@ -421,7 +433,10 @@ const ThreadRow = (props: {
   /** A durable title only: displayTitle falls back to the folder basename, which is never a thread's name. */
   const sessionTitle = mainSession?.title?.trim() || undefined
   const revisionTitle = tip !== undefined && !ThreadIntegrationModel.isPlaceholderRevisionDescription(tip.description) ? tip.description.trim() : undefined
-  const heading = sessionTitle ?? revisionTitle ?? mainSession?.displayTitle ?? title
+  // b:212a: a row is its thread. A displayTitle may be the folder name, so a thread with no title reads "Untitled thread"
+  // and the project follows on the second line; the folder name is only in the tooltip, the details and Copy path.
+  const heading = sessionTitle ?? revisionTitle ?? t('untitledThread')
+  const pathCopy = useCopyFeedback()
   const userMessages = listedSessionIds.reduce<{ count: number; known: boolean }>(
     (totals, sessionId) => {
       if (props.sessionById.get(sessionId)?.origin === 'subagent') return totals
@@ -555,7 +570,7 @@ const ThreadRow = (props: {
           <input
             type="checkbox"
             className="dshx:size-4 dshx:accent-primary dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-1"
-            aria-label={t('selectWorkspace', { name: thread.name })}
+            aria-label={t('selectWorkspace', { name: heading })}
             checked={props.selected}
             disabled={props.busy}
             onClick={event => event.stopPropagation()}
@@ -591,10 +606,15 @@ const ThreadRow = (props: {
               <TooltipContent>{sessionTitle}</TooltipContent>
             </Tooltip>
           )}
-          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
-            <span className="dshx:truncate dshx:font-mono">{thread.name}</span>
-            {lifecycleText === undefined ? null : <span className="dshx:shrink-0">· {lifecycleText}</span>}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground" data-workspace-name={thread.name}>
+                <span className="dshx:truncate">{title}</span>
+                {lifecycleText === undefined ? null : <span className="dshx:shrink-0">· {lifecycleText}</span>}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="dshx:max-w-96 dshx:break-all">{t('ownWorkspaceHint', { name: thread.name, path: thread.path })}</TooltipContent>
+          </Tooltip>
         </div>
         <span className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:@max-pane-compact:col-start-3 dshx:@max-pane-compact:row-start-1 dshx:@max-pane-compact:justify-self-end">
           <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:whitespace-nowrap dshx:text-xs dshx:text-muted-foreground">
@@ -669,11 +689,12 @@ const ThreadRow = (props: {
           </Tooltip>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon-sm" variant="ghost" disabled={props.busy} aria-label={t('moreActions', { name: thread.name })}>
+              <Button size="icon-sm" variant="ghost" disabled={props.busy} aria-label={t('moreActions', { name: heading })}>
                 <EllipsisIcon />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => void pathCopy.copy(thread.path)}>{pathCopy.copied ? t('copied') : t('copyWorkspacePath')}</DropdownMenuItem>
               <DropdownMenuItem variant="destructive" onSelect={props.onDiscard}>
                 {thread.unlanded.length > 0 ? t('removeWorkspaceWorkMenu') : t('removeWorkspaceMenu')}
               </DropdownMenuItem>
@@ -705,8 +726,8 @@ const DiscardDialog = (props: { readonly t: JjIntegrationTranslate; readonly con
             {target === null
               ? null
               : target.unlandedCount > 0
-                ? t('removeWorkspaceWithWorkTitle', { name: target.name, count: target.unlandedCount })
-                : t('removeWorkspaceTitle', { name: target.name })}
+                ? t('removeWorkspaceWithWorkTitle', { name: target.label ?? target.name, count: target.unlandedCount })
+                : t('removeWorkspaceTitle', { name: target.label ?? target.name })}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {target !== null && target.unlandedCount > 0
@@ -1130,10 +1151,7 @@ export const ThreadWorkspacesPanel = (props: {
   const queuedCount = Math.max(queueSnapshot.context.queue.length - (activeIntegrationPath === null ? 0 : 1), 0)
   const failedPaths = [...integrationJobs.entries()].filter(([, job]) => job.phase === 'failed').map(([path]) => path)
   const activeTitle = activeIntegrationPath === null ? undefined : entries.find(entry => entry.thread.path === activeIntegrationPath)?.thread
-  const activeLabel =
-    activeTitle === undefined
-      ? undefined
-      : (ThreadSessionSelection.mainSessionOf({ sessionIds: activeTitle.sessionIds, sessionById })?.displayTitle ?? activeTitle.name)
+  const activeLabel = activeTitle === undefined ? undefined : threadLabelOf(activeTitle, sessionById, t('untitledThread'))
   const queueVisible = queueBusy || failedPaths.length > 0
 
   return (
@@ -1371,6 +1389,7 @@ export const ThreadWorkspacesPanel = (props: {
                                   discard.request({
                                     path: entry.thread.path,
                                     name: entry.thread.name,
+                                    label: threadLabelOf(entry.thread, sessionById, t('untitledThread')),
                                     unlandedCount: ThreadIntegrationModel.unlandedTotals(entry.thread).total,
                                   })
                                 }

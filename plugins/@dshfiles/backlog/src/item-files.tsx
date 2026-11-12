@@ -27,7 +27,7 @@ const AttachmentImage = (props: {
         {image.data?.ok === true ? (
           <img src={image.data.value.dataUrl} alt={props.attachment.name} loading="lazy" className="dshx:size-full dshx:object-cover" />
         ) : (
-          <span className="dshx:flex dshx:size-full dshx:items-center dshx:justify-center dshx:p-2 dshx:text-center dshx:text-[11px] dshx:text-muted-foreground">
+          <span className="dshx:flex dshx:size-full dshx:items-center dshx:justify-center dshx:p-2 dshx:text-center dshx:text-2xs dshx:text-muted-foreground">
             {image.isError || image.data?.ok === false ? 'Missing image' : props.attachment.name}
           </span>
         )}
@@ -62,8 +62,8 @@ const AttachmentFile = (props: {
     <div className="dshx:group/file dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/30 dshx:px-2.5 dshx:py-2">
       <FileIcon aria-hidden className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-        <span className="dshx:truncate dshx:text-[13px] dshx:text-foreground">{props.attachment.name}</span>
-        <span className="dshx:text-[11px] dshx:text-muted-foreground">{fileSizeLabel(props.attachment.bytes)}</span>
+        <span className="dshx:truncate dshx:text-sm dshx:text-foreground">{props.attachment.name}</span>
+        <span className="dshx:text-2xs dshx:text-muted-foreground">{fileSizeLabel(props.attachment.bytes)}</span>
       </span>
       {dataUrl === null ? null : (
         <a

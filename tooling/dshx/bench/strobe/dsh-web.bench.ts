@@ -58,7 +58,7 @@ const prepareThreads = async ({ playwright }: { playwright: { page: BrowserPage 
     else await setup.getByRole('button', { name: 'Close', exact: true }).click()
   }
   const selectSampleWorkspace = async () => {
-    const chooseWorkspace = page.getByRole('button', { name: 'Choose workspace', exact: true })
+    const chooseWorkspace = page.getByRole('button', { name: 'Choose project', exact: true })
     if (!(await chooseWorkspace.isVisible().catch(() => false))) return
     await chooseWorkspace.click()
     const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
@@ -76,12 +76,12 @@ const prepareThreads = async ({ playwright }: { playwright: { page: BrowserPage 
   fixtureIds = { a, b, large }
   return fixtureIds
 }
-const sessionComposer = '[aria-label="Message or run a task, / commands, @ files or sessions"]'
+const sessionComposer = '[aria-label="Message or run a task, / commands, @ files or threads"]'
 const fixtures = (): FixtureIds => {
   if (fixtureIds === undefined) throw new Error('Strobe fixture sessions were not prepared.')
   return fixtureIds
 }
-const newThreadComposer = '[aria-label="Describe what you want to build, / commands, @ files or sessions"]'
+const newThreadComposer = '[aria-label="Describe what you want to build, / commands, @ files or threads"]'
 
 export default bench({
   targets: { dsh: url(startUrl, { viewport: { width: 1440, height: 900 }, prepare: prepareThreads }) },

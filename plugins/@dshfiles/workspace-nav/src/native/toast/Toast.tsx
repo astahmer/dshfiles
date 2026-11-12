@@ -1,5 +1,6 @@
 /** One presentation Factory and the adapters for keyed Workspace notices. */
-import { IconWarningOutlineRegular, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
+import { TriangleAlertIcon } from '@dshfiles/plugin-ui/icons'
+import { Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ArchiveToastEntryProps, ToastEntryProps, WorkspaceToastProps } from '../contract/toast.ts'
 
@@ -38,7 +39,7 @@ export function ArchiveToastEntry(props: ArchiveToastEntryProps) {
 export function WorkspaceToast({ seq, text, tone, holdMs, actions, onDone }: WorkspaceToastProps) {
   return <Toast key={seq} text={text} onDone={onDone}
     {...tone === 'success' ? { tone: 'success' as const } : {}}
-    {...tone === 'warning' ? { icon: <IconWarningOutlineRegular /> } : {}}
+    {...tone === 'warning' ? { icon: <TriangleAlertIcon size={14} strokeWidth={1.5} /> } : {}}
     {...holdMs === undefined ? {} : { holdMs }}
     {...actions === undefined ? {} : { actions }} />
 }

@@ -37,8 +37,12 @@ export const jujutsuSettings = defineSettings({
       .description('How the revision graph and Source Control reload repository data.'),
     refreshIntervalSeconds: Schema.natural().min(10).default(60).description('Seconds between automatic refreshes while the panel is visible.'),
     refreshOnVisible: Schema.boolean().default(true).description('Refresh when the panel or window becomes visible again.'),
-    composerBar: Schema.boolean().default(true).description('Show the changed-files bar above the composer when the Session folder is a JJ workspace.'),
-    composerChips: Schema.boolean().default(true).description('Show the JJ workspace and bookmark in the composer run summary chip; needs Rich Composer.'),
+    composerBar: Schema.boolean()
+      .default(true)
+      .description(
+        'Show the Changes pill (net file diff, opens the Changes view) in the thread header and the phone top bar when the Session folder is a JJ workspace.',
+      ),
+    composerChips: Schema.boolean().default(true).description('Show workspace, folder and working-copy chips below the composer.'),
     headerToggle: Schema.boolean()
       .default(false)
       .description(

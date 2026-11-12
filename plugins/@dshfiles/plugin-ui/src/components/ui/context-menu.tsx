@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { cn } from '../../lib/utils.js'
 import { useViewportClamp } from '../../hooks/viewport-clamp.js'
+import { KeyHint, keysAria } from './kbd.js'
 import { CheckIcon, ChevronRightIcon, CircleIcon } from 'lucide-react'
 import { ContextMenu as ContextMenuPrimitive } from 'radix-ui'
 
@@ -86,10 +87,14 @@ function ContextMenuItem({
   className,
   inset,
   variant = 'default',
+  keys,
+  children,
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Item> & {
   inset?: boolean
   variant?: 'default' | 'destructive'
+  /** The key that runs the same verb outside the menu (a dshx `Command` key spec); shown at the row's end. */
+  keys?: string | readonly string[]
 }) {
   return (
     <ContextMenuPrimitive.Item
@@ -100,8 +105,13 @@ function ContextMenuItem({
         'dshx:relative dshx:flex dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:outline-hidden dshx:select-none dshx:focus:bg-accent dshx:focus:text-accent-foreground dshx:data-[disabled]:pointer-events-none dshx:data-[disabled]:opacity-50 dshx:data-[inset]:pl-8 dshx:data-[variant=destructive]:text-destructive dshx:data-[variant=destructive]:focus:bg-destructive/10 dshx:data-[variant=destructive]:focus:text-destructive dshx:dark:data-[variant=destructive]:focus:bg-destructive/20 dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4 dshx:[&_svg:not([class*=text-])]:text-muted-foreground dshx:data-[variant=destructive]:*:[svg]:text-destructive!',
         className,
       )}
+      aria-keyshortcuts={keysAria(keys)}
       {...props}
-    />
+    >
+      {children}
+      {/* The item says its keys through aria-keyshortcuts; the keycaps are for the eye, out of its accessible name. */}
+      {keys === undefined ? null : <ContextMenuShortcut keys={keys} aria-hidden="true" />}
+    </ContextMenuPrimitive.Item>
   )
 }
 
@@ -168,9 +178,12 @@ function ContextMenuSeparator({ className, ...props }: React.ComponentProps<type
   )
 }
 
-function ContextMenuShortcut({ className, ...props }: React.ComponentProps<'span'>) {
+function ContextMenuShortcut({ className, keys, children, ...props }: React.ComponentProps<'span'> & { keys?: string | readonly string[] }) {
+  if (keys !== undefined) return <KeyHint keys={keys} className={cn('dshx:ml-auto dshx:pl-4', className)} data-slot="context-menu-shortcut" {...props} />
   return (
-    <span data-slot="context-menu-shortcut" className={cn('dshx:ml-auto dshx:text-xs dshx:tracking-widest dshx:text-muted-foreground', className)} {...props} />
+    <span data-slot="context-menu-shortcut" className={cn('dshx:ml-auto dshx:text-xs dshx:tracking-widest dshx:text-muted-foreground', className)} {...props}>
+      {children}
+    </span>
   )
 }
 

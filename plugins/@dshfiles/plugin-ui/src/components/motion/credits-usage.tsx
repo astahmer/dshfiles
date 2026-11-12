@@ -210,7 +210,7 @@ function CategoryCard({ category, delay }: { readonly category: CreditCategory; 
             value={Math.max(0, Math.min(100, category.meter.percent))}
           />
         )}
-        <span className="dshx:line-clamp-2 dshx:text-[11px] dshx:leading-snug dshx:text-muted-foreground">{category.caption}</span>
+        <span className="dshx:line-clamp-2 dshx:text-2xs dshx:leading-snug dshx:text-muted-foreground">{category.caption}</span>
       </div>
       {charted ? <MiniChart category={category} max={max} delay={delay} /> : null}
     </article>
@@ -221,7 +221,7 @@ function MiniChart({ category, max, delay }: { readonly category: CreditCategory
   const labels = category.axisLabels ?? category.series.map(() => '')
   return (
     <div aria-hidden className="dshx:grid dshx:grid-cols-[auto_minmax(0,1fr)] dshx:grid-rows-[minmax(0,1fr)_auto] dshx:gap-x-1.5 dshx:gap-y-1">
-      <div className="dshx:flex dshx:flex-col dshx:justify-between dshx:text-right dshx:text-[9px] dshx:leading-none dshx:text-muted-foreground/70 dshx:tabular-nums">
+      <div className="dshx:flex dshx:flex-col dshx:justify-between dshx:text-right dshx:text-2xs dshx:leading-none dshx:text-muted-foreground/70 dshx:tabular-nums">
         <span>{max}</span>
         <span>{max / 2}</span>
         <span>0</span>
@@ -237,7 +237,7 @@ function MiniChart({ category, max, delay }: { readonly category: CreditCategory
         )}
       </div>
       <span />
-      <div className="dshx:flex dshx:justify-around dshx:text-[9px] dshx:leading-none dshx:text-muted-foreground/70">
+      <div className="dshx:flex dshx:justify-around dshx:text-2xs dshx:leading-none dshx:text-muted-foreground/70">
         {labels.map((label, index) => (
           <span key={index} className="dshx:w-0 dshx:flex-1 dshx:text-center">
             {label}
@@ -295,7 +295,7 @@ function ColumnPlot({
             style={{ height: `${Math.min(100, (value / max) * 100)}%` }}
             className={cn(
               'dshx:relative dshx:origin-bottom dshx:transition-[height] dshx:duration-500',
-              kind === 'bars' ? cn('dshx:w-[55%] dshx:max-w-3 dshx:rounded-t-[3px]', toneBg[tone]) : cn('dshx:w-px', toneStem[tone]),
+              kind === 'bars' ? cn('dshx:w-[55%] dshx:max-w-3 dshx:rounded-t-xs', toneBg[tone]) : cn('dshx:w-px', toneStem[tone]),
             )}
           />
           {kind === 'stems' ? (
@@ -427,7 +427,7 @@ function BudgetBar({
           />
         ))}
       </div>
-      <ul className="dshx:flex dshx:flex-wrap dshx:gap-x-3 dshx:gap-y-1 dshx:text-[11px] dshx:text-muted-foreground">
+      <ul className="dshx:flex dshx:flex-wrap dshx:gap-x-3 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground">
         {categories.map(category => (
           <li key={category.id} className="dshx:flex dshx:items-center dshx:gap-1">
             <span aria-hidden className={cn('dshx:size-1.5 dshx:rounded-full', toneBg[category.tone])} />
@@ -540,7 +540,7 @@ function OptionCards({
             <RadioDot checked={checked} />
             <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
               <span className="dshx:truncate dshx:text-sm dshx:font-medium dshx:text-foreground">{option.label}</span>
-              <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{option.hint}</span>
+              <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{option.hint}</span>
             </span>
             <span className="dshx:shrink-0 dshx:text-sm dshx:font-medium dshx:text-foreground dshx:tabular-nums">{option.price}</span>
           </button>

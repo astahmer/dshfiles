@@ -1,15 +1,10 @@
+import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useMemo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionListState, SessionProjectionMap, SessionSummary, SessionProjectionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import {
-  IconChevronDownOutlineRegular,
-  IconChevronRightOutlineRegular,
-  IconRefreshOutlineRegular,
-  StateDot,
-  Tooltip as NativeTooltip,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { StateDot, Tooltip as NativeTooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { createHoverIntentMachine, useMachine } from '@dshfiles/plugin-ui/machine'
 import { HostSnapshotsModel } from '../snapshots.js'
@@ -285,7 +280,7 @@ function CatalogRows({
               refreshProjection(parentSessionId)
             }}
           >
-            <IconRefreshOutlineRegular size={14} />
+            <RefreshCwIcon strokeWidth={1.5} size={14} />
             {t('retry')}
           </button>
         </div>
@@ -378,7 +373,7 @@ function CatalogRows({
                   aria-label={t(isExpanded ? 'branch.collapse' : 'branch.expand', { label })}
                   onClick={toggle}
                 >
-                  <IconChevronRightOutlineRegular />
+                  <ChevronRightIcon size={14} strokeWidth={1.5} />
                 </button>
               )}
               <div className={css.clickarea}>
@@ -415,7 +410,7 @@ function CatalogRows({
                         event.stopPropagation()
                       }}
                     >
-                      <IconChevronRightOutlineRegular />
+                      <ChevronRightIcon size={14} strokeWidth={1.5} />
                     </button>
                   </NativeTooltip>
                 )}
@@ -688,7 +683,7 @@ function CatalogDropdown({
             <span className={css.count}>{t(totalCountKey, { count: runningCount > 0 ? `${runningCount}/${directCount}` : directCount })}</span>
           </>
         )}
-        {variant === 'switcher' ? <SubagentSwitcherIcon /> : <IconChevronDownOutlineRegular className={open ? css.triggerOpen : undefined} />}
+        {variant === 'switcher' ? <SubagentSwitcherIcon /> : <ChevronDownIcon size={14} strokeWidth={1.5} className={open ? css.triggerOpen : undefined} />}
       </button>
       {open &&
         createPortal(

@@ -1,66 +1,81 @@
 /**
- * Capture-phase keyboard shortcuts.
+ * Capture-phase keyboard shortcuts, in layers.
  *
- * The Host's own shortcut runtime listens for `keydown` in the bubble phase, so a
- * chord the browser also claims — `primary+p` for print — has already done its
- * browser-level work by the time dispatch runs. A bubble listener cannot take
- * those chords back; a capture listener runs before the event reaches the target
- * and can, which is why this exists as a plugin rather than as configuration.
+ * The Host's own shortcut runtime listens for `keydown` in the bubble phase, so a chord the browser also claims —
+ * `primary+p` for print — has already done its browser-level work by the time dispatch runs. A capture listener runs
+ * before the event reaches the target and can take it back, which is why this exists as a plugin rather than as
+ * configuration. The Web registry also refuses `⌥`-letter defaults and has no single-key or sequence layer, so those
+ * live here too: one listener, one registry (dshx `Command`), every layer.
  *
- * It also covers the runtime's native-input path. That path skips DOM dispatch
- * entirely on macOS and Windows, expecting an Electron shell to forward
- * `before-input-event`. In a browser there is no such shell, so the registry is
- * inert there — which is why `primary+k` does nothing on the web profile today.
+ * The layers (`CommandScope`):
  *
- * Two rules keep this from being hostile:
+ * - **global** chords fire anywhere; a modified chord cannot type, so it also fires from a text field.
+ * - **not-typing** keys fire anywhere except a text field or an IME composition.
+ * - **list / triage / changes** keys fire only inside an element marked `data-shortcut-scope="<scope>"`: the focused
+ *   one, or with nothing focused the region the user last pointed at or focused, else one marked
+ *   `data-shortcut-ambient`. Two mounted lists can both bind `J`; the region decides.
+ * - **composer** chords fire only from inside `data-shortcut-scope="composer"`.
  *
- * - A chord is only claimed when the focused element is not editable. Typing
- *   `Cmd+P` inside a textarea should insert those characters, not open a panel.
- * - A chord already handled by someone else is left alone. DSH's own registry runs
- *   first for anything it owns, and this only claims what nothing else took.
- * - A chord the terminal reads keeps reaching the shell. `Cmd+J` may toggle the
- *   bottom panel everywhere else, but `Ctrl+J` is a line feed once xterm owns the
- *   keyboard, so a command can opt out of the terminal.
+ * Guards that hold whatever the scope:
+ *
+ * - A key without the primary modifier (`J`, `Shift+J`, `Alt+J`, `G I`) never fires while typing: in a text field,
+ *   during an IME composition, or inside an open menu or dialog that is not its own region. `⌥J` types `∆` on macOS.
+ * - Character keys (no modifier but Shift) can be turned off as a whole (WCAG 2.1.4).
+ * - A key someone already handled, or an auto-repeat, is left alone, and exactly the asked modifiers must be held.
+ * - A chord the terminal reads keeps reaching the shell. `Cmd+J` may toggle the bottom panel everywhere else, but
+ *   `Ctrl+J` is a line feed once xterm owns the keyboard, so a command can opt out of the terminal.
  */
+import { CommandKeys, type KeyStep, type ParsedKeys } from '@dshfiles/dshx/client'
+
+export type ShortcutScope = 'global' | 'not-typing' | 'list' | 'triage' | 'changes' | 'composer'
 
 /** Which input owner the key event belongs to, named as the Host adapter names them. */
 export type ShortcutRegion = 'page' | 'editable' | 'terminal'
 
-/** `primary` is Meta on macOS and Control everywhere else, matching the Host. */
-export type Modifier = 'primary' | 'control' | 'alt' | 'shift' | 'meta'
+/** Region scopes: they apply only inside an element that names them. */
+const REGION_SCOPES: ReadonlySet<ShortcutScope> = new Set(['list', 'triage', 'changes', 'composer'])
 
-export interface Shortcut {
+export interface ShortcutTrigger {
+  readonly keys: string
+  readonly event: KeyboardEvent
+}
+
+export interface ShortcutBinding {
   /** Stable id, so a binding can be referred to by name rather than by chord. */
   readonly id: string
-  readonly key: string
-  readonly modifier: Modifier
-  /** Extra modifier that must also be held, for chords like `primary+shift+p`. */
-  readonly alsoShift?: boolean
+  readonly keys: ParsedKeys
+  readonly scope: ShortcutScope
+  /** For a region scope: the element whose keys these are; absent means any region of that scope. */
+  readonly region?: () => Element | null | undefined
   /**
-   * Whether the chord still applies when a text field has focus.
-   *
-   * The composer is a textarea and holds focus almost all the time, so a chord
-   * guarded against editable targets would never fire in practice. Plain letter
-   * chords still need the guard — those are the ones that would insert text — but
-   * a modified chord cannot type anything, so it is safe to claim anywhere.
-   */
-  readonly allowInEditable?: boolean
-  /**
-   * Whether the chord still applies while a terminal owns the keyboard.
-   *
-   * Defaults to `true`: a modified chord cannot type anything, and app chords are
-   * expected to work from every surface. A chord the shell itself reads — `Ctrl+J`
-   * is a line feed — sets this to `false` so the key reaches xterm instead.
+   * Whether the key still applies while a terminal owns the keyboard. Defaults to `true`: app chords are expected to
+   * work from every surface. A chord the shell itself reads (`Ctrl+J` is a line feed) sets `false` so xterm gets it.
    */
   readonly allowInTerminal?: boolean
   /** Human label for menus and help. */
   readonly label: string
   /** Returning false declines the key: the event goes on to its target as if nothing matched. */
-  readonly run: (event: KeyboardEvent) => void | false
+  readonly run: (trigger: ShortcutTrigger) => void | false
+}
+
+export interface ShortcutLayerOptions {
+  /** Read on every key press, so bindings can change without reinstalling the listener. */
+  readonly bindings: () => readonly ShortcutBinding[]
+  /** Whether character-key shortcuts (`J`, `?`, `G I`) are on; read on every key press. */
+  readonly singleKeys?: () => boolean
+  readonly now?: () => number
 }
 
 const EDITABLE_SELECTOR =
-  'input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'
+  'input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([type="file"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [role="searchbox"]'
+
+/** An open menu, listbox or dialog owns plain keys (type-ahead, its own arrows) unless it is a shortcut region. */
+const OVERLAY_SELECTOR = '[role="menu"], [role="menubar"], [role="listbox"], [role="dialog"], [role="alertdialog"]'
+
+const REGION_SELECTOR = '[data-shortcut-scope]'
+const AMBIENT_SELECTOR = '[data-shortcut-ambient]'
+
+const MODIFIER_KEYS = new Set(['Shift', 'Meta', 'Control', 'Alt', 'AltGraph', 'CapsLock', 'Fn', 'OS', 'Hyper', 'Super'])
 
 /** xterm's root element, the same owner the Host adapter calls a `terminal` region. */
 const TERMINAL_SELECTOR = '.xterm'
@@ -68,127 +83,241 @@ const TERMINAL_SELECTOR = '.xterm'
 /** Resolve the Host's logical `primary` to the physical modifier for this platform. */
 const isPrimaryHeld = (event: KeyboardEvent, mac: boolean): boolean => (mac ? event.metaKey : event.ctrlKey)
 
-/**
- * Count how many modifiers the event carries, ignoring the one the chord claims.
- *
- * A keydown reports every modifier that is down, so a chord that only checked for
- * its own would also fire on `alt+cmd+p` and quietly steal a sequence the Host
- * might own. Requiring the set to match exactly is what makes the chords
- * predictable enough to document.
- */
-const extraModifiers = (event: KeyboardEvent, mac: boolean): number =>
-  (event.ctrlKey ? 1 : 0) + (event.metaKey ? 1 : 0) + (event.altKey ? 1 : 0) + (event.shiftKey ? 1 : 0) - (isPrimaryHeld(event, mac) ? 1 : 0)
+/** The other of Ctrl/⌘, which no binding asks for: holding it means the press is someone else's chord. */
+const isSecondaryHeld = (event: KeyboardEvent, mac: boolean): boolean => (mac ? event.ctrlKey : event.metaKey)
 
-const NAMED_KEYS: Readonly<Record<string, string>> = {
-  ',': 'Comma',
-  '.': 'Period',
-  '/': 'Slash',
-  ';': 'Semicolon',
-  "'": 'Quote',
-  '[': 'BracketLeft',
-  ']': 'BracketRight',
-  '\\': 'Backslash',
-  '`': 'Backquote',
-  '-': 'Minus',
-  '=': 'Equal',
-  enter: 'Enter',
-  escape: 'Escape',
-  space: 'Space',
-  tab: 'Tab',
+/**
+ * Whether this event is exactly this step.
+ *
+ * "Exactly" matters: a keydown reports every modifier that is down, so a step that only checked for its own would
+ * also fire on `alt+cmd+p` and quietly steal a sequence the Host might own.
+ */
+const matchesStep = (event: KeyboardEvent, step: KeyStep, mac: boolean): boolean => {
+  const keyMatches = event.code === step.code || (step.char !== undefined && event.key === step.char)
+  if (!keyMatches) return false
+  if (isSecondaryHeld(event, mac)) return false
+  if (isPrimaryHeld(event, mac) !== step.primary) return false
+  if (event.altKey !== step.alt) return false
+  // A typed symbol (`?`) answers to its character whatever Shift took to type it on this layout.
+  if (step.char !== undefined && event.key === step.char) return true
+  return event.shiftKey === step.shift
 }
 
-const PRIMARY_NAMES = new Set(['mod', 'primary', 'cmd', 'ctrl'])
+const isEditableTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof Element)) return false
+  return target.closest(EDITABLE_SELECTOR) !== null
+}
+
+interface Region {
+  readonly scopes: readonly string[]
+  readonly element: Element
+}
+
+const regionOf = (element: Element): Region => ({ element, scopes: (element.getAttribute('data-shortcut-scope') ?? '').split(/\s+/u).filter(Boolean) })
+
+/** Every shortcut region around an element, innermost first, stopping at an overlay that is not one. */
+const regionsAround = (target: Element, stopAt: Element | null): Region[] => {
+  const regions: Region[] = []
+  let cursor: Element | null = target.closest(REGION_SELECTOR)
+  while (cursor !== null) {
+    if (stopAt !== null && !stopAt.contains(cursor)) break
+    regions.push(regionOf(cursor))
+    cursor = cursor.parentElement?.closest(REGION_SELECTOR) ?? null
+  }
+  return regions
+}
+
+const isShown = (element: Element): boolean => element.isConnected && (!(element instanceof HTMLElement) || element.getClientRects().length > 0)
+
+export interface KeyContext {
+  readonly target: Element | null
+  readonly typing: boolean
+  /** The key landed in xterm (its hidden textarea is also a text field, so `typing` is true there too). */
+  readonly terminal: boolean
+  /** An open menu or dialog the key landed in, which plain keys belong to unless it is a region. */
+  readonly overlay: Element | null
+  readonly regions: readonly Region[]
+}
+
+/** Where a key press landed, read once per event. */
+const resolveContext = (event: KeyboardEvent, ambient: () => Element | null): KeyContext => {
+  const fromPath = event.composedPath().find((node): node is Element => node instanceof Element)
+  const doc = event.target instanceof Node ? (event.target.ownerDocument ?? (event.target instanceof Document ? event.target : null)) : null
+  const target = fromPath ?? (doc?.activeElement instanceof Element ? doc.activeElement : null)
+  // keyCode 229 is the IME's placeholder key in browsers that end a composition before `isComposing` is set.
+  const typing = event.isComposing || event.keyCode === 229 || isEditableTarget(target)
+  const overlay = target?.closest(OVERLAY_SELECTOR) ?? null
+  const terminal = (target?.closest(TERMINAL_SELECTOR) ?? null) !== null
+  const isDocumentLevel = target === null || target === doc?.body || target === doc?.documentElement
+  if (isDocumentLevel) {
+    const fallback = ambient()
+    return { target, typing, terminal, overlay, regions: fallback === null ? [] : regionsAround(fallback, null) }
+  }
+  return { target, typing, terminal, overlay, regions: regionsAround(target, overlay) }
+}
+
+/** Lower is more specific: the innermost region first, then not-typing, then global. */
+const rankOf = (binding: ShortcutBinding, context: KeyContext): number | undefined => {
+  if (REGION_SCOPES.has(binding.scope)) {
+    if (binding.scope !== 'composer' && context.typing) return undefined
+    const index = context.regions.findIndex(region => {
+      if (!region.scopes.includes(binding.scope)) return false
+      const owner = binding.region?.()
+      if (binding.region === undefined) return true
+      return owner !== null && owner !== undefined && (owner === region.element || owner.contains(region.element))
+    })
+    return index === -1 ? undefined : index
+  }
+  if (binding.keys.typesText && context.overlay !== null) return undefined
+  if (binding.scope === 'not-typing') return context.typing ? undefined : 1_000
+  return 2_000
+}
+
+const eligible = (binding: ShortcutBinding, context: KeyContext, singleKeys: boolean): number | undefined => {
+  if (binding.keys.characterKey && !singleKeys) return undefined
+  if (context.terminal && binding.allowInTerminal === false) return undefined
+  if (binding.keys.typesText && context.typing) return undefined
+  // Composer chords are chords: a plain key there is the user's text.
+  if (binding.scope === 'composer' && binding.keys.typesText) return undefined
+  return rankOf(binding, context)
+}
+
+const byRank = (context: KeyContext, singleKeys: boolean, bindings: readonly ShortcutBinding[]): ShortcutBinding[] =>
+  bindings
+    .flatMap((binding, order) => {
+      const rank = eligible(binding, context, singleKeys)
+      return rank === undefined ? [] : [{ binding, rank, order }]
+    })
+    .sort((left, right) => left.rank - right.rank || left.order - right.order)
+    .map(entry => entry.binding)
+
+interface Pending {
+  readonly step: KeyStep
+  readonly at: number
+  readonly context: KeyContext
+}
 
 /**
- * Read a chord such as `Mod+Shift+K` into the physical key and modifiers it needs.
+ * Install one capture-phase listener for every layer.
  *
- * Only chords held with the primary modifier can be claimed, so anything else
- * returns undefined and the caller leaves it unbound.
+ * Capture is the whole point: it runs before the target's own handlers. The listener is passive about anything it does
+ * not own and calls nothing when no binding matches.
  */
-const parseChord = (chord: string): { readonly key: string; readonly alsoShift: boolean } | undefined => {
-  const parts = chord.split('+').map(part => part.trim().toLowerCase())
-  const keyName = parts.at(-1)
-  const modifiers = new Set(parts.slice(0, -1))
-  if (keyName === undefined || keyName === '') return undefined
-  if (![...modifiers].some(modifier => PRIMARY_NAMES.has(modifier))) return undefined
-  const unsupported = [...modifiers].filter(modifier => !PRIMARY_NAMES.has(modifier) && modifier !== 'shift')
-  if (unsupported.length > 0) return undefined
-  const key = /^[a-z]$/u.test(keyName) ? `Key${keyName.toUpperCase()}` : /^\d$/u.test(keyName) ? `Digit${keyName}` : NAMED_KEYS[keyName]
-  if (key === undefined) return undefined
-  return { key, alsoShift: modifiers.has('shift') }
+const install = (target: Window, options: ShortcutLayerOptions): (() => void) => {
+  const mac = CommandKeys.isMacPlatform(target.navigator.platform)
+  const now = options.now ?? (() => Date.now())
+  const singleKeys = options.singleKeys ?? (() => true)
+  let pending: Pending | undefined
+  let lastRegion: Element | null = null
+
+  const ambient = (): Element | null => {
+    if (lastRegion !== null && isShown(lastRegion)) return lastRegion
+    const marked = Array.from(target.document.querySelectorAll(AMBIENT_SELECTOR)).filter(isShown)
+    return marked.at(-1) ?? null
+  }
+
+  /** The region the user last worked in, so J still reaches the list after focus fell back to the page. */
+  const remember = (event: Event): void => {
+    const element = event.target instanceof Element ? event.target : null
+    lastRegion = element?.closest(REGION_SELECTOR) ?? null
+  }
+
+  const claim = (event: KeyboardEvent): void => {
+    // Both calls are needed: preventDefault stops the browser's own binding, stopPropagation keeps the Host's runtime
+    // (and the target's handlers) from also acting on it.
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  const runFirst = (candidates: readonly ShortcutBinding[], event: KeyboardEvent): boolean => {
+    for (const binding of candidates) {
+      if (binding.run({ keys: binding.keys.spec, event }) === false) continue
+      claim(event)
+      return true
+    }
+    return false
+  }
+
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.defaultPrevented || event.repeat) return
+    if (MODIFIER_KEYS.has(event.key)) return
+    const bindings = options.bindings()
+    const singleKeysOn = singleKeys()
+
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- a snapshot: `pending` is cleared on the next line.
+    const waiting = pending
+    pending = undefined
+    if (waiting !== undefined && now() - waiting.at <= CommandKeys.SEQUENCE_MS) {
+      const seconds = byRank(waiting.context, singleKeysOn, bindings).filter(binding => {
+        const [first, second] = binding.keys.steps
+        return second !== undefined && first.code === waiting.step.code && first.shift === waiting.step.shift && matchesStep(event, second, mac)
+      })
+      if (runFirst(seconds, event)) return
+      // Not a known second key: the sequence ends and this key is judged on its own.
+    }
+
+    const context = resolveContext(event, ambient)
+    const ranked = byRank(context, singleKeysOn, bindings)
+    const starts = ranked.filter(binding => binding.keys.steps.length === 2 && matchesStep(event, binding.keys.steps[0], mac))
+    const first = starts[0]?.keys.steps[0]
+    if (first !== undefined) {
+      pending = { step: first, at: now(), context }
+      claim(event)
+      return
+    }
+    runFirst(
+      ranked.filter(binding => binding.keys.steps.length === 1 && matchesStep(event, binding.keys.steps[0], mac)),
+      event,
+    )
+  }
+
+  // Any click ends a half-typed sequence, as it does in the Host's own registry.
+  const onPointerDown = (event: Event): void => {
+    pending = undefined
+    remember(event)
+  }
+
+  target.addEventListener('keydown', onKeyDown, true)
+  target.addEventListener('pointerdown', onPointerDown, true)
+  target.addEventListener('focusin', remember, true)
+  return () => {
+    target.removeEventListener('keydown', onKeyDown, true)
+    target.removeEventListener('pointerdown', onPointerDown, true)
+    target.removeEventListener('focusin', remember, true)
+  }
+}
+
+/** Read a scope as the matcher understands it: `page` is the older name of `not-typing`. */
+const normalizeScope = (scope: string | undefined): ShortcutScope => {
+  switch (scope) {
+    case 'page':
+    case 'not-typing':
+      return 'not-typing'
+    case 'list':
+    case 'triage':
+    case 'changes':
+    case 'composer':
+      return scope
+    default:
+      return 'global'
+  }
 }
 
 export class ShortcutKeyboardModel {
-  static readonly parseChord = parseChord
-
-  static readonly isMacPlatform = (platform: string): boolean => platform === 'MacIntel' || platform === 'macOS' || platform.startsWith('Mac')
-
   /** Whether the event landed somewhere that consumes plain character keys. */
-  static readonly isEditableTarget = (target: EventTarget | null): boolean => {
-    if (!(target instanceof Element)) return false
-    if (target.matches(EDITABLE_SELECTOR)) return true
-    // A shortcut pressed while a dialog is open belongs to the dialog.
-    return target.closest(EDITABLE_SELECTOR) !== null
-  }
+  static readonly isEditableTarget = isEditableTarget
 
   /** Which input owner the event lands in, in the order the Host resolves it: terminal, then editable, then page. */
   static readonly regionOf = (target: EventTarget | null): ShortcutRegion => {
     if (!(target instanceof Element)) return 'page'
     if (target.closest(TERMINAL_SELECTOR) !== null) return 'terminal'
-    return ShortcutKeyboardModel.isEditableTarget(target) ? 'editable' : 'page'
+    return isEditableTarget(target) ? 'editable' : 'page'
   }
-
-  /**
-   * Whether this event is exactly this chord.
-   *
-   * "Exactly" matters: a chord that also matched `primary+shift+p` would fire both,
-   * because a keydown carries every modifier that is down.
-   */
-  static readonly matchesShortcut = (event: KeyboardEvent, shortcut: Shortcut, mac: boolean): boolean => {
-    if (event.code !== shortcut.key && event.key !== shortcut.key) return false
-    if (!isPrimaryHeld(event, mac)) return false
-    // Exactly one extra modifier is allowed, and only when the chord asks for it.
-    const extra = extraModifiers(event, mac)
-    return shortcut.alsoShift === true ? extra === 1 && event.shiftKey : extra === 0
-  }
+  static readonly matchesStep = matchesStep
+  static readonly resolveContext = resolveContext
+  static readonly normalizeScope = normalizeScope
 }
 
-/**
- * Install one capture-phase listener for the given shortcuts.
- *
- * Capture is the whole point: it runs before the target's own handlers, so
- * claiming a browser chord here is possible at all. The listener is passive about
- * anything it does not own and calls nothing when no binding matches.
- */
-export const installShortcuts = (target: Window, shortcuts: readonly Shortcut[]): (() => void) => {
-  const mac = ShortcutKeyboardModel.isMacPlatform(target.navigator.platform)
-
-  const onKeyDown = (event: KeyboardEvent): void => {
-    // Someone already handled it, a composition is in flight, or the key is being
-    // auto-repeated: none of these are a fresh command.
-    if (event.defaultPrevented || event.isComposing || event.repeat) return
-    // The region decides which guards apply: xterm's hidden textarea is a text
-    // field, so it is named a terminal first and the editable rule never sees it.
-    const region = ShortcutKeyboardModel.regionOf(event.composedPath().find(node => node instanceof Element) ?? null)
-    for (const shortcut of shortcuts) {
-      if (!ShortcutKeyboardModel.matchesShortcut(event, shortcut, mac)) continue
-      // A modified chord cannot insert text, so it is claimed even from a text
-      // field. Without this the guard below would swallow every chord aimed at the
-      // composer, which is where focus actually is.
-      if (region === 'editable' && shortcut.allowInEditable !== true) continue
-      if (region === 'terminal' && shortcut.allowInTerminal === false) continue
-      if (shortcut.run(event) === false) continue
-
-      // Both calls are needed: preventDefault stops the browser's own binding,
-      // stopPropagation keeps the Host's runtime from also dispatching it.
-      event.preventDefault()
-      event.stopPropagation()
-      return
-    }
-  }
-
-  target.addEventListener('keydown', onKeyDown, true)
-  return () => {
-    target.removeEventListener('keydown', onKeyDown, true)
-  }
+export class ShortcutLayer {
+  static readonly install = install
 }

@@ -133,15 +133,10 @@ export const InboxView = (props: {
                     <WandSparklesIcon className="dshx:size-3.5" />
                   </span>
                 ) : (
-                  <ItemGlyphs.ActorAvatar actorId={item.activity.last?.actor ?? item.actors[0]?.id} className="dshx:size-7 dshx:text-[11px] dshx:ring-0" />
+                  <ItemGlyphs.ActorAvatar actorId={item.activity.last?.actor ?? item.actors[0]?.id} className="dshx:size-7 dshx:text-2xs dshx:ring-0" />
                 )}
                 <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
-                  <p
-                    className={cn(
-                      'dshx:line-clamp-2 dshx:text-[13px] dshx:leading-snug',
-                      isUnread(item) ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
-                    )}
-                  >
+                  <p className={cn('dshx:line-clamp-2 dshx:text-sm dshx:leading-snug', isUnread(item) ? 'dshx:text-foreground' : 'dshx:text-muted-foreground')}>
                     {hasItemReason ? headline(item) : imageTitleFallback(item.title)}
                   </p>
                   {item.activity.last?.kind === 'commented' ? (
@@ -154,7 +149,7 @@ export const InboxView = (props: {
                     return (
                       <div
                         key={thread.sessionId}
-                        className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground"
+                        className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground"
                       >
                         <reason.Icon aria-hidden className={cn('dshx:size-3.5', reason.tone)} />
                         <Tooltip>
@@ -193,7 +188,7 @@ export const InboxView = (props: {
                       </div>
                     )
                   })}
-                  <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+                  <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
                     <ItemGlyphs.AttentionBadge attention={item.attention} compact />
                     <LinkedThreadChips
                       sessionIds={linkedThreadIds(item).filter(sessionId => !threads.some(thread => thread.sessionId === sessionId))}

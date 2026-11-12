@@ -7,7 +7,7 @@ import { ItemGlyphs } from './item-glyphs.js'
 
 const chipClass = (active: boolean): string =>
   cn(
-    'dshx:inline-flex dshx:h-6 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:px-2 dshx:text-[11px] dshx:transition-colors',
+    'dshx:inline-flex dshx:h-6 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:px-2 dshx:text-2xs dshx:transition-colors',
     active
       ? 'dshx:border-border dshx:bg-background dshx:text-foreground dshx:shadow-xs'
       : 'dshx:border-transparent dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground',

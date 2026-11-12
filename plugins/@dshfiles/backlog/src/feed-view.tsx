@@ -45,7 +45,7 @@ const activityLine = (item: BacklogSummaryView): { readonly actorId: string; rea
 const Chip = (props: { readonly children: ReactNode; readonly className?: string }): JSX.Element => (
   <span
     className={cn(
-      'dshx:inline-flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground',
+      'dshx:inline-flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground',
       props.className,
     )}
   >
@@ -99,18 +99,18 @@ const FeedEntry = (props: {
         {props.selection.selected.has(item.id) ? (
           <span
             aria-hidden="true"
-            className="dshx:pointer-events-none dshx:absolute dshx:-left-2 dshx:top-1/2 dshx:flex dshx:size-4 dshx:-translate-y-1/2 dshx:items-center dshx:justify-center dshx:rounded-[3px] dshx:border dshx:border-info dshx:bg-info dshx:text-[11px] dshx:text-info-foreground"
+            className="dshx:pointer-events-none dshx:absolute dshx:-left-2 dshx:top-1/2 dshx:flex dshx:size-4 dshx:-translate-y-1/2 dshx:items-center dshx:justify-center dshx:rounded-xs dshx:border dshx:border-info dshx:bg-info dshx:text-2xs dshx:text-info-foreground"
             data-backlog-selection-indicator=""
           >
             ✓
           </span>
         ) : null}
-        <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-[11px] dshx:ring-0" />
+        <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-2xs dshx:ring-0" />
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
           <div className="dshx:flex dshx:items-baseline dshx:gap-2 dshx:text-xs">
             <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(author)}</span>
             <span className="dshx:text-muted-foreground">{new Date(item.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-            <BacklogMentionHandle item={item} className="dshx:text-[11px] dshx:text-muted-foreground" />
+            <BacklogMentionHandle item={item} className="dshx:text-2xs dshx:text-muted-foreground" />
           </div>
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
             <span onClick={event => event.stopPropagation()}>
@@ -142,7 +142,7 @@ const FeedEntry = (props: {
           {item.preview === '' ? null : (
             <BacklogText
               text={item.preview}
-              className="dshx:line-clamp-2 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-relaxed! dshx:[&>div]:text-muted-foreground! dshx:[&>div>p]:my-0"
+              className="dshx:line-clamp-2 dshx:text-sm dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-sm! dshx:[&>div]:leading-relaxed! dshx:[&>div]:text-muted-foreground! dshx:[&>div>p]:my-0"
             />
           )}
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
@@ -181,7 +181,7 @@ const FeedEntry = (props: {
             {item.freshness === 'fresh' ? null : <Chip className={cn(item.freshness === 'stale' && 'dshx:text-warning')}>{item.freshness}</Chip>}
           </div>
           {activity === null ? null : (
-            <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+            <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
               <span aria-hidden className="dshx:h-px dshx:w-3 dshx:shrink-0 dshx:bg-border" />
               <span className="dshx:min-w-0 dshx:truncate">
                 <ActorThreadLink actorId={activity.actorId} openThread={props.openThread} /> <span>{activity.summary}</span>
@@ -298,7 +298,7 @@ export const FeedView = (props: {
         {separator ? (
           <div role="separator" className="dshx:my-3 dshx:flex dshx:items-center dshx:gap-3 dshx:px-3">
             <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
-            <span className="dshx:text-[11px] dshx:font-medium dshx:text-muted-foreground">{label}</span>
+            <span className="dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{label}</span>
             <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
           </div>
         ) : null}

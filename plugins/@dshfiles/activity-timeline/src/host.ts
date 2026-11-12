@@ -11,6 +11,8 @@ import { attentionApi } from './attention-api.js'
 import { AttentionHost, attentionHandlers } from './attention-host.js'
 import { AttentionInbox } from './attention-store.js'
 import type { ActivityIngest } from './types.js'
+import { webPushApi } from './web-push-api.js'
+import { WebPush, webPushHandlers } from './web-push-host.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -62,8 +64,11 @@ const ActivityHostEvents = Layer.effectDiscard(
   }),
 )
 
+const InboxLive = AttentionInbox.layer.pipe(Layer.provide(StorageDomain.layer))
 const ActivityTimelineLive = Layer.mergeAll(ActivityHostEvents, AttentionHost.layer).pipe(
-  Layer.provideMerge(Layer.mergeAll(ActivityTimeline.layer, AttentionInbox.layer.pipe(Layer.provide(StorageDomain.layer)))),
+  // Inbox push (T6.5) reads the inbox and owns its own storage domain and worker route.
+  Layer.provideMerge(WebPush.layer.pipe(Layer.provide(StorageDomain.layer))),
+  Layer.provideMerge(Layer.mergeAll(ActivityTimeline.layer, InboxLive)),
   Layer.provide(ActivityStore.layer),
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
 )
@@ -74,6 +79,7 @@ export default DshxPlugin.make({
   layer: ActivityTimelineLive,
   apis: [
     Api.bind(attentionApi, attentionHandlers),
+    Api.bind(webPushApi, webPushHandlers),
     Api.bind(activityTimelineApi, {
       page: input => ActivityTimeline.use(timeline => timeline.page(input)),
       attention: input => ActivityTimeline.use(timeline => timeline.attention(input.limit ?? 20)).pipe(Effect.map(events => ({ events: [...events] }))),

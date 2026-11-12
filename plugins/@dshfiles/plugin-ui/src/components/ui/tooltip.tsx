@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { cn } from '../../lib/utils.js'
+import { KeyHint } from './kbd.js'
 import { Tooltip as TooltipPrimitive } from 'radix-ui'
 
 function TooltipProvider({ delayDuration = 0, ...props }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
@@ -14,7 +15,16 @@ function TooltipTrigger({ ...props }: React.ComponentProps<typeof TooltipPrimiti
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
 }
 
-function TooltipContent({ className, sideOffset = 0, children, ...props }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+function TooltipContent({
+  className,
+  sideOffset = 0,
+  children,
+  keys,
+  ...props
+}: React.ComponentProps<typeof TooltipPrimitive.Content> & {
+  /** The key that runs the control's verb (a dshx `Command` key spec), shown after the label. */
+  keys?: string | readonly string[]
+}) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
@@ -26,8 +36,15 @@ function TooltipContent({ className, sideOffset = 0, children, ...props }: React
         )}
         {...props}
       >
-        {children}
-        <TooltipPrimitive.Arrow className="dshx:z-[1100] dshx:size-2.5 dshx:translate-y-[calc(-50%_-_2px)] dshx:rotate-45 dshx:rounded-[2px] dshx:bg-foreground dshx:fill-foreground" />
+        {keys === undefined ? (
+          children
+        ) : (
+          <span className="dshx:inline-flex dshx:items-center dshx:gap-2">
+            {children}
+            <KeyHint keys={keys} />
+          </span>
+        )}
+        <TooltipPrimitive.Arrow className="dshx:z-[1100] dshx:size-2.5 dshx:translate-y-[calc(-50%_-_2px)] dshx:rotate-45 dshx:rounded-xs dshx:bg-foreground dshx:fill-foreground" />
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )

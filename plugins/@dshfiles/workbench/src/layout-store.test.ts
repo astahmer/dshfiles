@@ -38,7 +38,25 @@ const layout: SerializedDockview = {
 }
 
 describe('layout store', () => {
-  it('opens Navigation and Threads as separate tab-controlled sidebar groups', () => {
+  it('opens the one sidebar pane alone with its tab row hidden: the old Fixed column (b:952m)', () => {
+    const api = dockview()
+    WorkbenchLayout.applyDefaultLayout(
+      api,
+      [
+        { id: 'dshfiles-thread-sidebar.workbench-threads', title: 'Threads', component: () => null },
+        { id: 'dshfiles-thread-sidebar.workbench-navigation', title: 'Navigation', component: () => null },
+        { id: 'dshfiles-thread-sidebar.workbench-sidebar', title: 'Sidebar', component: () => null },
+      ],
+      'threads',
+    )
+    expect(api.groups).toHaveLength(1)
+    expect(api.panels.map(panel => panel.id)).toEqual(['dshfiles-thread-sidebar.workbench-sidebar'])
+    expect(api.groups[0]?.header.hidden).toBe(true)
+    // Dockview's own hideHeader field persists the hidden row, so a reload keeps it.
+    expect(JSON.stringify(api.toJSON())).toContain('"hideHeader":true')
+  })
+
+  it('keeps the former Navigation-over-Threads default for a sidebar without the one sidebar pane', () => {
     const api = dockview()
     WorkbenchLayout.applyDefaultLayout(
       api,

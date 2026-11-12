@@ -3,7 +3,7 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/mcp-servers',
-  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/credential-port'] },
+  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/credential-port', '@dshfiles/plugin-ui'] },
   client: {
     entry: 'src/client.tsx',
     dshxRuntime: 'shared',

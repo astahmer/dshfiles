@@ -12,7 +12,7 @@ const openProjectChecks = async (page: Page): Promise<void> => {
     await panel.getByRole('button', { name: 'Refresh project checks', exact: true }).click()
     return
   }
-  const composer = page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.pressSequentially('/project-checks')
   await expect(page.getByRole('option', { name: /^Project checks/ })).toBeVisible()
   await composer.press('Enter')
@@ -105,7 +105,7 @@ Then('the Activity Timeline labels cancellation as notable, not failure', async 
 
 When('the associated Session is opened from the Activity detail', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Open Session', exact: true }).click()
-  await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
 })
 
 Then('the receipt is backfilled once after restarting the scratch Host', async ({ page }: { page: Page }) => {
@@ -133,7 +133,7 @@ Then('the receipt is backfilled once after restarting the scratch Host', async (
 
   await page.getByRole('button', { name: /Manual pass passed/ }).click()
   await page.getByRole('button', { name: 'Open Session', exact: true }).click()
-  await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
   await openProjectChecks(page)
   await recordAssertion(page, 'verification-evidence-manual-receipts-once', async () => {
     await expect(receiptRows(page)).toHaveCount(3)
@@ -169,7 +169,7 @@ Then('the receipt is backfilled once after restarting the scratch Host', async (
     await page.getByRole('button', { name: /Manual pass passed/ }).click()
     await page.getByRole('button', { name: 'Open Session', exact: true }).click()
     await expect(page.getByRole('alert').filter({ hasText: 'This Session is archived or unavailable and cannot be opened.' })).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toHaveCount(0)
     await expect(owningSession).toHaveCount(0, { timeout: 10_000 })
   })
   await finishJourneyAssertions(page)

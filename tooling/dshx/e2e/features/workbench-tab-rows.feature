@@ -3,6 +3,7 @@ Feature: Content-only single-tab groups
   @scenario:workbench.single-tab-row
   Scenario: Hiding one tab row preserves the view and a real dropped tab reveals it
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar keeps the former Free docking panes
     When a drafted Scratchpad is the only tab in the centre grid
     And its single tab row is hidden from the tab context menu
     Then the tab row is hidden but its original draft stays mounted
@@ -17,6 +18,7 @@ Feature: Content-only single-tab groups
   @scenario:workbench.sidebar-preview-tab @scenario:thread-sidebar.preview-as-regular-tab
   Scenario: Account Preview is a normal left tab and never resurrects after moving or closing
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar keeps the former Free docking panes
     Then the account preview is one ordinary left tab rather than a fixed footer
     When the account preview tab row is hidden and shown again
     And the account preview is moved into the right pane
@@ -27,7 +29,7 @@ Feature: Content-only single-tab groups
   @scenario:workbench.sidebar-preview-legacy-migration
   Scenario: An existing sidebar gains the regular Preview without resetting its other groups
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
-    And the sidebar uses Settings › Layout › Free docking
+    And the sidebar keeps the former Free docking panes
     When an old saved sidebar without a docked Preview is restored
     Then its existing views and hidden row survive the once-only Preview conversion
-    And resetting the layout restores the default visible rows and regular Preview
+    And resetting the layout restores the default Sidebar pane

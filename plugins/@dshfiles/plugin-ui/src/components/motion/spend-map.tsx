@@ -183,10 +183,10 @@ export function SpendMap({
             </div>
             <div className="dshx:flex dshx:flex-col dshx:items-center dshx:text-center">
               <span className="dshx:text-xs dshx:font-semibold dshx:text-foreground">{owner}</span>
-              {period ? <span className="dshx:text-[11px] dshx:text-muted-foreground">{period}</span> : null}
+              {period ? <span className="dshx:text-2xs dshx:text-muted-foreground">{period}</span> : null}
             </div>
             {projected !== undefined ? (
-              <span className="dshx:rounded-md dshx:bg-warning/15 dshx:px-1.5 dshx:py-0.5 dshx:text-[11px] dshx:font-medium dshx:text-warning">
+              <span className="dshx:rounded-md dshx:bg-warning/15 dshx:px-1.5 dshx:py-0.5 dshx:text-2xs dshx:font-medium dshx:text-warning">
                 Projected {format(projected)}
               </span>
             ) : null}
@@ -232,7 +232,7 @@ export function SpendMap({
       {leaf ? <LeafDetail leaf={leaf} format={format} period={detailPeriod} capped={cap !== undefined} /> : null}
 
       {footer ? (
-        <footer className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:px-4 dshx:pb-3 dshx:text-[11px] dshx:text-muted-foreground">
+        <footer className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:px-4 dshx:pb-3 dshx:text-2xs dshx:text-muted-foreground">
           {footer}
         </footer>
       ) : null}
@@ -312,7 +312,7 @@ function CapGauge({ value, cap, format }: { readonly value: number; readonly cap
       </svg>
       <div className="dshx:absolute dshx:inset-0 dshx:flex dshx:flex-col dshx:items-center dshx:justify-center">
         <RollingNumber value={value} format={format} className="dshx:text-lg dshx:leading-none dshx:font-semibold dshx:tracking-tight dshx:text-foreground" />
-        {cap === undefined ? null : <span className="dshx:mt-1 dshx:text-[10px] dshx:text-muted-foreground">of {format(cap)}</span>}
+        {cap === undefined ? null : <span className="dshx:mt-1 dshx:text-2xs dshx:text-muted-foreground">of {format(cap)}</span>}
       </div>
     </div>
   )
@@ -353,7 +353,7 @@ function DimensionCard({
       <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:font-medium dshx:text-foreground dshx:[&_svg]:size-3.5 dshx:[&_svg]:text-muted-foreground">
         {dimension.icon}
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{dimension.label}</span>
-        <span className="dshx:text-[11px] dshx:font-normal dshx:text-muted-foreground">{dimension.leaves.length}</span>
+        <span className="dshx:text-2xs dshx:font-normal dshx:text-muted-foreground">{dimension.leaves.length}</span>
       </span>
       <span aria-hidden className="dshx:flex dshx:h-1 dshx:gap-0.5">
         {dimension.leaves.map(entry => (
@@ -368,7 +368,7 @@ function DimensionCard({
         ))}
       </span>
       {top ? (
-        <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+        <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
           <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', selected ? 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/40')} />
           <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{top.label}</span>
           <RollingNumber value={Math.round(top.share * 100)} format={value => `${Math.round(value)}%`} className="dshx:font-medium dshx:text-foreground" />
@@ -403,19 +403,19 @@ function LeafCard({
         selected ? 'dshx:border-foreground/25 dshx:bg-muted dshx:shadow-sm' : 'dshx:border-border dshx:bg-card dshx:hover:bg-accent/50',
       )}
     >
-      <span className="dshx:grid dshx:size-6 dshx:shrink-0 dshx:place-items-center dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:text-[11px] dshx:font-semibold dshx:text-foreground dshx:[&_svg]:size-3.5">
+      <span className="dshx:grid dshx:size-6 dshx:shrink-0 dshx:place-items-center dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:[&_svg]:size-3.5">
         {leaf.icon ?? leaf.label.slice(0, 1)}
       </span>
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
         <span className="dshx:truncate dshx:text-xs dshx:font-medium dshx:text-foreground">{leaf.label}</span>
-        <span className="dshx:truncate dshx:text-[10px] dshx:text-muted-foreground dshx:tabular-nums">
+        <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
           {format(leaf.amount)} · {percent(leaf.share)}
         </span>
       </span>
       {leaf.flag ? (
         <span
           className={cn(
-            'dshx:shrink-0 dshx:rounded-md dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:font-medium dshx:@max-pane-narrow:hidden',
+            'dshx:shrink-0 dshx:rounded-md dshx:px-1.5 dshx:py-0.5 dshx:text-2xs dshx:font-medium dshx:@max-pane-narrow:hidden',
             leaf.flag.tone === 'destructive' ? 'dshx:bg-destructive/12 dshx:text-destructive' : 'dshx:bg-warning/15 dshx:text-warning',
           )}
         >
@@ -433,7 +433,7 @@ function TrendChip({ trend, suffix, className }: { readonly trend: number; reado
   return (
     <span
       className={cn(
-        'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:font-medium dshx:text-foreground dshx:tabular-nums dshx:[&_svg]:size-3',
+        'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:px-1.5 dshx:py-0.5 dshx:text-2xs dshx:font-medium dshx:text-foreground dshx:tabular-nums dshx:[&_svg]:size-3',
         className,
       )}
     >
@@ -500,7 +500,7 @@ function LeafDetail({
       )}
     >
       <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-        <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
+        <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">
           {leaf.label} · {period}
         </span>
         <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
@@ -516,13 +516,13 @@ function LeafDetail({
                 className={cn('dshx:block dshx:h-full dshx:rounded-full dshx:transition-colors', over ? 'dshx:bg-destructive' : 'dshx:bg-foreground')}
               />
             </span>
-            <span className={cn('dshx:flex dshx:justify-between dshx:text-[10px]', over ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}>
+            <span className={cn('dshx:flex dshx:justify-between dshx:text-2xs', over ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}>
               <span>{Math.round(capRatio * 100)}% of cap, projected</span>
               <span className="dshx:text-muted-foreground">{format(leaf.cap)}</span>
             </span>
           </div>
         ) : capped ? (
-          <span className="dshx:text-[10px] dshx:text-muted-foreground">No monthly cap set</span>
+          <span className="dshx:text-2xs dshx:text-muted-foreground">No monthly cap set</span>
         ) : null}
       </div>
       {series.length > 1 ? (

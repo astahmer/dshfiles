@@ -9,6 +9,7 @@ Feature: Workbench layouts
   @scenario:workbench.persisted-layout
   Scenario: The default layout persists, resets and survives a corrupt save
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/editor" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the Workbench is opened
     Then the default layout shows the Conversation
@@ -21,6 +22,7 @@ Feature: Workbench layouts
   @scenario:workbench.missing-plugin
   Scenario: A panel whose plugin is disabled waits as a placeholder
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/editor" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the Workbench is opened
     And the main workbench adds the registered "Editor" panel
@@ -32,6 +34,7 @@ Feature: Workbench layouts
   @scenario:workbench.repeated-plugin-views
   Scenario: The same Backlog view opens independently in two panes
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/backlog" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the empty right pane is opened
     And Backlog is opened in the right and main panes
@@ -42,6 +45,7 @@ Feature: Workbench layouts
   @scenario:workbench.surface-layouts
   Scenario: The right pane keeps a layout apart from the main Workbench
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/editor, @dshfiles/jujutsu" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the main workbench adds the registered "Editor" panel
     And the right pane closes its Jujutsu panel
@@ -51,6 +55,7 @@ Feature: Workbench layouts
   @scenario:frame-layout.global-dock
   Scenario: The global dock keeps one panel set outside any thread
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/jujutsu, @dshfiles/editor, @dshfiles/workspace-folder-picker" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the right pane is opened from the main Pane options
     Then the global dock shows the Jujutsu panel
@@ -66,6 +71,7 @@ Feature: Workbench layouts
   @scenario:frame-layout.bottom-panel
   Scenario: A panel moves from the right column into the bottom panel
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/jujutsu, @dshfiles/editor" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the right pane is opened from the main Pane options
     Then the global dock shows the Jujutsu panel
@@ -92,6 +98,7 @@ Feature: Workbench layouts
   @scenario:workbench.drag-between-regions
   Scenario: A panel dragged by its tab lands in another region
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/jujutsu, @dshfiles/editor" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the right pane is opened from the main Pane options
     Then the global dock shows the Jujutsu panel
@@ -107,6 +114,7 @@ Feature: Workbench layouts
   @scenario:workbench.saved-layouts
   Scenario: A named layout brings a panel back to where it was saved
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/jujutsu, @dshfiles/editor" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the right pane is opened from the main Pane options
     Then the global dock shows the Jujutsu panel
@@ -125,6 +133,7 @@ Feature: Workbench layouts
   @scenario:workbench.early-open
   Scenario: Go to file opens its requested file in the unified Workbench
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/editor, @dshfiles/workspace-folder-picker, @dshfiles/command-palette" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable workspace with source, dependency and version-control files has a thread
     And "hello.ts" is opened with Go to file
@@ -133,6 +142,7 @@ Feature: Workbench layouts
   @scenario:workbench.main-hosts-the-conversation
   Scenario: The main workbench hosts real conversations and switches their threads
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     Then the conversation is inside a Dockview panel and switching threads changes its messages
@@ -142,6 +152,7 @@ Feature: Workbench layouts
   @scenario:main-tabs.workbench-legacy-disabled-conversation-tabs
   Scenario: Legacy disabled preview preferences preview sidebar conversations and keep double-clicked ones through reload
     Given an isolated Workbench profile with legacy disabled preview tabs is booted
+    And the sidebar keeps the former Free docking panes
     Then Main tabs settings still show disabled tabs and Preview opening
     When two real Workbench threads are previewed then kept from the sidebar
     Then both sidebar conversations have their own kept fixed-session tabs
@@ -159,6 +170,7 @@ Feature: Workbench layouts
   @scenario:thread-sidebar.workbench-assemblies
   Scenario: The New tab chooser hosts registered pages and one real Settings hub
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/jujutsu, @dshfiles/settings-shell, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the main workbench adds the registered "Jujutsu" panel
     And the main workbench adds the registered "Settings" panel
@@ -172,6 +184,7 @@ Feature: Workbench layouts
   @scenario:workbench.drag-across-all-regions
   Scenario: Real pointer drags move one panel through centre right and bottom and reload restores it
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/jujutsu" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the main workbench adds the registered "Jujutsu" panel
     And the main workbench opens an empty dock and bottom row
@@ -190,6 +203,7 @@ Feature: Workbench layouts
   @scenario:main-tabs.workbench-tab-semantics
   Scenario: Dockview conversations stay kept and preserve pin unread close and thread-open semantics
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/main-tabs, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/jujutsu" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     Then the latest Dockview thread tab is kept by default and the old main strip is absent
@@ -216,6 +230,7 @@ Feature: Workbench layouts
   @scenario:session-controller.live-model-catalog
   Scenario: Real native preview review and terminal resources become panels without losing their owners
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/thread-sidebar, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/session-controller, @dshfiles/model-selection, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker, @dshfiles/command-palette" is booted
+    And the sidebar keeps the former Free docking panes
     When a Command Code account backed by a local fake provider is added
     And a disposable Workbench resource thread edits two real files
     And the unified Workbench is ready
@@ -229,6 +244,7 @@ Feature: Workbench layouts
   @scenario:workbench.nested-surfaces
   Scenario: Real split groups merge by drag and restore their saved arrangement without nested containers
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/main-tabs, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/jujutsu, @dshfiles/editor" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the main pane is split right beside Editor through Pane options
     Then Editor and Jujutsu occupy real adjacent groups without a nested container
@@ -246,6 +262,7 @@ Feature: Workbench layouts
   @scenario:workbench.unified-surfaces
   Scenario: Saved native preferences migrate to the unified owned Workbench
     Given an isolated Workbench profile with saved legacy native preferences is booted
+    And the sidebar keeps the former Free docking panes
     Then the default centre is the dockable Workbench
     And no native surface choice is exposed in Workbench settings
     When the unified right pane is revealed from the main Pane options
@@ -258,7 +275,7 @@ Feature: Workbench layouts
   @scenario:workbench.right-pane-toggle
   Scenario: The original right toggle keeps a full-height live view while the bottom is open
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
-    And the sidebar uses Settings › Layout › Free docking
+    And the sidebar keeps the former Free docking panes
     When the original right sidebar shortcut opens the Workbench pane
     Then the right Workbench pane fills the frame height
     When a disposable Workbench workspace has two real threads
@@ -277,7 +294,7 @@ Feature: Workbench layouts
   @scenario:workbench.responsive-main
   Scenario: Main surface controls stay reachable at narrow widths and in a split layout
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/main-tabs, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/jujutsu, @dshfiles/editor, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
-    And the sidebar uses Settings › Layout › Free docking
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the main workbench adds the registered "Jujutsu" panel
     Then the quiet pane tab strips fit at 360 480 768 and 1024 pixels
@@ -289,20 +306,20 @@ Feature: Workbench layouts
   @scenario:workbench.every-pane-views
   Scenario: The custom Threads plugin view can replace content in every pane
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/jujutsu" is booted
-    And the sidebar uses Settings › Layout › Free docking
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the main workbench opens an empty dock and bottom row
     And the real Threads view is opened through every pane chooser
     And a plugin view is moved into the collapsed left pane
     Then the left pane reveals the explicitly moved plugin view
     When Reset layout is used from a remaining Workbench surface
-    Then the left pane content is tab controlled between fixed chrome
+    Then Reset layout restores the default Sidebar pane between fixed chrome
     And the workbench main acceptance journey is complete
 
   @scenario:workbench.layout-recovery
   Scenario: Reset recovers moved chat tabs and stays recovered after reload
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/main-tabs, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/jujutsu" is booted
-    And the sidebar uses Settings › Layout › Free docking
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     And the Dockview thread tab is pinned from its context menu
@@ -315,18 +332,18 @@ Feature: Workbench layouts
     When Reset layout is used from a remaining Workbench surface
     And the Workbench main page is reloaded
     Then the main chat tab and composer are recovered without losing its pin
-    And the left pane content is tab controlled between fixed chrome
+    And Reset layout restores the default Sidebar pane between fixed chrome
     And the workbench main acceptance journey is complete
 
   @scenario:rich-composer.workbench-conversation-views
   @scenario:workbench.reusable-view-picker
   Scenario: New tab choosers offer reusable plugin views rather than individual chat trajectories
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
-    And the sidebar uses Settings › Layout › Free docking
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     Then the reusable view picker offers plugins without per-thread trajectories
-    And the left pane content is tab controlled between fixed chrome
+    And Reset layout restores the default Sidebar pane between fixed chrome
     When the Workbench main page is reloaded
     Then the reusable view picker offers plugins without per-thread trajectories
     And the workbench main acceptance journey is complete
@@ -334,6 +351,7 @@ Feature: Workbench layouts
   @scenario:workbench.new-tab-chooser
   Scenario: Every group plus opens a searchable chooser tab and selecting a view replaces only that tab
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/main-tabs, @dshfiles/editor, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     And the main workbench opens an empty dock and bottom row
@@ -349,6 +367,7 @@ Feature: Workbench layouts
   @scenario:workbench.quiet-pane-chrome
   Scenario: Pane actions share the tab strip without duplicated headings or toolbars
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/editor" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And the main workbench opens an empty dock and bottom row
     Then pane chrome has one tab strip with local actions and no duplicate toolbar
@@ -360,6 +379,7 @@ Feature: Workbench layouts
   @scenario:workbench.last-root-safety
   Scenario: Floating the last centre tab keeps a docked chooser and its draft
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a drafted Scratchpad is the only tab in the centre grid
     And the final centre Scratchpad tab is floated with the real Shift gesture
@@ -372,7 +392,7 @@ Feature: Workbench layouts
   @scenario:workbench.reset-visible-current-chat
   Scenario: Reset reveals the current chat and left thread list from tools and legacy floats
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
-    And the sidebar uses Settings › Layout › Free docking
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     And each fixed-session conversation receives its own draft
@@ -398,6 +418,7 @@ Feature: Workbench layouts
   @scenario:workbench.fixed-conversation-lifecycle
   Scenario: Sidebar conversations reopen with complete fixed inputs and legacy followers never return
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     And each fixed-session conversation receives its own draft
@@ -410,6 +431,7 @@ Feature: Workbench layouts
   @scenario:workbench.plugin-view-names
   Scenario: Reusable plugin views are qualified and legacy saved titles refresh without losing owners or drafts
     Given an isolated Workbench view-name profile with Main Tabs and demo views is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     And each fixed-session conversation receives its own draft

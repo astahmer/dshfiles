@@ -3,6 +3,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statS
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { LauncherConfig } from './launcher-config.mjs'
+import { runningHostPids } from './running-hosts.mjs'
 import { activeSafeProfile } from './safe-mode.mjs'
 
 const run = (command, args, options) =>
@@ -62,7 +63,7 @@ const acquireLaunchLock = path => {
   return acquireLaunchLock(path)
 }
 
-export async function launchDsh(args, config = LauncherConfig.load(), inherited = process.env) {
+export async function launchDsh(args, config = LauncherConfig.load(), inherited = process.env, log = line => process.stderr.write(`${line}\n`)) {
   const core = LauncherConfig.requireCoreEntry(config)
   const env = LauncherConfig.environment(config, inherited)
   if (!existsSync(core) || !statSync(core).isFile() || !existsSync(config.nodeBinary)) throw new Error('Configured runtime is missing; nothing started')
@@ -71,15 +72,12 @@ export async function launchDsh(args, config = LauncherConfig.load(), inherited 
   const supervisor = join(config.sourceRoot, 'scripts/supervise-dsh.mjs')
   if (!existsSync(supervisor) || !existsSync(join(config.sourceRoot, 'scripts/prepare-manuel-source.mjs')))
     throw new Error('Configured source checkout is missing; nothing started')
+  log(`[dsh-launcher] home ${config.dshHome}, profile ${config.profile}, source ${config.sourceRoot}`)
   // Check before any build/profile write. Preparation repeats this check under the launch lock.
   const safe = activeSafeProfile({ home: config.dshHome, profile: config.profile })
   for (const profile of safe === undefined ? [config.profile] : [config.profile, safe]) {
-    const running = await run('pgrep', ['-u', String(process.getuid()), '-f', LauncherConfig.runningProfilePattern({ ...config, profile })], {
-      env,
-      stdio: 'ignore',
-    })
-    if (running === 0) throw new Error('DSH is already running; no build or profile change performed')
-    if (running !== 1) throw new Error('Could not check running DSH processes; nothing started')
+    const pids = runningHostPids({ home: config.dshHome, profile, coreEntry: config.coreEntry, env })
+    if (pids.length > 0) throw new Error(`DSH is already running on this home (pid ${pids.join(', ')}); stop it first. No build or profile change performed`)
   }
   const runtime = join(config.dshHome, 'runtime')
   mkdirSync(runtime, { recursive: true, mode: 0o700 })

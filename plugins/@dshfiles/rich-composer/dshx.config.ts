@@ -4,6 +4,8 @@ export default defineConfig({
   name: '@dshfiles/rich-composer',
   modules: {
     'conversation-contract': 'src/conversation-contract.ts',
+    'thread-views': 'src/thread-views.ts',
+    'composer-more': 'src/composer-more.ts',
     'phone-thread-menu': 'src/phone-thread-menu.tsx',
     'rich-text-editor': 'src/editor/index.ts',
   },

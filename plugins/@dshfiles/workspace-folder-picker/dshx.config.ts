@@ -12,6 +12,7 @@ export default defineConfig({
     'project-config': 'src/project-config.ts',
     'project-settings-panels': 'src/project-settings-panels.ts',
     'repository-setup-contract': 'src/repository-setup-contract.ts',
+    'project-add-flow': 'src/project-add-flow.ts',
   },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: { dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },

@@ -32,3 +32,11 @@ describe('UsageFormattingModel', () => {
     expect(UsageFormattingModel.changeRatio(150, 100)).toBe(0.5)
   })
 })
+
+describe('UsageFormattingModel.familyMemberTitle', () => {
+  it('names an untitled subagent in words instead of its Session id', () => {
+    expect(UsageFormattingModel.familyMemberTitle({ title: null })).toBe('Untitled subagent')
+    expect(UsageFormattingModel.familyMemberTitle({ title: '  ' })).toBe('Untitled subagent')
+    expect(UsageFormattingModel.familyMemberTitle({ title: 'Review the diff' })).toBe('Review the diff')
+  })
+})

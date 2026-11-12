@@ -32,7 +32,8 @@
         "expect text \"Enter a custom destination…\""
       ],
       "reachNarrow": [
-        "click button \"New\"",
+        "click button \"Back to Threads\"",
+        "click button \"New thread\"",
         "click button \"Run on Local\"",
         "click option \"Add host…\"",
         "expect dialog \"Add host\"",
@@ -678,7 +679,7 @@
       "externalDependencies": [],
       "reach": [
         "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@t:\"",
         "expect text \"Threads · @f: files\""
       ],
       "verification": [
@@ -767,7 +768,8 @@
       ],
       "externalDependencies": [],
       "reach": [
-        "click button \"Sidebar settings\"",
+        "click button \"Filter: *\"",
+        "click menuitem \"Sidebar settings\"",
         "click checkbox \"Show remote threads in a separate group\"",
         "click button \"Remote threads started from this DSH\"",
         "expect heading \"Remote threads\""

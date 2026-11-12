@@ -1,5 +1,5 @@
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { DshxPlugin, hostService } from '@dshfiles/dshx/effect'
+import { DshxPlugin, hostService, WebRoutes } from '@dshfiles/dshx/effect'
 import { Effect, Layer, Schema } from 'effect'
 import { injectAfterHead, SHARED_EVENT_SOURCE_WORKER, SHARED_EVENT_SOURCE_WORKER_PATH, sharedEventSourceScript } from './shim.js'
 
@@ -24,7 +24,7 @@ const serveSharedEventSource = Effect.fn('shared streams setup')(function* (conf
   yield* Effect.acquireRelease(
     Effect.try({
       try: () =>
-        webServer.register({
+        WebRoutes.holdRoute(webServer, {
           kind: 'exact',
           path: `/${SHARED_EVENT_SOURCE_WORKER_PATH}`,
           handler: (_request, response) => {

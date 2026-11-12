@@ -14,15 +14,10 @@
  * are slot entries with their own behavior, so this component threads no
  * action callbacks and hosts no action surface.
  */
+import { ArchiveIcon, ChevronsUpDownIcon, ClockIcon, FolderPlusIcon, FolderTreeIcon, ListIcon, SearchIcon, SlidersHorizontalIcon } from '@dshfiles/plugin-ui/icons'
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
-import {
-  Button, HoverCardGroup, IconArchiveCheckOutlineRegular, IconArchiveOffOutlineRegular, IconArchiveOutlineRegular,
-  IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular,
-  IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular,
-  IconQueueOutlineRegular, IconSearchOutlineRegular, IconSlidersTwoOutlineRegular,
-  IconWorkspaceTreeOutlineRegular, Menu, Modal, Tooltip,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, HoverCardGroup, IconArchiveCheckOutlineRegular, IconArchiveOffOutlineRegular, IconCloseFillRegular, IconFolderCloseRegular, IconQueueOutlineRegular, Menu, Modal, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   SessionListState, SessionSearchResultItem,
 } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -162,12 +157,12 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
       items={[
         { type: 'label' as const, id: 'group-by', text: t('groupBy.label') },
         { id: 'workspace', label: t('groupBy.workspace'), icon: <IconFolderCloseRegular /> },
-        { id: 'workspace-tree', label: t('groupBy.workspaceTree'), icon: <IconWorkspaceTreeOutlineRegular /> },
-        { id: 'flat', label: t('groupBy.flat'), icon: <IconFlatListOutlineRegular /> },
+        { id: 'workspace-tree', label: t('groupBy.workspaceTree'), icon: <FolderTreeIcon size={14} strokeWidth={1.5} /> },
+        { id: 'flat', label: t('groupBy.flat'), icon: <ListIcon size={14} strokeWidth={1.5} /> },
         { type: 'separator' as const, id: 'order-by-separator' },
         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
-        { id: 'manual', label: t('orderBy.manual'), icon: <IconChevronsUpDownOutlineRegular /> },
-        { id: 'updated', label: t('orderBy.updated'), icon: <IconClockOutlineRegular /> },
+        { id: 'manual', label: t('orderBy.manual'), icon: <ChevronsUpDownIcon size={14} strokeWidth={1.5} /> },
+        { id: 'updated', label: t('orderBy.updated'), icon: <ClockIcon size={14} strokeWidth={1.5} /> },
         { type: 'separator' as const, id: 'archived-filter-separator' },
         { type: 'label' as const, id: 'filter-by', text: t('filterBy.label') },
         { id: 'hide-archived', label: t('viewOptions.hideArchived'), icon: <IconArchiveOffOutlineRegular /> },
@@ -201,7 +196,7 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
             aria-label={t('viewOptions.label')}
             onClick={() => { setOpen(v => !v) }}
           >
-            <IconSlidersTwoOutlineRegular />
+            <SlidersHorizontalIcon size={14} strokeWidth={1.5} />
           </button>
         </Tooltip>
       )}
@@ -308,7 +303,7 @@ function EmptySessions({ rowState, onLeaveArchivedOnly, t }: Pick<SessionTreePro
   const archivedOnly = rowState.archivedFilter === 'only'
   return (
     <div className={css.emptyState} data-row-key="empty">
-      {archivedOnly ? <IconArchiveOutlineRegular size={24} /> : <IconQueueOutlineRegular size={24} />}
+      {archivedOnly ? <ArchiveIcon strokeWidth={1.5} size={24} /> : <IconQueueOutlineRegular size={24} />}
       <div>{archivedOnly ? t('empty.noneArchived') : t('empty.none')}</div>
       {archivedOnly && (
         <button type="button" className={css.emptyAction} onClick={onLeaveArchivedOnly}>
@@ -1267,7 +1262,7 @@ function WorkspaceBrowserBody({
                     requestSearch()
                   }}
                 >
-                  <IconSearchOutlineRegular size={searchExpanded ? 11 : 14} />
+                  <SearchIcon strokeWidth={1.5} size={searchExpanded ? 11 : 14} />
                 </button>
               </Tooltip>
               <input
@@ -1329,7 +1324,7 @@ function WorkspaceBrowserBody({
                   requestAddWorkspace()
                 }}
               >
-                <IconProjectAddOutlineRegular size={wide ? 16 : 18} />
+                <FolderPlusIcon strokeWidth={1.5} size={wide ? 16 : 18} />
               </button>
             </Tooltip>
           )}
@@ -1366,7 +1361,7 @@ function WorkspaceBrowserBody({
               requestSearch()
             }}
           >
-            <IconSearchOutlineRegular size={18} />
+            <SearchIcon strokeWidth={1.5} size={18} />
           </button>
         </Tooltip>
       </div>}

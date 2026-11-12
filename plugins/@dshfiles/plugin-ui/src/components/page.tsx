@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { EllipsisIcon } from 'lucide-react'
+import { ChevronDownIcon, EllipsisIcon } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 import { Button } from './ui/button.js'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu.js'
@@ -19,6 +19,11 @@ export interface PageAction {
   readonly destructive?: boolean
   /** `inline` (default) shows the action as a button while the page is wide; `overflow` always keeps it in the menu. */
   readonly placement?: 'inline' | 'overflow'
+  /**
+   * The primary action as a menu (`New ▾`: Markdown, HTML): the button opens these choices instead of running
+   * `onSelect`. Only the primary action reads it; it never folds into the overflow menu.
+   */
+  readonly items?: readonly PageAction[]
 }
 
 export interface PageTab {
@@ -95,6 +100,27 @@ const ActionButton = ({ action, primary }: { readonly action: PageAction; readon
   </Button>
 )
 
+/** A primary action that offers a few kinds (`New ▾`): one black button, its choices in a menu. */
+const PrimaryMenu = ({ action, items }: { readonly action: PageAction; readonly items: readonly PageAction[] }): React.JSX.Element => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button type="button" size="sm" disabled={action.disabled === true || action.pending === true} data-page-action={action.id}>
+        <ActionIcon action={action} />
+        {action.label}
+        <ChevronDownIcon aria-hidden className="dshx:-mr-0.5 dshx:opacity-70" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="dshx-root">
+      {items.map(item => (
+        <DropdownMenuItem key={item.id} disabled={item.disabled === true || item.pending === true} onSelect={item.onSelect} data-page-action={item.id}>
+          <ActionIcon action={item} />
+          {item.label}
+        </DropdownMenuItem>
+      ))}
+    </DropdownMenuContent>
+  </DropdownMenu>
+)
+
 /** The page header: `h1` title, count and meta chips, one-line description; one primary action and an overflow. */
 const PageHeaderRow = (props: {
   readonly heading: React.ReactNode
@@ -156,7 +182,11 @@ const PageHeaderRow = (props: {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {props.primaryAction === undefined ? null : <ActionButton action={props.primaryAction} primary />}
+          {props.primaryAction === undefined ? null : props.primaryAction.items === undefined ? (
+            <ActionButton action={props.primaryAction} primary />
+          ) : (
+            <PrimaryMenu action={props.primaryAction} items={props.primaryAction.items} />
+          )}
         </div>
       )}
     </header>

@@ -70,6 +70,9 @@ export const createApiClient = ApiRuntimeModel.createClient
 export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient
 export type { RegisteredApiSpec } from '../api/runtime.js'
 export { useSettings } from '../settings/client.js'
+/** Read one Settings contract outside React (a keyboard listener, a store); `useSettings` is the React form. */
+export { createSettingsClientRuntime } from '../settings/client.js'
+export type { SettingsClientRuntime } from '../settings/client.js'
 export { observeSettings } from '../settings/observe.js'
 export { SettingsWriteJournal } from '../settings/write-journal.js'
 export type { JournaledSettingsForm, SettingsWriteOp } from '../settings/write-journal.js'
@@ -103,6 +106,8 @@ export const constantSource = PluginContextModel.constant
 export const createSource = PluginContextModel.signal
 
 export { CommandChords } from './command-chords.js'
+export { CommandKeys } from './command-keys.js'
+export type { KeyStep, ParsedKeys } from './command-keys.js'
 export { Command, Composer, Dialogs, SessionScreen, Toasts } from './app-services.js'
 export { LinkHandler, MarkdownLinks } from './links.js'
 export { Browser, Changes, Files } from './app-contracts.js'
@@ -112,6 +117,8 @@ export type {
   AlertInput,
   AppearanceState,
   CommandItem,
+  CommandScope,
+  CommandTrigger,
   CommandsService,
   ComposerAttachment,
   ComposerModelSelection,

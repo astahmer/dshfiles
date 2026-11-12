@@ -87,7 +87,7 @@
         "Rows the reader scrolls past must not snap back when older rows mount: a paging anchor armed mid-gesture yields to the reader's scroll."
       ],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or threads\""],
       "verification": [
         {
           "kind": "unit-test",
@@ -192,10 +192,11 @@
       "reach": [
         "seed tool-call-thread",
         "seed otlp-session-turns",
+        "click button \"More actions\"",
         "click button \"Open the trace of turn*\"",
         "click treeitem \"execute_tool bash*\"",
         "click button \"Show in chat\"",
-        "expect tab \"Chat\""
+        "expect button \"More thread actions\""
       ],
       "verification": [
         {
@@ -315,52 +316,303 @@
       ]
     },
     {
-      "id": "find-in-thread",
-      "title": "Find in thread across the whole transcript",
-      "summary": "Mod+F, or Find in thread in the command palette, opens a find bar over the thread: it asks the session-search index for every matching event of the whole Session, jumps to the Turn that holds each one (loading older history into the window first), marks the typed words there and steps through matches with Enter and Shift+Enter.",
-      "surfaces": ["client", "command"],
+      "id": "folded-work",
+      "title": "A finished turn folds its work under one Worked for row",
+      "summary": "While a turn runs, its tail reads \"Working for 12s\" with a shimmer (paused off screen, none under reduced motion). Once it settles, its tool calls fold under one \"Worked for 1m 12s\" row; a failed call (an error result or a shell command that exited non-zero), a question and any PinnedToolCalls deliverable stay outside the fold, so a folded turn still shows what failed.",
+      "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: find bar",
+      "currentSurface": "transcript: turn process row",
       "configuration": [],
-      "states": ["closed", "searching", "matches", "no-match", "index-missing"],
-      "failureModes": [
-        "Without @dshfiles/session-search the bar says to add it and restart DSH; when another backend owns sessionQuery it says to disable the stock row.",
-        "A match inside folded tool output lands on its Turn and shows the snippet in the bar; the words are marked only in rows on screen.",
-        "With no Chat view on screen the command returns the key to the browser's own find."
-      ],
+      "states": ["running", "settled-folded", "settled-open", "failure-pinned"],
+      "failureModes": ["A tool that reports failure only inside its own text (not isError, no [exit code: N] footer) folds like a success."],
       "externalDependencies": [],
-      "reach": ["seed tool-call-thread", "press ControlOrMeta+f", "fill textbox \"Find in thread\" \"bash\"", "expect text \"Tool call\""],
-      "onboarding": {
-        "firstAction": "Press Cmd+F (Ctrl+F elsewhere) in a thread and type a word.",
-        "doneWhen": "The thread jumps to each match, older history included.",
-        "open": {
-          "command": "dshfiles-chat.find-in-thread"
-        }
-      },
+      "reach": ["seed tool-call-thread", "expect text \"Tool finished.\"", "expect text \"Worked for*\""],
       "verification": [
         {
           "kind": "unit-test",
-          "id": "chat.find-turn-mapping",
-          "file": "plugins/@dshfiles/chat/src/transcript-find.test.ts",
-          "testName": "maps an event seq to the Turn that holds it"
+          "id": "chat.failures-never-fold",
+          "file": "plugins/@dshfiles/chat/tests/pinned-tool-calls.test.ts",
+          "testName": "never folds a question or a failed call: both stay in the Turn outside the process fold"
         },
         {
           "kind": "unit-test",
-          "id": "chat.find-target",
-          "file": "plugins/@dshfiles/chat/src/transcript-find.test.ts",
-          "testName": "opens the find bar of the focused Chat view, else the last one used, and lets the key through when none is on screen"
+          "id": "chat.exit-code-failure",
+          "file": "plugins/@dshfiles/chat/tests/pinned-tool-calls.test.ts",
+          "testName": "treats a shell command that exited non-zero as failed, and exit 0 as folded work"
         },
         {
-          "kind": "gherkin",
-          "id": "chat.find-in-thread",
-          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+          "kind": "not-applicable",
+          "id": "chat.folded-work-browser",
+          "reason": "Walked in scratch DSH vr-p2 (visual refresh P2): a 30-call turn folded and expanded with its exit-3 call visible while folded, light/dark/phone. The e2e journeys that open the fold (tool-meta, html-render, test-runs) also cover the Worked for row."
         }
       ],
       "telemetry": [
         {
           "kind": "not-applicable",
-          "reason": "Client-only: the find bar renders browser state; its Host read is the session-search findInThread API, which gets the automatic api-dispatch span there."
+          "reason": "Client-only: the fold groups browser-side Chat nodes and starts no Host work."
+        }
+      ]
+    },
+    {
+      "id": "view-mode",
+      "title": "Choose Summary, Normal or Verbose for tool work",
+      "summary": "Settings › General › View mode: Summary folds every turn’s tool work under one row, Normal folds finished turns, Verbose keeps every call open. Without a saved choice a touch phone gets Summary and other browsers Normal. The Agent reads it with transcript_view_get and sets or clears it with transcript_view_set (Chat’s own chat-view API on the same dshfiles-chat field), only when the user asked.",
+      "surfaces": ["client", "settings", "tool", "api"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: general › view mode",
+      "configuration": [
+        {
+          "key": "transcriptView",
+          "defaultValue": "detailed",
+          "constraints": "compact (Summary), detailed (Normal), verbose (Verbose); standard and legacy normal/expanded stay accepted. Without a saved value a coarse pointer gets compact; detailed is the default elsewhere.",
+          "choices": ["compact", "detailed", "verbose", "standard"],
+          "coveredBy": ["chat.view-mode-contract"]
+        }
+      ],
+      "states": ["device-default", "summary", "normal", "verbose"],
+      "failureModes": ["A read-only profile refuses transcript_view_set with SettingsReadOnly; the Settings row keeps the local choice for the session."],
+      "externalDependencies": [],
+      "reach": ["click button \"Settings\"", "expect text \"View mode\""],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.view-mode-contract",
+          "file": "plugins/@dshfiles/chat/tests/transcript-view-modes.test.ts",
+          "testName": "defaults to Summary on a touch phone, Normal in other browsers and Standard in the desktop app"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.transcript-view-tools",
+          "file": "plugins/@dshfiles/chat/tests/transcript-view-host.test.ts",
+          "testName": "reads the saved mode, saves another at the revision it read, and clears it back to the device default"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "chat.view-mode-browser",
+          "reason": "Walked in scratch DSH vr-p2 (visual refresh P2): each mode captured at 1440x900 WebKit light/dark and 390x844 WebKit. No Gherkin scenario yet."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "find-in-thread",
+      "title": "Find text anywhere in a long thread",
+      "summary": "⌘F in a thread (or Find in thread in its ⋯ menu, the phone's way in) opens a find bar: it asks session-search's index for every match in the whole thread, shows \"n of N\" counted from the newest, steps with ↵ (older) and ⇧↵ (newer), pages an unloaded Turn in, opens the Worked for fold, folded prompt or closed tool row that hides the match and highlights it. A second ⌘F while its field has focus is the browser's find. Without the index (not installed, thread not indexed yet) it searches the loaded Turns and says so; a failed search shows the reason and Retry.",
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: find bar over the thread",
+      "configuration": [],
+      "states": ["closed", "searching", "matches", "no-match", "loaded-only", "failed"],
+      "failureModes": [
+        "A thread whose newest events have not reached the index yet (about half a second behind) finds them only after the index catches up.",
+        "A match inside a tool row's output that the row does not render lands on the row with an outline instead of a text highlight."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed tool-call-thread",
+        "expect text \"Tool finished.\"",
+        "click textbox \"Message or run a task*\"",
+        "press ControlOrMeta+KeyF",
+        "fill searchbox \"Find in thread\" \"tool\"",
+        "expect text \"1 of*\""
+      ],
+      "onboarding": {
+        "firstAction": "Press Cmd+F (Ctrl+F elsewhere) in a thread and type a word.",
+        "doneWhen": "The thread jumps to each match, older history included.",
+        "open": {
+          "command": "@dshfiles/chat.find"
+        }
+      },
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.find-numbering",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "starts at the newest match above the reader, numbers from the newest and wraps both ways"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.find-turn-of",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "maps an event to its Turn by turn/start sequence (binary search, and linear when a sequence is missing)"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.find-loaded-rows",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "counts loaded-window matches per innermost row, including rows inside folds"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.find-in-thread",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "chat.find-browser",
+          "reason": "Walked in a scratch DSH on a seeded 200-turn thread (productivity pass q4): a match in turn 5's folded command output found from the tail, light, dark and phone WebKit, with find-to-highlight time in the perf table."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "turn-map",
+      "title": "Typed turn map with filters and Turn keys",
+      "summary": "The turn rail marks each Turn by what happened: a question (accent), a failure (danger), an edit (muted fill) or a plain prompt; a band shows the Turns on screen; previous / next buttons and [ / ] (or ⌥↑ / ⌥↓) step between Turns of the current filter (All, Questions, Errors, Edits). The facts come from turn-summary's whole-log projection, so unloaded Turns are typed too. On a phone or a narrow pane, Turns in the thread ⋯ menu opens a bottom sheet listing every prompt with its kind and the same filters; tapping one jumps there.",
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: turn rail and Turns sheet",
+      "configuration": [],
+      "states": ["all", "filtered", "sheet-open"],
+      "failureModes": [
+        "Without turn-summary (or on a Host that has not reloaded it) every mark reads as a plain prompt and the filters other than All are empty."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed tool-call-thread",
+        "expect text \"Tool finished.\"",
+        "click button \"More thread actions\"",
+        "click menuitem \"Turns\"",
+        "expect text \"Turns\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.turn-kind",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "lets the strongest fact win: failed, then question, then edited, else a plain prompt"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.turn-rail-kinds",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "types every Turn, loaded or not, and keeps the outline sequence for a loaded Turn"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "chat.turn-map-browser",
+          "reason": "Walked in a scratch DSH on a seeded 200-turn thread (productivity pass q4): rail with Errors filter on desktop, Turns sheet with filters on phone WebKit 390×844."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the rail and sheet render a session projection the Host already serves and start no Host work."
+        }
+      ]
+    },
+    {
+      "id": "since-you-left",
+      "title": "Since you left: divider and recap above the first unseen Turn",
+      "summary": "When a thread opens with Turns that finished while the user was away (its unread record, read before opening clears it), a divider marks the first unseen Turn and one card above it says what happened: \"3 turns · 7 files +120 −14 · 1 failed · 1 question waiting\", with chips that jump to each failed or questioning Turn and to the Turn that wrote each file. Built from turn-summary's facts, no model call; dismissible; never drawn for Turns already seen.",
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: divider above the first unseen Turn",
+      "configuration": [],
+      "states": ["shown", "dismissed", "none"],
+      "failureModes": ["A record written before this release knows only its newest finish, so the recap covers that one Turn."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.since-recap",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "starts at the Turn of the first unseen finish and sums files, lines, failures and open questions"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.since-newest-only",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "without a first-unread sequence covers only the newest finished Turn, and nothing before any Turn"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "chat.since-browser",
+          "reason": "Walked in a scratch DSH (productivity pass q4): three Turns finished while another thread was open; reopening drew the divider and recap, light, dark and phone WebKit."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the recap folds a session projection and a handed-over unread record; it starts no Host work."
+        }
+      ]
+    },
+    {
+      "id": "run-folds",
+      "title": "Runs of background jobs and subagents fold into one summary row",
+      "summary": "Two or more consecutive background-job or subagent rows fold into one row: \"4 background jobs · 1 failed · 2 running · 1 done · longest 4m 10s\", \"3 subagents · 2 working · 1 finished\", or one combined row when both kinds stand together. The row keeps live state (phase-synced spinner, the oldest running job's time on the shared second clock) and expands on click or Enter to the individual rows, each still expandable for output and its Stop/Open verbs; the choice holds while the page lives. A failed job or a subagent that needs you keeps its own row outside the fold, counted in red or indigo right after the total so a narrow row never truncates it. One row never folds; Verbose shows every row. Kinds come from the TranscriptRunFolds registry (`@dshfiles/chat/run-folds`), filled by background-jobs and thread-sidebar; without providers nothing folds.",
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: summary row in place of the first row of the run",
+      "configuration": [],
+      "states": ["folded", "expanded", "problem-pinned", "verbose-unfolded"],
+      "failureModes": [
+        "A job that fails after its tool call settled stays outside the run fold, but the turn's own Worked for fold still hides it until opened: that fold is decided from the tool result, which reported success.",
+        "Runs are split by any other row between them (an assistant note, a different tool); same-turn rows that are not adjacent do not fold together."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.run-fold-partition",
+          "file": "plugins/@dshfiles/chat/src/run-fold-model.test.ts",
+          "testName": "folds a run of consecutive claimed rows"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.run-fold-single",
+          "file": "plugins/@dshfiles/chat/src/run-fold-model.test.ts",
+          "testName": "leaves a single claimed row alone"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.run-fold-problems",
+          "file": "plugins/@dshfiles/chat/src/run-fold-model.test.ts",
+          "testName": "never hides a problem, even collapsed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.run-fold-verbose",
+          "file": "plugins/@dshfiles/chat/src/run-fold-model.test.ts",
+          "testName": "folds nothing when the view mode does not fold (Verbose)"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.run-fold-mixed",
+          "file": "plugins/@dshfiles/chat/src/run-fold-model.test.ts",
+          "testName": "names each kind of a mixed run with its noun"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "chat.run-fold-browser",
+          "reason": "Walked in scratch DSH folds (transcript folds): a turn starting four background jobs (two running, one done, one failed) and one starting three subagents, folded and expanded, light, dark and phone WebKit 390 and 375."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the fold groups browser-side Chat rows from provider state already in the page; it starts no Host work."
         }
       ]
     },
@@ -383,7 +635,7 @@
         "click button \"dshx_fake_commandcode/gpt-6-luna*\"",
         "click text \"Effort\"",
         "click text \"High\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Say hello\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Say hello\"",
         "press Enter",
         "expect note \"Effort*\""
       ],
@@ -435,7 +687,7 @@
         "A saved reading position in this tab wins over the unread landing; a running thread always follows its tail."
       ],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or threads\""],
       "verification": [
         {
           "kind": "unit-test",

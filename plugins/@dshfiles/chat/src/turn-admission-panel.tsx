@@ -44,15 +44,12 @@ export const TurnAdmissionSettingsRow = (): JSX.Element | null => {
     if (parsed !== saved.maxRunningThreads) save.mutate({ ...saved, maxRunningThreads: parsed })
   }
   return (
-    <div
-      className="dshx-root dshx:flex dshx:flex-col dshx:gap-3 dshx:border-b-[0.5px] dshx:border-border dshx:py-4"
-      data-settings-entry="running-threads-limit"
-    >
+    <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-3 dshx:border-b dshx:border-border dshx:py-4" data-settings-entry="running-threads-limit">
       <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-6">
         <label htmlFor="dshfiles-running-threads-limit" className="dshx:min-w-0">
-          <span className="dshx:block dshx:text-[14px] dshx:leading-5">Running threads limit</span>
-          <span className="dshx:mt-1 dshx:block dshx:text-[12px] dshx:leading-[18px] dshx:text-muted-foreground">
-            New turns wait for a free slot once this many threads run. 0 means no limit.
+          <span className="dshx:block dshx:text-sm">Running threads limit</span>
+          <span className="dshx:mt-1 dshx:block dshx:text-xs dshx:text-muted-foreground">
+            Once this many threads run, a new turn waits to start. 0 means no limit.
           </span>
         </label>
         <Input
@@ -61,7 +58,7 @@ export const TurnAdmissionSettingsRow = (): JSX.Element | null => {
           inputMode="numeric"
           min={0}
           max={64}
-          className="dshx:h-11 dshx:w-20 dshx:shrink-0"
+          className="dshx:w-20 dshx:shrink-0"
           value={limit}
           disabled={save.isPending}
           onChange={event => setLimit(event.currentTarget.value)}
@@ -72,7 +69,7 @@ export const TurnAdmissionSettingsRow = (): JSX.Element | null => {
         />
       </div>
       <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-6">
-        <label htmlFor="dshfiles-running-threads-subagents" className="dshx:min-w-0 dshx:text-[13px]">
+        <label htmlFor="dshfiles-running-threads-subagents" className="dshx:min-w-0 dshx:text-sm">
           Subagents take a slot
         </label>
         <Switch
@@ -91,7 +88,18 @@ export const TurnAdmissionSettingsRow = (): JSX.Element | null => {
   )
 }
 
-/** Above the composer: this thread's turn waits for a free slot, with how many start first and a way past the limit. */
+/** The waiting line: "Waits to start · 2 ahead · 3 of 3 running". */
+export const waitingLine = (input: { readonly ahead: number; readonly running: number; readonly limit: number }): string =>
+  `Waits to start · ${String(input.ahead)} ahead · ${String(input.running)} of ${String(input.limit)} running`
+
+/**
+ * Settings › General, where the running threads limit lives; false when no Settings shell took the request. Raw
+ * `dshfiles:open-settings` event, not settings-shell's helper: settings-shell already depends on chat through editor.
+ */
+const openGeneralSettings = (): boolean =>
+  !window.dispatchEvent(new CustomEvent('dshfiles:open-settings', { detail: { section: 'general', query: 'Running threads limit' }, cancelable: true }))
+
+/** Above the composer: this thread's turn waits to start, with how many start first and a way past the limit. */
 export const TurnAdmissionDock = (props: { readonly sessionId: string }): JSX.Element | null => {
   const api = useApi(turnAdmissionApi)
   const snapshot = useResource(turnAdmissionApi, 'snapshot', {}, TURN_ADMISSION_READ)
@@ -107,18 +115,27 @@ export const TurnAdmissionDock = (props: { readonly sessionId: string }): JSX.El
     <div
       role="status"
       data-turn-admission-waiting=""
-      className="dshx-root dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-3 dshx:py-1.5 dshx:text-xs"
+      className="dshx-root dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-3 dshx:py-1.5 dshx:text-xs"
     >
-      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-        Waiting for a free slot · {waiting.ahead} ahead · {data.running}/{data.policy.maxRunningThreads} running
-      </span>
-      <Button size="sm" variant="outline" className="dshx:min-h-11 dshx:shrink-0" disabled={start.isPending} onClick={() => start.mutate()}>
-        Start now
-      </Button>
-      {start.isError ? (
-        <span role="alert" className="dshx:text-destructive">
-          {errorMessage(start.error, 'Could not start.')}
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:tabular-nums">
+          {waitingLine({ ahead: waiting.ahead, running: data.running, limit: data.policy.maxRunningThreads })}
         </span>
+        <Button size="sm" variant="outline" className="dshx:shrink-0" disabled={start.isPending} onClick={() => start.mutate()}>
+          {start.isError ? 'Try again' : 'Start now'}
+        </Button>
+      </div>
+      {start.isError ? (
+        <p role="alert" className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:text-destructive">
+          <span className="dshx:min-w-0">{errorMessage(start.error, 'This turn could not start past the limit.')}</span>
+          <span className="dshx:text-muted-foreground">
+            Try again, or raise the limit in{' '}
+            <Button className="dshx:h-auto dshx:p-0 dshx:text-xs" onClick={openGeneralSettings} size="sm" variant="link">
+              Settings › General
+            </Button>
+            .
+          </span>
+        </p>
       ) : null}
     </div>
   )

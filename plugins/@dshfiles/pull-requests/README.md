@@ -2,6 +2,8 @@
 
 ![Create a GitHub pull request from a thread](docs/screenshots/github-pull-request-create.png)
 
+![Open PR from the Land card: the preview names what blocks publishing and how to fix it](docs/screenshots/land-card-open-pr.png)
+
 Forge integration that creates a pull request or merge request from a DSH thread, links it to the thread, watches it, and reports meaningful state changes through the thread sidebar. GitHub uses `gh`; GitLab uses `glab` behind the same forge port (`src/forge-port.ts`), so link, watch, create and the composer `#` picker work on both. In the browser, the command palette's **Create pull request from this thread** opens a dialog: it previews the repository, bookmark, base and commits, shows a title and body drafted from the thread that you can edit, lists every blocker with its fix, and pushes and creates only when you confirm. The result links the pull request to the thread and starts watching it. The plugin exposes these Agent tools:
 
 - `pull_request_link` — link by GitHub PR URL or GitLab merge-request URL, or by number and repository `cwd`.
@@ -12,6 +14,13 @@ Forge integration that creates a pull request or merge request from a DSH thread
 - `pull_request_create` — after the preview, with `confirm: true` and the preview's `headCommitId`: sets the bookmark on that commit, runs `jj git push --remote <remote> --bookmark <name>`, then `gh pr create` (or reuses the open PR for the bookmark), and links and watches the PR on the thread.
 
 ## Creating a pull request from a thread
+
+Two ways in, one dialog: the palette's **Create pull request**, and **Open PR** beside Land on the Changes facet's
+Land card ([diffs-review](../diffs-review/README.md)), which this plugin adds through diffs-review's
+`land-card-actions` registry (this plugin depends on diffs-review, never the reverse). Both open the preview below and
+publish only from its confirm button. Once a pull request is linked to the thread, the card shows `#N`, its state and
+its CI checks ("1 of 4 checks failed" in the failure colour) instead of the button, read from the links this plugin
+already watches; the agent reads the same with `pull_request_list`.
 
 The preview changes nothing. It reads the thread's directory from its stored header and its title from the title index; only when the model drafts the description does it read the conversation (a bounded window of the newest messages and the last model route). It runs `gh auth status`, `gh repo view` and `gh pr list --head`, and reads jj: the remote (`origin` first), the base branch (`gh`'s default branch at that remote), and the commits from `<base>@<remote>` to the working copy (an empty, undescribed working-copy commit is skipped). The bookmark is an existing local bookmark on the head commit, else `dsh/<thread-title-slug>`.
 
@@ -34,6 +43,10 @@ Create reads only the thread's directory (none at all when `cwd` is passed), nev
 - Uses the installed `gh` (GitHub) or `glab` (GitLab) executable and its existing login. It never reads, prints, or stores an authentication token. GitHub Enterprise hosts are not supported; any https GitLab host is.
 - GitLab: a bare `owner/name` repository key is GitHub (the same keys older records hold), and a dotted first segment names a forge host (`gitlab.com/group/sub/project`). Repository and merge-request URLs are parsed strictly (https only, no userinfo, `/-/merge_requests/<n>`); other hosts are refused with a message naming the supported forges. `glab mr view --output json` is decoded into the same normalized view the GitHub watcher stores: `detailed_merge_status`/`merge_status` map mergeability, `blocking_discussions_resolved` and conflicts map to BLOCKED, `head_pipeline.status` becomes one `pipeline` check entry, and `approvals_required` maps the review decision. `glab mr create --yes` creates the merge request; the push is the same `jj git push` as GitHub.
 - Verify GitLab on a host with `glab` installed: `glab auth status`, then `pnpm --dir plugins/@dshfiles/pull-requests test` covers parsing and normalization, and `link`/`watch` need a real merge-request URL.
+- Typing `#` in the composer lists recent GitHub issues and pull requests of the thread's repository. When `gh` is
+  missing or signed out, the list shows one recovery row instead (“Sign in with gh auth login to list issues”);
+  choosing it copies the command (or the install link) and inserts nothing. A folder with no GitHub remote is not a
+  forge, so the list stays empty there. `pull_request_search` reports the same reason to the agent.
 - Watching polls immediately. After that, Host events refresh a thread's watched pull requests within a debounce (3 seconds by default): a `jj git push`, `git push`, `gh pr create|merge|ready|close|reopen` or `glab mr …` command returning in that thread, the end of one of its turns, or a new link to a pull request that another thread watches. A pull request checked in the last 20 seconds is skipped, so a push and the turn end after it cost one read. A slow sweep polls every watched pull request every ten minutes by default as the fallback for changes made outside DSH. Multiple linked threads and backlog items watching the same repository and PR share one read per poll; every GitHub pull request of one pass is read in batched GraphQL calls (see [GitHub API budget](#github-api-budget)). Links, last-known state, and rate-limit backoff persist in the Host `StorageDomain`.
 - Measured by the probe in `tests/refresh-triggers.spec.ts` (five watched pull requests, one hour, two pushes): the former two-minute sweep made 150 `gh pr view` calls and saw a push up to two minutes late; the event-driven watcher makes 32 and sees each push within the 3-second debounce.
 - Settings (namespace `dshfiles-pull-requests`, applied live): `refreshOnThreadEvents` (default on; off leaves only the sweep), `eventDebounceSeconds` (default 3, 1–60), `sweepMinutes` (default 10, 1–120; lower it when event refresh is off), `githubPointsFloor` (default 500, 0–4,900; see below). Each burst and each sweep reads them again, so a change applies without a restart; a Host older than this namespace runs on these defaults.

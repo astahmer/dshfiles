@@ -54,6 +54,8 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   'dshfiles-new-thread': { group: 'projects', order: 0 },
   'dshfiles-network-access': { group: 'hosts', order: 20 },
   plugins: { group: 'plugins', order: 0 },
+  // thread-sidebar's Update DSH (fetch, What's new, sync and rebuild, then Restart when idle).
+  'dshfiles-update-dsh': { group: 'about', label: 'Update DSH', order: 5 },
   // dshmarket's own settings section: the community catalog, a full page of its own. Unplaced, it landed under "Other".
   market: { group: 'plugins', label: 'Plugin Market', order: 10 },
 }
@@ -61,6 +63,8 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
 /** Settings namespaces (Loader row ids), including DSH core rows that only have a package name for a title. */
 const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   // General
+  // The theme owner (`@dshfiles/ui-styles`) serves the fields; Settings only places them (no dependency on the owner).
+  'dshfiles-ui-styles': { group: 'general', label: 'Appearance', order: 1 },
   'dshfiles-settings-shell': { group: 'general', label: 'Settings', order: 90 },
   'thread-sidebar': { group: 'general', entry: 'thread-sidebar' },
   'dshfiles-frame-layout': { group: 'general', entry: 'dshfiles-status-bar' },
@@ -253,12 +257,10 @@ const pageTitle = (page: PluginSettingsPage): string => {
 }
 
 /**
- * Single fields that belong to another task than the rest of their namespace: Layout (fixed rail or free docking) is
- * stored by the thread sidebar but is a General choice (plan §4.6).
+ * Single fields that belong to another task than the rest of their namespace (plan §4.6). Empty since the one sidebar
+ * layout (b:952m) retired Layout (fixed rail or free docking), the only one; kept for the next such field.
  */
-const PROMOTED_FIELDS: ReadonlyArray<{ readonly ns: string; readonly key: string; readonly entry: string; readonly title: string }> = [
-  { ns: 'thread-sidebar', key: 'layoutMode', entry: 'general', title: 'Layout' },
-]
+const PROMOTED_FIELDS: ReadonlyArray<{ readonly ns: string; readonly key: string; readonly entry: string; readonly title: string }> = []
 
 /** The namespace holding the one Jev key (this plugin's own settings). */
 const SHARED_JEV_NAMESPACE = 'dshfiles-settings-shell'

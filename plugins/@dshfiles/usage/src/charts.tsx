@@ -23,16 +23,16 @@ const TOKEN_KINDS = ['Input', 'Cache read', 'Cache write', 'Output'] as const
 const purposeLabelsByKey = new Map(Object.entries(UsageFormattingModel.purposeLabels))
 
 const Panel = (props: { readonly title: string; readonly description?: string; readonly className?: string; readonly children: ReactNode }): JSX.Element => (
-  <ChartFrame title={props.title} description={props.description} className={cn('dshx:rounded-lg dshx:border dshx:p-3', props.className)}>
+  <ChartFrame title={props.title} description={props.description} className={cn('dshx:border-t dshx:border-border dshx:pt-4', props.className)}>
     {props.children}
   </ChartFrame>
 )
 
 const Tile = (props: { readonly label: string; readonly value: string; readonly detail?: ReactNode }): JSX.Element => (
-  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:px-3 dshx:py-2">
+  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:py-1">
     <span className="dshx:text-xs dshx:text-muted-foreground">{props.label}</span>
     <span className="dshx:text-base dshx:font-semibold dshx:tabular-nums">{props.value}</span>
-    {props.detail === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{props.detail}</span>}
+    {props.detail === undefined ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.detail}</span>}
   </div>
 )
 

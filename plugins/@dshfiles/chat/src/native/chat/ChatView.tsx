@@ -1,15 +1,14 @@
 // An enclosing `[data-conversation-scroll]` owns scrolling when present;
 // otherwise this view owns it. Each row subscribes to one stable node key.
 
+import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   NodeKey, RenderEntry,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
-import {
-  Button, classifyLinkPath, IconChevronDownOutlineRegular, MarkdownDelegateProvider, Modal,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, classifyLinkPath, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@dshfiles/plugin-ui/components/image-lightbox'
 import { endInteractionAfterPaint } from '@dshfiles/dshx/tracing/client'
 import { isAtOrOutside } from '../contract/group-tree.ts'
@@ -20,11 +19,18 @@ import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { AnnotateSelection } from './AnnotateSelection.tsx'
 import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
+import { chatRenderKey } from './render-entry.ts'
 import { ConversationViewOpenerContext, useChatFocus } from '../../chat-focus-reveal.ts'
 import { InlineReferenceScope } from '../../inline-references.tsx'
-import { mergeTurnRailItems, turnStarts } from './turn-rail-items.ts'
-import { TranscriptFind } from '../../transcript-find.ts'
-import { TranscriptFindBar } from '../../transcript-find-bar.tsx'
+import { mergeTurnRailItems } from './turn-rail-items.ts'
+import { TurnMarksModel, type TurnMarkFilter } from '../../turn-marks.ts'
+import { SinceYouLeftModel, ThreadToolsModel, type SinceYouLeftNote } from '../../thread-tools.ts'
+import { ChatViewRegistry } from './chat-view-registry.ts'
+import { ThreadFindBar } from './ThreadFindBar.tsx'
+import { ThreadFindModel } from './thread-find-model.ts'
+import { TurnsSheet } from './TurnsSheet.tsx'
+import { SinceYouLeftRecapModel } from './since-you-left.ts'
+import { SinceYouLeftCard, SinceYouLeftContext, type SinceYouLeftPlacement } from './SinceYouLeftCard.tsx'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
 import { ImagePreviewRequestModel, type ImagePreview } from '../../image-preview-request.ts'
@@ -92,29 +98,13 @@ export function ChatView({
   // Host-computed whole-log outline; the merge is view-layer only (the
   // conversation snapshot never carries projection values).
   const turnOutline = useProjection('turnOutline')
+  // dshfiles (productivity pass T4.2): per-Turn question / failure / edit facts, served by turn-summary's Host fold.
+  const turnMarksValue = useProjection(TurnMarksModel.key)
+  const turnMarks = useMemo(() => TurnMarksModel.byTurn(turnMarksValue), [turnMarksValue])
   const railItems = useMemo(
-    () => mergeTurnRailItems(turnNavigationItems, turnOutline),
-    [turnNavigationItems, turnOutline],
+    () => mergeTurnRailItems(turnNavigationItems, turnOutline, turnMarks),
+    [turnNavigationItems, turnOutline, turnMarks],
   )
-  const findTurnStarts = useMemo(() => turnStarts(turnOutline), [turnOutline])
-  // 0 while the find bar is closed; each `Find in thread` request bumps it so the bar selects its text again.
-  const [findRequest, setFindRequest] = useState(0)
-  const frameRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { setFindRequest(0) }, [sessionId])
-  useEffect(() => {
-    const target = { frame: () => frameRef.current, open: () => setFindRequest(request => request + 1) }
-    const unregister = TranscriptFind.register(target)
-    const frame = frameRef.current
-    const touch = (): void => { TranscriptFind.touch(target) }
-    frame?.addEventListener('focusin', touch)
-    frame?.addEventListener('pointerdown', touch)
-    return () => {
-      unregister()
-      frame?.removeEventListener('focusin', touch)
-      frame?.removeEventListener('pointerdown', touch)
-    }
-  }, [])
-  const closeFind = useCallback(() => { setFindRequest(0) }, [])
   const inbox = useProjection('inbox') as InboxState | undefined
   // Workspace root off the session list row: path summaries display relative to it.
   const cwd = useSessions(s => s.byId[sessionId]?.cwd)
@@ -345,27 +335,223 @@ export function ChatView({
   })
   const flowContext = useMemo<ChatFlowHookContext>(() => ({ motion: scroll.motion }), [scroll.motion])
 
+  // dshfiles (productivity pass Q4): long-thread tools — find, the typed turn map, the Turns sheet, Since you left.
+  const frameRef = useRef<HTMLDivElement>(null)
+  const listElement = useCallback(() => scroll.listRef.current, [scroll.listRef])
+  const navigateToTurn = scroll.navigateToTurn
+  const activeTurn = scroll.activeTurn
+  const [turnFilter, setTurnFilter] = useState<TurnMarkFilter>('all')
+  useEffect(() => { setTurnFilter('all') }, [sessionId])
+  const filterCounts = useMemo(() => {
+    const counts: Record<TurnMarkFilter, number> = { all: railItems.length, questions: 0, errors: 0, edits: 0 }
+    for (const item of railItems) {
+      if (TurnMarksModel.matches('questions', item.kind, item.mark)) counts.questions += 1
+      if (TurnMarksModel.matches('errors', item.kind, item.mark)) counts.errors += 1
+      if (TurnMarksModel.matches('edits', item.kind, item.mark)) counts.edits += 1
+    }
+    return counts
+  }, [railItems])
+  const shownRailItems = useMemo(
+    () => (turnFilter === 'all' ? railItems : railItems.filter(item => TurnMarksModel.matches(turnFilter, item.kind, item.mark))),
+    [railItems, turnFilter],
+  )
+  /** Jump to a Turn; one the window has not mounted pages in through its `turn/start` sequence. */
+  const jumpToTurn = useCallback((turn: number) => {
+    const item = railItems.find(candidate => candidate.turn === turn)
+    if (item === undefined) return
+    const mounted = scroll.columnRef.current?.querySelector(`[data-chat-turn="${String(turn)}"]`) != null
+    navigateToTurn(!mounted && item.seq !== null ? { ...item, anchor: { kind: 'unloaded', seq: item.seq } } : item)
+  }, [railItems, navigateToTurn, scroll.columnRef])
+  const stepTurn = useCallback((direction: 'previous' | 'next'): boolean => {
+    const target = direction === 'previous'
+      ? shownRailItems.findLast(item => activeTurn === null || item.turn < activeTurn)
+      : shownRailItems.find(item => activeTurn !== null && item.turn > activeTurn)
+    if (target === undefined) return false
+    jumpToTurn(target.turn)
+    return true
+  }, [shownRailItems, activeTurn, jumpToTurn])
+  // The Turns on screen, for the rail's band; read from the top-level rows after each scroll frame.
+  const [inView, setInView] = useState<{ readonly first: number; readonly last: number } | null>(null)
+  useEffect(() => {
+    const column = scroll.columnRef.current
+    const list = scroll.listRef.current
+    if (column === null || list === null) return
+    let frame = 0
+    const measure = (): void => {
+      frame = 0
+      const scroller = list.closest<HTMLElement>('[data-conversation-scroll]') ?? list
+      const bounds = scroller.getBoundingClientRect()
+      let first = Number.POSITIVE_INFINITY
+      let last = Number.NEGATIVE_INFINITY
+      for (const row of column.querySelectorAll<HTMLElement>(':scope > [data-chat-turn]')) {
+        const rect = row.getBoundingClientRect()
+        if (rect.height === 0 || rect.bottom <= bounds.top || rect.top >= bounds.bottom) continue
+        const turn = Number(row.dataset.chatTurn)
+        if (!Number.isFinite(turn)) continue
+        first = Math.min(first, turn)
+        last = Math.max(last, turn)
+      }
+      const next = Number.isFinite(first) ? { first, last } : null
+      setInView(current => (current?.first === next?.first && current?.last === next?.last ? current : next))
+    }
+    const schedule = (): void => {
+      if (frame === 0) frame = requestAnimationFrame(measure)
+    }
+    schedule()
+    document.addEventListener('scroll', schedule, { capture: true, passive: true })
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null
+    observer?.observe(column)
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame)
+      document.removeEventListener('scroll', schedule, { capture: true })
+      observer?.disconnect()
+    }
+  }, [scroll.columnRef, scroll.listRef, sessionId, scroll.initialized])
+
+  // Find: rows of each loaded Turn with their first sequence, so a hit maps to the row that renders it.
+  const rowsByTurn = useMemo(() => {
+    const rows = new Map<number, { key: string; seq: number }[]>()
+    for (const key of order) {
+      const node = nodeStore.get(key)
+      const location = node?.location
+      if (node === undefined || (location?.kind !== 'turn' && location?.kind !== 'step')) continue
+      const turn = location.turn.turn
+      const list = rows.get(turn) ?? []
+      list.push({ key, seq: node.anchorSeq })
+      rows.set(turn, list)
+    }
+    return rows
+  }, [order, nodeStore])
+  const rowsRef = useRef(rowsByTurn)
+  rowsRef.current = rowsByTurn
+  // A finished Turn keeps its work out of the order until its "Worked for" opens: an event of that work resolves to
+  // the process row, whose toggle the reveal opens; once its rows load, the same lookup lands on the real row.
+  const rowFor = useCallback((turn: number, seq: number, type: string | undefined) => {
+    const rows = rowsRef.current.get(turn) ?? []
+    const key = ThreadFindModel.rowFor(rows, seq)
+    if (key === null || type === undefined || type === 'user/message') return key
+    if (nodeStore.get(key as NodeKey)?.kind !== 'user') return key
+    return rows.find(row => nodeStore.get(row.key as NodeKey)?.kind === 'turn-process')?.key ?? key
+  }, [nodeStore])
+  const railRef = useRef(railItems)
+  railRef.current = railItems
+  const activeRef = useRef(activeTurn)
+  activeRef.current = activeTurn
+  const readerSeq = useCallback((): number | null => {
+    const items = railRef.current
+    const index = items.findIndex(item => item.turn === activeRef.current)
+    const next = index === -1 ? undefined : items[index + 1]
+    return next?.seq === null || next?.seq === undefined ? null : next.seq - 1
+  }, [])
+  const [find, setFind] = useState<{ readonly open: boolean; readonly focus: number }>({ open: false, focus: 0 })
+  const openFind = useCallback(() => { setFind(current => ({ open: true, focus: current.focus + 1 })) }, [])
+  const closeFind = useCallback(() => {
+    setFind(current => ({ ...current, open: false }))
+    frameRef.current?.querySelector<HTMLElement>('[data-chat-flow]')?.focus({ preventScroll: true })
+  }, [])
+  useEffect(() => { setFind(current => (current.open ? { ...current, open: false } : current)) }, [sessionId])
+  // The sheet mounts the first time it opens (and stays, for its closing animation): a closed sheet costs nothing.
+  const [turnsSheet, setTurnsSheet] = useState<'unmounted' | 'open' | 'closed'>('unmounted')
+  const openTurns = useCallback(() => { setTurnsSheet('open') }, [])
+  const setTurnsOpen = useCallback((open: boolean) => { setTurnsSheet(open ? 'open' : 'closed') }, [])
+  useEffect(() => { setTurnsSheet('unmounted') }, [sessionId])
+  // The thread `⋯` menu (and ⌘F / [ / ] through the registry) reach this view.
+  const stepRef = useRef(stepTurn)
+  stepRef.current = stepTurn
+  useEffect(() => {
+    const unregister = ChatViewRegistry.register({
+      sessionId,
+      root: () => frameRef.current,
+      openFind,
+      findFocused: () => frameRef.current?.querySelector('[data-thread-find]')?.contains(document.activeElement) === true,
+      stepTurn: direction => stepRef.current(direction),
+      openTurns,
+    })
+    const take = (): void => {
+      const tool = ThreadToolsModel.take(sessionId)
+      if (tool === 'find') openFind()
+      else if (tool === 'turns') openTurns()
+    }
+    take()
+    const stop = ThreadToolsModel.listen(sessionId, take)
+    return () => {
+      stop()
+      unregister()
+    }
+  }, [sessionId, openFind, openTurns])
+
+  // Since you left: the unread record the opening surface handed over before clearing it.
+  const [sinceNote, setSinceNote] = useState<SinceYouLeftNote | null>(null)
+  useLayoutEffect(() => {
+    setSinceNote(SinceYouLeftModel.take(sessionId))
+    return SinceYouLeftModel.listen(sessionId, () => {
+      const note = SinceYouLeftModel.take(sessionId)
+      if (note !== null) setSinceNote(note)
+    })
+  }, [sessionId])
+  const recap = useMemo(() => (sinceNote === null ? null : SinceYouLeftRecapModel.recap(railItems, sinceNote)), [sinceNote, railItems])
+  const dismissSince = useCallback(() => { setSinceNote(null) }, [])
+  const entryTurn = useCallback((entry: RenderEntry): number | undefined => {
+    const key = entry.kind === 'node' ? entry.key : groupMembers(entry.key)[0]
+    const location = key === undefined ? undefined : nodeStore.get(key as NodeKey)?.location
+    return location?.kind === 'turn' || location?.kind === 'step' ? location.turn.turn : undefined
+  }, [groupMembers, nodeStore])
+  const sincePlacement = useMemo<SinceYouLeftPlacement | null>(() => {
+    if (recap === null) return null
+    const before = transcript.entries.find(entry => (entryTurn(entry) ?? -1) >= recap.firstTurn)
+    if (before === undefined) return null
+    // Opening at the final answer (the default): the recap sits right above that answer, the landing position, when the
+    // latest Turn ended with one; a failed or questioning Turn keeps it above the first unseen Turn.
+    const latest = railItems.at(-1)
+    const atAnswer = unreadLanding === 'final-answer' && !running && latest !== undefined && latest.kind !== 'failed' && latest.kind !== 'question'
+    return {
+      beforeKey: chatRenderKey(before),
+      element: <SinceYouLeftCard recap={recap} onJump={jumpToTurn} onDismiss={dismissSince} t={t} />,
+      ...(atAnswer ? { answerTurn: latest.turn } : {}),
+    }
+  }, [recap, transcript.entries, entryTurn, jumpToTurn, dismissSince, t, railItems, unreadLanding, running])
+
   return (
     <div ref={frameRef} className={css.frame}>
       <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t} />
-      {findRequest > 0 && (
-        <TranscriptFindBar
-          sessionId={sessionId}
-          listRef={scroll.listRef}
-          turnStarts={findTurnStarts}
-          focusRequest={findRequest}
-          onClose={closeFind}
-        />
-      )}
       {scroll.initialized && (
         <TurnNavigator
-          items={railItems}
+          items={shownRailItems}
           activeTurn={scroll.activeTurn}
           busyTurn={scroll.busyTurn}
           onNavigate={scroll.navigateToTurn}
           t={t}
+          filter={turnFilter}
+          filterCounts={filterCounts}
+          onFilterChange={setTurnFilter}
+          inView={inView}
+          onStep={stepTurn}
         />
       )}
+      {find.open && (
+        <ThreadFindBar
+          sessionId={sessionId}
+          focusRequest={find.focus}
+          onClose={closeFind}
+          list={listElement}
+          anchors={railItems}
+          rowFor={rowFor}
+          revealTurn={jumpToTurn}
+          readerSeq={readerSeq}
+          t={t}
+        />
+      )}
+      {turnsSheet !== 'unmounted' && <TurnsSheet
+        open={turnsSheet === 'open'}
+        onOpenChange={setTurnsOpen}
+        items={railItems}
+        activeTurn={scroll.activeTurn}
+        filter={turnFilter}
+        counts={filterCounts}
+        onFilterChange={setTurnFilter}
+        onNavigate={item => { jumpToTurn(item.turn) }}
+        t={t}
+      />}
       <div className={css.root} data-chat-following-tail={scroll.followingTail ? '' : undefined}>
         <div ref={scroll.listRef} className={css.scroll}>
           <div ref={scroll.columnRef} className={css.column} data-chat-flow=""
@@ -384,10 +570,12 @@ export function ChatView({
             <MarkdownDelegateProvider openFile={requestOpenImageAwareFile} openExternalLink={requestOpenMarkdownExternalLink} fileImages={fileImages}>
               <InlineReferenceScope sessionId={sessionId} cwd={cwd}>
               <ConversationViewOpenerContext.Provider value={openView}>
+              <SinceYouLeftContext.Provider value={sincePlacement}>
                 {renderSlot('conversation.chat.flow', {
                   entries: transcript.entries, pendingInputs, lastInputTurn, deferCollapse,
                   cwd, openFile: requestOpenImageAwareFile, inspectCall, forkAt, loadImage, useProjection, fileMentions,
                 }, { hookContext: flowContext })}
+              </SinceYouLeftContext.Provider>
               </ConversationViewOpenerContext.Provider>
               </InlineReferenceScope>
             </MarkdownDelegateProvider>
@@ -407,7 +595,7 @@ export function ChatView({
             aria-label={t('chat.toBottom')}
             onClick={scroll.returnToBottom}
           >
-            <IconChevronDownOutlineRegular />
+            <ChevronDownIcon size={14} strokeWidth={1.5} />
           </button>
         </div>
       )}

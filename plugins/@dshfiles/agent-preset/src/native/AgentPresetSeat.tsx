@@ -23,6 +23,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { AgentPresetSeatState } from './seat-store.ts'
 import { presetDisplayText } from './locales.ts'
 import { requiresCodingTools } from './settings-store.ts'
+import { AgentPresetMenuRequests } from './menu-requests.ts'
 import css from './AgentPresetSeat.module.css'
 
 /** Registration-side business face for the hero chip. */
@@ -136,6 +137,9 @@ export function AgentPresetSeat({
     return () => { window.clearTimeout(done) }
   }, [state.introduce, ready, label, introduced])
 
+  // The composer ⋯ menu's "Agent mode…" row (b:4v6p) opens this menu even while the composer hides the chip.
+  useEffect(() => (main ? AgentPresetMenuRequests.subscribe(() => { setOpen(true) }) : undefined), [main])
+
   // A refused initial composition still needs its Toast when there is no chip to show.
   if (!main) return null
 
@@ -190,6 +194,9 @@ export function AgentPresetSeat({
           <button
             type="button"
             className={css.seat}
+            // The composer hides a chip that keeps the default unless its menu is open (b:4v6p).
+            data-agent-preset-default={state.current !== '' && state.current === state.defaultPreset ? '' : undefined}
+            data-agent-preset-open={open && options.length > 0 ? '' : undefined}
             aria-haspopup="menu"
             aria-expanded={open && options.length > 0}
             title={(typeof state.error === 'object' ? state.error?.reason : state.error) ?? t('seatHint')}

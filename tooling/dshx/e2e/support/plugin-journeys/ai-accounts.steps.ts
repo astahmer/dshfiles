@@ -293,15 +293,13 @@ Then('the account dashboard reference screens fit desktop mobile and dark layout
         const strip = page.getByRole('group', { name: /^AI accounts usage/ })
         const healthy = strip.getByRole('button', { name: /^Command Code Work:/ })
         const exhausted = strip.getByRole('button', { name: /^Command Code Personal:/ })
-        await expect(exhausted).toHaveClass(/dshx:bg-destructive\/10/u)
+        // A reached limit says so in red words in its compact segment (b:hbtt): no box, same height as a healthy account.
+        await expect(exhausted.locator('[data-quota-tone="critical"]')).toHaveText('limit')
+        await expect(exhausted.locator('[data-quota-tone="critical"]')).toHaveClass(/dshx:text-destructive/u)
         const healthyHeight = await healthy.evaluate(element => element.getBoundingClientRect().height)
-        const paintedHeight = await exhausted.evaluate(element => ({
-          height: element.getBoundingClientRect().height,
-          background: getComputedStyle(element).backgroundColor,
-        }))
+        const exhaustedHeight = await exhausted.evaluate(element => element.getBoundingClientRect().height)
         expect(healthyHeight).toBeGreaterThan(0)
-        expect(paintedHeight.height).toBe(healthyHeight)
-        expect(paintedHeight.background).not.toBe('rgba(0, 0, 0, 0)')
+        expect(exhaustedHeight).toBe(healthyHeight)
         await page
           .getByRole('group', { name: /^AI accounts usage/ })
           .screenshot({ path: test.info().outputPath(`sidebar-account-settings-${width}.png`), animations: 'disabled' })
@@ -478,7 +476,7 @@ const applyExistingReference = async (page: Page, ref: string): Promise<void> =>
 const sidebarAddOrigins = new WeakMap<Page, string>()
 
 When('the sidebar add-account shortcut is opened from the composer', async ({ page }: { page: Page }) => {
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill('Keep this unsent draft while connecting an account.')
   sidebarAddOrigins.set(page, page.url())
   await page.getByRole('button', { name: 'Add AI account', exact: true }).click()
@@ -564,7 +562,7 @@ Then('account setup closes without navigating away or losing the composer draft'
     await emptyAccountStore(page)
     expect(page.url()).toBe(sidebarAddOrigins.get(page))
     await expect(providerAccounts(page)).toHaveCount(0)
-    await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toHaveText(
+    await expect(page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })).toHaveText(
       'Keep this unsent draft while connecting an account.',
     )
   })
@@ -678,7 +676,7 @@ Then('all restored methods remain provisional and cancelled connections add no a
 })
 
 When('a provider request fails because its credential is missing', async ({ page }: { page: Page }) => {
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill('Verify inline recovery for missing provider credentials.')
   await page.getByRole('button', { name: 'Send message', exact: true }).click({ timeout: 10_000 })
   await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 30_000 })
@@ -1011,10 +1009,10 @@ Then('the account shows the session and weekly windows the provider reports', as
   await recordAssertion(page, 'ai-accounts-quota-windows-follow-the-provider', async () => {
     await expect(page.getByRole('progressbar', { name: 'Current session remaining', exact: true })).toBeVisible()
     await expect(page.getByRole('article', { name: 'Current session: 75% left', exact: true })).toBeVisible()
-    await expect(page.getByText(/^Resets in (59|60)m$/)).toBeVisible()
+    await expect(page.getByText(/^Resets in (?:59|60) min$/u)).toBeVisible()
     await expect(page.getByRole('progressbar', { name: 'Weekly limit remaining', exact: true })).toBeVisible()
     await expect(page.getByRole('article', { name: 'Weekly limit: 10% left', exact: true })).toBeVisible()
-    await expect(page.getByText(/^Resets in 2d \d+h$/)).toBeVisible()
+    await expect(page.getByText(/^Resets in 2 d \d+ h$/u)).toBeVisible()
   })
   await recordAssertion(page, 'ai-accounts-sidebar-foot-shows-the-tightest-window', () =>
     expect(page.getByRole('button', { name: /^Command Code 1: Weekly limit: 10% left, resets in 2d \d+h$/ })).toBeVisible(),
@@ -1068,6 +1066,27 @@ const selectAccountModel = async (page: Page, model: string): Promise<void> => {
 }
 
 const usageStrip = (page: Page) => page.getByRole('group', { name: /^AI accounts usage/ })
+/**
+ * The strip shows every enabled account that fits (b:hbtt), so both Command Code tiles are normally there already; a
+ * strip too narrow for both gets them pinned, as a user does from the popover: right-click › Pin to the status bar.
+ */
+const keepBothAccountsInStrip = async (page: Page): Promise<void> => {
+  const tiles = usageStrip(page).getByRole('button', { name: /^Command Code [12]:/u })
+  if ((await tiles.count()) >= 2) return
+  await usageStrip(page).getByRole('button').first().click()
+  for (const name of ['Command Code 1', 'Command Code 2']) {
+    const card = page
+      .locator('[data-radix-popper-content-wrapper] article')
+      .filter({ has: page.getByText(name, { exact: true }) })
+      .first()
+    await card.click({ button: 'right' })
+    const keep = page.getByRole('menuitem', { name: 'Pin to the status bar', exact: true })
+    if (await keep.isVisible().catch(() => false)) await keep.click()
+    else await page.keyboard.press('Escape')
+  }
+  await page.keyboard.press('Escape')
+  await expect(tiles).toHaveCount(2)
+}
 const stripMeter = (page: Page) => usageStrip(page).getByRole('button', { name: /^Command Code 1: Weekly limit/ })
 const expectActiveAccount = async (page: Page, accountId: string): Promise<void> => {
   const active = usageStrip(page).locator('[data-active-account]')
@@ -1084,7 +1103,7 @@ When('two healthy threads use different accounts', async ({ page }: { page: Page
     await page.getByRole('button', { name: 'New session', exact: true }).first().click()
     await page.getByRole('button', { name: /^Select model/ }).click()
     await selectAccountModel(page, `${accountId}/gpt-6-luna`)
-    const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+    const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
     await composer.fill(`Verify the source of chat ${answer}.`)
     await composer.press('Enter')
     await expect(page.getByText(`Answered by ${answer}`, { exact: true }).last()).toBeVisible({ timeout: 30_000 })
@@ -1142,6 +1161,7 @@ Then('the sidebar moves the current thread between accounts without the model pi
   }
   const expectAccountOrder = async (): Promise<void> => {
     expect(await readSavedAccounts(page)).toEqual(expectedAccounts)
+    await keepBothAccountsInStrip(page)
     const tiles = usageStrip(page).getByRole('button', { name: /^Command Code [12]:/u })
     await expect(tiles).toHaveCount(2)
     await expect(tiles.nth(0)).toHaveAttribute('aria-label', /^Command Code 1:/u)
@@ -1204,7 +1224,7 @@ Then('the sidebar moves the current thread between accounts without the model pi
   const ask = async (accountId: string, answer: string, question: string, model = 'gpt-6-luna'): Promise<void> => {
     const before = turns().length
     const previousAnswers = await page.getByText(`Answered by ${answer}`, { exact: true }).count()
-    const composer = page.getByRole('textbox', { name: /\/ commands, @ files or sessions$/u })
+    const composer = page.getByRole('textbox', { name: /\/ commands, @ files or (?:threads|sessions)$/u })
     await composer.fill(question)
     await composer.press('Enter')
     await expect(page.getByText(`Answered by ${answer}`, { exact: true })).toHaveCount(previousAnswers + 1, { timeout: 30_000 })
@@ -1253,7 +1273,7 @@ Then('the sidebar moves the current thread between accounts without the model pi
       for (const width of [360, 480]) {
         await page.setViewportSize({ width, height: 900 })
         // A phone-width frame folds the status strip into one Status chip whose sheet lists the usage strip.
-        const statusChip = page.getByRole('button', { name: 'Status', exact: true })
+        const statusChip = page.getByRole('button', { name: /^Status(?::|$)/u })
         await expect(statusChip).toBeVisible()
         if ((await statusChip.getAttribute('aria-expanded')) !== 'true') await statusChip.click()
         await openSwitch(1)
@@ -1368,7 +1388,7 @@ Then('the sidebar moves the current thread between accounts without the model pi
     // is sent: stock prompt-preparation compaction is separate from the dialog's advisory-only behavior.
     const retainedDetail = 'retain this detail '.repeat(6_000).trimEnd()
     const before = turns().length
-    const composer = page.getByRole('textbox', { name: /\/ commands, @ files or sessions$/u })
+    const composer = page.getByRole('textbox', { name: /\/ commands, @ files or (?:threads|sessions)$/u })
     await composer.fill(`Keep this detail in our conversation. [[answer ${retainedDetail}]]`)
     await composer.press('Enter')
     const retainedHistory = page.getByText(/^retain this detail /u)
@@ -1412,7 +1432,10 @@ Then('the sidebar moves the current thread between accounts without the model pi
 })
 
 Then('the usage strip shows its short name, renamed from AI Accounts settings', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'ai-accounts-strip-shows-initials-by-default', () => expect(stripMeter(page)).toContainText('CC'))
+  // A compact status-strip segment (b:hbtt) names the account by its initials; a short name the user sets replaces them.
+  await recordAssertion(page, 'ai-accounts-strip-shows-the-name-by-default', async () => {
+    await expect(stripMeter(page)).toContainText('CC1')
+  })
   await openSettingsDialog(page)
   await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
   await expect(page.getByRole('switch', { name: 'Short names in the strip', exact: true })).toBeChecked()
@@ -1426,7 +1449,11 @@ Then('the usage strip shows its short name, renamed from AI Accounts settings', 
 Then("the strip's context menu hides and shows short names", async ({ page }: { page: Page }) => {
   await stripMeter(page).click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Hide short names', exact: true }).click()
-  await recordAssertion(page, 'ai-accounts-strip-hides-short-names', () => expect(stripMeter(page)).not.toContainText('WRK'))
+  // Short names off: the segment names the account in full again (b:hbtt).
+  await recordAssertion(page, 'ai-accounts-strip-hides-short-names', async () => {
+    await expect(stripMeter(page)).not.toContainText('WRK')
+    await expect(stripMeter(page)).toContainText('Command')
+  })
   await stripMeter(page).click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Show short names', exact: true }).click()
   await recordAssertion(page, 'ai-accounts-strip-shows-short-names-again', () => expect(stripMeter(page)).toContainText('WRK'))
@@ -1495,31 +1522,31 @@ const expectDisabledQuotaPreview = async (page: Page): Promise<void> => {
   const tile = disabledPreview(page)
   await expect(tile).toBeVisible()
   await expect(tile).toBeEnabled()
-  await expect(tile).toHaveClass(/dshx:opacity-50/u)
   await expect(tile).toHaveAttribute('aria-label', /^Command Code 1: Weekly limit: 10% left, resets in 2d 23h\. OFF(?:\.|$)/u)
-  await expect(tile.getByText('10%', { exact: true })).toBeVisible()
-  await expect(tile.getByText('↻ 2d 23h', { exact: true })).toBeVisible()
-  const off = tile.getByText('OFF', { exact: true })
-  const shortName = off.locator('..').locator(':scope > span').first()
-  await expect(off).toBeVisible()
-  await expect(shortName).toBeVisible()
-  await expect(shortName).not.toHaveText(/^(?:OFF)?$/u)
-  for (const text of [shortName, off, tile.getByText('10%', { exact: true }), tile.getByText('↻ 2d 23h', { exact: true })]) {
-    await expect(text).toHaveClass(/dshx:text-muted-foreground/u)
-    expect(await text.evaluate(element => getComputedStyle(element).color)).toBe(await off.evaluate(element => getComputedStyle(element).color))
+  if ((await tile.locator('[data-quota-off]').count()) > 0) {
+    // The desktop strip's compact segment (b:hbtt): the account that is off is dimmed and reads "off"; its numbers are
+    // in the tooltip and the accessible name.
+    const words = tile.getByText('off', { exact: true })
+    await expect(words).toBeVisible()
+    await expect(words).toHaveClass(/dshx:text-\(--dsw-alias-label-tertiary\)/u)
+    await expect(tile.getByText('CC1', { exact: true })).toBeVisible()
+  } else {
+    // The phone sheet's quiet line keeps a disabled account's numbers, muted, with OFF after them (polish pass b:r4et).
+    const left = tile.getByText('10% left', { exact: true })
+    const off = tile.getByText('OFF', { exact: true })
+    await expect(left).toBeVisible()
+    await expect(off).toBeVisible()
+    await expect(tile.getByText('Command Code 1', { exact: true })).toBeVisible()
+    await expect(left).toHaveClass(/dshx:text-\(--dsw-alias-label-tertiary\)/u)
+    await expect(off).toHaveClass(/dshx:text-muted-foreground/u)
+    const leftBounds = await left.boundingBox()
+    const offBounds = await off.boundingBox()
+    expect(leftBounds).not.toBeNull()
+    expect(offBounds).not.toBeNull()
+    expect(offBounds?.x ?? 0).toBeGreaterThan(leftBounds?.x ?? 0)
   }
-  const nameBounds = await shortName.boundingBox()
-  const offBounds = await off.boundingBox()
-  const tileBounds = await tile.boundingBox()
-  expect(nameBounds).not.toBeNull()
-  expect(offBounds).not.toBeNull()
-  expect(tileBounds).not.toBeNull()
-  expect(offBounds?.x).toBe(nameBounds?.x)
-  expect(offBounds?.y).toBeGreaterThanOrEqual((nameBounds?.y ?? 0) + (nameBounds?.height ?? 0))
-  expect((offBounds?.y ?? 0) + (offBounds?.height ?? 0)).toBeLessThanOrEqual((tileBounds?.y ?? 0) + (tileBounds?.height ?? 0) + 1)
-  expect(await off.evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(9)
   await expect(tile).not.toContainText('Disabled')
-  // The status strip row (or its phone sheet row) stays one line: the preview keeps OFF inside it instead of growing it.
+  // The status strip row (or its phone sheet row) stays one line: OFF sits inside it instead of growing it.
   expect(
     await tile.evaluate(element => {
       const row = element.closest('[role="listitem"], [data-status-strip="full"]')?.getBoundingClientRect()
@@ -1568,8 +1595,8 @@ const expectDisabledPopoverQuota = async (page: Page): Promise<void> => {
     await expect(meter).toBeVisible()
     expect(await meter.locator('[data-slot="progress-indicator"]').evaluate(element => getComputedStyle(element).backgroundColor)).toBe(mutedColor)
   }
-  await expect(card.getByText(/^Resets in (59|60)m$/u)).toBeVisible()
-  await expect(card.getByText('Resets in 2d 23h', { exact: true })).toBeVisible()
+  await expect(card.getByText(/^Resets in (?:59|60) min$/u)).toBeVisible()
+  await expect(card.getByText('Resets in 2 d 23 h', { exact: true })).toBeVisible()
   await expect(card.getByText('Disabled', { exact: true })).toHaveCount(0)
 }
 const expectPreviewOrder = async (page: Page): Promise<void> => {
@@ -1704,7 +1731,7 @@ Then('usage popover toggles persist enabled state without hiding or reordering a
           await page.keyboard.press('Escape')
           await page.setViewportSize({ width, height: 900 })
           // A phone-width frame folds the status strip into one Status chip whose sheet lists the items.
-          const statusChip = page.getByRole('button', { name: 'Status', exact: true })
+          const statusChip = page.getByRole('button', { name: /^Status(?::|$)/u })
           await expect(statusChip).toBeVisible()
           if ((await statusChip.getAttribute('aria-expanded')) !== 'true') await statusChip.click()
           await expectDisabledQuotaPreview(page)
@@ -1788,6 +1815,7 @@ const quotaAccountCard = (page: Page, name: string) =>
     .locator('article')
     .filter({ has: page.getByText(name, { exact: true }) })
 const expectCanonicalQuotaOrder = async (page: Page): Promise<void> => {
+  await keepBothAccountsInStrip(page)
   const tiles = usageStrip(page).getByRole('button', { name: /^Command Code [12]:/u })
   await expect(tiles).toHaveCount(2)
   await expect(tiles.nth(0)).toHaveAttribute('aria-label', /^Command Code 2:/u)
@@ -1816,7 +1844,8 @@ Then('an expired quota login keeps its sidebar identity without inventing a perc
   await expect.poll(() => fakeQuotaReads(page, unavailableAccountKey)).toBeGreaterThan(beforeReads)
   await recordAssertion(page, 'ai-accounts-unavailable-sidebar-remains-visible', async () => {
     await expect(unavailableTile(page)).toBeVisible()
-    await expect(unavailableTile(page)).toContainText('Sign in again')
+    // The compact segment says "sign in" (b:hbtt); its accessible name and tooltip keep "Sign in again".
+    await expect(unavailableTile(page)).toContainText('sign in')
     await expect(unavailableTile(page)).not.toContainText('%')
     await expect(unavailableTile(page).getByRole('progressbar')).toHaveCount(0)
     await expectCanonicalQuotaOrder(page)
@@ -2086,7 +2115,7 @@ When("a new thread asks the first account's model a question", async ({ page }: 
   await page.getByRole('button', { name: /^Select model/ }).click()
   await selectAccountModel(page, 'commandcode_work/gpt-6-luna')
   await expect(page.getByRole('button', { name: /^Select model, current commandcode_work\/gpt-6-luna/ })).toBeVisible()
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill('Which account answers?')
   await composer.press('Enter')
 })
@@ -2125,7 +2154,7 @@ When("a new thread asks the second account's model a question", async ({ page }:
   await page.getByRole('button', { name: /^Select model/ }).click()
   await selectAccountModel(page, 'commandcode_work_2/gpt-6-luna')
   await expect(page.getByRole('button', { name: /^Select model, current commandcode_work_2\/gpt-6-luna/ })).toBeVisible()
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill('Which account answers first?')
   await composer.press('Enter')
 })
@@ -2142,7 +2171,7 @@ Then('the first account is tried, the healthy one answers, and the next request 
     await expectActiveAccount(page, 'commandcode_work_2')
   })
   const before = turnKeys().length
-  const composer = page.getByRole('textbox', { name: /\/ commands, @ files or sessions$/ })
+  const composer = page.getByRole('textbox', { name: /\/ commands, @ files or (?:threads|sessions)$/ })
   await composer.fill('And the next request?')
   await composer.press('Enter')
   await recordAssertion(page, 'ai-accounts-priority-skips-the-cooling-account', async () => {
@@ -2161,20 +2190,13 @@ const composerPicker = (page: Page) => page.getByRole('button', { name: /, reaso
 const fallbacks = (page: Page) => page.getByRole('region', { name: 'Fallbacks', exact: true })
 
 const pickAccountModel = async (page: Page, account: string): Promise<void> => {
-  const dialog = page.getByRole('dialog')
-  const accountChip = dialog.getByRole('button', { name: account, exact: true })
-  if ((await accountChip.count()) > 0) {
-    await accountChip.click()
-    await expect(accountChip).toHaveAttribute('aria-pressed', 'true')
-    return
-  }
+  // b:16yr: the list shows one row per model; the detail panel's Account chips choose the account.
   const modelList = page.getByRole('list', { name: 'Models and accounts', exact: true })
-  const row = modelList.locator('[data-model-picker-row]').filter({
-    has: page.getByRole('button', { name: `Use gpt-6-luna via Command Code (${account})`, exact: true }),
-  })
-  await row.locator('[data-model-picker-option]').click()
-  await expect(row.locator('[data-model-picker-option]')).toHaveAttribute('aria-pressed', 'true')
+  const row = modelList.locator('[data-model-picker-row]').filter({ hasText: 'gpt-6-luna' }).first()
   await row.getByRole('button', { name: /Details for/iu }).click()
+  const chip = page.getByLabel('Available accounts').getByRole('button', { name: account, exact: true })
+  await chip.click()
+  await expect(chip).toHaveAttribute('aria-pressed', 'true')
 }
 
 When('a new thread falls back from the first account to the third one in the composer picker', async ({ page }: { page: Page }) => {
@@ -2189,7 +2211,7 @@ When('a new thread falls back from the first account to the third one in the com
 })
 
 When('the thread asks a question', async ({ page }: { page: Page }) => {
-  const composer = page.getByRole('textbox', { name: /\/ commands, @ files or sessions$/ })
+  const composer = page.getByRole('textbox', { name: /\/ commands, @ files or (?:threads|sessions)$/ })
   await composer.fill('Who takes over?')
   await composer.press('Enter')
 })
@@ -2240,7 +2262,7 @@ const failTurnOnExhaustedAccount = async (page: Page, key: string): Promise<void
   } else {
     await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   }
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.waitFor({ state: 'visible', timeout: 15_000 })
   await page.getByRole('button', { name: /^Select model/ }).click()
   await selectAccountModel(page, 'commandcode_work/gpt-6-luna')

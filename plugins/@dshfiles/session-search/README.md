@@ -54,12 +54,14 @@ The freeze, the baseline and the decisions behind this backend are in [Host loop
 
 `sessionQuery.searchEvents` ranks and keeps the best event per Session, which suits a palette but not a find bar that
 walks one thread top to bottom. The `findInThread` method of this plugin's `session-search` API (agent tool
-`thread_find`, read-only) returns every current-surface event of one Session whose indexed text has all the typed words,
+`session_find_in_thread`, read-only) returns every current-surface event of one Session whose indexed text has all the typed words,
 in seq order, with a short snippet:
 
 - Each word is quoted, so punctuation and FTS5 operators stay literal; the last word matches as a prefix, so results
   follow typing. Text with no letter or digit returns nothing.
 - The default limit is 200 and the most is 1 000; `hasMore` says when a thread has more.
+- `newest: true` keeps the newest `limit` matches instead of the oldest (still in seq order): Chat's find bar starts
+  from the tail, so it asks for the newest 500.
 - An archived Session is indexed for that request, as a targeted search is.
 - A match is one event: several hits inside one tool output count once. Core's text extraction leaves model thinking
   out of the index, and tool payloads are capped at 8 KB per event, so neither a thought nor a hit past that cap is

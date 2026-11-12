@@ -1,3 +1,5 @@
+import { PaletteMath, type StandaloneColours } from '@dshfiles/plugin-ui/theme/palette'
+
 /**
  * The share page and the static export: one self-contained HTML document with inline CSS, no script, no external
  * resource and no link back into DSH. Every transcript character is HTML-escaped before the few markup rules
@@ -39,16 +41,22 @@ const renderMessage = (text: string): string => {
   return parts.map((part, index) => (index % 2 === 1 ? `<pre><code>${escapeHtml(part.replace(/\n$/, ''))}</code></pre>` : prose(part))).join('')
 }
 
+/** The exported page cannot read the Host variables: it carries the generated default palette (DESIGN.md › Colors). */
+const LIGHT = PaletteMath.standaloneColours('light')
+const DARK = PaletteMath.standaloneColours('dark')
+const pageVariables = (colours: StandaloneColours): string =>
+  `--bg:${colours.panel};--fg:${colours.text};--muted:${colours.muted};--card:${colours.bg};--border:${colours.line};--user:${colours.accentBg};--code:${colours.raised};--danger:${colours.danger}`
+
 const STYLE = `
-:root{color-scheme:light dark;--bg:#fafafa;--fg:#18181b;--muted:#71717a;--card:#fff;--border:#e4e4e7;--user:#eef2ff;--code:#f4f4f5}
-@media (prefers-color-scheme:dark){:root{--bg:#09090b;--fg:#fafafa;--muted:#a1a1aa;--card:#18181b;--border:#27272a;--user:#1e1b4b;--code:#27272a}}
+:root{color-scheme:light dark;${pageVariables(LIGHT)}}
+@media (prefers-color-scheme:dark){:root{${pageVariables(DARK)}}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 main{max-width:46rem;margin:0 auto;padding:1.5rem 1rem 4rem}h1{font-size:1.25rem;margin:0 0 .25rem}
 .meta{color:var(--muted);font-size:.8rem;margin:0 0 1.5rem}.msg{border:1px solid var(--border);border-radius:.75rem;padding:.75rem 1rem;margin:0 0 .75rem;background:var(--card);overflow-wrap:anywhere}
 .msg.user{background:var(--user)}.role{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 .25rem}
 .msg p{margin:.4rem 0}pre{background:var(--code);padding:.6rem .75rem;border-radius:.5rem;overflow-x:auto;font-size:.85rem}code{font:.85em ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);padding:0 .2em;border-radius:.25em}pre code{padding:0;background:none}
 .note{color:var(--muted);font-size:.8rem;border-top:1px solid var(--border);padding-top:1rem;margin-top:2rem}form{display:flex;flex-direction:column;gap:.75rem;max-width:22rem}
-input{font:inherit;padding:.5rem .75rem;border:1px solid var(--border);border-radius:.5rem;background:var(--card);color:var(--fg)}button{font:inherit;padding:.5rem .75rem;border:0;border-radius:.5rem;background:var(--fg);color:var(--bg);cursor:pointer}.error{color:#dc2626}
+input{font:inherit;padding:.5rem .75rem;border:1px solid var(--border);border-radius:.5rem;background:var(--card);color:var(--fg)}button{font:inherit;padding:.5rem .75rem;border:0;border-radius:.5rem;background:var(--fg);color:var(--bg);cursor:pointer}.error{color:var(--danger)}
 `
 
 /** Seconds between reloads of a live page; long enough that a reader does not hammer the rate limit. */

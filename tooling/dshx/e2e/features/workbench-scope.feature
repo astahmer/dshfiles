@@ -8,6 +8,7 @@ Feature: Workbench window scope
   @scenario:main-tabs.cross-project-chooser
   Scenario: Selecting existing conversations from different projects preserves the ordinary New tab
     Given an isolated two-project Workbench scope profile is booted
+    And the sidebar keeps the former Free docking panes
     And two real projects have conversations in a legacy mixed Workbench scene
     When the already-open other-project conversation is selected
     Then the same chooser order pins and conversation drafts survive project-crossing switches and reload

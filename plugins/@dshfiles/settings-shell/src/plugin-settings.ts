@@ -39,7 +39,8 @@ export class SettingsPluginPages {
 
   /**
    * One page per namespace with at least one visible setting: titled by its bundle's manifest, else its schema, else
-   * its id. Namespaces without a page of their own are the "Plugins" group; the rest, whose plugins draw native pages,
+   * its id. The description is the schema's own when it has one (written for this form), else the manifest's, whose
+   * fallback is the package description written for developers. Namespaces without a page of their own are the "Plugins" group; the rest, whose plugins draw native pages,
    * are "More settings", so search can still reach every field.
    */
   static pluginSettingsPages = (input: {
@@ -58,7 +59,7 @@ export class SettingsPluginPages {
             pageId: SettingsPluginPages.pluginPageId(namespace.ns),
             ns: namespace.ns,
             title: label?.title || own.title || SettingsSchemaModel.humanizeKey(namespace.ns.replace(/^dshfiles-/u, '')),
-            description: label?.description || own.description,
+            description: own.description || label?.description || '',
             group: namespace.autoGenerate ? ('plugins' as const) : ('more' as const),
             fields,
             modifiedPaths: fields.filter(field => SettingsSchemaModel.hasValueAt(namespace.user, field.path)).map(field => field.path.join('.')),

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CatalogFeature, CatalogReachStep } from './catalog-model.js'
 import { PHONE_QUERY, ReachModel, type FeatureReach } from './reach-model.js'
 import type { RouteServices } from './routes.js'
-import { ShowMeWhere } from './show-me-where.js'
+import { ShowMeWhere, WalkUnreadable } from './show-me-where.js'
 
 const click = (by: string, name: string): CatalogReachStep => ({ text: `click ${by} "${name}"`, action: 'click', by, name, value: null })
 const expectStep = (by: string, name: string): CatalogReachStep => ({ text: `expect ${by} "${name}"`, action: 'expect', by, name, value: null })
@@ -100,5 +100,26 @@ describe('onboarding_reach output', () => {
     expect(desktopOnly).not.toContain('Phone')
     expect(desktopOnly).toContain('1. Click "Knowledge" (tab)')
     expect(ReachModel.stepsFor({ reach: reachOf(PHONE_REACH), phone: false }).length).toBe(3)
+  })
+})
+
+describe('WalkUnreadable', () => {
+  afterEach(cleanup)
+
+  it('says what failed in plain words and offers Try again and End', () => {
+    const onRetry = vi.fn()
+    const onEnd = vi.fn()
+    render(<WalkUnreadable onEnd={onEnd} onRetry={onRetry} />)
+    const card = screen.getByRole('alert')
+    expect(card.textContent).not.toMatch(/Host|onboarding plugin/u)
+    expect(card.dataset.walkPhase).toBe('unreadable')
+    // The walk card's kit surface: popover radius and s2, no viewport breakpoint.
+    expect(card.className).toContain('dshx:rounded-xl')
+    expect(card.className).toContain('dshx:shadow-s2')
+    expect(card.className).not.toMatch(/max-sm:|z-\[/u)
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    fireEvent.click(screen.getByRole('button', { name: 'End' }))
+    expect(onRetry).toHaveBeenCalledOnce()
+    expect(onEnd).toHaveBeenCalledOnce()
   })
 })

@@ -2,9 +2,10 @@
  * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2 (MIT): `DesktopUpdateIndicator.js` and
  * `desktop-update-source.js`. Optional Electron update status; the native shell owns actions and Web owns copy.
  */
+import { DownloadIcon, LoaderCircleIcon } from '@dshfiles/plugin-ui/icons'
 import type { DesktopUpdateBridge, DesktopUpdatePresentation, DesktopUpdateView } from '@deepseek-ai/dsh-client-ui-settings-general/types'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { IconDownloadOutlineRegular, IconLoadingOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useSyncExternalStore } from 'react'
 import * as Schema from 'effect/Schema'
 import * as Option from 'effect/Option'
@@ -151,7 +152,7 @@ export const DesktopUpdateIndicator = (props: {
       <button
         aria-disabled={busy}
         aria-label={label}
-        className="dshx:box-border dshx:inline-grid dshx:h-7 dshx:flex-none dshx:cursor-pointer dshx:grid-cols-[14px_max-content] dshx:items-center dshx:gap-x-1 dshx:rounded-[var(--dsw-radius-sm)] dshx:border dshx:border-[color-mix(in_srgb,var(--dsw-alias-brand-primary-new-colorprimary-new-color)_20%,transparent)] dshx:bg-[color-mix(in_srgb,var(--dsw-alias-brand-primary-new-colorprimary-new-color)_8%,transparent)] dshx:px-2 dshx:text-left dshx:text-[12px] dshx:leading-[18px] dshx:font-medium dshx:whitespace-nowrap dshx:text-[var(--dsw-alias-brand-primary-new-colorprimary-new-color)] dshx:aria-disabled:cursor-default"
+        className="dshx:box-border dshx:inline-grid dshx:h-7 dshx:flex-none dshx:cursor-pointer dshx:grid-cols-[14px_max-content] dshx:items-center dshx:gap-x-1 dshx:rounded-md dshx:border dshx:border-[color-mix(in_srgb,var(--dsw-alias-brand-primary-new-colorprimary-new-color)_20%,transparent)] dshx:bg-[color-mix(in_srgb,var(--dsw-alias-brand-primary-new-colorprimary-new-color)_8%,transparent)] dshx:px-2 dshx:text-left dshx:text-xs dshx:leading-[18px] dshx:font-medium dshx:whitespace-nowrap dshx:text-[var(--dsw-alias-brand-primary-new-colorprimary-new-color)] dshx:aria-disabled:cursor-default"
         onClick={() => {
           if (!busy) props.source.open()
         }}
@@ -161,9 +162,9 @@ export const DesktopUpdateIndicator = (props: {
           {error ? (
             <span className="dshx:size-1.5 dshx:rounded-full dshx:bg-current" />
           ) : busy ? (
-            <IconLoadingOutlineRegular className="dshx:animate-spin dshx:motion-reduce:animate-none" size={14} />
+            <LoaderCircleIcon strokeWidth={1.5} className="dshx:animate-spin dshx:motion-reduce:animate-none" size={14} />
           ) : (
-            <IconDownloadOutlineRegular size={14} />
+            <DownloadIcon strokeWidth={1.5} size={14} />
           )}
         </span>
         <span>{label}</span>

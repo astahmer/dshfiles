@@ -5,7 +5,7 @@ import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const TEST_RUNS_DIRECTORY = join(DSHFILES_ROOT, 'plugins/@dshfiles/test-runs')
 const RUN_TESTS_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'cd . && pnpm exec vitest run src/vitest-report.test.ts', description: 'Run the test-runs Vitest suite' })}]]`
 
@@ -19,13 +19,13 @@ When('the fake model runs the test-runs Vitest suite in the selected workspace',
 })
 
 Then('the finished tool call shows a Vitest results card', async ({ page }: { page: Page }) => {
-  await expect(page.getByRole('status').filter({ hasText: /^(Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
   const card = page.locator('[data-chat-call-id]').first()
   const commandGroup = page.getByText('Ran commands', { exact: true }).last()
   const testCardToggle = card.getByRole('button', { name: /^Ran tests\b/ })
   if (!(await commandGroup.isVisible())) {
     await page
-      .getByText(/^Completed in /)
+      .getByText(/^Worked for /)
       .last()
       .click()
     await expect(commandGroup).toBeVisible({ timeout: 20_000 })

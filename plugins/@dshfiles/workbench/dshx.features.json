@@ -4,8 +4,8 @@
     {
       "id": "conversation-header",
       "title": "Keep the original conversation toolbar and child views inside each thread",
-      "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and thread actions, and native Chat/Trajectory/Traces/Requests navigation when those providers are present. The original header child has one declarer behind a reusable owned Factory, shared with native mode; no borrowed renderer or global-following duplicate is used. Native selected views drive the existing content/composer instead of a forced Chat view. The original right-sidebar opener uses the registered Workbench dock actions, not the hidden native carrier. Outer Workbench tab layout, original blank hero and independent view-only panels retain their owners. The optional producer-owned ConversationScope contract wraps this occurrence's resident header and composer together; without a provider both Factories render unchanged.",
-      "reach": ["seed tool-call-thread", "expect button \"More thread actions\"", "expect tab \"Chat\"", "expect tab \"Trajectory\""],
+      "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and one thread actions `⋯` whose Open Trajectory/Traces/Requests items open those views as thread-panel facets (productivity pass Q5: no view tabs in the header; the stage is always Chat). The original header child has one declarer behind a reusable owned Factory, shared with native mode; no borrowed renderer or global-following duplicate is used. The title keeps its room: header chips shrink and leave from the start edge before it truncates. The original right-sidebar opener uses the registered Workbench dock actions, not the hidden native carrier. Outer Workbench tab layout, original blank hero and independent view-only panels retain their owners. The optional producer-owned ConversationScope contract wraps this occurrence's resident header and composer together; without a provider both Factories render unchanged.",
+      "reach": ["seed tool-call-thread", "click button \"More thread actions\"", "expect menuitem \"Open Traces\""],
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -109,14 +109,14 @@
     {
       "id": "single-tab-rows",
       "title": "Hide a single tab row without hiding its view",
-      "summary": "Right-click the sole tab or blank row space and choose Hide tab row. Its original docked content and input stay mounted; a hover/keyboard Show tab row control and the global Workbench: Show tab rows command recover it. Native hideHeader persists in the existing layout JSON. A second tab added or dropped into the content reveals the row and clears the hidden preference; returning to one tab does not automatically hide it. Multiple-tab groups cannot be hidden.",
+      "summary": "Right-click the sole tab or blank row space and choose Hide tab row. Its original docked content and input stay mounted; a hover/keyboard Show tab row control and the global Show tab rows command recover it. Native hideHeader persists in the existing layout JSON. A second tab added or dropped into the content reveals the row and clears the hidden preference; returning to one tab does not automatically hide it. Multiple-tab groups cannot be hidden.",
       "reach": [
-        "rightclick tab \"Thread Sidebar: Threads\"",
+        "rightclick tab \"Threads\"",
         "click menuitem \"Hide tab row\"",
         "hover button \"Search threads\"",
         "expect button \"Show tab row\"",
         "click button \"Show tab row\"",
-        "expect tab \"Thread Sidebar: Threads\""
+        "expect tab \"Threads\""
       ],
       "surfaces": ["client", "storage", "integration"],
       "surface": "infrastructure",
@@ -165,20 +165,15 @@
       "id": "sidebar-preview-tab",
       "title": "Account Preview is a regular movable docked view",
       "summary": "The existing footer.above assembly is seated once as an ordinary left Workbench tab, preserving the real account preview owner and actions. Existing saved placements in any root/nested region win; moving or explicitly closing it never creates a duplicate or resurrects it on reload. Reset layout can restore the default. Native brand/account toolbar and update notices remain fixed; a standalone Sidebar without the Workbench override retains its old preview fallback.",
-      "reach": [
-        "expect tab \"AI Accounts: Preview\"",
-        "rightclick tab \"AI Accounts: Preview\"",
-        "click menuitem \"Hide tab row\"",
-        "expect button \"Add AI account\""
-      ],
+      "reach": ["expect tab \"Quota\"", "rightclick tab \"Quota\"", "click menuitem \"Hide tab row\"", "expect button \"Add AI account\""],
       "surfaces": ["client", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
-      "currentSurface": "workbench: AI Accounts: Preview tab",
+      "currentSurface": "workbench: Quota tab",
       "configuration": [],
       "states": ["legacy-fixed", "ordinary-left-group", "content-only", "moved", "closed", "explicitly-reopened", "standalone-fallback"],
       "failureModes": [
-        "Mixed or unnamed preview contributors use the existing truthful Thread Sidebar: Plugin previews label, not a guessed account-specific owner.",
+        "Mixed or unnamed preview contributors use the existing truthful Sidebar previews label, not a guessed account-specific owner.",
         "The one-time browser migration marker only controls initial seating; native layout JSON remains the actual placement and tab-row owner."
       ],
       "externalDependencies": [],
@@ -217,7 +212,7 @@
       "id": "window-floating",
       "title": "Root-pane windows float across the application",
       "summary": "Float panel and native Shift-float keep the same pane API, panel and renderer but move native chrome and persistent content through window coordinates. Main, left, right and bottom floats can leave their source pane, overlap with native chrome/body interleaving and per-window focus order, resize and reload, and their tabs can dock through the existing cross-region owner. Nested paint-contained surfaces remain local. Hiding a source pane retains native descendant visibility semantics rather than inventing another floating resource owner.",
-      "reach": ["rightclick tab \"Thread Sidebar: Threads\"", "click menuitem \"Float panel\"", "expect button \"Search threads\""],
+      "reach": ["rightclick tab \"Threads\"", "click menuitem \"Float panel\"", "expect button \"Search threads\""],
       "surfaces": ["client", "integration", "storage"],
       "surface": "infrastructure",
       "destination": "none",
@@ -287,7 +282,7 @@
       "id": "main-conversation",
       "title": "Workbench as the main conversation surface",
       "summary": "One fixed Session-bound conversation tab contains both native chat history and the real text-input editor. Sidebar clicks open a closed conversation in the reusable italic preview tab (kept once edited, double-clicked or pinned) or focus its existing tab; other tabs never follow global selection. Closing all tabs leaves the docked chooser, not a resurrected global conversation. Legacy global-following aliases retire without changing fixed tab identity. Genuinely empty fixed Sessions use the native centered welcome, workspace/model controls and original composer; unsent drafts do not turn them into active transcripts. Loading history settles without a false welcome, and the first real turn becomes normal scrollable chat without replacing the editor.",
-      "reach": ["seed tool-call-thread", "click button \"New thread\"", "expect text \"Into the Unknown\""],
+      "reach": ["seed tool-call-thread", "click button \"New thread\"", "expect text \"What should we build*\""],
       "surfaces": ["client", "integration", "settings"],
       "surface": "infrastructure",
       "destination": "none",
@@ -386,8 +381,8 @@
     {
       "id": "main-panel-sources",
       "title": "Choose plugin views and one Settings hub",
-      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use qualified destination names when available, such as Agents › Directory; their tab captions stay short. Conversations open only from the thread list or New thread, never as a separate Rich Composer/current-conversation choice. Search matches full qualified names; special ordering uses stable IDs. Restored reusable panels refresh their captions without changing IDs or remounting, while user conversation, scoped and resource titles remain untouched. Empty right/bottom panes and semantic Start use the same chooser; Settings leaves and runtime occurrences are not primary suggestions.",
-      "reach": ["click button \"New tab\"", "expect region \"Choose a view\""],
+      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use qualified destination names when available, such as Agents › Directory, and producer-declared names otherwise (Quota, Files); their tab captions stay short. Conversations open only from the thread list or New thread, never as a separate Rich Composer/current-conversation choice. Search matches full qualified names; special ordering uses stable IDs. Restored reusable panels refresh their captions without changing IDs or remounting, while user conversation, scoped and resource titles remain untouched. Empty right/bottom panes and semantic Start use the same chooser; Settings leaves and runtime occurrences are not primary suggestions.",
+      "reach": ["press ControlOrMeta+Alt+KeyT", "expect region \"Choose a view\""],
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -594,7 +589,7 @@
       "summary": "Terminal: Terminal explicitly creates an independently owned native terminal in the selected tab group without opening the right pane. Moving and restoring the real occurrence preserves its native PTY and Session ownership.",
       "reach": [
         "seed tool-call-thread",
-        "click button \"New tab\"",
+        "press ControlOrMeta+Alt+KeyT",
         "fill textbox \"Search views\" \"Terminal\"",
         "click button \"Terminal: Terminal\"",
         "expect tab \"Terminal*\""
@@ -643,7 +638,7 @@
       "summary": "Every pane's Choose a view lists the native right-pane page types that offer a guide entry (Changes, Cost, Jobs, Workspace files, Jujutsu, Editor, Land) under Thread panels, with their guide title, description, icon and order. Picking one opens that page for the on-screen thread in the chooser's own pane; its body renders through the sidebar.right.pane.tab seat with the thread's sessionId. An open facet follows the thread on screen: switching threads puts the new thread's page in the same place, and while no thread is on screen (a new-thread draft, a destination page) the facet keeps its place.",
       "reach": [
         "seed tool-call-thread",
-        "click button \"New tab\"",
+        "press ControlOrMeta+Alt+KeyT",
         "expect group \"Thread panels\"",
         "click button \"route, cost per turn*\"",
         "expect text \"List-price estimates of this thread*\""

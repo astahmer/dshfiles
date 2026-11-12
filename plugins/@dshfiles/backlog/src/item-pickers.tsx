@@ -55,7 +55,7 @@ const Picker = <Value extends string>(props: {
         <DropdownMenuLabel className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">{props.label}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {props.values.map((value, index) => (
-          <DropdownMenuItem key={value} onSelect={() => props.onPick(value)} className="dshx:gap-2 dshx:text-[13px]">
+          <DropdownMenuItem key={value} onSelect={() => props.onPick(value)} className="dshx:gap-2 dshx:text-sm">
             {props.render(value)}
             {value === props.value ? <CheckIcon aria-hidden className="dshx:ml-auto dshx:size-3.5" /> : null}
             {value === props.value ? null : <DropdownMenuShortcut>{shortcutOf(value, index)}</DropdownMenuShortcut>}
@@ -77,7 +77,7 @@ const StatusPicker = (props: {
     value={props.status}
     values={BacklogItems.statuses}
     onPick={props.onPick}
-    triggerClassName={props.withLabel === true ? 'dshx:h-7 dshx:px-2 dshx:text-[13px]' : 'dshx:size-6 dshx:justify-center'}
+    triggerClassName={props.withLabel === true ? 'dshx:h-7 dshx:px-2 dshx:text-sm' : 'dshx:size-6 dshx:justify-center'}
     trigger={
       <>
         <ItemGlyphs.StatusIcon status={props.status} />
@@ -99,7 +99,7 @@ const KindPicker = (props: { readonly itemLabel: string; readonly kind: BacklogK
     value={props.kind}
     values={BacklogItems.kinds}
     onPick={props.onPick}
-    triggerClassName="dshx:h-7 dshx:px-2 dshx:text-[13px]"
+    triggerClassName="dshx:h-7 dshx:px-2 dshx:text-sm"
     trigger={
       <>
         <ItemGlyphs.KindIcon kind={props.kind} />
@@ -126,7 +126,7 @@ const ProjectPickerField = (props: {
     value={props.project ?? BacklogProjects.none}
     projects={props.projects}
     onPick={value => props.onPick(value === BacklogProjects.none ? null : value)}
-    triggerClassName="dshx:h-7 dshx:px-1.5 dshx:text-[13px]"
+    triggerClassName="dshx:h-7 dshx:px-1.5 dshx:text-sm"
     trigger={
       props.project === null ? (
         <>
@@ -153,7 +153,7 @@ const AttentionPicker = (props: {
     value={props.attention}
     values={BacklogItems.attentions}
     onPick={props.onPick}
-    triggerClassName="dshx:h-7 dshx:px-1.5 dshx:text-[13px]"
+    triggerClassName="dshx:h-7 dshx:px-1.5 dshx:text-sm"
     trigger={
       props.attention === 'none' ? <span className="dshx:text-muted-foreground">Attention</span> : <ItemGlyphs.AttentionBadge attention={props.attention} />
     }
@@ -178,7 +178,7 @@ const PriorityPicker = (props: {
     values={BacklogItems.priorities}
     onPick={props.onPick}
     shortcutOf={priorityShortcut}
-    triggerClassName={props.withLabel === true ? 'dshx:h-7 dshx:px-2 dshx:text-[13px]' : 'dshx:size-6 dshx:justify-center'}
+    triggerClassName={props.withLabel === true ? 'dshx:h-7 dshx:px-2 dshx:text-sm' : 'dshx:size-6 dshx:justify-center'}
     trigger={
       <>
         <WorkGlyphs.PriorityIcon priority={props.priority} />
@@ -228,9 +228,9 @@ const DuePicker = (props: {
         <DropdownMenuLabel className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">Due date</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {dueShortcuts(today).map(shortcut => (
-          <DropdownMenuItem key={shortcut.label} onSelect={() => props.onPick(shortcut.due)} className="dshx:gap-2 dshx:text-[13px]">
+          <DropdownMenuItem key={shortcut.label} onSelect={() => props.onPick(shortcut.due)} className="dshx:gap-2 dshx:text-sm">
             {shortcut.label}
-            <span className="dshx:ml-auto dshx:text-[11px] dshx:text-muted-foreground">{shortcut.due}</span>
+            <span className="dshx:ml-auto dshx:text-2xs dshx:text-muted-foreground">{shortcut.due}</span>
           </DropdownMenuItem>
         ))}
         <div className="dshx:px-2 dshx:py-1.5" onKeyDown={event => event.stopPropagation()}>
@@ -250,7 +250,7 @@ const DuePicker = (props: {
         {props.due === null ? null : (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => props.onPick(null)} className="dshx:text-[13px]">
+            <DropdownMenuItem onSelect={() => props.onPick(null)} className="dshx:text-sm">
               Clear due date
             </DropdownMenuItem>
           </>
@@ -284,7 +284,7 @@ const RecurrencePicker = (props: {
         <DropdownMenuLabel className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">Repeat when done</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {recurrencePresets.map(preset => (
-          <DropdownMenuItem key={preset} onSelect={() => props.onPick(preset)} className="dshx:gap-2 dshx:text-[13px]">
+          <DropdownMenuItem key={preset} onSelect={() => props.onPick(preset)} className="dshx:gap-2 dshx:text-sm">
             {Recurrence.label(preset)}
             {props.recurrence === preset ? <CheckIcon aria-hidden className="dshx:ml-auto dshx:size-3.5" /> : null}
           </DropdownMenuItem>
@@ -310,7 +310,7 @@ const RecurrencePicker = (props: {
         {props.recurrence === null ? null : (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => props.onPick(null)} className="dshx:text-[13px]">
+            <DropdownMenuItem onSelect={() => props.onPick(null)} className="dshx:text-sm">
               Stop repeating
             </DropdownMenuItem>
           </>

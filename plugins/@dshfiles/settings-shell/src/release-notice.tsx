@@ -2,7 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { ChevronDownIcon, ChevronUpIcon, ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronUpIcon, ExternalLinkIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import * as Schema from 'effect/Schema'
@@ -93,7 +93,7 @@ const ReleaseVersions = (props: { readonly t: ShellTranslate; readonly status: D
   const behind = props.status.available ? props.status.releases.length : 0
   return (
     <div
-      className="dshx:mt-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-1 dshx:text-[12px] dshx:leading-[18px] dshx:text-muted-foreground"
+      className="dshx:mt-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-1 dshx:text-xs dshx:text-muted-foreground"
       data-dsh-release-versions=""
     >
       <ReleaseVersion
@@ -129,26 +129,40 @@ export const DshReleaseIndicator = (props: { readonly t: ShellTranslate }): JSX.
   )
 }
 
-export const DshReleaseNotice = (props: { readonly t: ShellTranslate }): JSX.Element => {
+/**
+ * A newer release (or a failed check) as a quiet banner above the General rows, not a row among the preferences
+ * (visual refresh T4.4): one muted surface with the TL;DR toggle and a dismiss. Nothing renders while the
+ * installed release is current or the notice was dismissed for that version.
+ */
+export const DshReleaseBanner = (props: { readonly t: ShellTranslate }): JSX.Element | null => {
   const { query: status, off } = useReleaseStatus()
   const dismissed = dismissedRelease.useValue()
   const [expanded, setExpanded] = useState(false)
   const releaseStatus = status.data
   const updateAvailable = releaseStatus?.available === true && releaseStatus.latestVersion !== dismissed
+  if (!updateAvailable && !status.isError) return null
   const highlights: { readonly section: string; readonly text: string; readonly version: string }[] =
     releaseStatus?.releases.flatMap(release => release.highlights.map(highlight => ({ ...highlight, version: release.version }))).slice(0, 8) ?? []
   return (
-    <section className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:py-4" data-dsh-release-notice="">
-      <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-4">
+    <div
+      className="dshx:mt-2 dshx:mb-1 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:bg-muted dshx:px-3 dshx:py-2.5"
+      data-dsh-release-banner=""
+      role="status"
+    >
+      <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3">
         <div className="dshx:min-w-0 dshx:flex-1">
-          <div className="dshx:text-[14px] dshx:leading-5 dshx:font-medium">
+          <div className="dshx:text-sm dshx:font-medium">
             {noticeMessage({ t: props.t, updateAvailable, isError: status.isError, off, status: releaseStatus })}
           </div>
-          {releaseStatus !== undefined && <ReleaseVersions status={releaseStatus} t={props.t} />}
+          {updateAvailable ? (
+            <ReleaseVersions status={releaseStatus} t={props.t} />
+          ) : (
+            <div className="dshx:mt-0.5 dshx:text-xs dshx:text-muted-foreground">{props.t('releaseNotice.retryHint')}</div>
+          )}
         </div>
         {updateAvailable && (
           <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-            <Button aria-expanded={expanded} onClick={() => setExpanded(value => !value)} size="sm" variant="outline">
+            <Button aria-expanded={expanded} onClick={() => setExpanded(value => !value)} size="sm" variant="ghost">
               {expanded ? props.t('releaseNotice.hideSummary') : props.t('releaseNotice.showSummary')}
               {expanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
             </Button>
@@ -160,7 +174,7 @@ export const DshReleaseNotice = (props: { readonly t: ShellTranslate }): JSX.Ele
               size="icon-sm"
               variant="ghost"
             >
-              <span aria-hidden="true">×</span>
+              <XIcon aria-hidden="true" />
             </Button>
           </div>
         )}
@@ -168,9 +182,9 @@ export const DshReleaseNotice = (props: { readonly t: ShellTranslate }): JSX.Ele
       {expanded && updateAvailable && (
         <div className="dshx:flex dshx:flex-col dshx:gap-2" data-dsh-release-summary="">
           {highlights.length === 0 ? (
-            <p className="dshx:m-0 dshx:text-[12px] dshx:text-muted-foreground">{props.t('releaseNotice.noHighlights')}</p>
+            <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{props.t('releaseNotice.noHighlights')}</p>
           ) : (
-            <ul className="dshx:m-0 dshx:flex dshx:flex-col dshx:gap-1 dshx:ps-5 dshx:text-[12px] dshx:leading-[18px]">
+            <ul className="dshx:m-0 dshx:flex dshx:flex-col dshx:gap-1 dshx:ps-5 dshx:text-xs">
               {highlights.map((highlight, index) => (
                 <li key={`${highlight.version}-${index}`}>
                   <span className="dshx:font-medium">
@@ -183,7 +197,7 @@ export const DshReleaseNotice = (props: { readonly t: ShellTranslate }): JSX.Ele
           )}
           {releaseStatus.latestUrl !== null && (
             <a
-              className="dshx:inline-flex dshx:w-fit dshx:items-center dshx:gap-1 dshx:text-[12px] dshx:text-primary dshx:underline dshx:underline-offset-2"
+              className="dshx:inline-flex dshx:w-fit dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-primary dshx:underline dshx:underline-offset-2"
               href={releaseStatus.latestUrl}
               rel="noreferrer"
               target="_blank"
@@ -193,16 +207,33 @@ export const DshReleaseNotice = (props: { readonly t: ShellTranslate }): JSX.Ele
           )}
         </div>
       )}
-      <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3">
-        <Button disabled={status.isFetching} onClick={() => void status.refetch()} size="sm" variant="ghost">
-          {props.t(status.isFetching ? 'releaseNotice.checking' : 'releaseNotice.check')}
-        </Button>
-        {status.isError && (
-          <span className="dshx:text-[12px] dshx:text-muted-foreground" role="status">
-            {props.t('releaseNotice.retryHint')}
-          </span>
-        )}
-      </div>
-    </section>
+    </div>
+  )
+}
+
+/**
+ * The manual check beside the installed version: the release status in one muted line, the check verb, and (upstream
+ * rwuztzuw) the installed and latest releases linked and dated. Settings › About is the one place for both.
+ */
+export const DshReleaseCheck = (props: { readonly t: ShellTranslate }): JSX.Element => {
+  const { query: status, off } = useReleaseStatus()
+  const dismissed = dismissedRelease.useValue()
+  const releaseStatus = status.data
+  const updateAvailable = releaseStatus?.available === true && releaseStatus.latestVersion !== dismissed
+  return (
+    <div
+      className="dshx:-mt-2 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:pb-4 dshx:text-xs dshx:text-muted-foreground"
+      data-dsh-release-notice=""
+    >
+      <span role="status">{noticeMessage({ t: props.t, updateAvailable, isError: status.isError, off, status: releaseStatus })}</span>
+      <Button className="dshx:-ms-2" disabled={status.isFetching} onClick={() => void status.refetch()} size="sm" variant="ghost">
+        {props.t(status.isFetching ? 'releaseNotice.checking' : 'releaseNotice.check')}
+      </Button>
+      {releaseStatus !== undefined && (
+        <div className="dshx:basis-full">
+          <ReleaseVersions status={releaseStatus} t={props.t} />
+        </div>
+      )}
+    </div>
   )
 }

@@ -6,7 +6,7 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { threadWorkspacePathFor } from './jj-integration.steps.js'
 
-const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 const THREAD_CHANGES = [
   { path: 'README.md', content: `# Review fixture\n\n${Array.from({ length: 80 }, (_, index) => `Documentation line ${String(index + 1)}.`).join('\n')}\n` },
   { path: 'src/app.ts', content: 'export const reviewFixture = true\n' },

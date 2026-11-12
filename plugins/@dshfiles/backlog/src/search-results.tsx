@@ -118,19 +118,17 @@ export const SearchResults = (props: {
                     : 'dshx:hover:bg-accent/30',
               )}
             >
-              <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-[13px]">
+              <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-sm">
                 <ItemGlyphs.StatusIcon status={item.status} />
-                <BacklogMentionHandle item={item} className="dshx:w-12 dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground" />
+                <BacklogMentionHandle item={item} className="dshx:w-12 dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground" />
                 <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">
                   <Highlight text={imageTitleFallback(item.title)} terms={terms} />
                 </span>
                 <ItemGlyphs.AttentionBadge attention={item.attention} compact />
                 {item.freshness === 'fresh' ? null : (
-                  <span className="dshx:shrink-0 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground">
-                    {item.freshness}
-                  </span>
+                  <span className="dshx:shrink-0 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground">{item.freshness}</span>
                 )}
-                <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+                <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
                   {item.project === null ? null : (
                     <>
                       <ItemGlyphs.ProjectLabel project={item.project} />·

@@ -2,7 +2,7 @@ import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import { SchemaHelpers } from './schema-helpers.js'
 
-const sessionIdInput = SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)) }))
+const sessionIdInput = SchemaHelpers.toolInput({ sessionId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)) })
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))
 const toolNames = Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(128))).check(Schema.isMaxLength(20))
 

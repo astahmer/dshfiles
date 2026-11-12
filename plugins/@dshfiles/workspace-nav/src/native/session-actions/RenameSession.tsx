@@ -4,8 +4,9 @@
  * The dialog lives outside the row menu because the row unmounts with the
  * menu; the browser raises the same request from a title double-click.
  */
+import { PencilIcon } from '@dshfiles/plugin-ui/icons'
 import { useRef, useState } from 'react'
-import { Button, IconEditOutlineRegular, MenuItemButton, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, MenuItemButton, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   RenameSessionInjected, SessionMenuItemProps, SessionRenameDialogInjected, SessionRenameDialogProps, SessionRenameTarget,
 } from '../contract/slots.ts'
@@ -24,7 +25,7 @@ export function RenameSessionMenuItem({
   return (
     <MenuItemButton
       shortcut={shortcut}
-      icon={<IconEditOutlineRegular />}
+      icon={<PencilIcon size={14} strokeWidth={1.5} />}
       onSelect={() => {
         setMenuOpen(false)
         requestSessionRename(sessionId, displayTitle)

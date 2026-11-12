@@ -27,7 +27,7 @@ const Comparison = (props: { current: number | null | undefined; previous: numbe
   const change = AccountUsageDashboardModel.percentChange(props.current, props.previous)
   const favorable = change !== null && (props.latency === true ? change <= 0 : change >= 0)
   return (
-    <div className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:text-[11px]">
+    <div className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:text-2xs">
       <span className={cn('dshx:font-medium', change === null ? 'dshx:text-muted-foreground' : favorable ? 'dshx:text-success' : 'dshx:text-warning')}>
         {change === null ? '— No comparison available' : `${change > 0 ? '↑' : change < 0 ? '↓' : '↔'} ${Math.abs(change).toFixed(0)}%`}
       </span>
@@ -37,7 +37,7 @@ const Comparison = (props: { current: number | null | undefined; previous: numbe
 }
 
 const Metric = (props: { label: string; value: string; children: ReactNode }): JSX.Element => (
-  <div className="dshx:min-w-0 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-3">
+  <div className="dshx:min-w-0 dshx:py-1">
     <p className="dshx:mb-1.5 dshx:text-xs dshx:text-muted-foreground">{props.label}</p>
     <p className="dshx:mb-1 dshx:text-2xl dshx:font-semibold dshx:tracking-tight dshx:tabular-nums">{props.value}</p>
     {props.children}
@@ -45,7 +45,7 @@ const Metric = (props: { label: string; value: string; children: ReactNode }): J
 )
 
 const Legend = (): JSX.Element => (
-  <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-1 dshx:text-[10px] dshx:text-muted-foreground" aria-label="Chart legend">
+  <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground" aria-label="Chart legend">
     <span className="dshx:flex dshx:items-center dshx:gap-1.5">
       <span className="dshx:h-0.5 dshx:w-3 dshx:bg-chart-1" />
       Requests
@@ -326,7 +326,7 @@ export const AccountUsageDashboardContent = (props: {
         <DayTable days={days} empty={summary.requests === 0} />
       </div>
       <RecentRequests requests={props.requests} onViewAll={props.onOpenUsageHistory} />
-      <p className="dshx:text-[11px] dshx:leading-relaxed dshx:text-muted-foreground">
+      <p className="dshx:text-2xs dshx:leading-relaxed dshx:text-muted-foreground">
         DSH-recorded requests only. Cost is a list-price estimate, not your subscription bill. Input includes cache reads and writes. Average latency is the
         mean completed request duration. — means unavailable
         {summary.missingUsage ? `; ${summary.missingUsage.toLocaleString()} requests have no token counts` : ''}

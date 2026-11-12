@@ -5,6 +5,7 @@ import { Then, When } from '../bdd.js'
 import { fakeCommandCodeFor, type FakeChatRequest } from '../fake-command-code.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { startThreadWithModel } from '../threads.js'
+import { chooseComposerMore, expectComposerMoreEnabled } from '../composer-more.js'
 
 const LONG_TAIL = 'x'.repeat(260)
 const queueDock = (page: Page) => page.locator('[data-queue-dock]')
@@ -50,7 +51,7 @@ const dragRow = async (page: Page, input: { readonly from: number; readonly to: 
 
 When('a thread on the fake model is kept busy by a held turn', async ({ page }: { page: Page }) => {
   await startThreadWithModel(page, { project: 'Default workspace', model: 'commandcode_work/gpt-6-luna' })
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill('queue journey [[hold]]')
   await composer.press('Enter')
   await expect.poll(() => fakeCommandCodeFor(page).requests.filter(request => request.kind === 'turn').length).toBe(1)
@@ -76,6 +77,53 @@ When('the held turn finishes', async ({ page }: { page: Page }) => {
 
 When('the second queued message is edited in the composer', async ({ page }: { page: Page }) => {
   await queuedRows(page).nth(1).getByRole('button', { name: 'Edit queued message', exact: true }).click()
+})
+
+const turnRequests = (page: Page): readonly FakeChatRequest[] => fakeCommandCodeFor(page).requests.filter(request => request.kind === 'turn')
+const pendingSteering = (page: Page) => page.locator('[data-pending-steering]')
+
+When('the queued message {string} is steered from its row', async ({ page }: { page: Page }, text: string) => {
+  await queuedRows(page).filter({ hasText: text }).getByRole('button', { name: 'Steer with queued message', exact: true }).click()
+})
+
+Then('{string} leaves the queue and joins the running turn', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'queue-reorder-row-steer-joins-the-running-turn', async () => {
+    await expect(queuedRows(page)).toHaveCount(2)
+    await expect(queuedRows(page).filter({ hasText: text })).toHaveCount(0)
+    // Steering, not a queued turn: the message waits for the held turn's next step.
+    await expect(pendingSteering(page).filter({ hasText: text })).toBeVisible()
+    expect(turnRequests(page)).toHaveLength(1)
+  })
+})
+
+When('the rest of the queue is steered with Cmd+Enter', async ({ page }: { page: Page }) => {
+  // An empty composer over a running turn with queued messages names the gesture in its placeholder.
+  const composer = page.locator('[data-composer-card]').getByRole('textbox', { name: 'Cmd/Ctrl+Enter steers all queued messages', exact: true })
+  await expect(composer).toBeVisible()
+  await composer.click()
+  await composer.press('ControlOrMeta+Enter')
+})
+
+Then('the queue is empty and the running turn continues with every steered message', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'queue-reorder-cmd-enter-steers-the-whole-queue', async () => {
+    await expect(queueDock(page)).toHaveCount(0)
+    for (const text of ['first queued', 'second queued', 'third queued']) await expect(pendingSteering(page).filter({ hasText: text })).toBeVisible()
+    expect(turnRequests(page)).toHaveLength(1)
+  })
+  fakeCommandCodeFor(page).releaseHeldTurns()
+  await recordAssertion(page, 'queue-reorder-steered-messages-reach-the-running-turn', async () => {
+    // The held turn's next step carries all three together; queued messages would each open a later turn of their own.
+    await expect
+      .poll(
+        () =>
+          turnRequests(page)[1]
+            ?.messages.filter(message => message.role === 'user')
+            .map(message => message.text.split(/\s/)[0]) ?? [],
+        { timeout: 60_000 },
+      )
+      .toEqual(expect.arrayContaining(['second', 'first', 'third']))
+  })
+  await finishJourneyAssertions(page)
 })
 
 When('queued messages are set to start collapsed with 40-character previews', async ({ page }: { page: Page }) => {
@@ -193,7 +241,7 @@ When('an idle thread {string} and a busy thread {string} exist', async ({ page }
     [busy, ' [[hold]]'],
   ] as const) {
     await startThreadWithModel(page, { project: 'Default workspace', model: 'commandcode_work/gpt-6-luna' })
-    const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+    const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
     await composer.fill(`${title} [[title ${title}]]${directive}`)
     await composer.press('Enter')
     await expect(page.getByText(title, { exact: true }).first()).toBeVisible({ timeout: 30_000 })
@@ -288,13 +336,14 @@ When('a thread on the fake model answers its first message', async ({ page }: { 
   await composer.fill('send later journey')
   await composer.press('Enter')
   await expect.poll(() => fakeCommandCodeFor(page).requests.filter(request => request.kind === 'turn').length).toBe(1)
-  await expect(page.getByRole('button', { name: 'Send later', exact: true })).toBeVisible()
+  // A row of the composer's More menu (no chip in the bar); the bar button only where the bar keeps the extras.
+  await expectComposerMoreEnabled(page, 'Send later', 'Send later')
 })
 
 When('{string} is scheduled from Send later for {string} at phone width', async ({ page }: { page: Page }, text: string, preset: string) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await composerInput(page).fill(text)
-  await page.getByRole('button', { name: 'Send later', exact: true }).click()
+  await chooseComposerMore(page, 'Send later', 'Send later')
   const presets = page.getByRole('group', { name: 'Send at', exact: true })
   await expect(presets).toBeVisible()
   const box = await presets.boundingBox()

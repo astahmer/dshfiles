@@ -42,6 +42,7 @@ const formatAge = (at: number): string => {
 interface CleanupRow {
   readonly key: string
   readonly target: CleanupTarget
+  readonly path: string
   readonly at: number
   readonly missing: boolean
   readonly integratedInto?: readonly string[] | undefined
@@ -52,6 +53,7 @@ const cleanupRows = (result: CleanupResult): CleanupRow[] => [
   ...result.workspaces.map(workspace => ({
     key: JSON.stringify([workspace.repoRoot, workspace.name, workspace.kind]),
     target: { repoRoot: workspace.repoRoot, name: workspace.name, kind: workspace.kind },
+    path: workspace.path,
     at: workspace.lastUsedAt,
     missing: workspace.missing,
     integratedInto: workspace.integratedInto,
@@ -60,13 +62,20 @@ const cleanupRows = (result: CleanupResult): CleanupRow[] => [
   ...result.untracked.map(entry => ({
     key: JSON.stringify([entry.repoRoot, entry.name, 'untracked']),
     target: { repoRoot: entry.repoRoot, name: entry.name, kind: 'untracked' as const },
+    path: entry.path,
     at: entry.modifiedAt,
     missing: false,
   })),
 ]
 
+/** A thread's own workspace: removable once idle, and named by its thread rather than its folder (b:212a). */
+const isThreadWorkspaceKind = (kind: CleanupKindView): boolean => kind === 'empty' || kind === 'integrated' || kind === 'merged'
+
+const projectNameOf = (repoRoot: string): string => repoRoot.replace(/\/+$/u, '').split('/').at(-1) ?? repoRoot
+
 const rowMeta = (row: CleanupRow): string =>
   [
+    isThreadWorkspaceKind(row.target.kind) ? projectNameOf(row.target.repoRoot) : undefined,
     row.missing ? 'Folder missing' : undefined,
     row.integratedInto === undefined ? undefined : `On ${row.integratedInto.join(', ')}`,
     ...cleanupProcessLabels(row.processes),
@@ -82,6 +91,8 @@ export const WorkspaceCleanupDialog = (props: {
   readonly path: string
   readonly onOpenChange: (open: boolean) => void
   readonly onCleaned: () => void
+  /** The thread a workspace folder belongs to; a thread workspace is titled by it, its folder name kept for the tooltip. */
+  readonly threadTitleOf?: ((path: string) => string | undefined) | undefined
 }) => {
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
@@ -244,13 +255,19 @@ export const WorkspaceCleanupDialog = (props: {
                     className="dshx:mx-5 dshx:mb-2 dshx:ml-12 dshx:rounded-xl dshx:p-1 dshx:shadow-none"
                     density="compact"
                     heading={choice.label}
-                    items={groupRows.map(row => ({
-                      id: row.key,
-                      title: row.target.name,
-                      meta: rowMeta(row),
-                      tag: KIND_TAG[row.target.kind],
-                      tone: row.missing ? 'warning' : 'muted',
-                    }))}
+                    items={groupRows.map(row => {
+                      // A thread workspace reads as its thread, then its project (b:212a). One no titled thread uses has no
+                      // thread to be named by, and several "Untitled thread" rows could not be told apart before removal,
+                      // so it keeps its folder name, as untracked folders and other jj workspaces do.
+                      const title = (isThreadWorkspaceKind(row.target.kind) ? props.threadTitleOf?.(row.path) : undefined) ?? row.target.name
+                      return {
+                        id: row.key,
+                        title,
+                        meta: rowMeta(row),
+                        tag: KIND_TAG[row.target.kind],
+                        tone: row.missing ? 'warning' : 'muted',
+                      } as const
+                    })}
                     onSelectionChange={keys => selectGroup(groupRows, keys)}
                     selectedIds={groupRows.filter(row => selected.has(row.key)).map(row => row.key)}
                     showHeader={false}

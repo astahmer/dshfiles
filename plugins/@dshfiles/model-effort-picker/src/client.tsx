@@ -2,6 +2,7 @@ import type { ModelDirectory, ModelDirectoryState } from '@deepseek-ai/dsh-clien
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { defineClientPlugin, joinPageRead } from '@dshfiles/dshx/client'
 import { multiHostApi } from '@dshfiles/multi-host/api'
+import { modelPickerLocale, MODEL_PICKER_LOCALE_NAMESPACE } from './locales.js'
 import { ModelEffortPicker } from './model-effort-picker.js'
 import { RemoteModelDirectory } from './remote-model-directory.js'
 
@@ -12,6 +13,7 @@ const remoteDirectories = new WeakMap<ModelDirectory, RemoteModelDirectory>()
 export default defineClientPlugin({
   id: 'dshfiles-model-effort-picker',
   uses: ['ui', 'models', 'rpc'],
+  locales: [modelPickerLocale],
   setup(api) {
     const remoteApi = api.rpc.use(multiHostApi)
     api.ui.register(
@@ -19,6 +21,7 @@ export default defineClientPlugin({
         name: 'conversation.input.model',
         // Lower priority wins, so shadow the native slot at priority 0.
         priority: -1,
+        locale: MODEL_PICKER_LOCALE_NAMESPACE,
         inject: sessionId => {
           const directory = api.models.directoryFor(sessionId)
           const available = api.raw.ctx.sessions.subagentAddress(sessionId) === undefined

@@ -1,7 +1,7 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
-import { Composer, useApi, useContract } from '@dshfiles/dshx/client'
+import { Composer, useApi, useContract, usePlugin } from '@dshfiles/dshx/client'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
@@ -11,13 +11,15 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
+import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
 import { MessageSquarePlus, RefreshCw, X } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { diffsReviewApi } from './api.js'
 import { FacetSessionStateModel, type FacetSessionPatch } from './changes-facet-state.js'
+import { ChangesKeysModel, type HunkCursor } from './changes-keys.js'
 import { ChangesScopeModel, changesScopeSchema, type ChangesRequest, type ChangesScope } from './changes-scope.js'
 import { ChangedImages } from './changed-images.js'
 import { CombinedReview } from './combined-review.js'
@@ -37,6 +39,8 @@ export interface ChangesFacetProps {
   readonly requestRevision: number
   readonly sessions: ISessions
   readonly openHistory: () => void
+  /** Brings another thread on screen with its Changes facet ("Land & next"). */
+  readonly openThread?: ((sessionId: string) => void) | undefined
 }
 
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
@@ -47,6 +51,30 @@ interface UserQuestionsProjection {
 }
 
 const isScope = Schema.is(changesScopeSchema)
+
+/** The outermost elements of a file's diff shadow root that match `selector`, in document order. */
+const shadowMatches = (container: Element, selector: string): readonly Element[] => {
+  const host = [container, ...container.querySelectorAll('*')].find(element => element.shadowRoot !== null)
+  const matches = [...(host?.shadowRoot?.querySelectorAll(selector) ?? [])]
+  return matches.filter(element => !matches.some(other => other !== element && other.contains(element)))
+}
+
+/**
+ * Bring a hunk on screen: its file first (the diff virtualises files), then the separator above it on the next frames.
+ * A hunk without a separator (a file that changes on its first line) leaves the file's top on screen.
+ */
+const scrollToHunk = (input: { readonly root: Element | null; readonly path: string; readonly separator: number | undefined }): void => {
+  const file = input.root?.querySelector(`[data-diff-path="${CSS.escape(input.path)}"]`)
+  if (file === null || file === undefined) return
+  file.scrollIntoView({ block: 'start' })
+  const separator = input.separator
+  if (separator === undefined) return
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      shadowMatches(file, '[data-separator]')[separator]?.scrollIntoView({ block: 'start' })
+    }),
+  )
+}
 
 const Stat = (props: { readonly children: ReactNode; readonly tone?: 'add' | 'del' }): JSX.Element => (
   <span
@@ -87,6 +115,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
   const queryClient = useQueryClient()
   const { cwd, busy } = useThreadSummary(props.sessions, props.sessionId)
   const sessionId = props.sessionId
+  const threadTitle = useCallback((id: string) => props.sessions.list.getSnapshot().byId[SessionId(id)]?.displayTitle, [props.sessions])
   const [stored, setStored] = useState(() => ({
     ...FacetSessionStateModel.initial(sessionId),
     scope: props.request?.scope,
@@ -94,7 +123,12 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
     revisions: ChangesScopeModel.selectionOf(props.request),
   }))
   // Scope, turn, selection and comment draft belong to one thread: switching threads starts them over together.
-  const { scope, seq, revisions, selectionRevision, focusPath, selection, comment, commentNotice } = FacetSessionStateModel.forSession(stored, sessionId)
+  const { scope, seq, revisions, selectionRevision, focusPath, hunk, selection, comment, commentNotice } = FacetSessionStateModel.forSession(stored, sessionId)
+  const plugin = usePlugin()
+  const facetRoot = useRef<HTMLDivElement | null>(null)
+  const diffsRoot = useRef<HTMLDivElement | null>(null)
+  /** Bumped by ⇧L: the Land card opens its preview (never lands from a key). */
+  const [landRequest, setLandRequest] = useState(0)
   const patchFacet = useCallback(
     (patch: FacetSessionPatch): void => setStored(current => FacetSessionStateModel.update(current, { sessionId, patch })),
     [sessionId],
@@ -196,6 +230,126 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
   const viewedCount = paths.filter(path => marks.viewed.has(path)).length
   const additions = (diff?.files ?? []).reduce((total, file) => total + file.added, 0)
   const deletions = (diff?.files ?? []).reduce((total, file) => total + file.deleted, 0)
+  const keyFiles = useMemo(() => parsedFiles.map(file => ({ name: file.name, hunks: file.hunks })), [parsedFiles])
+  const hunkTotal = keyFiles.reduce((total, file) => total + file.hunks.length, 0)
+  const hunkPosition =
+    hunk === null ? undefined : ChangesKeysModel.hunksOf(keyFiles).findIndex(entry => entry.path === hunk.path && entry.hunk === hunk.hunk) + 1
+  const filesShown = activeScope !== 'revisions' && diff !== undefined && diff.files.length > 0
+  const moveFile = (delta: 1 | -1): false | undefined => {
+    if (!filesShown) return false
+    const next = ChangesKeysModel.stepFile(paths, focusPath, delta)
+    if (next === undefined) return false
+    patchFacet({ focusPath: next, hunk: null })
+    return undefined
+  }
+  const moveHunk = (delta: 1 | -1): false | undefined => {
+    if (!filesShown) return false
+    const next: HunkCursor | undefined = ChangesKeysModel.stepHunk(keyFiles, hunk, delta, focusPath)
+    if (next === undefined) return false
+    patchFacet({ hunk: next, focusPath: next.path })
+    const file = keyFiles.find(entry => entry.name === next.path)
+    scrollToHunk({
+      root: diffsRoot.current,
+      path: next.path,
+      separator: file === undefined ? undefined : ChangesKeysModel.separatorIndex(file.hunks, next.hunk),
+    })
+    return undefined
+  }
+  const viewAndNext = (): false | undefined => {
+    if (!filesShown || !marks.ready) return false
+    const current = focusPath ?? paths[0]
+    if (current === undefined) return false
+    if (!marks.viewed.has(current)) marks.set([current], true)
+    const next = ChangesKeysModel.nextUnviewed(paths, new Set([...marks.viewed, current]), current)
+    if (next === undefined) patchFacet({ focusPath: current, hunk: null, commentNotice: 'Every file is viewed. Shift+L opens the Land preview.' })
+    else patchFacet({ focusPath: next, hunk: null, commentNotice: null })
+    return undefined
+  }
+  const commentOnHunk = (): false | undefined => {
+    if (!filesShown) return false
+    const path = hunk?.path ?? focusPath ?? paths[0]
+    const file = parsedFiles.find(entry => entry.name === path)
+    const target = file?.hunks[hunk !== null && hunk.path === path ? hunk.hunk : 0]
+    if (file === undefined || target === undefined) return false
+    const lines = ChangesKeysModel.hunkLines(target)
+    patchFacet({ selection: { file, ...lines }, selectionRevision: undefined, commentNotice: null, focusPath: file.name })
+    return undefined
+  }
+  const region = (): HTMLDivElement | null => facetRoot.current
+  useCommands(props.sessionId === undefined ? undefined : plugin, [
+    {
+      id: '@dshfiles/diffs-review.changes-next-file',
+      title: 'Next file',
+      keys: ['J'],
+      scope: 'changes',
+      section: 'Changes',
+      hidden: true,
+      region,
+      run: () => moveFile(1),
+    },
+    {
+      id: '@dshfiles/diffs-review.changes-previous-file',
+      title: 'Previous file',
+      keys: ['K'],
+      scope: 'changes',
+      section: 'Changes',
+      hidden: true,
+      region,
+      run: () => moveFile(-1),
+    },
+    {
+      id: '@dshfiles/diffs-review.changes-next-hunk',
+      title: 'Next hunk',
+      keys: ['N'],
+      scope: 'changes',
+      section: 'Changes',
+      hidden: true,
+      region,
+      run: () => moveHunk(1),
+    },
+    {
+      id: '@dshfiles/diffs-review.changes-previous-hunk',
+      title: 'Previous hunk',
+      keys: ['P'],
+      scope: 'changes',
+      section: 'Changes',
+      hidden: true,
+      region,
+      run: () => moveHunk(-1),
+    },
+    {
+      id: '@dshfiles/diffs-review.changes-view-next',
+      title: 'Mark viewed, go to the next unviewed file',
+      keys: ['V'],
+      scope: 'changes',
+      section: 'Changes',
+      hidden: true,
+      region,
+      run: viewAndNext,
+    },
+    {
+      id: '@dshfiles/diffs-review.changes-comment',
+      title: 'Comment on this hunk',
+      keys: ['C'],
+      scope: 'changes',
+      section: 'Changes',
+      hidden: true,
+      region,
+      run: commentOnHunk,
+    },
+    {
+      id: '@dshfiles/diffs-review.changes-land-preview',
+      title: 'Open the Land preview',
+      keys: ['Shift+L'],
+      scope: 'changes',
+      section: 'Changes',
+      hidden: true,
+      region,
+      run: () => {
+        setLandRequest(current => current + 1)
+      },
+    },
+  ])
 
   const refreshDiff = (): void => {
     void queryClient.invalidateQueries({ queryKey: ['diffs-review', 'facet'] })
@@ -276,6 +430,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
         </div>
         <Textarea
           aria-label="Comment on the selected lines"
+          autoFocus
           className="dshx:min-h-16 dshx:text-xs"
           onChange={event => patchFacet({ comment: event.target.value })}
           onKeyDown={event => {
@@ -298,11 +453,23 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
 
   return (
     <div
-      className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-3"
+      className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-3 dshx:outline-none"
+      data-shortcut-scope="changes"
       data-testid="changes-facet"
+      ref={facetRoot}
+      tabIndex={-1}
     >
       {cwd === undefined || cwd.length === 0 ? null : (
-        <LandCard cwd={cwd} onLanded={refreshDiff} openHistory={props.openHistory} sessionId={props.sessionId} threadBusy={busy} />
+        <LandCard
+          cwd={cwd}
+          onLanded={refreshDiff}
+          openHistory={props.openHistory}
+          openThread={props.openThread}
+          landRequest={landRequest}
+          sessionId={props.sessionId}
+          threadBusy={busy}
+          threadTitle={threadTitle}
+        />
       )}
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <ToggleGroup
@@ -310,7 +477,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
           className="dshx:max-w-full dshx:flex-wrap"
           onValueChange={value => {
             if (isScope(value)) {
-              patchFacet({ scope: value, selection: null })
+              patchFacet({ scope: value, selection: null, hunk: null })
             }
           }}
           size="sm"
@@ -383,6 +550,11 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
             <Stat>
               {viewedCount}/{diff.files.length} viewed
             </Stat>
+            {hunkPosition === undefined || hunkPosition === 0 ? null : (
+              <Stat>
+                hunk {hunkPosition}/{hunkTotal}
+              </Stat>
+            )}
             <Progress className="dshx:min-w-16 dshx:flex-1" value={diff.files.length === 0 ? 0 : Math.round((viewedCount / diff.files.length) * 100)} />
             <Button
               disabled={!marks.ready}
@@ -408,8 +580,14 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
           <ul aria-label="Changed files" className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-md dshx:border dshx:border-border">
             {diff.files.map(file => {
               const viewed = marks.viewed.has(file.path)
+              const current = focusPath === file.path
               return (
-                <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2 dshx:py-1" data-changes-file={file.path} key={file.path}>
+                <li
+                  aria-current={current ? 'true' : undefined}
+                  className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2 dshx:py-1', current && 'dshx:bg-accent')}
+                  data-changes-file={file.path}
+                  key={file.path}
+                >
                   <Checkbox
                     aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.display}`}
                     checked={viewed}
@@ -424,7 +602,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
                     )}
                     onClick={() => {
                       if (packageJson.isTextHidden(file.path)) packageJson.showText(file.path)
-                      patchFacet({ focusPath: file.path })
+                      patchFacet({ focusPath: file.path, hunk: null })
                     }}
                     type="button"
                   >
@@ -444,7 +622,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
               return (
                 <Button
                   aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${path}`}
-                  className="dshx:gap-1 dshx:text-[11px]"
+                  className="dshx:gap-1 dshx:text-2xs"
                   disabled={!marks.ready}
                   onClick={() => marks.set([path], !viewed)}
                   size="sm"
@@ -461,6 +639,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
             <div
               className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border"
               data-testid="changes-diffs"
+              ref={diffsRoot}
             >
               <PatchView
                 className="dshx:flex-1"
@@ -475,7 +654,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
                   return (
                     <Button
                       aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.name}`}
-                      className="dshx:gap-1 dshx:text-[11px]"
+                      className="dshx:gap-1 dshx:text-2xs"
                       disabled={!marks.ready}
                       onClick={() => marks.set([file.name], !viewed)}
                       size="sm"

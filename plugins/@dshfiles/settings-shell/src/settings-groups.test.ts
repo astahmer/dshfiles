@@ -38,7 +38,7 @@ const pages = [
   page('web', 'web', ['port']),
   page('dshfiles-backlog', 'Backlog', ['autoTriage', 'jevEnabled', 'jevSecret']),
   page('dshfiles-memory', 'Memory', ['jevEnabled', 'jevSecret']),
-  page('thread-sidebar', 'Thread Sidebar', ['layoutMode', 'maxChildren']),
+  page('thread-sidebar', 'Thread Sidebar', ['maxChildren']),
   page('secret-catalog', 'Secret catalog', ['scope']),
   page('ui-theme', 'ui-theme', ['theme'], 'more'),
   page('mystery-plugin', 'mystery-plugin', ['x']),
@@ -49,6 +49,13 @@ const all = grouped.flatMap(group => group.entries.map(entry => ({ ...entry, gro
 const labels = all.map(entry => entry.label)
 
 describe('settings groups', () => {
+  it('places the theme owner as General › Appearance right after the native General section', () => {
+    const general = SettingsGroups.group({ sections, pages: [...pages, page('dshfiles-ui-styles', 'Ui styles', ['preset', 'uiFont'])], panels }).find(
+      group => group.group.id === 'general',
+    )
+    expect(general?.entries.map(entry => entry.label).slice(0, 2)).toEqual(['General', 'Appearance'])
+  })
+
   it('lists the task groups of plan §4.6 in order, leaving out empty ones', () => {
     expect(grouped.map(group => group.group.label)).toEqual([
       'General',
@@ -150,9 +157,9 @@ describe('settings groups', () => {
     expect(withShared.some(entry => entry.id === 'plugin:dshfiles-settings-shell')).toBe(false)
   })
 
-  it('puts Layout in General and keeps the rest of the thread sidebar under Thread list', () => {
+  it('keeps the thread sidebar under Thread list, with no Layout page in General (b:952m)', () => {
     const general = all.find(entry => entry.id === 'general')
-    expect(general?.pages.map(current => [current.title, current.fields.map(each => each.key)])).toEqual([['Layout', ['layoutMode']]])
+    expect(general?.pages.some(current => current.title === 'Layout') ?? false).toBe(false)
     const threadList = all.find(entry => entry.id === 'thread-sidebar')
     expect(threadList).toMatchObject({ label: 'Thread list', groupId: 'general' })
     expect(threadList?.pages[0]?.fields.map(each => each.key)).toEqual(['maxChildren'])

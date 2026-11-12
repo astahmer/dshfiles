@@ -109,7 +109,7 @@ export const ShellRoot = (props: {
                 aria-keyshortcuts={shortcut?.aria}
                 aria-label={t('trigger')}
                 className={cn(
-                  'dshx:m-0 dshx:box-border dshx:flex dshx:h-[42px] dshx:w-auto dshx:min-w-0 dshx:flex-1 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:overflow-hidden dshx:rounded-[var(--dsw-radius-md)] dshx:border-none dshx:bg-transparent dshx:py-0 dshx:pr-2.5 dshx:pl-2 dshx:text-[14px] dshx:leading-[22px] dshx:text-[var(--dsw-alias-label-primary)] dshx:hover:bg-[var(--dsw-alias-interactive-bg-hover)]',
+                  'dshx:m-0 dshx:box-border dshx:flex dshx:h-[42px] dshx:w-auto dshx:min-w-0 dshx:flex-1 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:overflow-hidden dshx:rounded-lg dshx:border-none dshx:bg-transparent dshx:py-0 dshx:pr-2.5 dshx:pl-2 dshx:text-base dshx:leading-[22px] dshx:text-foreground dshx:hover:bg-[var(--dsw-alias-interactive-bg-hover)]',
                   !wide && 'dshx:size-9 dshx:flex-none dshx:justify-center dshx:gap-0 dshx:p-0',
                 )}
                 onClick={deps.openSettings}

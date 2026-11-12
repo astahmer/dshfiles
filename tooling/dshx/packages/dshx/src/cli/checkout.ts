@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import type { Writable } from 'node:stream'
 import { CheckoutSyncError } from '../checkout/rebuild.js'
-import { syncCheckout, type CheckoutSyncResult } from '../checkout/sync.js'
+import { planCheckout, syncCheckout, type CheckoutPlanResult, type CheckoutSyncResult } from '../checkout/sync.js'
 import { TracerModel } from '../tracing/tracer.js'
 import { CliOutput } from './common.js'
 
@@ -17,6 +17,10 @@ restart (Host bundle or manifest changes) or picks the change up over HMR (clien
 When the profile seed changed it reconciles the live web profile with scripts/profile-sync.ts (skipped when
 DSHFILES_DIR names another checkout); a restart applies it.
 It never restarts DSH.
+
+dshx checkout plan --revision <commit> — what moving that checkout to a revision would install, rebuild and
+restart, read only (no rebase, no snapshot). The revision need not be on a bookmark: a thread's head before it
+lands, or main@origin before it is fetched in. Changes count from the last commit the checkout shares with it.
 
 Options:
   --workspace <name>   jj workspace to sync (default "default").
@@ -64,6 +68,45 @@ const humanReport = (result: CheckoutSyncResult): string => {
   return `${lines.join('\n')}\n`
 }
 
+const humanPlan = (result: CheckoutPlanResult): string => {
+  const hot = result.plugins.filter(plugin => plugin.client && !plugin.host).map(plugin => plugin.name)
+  return `${[
+    `${result.workspace} (${result.path}) → ${result.to.slice(0, 12)}`,
+    `  files      ${String(result.changedFiles.length)} changed since ${result.from?.slice(0, 12) ?? 'root'}`,
+    `  install    ${list(result.installs)}`,
+    `  rebuild    ${list([...(result.rebuilt.dshx ? ['dshx'] : []), ...result.rebuilt.plugins])}`,
+    ...(hot.length === 0 ? [] : [`  hmr        ${list(hot)}`]),
+    result.restart.needed ? `  restart    needed: ${result.restart.reasons.join('; ')}` : '  restart    not needed',
+  ].join('\n')}\n`
+}
+
+const runPlan = async (
+  argv: readonly string[],
+  io: { readonly stdout: Writable; readonly stderr: Writable },
+  fail: (error: CheckoutSyncError) => number,
+  json: boolean,
+): Promise<number> => {
+  let values: { readonly workspace: string; readonly revision?: string | undefined; readonly cwd?: string | undefined }
+  try {
+    values = parseArgs({
+      args: [...argv],
+      strict: true,
+      options: { workspace: { type: 'string', default: 'default' }, revision: { type: 'string' }, cwd: { type: 'string' }, json: { type: 'boolean' } },
+    }).values
+  } catch (error) {
+    return fail(new CheckoutSyncError('usage', error instanceof Error ? error.message : String(error), 'Run "dshx checkout sync --help".'))
+  }
+  if (values.revision === undefined) return fail(new CheckoutSyncError('usage', 'checkout plan needs --revision <commit>.', 'Pass a full commit id.'))
+  try {
+    const result = await planCheckout({ cwd: values.cwd ?? process.cwd(), workspace: values.workspace, revision: values.revision })
+    write(io.stdout, json ? `${JSON.stringify({ schemaVersion: 1, command: 'checkout plan', ok: true, data: result }, null, 2)}\n` : humanPlan(result))
+    return 0
+  } catch (error) {
+    if (error instanceof CheckoutSyncError) return fail(error)
+    return fail(new CheckoutSyncError('failed', error instanceof Error ? error.message : String(error), 'Re-run with --json and read the error.'))
+  }
+}
+
 export const runCheckoutCli = async (argv: readonly string[], io: { readonly stdout: Writable; readonly stderr: Writable }): Promise<number> => {
   const action = argv[0] ?? ''
   const command = `checkout ${action}`.trim()
@@ -77,6 +120,7 @@ export const runCheckoutCli = async (argv: readonly string[], io: { readonly std
     write(io.stdout, `${HELP}\n`)
     return 0
   }
+  if (action === 'plan') return runPlan(argv.slice(1), io, fail, json)
   if (action !== 'sync') return fail(new CheckoutSyncError('usage', `Unknown checkout action "${action}".`, 'Run "dshx checkout sync --help".'))
 
   const parse = () =>

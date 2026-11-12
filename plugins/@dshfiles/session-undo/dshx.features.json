@@ -100,7 +100,7 @@
       "externalDependencies": [],
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"Add a second turn to rewind past\"",
+        "fill textbox \"commands, @ files or threads*\" \"Add a second turn to rewind past\"",
         "press Enter",
         "click button \"Rewind to an earlier turn\"",
         "click menuitem \"Rewind to here · Turn 1\"",
@@ -145,16 +145,16 @@
     {
       "id": "turn-checkpoint",
       "title": "Each turn names the jj revision its edits left, with Restore to here",
-      "summary": "When a turn ends in a jj workspace, session-undo snapshots the files again and records the revision holding them (@, or its parent past an empty undescribed change) when it differs from the turn's start. The turn's action row shows it as a jj: reference the Jujutsu panel opens, and Restore to here rewinds to the start of the next recorded turn, so files and conversation return to how this turn left them. A git workspace takes no turn-end snapshot and shows nothing.",
+      "summary": "When a turn ends in a jj workspace, session-undo snapshots the files again and records the revision holding them (@, or its parent past an empty undescribed change) when it differs from the turn's start. The reply's More actions menu shows it as a muted change name (a jj: reference the Jujutsu panel opens), and Restore to here rewinds to the start of the next recorded turn, so files and conversation return to how this turn left them. A git workspace takes no turn-end snapshot and shows nothing.",
       "surfaces": ["client", "host", "integration"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: turn action row",
+      "currentSurface": "transcript: reply More actions menu",
       "configuration": [
         {
           "key": "turnRevisions",
           "defaultValue": "true",
-          "constraints": "Boolean; off skips the turn-end snapshot and hides the revision and Restore in the turn's action row.",
+          "constraints": "Boolean; off skips the turn-end snapshot and hides the revision and Restore in the reply's More actions menu.",
           "choices": ["true", "false"],
           "coveredBy": ["session-undo.turn-revision"]
         }
@@ -176,9 +176,9 @@
       ],
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"echo one > reach-1.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
+        "fill textbox \"commands, @ files or threads*\" \"[[call bash {\\\"command\\\":\\\"echo one > reach-1.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
         "press Enter",
-        "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"echo two > reach-2.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
+        "fill textbox \"commands, @ files or threads*\" \"[[call bash {\\\"command\\\":\\\"echo two > reach-2.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
         "press Enter",
         "expect button \"Restore to after this turn\""
       ],

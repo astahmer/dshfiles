@@ -38,7 +38,7 @@ export const AttributeTable = (props: {
               <dt className="dshx:min-w-0 dshx:break-all dshx:font-mono dshx:text-muted-foreground">{key}</dt>
               <dd className="dshx:min-w-0 dshx:break-all dshx:font-mono" data-attribute={key}>
                 {TraceFormat.attribute(value)}
-                {isRedacted(value) ? <span className="dshx:block dshx:font-sans dshx:text-[11px] dshx:text-warning">{props.t('redactedNote')}</span> : null}
+                {isRedacted(value) ? <span className="dshx:block dshx:font-sans dshx:text-2xs dshx:text-warning">{props.t('redactedNote')}</span> : null}
               </dd>
             </div>
           ))}
@@ -87,7 +87,7 @@ const StackTraceView = (props: { readonly stacktrace: string; readonly heading: 
           className="dshx:p-3"
         />
       ) : (
-        <pre className="dshx:max-h-80 dshx:overflow-auto dshx:rounded dshx:bg-muted/40 dshx:p-2 dshx:font-mono dshx:text-[11px] dshx:leading-4 dshx:whitespace-pre">
+        <pre className="dshx:max-h-80 dshx:overflow-auto dshx:rounded dshx:bg-muted/40 dshx:p-2 dshx:font-mono dshx:text-2xs dshx:leading-4 dshx:whitespace-pre">
           {props.stacktrace}
         </pre>
       )}

@@ -68,7 +68,7 @@ export const Highlight = (props: { readonly text: string; readonly query: string
   while (at !== -1) {
     if (at > from) parts.push(props.text.slice(from, at))
     parts.push(
-      <mark className="dshx:rounded-[2px] dshx:bg-warning/30 dshx:text-inherit" key={at}>
+      <mark className="dshx:rounded-xs dshx:bg-warning/30 dshx:text-inherit" key={at}>
         {props.text.slice(at, at + query.length)}
       </mark>,
     )
@@ -524,14 +524,14 @@ const SettingRow = (props: {
       )}
       <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-6">
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-          <span className="dshx:flex dshx:min-h-5 dshx:items-center dshx:gap-2 dshx:text-[14px] dshx:leading-5 dshx:text-foreground">
+          <span className="dshx:flex dshx:min-h-5 dshx:items-center dshx:gap-2 dshx:text-base dshx:leading-5 dshx:text-foreground">
             <span data-setting-label={field.path.join('.')}>
               <Highlight query={props.highlight} text={field.title} />
             </span>
             {props.modified && <span className="dshx:sr-only">{props.t('form.modified')}</span>}
             {props.modified && (
               <Button
-                className="dshx:h-5 dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground dshx:opacity-0 dshx:group-focus-within:opacity-100 dshx:group-hover:opacity-100 dshx:focus-visible:opacity-100"
+                className="dshx:h-5 dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground dshx:opacity-0 dshx:group-focus-within:opacity-100 dshx:group-hover:opacity-100 dshx:focus-visible:opacity-100"
                 disabled={props.disabled}
                 onClick={reset}
                 size="xs"
@@ -544,11 +544,11 @@ const SettingRow = (props: {
             )}
           </span>
           {field.description !== '' && (
-            <span className="dshx:text-[12px] dshx:leading-[18px] dshx:text-muted-foreground">
+            <span className="dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">
               <Highlight query={props.highlight} text={field.description} />
             </span>
           )}
-          <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2 dshx:text-[11px] dshx:text-muted-foreground/80">
+          <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2 dshx:text-2xs dshx:text-muted-foreground/80">
             <code className="dshx:font-mono">
               <Highlight query={props.highlight} text={field.path.join('.')} />
             </code>

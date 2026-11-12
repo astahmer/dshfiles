@@ -13,6 +13,27 @@ const HISTORY_ROWS = 50
 
 export const promptHistoryKeys = { search: (text: string) => ['prompt-stash', 'history', text] as const }
 
+const relativeTime = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+const STEPS: readonly (readonly [Intl.RelativeTimeFormatUnit, number])[] = [
+  ['minute', 60],
+  ['hour', 60 * 60],
+  ['day', 24 * 60 * 60],
+]
+
+/** "5 minutes ago", "yesterday", then the date after a week; the exact instant stays in the `<time>` element. */
+const sentAt = (time: number, now: number): string => {
+  const seconds = Math.round((time - now) / 1000)
+  if (Math.abs(seconds) < 60) return relativeTime.format(0, 'minute')
+  for (const [index, [unit, size]] of STEPS.entries()) {
+    const next = STEPS[index + 1]
+    if (next === undefined || Math.abs(seconds) < next[1]) {
+      const value = Math.round(seconds / size)
+      if (unit !== 'day' || Math.abs(value) < 7) return relativeTime.format(value, unit)
+    }
+  }
+  return new Date(time).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 const emptyLine = (text: string): JSX.Element => <p className="dshx:px-3 dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">{text}</p>
 
 /** Every prompt the user sent across threads, searched on the Host; Enter inserts, the star saves it to the library. */
@@ -37,6 +58,7 @@ export const PromptHistoryTab = (props: {
   })
 
   const prompts: readonly HistoryPrompt[] = history.data?.prompts ?? []
+  const [now] = useState(() => Date.now())
   const status = history.isError ? 'error' : (history.data?.status ?? 'loading')
 
   return (
@@ -45,9 +67,9 @@ export const PromptHistoryTab = (props: {
       <CommandList className="dshx:max-h-80 dshx:p-1" label="Prompt history">
         {status === 'loading' ? emptyLine('Searching sent prompts…') : null}
         {status === 'error' ? emptyLine('Prompt history could not be read. Reopen Prompts to try again; restart DSH if it keeps failing.') : null}
-        {status === 'disabled' ? emptyLine('Prompt history is off. Turn on promptHistory in Settings › Plugins › Prompt Stash.') : null}
+        {status === 'disabled' ? emptyLine('Prompt history is off. Turn it on in Settings › Plugins › Prompt stash, then reopen Prompts.') : null}
         {status === 'unavailable'
-          ? emptyLine('Prompt history needs the Session Search plugin. Add @dshfiles/session-search to this profile and restart DSH.')
+          ? emptyLine('Prompt history needs thread search, which this profile does not load. Enable it under Getting started › Packs, then restart DSH.')
           : null}
         {status === 'ready' ? (
           <CommandEmpty className="dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">
@@ -66,7 +88,9 @@ export const PromptHistoryTab = (props: {
               className="dshx:group/history dshx:items-start"
             >
               <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-                <span className="dshx:text-xs dshx:text-muted-foreground">{new Date(prompt.time).toLocaleString()}</span>
+                <time className="dshx:text-xs dshx:text-muted-foreground" dateTime={new Date(prompt.time).toISOString()}>
+                  {sentAt(prompt.time, now)}
+                </time>
                 <span className="dshx:line-clamp-2 dshx:w-full dshx:text-sm">{prompt.text.slice(0, 240)}</span>
               </div>
               <Button
@@ -75,7 +99,7 @@ export const PromptHistoryTab = (props: {
                 size="icon-xs"
                 className={cn(
                   'dshx:flex-none dshx:pointer-coarse:size-11',
-                  saved ? 'dshx:text-warning' : 'dshx:text-muted-foreground dshx:hover:text-foreground',
+                  saved ? 'dshx:text-foreground' : 'dshx:text-muted-foreground dshx:hover:text-foreground',
                 )}
                 aria-label={saved ? 'Saved to prompts' : 'Save to prompts'}
                 aria-pressed={saved}

@@ -1,5 +1,5 @@
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
-import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, EyeIcon, EyeOffIcon, TagIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, EyeIcon, EyeOffIcon, PinIcon, TagIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 import { useApi } from '@dshfiles/dshx/client'
@@ -78,8 +78,12 @@ export const ArrangeableAccount = (props: {
   /** Give the wrapper a tab stop when its child is not focusable itself. */
   readonly focusable?: boolean
   readonly className?: string
+  /** Marks a status-strip segment, which the strip measures (b:hbtt). */
+  readonly stripSegment?: boolean
   readonly children: ReactNode
   readonly threadAction?: { readonly disabled: boolean; readonly onSelect: () => void }
+  /** Pin this account to the status bar (b:hbtt: pins filter it); absent where the strip does not apply. */
+  readonly pinAction?: { readonly pinned: boolean; readonly onSelect: () => void } | undefined
 }): JSX.Element => {
   const [dropTarget, setDropTarget] = useState(false)
   const index = props.shownIds.indexOf(props.id)
@@ -95,6 +99,7 @@ export const ArrangeableAccount = (props: {
       <ContextMenuTrigger asChild>
         <div
           className={cn(props.className, dropTarget && 'dshx:rounded-md dshx:ring-2 dshx:ring-ring/60')}
+          data-quota-segment={props.stripSegment === true ? '' : undefined}
           aria-label={props.focusable === true ? `${props.name}: drag to reorder, or open the context menu to move or hide` : undefined}
           aria-busy={props.arrangement.pending && showStatus}
           draggable={!disabled}
@@ -135,6 +140,15 @@ export const ArrangeableAccount = (props: {
           <>
             <ContextMenuItem disabled={props.threadAction.disabled} onSelect={props.threadAction.onSelect}>
               Use this account for this thread
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
+        {props.pinAction === undefined ? null : (
+          <>
+            <ContextMenuItem onSelect={props.pinAction.onSelect}>
+              <PinIcon />
+              {props.pinAction.pinned ? 'Unpin from the status bar' : 'Pin to the status bar'}
             </ContextMenuItem>
             <ContextMenuSeparator />
           </>

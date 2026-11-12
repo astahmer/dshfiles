@@ -12,10 +12,11 @@
  * (a localized title), then the description right-aligned. A source publishing crumbs gets a breadcrumb
  * header pinned above the scrolling list.
  */
+import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { MenuSurface } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
-import { IconChevronRightOutlineRegular, ReferenceIconRegular, useAnchoredMaxHeight } from '@deepseek-ai/dsh-client-ui-primitives'
+import { ReferenceIconRegular, useAnchoredMaxHeight } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './MenuView.module.css'
 import type { MenuViewInjected } from './slots.js'
@@ -117,7 +118,7 @@ const MenuRow = memo(({ source, index, item, active, previousSection, t, onPick,
               onPick(source, index, 'drill')
             }}
           >
-            <IconChevronRightOutlineRegular size={12} />
+            <ChevronRightIcon strokeWidth={1.5} size={12} />
           </span>
         </span>
       )}
@@ -189,7 +190,7 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
               <Fragment key={`${String(index)}-${crumb.value}`}>
                 {index > 0 && (
                   <span className={css.crumbSeparator} aria-hidden>
-                    <IconChevronRightOutlineRegular />
+                    <ChevronRightIcon size={14} strokeWidth={1.5} />
                   </span>
                 )}
                 <button

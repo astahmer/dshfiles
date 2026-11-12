@@ -417,3 +417,63 @@ const syncOnce = async (options: SyncCheckoutOptions): Promise<Omit<CheckoutSync
  * Every jj step runs in the workspace's own directory, so its files follow the rebase.
  */
 export const syncCheckout = async (options: SyncCheckoutOptions): Promise<CheckoutSyncResult> => finish(await syncOnce(options))
+
+export interface CheckoutPlanResult {
+  readonly workspace: string
+  readonly path: string
+  /** The commit this checkout and the revision last shared; changes after it are what the revision would bring. */
+  readonly from: string | null
+  readonly to: string
+  readonly changedFiles: readonly string[]
+  readonly installs: readonly string[]
+  readonly rebuilt: { readonly dshx: boolean; readonly plugins: readonly string[] }
+  readonly plugins: readonly PluginEffect[]
+  readonly restart: { readonly needed: boolean; readonly reasons: readonly string[] }
+}
+
+/**
+ * What moving the checkout of one jj workspace to a revision would install, rebuild and restart, read only: no rebase,
+ * no snapshot, no operation. The revision need not be on a bookmark (a thread's head before it lands, `main@origin`
+ * before it is fetched in), so this answers "what would the running DSH pick up" without `sync --dry-run`'s simulated
+ * rebase. Changes count from the last commit the checkout and the revision share; the checkout's own local edits are
+ * not part of it.
+ */
+export const planCheckout = async (options: { readonly cwd: string; readonly workspace: string; readonly revision: string }): Promise<CheckoutPlanResult> => {
+  if (!/^[A-Za-z0-9._-]+$/u.test(options.workspace)) throw new CheckoutSyncError('usage', '--workspace takes a plain jj name.', 'Use e.g. --workspace default.')
+  if (!COMMIT_ID.test(options.revision))
+    throw new CheckoutSyncError('usage', '--revision must be a full lowercase hexadecimal commit id.', 'Pass a 40- or 64-character jj commit id.')
+  const located = await CheckoutRebuild.command({
+    argv: ['jj', '--color=never', '--no-pager', '--ignore-working-copy', 'workspace', 'root', '--name', options.workspace],
+    cwd: options.cwd,
+  })
+  if (located.exitCode !== 0)
+    throw new CheckoutSyncError(
+      'no-workspace',
+      `No jj workspace named "${options.workspace}" here.`,
+      'List them with "jj workspace list", then pass --workspace <name>.',
+    )
+  const path = located.output.trim()
+  const jj = jjAt(path)
+  const revset = commitIdRevset(options.revision)
+  const target = (await jj.revisions(revset)).find(revision => COMMIT_ID.test(revision.commitId))
+  if (target === undefined)
+    throw new CheckoutSyncError('no-revision', `The revision ${options.revision} does not exist.`, 'Pass a full commit id available in this repository.')
+  const workingCopy = `${options.workspace}@`
+  const from = (await jj.revisions(`latest(heads(::${workingCopy} & ::${revset}))`))[0]?.commitId ?? null
+  const changedFiles = (await jj.read(['--ignore-working-copy', 'diff', '--from', from ?? 'root()', '--to', target.commitId, '--name-only']))
+    .split('\n')
+    .filter(line => line.length > 0)
+  const plan = CheckoutRebuild.plan({ root: path, changedFiles })
+  const reasons = restartReasons(plan.plugins, plan.profileChanged ? 'the profile seed changed: a sync reconciles the web profile; restart to apply' : null)
+  return {
+    workspace: options.workspace,
+    path,
+    from,
+    to: target.commitId,
+    changedFiles: changedFiles.slice(0, MAX_LISTED_FILES),
+    installs: plan.installRoots,
+    rebuilt: { dshx: plan.dshx, plugins: plan.plugins.map(plugin => plugin.name) },
+    plugins: plan.plugins,
+    restart: { needed: reasons.length > 0, reasons },
+  }
+}

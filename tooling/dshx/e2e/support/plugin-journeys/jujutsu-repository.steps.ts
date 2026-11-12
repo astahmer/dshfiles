@@ -323,11 +323,19 @@ Then('the workspace {string} exists and a session opens in it only when asked', 
   await provision.getByRole('button', { name: 'Open a thread here', exact: true }).click()
   await recordAssertion(page, 'jujutsu-session-opens-in-the-new-workspace', async () => {
     await expect(page.getByRole('treeitem', { name, exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(name)
-    await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toBeEditable()
+    await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toHaveText(name)
+    await expect(page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })).toBeEditable()
   })
   await finishJourneyAssertions(page)
 })
+
+/** The composer meter line's Jujutsu location entry: "Own workspace · 1 ahead of main" (b:gyk7, b:212a). */
+const locationChip = (page: Page) =>
+  page
+    .locator('[data-composer-meta="location"] button')
+    .filter({ visible: true })
+    .filter({ hasText: /^Own workspace · (\d+ )?ahead of main$/u })
+    .first()
 
 When('the repository is registered and a thread is started in it', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
@@ -337,9 +345,13 @@ When('the repository is registered and a thread is started in it', async ({ page
   await page.getByRole('option', { name: /^Own workspace/ }).click()
   await sendMessage(page, 'jujutsu composer context thread')
   // Choosing Own workspace and sending can each provision one, so the thread's own workspace is the one its chip names.
-  const chip = page.getByRole('button', { name: /^repo \(thread-[0-9a-f]{6} \/ main\+\)$/ })
+  // The meter line's location entry (b:gyk7): the run summary names the project, the chip says where the working copy
+  // stands, and its tooltip names the workspace.
+  const chip = locationChip(page)
   await expect(chip).toBeVisible({ timeout: 30_000 })
-  const threadName = /thread-[0-9a-f]{6}/u.exec((await chip.getAttribute('aria-label')) ?? (await chip.textContent()) ?? '')?.[0]
+  await chip.hover()
+  const threadName = /thread-[0-9a-f]{6}/u.exec(await page.getByRole('tooltip').innerText())?.[0]
+  await page.mouse.move(1, 1)
   const workspaces = jj(repository, ['--ignore-working-copy', 'workspace', 'list'])
   const threadRelativePath = workspaces
     .split('\n')
@@ -488,16 +500,15 @@ Then('clicking the foreign reference opens the panel on the other repository foc
   await finishJourneyAssertions(page)
 })
 
-Then('the composer run summary names the project, thread workspace and bookmark in one chip', async ({ page }: { page: Page }) => {
-  const summary = page.locator('[data-run-summary]')
-  const chip = summary.locator('[data-jujutsu-location]').getByRole('button', { name: /^main\+$/ })
+Then('the composer dock names the project, thread workspace and bookmark in one chip', async ({ page }: { page: Page }) => {
+  const chip = locationChip(page)
   const viewport = page.viewportSize()
-  await recordAssertion(page, 'jujutsu-composer-run-summary-has-one-context-chip', async () => {
-    await expect(summary).toHaveCount(1)
-    await expect(summary).toContainText('repo')
-    await expect(summary).toContainText(/thread-[0-9a-f]{6}/u)
+  await recordAssertion(page, 'jujutsu-composer-dock-has-one-context-chip', async () => {
     await expect(chip).toBeVisible()
-    await expect(page.getByRole('button', { name: /^thread-[0-9a-f]{6}/u })).toHaveCount(0)
+    await expect(page.locator('[data-composer-meta="location"]').filter({ visible: true })).toHaveCount(1)
+    // The project is named once, by the run summary before it.
+    await expect(page.locator('[data-composer-dock] [data-run-summary]').filter({ visible: true }).first()).toContainText('repo')
+    await expect(chip).not.toContainText('repo')
   })
   for (const width of [360, 480, 768, 1024]) {
     await page.setViewportSize({ width, height: viewport?.height ?? 900 })

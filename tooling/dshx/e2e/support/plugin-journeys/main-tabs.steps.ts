@@ -133,7 +133,7 @@ When('a disposable native-tabs workspace is selected', async ({ page }: { page: 
   if (await addWorkspace.isVisible()) await registerWorkspaceFolder(page, root)
   else {
     // Owned sidebar profiles use the composer's public project picker rather than the native Add workspace button.
-    await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+    await page.getByRole('button', { name: /^Choose (?:project|workspace)$/u }).click()
     const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
     await expect(picker).toBeVisible()
     await picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true }).fill(root)
@@ -152,18 +152,18 @@ When('a disposable native-tabs workspace is selected', async ({ page }: { page: 
       await expect(setup).toBeHidden()
     }
   }
-  await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(basename(root))
+  await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toHaveText(basename(root))
 })
 
 const startNativeThread = async (page: Page, prompt: string): Promise<string> => {
   const root = nativeWorkspaceRoots.get(page)
   if (root === undefined) throw new Error("Select this scenario's disposable native-tabs workspace before creating threads.")
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   // Workspace setup can already own a visible blank draft. Starting another native Session here is asynchronous
   // and can replace that composer after fill; reuse it rather than racing an unnecessary navigation.
   if (!(await composer.isVisible())) await newThreadButton(page).click()
   await StartupDialogs.dismissProviderSetupIfShown(page)
-  await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(basename(root))
+  await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toHaveText(basename(root))
   await composer.fill(prompt)
   const send = page.getByRole('button', { name: 'Send message', exact: true })
   await expect(send).toBeEnabled()
@@ -305,7 +305,7 @@ When('the Jujutsu tab is closed with a middle click and other tabs are closed fr
 Then('only the pinned Plugins and the thread remain', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-close-others-keeps-pinned', async () => {
     await expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'tabs thread*'])
-    await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -329,7 +329,7 @@ When('a thread is started beside the Plugins tab', async ({ page }: { page: Page
 Then('the tab strip still sits directly above the main panel', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-strip-follows-panel-changes', async () => {
     await expect.poll(() => stripPlacement(page)).toEqual(expectedPlacement)
-    await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

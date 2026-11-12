@@ -366,7 +366,7 @@ function Row({
         aria-hidden
         className={cn(
           'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:font-semibold dshx:tracking-wide',
-          compact ? 'dshx:h-5 dshx:min-w-8 dshx:rounded-md dshx:px-1 dshx:text-[10px]' : 'dshx:size-10 dshx:rounded-xl dshx:text-[11px]',
+          compact ? 'dshx:h-5 dshx:min-w-8 dshx:rounded-md dshx:px-1 dshx:text-2xs' : 'dshx:size-10 dshx:rounded-xl dshx:text-2xs',
           tileTone[item.tone ?? 'muted'],
         )}
       >

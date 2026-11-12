@@ -7,7 +7,7 @@ Agent work you can read at a glance, in the transcript and beside the composer:
 - **Plan card.** Each `todo_write` call is drawn as a plan: "Step 2 of 3 · Fix the rounding bug", expanding to every step with a done / active / pending glyph and how long it took. A call the card cannot read, or that failed, shows the native todo row.
 - **Pinned step.** While the latest turn's plan has steps left, a chip beside the native plan-mode control says "Step 2 of 3 · Fix the rounding bug · 12s" and opens the whole plan.
 - **Live activity strip.** While anything runs, a strip beside the native composer activity names it — the running tool call, background jobs, subagents — with a live timer, and opens the full list with a timer per row. It renders nothing while idle.
-- **Compaction meter.** In the composer's meter line, beside the native context ring and the cost estimate, a chip counts the tokens left before automatic compaction: "compacts in ~40K", then "compacts next step". Its tooltip gives the trigger and the window ("Automatic compaction at ~126K of 200K (63%)").
+- **Compaction meter.** Open the composer's context ring: under the occupancy breakdown, a row counts the tokens left before automatic compaction ("Compacts in ~40K", then "Compacts next step") and gives the trigger and the window ("Automatic compaction at ~126K of 200K (63%)"). The meter line keeps one context item.
 - **Failure card.** Under a native turn-error row, and under a model-retry row once retrying gave up, a bar shows the retry count and two actions: **Retry** puts a retry request in the composer, **Ask to fix** inserts the failure with a request to fix it. Neither sends: you review and send. Stopped or interrupted turns get no actions.
 
 ![Live activity strip beside the composer controls](docs/screenshots/live-activity-strip.png)
@@ -22,15 +22,15 @@ Built with dshx (no port). The view ideas come from affectUI Agent Plan, AI Elem
 
 All apply live. Turning a card off restores the native view.
 
-| Key               | Default | Meaning                                                                  |
-| ----------------- | ------- | ------------------------------------------------------------------------ |
-| `enabled`         | `true`  | Master switch for every card below.                                      |
-| `planCard`        | `true`  | Draw `todo_write` calls as the plan card instead of the native todo row. |
-| `stepTiming`      | `true`  | Show how long each step took.                                            |
-| `pinnedStep`      | `true`  | Pin the current plan step beside the composer.                           |
-| `activityStrip`   | `true`  | Show what runs now beside the composer controls.                         |
-| `failureCard`     | `true`  | Add the retry count and Retry / Ask to fix under failure rows.           |
-| `compactionMeter` | `true`  | Count the tokens left before automatic compaction in the meter line.     |
+| Key               | Default | Meaning                                                                       |
+| ----------------- | ------- | ----------------------------------------------------------------------------- |
+| `enabled`         | `true`  | Master switch for every card below.                                           |
+| `planCard`        | `true`  | Draw `todo_write` calls as the plan card instead of the native todo row.      |
+| `stepTiming`      | `true`  | Show how long each step took.                                                 |
+| `pinnedStep`      | `true`  | Pin the current plan step beside the composer.                                |
+| `activityStrip`   | `true`  | Show what runs now beside the composer controls.                              |
+| `failureCard`     | `true`  | Add the retry count and Retry / Ask to fix under failure rows.                |
+| `compactionMeter` | `true`  | Count the tokens left before automatic compaction in the context meter panel. |
 
 ## How it works
 
@@ -42,7 +42,7 @@ All apply live. Turning a card off restores the native view.
   - `tool.call.toolview` key `todo_write`: the plan card, with the native row as the fallback.
   - `conversation.input.plan` and `conversation.input.activity` are single slots held by native controls: the pin and the strip render **beside** the occupant, never instead of it. Where no native control holds the seat, the plugin's own entry (priority 100, losing to any native one) shows the chip alone.
   - `conversation.chat.node` keys `turn-error` and `model-retry`: the native row stays as drawn, the failure bar goes under it.
-- **Compaction meter.** The context meter itself is native: the ring and its breakdown come from `@deepseek-ai/dsh-token-meter`'s `contextPressure` / `contextBreakdown` projections (`@dshfiles/rich-composer` draws them), and the cost estimate is `@dshfiles/ai-accounts`'. This plugin adds only the missing reading, the next compaction, as a `conversation.composer.dock` entry (order 5, before the AI Accounts cost at 10). The trigger comes from `@dshfiles/context-compaction`'s `threshold` API (agent tool `compaction_threshold`), which applies the running engine's policy to the thread's routed model, window and output reservation exactly as the engine does; it is refetched when the route's window changes. The live size is the `projectedTokens` the ring shows. Without context-compaction (stock `compaction-basic`), or with automatic compaction off, the chip stays hidden.
+- **Compaction meter.** The context meter itself is native: the ring and its breakdown come from `@deepseek-ai/dsh-token-meter`'s `contextPressure` / `contextBreakdown` projections (`@dshfiles/rich-composer` draws them), and the cost estimate is `@dshfiles/ai-accounts`'. This plugin adds only the missing reading, the next compaction, as a row in rich-composer's `conversation.composer.context` seat inside the context meter panel (order 5). The trigger comes from `@dshfiles/context-compaction`'s `threshold` API (agent tool `compaction_threshold`), which applies the running engine's policy to the thread's routed model, window and output reservation exactly as the engine does; it is refetched when the route's window changes. The live size is the `projectedTokens` the ring shows. Without context-compaction (stock `compaction-basic`), or with automatic compaction off, the row stays hidden; like the ring it shows from 25% occupancy.
 - **Actions.** Retry and Ask to fix use the dshx `Composer` contract (`setText` / `insert`, then `focus`), provided by `@dshfiles/rich-composer`. Without a provider the actions are hidden and only the retry count shows.
 
 ## Limits

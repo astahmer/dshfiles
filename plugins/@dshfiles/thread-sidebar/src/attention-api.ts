@@ -27,6 +27,11 @@ export const threadAttentionViewSchema = SchemaHelpers.strictStruct(
     finishedSeq: Schema.NullOr(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
     finishedReason: Schema.NullOr(Schema.Literals(ATTENTION_FINISH_REASONS)),
     manuallyUnread: Schema.Boolean,
+    /**
+     * Sequence of the first finished turn the user has not seen since they last read the thread; absent on records
+     * written before it existed (then only `finishedSeq` is known). Chat draws "Since you left" above that turn.
+     */
+    firstUnreadSeq: Schema.optionalKey(Schema.NullOr(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)))),
   }),
 )
 

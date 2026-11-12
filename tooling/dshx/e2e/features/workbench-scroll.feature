@@ -3,6 +3,7 @@ Feature: Workbench long conversation scrolling
   @scenario:workbench.long-conversation-scroll
   Scenario: Long fixed conversations keep their real composer reachable through scrolling switching and reload
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/main-tabs, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     And the second Workbench conversation receives a long history message

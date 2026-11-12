@@ -17,6 +17,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 import type { AgentPresetSettingsState } from './settings-store.ts'
 import { presetDisplayText } from './locales.ts'
+import { headerNamesPreset } from './label-visibility.ts'
 import css from './AgentPresetLabel.module.css'
 
 /** Registration-side business face for the header label. */
@@ -48,6 +49,8 @@ export function AgentPresetLabel({
     return typeof value === 'string' ? value : undefined
   })
   const options = useAgentPresets(state => state.options)
+  const roster = useAgentPresets(state => state.status)
+  const defaultPreset = useAgentPresets(state => state.defaultPreset)
 
   useEffect(() => {
     // Deployments that compose no presets never label anything, so the roster
@@ -55,14 +58,14 @@ export function AgentPresetLabel({
     if (preset !== undefined) void load()
   }, [preset, load])
 
-  if (preset === undefined) return null
+  if (preset === undefined || !headerNamesPreset(preset, roster, defaultPreset)) return null
 
   const option = options.find(entry => entry.id === preset)
   const text = option === undefined ? undefined : presetDisplayText(option, t)
   return (
     <span className={css.label} title={text?.description ?? t('headerHint')}>
       <IconAgentPresetOutlineRegular size={14} className={css.icon} />
-      {text?.name ?? preset}
+      <span className={css.name}>{text?.name ?? preset}</span>
     </span>
   )
 }

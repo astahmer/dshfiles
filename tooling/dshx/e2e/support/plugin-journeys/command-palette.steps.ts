@@ -168,7 +168,7 @@ When('a searchable user message is sent to a new thread', async ({ page }: { pag
     await promptGate
     await route.continue()
   })
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions' })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill(marker)
   await composer.press('Enter')
   await expect(page.getByText(marker, { exact: true }).first()).toBeVisible()
@@ -316,6 +316,11 @@ Then('command, content, line, and help prefixes open their matching views', asyn
 Then('the empty palette suggests {string} with the keys {string}', async ({ page }: { page: Page }, title: string, keys: string) => {
   const option = paletteOption(page, new RegExp(title))
   await recordAssertion(page, 'suggested-command-shows-before-typing', () => expect(option).toBeVisible())
-  await recordAssertion(page, 'suggested-command-shows-effective-keys', () => expect(option).toContainText(keys))
+  // Rows draw a spec as the platform's keycaps (CommandKeys): Mod+B reads ⌘B on macOS and Ctrl B elsewhere.
+  const mac = await page.evaluate(() => navigator.platform.startsWith('Mac') || navigator.platform === 'macOS')
+  const caps = keys
+    .split('+')
+    .map(part => (part === 'Mod' ? (mac ? '⌘' : 'Ctrl') : part === 'Shift' ? (mac ? '⇧' : 'Shift') : part === 'Alt' ? (mac ? '⌥' : 'Alt') : part))
+  await recordAssertion(page, 'suggested-command-shows-effective-keys', () => expect(option).toContainText(caps.join('')))
   await finishJourneyAssertions(page)
 })

@@ -4,7 +4,7 @@ import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialo
 import { When, Then } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
-const names = { threads: 'Thread Sidebar: Threads', scratchpad: 'Workbench: Scratchpad' } as const
+const names = { threads: 'Threads', scratchpad: 'Workbench: Scratchpad' } as const
 interface FloatJourney {
   readonly id: string
   readonly name: string

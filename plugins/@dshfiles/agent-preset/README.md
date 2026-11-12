@@ -1,6 +1,12 @@
 # @dshfiles/agent-preset
 
-![Choose a preset on a local draft before typing](docs/screenshots/draft-preset-selection.png)
+![Choose a preset on a local draft before typing, from the composer's ⋯ › Agent mode…](docs/screenshots/draft-preset-selection.png)
+
+**Where the picker is (b:4v6p).** rich-composer hides the new-thread chip while the draft keeps the Host's default
+preset (Settings › Composer `showAgentPresetPicker` shows it always). The chip marks itself `data-agent-preset-default`
+and `data-agent-preset-open`; this plugin adds the composer ⋯ row **Agent mode…** and the ⌘K row **Agent mode: choose for
+the new thread…**, which open its menu. A non-default preset keeps the chip in view; a started thread's header names its preset only when
+it is not the Host default (b:4qjm).
 
 Whole native Loader-row fork of `@deepseek-ai/dsh-client-ui-agent-preset` from stock DSH `0.2.1-rc.2`.
 The native preset seat's private stage/apply controller cannot be replaced through an additive slot.
@@ -53,7 +59,9 @@ profile, install globally, restart DSH, or update the running Host.
   section and every seat sends one request instead of one per store. At boot that request waits for the page's
   first connected generation, whose `connection/reset` then only releases it instead of reloading every surface.
   [Locales](src/native/locales.ts) carry the
-  recorded copy delta. Native components and styles are unchanged.
+  recorded copy delta. The [header label](src/native/AgentPresetLabel.tsx) puts the preset name in its own span
+  ([styles](src/native/AgentPresetLabel.module.css)), so a label the header squeezes ends in an ellipsis instead of
+  being cut mid-letter (b:ark0). Other native components and styles are unchanged.
 
 On an upstream bump, run `node scripts/native-fork-diff.mjs agent-preset --to <new-tag>`, copy unchanged
 files, reapply the recorded deltas, update provenance, and rerun the focused tests plus the scratch journey.

@@ -59,12 +59,12 @@ export const NativeProvidersList = (props: {
                 </span>
                 <span className="dshx:min-w-0">
                   <strong className="dshx:block dshx:truncate dshx:text-sm dshx:font-semibold">{provider.label}</strong>
-                  <span className="dshx:mt-1 dshx:block dshx:text-[11px] dshx:text-muted-foreground">Built-in provider</span>
+                  <span className="dshx:mt-1 dshx:block dshx:text-2xs dshx:text-muted-foreground">Built-in provider</span>
                 </span>
               </button>
               <span
                 className={cn(
-                  'dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px]',
+                  'dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs',
                   provider.enabled && provider.running ? 'dshx:text-success' : 'dshx:text-muted-foreground',
                 )}
               >

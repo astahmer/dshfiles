@@ -16,7 +16,7 @@
       "surfaces": ["client", "host", "api", "tool", "command", "settings"],
       "surface": "destinationSection",
       "destination": "knowledge",
-      "currentSurface": "rail: Knowledge › Getting started; palette: Onboarding: Getting started",
+      "currentSurface": "rail: Knowledge › Getting started; palette: Getting started",
       "configuration": [
         {
           "key": "checklist",
@@ -243,17 +243,17 @@
     {
       "id": "setup-wizard",
       "title": "Get set up in three steps: account, project, first task",
-      "summary": "While no thread is open, a three-step setup wizard links to AI accounts, Settings › Projects and workspace isolation, ticks each step from the live checklist, and ends by inserting a starter prompt into the composer without sending it. Skip, Back and Next on every step; the outcome is kept per browser. Onboarding: Show the setup wizard and Start setup on Getting started replay it. It makes no model request.",
+      "summary": "While an AI account or a project is still missing (the live checklist) and no thread is open, a three-step setup wizard links to AI accounts, Settings › Projects and workspace isolation, ticks each step from the live checklist, and ends by inserting a starter prompt into the composer without sending it. It is a dialog (a bottom sheet on a phone) with focus kept inside: Escape, the close button or a link to a setup page put it away for now; Don't show again, Back and Next on every step, and only Done or Don't show again is kept per browser. Show the setup wizard (⌘K) and Start setup on Getting started replay it, on any profile. It makes no model request.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Show the setup wizard\"",
-        "click option \"Onboarding: Show the setup wizard*\"",
-        "expect region \"Connect an AI account\""
+        "click option \"Show the setup wizard*\"",
+        "expect dialog \"Connect an AI account\""
       ],
       "surfaces": ["client", "command", "settings"],
       "surface": "detail",
       "destination": "threads",
-      "currentSurface": "empty thread view (first run); palette: Onboarding: Show the setup wizard",
+      "currentSurface": "empty thread view (first run); palette: Show the setup wizard",
       "configuration": [
         {
           "key": "wizard",
@@ -276,7 +276,7 @@
       ],
       "onboarding": {
         "prerequisites": ["account", "project"],
-        "firstAction": "Run Onboarding: Show the setup wizard from the command palette.",
+        "firstAction": "Run Show the setup wizard from the command palette.",
         "doneWhen": "A starter prompt waits in the composer.",
         "open": {
           "command": "@dshfiles/onboarding.wizard"
@@ -292,7 +292,7 @@
           "kind": "unit-test",
           "id": "onboarding.wizard",
           "file": "plugins/@dshfiles/onboarding/src/setup-wizard.test.tsx",
-          "testName": "walks account, project and first task, inserts the prompt without sending, and reports skip"
+          "testName": "walks account, project and first task, inserts the prompt without sending, and keeps Don’t show again"
         }
       ]
     },

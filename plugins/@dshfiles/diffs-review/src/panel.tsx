@@ -124,7 +124,11 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
       ? reviewPath === ''
         ? 'Choose project or workspace'
         : `Other folder · ${reviewPath.split('/').filter(Boolean).at(-1) ?? reviewPath}`
-      : selectedProject.title
+      : selectedProject.isJjWorkspace === true
+        ? // A thread workspace is registered as "sample · thread-e4fde2"; the label names its project and says it is the
+          // thread's own workspace, never the folder (b:212a).
+          `${selectedProject.title.split(' · ')[0]?.trim() || selectedProject.title} · Own workspace`
+        : selectedProject.title
 
   // An empty base field leaves the base to the Host: the project's main branch (chosen, declared or detected), else
   // main, master or trunk. The placeholder names the one it used.
@@ -248,7 +252,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
           }}
           className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
         />
-        <Button variant={isReviewed ? 'secondary' : 'ghost'} size="sm" className="dshx:gap-1 dshx:text-[11px]" onClick={() => markReviewed(path)}>
+        <Button variant={isReviewed ? 'secondary' : 'ghost'} size="sm" className="dshx:gap-1 dshx:text-2xs" onClick={() => markReviewed(path)}>
           <Check aria-hidden className="dshx:size-3" />
           {isReviewed ? 'Reviewed' : 'Mark reviewed'}
         </Button>
@@ -301,7 +305,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         description="Changed files of a project or workspace against its base, ordered by importance. Marks are kept across browsers."
         meta={
           result?.status === 'ok' ? (
-            <Badge variant="secondary" className="dshx:font-mono dshx:text-[11px]">
+            <Badge variant="secondary" className="dshx:font-mono dshx:text-2xs">
               {result.range}
             </Badge>
           ) : undefined
@@ -453,7 +457,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
               if (scope === undefined) return null
               return (
                 <span className="dshx:mr-2 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                  <Badge variant="secondary" className="dshx:text-[10px]">
+                  <Badge variant="secondary" className="dshx:text-2xs">
                     {scope.label}
                   </Badge>
                   <span className={cn(HINT, 'dshx:truncate')}>{aiSummaries?.[scope.key] ?? scope.summary}</span>

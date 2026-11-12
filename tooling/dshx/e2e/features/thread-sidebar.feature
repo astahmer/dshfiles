@@ -170,15 +170,17 @@ Feature: Thread sidebar journeys
     When the palette query is "Mute notification sounds"
     Then the notification sound mute palette action toggles both ways
 
+  # One sidebar layout (b:952m): the header destinations live in the Workbench Navigation pane (the standalone
+  # docking header without a Workbench is retired), so this journey runs with the Workbench.
   @scenario:thread-sidebar.navigation-layout
   Scenario: Header destinations can be reordered and hidden
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
-    When the header is expanded, reordered, and one destination is hidden
-    Then the custom layout survives a browser reload
+    Given an isolated Workbench header profile with all original view providers is booted
+    When the Navigation pane destinations are reordered and one is hidden
+    Then the custom navigation survives a browser reload
 
   @scenario:thread-sidebar.footer-more-menu
   Scenario: The header and footer More menus both reach Settings and the pages
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    Given an isolated Workbench header profile with all original view providers is booted
     When the sidebar footer More menu is opened
     Then the footer menu lists Settings and the sidebar pages and opens the Plugins page
     When the sidebar header More menu is opened
@@ -186,7 +188,7 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.navigation-menu-overflow
   Scenario: The menu-only overflow mode keeps Settings and the moved destinations behind its More button
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    Given an isolated Workbench header profile with all original view providers is booted
     When the sidebar header moves overflowing destinations into its More menu only
     Then the header More menu still offers Settings and opens a destination the row left out
 
@@ -236,7 +238,7 @@ Feature: Thread sidebar journeys
 
   @scenario:activity-timeline.jump-next-waiting
   Scenario: Option-J jumps to the next thread that needs you
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/activity-timeline, @dshfiles/command-palette" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/activity-timeline, @dshfiles/command-palette, @dshfiles/shortcuts" is booted
     When a thread's turn fails while another thread is open
     Then the palette lists Jump to next waiting with its Option-J binding
     And pressing Option-J opens the failed thread
@@ -246,6 +248,12 @@ Feature: Thread sidebar journeys
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/command-palette" is booted
     When the thread-sidebar command palette is searched for restart
     Then no restart action or confirmation appears without pending Host changes
+
+  @scenario:thread-sidebar.rail-actions
+  Scenario: Copy DSH URL sits on the rail above Settings, and its setting moves it to the row under the list
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
+    When the Copy DSH URL action on the rail is used
+    Then it confirms the copy, sits directly above Settings, and the setting moves it to the row under the list
 
   @scenario:thread-sidebar.skill-mentions
   Scenario: Find a user-invocable skill through @ autocomplete

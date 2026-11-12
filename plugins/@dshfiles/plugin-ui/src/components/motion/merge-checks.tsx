@@ -2,7 +2,8 @@ import * as React from 'react'
 import { animate, enter, motionSafe, presets, springs, staggers, easings, type AnimationPlaybackControls } from '../../motion/index.js'
 import { Button } from '../ui/button.js'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip.js'
-import { CheckIcon, CircleDashedIcon, GitMergeIcon, LoaderCircleIcon, TriangleAlertIcon, XIcon } from '../../icons.js'
+import { CheckIcon, GitMergeIcon, LoaderCircleIcon, TriangleAlertIcon, XIcon } from '../../icons.js'
+import { StatusGlyph as WorkGlyph } from '../work-status.js'
 import { cn } from '../../lib/utils.js'
 import { ShimmerText } from './text.js'
 
@@ -107,12 +108,13 @@ function statusIcon(status: MergeCheckStatus): React.ReactNode {
       return <CheckIcon className="dshx:size-3.5 dshx:text-success" strokeWidth={2.5} />
     case 'warning':
       return <TriangleAlertIcon className="dshx:size-3.5 dshx:text-warning" strokeWidth={2.5} />
+    // Failed, running and queued share the one StatusGlyph (T1.1): red cross, synced colourless spinner, faint ring.
     case 'failed':
-      return <XIcon className="dshx:size-3.5 dshx:text-destructive" strokeWidth={2.5} />
+      return <WorkGlyph status="failed" decorative />
     case 'running':
-      return <LoaderCircleIcon className="dshx:size-3.5 dshx:animate-spin dshx:text-info dshx:motion-reduce:animate-none" />
+      return <WorkGlyph status="working" decorative />
     case 'queued':
-      return <CircleDashedIcon className="dshx:size-3.5 dshx:text-muted-foreground" />
+      return <WorkGlyph status="idle" decorative />
   }
 }
 

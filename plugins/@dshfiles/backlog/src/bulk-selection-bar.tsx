@@ -21,7 +21,7 @@ export const bulkSelectionBarClearance = 64
 const actionClass = 'dshx:inline-flex dshx:h-7 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent'
 const iconClass = 'dshx:size-3.5'
 const chevronClass = 'dshx:size-3 dshx:opacity-60'
-const menuItemClass = 'dshx:gap-2 dshx:text-[13px]'
+const menuItemClass = 'dshx:gap-2 dshx:text-sm'
 const labelHiddenWhenCompact = 'dshx:@max-pane-compact:sr-only'
 const hiddenWhenNarrow = 'dshx:@max-pane-narrow:hidden'
 const shownWhenNarrow = 'dshx:hidden dshx:@max-pane-narrow:inline-flex'
@@ -51,7 +51,7 @@ export const BulkSelectionBar = (props: {
     <div
       role="group"
       aria-label="Selection actions"
-      className="dshx:pointer-events-auto dshx:flex dshx:max-w-[calc(100%-1rem)] dshx:items-center dshx:gap-1 dshx:whitespace-nowrap dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-1 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-bottom-2"
+      className="dshx:pointer-events-auto dshx:flex dshx:max-w-[calc(100%-1rem)] dshx:items-center dshx:gap-1 dshx:whitespace-nowrap dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-1 dshx:pl-3 dshx:text-sm dshx:shadow-lg dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-bottom-2"
     >
       <Tooltip>
         <TooltipTrigger asChild>

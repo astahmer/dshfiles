@@ -103,8 +103,8 @@ describe('formatDuration', () => {
 
 describe('formatMoment', () => {
   it('shows the clock time today and adds the day otherwise', () => {
-    expect(ToolTimingModel.formatMoment({ at: at('14:02:11'), now: at('15:00:00'), format: 'absolute', t })).toMatch(/^14:02:11$/)
-    expect(ToolTimingModel.formatMoment({ at: at('14:02:11') - 86_400_000, now: at('15:00:00'), format: 'absolute', t })).toMatch(/13.* 14:02:11$/)
+    expect(ToolTimingModel.formatMoment({ at: at('14:02:11'), now: at('15:00:00'), format: 'absolute', t })).toMatch(/^14:02$/)
+    expect(ToolTimingModel.formatMoment({ at: at('14:02:11') - 86_400_000, now: at('15:00:00'), format: 'absolute', t })).toMatch(/13.* 14:02$/)
   })
 
   it('counts back from now in the relative format', () => {
@@ -145,8 +145,8 @@ describe('describeTiming', () => {
   it('pairs the duration with the start time, live while the call runs', () => {
     const now = at('14:02:15')
     expect(ToolTimingModel.describeTiming({ timing: { kind: 'running', startedAt: at('14:02:11') }, now, format: 'absolute', t })).toEqual({
-      text: '4 s · 14:02:11',
-      label: 'Running for 4 s, started 14:02:11',
+      text: '4 s · 14:02',
+      label: 'Running for 4 s, started 14:02',
     })
     expect(
       ToolTimingModel.describeTiming({ timing: { kind: 'finished', startedAt: at('14:02:11'), endedAt: at('14:02:11') + 1_200 }, now, format: 'relative', t }),
@@ -154,6 +154,6 @@ describe('describeTiming', () => {
       text: '1.2 s · 4 s ago',
       label: 'Took 1.2 s, started 4 s ago',
     })
-    expect(ToolTimingModel.describeTiming({ timing: { kind: 'ended', endedAt: at('14:02:12') }, now, format: 'absolute', t }).text).toBe('ended 14:02:12')
+    expect(ToolTimingModel.describeTiming({ timing: { kind: 'ended', endedAt: at('14:02:12') }, now, format: 'absolute', t }).text).toBe('ended 14:02')
   })
 })

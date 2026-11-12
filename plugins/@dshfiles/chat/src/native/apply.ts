@@ -43,7 +43,8 @@ import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/Tr
 import { createChatStore } from './stores.ts'
 import { TranscriptViewPolicy } from './transcript-view.ts'
 import { derivePresentationPolicy } from './presentation-policy.ts'
-import { CHAT_SETTINGS_NAMESPACE, DEFAULT_LINK_OPENING, DEFAULT_TRANSCRIPT_VIEW_MODE, type ChatSettings } from '../chat-settings.ts'
+import { CHAT_SETTINGS_NAMESPACE, DEFAULT_LINK_OPENING, type ChatSettings } from '../chat-settings.ts'
+import { deviceDefaultTranscriptView } from '../transcript-view-modes.ts'
 import { LinkOpeningRow, type LinkOpeningRowInjected } from './settings/LinkOpeningRow.tsx'
 import { ImageGalleryScopeRow, type ImageGalleryScopeRowInjected } from './settings/ImageGalleryScopeRow.tsx'
 import { UnreadLandingRow, type UnreadLandingRowInjected } from './settings/UnreadLandingRow.tsx'
@@ -172,7 +173,11 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       }),
     }, LinkOpeningRow))
   })
-  const transcriptView = new TranscriptViewPolicy(chatSettings, 'dshDesktop' in globalThis ? 'standard' : DEFAULT_TRANSCRIPT_VIEW_MODE)
+  // dshfiles (visual refresh T2.5): without a saved choice a touch phone gets Summary, other browsers Normal.
+  const transcriptView = new TranscriptViewPolicy(chatSettings, deviceDefaultTranscriptView({
+    desktopApp: 'dshDesktop' in globalThis,
+    coarsePointer: typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches,
+  }))
   const presentation = derivePresentationPolicy(transcriptView.mode, transcriptView.collapseTiming)
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
   const imageGalleryScope = new ImageGalleryScopePolicy(chatSettings)

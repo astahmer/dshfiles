@@ -1,3 +1,4 @@
+import { PaletteMath } from '@dshfiles/plugin-ui/theme/palette'
 import type { HtmlPageTheme } from './html-page.js'
 
 /**
@@ -19,33 +20,27 @@ export type ColorScheme = 'light' | 'dark'
 const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
 const SANS = "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
 
+/** A pinned theme, or a Host token the page cannot read: the generated default palette (DESIGN.md › Colors). */
+const generatedTokens = (scheme: ColorScheme) => {
+  const colours = PaletteMath.standaloneColours(scheme)
+  return {
+    bg: colours.bg,
+    surface: colours.panel,
+    fg: colours.text,
+    muted: colours.muted,
+    border: colours.line,
+    accent: colours.accent,
+    success: colours.success,
+    warning: colours.warning,
+    danger: colours.danger,
+    font: SANS,
+    'mono-font': MONO,
+  } satisfies ThemeTokens
+}
+
 const fallbackTokens = {
-  light: {
-    bg: '#ffffff',
-    surface: '#f5f6f8',
-    fg: '#1f2329',
-    muted: '#646a73',
-    border: '#dee0e3',
-    accent: '#3370ff',
-    success: '#2ea121',
-    warning: '#de7802',
-    danger: '#e22e28',
-    font: SANS,
-    'mono-font': MONO,
-  },
-  dark: {
-    bg: '#18191b',
-    surface: '#232427',
-    fg: '#ebebeb',
-    muted: '#a6a6a6',
-    border: '#3a3b3e',
-    accent: '#4c88ff',
-    success: '#51ba43',
-    warning: '#f29d38',
-    danger: '#f2615c',
-    font: SANS,
-    'mono-font': MONO,
-  },
+  light: generatedTokens('light'),
+  dark: generatedTokens('dark'),
 } satisfies Readonly<Record<ColorScheme, ThemeTokens>>
 
 /** Host `--dsw-*` tokens each page variable reads, first match wins. */

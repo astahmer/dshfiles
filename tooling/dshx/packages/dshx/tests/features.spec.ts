@@ -90,7 +90,7 @@ describe('plugin feature metadata', () => {
   it('accepts reach steps a scratch DSH can run and rejects ones it cannot', () => {
     const withReach = (reach: readonly string[]) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
     expect(
-      withReach(['click button "Choose workspace"', 'fill textbox "Search" "sample"', 'expect option "sample*"', 'press Enter', 'expect checkbox "workspace"']),
+      withReach(['click button "Choose project"', 'fill textbox "Search" "sample"', 'expect option "sample*"', 'press Enter', 'expect checkbox "workspace"']),
     ).toEqual([])
     expect(withReach(['attach "tooling/dshx/e2e/fixtures/attachments/red.png"', 'expect button "Remove image red.png"'])).toEqual([])
     for (const outside of ['attach "/etc/hosts"', 'attach "../secrets.txt"', 'attach "plugins/../../x"']) {

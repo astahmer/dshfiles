@@ -733,8 +733,8 @@ Then('the feed narrows back to {string}', async ({ page }: { page: Page }, title
 })
 
 const startThreadDialog = (page: Page) => page.getByRole('dialog', { name: 'Start thread', exact: true })
-const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
-const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
+const NEW_THREAD_COMPOSER = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
 
 When('backlog card b:{int} is clicked', async ({ page }: { page: Page }, id: number) => {
@@ -1867,18 +1867,27 @@ When('the thread the item links is opened', async ({ page }: { page: Page }) => 
 
 Then('the thread header lists backlog item b:{int} titled {string}', async ({ page }: { page: Page }, id: number, title: string) => {
   await recordAssertion(page, 'backlog-thread-backlinks', async () => {
-    const count = page.getByRole('button', { name: '1 backlog item links here', exact: true })
-    await expect(count).toBeVisible({ timeout: 20_000 })
-    await count.click()
-    const chip = page.getByRole('dialog').getByRole('button', { name: `Preview backlog item ${await withBacklogRefs(page, `b:${String(id)}`)}`, exact: true })
-    await expect(chip).toBeVisible()
-    await expect(chip).toContainText(title)
+    // b:ysaj: a submenu of the thread header's ⋯, not an indigo count chip in the header row.
+    await expect(page.locator('[data-dshfiles-backlog-backlinks="thread"]')).toHaveCount(0)
+    await page.getByRole('button', { name: 'More thread actions', exact: true }).first().click()
+    const linked = page.getByRole('menuitem', { name: 'Linked backlog items (1)', exact: true })
+    await expect(linked).toBeVisible({ timeout: 20_000 })
+    await linked.click()
+    const item = page.getByRole('menu', { name: 'Linked backlog items (1)', exact: true }).getByRole('menuitem')
+    await expect(item).toHaveCount(1)
+    await expect(item).toContainText(title)
+    await expect(item).toContainText(await withBacklogRefs(page, `b:${String(id)}`))
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
   })
   await finishJourneyAssertions(page)
 })
 
 When('the reply is added to the backlog', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Quote this reply in a new backlog item', exact: true }).last().click()
+  // b:ysaj: a row of the reply's More actions menu.
+  await page.locator('[data-turn-tail]').last().hover()
+  await page.locator('[data-turn-tail]').last().getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.locator('[data-message-actions-menu]').getByRole('button', { name: 'Add to backlog', exact: true }).click()
 })
 
 Then('the capture quotes the reply {string} and links the thread', async ({ page }: { page: Page }, reply: string) => {

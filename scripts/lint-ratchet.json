@@ -2,7 +2,7 @@
   "oxlint": {
     "antislop(no-conditional-empty-object-spread)": 0,
     "antislop(no-export-bag)": 0,
-    "antislop(no-known-value-widening)": 88,
+    "antislop(no-known-value-widening)": 86,
     "antislop(no-runtime-typeof)": 26,
     "antislop(no-unknown-parameters)": 197,
     "antislop(no-unknown-returns)": 96,

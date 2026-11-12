@@ -357,7 +357,7 @@ export function SpanGlyph({
       aria-hidden
       className={cn(
         'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:font-semibold',
-        size === 'sm' ? 'dshx:size-5 dshx:text-[10px]' : 'dshx:size-8 dshx:text-xs',
+        size === 'sm' ? 'dshx:size-5 dshx:text-2xs' : 'dshx:size-8 dshx:text-xs',
         toneText[tone],
         className,
       )}
@@ -425,7 +425,7 @@ export function StatStrip({ stats, className }: { readonly stats: readonly Trace
         const format = stat.format ?? formatCount
         return (
           <div key={stat.label} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:px-3 dshx:py-2 dshx:first:pl-0 dshx:@max-pane-narrow:pl-0">
-            <dt className="dshx:truncate dshx:text-[10px] dshx:font-medium dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">{stat.label}</dt>
+            <dt className="dshx:truncate dshx:text-2xs dshx:font-medium dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">{stat.label}</dt>
             <dd
               className={cn(
                 'dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-1.5 dshx:text-base dshx:font-medium dshx:tabular-nums',
@@ -483,20 +483,17 @@ function LegendMark({ swatch }: { readonly swatch: LegendSwatch }) {
     return (
       <span
         aria-hidden
-        className="dshx:inline-flex dshx:h-2.5 dshx:w-3.5 dshx:items-center dshx:justify-center dshx:rounded-[3px] dshx:bg-destructive dshx:text-background"
+        className="dshx:inline-flex dshx:h-2.5 dshx:w-3.5 dshx:items-center dshx:justify-center dshx:rounded-xs dshx:bg-destructive dshx:text-background"
       >
         <XIcon className="dshx:size-2" strokeWidth={3} />
       </span>
     )
   if (swatch === 'hatched')
     return (
-      <span aria-hidden style={hatchStyle} className="dshx:h-2.5 dshx:w-3.5 dshx:rounded-[3px] dshx:border dshx:border-border dshx:text-muted-foreground/50" />
+      <span aria-hidden style={hatchStyle} className="dshx:h-2.5 dshx:w-3.5 dshx:rounded-xs dshx:border dshx:border-border dshx:text-muted-foreground/50" />
     )
   return (
-    <span
-      aria-hidden
-      className={cn('dshx:h-2.5 dshx:w-3.5 dshx:rounded-[3px]', swatch === 'solid' ? 'dshx:bg-foreground/80' : 'dshx:bg-muted-foreground/40')}
-    />
+    <span aria-hidden className={cn('dshx:h-2.5 dshx:w-3.5 dshx:rounded-xs', swatch === 'solid' ? 'dshx:bg-foreground/80' : 'dshx:bg-muted-foreground/40')} />
   )
 }
 
@@ -824,7 +821,7 @@ export function TreeLabel({
         <span className="dshx:flex-1" />
       )}
       {collapsed && hiddenCount > 0 ? (
-        <span className="dshx:shrink-0 dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:text-[10px] dshx:font-medium dshx:text-muted-foreground dshx:tabular-nums">
+        <span className="dshx:shrink-0 dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground dshx:tabular-nums">
           +{hiddenCount}
         </span>
       ) : null}

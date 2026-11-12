@@ -7,24 +7,60 @@
   background: var(--dsw-alias-bg-base);
 }
 
-/* 76px with its rule: the height of the Sidebar's tab strip and header row
-   (ui-dockkit `.tabStrip` 38px + the pane header's 38px), so the two rules
-   meet at the column edge. The rows add up to it — 10px top inset, the 30px
-   title row, the tab strip's 10px margin, a 16px tab line, and its 9px bottom
-   inset — so no row below may grow past its figure. */
+/* One header row (visual refresh T1.4): title, actions and the view switch
+   share a 44px band with one hairline under it; there is no second tab row. */
 .header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   flex: none;
   box-sizing: border-box;
-  min-height: 76px;
-  padding: 10px 28px 0 20px;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+  min-height: 44px;
+  padding: 6px 16px 6px 16px;
+  border-bottom: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l3));
 }
 
-.header:where(:not(:has(.tabs))) {
+/* Seated in a Workbench group's tab row (T1.4): the tabs' row is the header
+   row, so the header draws no band, rule or minimum height of its own. */
+:global([data-conversation-header-seated]) .header {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   min-height: 0;
-  padding-bottom: 10px;
+  padding: 0 4px 0 12px;
+  border-bottom: none;
+}
+
+:global([data-conversation-header-seated]) .titleRow {
+  min-height: 0;
+  padding-inline-start: 0;
+}
+
+:global([data-conversation-header-seated]) .headerCorner {
+  margin-right: 0;
+}
+
+/* Seated, the row never wraps (it is the tab row's height): the title gives way first. */
+:global([data-conversation-header-seated]) .titleCluster {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+:global([data-conversation-header-seated]) .crumbs {
+  max-width: none;
+  min-width: 0;
+}
+
+/* A narrow inline header (a half-width split) keeps the title readable: the
+   view switch and actions wrap under it rather than squeezing it to "F…". */
+.titleCluster {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.crumbs {
+  flex: 0 1 auto;
+  max-width: max(45%, 140px);
 }
 
 /* Blank Sessions retain navigation controls without conversation title or tabs. */
@@ -82,7 +118,8 @@
 
 .titleCluster {
   display: flex;
-  flex: 1;
+  /* Productivity pass Q5: sized by its content (the title), so the chips beside it give way first. */
+  flex: 1 1 auto;
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -193,14 +230,44 @@ button.crumbEditable {
 
 .headerActions {
   display: flex;
-  flex: none;
+  /* Chips collapse before the title truncates (productivity pass Q5): they shrink a thousand times faster. */
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
 }
 
+/* b:ark0: an action chip that runs out of room ends its label in an ellipsis on one line. It never wraps under itself
+   (stock dsh-client-ui-jobs' "2 background jobs running ⌄" did once the Changes pill kept its whole width). The slot
+   wrapper is display: contents, so its children are this row's flex items. */
+.headerActions > *,
+.headerActions > :global([data-slot]) > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.headerActions :where(button, a) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.headerActions :where(button, a) > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Chips shed their parts by the row's width (container tiers in their owners: elapsed time, then labels, then counts),
+   and the group never shrinks below what is left, so the title truncates last and no chip is drawn over another
+   (b:czs9). Past that floor, overflowing chips leave from the start edge: the trailing `⋯` is the last to go. */
 .headerUtilities {
   display: flex;
-  flex: none;
+  flex: 0 1000 auto;
+  justify-content: flex-end;
+  min-width: min-content;
+  overflow: hidden;
   align-items: center;
   gap: 8px;
   margin-left: 20px;
@@ -226,179 +293,206 @@ button.crumbEditable {
   display: none;
 }
 
-/* The menu contract hides only tools with a mounted reader in their own composer occurrence. */
-.phoneMenuLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 35;
-  display: flex;
-  flex-direction: column;
+/* The scrim and sheet below are portalled straight into the body, never inside .phoneBar: its transform would make it
+   their containing block, laying the "bottom" sheet out against the 44px bar (b:ppd0). */
+
+/* PhoneThreadMenu (upstream #76): a composer tool whose launcher, our phone ⋯ sheet, is on screen hides in place and is
+   listed in the sheet instead (ConversationSession). Only the hiding rule is taken: the sheet keeps our styles. */
+@media (max-width: 639.98px) {
+  :global(html[data-shell-phone-nav]) :global([data-phone-thread-tool-hidden]) {
+    display: none !important;
+  }
 }
 
-.phoneMenuScrim {
-  position: absolute;
-  inset: 0;
-  padding: 0;
+/* Without a thread panel to host the other views (productivity pass Q5), the view switch is a segmented control in the title row (T1.4; DESIGN.md
+   bans blue underline tabs): a quiet track, the selected view a raised chip
+   in ink. Colour stays a signal, so selection is not accent-coloured. */
+.tabs {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: 12px;
+  padding: 2px;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1));
+}
+
+.tab {
+  height: 24px;
+  padding: 0 10px;
   border: none;
-  background: color-mix(in srgb, black 32%, transparent);
-  cursor: default;
+  border-radius: var(--dsw-radius-xs);
+  background: transparent;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.phoneMenu {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  max-height: 85%;
-  overflow-y: auto;
-  padding: 12px 16px 16px;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: 0 0 var(--dsw-radius-lg) var(--dsw-radius-lg);
-  background: var(--dsw-alias-bg-base);
-  box-shadow: 0 12px 32px color-mix(in srgb, black 18%, transparent);
+.tab:hover {
+  color: var(--dsw-alias-label-primary);
 }
 
-.phoneMenuSection {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
+.tab:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
 }
 
-.phoneMenuHeading {
-  margin: 0;
-  font-size: 11px;
-  line-height: 14px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--dsw-alias-label-caption);
+.tabActive {
+  background: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
+  color: var(--dsw-alias-label-primary);
+  box-shadow: 0 0 0 1px var(--dshx-tone-line, var(--dsw-alias-border-l2));
 }
 
-.phoneMenuList {
-  display: flex;
-  flex-direction: column;
+/* Narrow title rows give the crumbs priority over the switch's padding. */
+@container (max-width: 560px) {
+  .tab {
+    padding: 0 6px;
+  }
 }
 
-.phoneMenuItem {
+/* Phone shell (T1.4): the shell's 44pt top bar already shows Back and the
+   title, so the conversation header gives up its row; its view switch and
+   actions live in the `⋯` sheet below, portalled into that top bar. */
+@media (max-width: 639.98px) {
+  :global(html[data-shell-phone-nav]) .header {
+    display: none;
+  }
+}
+
+/* dshfiles (productivity pass Q6): marks where this conversation's header sits; it has a box only while on screen. */
+.phoneBarAnchor {
+  display: block;
+  width: 100%;
+  height: 0;
+}
+
+.phoneBar {
+  position: fixed;
+  top: calc(var(--dsh-phone-top-height, 44px) - 44px);
+  right: max(4px, env(safe-area-inset-right, 0px));
+  z-index: 42;
   display: flex;
   align-items: center;
+  height: 44px;
+  transform: translateY(var(--dsh-visual-offset-top, 0px));
+}
+
+/* Only while a thread is the stage: the shell's list (or a page) covers it otherwise. */
+:global(html:not(:has([data-phone-top-bar][data-phone-stage='thread']))) .phoneBar {
+  display: none;
+}
+
+.phoneMenuButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.phoneMenuButton:active,
+.phoneMenuButton[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.phoneScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  border: none;
+  background: color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 30%, transparent);
+}
+
+.phoneSheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1041;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 80vh;
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  border-top-left-radius: var(--dsw-radius-panel, 16px);
+  border-top-right-radius: var(--dsw-radius-panel, 16px);
+  background: var(--dshx-tone-raised, var(--dsw-alias-bg-layer-2));
+  box-shadow: var(--dshx-elevation-3);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* The sheet takes focus on open (the focus trap's start), not as a control: no ring around the whole sheet. */
+.phoneSheet:focus {
+  outline: none;
+}
+
+.phoneGrabber {
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
+}
+
+/* In the sheet the view switch spans the width with 44pt segments. */
+.phoneSheet .tabs {
+  display: flex;
+  margin-left: 0;
+}
+
+.phoneSheet .tab {
+  flex: 1;
+  height: 40px;
+  font-size: 15px;
+}
+
+.phoneSheetActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Composer tools listed by the PhoneThreadMenu contract: one 44px row each, picked from the sheet. */
+.phoneSheetTools {
+  display: flex;
+  flex-direction: column;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+  padding-top: 6px;
+}
+
+.phoneSheetTool {
+  display: block;
   min-height: 44px;
   padding: 0 10px;
   border: none;
   border-radius: var(--dsw-radius-md);
   background: transparent;
-  font-size: 15px;
-  line-height: 20px;
+  font: inherit;
+  font-size: var(--dsh-content-font-size, 15px);
+  line-height: 44px;
   text-align: left;
   color: var(--dsw-alias-label-primary);
+  /* A full-width row keeps its label on one line; a label longer than the row ends in an ellipsis. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.phoneMenuItem:active {
+.phoneSheetTool:active,
+.phoneSheetTool:focus-visible {
   background: var(--dsw-alias-bg-layer-2);
-}
-
-.phoneMenuItemActive {
-  font-weight: 600;
-  color: var(--dsw-alias-state-business-primary);
-}
-
-.phoneMenuRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.phoneMenuRow > .headerUtilities {
-  flex-wrap: wrap;
-  margin-left: 0;
-}
-
-.phoneMenuRow > .headerActions {
-  flex-wrap: wrap;
-}
-
-.phoneMenuCorner {
-  display: contents;
-}
-
-.phoneMenuCorner > .headerCorner {
-  margin: 0 0 0 auto;
-}
-
-@media (max-width: 639.98px) {
-  :global(html[data-shell-phone-nav]) :global([data-phone-thread-tool-hidden]) {
-    display: none !important;
-  }
-
-  /* No title row on a phone: the header is only as tall as a selected
-     secondary view's strip, holds the menu layer without taking room, and
-     disappears when neither shows and no leading control rendered. */
-  :global(html[data-shell-phone-nav]) .header {
-    min-height: 0;
-    padding-top: 0;
-  }
-
-  :global(html[data-shell-phone-nav]) .header:not(:has(.tabs)) {
-    padding: 0;
-    border-bottom: none;
-  }
-
-  :global(html[data-shell-phone-nav]) .header:not(:has(.tabs, .phoneMenuLayer, .headerLeading [data-slot] > *)) {
-    display: none;
-  }
-}
-
-/* figma Tab_Group 34:11441: 35px strip, gap 36, pad-left 8, tabs bottom-aligned.
-   Positioned above the header's own paint, so the active bar covers the rule. */
-.tabs {
-  grid-column: 1 / -1;
-  position: relative;
-  z-index: 1;
-  display: flex;
-  gap: 36px;
-  margin-top: 10px;
-  padding-left: 8px;
-}
-
-/* figma .Tab 34:11442: 13/16 text (figma wt510, rendered 500). The 2px bar
-   reaches 1px past the tab's box to end flush with the header's bottom edge,
-   sitting over the rule. */
-.tab {
-  position: relative;
-  padding: 0 0 9px;
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  line-height: 16px;
-  font-weight: 500;
-  color: var(--dsw-alias-label-tertiary);
-  cursor: pointer;
-}
-
-.tab::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  left: 0;
-  height: 2px;
-  border-radius: 2px;
-  background: transparent;
-}
-
-/* Selected tab is blue, not ink: brand-primary resolves to neutral black in
-   this token sheet, so the selected state rides the business blue — the
-   nearest semantic token that stays blue in both themes. */
-.tabActive {
-  color: var(--dsw-alias-state-business-primary);
-}
-
-.tabActive::after {
-  background: var(--dsw-alias-state-business-primary);
 }
 
 .viewArea {
@@ -692,17 +786,18 @@ button.crumbEditable {
   padding: 0 16px 0 20px;
 }
 
-/* Plugin options share the row, pushed to its right edge. */
+/* Plugin options follow the run segments inside the card's bottom bar (visual refresh T3.2); an empty seat takes no
+   room, so it never pushes the controls after it apart. */
 .heroOptions {
   display: flex;
   flex: none;
   align-items: center;
   gap: 2px;
   min-width: 0;
-  margin-left: auto;
 }
 
-.heroOptions:empty {
+.heroOptions:empty,
+.heroOptions:not(:has(> * > *)) {
   display: none;
 }
 
@@ -745,10 +840,8 @@ button.crumbEditable {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  flex: 0 1 auto;
-  /* No percentage cap: the meter line shrink-wraps its items, so a share of
-     it would truncate the chip on a roomy line. It shrinks only when the line
-     reaches the composer width. */
+  /* One quiet meter line (visual refresh T3.2): the chip keeps its whole text and the line scrolls instead. */
+  flex: none;
   min-width: 0;
   padding: 1px 8px;
   border-radius: var(--dsw-radius-sm);
@@ -778,4 +871,271 @@ button.crumbEditable {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The phone top bar's Changes pill (visual refresh T3.2): before `⋯`, its 44pt hit area its own. */
+.phoneChanges {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.phoneChanges:empty {
+  display: none;
+}
+
+/* Hero suggestion cards (visual refresh T3.4): Resume / Review / Inbox under the composer, each from the plugin that
+   owns its data. Flat cards on a hairline (the composer stays the only elevated object); the row disappears when no
+   owner has anything real to suggest. */
+.heroSuggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px var(--dsh-composer-side-clearance) 0;
+}
+
+.heroSuggestions > * {
+  display: contents;
+}
+
+.heroSuggestions:not(:has(button, a)) {
+  display: none;
+}
+
+/* Phone (visual refresh T3.5): the new-thread stack sits at the bottom of the stage so the composer rides on the
+   keyboard (the shell shrinks the frame to the visual viewport); the headline and the cards stack above it, full
+   width, as in the phone mockup. */
+@media (max-width: 639.98px) {
+  :global(html[data-shell-phone-nav]) .body[data-content-phase='hero'] .scrollBody {
+    justify-content: flex-end;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerHero {
+    align-self: stretch;
+    width: 100%;
+    gap: 12px;
+    padding-bottom: 8px;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerHero > :global([data-hero-shell]) {
+    order: -2;
+    justify-content: flex-start;
+    padding: 0 var(--dsh-composer-side-clearance);
+  }
+
+  :global(html[data-shell-phone-nav]) .heroSuggestions {
+    order: -1;
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 0;
+  }
+}
+
+/* Phone pickers as bottom sheets (visual refresh T3.5). The composer's pickers belong to their owners (kit Dialog,
+   Radix popovers, the native menu); while one of them is open from the composer card on the phone shell, its layer
+   presents as a 16px-radius sheet on the bottom edge with a grabber, the only shadowed layer besides the composer.
+   The owners keep their contents, keyboard handling and dismissal; only the geometry changes. */
+@media (max-width: 639.98px) {
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([data-radix-popper-content-wrapper]),
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([data-menu-material][role='menu']),
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([role='dialog'][data-slot='dialog-content']) {
+    position: fixed !important;
+    top: auto !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    transform: none !important;
+    translate: none !important;
+    /* The kit dialog centres itself through Tailwind's translate variables. */
+    --tw-translate-x: 0 !important;
+    --tw-translate-y: 0 !important;
+  }
+
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([data-radix-popper-content-wrapper] > [data-slot]),
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([data-menu-material][role='menu']),
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([role='dialog'][data-slot='dialog-content']) {
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 72dvh !important;
+    padding-top: 20px !important;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+    border-width: 1px 0 0 !important;
+    border-radius: var(--dsw-radius-panel, 16px) var(--dsw-radius-panel, 16px) 0 0 !important;
+    /* A solid raised fill (no translucent menu material over the composer) and a dim scrim drawn as a spread shadow;
+       a tap outside still closes the picker through its owner. */
+    background: var(--dshx-tone-raised, var(--dsw-alias-bg-layer-2)) !important;
+    backdrop-filter: none !important;
+    box-shadow:
+      var(--dshx-elevation-3),
+      0 0 0 100vmax color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 30%, transparent) !important;
+    overflow-y: auto;
+    animation: composer-picker-sheet-in var(--dshx-duration-sheet, 280ms) var(--dshx-motion-ease-enter, ease) both;
+  }
+
+  /* The grabber says it is a sheet. */
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([data-radix-popper-content-wrapper] > [data-slot])::before,
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([data-menu-material][role='menu'])::before,
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([role='dialog'][data-slot='dialog-content'])::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 999px;
+    background: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
+  }
+}
+
+@keyframes composer-picker-sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes composer-picker-sheet-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+/* Where the thread runs (b:4qjm). A wide bar dissolves the group: its pickers sit in the run row as before and the phone
+   chip, headings and Done stay out of it. */
+.runPlace,
+.placeSheet {
+  display: contents;
+}
+
+.placeSummary,
+.placeHeading,
+.placeLabel,
+.placeDone {
+  display: none;
+}
+
+/* A phone bar: the group is one chip on its own first line, ahead of +; the pickers wait in a panel the chip opens in
+   the card, under it (the card clips anything drawn outside it). The attribute selectors outrank the new-thread bar's
+   `.rowHero .runRow > *` (flex: none), which would otherwise keep the chip beside +. */
+@container (max-width: 560px) {
+  .runPlace[data-run-place][data-row-break] {
+    display: flex;
+    flex: 0 0 100%;
+    flex-wrap: wrap;
+    order: -10;
+    min-width: 0;
+  }
+
+  .placeSummary {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    min-width: 0;
+    height: 28px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--dsw-radius-sm);
+    background: none;
+    color: var(--dsw-alias-label-secondary);
+    font: inherit;
+    font-size: var(--dsh-content-font-size-secondary, 13px);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .placeSummary:hover,
+  .placeSummary:focus-visible,
+  .runPlace[data-place-open] .placeSummary {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
+  }
+
+  .placeSheet {
+    display: none;
+  }
+
+  .runPlace[data-place-open] .placeSheet {
+    display: grid;
+    flex: 0 0 100%;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px 12px;
+    margin: 4px 0;
+    padding: 8px 10px;
+    border: 1px solid var(--dsw-alias-border-l2);
+    border-radius: var(--dsw-radius-md);
+  }
+
+  .runPlace[data-place-open] .placeSheet > * {
+    grid-column: 1 / -1;
+  }
+
+  .runPlace[data-place-open] .placeHeading {
+    display: block;
+    grid-row: 1;
+    color: var(--dsw-alias-label-secondary);
+    font-size: var(--dsh-content-font-size-secondary, 13px);
+    font-weight: 600;
+  }
+
+  .runPlace[data-place-open] .placeLabel {
+    display: block;
+    grid-column: 1;
+    color: var(--dsw-alias-label-tertiary);
+    font-size: var(--dsh-content-font-size-secondary, 13px);
+  }
+
+  .runPlace[data-place-open] [data-place-label='project'] {
+    grid-row: 2;
+  }
+
+  .runPlace[data-place-open] [data-place-label='host'] {
+    grid-row: 3;
+  }
+
+  .runPlace[data-place-open] [data-place-label='workspace'] {
+    grid-row: 4;
+  }
+
+  .runPlace[data-place-open] .placeSheet > .runProject {
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .runPlace[data-place-open] .placeSheet :global(span:has(> [data-run-segment='host'])) {
+    grid-row: 3;
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .runPlace[data-place-open] .placeSheet :global([data-run-segment='workspace']) {
+    grid-row: 4;
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .runPlace[data-place-open] .placeDone {
+    display: inline-flex;
+    justify-self: end;
+    height: 28px;
+    align-items: center;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--dsw-radius-md);
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
+    font: inherit;
+    cursor: pointer;
+  }
 }

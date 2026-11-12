@@ -112,7 +112,7 @@ export const PreviewDialog = ({
         {error === null ? null : <p className="dshx:text-xs dshx:text-destructive">{error}</p>}
         {picked === null ? null : (
           <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:p-2">
-            <p className="dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">{picked.selector}</p>
+            <p className="dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{picked.selector}</p>
             <Textarea
               autoFocus
               value={note}

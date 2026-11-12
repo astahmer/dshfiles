@@ -8,13 +8,14 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "main-tabs: New tab › Editor: Artifacts",
+      "currentSurface": "main-tabs: New tab › Artifacts",
       "reach": [
         "seed tool-call-thread",
         "click button \"Collapse sidebar\"",
         "click button \"New tab\"",
-        "click button \"Editor: Artifacts\"",
-        "click button \"New artifact\"",
+        "click button \"Artifacts\"",
+        "click button \"New\"",
+        "click menuitem \"Markdown\"",
         "expect textbox \"Artifact title\""
       ],
       "configuration": [],
@@ -47,12 +48,12 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "main-tabs: New tab › Editor: Files",
+      "currentSurface": "main-tabs: New tab › Files",
       "reach": [
         "seed tool-call-thread",
         "click button \"Collapse sidebar\"",
-        "click button \"New tab\"",
-        "click button \"Editor: Files\"",
+        "press ControlOrMeta+Alt+KeyT",
+        "click button \"Files\"",
         "expect tree \"Workspace files\"",
         "click text \"README.md\"",
         "click button \"Preview\"",
@@ -189,7 +190,7 @@
       "reach": [
         "seed tool-call-thread",
         "click button \"Collapse sidebar\"",
-        "click button \"New tab\"",
+        "press ControlOrMeta+Alt+KeyT",
         "click button \"Workspace files*\"",
         "click text \"README.md\"",
         "expect tab \"README.md\""

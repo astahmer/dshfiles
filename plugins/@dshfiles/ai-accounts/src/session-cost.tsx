@@ -55,7 +55,8 @@ export const SessionUsageCost = (props: SessionUsageCostOwnerProps): JSX.Element
 
 const SessionUsageCostAmount = (props: SessionUsageCostOwnerProps): JSX.Element | null => {
   const { session } = useSessionCostEstimate(props.useProjection)
-  if (session === null || !session.priced) return null
+  // A free or not-yet-billed thread shows no "≈$0.00" on the meter line (b:gyk7); the cost appears once there is one.
+  if (session === null || !session.priced || session.cost.total <= 0) return null
   if (props.placement === 'pill') return <span data-ai-accounts-session-cost="">{` · ${CostEstimateModel.formatEstimate(session)}`}</span>
   const bucket = { input: session.cost.input, cacheRead: session.cost.cacheRead, cacheWrite: session.cost.cacheWrite, output: session.cost.output }[
     props.placement
@@ -96,7 +97,7 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
     () => (session === null || view === null || view.turn === null ? null : CostEstimateModel.estimateCost({ groups: view.turn.groups, quotes: quoteMap })),
     [quoteMap, session, view],
   )
-  if (session === null || !session.priced || quotes === undefined || quotes === null) return null
+  if (session === null || !session.priced || session.cost.total <= 0 || quotes === undefined || quotes === null) return null
   const fetchedAt = quotes.fetchedAt
 
   return (

@@ -225,9 +225,9 @@ When('the Jev API key {string} is entered and saved', async ({ page }: { page: P
   await expect(setup).toHaveCount(0)
   await page.reload()
   await openBacklogSettings(page)
-  await expect(page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toHaveValue(
-    'secret:jev-api-key-optmem',
-  )
+  await expect(
+    page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]'),
+  ).toHaveValue('secret:jev-api-key-optmem')
   expect(await page.locator('body').innerText()).not.toContain(value)
 })
 
@@ -385,12 +385,12 @@ Then('the chat Jev setup stores a global key and binds only its reference', asyn
     expect(JSON.stringify(chatTurns)).not.toContain(value)
   })
   await openBacklogSettings(page)
-  await expect(page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toHaveValue(
-    'secret:TYPESAFE_API_KEY',
-  )
+  await expect(
+    page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]'),
+  ).toHaveValue('secret:TYPESAFE_API_KEY')
   await expect(page.getByRole('switch', { name: 'Jev enabled', exact: true })).toBeChecked()
   // Auto triage lives on Backlog's own page and is off by default; Settings › Jev shows Jev fields only.
-    await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).toHaveCount(0)
   await expect(page.locator('body')).not.toContainText(value)
   await finishJourneyAssertions(page)
 })
@@ -836,8 +836,8 @@ When('a thread in the seeded project asks the agent to request the secret {strin
   // The tool call waits for the user, so the turn stays open: send without waiting for it to settle.
   const directive = `[[call request_secret ${JSON.stringify({ alias, purpose: `Call the synthetic API with ${alias}.` })}]]`
   const composer = page
-    .getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
-    .or(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true }))
+    .getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
+    .or(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u }))
   await composer.fill(directive)
   await composer.press('Enter')
   await expect(requestCard(page, alias)).toBeVisible({ timeout: 60_000 })

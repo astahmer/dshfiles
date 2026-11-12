@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
+import { ThreadViewsModel } from '../../thread-views.ts'
 import type { ConversationSessionSlotProps } from '../contract/slots.ts'
 import { conversationPhase } from '../contract/snapshot.ts'
-import { resolveActiveView } from '../view-selection.ts'
+import { DEFAULT_VIEW_ID, resolveActiveView } from '../view-selection.ts'
 import css from './ConversationRoot.module.css'
 
 /**
@@ -17,7 +18,10 @@ export function DefaultConversationViews({
   const tabs = useConversationViews(value => value)
   const inspectCall = useInspectCall(value => value)
   const selectedId = useStore(s => s.view)
-  const active = resolveActiveView(tabs, selectedId)
+  // Productivity pass Q5 (E5): where a thread panel hosts the other views as facets, the stage is Chat and a stored
+  // view selection never replaces it; without one (no right pane) the header's view switch still drives the stage.
+  const facetsHosted = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.hosted, ThreadViewsModel.hosted)
+  const active = resolveActiveView(tabs, facetsHosted ? DEFAULT_VIEW_ID : selectedId)
   const session = useSession(s => s)
   const activeTargets = useConversation(s => s.activeTargets)
   const viewRequest = useStore(s => s.viewRequest ?? null)

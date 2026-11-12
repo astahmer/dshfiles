@@ -14,7 +14,16 @@ const freePortPatch = `- id: dshfiles-traces
 const bashDirective = '[[once call bash {"command":"echo traced-turn","description":"Traced turn"}]]'
 
 const sessionView = (page: Page): Locator => page.getByTestId('traces-session-view')
+// Productivity pass Q5 (E5): Traces is a thread-panel facet; the stage is always Chat and the header has no view tabs.
+// A composition without a thread panel keeps the header's view switch, so each check accepts that form too.
 const conversationTab = (page: Page, name: string): Locator => page.locator('[data-conversation-tabs]').getByRole('tab', { name, exact: true })
+const tracesFacet = async (page: Page): Promise<void> => {
+  if ((await page.locator('[data-conversation-tabs]').count()) > 0) await expect(conversationTab(page, 'Traces')).toHaveAttribute('aria-selected', 'true')
+  else await expect(page.locator('[data-thread-view-facet="dshfiles-traces"]').filter({ visible: true })).toHaveCount(1)
+}
+const noViewTabs = async (page: Page): Promise<void> => {
+  if ((await page.locator('[data-conversation-tabs]').count()) > 0) await expect(conversationTab(page, 'Chat')).toHaveAttribute('aria-selected', 'true')
+}
 const waterfall = (scope: Page | Locator): Locator => scope.getByRole('tree', { name: 'Span waterfall' })
 const turnOf = new WeakMap<Page, number>()
 
@@ -34,20 +43,23 @@ When('a new thread asks the fake model to run a bash command', async ({ page }: 
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await page.getByRole('button', { name: /^Select model/ }).click()
   await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill(bashDirective)
   await composer.press('Enter')
   await expect(page.getByText('Tool finished.').first()).toBeVisible({ timeout: 60_000 })
 })
 
 When("the turn footer's Trace button is clicked", async ({ page }: { page: Page }) => {
-  const footer = page.locator('[data-dshfiles-turn-trace]').last()
-  const turn = Number(await footer.getAttribute('data-dshfiles-turn-trace'))
+  // A reply's row is copy plus one More actions menu (productivity pass T1.5); Trace sits in that menu.
+  const tail = page.locator('[data-turn-tail]').last()
+  const turn = Number(await tail.getAttribute('data-turn-tail'))
   const turnSummary = page.locator(`[data-turn-tail="${String(turn)}"]`)
-  const traceButtons = turnSummary.getByRole('button', { name: `Open the trace of turn ${String(turn)}`, exact: true })
+  await turnSummary.locator('[data-clock="end"]').getByRole('button', { name: 'More actions', exact: true }).click()
+  const menu = page.locator('[data-message-actions-menu]')
+  const traceButtons = menu.getByRole('button', { name: `Open the trace of turn ${String(turn)}`, exact: true })
   await recordAssertion(page, 'traces-turn-footer-trace-button', async () => {
     await expect(traceButtons).toHaveCount(1)
-    await expect(turnSummary.locator('[data-clock="end"] [data-dshfiles-turn-trace]')).toHaveCount(1)
+    await expect(menu.locator(`[data-dshfiles-turn-trace="${String(turn)}"]`)).toHaveCount(1)
   })
   turnOf.set(page, turn)
   await traceButtons.click()
@@ -55,7 +67,7 @@ When("the turn footer's Trace button is clicked", async ({ page }: { page: Page 
 
 Then("the thread Traces tab opens the waterfall of that turn's trace", async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'traces-turn-button-opens-its-trace', async () => {
-    await expect(conversationTab(page, 'Traces')).toHaveAttribute('aria-selected', 'true')
+    await tracesFacet(page)
     // Agent telemetry exports the turn a moment after it ends; the tab retries until the trace holds the turn.
     await expect(waterfall(sessionView(page)).getByRole('treeitem').filter({ hasText: 'execute_tool bash' })).toHaveCount(1, { timeout: 30_000 })
     await expect(waterfall(sessionView(page)).getByRole('treeitem', { level: 2 })).toContainText('invoke_agent')
@@ -75,7 +87,7 @@ When('Show in chat is clicked on the bash tool span', async ({ page }: { page: P
 
 Then('Chat scrolls to the bash tool call and highlights it', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'chat-focus-highlights-the-tool-call', async () => {
-    await expect(conversationTab(page, 'Chat')).toHaveAttribute('aria-selected', 'true')
+    await noViewTabs(page)
     const highlighted = page.locator('[data-chat-call-id][data-chat-focus]')
     await expect(highlighted).toHaveCount(1, { timeout: 10_000 })
     await expect(highlighted.locator('xpath=ancestor-or-self::*[@data-chat-turn][1]')).toHaveAttribute('data-chat-turn', String(turnOf.get(page)))
@@ -95,7 +107,7 @@ When("the Traces panel opens the turn's trace and Open thread is clicked on its 
 
 Then('the thread opens in Chat with that turn highlighted', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'chat-focus-from-another-panel', async () => {
-    await expect(conversationTab(page, 'Chat')).toHaveAttribute('aria-selected', 'true')
+    await noViewTabs(page)
     await expect(page.locator(`[data-chat-turn="${String(turnOf.get(page))}"][data-chat-focus]`)).toHaveCount(1, { timeout: 10_000 })
   })
   await finishJourneyAssertions(page)

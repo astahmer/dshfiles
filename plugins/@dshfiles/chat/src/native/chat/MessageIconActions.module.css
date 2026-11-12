@@ -110,3 +110,102 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* dshfiles (visual refresh T5.4): on touch the 28px message actions (Copy, Good/Bad response, Trace) answer a 44pt
+   tap centred on the icon; the drawn row keeps its height. */
+@media (pointer: coarse) {
+  .actions :where(button) {
+    position: relative;
+  }
+
+  .actions :where(button)::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+  }
+}
+
+/* dshfiles (productivity pass T1.5): the reply's `⋯` menu holds the row's other actions. b:ysaj: one labelled row
+   per action (icon · words · muted detail), 32px, 44px on touch, whatever plugin draws it. */
+.menu {
+  width: auto;
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 4px;
+}
+
+.menuRow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.menuRow .endInfo,
+.menuRow > * {
+  margin-left: 0;
+}
+
+.menuRow :where(button) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  height: auto;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.menuRow :where(button):hover,
+.menuRow :where(button):focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.menuRow :where(button) svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+@media (pointer: coarse) {
+  .menuRow :where(button) {
+    min-height: 44px;
+  }
+}
+
+/* An icon-only toggle (the stock Good / Bad response buttons, which carry aria-pressed) reads its accessible name as
+   the row's words. */
+.menuRow :where(button[aria-pressed][aria-label]:not(:has(> :not(svg))))::after {
+  content: attr(aria-label);
+}
+
+/* Keep the row shown while its menu is open, even after the pointer leaves the turn. */
+@media (hover: hover) {
+  .actions:has([data-state='open']) {
+    opacity: 1 !important;
+  }
+}
+
+/* dshfiles (productivity pass T1.5): a user message's copy action shows on hover or focus on a pointer device, the
+   latest message included; touch keeps it visible. */
+@media (hover: hover) {
+  :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering']) .actions {
+    opacity: 0;
+    transition: opacity 80ms ease;
+  }
+
+  :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering']):is(:hover, :focus-within) .actions {
+    opacity: 1;
+  }
+}

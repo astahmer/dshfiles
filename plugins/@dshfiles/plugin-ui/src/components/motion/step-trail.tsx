@@ -151,7 +151,7 @@ function StepMeta({ step, small }: { readonly step: TrailStep; readonly small: b
     content = <span className={cn('dshx:font-medium dshx:text-info dshx:tabular-nums', small ? 'dshx:text-xs' : 'dshx:text-sm')}>{step.activeLabel}</span>
   else if (step.status === 'gated' && step.gateLabel !== undefined)
     content = (
-      <span className="dshx:rounded-full dshx:bg-warning/15 dshx:px-2.5 dshx:py-0.5 dshx:text-[13px] dshx:font-medium dshx:whitespace-nowrap dshx:text-warning dshx:@max-pane-narrow:px-2 dshx:@max-pane-narrow:text-xs">
+      <span className="dshx:rounded-full dshx:bg-warning/15 dshx:px-2.5 dshx:py-0.5 dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:text-warning dshx:@max-pane-narrow:px-2 dshx:@max-pane-narrow:text-xs">
         {step.gateLabel}
       </span>
     )

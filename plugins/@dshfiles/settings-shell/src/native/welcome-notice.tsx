@@ -137,7 +137,7 @@ const OnboardingModal = (props: { readonly title: string; readonly focusTitle: b
     <Modal className="dshx:max-h-full dshx:w-[min(600px,100%)] dshx:p-0" headless onClose={ignoreImplicitDismiss} open title={props.title}>
       <div className="dshx:box-border dshx:flex dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto dshx:p-7 dshx:max-[560px]:p-6">
         <h2
-          className="dshx:m-0 dshx:text-[20px] dshx:leading-7 dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)] dshx:outline-none"
+          className="dshx:m-0 dshx:text-title dshx:leading-7 dshx:font-medium dshx:text-foreground dshx:outline-none"
           ref={titleRef}
           tabIndex={props.focusTitle ? -1 : undefined}
         >
@@ -170,7 +170,7 @@ export const WelcomeNotice = (props: {
   if (waiting || acknowledged) return null
   return (
     <OnboardingModal focusTitle title={t('welcomeTitle')}>
-      <div className="dshx:text-[14px] dshx:leading-6 dshx:text-[var(--dsw-alias-label-secondary)] dshx:[&_p]:m-0 dshx:[&_p+p]:mt-3">
+      <div className="dshx:text-base dshx:leading-6 dshx:text-muted-foreground dshx:[&_p]:m-0 dshx:[&_p+p]:mt-3">
         {t('welcomeBody')
           .split('\n\n')
           .map(paragraph => (
@@ -178,7 +178,7 @@ export const WelcomeNotice = (props: {
           ))}
       </div>
       {error !== null && (
-        <p className="dshx:mt-4 dshx:mb-0 dshx:text-[14px] dshx:leading-[22px] dshx:text-[var(--dsw-alias-state-error-primary)]" role="alert">
+        <p className="dshx:mt-4 dshx:mb-0 dshx:text-base dshx:leading-[22px] dshx:text-destructive" role="alert">
           {t('welcomeError')}
         </p>
       )}

@@ -8,18 +8,20 @@
       "summary": "One @ menu that interleaves local files and threads plus this DSH's remote threads by match quality, recency, and workspace or project; @thread: / @t: and @file: / @f: narrow results, and picks insert native reference chips.",
       "reach": [
         "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Seed a mention target\"",
         "press Enter",
         "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@t:\"",
         "expect text \"Threads \u00b7 @f: files\""
       ],
       "reachNarrow": [
-        "click button \"New\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
+        "click button \"Back to Threads\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Seed a mention target\"",
         "press Enter",
-        "click button \"New\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+        "click button \"Back to Threads\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@t:\"",
         "expect text \"Threads · @f: files\""
       ],
       "surfaces": ["client"],
@@ -99,7 +101,7 @@
       "reach": [
         "seed tool-call-thread",
         "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@t:\"",
         "expect text \"Threads \u00b7 @f: files\"",
         "press Enter",
         "press Enter",

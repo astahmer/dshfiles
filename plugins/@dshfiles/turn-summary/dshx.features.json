@@ -166,6 +166,50 @@
           "reason": "Client-only: the card renders browser state and opens a right-pane address; it starts no Host work."
         }
       ]
+    },
+    {
+      "id": "turn-marks-projection",
+      "title": "Per-Turn facts for the turn map and Since you left",
+      "summary": "A whole-log session projection (dshfilesTurnMarks, contract @dshfiles/chat/turn-marks): for every Turn, whether it asked a question (and whether one is still open), whether it failed, and the files its accepted edits wrote with lines added and removed, counted like the turn footer. Changes publish at Turn boundaries and when a question opens or closes.",
+      "surfaces": ["host"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: session projection",
+      "configuration": [],
+      "states": ["open-turn", "closed-turn"],
+      "failureModes": ["A thread past 4000 Turns keeps the newest 4000; older marks read as plain prompts."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "turn-summary.marks-edit",
+          "file": "plugins/@dshfiles/turn-summary/src/turn-marks-projection.test.ts",
+          "testName": "marks an accepted edit with its lines, and skips a rejected one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "turn-summary.marks-question",
+          "file": "plugins/@dshfiles/turn-summary/src/turn-marks-projection.test.ts",
+          "testName": "marks a question at once and closes it on its result"
+        },
+        {
+          "kind": "unit-test",
+          "id": "turn-summary.marks-failed",
+          "file": "plugins/@dshfiles/turn-summary/src/turn-marks-projection.test.ts",
+          "testName": "marks a Turn that ended in an error as failed and keeps earlier entries by identity"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "turn-summary.marks-browser",
+          "reason": "A Host fold with no surface of its own; Chat's turn map and Since you left render it, walked in a scratch DSH on a seeded 200-turn thread (productivity pass q4)."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "A pure fold the Host's projection seam runs per event; it performs no I/O, spawns nothing and opens no socket."
+        }
+      ]
     }
   ]
 }

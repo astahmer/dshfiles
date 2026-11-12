@@ -42,6 +42,10 @@
     "./thread-on-screen": {
       "types": "./src/thread-on-screen.ts",
       "default": "./dist/thread-on-screen.js"
+    },
+    "./shell-merge": {
+      "types": "./src/shell-merge.ts",
+      "default": "./dist/shell-merge.js"
     }
   },
   "scripts": {

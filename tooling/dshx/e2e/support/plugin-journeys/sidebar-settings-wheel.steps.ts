@@ -4,7 +4,7 @@ import { Then, When } from '../bdd.js'
 import { recordAssertion, finishJourneyAssertions } from '../steps.js'
 import { ThreadSidebarJourney } from '../thread-list-grouping.js'
 
-const THREADS = 'Thread Sidebar: Threads'
+const THREADS = 'Threads'
 const ID = 'dshfiles-thread-sidebar.workbench-threads'
 const panel = (page: Page): Locator => page.locator(`[data-workbench-panel-id=${JSON.stringify(ID)}]`)
 const gear = (page: Page): Locator => panel(page).getByRole('button', { name: 'Sidebar settings', exact: true })
@@ -18,7 +18,7 @@ const openSettings = async (page: Page): Promise<void> => {
 }
 
 Then('the sidebar settings gear belongs to the Threads panel instead of fixed chrome', async ({ page }: { page: Page }) => {
-  // A movable Workbench Threads panel exists only in Settings › Layout › Free docking; the fixed layout seats the list.
+  // The movable Workbench Threads panel belongs to the former Free docking arrangement; the default seats the list in the Sidebar pane.
   await ThreadSidebarJourney.useFreeDocking(page)
   await recordAssertion(page, 'thread-sidebar-panel-gear-authority', async () => {
     await expect(gear(page)).toBeVisible()

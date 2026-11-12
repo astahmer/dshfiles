@@ -44,6 +44,7 @@ import {
   workspaceSyncSchema,
 } from './api-effect-schemas.js'
 import { CleanupJobModel, MAX_CLEANUP_MESSAGE_LENGTH, MAX_CLEANUP_RECOVERY_LENGTH } from './cleanup-jobs.js'
+import { DshUpdateModel, landImpactSchema, updateCheckSchema, updateJobSchema } from './dsh-update-model.js'
 import { strictStandardSchema } from './schema.js'
 
 /**
@@ -99,6 +100,7 @@ const landResultSchema = Schema.Struct({
   agentAsked: Schema.Boolean,
 })
 export type LandResult = typeof landResultSchema.Type
+export type { CheckoutPlanView, LandImpactView, UpdateCheckView, UpdateJobView } from './dsh-update-model.js'
 
 export type WorkspaceSyncView = typeof workspaceSyncSchema.Type
 export type WorkspaceSetupTask = typeof workspaceSetupTaskSchema.Type
@@ -463,6 +465,13 @@ export const jjIntegrationApi = defineApi({
         'Integrate this thread’s described work into the project’s main branch (Settings › Projects) unless another bookmark is named: rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.',
       tool: { name: 'jj_thread_rebase', render: output => output.summary },
     }),
+    landImpact: method({
+      input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) }),
+      output: landImpactSchema,
+      description:
+        'Try this change live: what landing the thread workspace at a path would change in the running DSH, read only. Plans moving the checkout DSH runs from to the thread’s newest landable commit with `dshx checkout plan`: files, reinstalls, which plugins hot-reload (client bundle only) and which need Restart when idle (Host bundle or manifest changed). It never lands, syncs or restarts.',
+      tool: { name: 'jj_thread_land_impact', readOnly: true, render: DshUpdateModel.renderImpact },
+    }),
     workspaceSetup: method({
       input: workspaceSetupInputSchema,
       output: workspaceSetupSchema,
@@ -505,6 +514,24 @@ export const jjIntegrationApi = defineApi({
                 .filter(part => part !== undefined)
                 .join(' · '),
       },
+    }),
+    updateCheck: method({
+      input: Schema.Struct({
+        fetch: Schema.optional(
+          Schema.Boolean.pipe(Schema.annotate({ description: 'Fetch the remote first (network). Default true; false reads what is already fetched.' })),
+        ),
+      }),
+      output: updateCheckSchema,
+      description:
+        "Update DSH, check: fetch the bookmark's remote copy (main@origin) for the jj checkout DSH runs from and list What's new (revisions it lacks), what moving onto them would install, rebuild and hot-reload, whether DSH would need a restart, and the last update job. Fetching moves no files and never fast-forwards the bookmark. Read-only.",
+      tool: { name: 'dsh_update_check', readOnly: true, render: DshUpdateModel.render },
+    }),
+    updateApply: method({
+      input: Schema.Struct({ confirm: Schema.Literal(true) }),
+      output: Schema.Struct({ job: Schema.NullOr(updateJobSchema), check: updateCheckSchema }),
+      description:
+        "Update DSH, apply: in the background, fetch, fast-forward the bookmark to its remote copy (only when it is a strict ancestor; diverged history is refused with the exact commands), then bring the checkout DSH runs from onto it with `dshx checkout sync` (keeps its undescribed local edits, refuses described local work, reinstalls and rebuilds what changed). Never pushes and never restarts DSH: when a Host bundle changed it reports a restart is needed, which the user applies with Restart when idle. Requires confirm: true. Call only when the user asked to update DSH; dsh_update_check shows the job's progress.",
+      tool: { name: 'dsh_update_apply', render: output => DshUpdateModel.render(output.check) },
     }),
     discard: method({
       input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)), force: Schema.Boolean }),

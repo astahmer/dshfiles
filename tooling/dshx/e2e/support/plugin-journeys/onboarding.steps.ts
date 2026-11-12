@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type CDPSession, type Locator, type Page } from '@playwright/test'
 import { parseReachStep } from '../../../packages/dshx/src/project/features.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { ScratchDriveRuntime, ScratchFeatureCatalog } from '../../../packages/dshx/src/scratch/drive.js'
@@ -15,7 +15,54 @@ const pack = (page: Page, title: string) =>
   gettingStarted(page)
     .locator('[data-pack]')
     .filter({ has: page.getByRole('heading', { name: title, exact: true }) })
-const composer = (page: Page) => page.getByRole('textbox', { name: /commands, @ files or sessions$/u }).first()
+/**
+ * The composer behind the open wizard dialog, which hides the page from the accessibility tree: found by element. Its
+ * label ends in "@ files or threads" in the fork and "… or sessions" in the stock composer.
+ */
+const composerBehindWizard = (page: Page) => page.locator('[role="textbox"][aria-label*="@ files or"]').first()
+
+/**
+ * A phone: 390 px wide with a touch screen, so `pointer: coarse` matches and the kit's comfortable density applies (44 px
+ * hit areas, 16 px fields). The emulation lasts as long as its CDP session, kept until {@link widen} restores the page.
+ */
+const touchSessions = new WeakMap<Page, CDPSession>()
+const narrow = async (page: Page): Promise<void> => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  if (touchSessions.has(page)) return
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+  touchSessions.set(page, cdp)
+}
+const widen = async (page: Page): Promise<void> => {
+  const cdp = touchSessions.get(page)
+  touchSessions.delete(page)
+  if (cdp !== undefined) {
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false })
+    await cdp.detach()
+  }
+  await page.setViewportSize({ width: 1280, height: 900 })
+}
+
+/**
+ * What a finger can hit, per visible control: the kit widens a control's hit area with an absolutely positioned
+ * ::after on a coarse pointer without changing its drawn size, and an input inside an input group is hit through the
+ * group. Layout sizes (offset), so a dialog's zoom-in does not scale them.
+ */
+/** 44 px, less the sub-pixel a rounded layout height can lose (the scratch phone audit uses the same bound). */
+const MIN_HIT = 43.5
+
+const hitHeights = (controls: Locator): Promise<{ readonly name: string; readonly height: number }[]> =>
+  controls.evaluateAll(elements =>
+    elements
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element.offsetParent !== null)
+      .map(element => {
+        const target = element.closest<HTMLElement>('[data-slot="input-group"]') ?? element
+        const after = getComputedStyle(target, '::after')
+        const px = (value: string): number => (value.endsWith('px') ? Number.parseFloat(value) : 0)
+        const widened = after.content !== 'none' && after.position === 'absolute' ? -px(after.top) - px(after.bottom) : 0
+        return { name: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '', height: target.offsetHeight + Math.max(0, widened) }
+      }),
+  )
 
 const runPaletteCommand = async (page: Page, title: string): Promise<void> => {
   await page.getByRole('button', { name: 'Open command palette', exact: true }).click()
@@ -26,11 +73,21 @@ const runPaletteCommand = async (page: Page, title: string): Promise<void> => {
 }
 
 When('the setup wizard shown on first run is skipped', async ({ page }: { page: Page }) => {
+  // Fork default (first-run.ts): the wizard opens by itself only while an AI account or a project is missing. A scratch
+  // profile with provider routes and the seeded project has both, so the wizard may stay closed; when it opens, it is
+  // skipped as upstream's journey does.
+  const opened = await page
+    .getByRole('dialog', { name: 'Connect an AI account', exact: true })
+    // It opens once the checklist read says setup is missing, or after 3 s without an answer.
+    .waitFor({ state: 'visible', timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false)
   await recordAssertion(page, 'onboarding-wizard-first-run', async () => {
-    await expect(page.getByRole('region', { name: 'Connect an AI account', exact: true })).toBeVisible()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
+    // The wizard is a kit dialog now; nothing else may open over a fresh page.
+    await expect(page.getByRole('dialog')).toHaveCount(opened ? 1 : 0)
+    if (!opened) await expect(wizard(page)).toHaveCount(0)
   })
-  await wizard(page).getByRole('button', { name: 'Skip', exact: true }).click()
+  if (opened) await wizard(page).getByRole('button', { name: "Don't show again", exact: true }).click()
   await expect(wizard(page)).toHaveCount(0)
 })
 
@@ -47,7 +104,11 @@ Then('Getting started shows the setup checklist, the packs and curated features'
     await expect(checklist.locator('[data-checklist-item="github"]')).toHaveAttribute('data-state', /^(done|todo|unknown)$/u)
     const packs = gettingStarted(page).getByRole('region', { name: /^Packs/u })
     await expect(packs.locator('[data-pack]')).toHaveCount(8)
-    await expect(packs.locator('[data-pack="core"]').getByText('thread-sidebar · enabled', { exact: true })).toBeVisible()
+    // Display names with a status glyph in neutral ink; the package name stays in a data attribute.
+    const sidebar = packs.locator('[data-pack="core"] [data-plugin="thread-sidebar"]')
+    await expect(sidebar).toHaveAttribute('data-plugin-state', 'enabled')
+    await expect(sidebar).toHaveText('Thread sidebar')
+    await expect(sidebar.getByRole('img', { name: 'enabled', exact: true })).toBeVisible()
     await expect(gettingStarted(page).getByRole('list', { name: 'Features', exact: true }).locator('[data-feature]').first()).toBeVisible()
   })
   await page.screenshot({ path: test.info().outputPath('getting-started.png'), animations: 'disabled' })
@@ -80,12 +141,12 @@ Then("that feature's page replaces Getting started", async ({ page }: { page: Pa
 })
 
 When('Getting started is narrowed to 390 pixels wide', async ({ page }: { page: Page }) => {
-  await page.setViewportSize({ width: 390, height: 844 })
+  await narrow(page)
   await expect(gettingStarted(page).getByRole('heading', { name: 'Getting started', exact: true })).toBeVisible()
 })
 
 When('Getting started is opened from the command palette', async ({ page }: { page: Page }) => {
-  await runPaletteCommand(page, 'Onboarding: Getting started')
+  await runPaletteCommand(page, 'Getting started')
   await expect(gettingStarted(page).getByRole('heading', { name: 'Getting started', exact: true })).toBeVisible()
 })
 
@@ -93,15 +154,9 @@ Then('every Getting started control is at least 44 pixels tall and the search an
   await recordAssertion(page, 'onboarding-narrow-touch-targets', async () => {
     const width = await gettingStarted(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)
     expect(width).toBe(true)
-    const heights = await gettingStarted(page)
-      .locator('button, input')
-      .evaluateAll(elements =>
-        elements
-          .filter(element => element instanceof HTMLElement && element.offsetParent !== null)
-          .map(element => ({ name: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '', height: element.getBoundingClientRect().height })),
-      )
+    const heights = await hitHeights(gettingStarted(page).locator('button, input'))
     expect(heights.length).toBeGreaterThan(10)
-    expect(heights.filter(entry => entry.height < 44)).toEqual([])
+    expect(heights.filter(entry => entry.height < MIN_HIT)).toEqual([])
   })
   await recordAssertion(page, 'onboarding-keyboard-search', async () => {
     await page.evaluate(() => {
@@ -117,7 +172,7 @@ Then('every Getting started control is at least 44 pixels tall and the search an
     await expect(gettingStarted(page).getByLabel('Search features')).toHaveValue('')
   })
   await page.screenshot({ path: test.info().outputPath('getting-started-390.png'), animations: 'disabled' })
-  await page.setViewportSize({ width: 1280, height: 900 })
+  await widen(page)
 })
 
 Then('the setup wizard stays closed after a reload', async ({ page }: { page: Page }) => {
@@ -129,27 +184,27 @@ Then('the setup wizard stays closed after a reload', async ({ page }: { page: Pa
 })
 
 When('the setup wizard is replayed from the command palette', async ({ page }: { page: Page }) => {
-  await runPaletteCommand(page, 'Onboarding: Show the setup wizard')
-  await expect(page.getByRole('region', { name: 'Connect an AI account', exact: true })).toBeVisible()
+  await runPaletteCommand(page, 'Show the setup wizard')
+  await expect(page.getByRole('dialog', { name: 'Connect an AI account', exact: true })).toBeVisible()
   await expect(wizard(page).locator('[data-wizard-item="account"]')).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('setup-wizard.png'), animations: 'disabled' })
 })
 
 When('the setup wizard is walked to the first task and a starter prompt is inserted', async ({ page }: { page: Page }) => {
   await wizard(page).getByRole('button', { name: 'Next', exact: true }).click()
-  await expect(page.getByRole('region', { name: 'Add a project', exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Add a project', exact: true })).toBeVisible()
   await wizard(page).getByRole('button', { name: 'Next', exact: true }).click()
-  await expect(page.getByRole('region', { name: 'Start a first task', exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Start a first task', exact: true })).toBeVisible()
   await wizard(page).getByRole('button', { name: 'Insert prompt', exact: true }).click()
 })
 
 Then('the composer holds the starter prompt and no message was sent', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'onboarding-insert-never-sends', async () => {
     await expect(wizard(page).getByRole('status')).toHaveText('In the composer. Send it when ready.')
-    await expect(composer(page)).toContainText(STARTER_PROMPT)
+    await expect(composerBehindWizard(page)).toContainText(STARTER_PROMPT)
     // A send clears the composer; the prompt is still there once any send would have happened.
     await page.waitForTimeout(1_500)
-    await expect(composer(page)).toContainText(STARTER_PROMPT)
+    await expect(composerBehindWizard(page)).toContainText(STARTER_PROMPT)
   })
   await wizard(page).getByRole('button', { name: 'Done', exact: true }).click()
   await expect(wizard(page)).toHaveCount(0)
@@ -248,11 +303,9 @@ Then(
       expect(overlaps).toBe(false)
       expect(card.x + card.width).toBeLessThanOrEqual(390)
       expect(await walkRing(page).evaluate(element => getComputedStyle(element).pointerEvents)).toBe('none')
-      const heights = await walkCard(page)
-        .locator('button, a')
-        .evaluateAll(elements => elements.map(element => element.getBoundingClientRect().height))
+      const heights = await hitHeights(walkCard(page).locator('button, a'))
       expect(heights.length).toBeGreaterThan(0)
-      expect(heights.filter(height => height < 44)).toEqual([])
+      expect(heights.filter(entry => entry.height < MIN_HIT)).toEqual([])
     })
     await page.screenshot({ path: test.info().outputPath('show-me-where.png'), animations: 'disabled' })
   },
@@ -364,7 +417,7 @@ const playReach = async (page: Page, steps: readonly string[]): Promise<void> =>
 
 Then('the phone walks of {string} each reach their final expect at 390 pixels', async ({ page }: { page: Page }, keys: string) => {
   const catalog = await ScratchFeatureCatalog.list()
-  await page.setViewportSize({ width: 390, height: 844 })
+  await narrow(page)
   for (const key of keys.split(',').map(entry => entry.trim())) {
     const feature = catalog.find(candidate => `${candidate.packageId.slice('@dshfiles/'.length)}#${candidate.id}` === key)
     const steps = feature?.reachNarrow ?? feature?.reach
@@ -374,7 +427,7 @@ Then('the phone walks of {string} each reach their final expect at 390 pixels', 
     await recordAssertion(page, `onboarding-phone-walk-${key.replace('#', '-')}`, () => playReach(page, steps))
   }
   await page.screenshot({ path: test.info().outputPath('phone-walk.png'), animations: 'disabled' })
-  await page.setViewportSize({ width: 1280, height: 900 })
+  await widen(page)
   await finishJourneyAssertions(page)
 })
 
@@ -407,18 +460,14 @@ Then('the pack preview names what would install and the restart it needs, with 4
   await recordAssertion(page, 'onboarding-pack-preview', async () => {
     const dialog = packDialog(page)
     await expect(dialog.locator('[data-preview-section="install"]')).toBeVisible()
-    await expect(dialog.locator('[data-preview-section="install"]')).toContainText('traces')
-    await expect(dialog.locator('[data-preview-section="restart"]')).toContainText('Restart when idle')
+    await expect(dialog.locator('[data-preview-section="install"]')).toContainText('Traces')
+    await expect(dialog.locator('[data-preview-section="restart"]')).toContainText('Restart DSH (bottom of the sidebar)')
     await expect(page.getByRole('dialog')).toHaveCount(1)
     const width = await dialog.evaluate(element => element.getBoundingClientRect().right <= window.innerWidth)
     expect(width).toBe(true)
-    const heights = await dialog
-      .locator('button, a')
-      .evaluateAll(elements =>
-        elements.filter(element => element instanceof HTMLElement && element.offsetParent !== null).map(element => element.getBoundingClientRect().height),
-      )
+    const heights = await hitHeights(dialog.locator('button, a'))
     expect(heights.length).toBeGreaterThan(0)
-    expect(heights.filter(height => height < 44)).toEqual([])
+    expect(heights.filter(entry => entry.height < MIN_HIT)).toEqual([])
   })
   await page.screenshot({ path: test.info().outputPath('pack-change.png'), animations: 'disabled' })
 })
@@ -437,7 +486,7 @@ Then(
       expect(writes.get(page) ?? []).toEqual([])
       expect(await page.evaluate(() => sessionStorage.getItem('onboarding-e2e-no-reload'))).toBe('kept')
     })
-    await page.setViewportSize({ width: 1280, height: 900 })
+    await widen(page)
     await finishJourneyAssertions(page)
   },
 )
@@ -467,12 +516,8 @@ Then("What's new keeps 44 pixel controls, and Mark as seen from the keyboard is 
   await recordAssertion(page, 'onboarding-whats-new-narrow', async () => {
     const fits = await whatsNew(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)
     expect(fits).toBe(true)
-    const heights = await whatsNew(page)
-      .locator('button, a')
-      .evaluateAll(elements =>
-        elements.filter(element => element instanceof HTMLElement && element.offsetParent !== null).map(element => element.getBoundingClientRect().height),
-      )
-    expect(heights.filter(height => height < 44)).toEqual([])
+    const heights = await hitHeights(whatsNew(page).locator('button, a'))
+    expect(heights.filter(entry => entry.height < MIN_HIT)).toEqual([])
   })
   await recordAssertion(page, 'onboarding-whats-new-mark-seen', async () => {
     expect(await page.evaluate(key => localStorage.getItem(key), WHATS_NEW_SEEN_KEY)).toBeNull()
@@ -483,7 +528,7 @@ Then("What's new keeps 44 pixel controls, and Mark as seen from the keyboard is 
     await expect(mark).toHaveCount(0)
     expect(await page.evaluate(key => localStorage.getItem(key), WHATS_NEW_SEEN_KEY)).toMatch(/^"\d{4}-\d{2}-\d{2}T/u)
   })
-  await page.setViewportSize({ width: 1280, height: 900 })
+  await widen(page)
   await finishJourneyAssertions(page)
 })
 
@@ -511,7 +556,7 @@ When('Suggestions is turned on from its Settings link', async ({ page }: { page:
 })
 
 Then('Suggestions shows a suggestion or an honest empty state with 44 pixel controls at 390 pixels, and never errors', async ({ page }: { page: Page }) => {
-  await page.setViewportSize({ width: 390, height: 844 })
+  await narrow(page)
   await recordAssertion(page, 'onboarding-suggestions-on', async () => {
     // A scratch profile has little or no tool use: an empty ready state or an absent Usage owner is honest, an error never is.
     await expect(suggestionsSection(page)).toHaveAttribute('data-suggestions', /^(ready|no-usage)$/u)
@@ -521,16 +566,12 @@ Then('Suggestions shows a suggestion or an honest empty state with 44 pixel cont
     if (state === 'ready' && suggested === 0) await expect(suggestionsSection(page).locator('[data-suggestions-empty]')).toBeVisible()
     const fits = await suggestionsSection(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)
     expect(fits).toBe(true)
-    const heights = await suggestionsSection(page)
-      .locator('button, a')
-      .evaluateAll(elements =>
-        elements.filter(element => element instanceof HTMLElement && element.offsetParent !== null).map(element => element.getBoundingClientRect().height),
-      )
-    expect(heights.filter(height => height < 44)).toEqual([])
+    const heights = await hitHeights(suggestionsSection(page).locator('button, a'))
+    expect(heights.filter(entry => entry.height < MIN_HIT)).toEqual([])
   })
   await suggestionsSection(page).scrollIntoViewIfNeeded()
   await page.screenshot({ path: test.info().outputPath('usage-suggestions.png'), animations: 'disabled' })
-  await page.setViewportSize({ width: 1280, height: 900 })
+  await widen(page)
   await finishJourneyAssertions(page)
 })
 
@@ -596,22 +637,16 @@ Then('the Try it confirmation names the token cost with 44 pixel controls and no
     const fits = await dialog.evaluate(element => element.getBoundingClientRect().right <= window.innerWidth)
     expect(fits).toBe(true)
     // Layout heights: the dialog's zoom-in scales its bounding boxes while it opens.
-    const heights = await dialog
-      .locator('button')
-      .evaluateAll(elements =>
-        elements
-          .filter(element => element instanceof HTMLElement && element.offsetParent !== null)
-          .map(element => (element instanceof HTMLElement ? element.offsetHeight : 0)),
-      )
+    const heights = await hitHeights(dialog.locator('button'))
     expect(heights.length).toBe(2)
     // Three row buttons collapse to icons in a phone-width pane instead of squeezing the title to a word per line.
     // The open dialog hides the page from the accessibility tree, so the row is read by element, not by role.
     const titleWidth = await page
-      .locator(`main[aria-label="Getting started"] [data-feature="${TRY_IT_FEATURE}"] p`)
+      .locator(`main[aria-label="Getting started"] [data-feature="${TRY_IT_FEATURE}"] [data-slot="entity-row-title"]`)
       .first()
       .evaluate(element => element.getBoundingClientRect().width)
     expect(titleWidth).toBeGreaterThan(120)
-    expect(heights.filter(height => height < 44)).toEqual([])
+    expect(heights.filter(entry => entry.height < MIN_HIT)).toEqual([])
     expect(sends.get(page) ?? []).toEqual([])
   })
   await page.screenshot({ path: test.info().outputPath('try-it.png'), animations: 'disabled' })
@@ -630,6 +665,6 @@ Then('no thread was started and no model request was sent, and Try it has focus 
     await page.waitForTimeout(1_000)
     expect(sends.get(page) ?? []).toEqual([])
   })
-  await page.setViewportSize({ width: 1280, height: 900 })
+  await widen(page)
   await finishJourneyAssertions(page)
 })

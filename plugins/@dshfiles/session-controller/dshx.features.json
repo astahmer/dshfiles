@@ -116,7 +116,7 @@
       "states": ["thread-opened", "history-visible"],
       "failureModes": ["The Host keeps replay state in the Session log; only the browser copy omits it."],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or threads\""],
       "verification": [
         {
           "kind": "unit-test",
@@ -244,7 +244,7 @@
         "A notice or wake that starts a parked thread's turn some other way runs it past the limit and the queue skips it."
       ],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or threads\""],
       "onboarding": {
         "firstAction": "Set Settings › General › Running threads limit to a number above 0.",
         "doneWhen": "Past that many running threads, a new turn waits for a free slot."

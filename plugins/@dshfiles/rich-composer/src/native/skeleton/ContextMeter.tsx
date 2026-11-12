@@ -4,7 +4,7 @@
  * Renders nothing until a provider reports both pressure and a route
  * capacity. */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 // Type-only: the `contextPressure` / `contextBreakdown` projection key merges.
@@ -12,11 +12,13 @@ import type {} from '@deepseek-ai/dsh-token-meter/client'
 import { Tooltip, useAnchoredPosition, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import { contextOccupancy } from '../context-occupancy.ts'
+import { CONTEXT_METER_VISIBLE_FROM, contextTone } from '../../context-tone.ts'
 import css from './ContextMeter.module.css'
 
 /** Ring geometry: 14px viewBox, 2px stroke. */
 const RADIUS = 5.5
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
+
 
 /**
  * Marker the localized occupancy sentence is split on, so the panel headline
@@ -51,9 +53,11 @@ export interface ContextMeterProps {
   useProjection: UseProjection
   /** The owning bar's locale seat, passed down as a plain prop. */
   t: ComposerBarProps['t']
+  /** dshfiles (b:ysaj): `conversation.composer.context` readings (compaction), as rows under the breakdown. */
+  detail?: ReactNode
 }
 
-export function ContextMeter({ useProjection, t }: ContextMeterProps) {
+export function ContextMeter({ useProjection, t, detail }: ContextMeterProps) {
   const pressure = useProjection('contextPressure')
   const breakdown = useProjection('contextBreakdown')
   const [open, setOpen] = useState(false)
@@ -86,7 +90,7 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
     return () => { document.removeEventListener('keydown', onKeyDown) }
   }, [available, open])
 
-  if (context === null) return null
+  if (context === null || context.percent < CONTEXT_METER_VISIBLE_FROM) return null
   const percent = context.percent
   const reading = `${percent}%`
   const [headBefore = '', headAfter = ''] = t('context.aria', { percent: READING_SLOT })
@@ -111,12 +115,14 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
         <button
           type="button"
           className={css.trigger}
+          data-context-tone={contextTone(percent)}
+          data-context-meter=""
           aria-label={t('context.aria', { percent: reading })}
           aria-haspopup="dialog"
           aria-expanded={open}
           onClick={() => { setOpen(!open) }}
         >
-          <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden>
+          <svg viewBox="0 0 14 14" width="16" height="16" aria-hidden>
             <circle className={css.track} cx="7" cy="7" r={RADIUS} />
             <circle
               className={css.fill}
@@ -127,7 +133,6 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
               transform="rotate(-90 7 7)"
             />
           </svg>
-          <span>{reading}</span>
         </button>
       </Tooltip>
       {open && createPortal(
@@ -172,6 +177,7 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
               ))}
             </dl>
           )}
+          {detail == null ? null : <div className={css.detail} data-context-detail="">{detail}</div>}
         </div>,
         document.body,
       )}

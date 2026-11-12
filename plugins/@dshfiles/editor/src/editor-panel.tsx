@@ -328,7 +328,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
       </div>
       {showTree && (
         <div className="dshx:max-h-[40%] dshx:min-h-24 dshx:flex-none dshx:overflow-auto dshx:border-b">
-          <div className="dshx:flex dshx:items-center dshx:justify-between dshx:px-2 dshx:pt-1 dshx:text-[11px] dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">
+          <div className="dshx:flex dshx:items-center dshx:justify-between dshx:px-2 dshx:pt-1 dshx:text-2xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">
             Files
             <Button
               aria-label="Refresh files"
@@ -366,7 +366,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         {active?.status === 'error' && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">{active.error}</p>}
         {engineError && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">The editor could not start.</p>}
       </div>
-      <div className="dshx:flex dshx:h-6 dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-t dshx:px-2 dshx:text-[11px] dshx:text-muted-foreground">
+      <div className="dshx:flex dshx:h-6 dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-t dshx:px-2 dshx:text-2xs dshx:text-muted-foreground">
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate" title={active?.path}>
           {active?.path ?? ''}
         </span>

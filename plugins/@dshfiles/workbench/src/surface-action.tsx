@@ -12,6 +12,9 @@ export const SurfaceAction = forwardRef<
     readonly iconOnly?: boolean
   }
 >(function SurfaceAction({ label, icon, iconOnly = false, ...props }, ref) {
+  // A menu trigger (Pane options) gets `aria-expanded` from its menu. While that menu is open the tooltip draws nothing:
+  // it would cover the menu and, as the newest layer, take the Escape meant to close the menu.
+  const expanded = props['aria-expanded'] === true || props['aria-expanded'] === 'true'
   return (
     <TooltipProvider delayDuration={400}>
       <Tooltip>
@@ -21,7 +24,7 @@ export const SurfaceAction = forwardRef<
             <span className={cn(iconOnly ? 'dshx:sr-only' : 'dshx:@max-pane-compact:sr-only')}>{label}</span>
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{label}</TooltipContent>
+        {expanded ? null : <TooltipContent>{label}</TooltipContent>}
       </Tooltip>
     </TooltipProvider>
   )

@@ -43,10 +43,12 @@ export interface AgentPresetSeatState {
    * chip); the renderer clears it via `introduced()` once played.
    */
   introduce: boolean
+  /** The Host-effective default (composer follow-up b:4v6p): the composer hides the chip while the draft keeps it. */
+  defaultPreset: string
 }
 
 const INITIAL: AgentPresetSeatState = {
-  options: [], current: '', error: null, busy: false, introduce: false,
+  options: [], current: '', error: null, busy: false, introduce: false, defaultPreset: '',
 }
 
 /** Chip fields carry values, not a version: a write that changes none of them is a subscriber pass and a chip render.
@@ -58,6 +60,7 @@ const sameSeat = (previous: AgentPresetSeatState, next: AgentPresetSeatState): b
   && previous.current === next.current
   && previous.error === next.error
   && previous.busy === next.busy
+  && previous.defaultPreset === next.defaultPreset
   && previous.introduce === next.introduce
 
 /**
@@ -165,6 +168,7 @@ export class AgentPresetSeatController {
       error: phase.kind === 'refused' ? phase.refusal : phase.kind === 'idle' ? phase.error : null,
       busy: phase.kind === 'applying',
       introduce: this.cue,
+      defaultPreset: this.fallback,
     }
     // A draft's preview moves on every keystroke while the chip's own fields do not.
     if (sameSeat(this.store.getSnapshot(), next)) return

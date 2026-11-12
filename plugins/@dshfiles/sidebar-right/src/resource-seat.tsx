@@ -99,5 +99,9 @@ function AddressableSeat(props: ResourceSeatProps): ReactNode {
 /** No native chrome or frame report is mounted in workbench mode; native mode uses the original seat unchanged. */
 export function ResourceSeat(props: ResourceSeatProps): ReactNode {
   const workbench = props.useWorkbenchMode(value => value)
+  // Claim this seat's store for its Session on mount: `open` only materializes the surface, and the owner re-adopts a
+  // cached store whose earlier seat had released it (native/client/index.ts).
+  const { actions, sessionId } = props
+  useLayoutEffect(() => actions.open(sessionId), [actions, sessionId])
   return workbench ? <AddressableSeat {...props} /> : <RightbarSeat {...props} />
 }

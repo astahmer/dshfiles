@@ -1,5 +1,6 @@
-import { useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { Browser, useContract, type BrowserService, type Subscribable } from '@dshfiles/dshx/client'
+import { RemoteReach, type ListeningPort, type Reach, type Viewer } from './remote-reach.js'
 
 /** Where an Open click landed: the browser pane beside the thread, or a new browser tab when no pane can take it. */
 export type PreviewTarget = 'pane' | 'tab'
@@ -34,15 +35,39 @@ const newBrowserTab = (url: string): void => {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-/** The pane's live availability and an `open` that falls back to a new tab. */
+const viewer = (): Viewer => ({ hostname: window.location.hostname, protocol: window.location.protocol })
+
+export type LoopbackNotice = Extract<Reach, { kind: 'loopback-only' }>
+
+/**
+ * The pane's live availability and an `open` that falls back to a new tab. On a GUI reached from another device
+ * (Tailscale, the LAN), a port is opened on the Host's own name, and a loopback-only one leaves a notice with the fix
+ * instead of a page that cannot load (T6.4).
+ */
 const usePreviewOpener = () => {
   const browser = useContract(Browser)
   const pane = browser.status === 'active' ? browser.value : undefined
   const available = pane?.available ?? NO_PANE
   const paneAvailable = useSyncExternalStore(available.subscribe, available.get, available.get)
+  const [notice, setNotice] = useState<LoopbackNotice | null>(null)
+  const follow = (reach: Reach): PreviewTarget | null => {
+    if (reach.kind === 'loopback-only') {
+      setNotice(reach)
+      return null
+    }
+    setNotice(null)
+    if (!reach.newTab) return open({ pane, url: reach.url, newTab: newBrowserTab })
+    newBrowserTab(reach.url)
+    return 'tab'
+  }
   return {
     paneAvailable,
-    open: (url: string): PreviewTarget => open({ pane, url, newTab: newBrowserTab }),
+    notice,
+    dismissNotice: () => setNotice(null),
+    /** Open one listening port of a dev server. */
+    openPort: (port: ListeningPort): PreviewTarget | null => follow(RemoteReach.port(port, viewer())),
+    /** Open a preview page's URL; `ports` are the thread's listed sockets, which say whether its port is reachable. */
+    open: (url: string, ports: readonly ListeningPort[] = []): PreviewTarget | null => follow(RemoteReach.url(url, ports, viewer())),
   }
 }
 

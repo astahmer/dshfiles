@@ -4,7 +4,9 @@
 
 ![Shared prompt library in the composer](docs/screenshots/prompt-library.png)
 
-Prompt Stash provides one composer action for reusable prompts. It uses DSH's revision-guarded insertion API and never submits a message. The Host owns the shared prompt library, so it is available in every browser.
+Prompt Stash provides one composer action for reusable prompts: **Saved prompts…** and **Recent messages here…** in the
+composer bar's More (⋯) menu, `/prompts` in the composer, or a Prompts button in the bar when the user pins it back
+(`dshfiles-rich-composer.showComposerExtras`). It uses DSH's revision-guarded insertion API and never submits a message. The Host owns the shared prompt library, so it is available in every browser.
 
 ## Prompts
 
@@ -16,7 +18,7 @@ Its Recent tab reads up to 20 direct user-text messages from the loaded Chat sna
 
 ![Search every prompt sent across threads](docs/screenshots/prompt-history.png)
 
-The **All threads** tab searches every prompt you sent in a top-level thread, newest first, each text once. Open it from the Prompts menu, with **Ctrl+R** while a composer has focus (elsewhere Ctrl+R stays the browser's reload), or with **Search prompt history** in the command palette. Enter inserts the prompt at the cursor without sending it; the star saves it to the shared library (unstar by deleting it under Saved). The agent reads the same results with `prompt_history_search` (read-only).
+The **All threads** tab searches every prompt you sent in a top-level thread, newest first, each text once. Open it from the composer's **⋯** menu (**Prompt history… ⌃R**, beside Saved prompts and Recent messages), with **Ctrl+R** while a composer has focus (elsewhere Ctrl+R stays the browser's reload), or with **Search prompt history** in the command palette. Each row says when it was sent ("5 minutes ago", "yesterday", then the date). Enter inserts the prompt at the cursor without sending it; the star saves it to the shared library (unstar by deleting it under Saved). The agent reads the same results with `prompt_history_search` (read-only).
 
 No second copy is stored: the rows come from `@dshfiles/session-search`'s index ([Prompt history](../session-search/README.md#prompt-history)), which leaves out subagent threads and messages a plugin or agent sent. Without that plugin the tab says so.
 

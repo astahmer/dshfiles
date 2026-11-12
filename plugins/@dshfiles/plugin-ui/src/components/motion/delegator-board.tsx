@@ -84,7 +84,7 @@ export function DelegatorBoard({ headline, summary, sections, onSelect, classNam
 }
 
 function SectionLabel({ children }: { readonly children: React.ReactNode }) {
-  return <span className="dshx:font-mono dshx:text-[11px] dshx:font-medium dshx:tracking-[0.18em] dshx:text-muted-foreground dshx:uppercase">{children}</span>
+  return <span className="dshx:font-mono dshx:text-2xs dshx:font-medium dshx:tracking-[0.18em] dshx:text-muted-foreground dshx:uppercase">{children}</span>
 }
 
 function DelegatorRow({ item, onSelect }: { readonly item: DelegatorItem; readonly onSelect: ((item: DelegatorItem) => void) | undefined }) {
@@ -93,7 +93,7 @@ function DelegatorRow({ item, onSelect }: { readonly item: DelegatorItem; readon
       <div className="dshx:flex dshx:items-start dshx:gap-3">
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <span className="dshx:text-sm dshx:font-semibold dshx:text-foreground">{item.title}</span>
-          {item.detail !== undefined ? <span className="dshx:text-[13px] dshx:leading-snug dshx:text-muted-foreground">{item.detail}</span> : null}
+          {item.detail !== undefined ? <span className="dshx:text-sm dshx:leading-snug dshx:text-muted-foreground">{item.detail}</span> : null}
         </div>
         <StatusTag status={item.status} />
       </div>
@@ -129,7 +129,7 @@ function StatusTag({ status }: { readonly status: DelegatorStatus }) {
     <span
       ref={ref}
       className={cn(
-        'dshx:mt-0.5 dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:rounded-[4px] dshx:border dshx:px-2 dshx:py-0.5 dshx:font-mono dshx:text-[11px] dshx:font-medium dshx:tracking-[0.12em] dshx:uppercase',
+        'dshx:mt-0.5 dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:border dshx:px-2 dshx:py-0.5 dshx:font-mono dshx:text-2xs dshx:font-medium dshx:tracking-[0.12em] dshx:uppercase',
         status === 'running' && 'dshx:border-warning/60 dshx:text-warning',
         status === 'done' && 'dshx:border-success/50 dshx:text-success',
         status === 'waiting' && 'dshx:border-border dshx:text-muted-foreground',

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
-import { Api, DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostContext, hostService, WebRoutes } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
@@ -48,10 +48,7 @@ const ShareRouteLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const web = yield* ShareWeb
     const handler = yield* ShareHandler
-    yield* Effect.acquireRelease(
-      Effect.sync(() => web.server.register({ kind: 'prefix', path: ROUTE_PATH, handler })),
-      unregister => Effect.sync(unregister),
-    )
+    yield* WebRoutes.register(web.server, { kind: 'prefix', path: ROUTE_PATH, handler })
   }),
 )
 

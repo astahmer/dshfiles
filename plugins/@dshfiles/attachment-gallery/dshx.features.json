@@ -21,7 +21,8 @@
         "expect img \"red.png\""
       ],
       "reachNarrow": [
-        "click button \"New\"",
+        "click button \"Back to Threads\"",
+        "click button \"New thread\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "expect button \"Remove image red.png\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",

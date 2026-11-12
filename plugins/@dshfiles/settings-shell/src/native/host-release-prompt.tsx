@@ -74,7 +74,7 @@ export const HostReleasePrompt = (props: {
       open
       title={props.t('hostRelease.title')}
     >
-      <div className="dshx:grid dshx:grid-cols-[max-content_minmax(0,max-content)_56px_minmax(0,max-content)] dshx:items-center dshx:justify-start dshx:gap-x-3 dshx:gap-y-2 dshx:text-[13px] dshx:leading-5">
+      <div className="dshx:grid dshx:grid-cols-[max-content_minmax(0,max-content)_56px_minmax(0,max-content)] dshx:items-center dshx:justify-start dshx:gap-x-3 dshx:gap-y-2 dshx:text-sm dshx:leading-5">
         <Transition done from={serviceFrom} label={props.t('hostRelease.service')} to={serviceTo} />
         <Transition done={false} from={pageFrom} label={props.t('hostRelease.page')} to={pageTo} />
       </div>

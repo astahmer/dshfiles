@@ -26,9 +26,12 @@ describe('jj-integration tool exposure', () => {
       'jj_thread_review_history',
       'jj_thread_status',
       'jj_thread_rebase',
+      'jj_thread_land_impact',
       'jj_workspace_setup',
       'jj_cancel_workspace_setup',
       'jj_thread_workspace_sync',
+      'dsh_update_check',
+      'dsh_update_apply',
       'jj_thread_discard',
       'jj_thread_discard_many',
       'jj_thread_cleanup',
@@ -48,7 +51,9 @@ describe('jj-integration tool exposure', () => {
       'jj_thread_refresh_repositories',
       'jj_thread_review_history',
       'jj_thread_status',
+      'jj_thread_land_impact',
       'jj_thread_workspace_sync',
+      'dsh_update_check',
       'jj_thread_cleanup_jobs',
     ])
     for (const method of Object.values(jjIntegrationApi.methods)) {
@@ -56,6 +61,13 @@ describe('jj-integration tool exposure', () => {
       expect(method.description ?? method.tool.description).toBeTruthy()
       expect(method.tool.render).toBeDefined()
     }
+  })
+
+  test('Update DSH applies only with an explicit confirm', async () => {
+    const input = jjIntegrationApi.methods.updateApply.input
+    expect(await validate(input, {})).toBe(true)
+    expect(await validate(input, { confirm: false })).toBe(true)
+    expect(await validate(input, { confirm: true })).toBe(false)
   })
 
   test('the cleanup tool names the bookmark that makes a workspace removable', () => {

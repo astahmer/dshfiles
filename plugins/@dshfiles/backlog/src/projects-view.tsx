@@ -74,7 +74,7 @@ const ProjectTitle = (props: { readonly projectKey: string; readonly large?: boo
 const Card = (props: { readonly heading: string; readonly action?: ReactNode; readonly children: ReactNode; readonly className?: string }): JSX.Element => (
   <section className={cn('dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-4', props.className)}>
     <div className="dshx:flex dshx:items-center dshx:justify-between">
-      <h3 className="dshx:text-[13px] dshx:font-semibold">{props.heading}</h3>
+      <h3 className="dshx:text-sm dshx:font-semibold">{props.heading}</h3>
       {props.action}
     </div>
     {props.children}
@@ -113,13 +113,13 @@ const ItemLine = (props: {
         onClick={event => {
           if (!props.selection.click(props.item.id, event)) props.select(props.item.id)
         }}
-        className="dshx:flex dshx:h-9 dshx:w-full dshx:items-center dshx:gap-2.5 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
+        className="dshx:flex dshx:h-9 dshx:w-full dshx:items-center dshx:gap-2.5 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-sm dshx:transition-colors dshx:hover:bg-accent/50"
       >
         <ItemGlyphs.StatusIcon status={props.item.status} />
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{imageTitleFallback(props.item.title)}</span>
         <ItemGlyphs.AttentionBadge attention={props.item.attention} compact />
         <ItemGlyphs.ActorStack actorIds={props.item.actors.map(actor => actor.id)} max={2} />
-        <span className="dshx:w-8 dshx:text-right dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(props.item.lastActivityAt)}</span>
+        <span className="dshx:w-8 dshx:text-right dshx:text-2xs dshx:text-muted-foreground">{ItemGlyphs.ago(props.item.lastActivityAt)}</span>
       </button>
     </li>
   </BacklogItemMenu>
@@ -171,7 +171,7 @@ const GuidanceCard = (props: { readonly project: string }): JSX.Element => {
         placeholder="Conventions, commands and limits agents should follow on this project's items"
         value={draft}
         rows={Math.min(12, Math.max(3, draft.split('\n').length + 1))}
-        className="dshx:text-[13px]"
+        className="dshx:text-sm"
         onChange={event => setDraft(event.currentTarget.value)}
         onBlur={() => {
           if (draft.trim() !== saved) save.mutate(draft)
@@ -248,7 +248,7 @@ const Overview = (props: {
           <h2 className="dshx:text-lg dshx:font-semibold dshx:tracking-tight">
             <ProjectTitle projectKey={project.key} large />
           </h2>
-          {project.key === NO_PROJECT ? null : <p className="dshx:truncate dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{project.key}</p>}
+          {project.key === NO_PROJECT ? null : <p className="dshx:truncate dshx:font-mono! dshx:text-2xs dshx:text-muted-foreground">{project.key}</p>}
         </div>
         <span className="dshx:ml-auto">
           <ItemGlyphs.ActorStack actorIds={project.actors} max={5} />
@@ -335,7 +335,7 @@ const Overview = (props: {
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
           {project.key === NO_PROJECT ? null : <GuidanceCard project={project.key} />}
           <Card heading="Details">
-            <dl className="dshx:grid dshx:grid-cols-[96px_minmax(0,1fr)] dshx:gap-y-2.5 dshx:text-[13px]">
+            <dl className="dshx:grid dshx:grid-cols-[96px_minmax(0,1fr)] dshx:gap-y-2.5 dshx:text-sm">
               <dt className="dshx:text-muted-foreground">Items</dt>
               <dd className="dshx:tabular-nums">{progressStatuses.reduce((sum, status) => sum + project.counts[status], 0) + project.counts.dropped}</dd>
               <dt className="dshx:text-muted-foreground">Agents</dt>
@@ -352,7 +352,7 @@ const Overview = (props: {
               <dd className="dshx:flex dshx:flex-wrap dshx:gap-1">
                 {revisions.length === 0 ? <span className="dshx:text-muted-foreground">None linked</span> : null}
                 {revisions.slice(0, 6).map(revision => (
-                  <span key={revision} className="dshx:rounded dshx:bg-muted dshx:px-1 dshx:font-mono! dshx:text-[11px]">
+                  <span key={revision} className="dshx:rounded dshx:bg-muted dshx:px-1 dshx:font-mono! dshx:text-2xs">
                     {revision.slice(0, 8)}
                   </span>
                 ))}
@@ -396,7 +396,7 @@ const Overview = (props: {
                       {item.activity.last === null ? '' : ItemGlyphs.describeEvent(item.activity.last, item.attention)} ·{' '}
                       <span className="dshx:font-medium dshx:text-foreground">{imageTitleFallback(item.title)}</span>
                     </button>
-                    <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
+                    <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
                   </li>
                 </BacklogItemMenu>
               ))}
@@ -480,12 +480,12 @@ export const ProjectsView = (props: {
                         <ProjectTitle projectKey={project.key} />
                       </p>
                       {project.key === NO_PROJECT ? (
-                        <p className="dshx:truncate dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">Captured outside a repository</p>
+                        <p className="dshx:truncate dshx:font-mono! dshx:text-2xs dshx:text-muted-foreground">Captured outside a repository</p>
                       ) : null}
                     </div>
                     <span
                       className={cn(
-                        'dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px]',
+                        'dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-2xs',
                         recent ? 'dshx:bg-success/12 dshx:text-success' : 'dshx:bg-muted dshx:text-muted-foreground',
                       )}
                     >

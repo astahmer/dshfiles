@@ -3,6 +3,11 @@ import type { AttentionCounts, AttentionDraft, AttentionItem, AttentionPublish, 
 
 /** Closed items (done or resolved) stay listed this long so the user can see and reopen them. */
 export const CLOSED_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
+/**
+ * A Ready item nobody touched for this long closes by itself (plan E2): "Other" holds what is worth a look, not every
+ * finish since last week. Needs you (blocking) and Failed never expire.
+ */
+export const UNSEEN_EXPIRY_MS = 72 * 60 * 60 * 1000
 /** Stored items at most; the oldest closed items leave first, then the oldest open ones. */
 export const MAX_ITEMS = 2000
 
@@ -47,7 +52,10 @@ export interface PublishOutcome {
  * - New key: a fresh open item.
  * - Resolved item: a new occurrence; it reopens with every user state cleared.
  * - Same fingerprint: unchanged, so Done and snooze-until-change hold.
- * - Changed fingerprint: the item updates, and a Done or a snooze-until-change lifts (a timed snooze holds).
+ * - Changed fingerprint: the item updates in place and a snooze-until-change lifts (a timed snooze holds). A Done lifts
+ *   only when the headline changed (reason, severity, verbs, choices or subject): a provider refreshing its supporting
+ *   detail, such as a ready-to-land diff stat or a subagent count, updates the row without bringing back an item the
+ *   user already dismissed.
  */
 const publish = (existing: AttentionItem | undefined, input: AttentionPublish, now: number): PublishOutcome => {
   const next = stated(input)
@@ -89,9 +97,15 @@ const publish = (existing: AttentionItem | undefined, input: AttentionPublish, n
   if (existing.fingerprint === next.fingerprint) return { changed: false, item: existing }
   return {
     changed: true,
-    item: { ...existing, ...next, updatedAt: now, doneAt: null, snoozeUntilChange: false },
+    item: { ...existing, ...next, updatedAt: now, doneAt: headlineChanged(existing, next) ? null : existing.doneAt, snoozeUntilChange: false },
   }
 }
+
+/** Everything an item states except its detail: what the user decided about when they marked it Done. */
+const headlineOf = (item: Pick<AttentionItem, 'reason' | 'severity' | 'verbs' | 'choices' | 'subject'>): string =>
+  JSON.stringify([item.severity, item.reason, item.verbs, item.choices, item.subject.kind, item.subject.id, item.subject.label ?? null])
+
+const headlineChanged = (existing: AttentionItem, next: ReturnType<typeof stated>): boolean => headlineOf(existing) !== headlineOf(next)
 
 /** The provider closed the item; resolving twice is a no-op. */
 const resolve = (existing: AttentionItem, now: number): PublishOutcome =>
@@ -127,6 +141,18 @@ const reopen = (existing: AttentionItem, now: number): UserTransition => {
 }
 
 const isSnoozed = (item: AttentionItem, now: number): boolean => item.snoozeUntilChange || (item.snoozedUntil !== null && item.snoozedUntil > now)
+
+/**
+ * Close a Ready item listed in Other that went unseen for `UNSEEN_EXPIRY_MS`: no provider change, no reopen and no
+ * snooze ending in that time. It closes as Done, so `reopen` brings it back; reopening sets `updatedAt`, which gives it
+ * another full window instead of closing it again at the next sweep. A changed publish reopens it as any Done item.
+ */
+const expireUnseen = (existing: AttentionItem, mutedSources: ReadonlySet<string>, now: number): PublishOutcome => {
+  if (existing.severity !== 'ready' || viewOf(existing, mutedSources, now) !== 'other') return { changed: false, item: existing }
+  const lastSeen = Math.max(existing.updatedAt, existing.snoozedUntil ?? 0)
+  if (now - lastSeen < UNSEEN_EXPIRY_MS) return { changed: false, item: existing }
+  return { changed: true, item: { ...existing, doneAt: now, updatedAt: now, snoozedUntil: null } }
+}
 
 /** Where one item shows; `null` for info items, which never reach the inbox. */
 const viewOf = (item: AttentionItem, mutedSources: ReadonlySet<string>, now: number): AttentionView | null => {
@@ -198,6 +224,7 @@ export class AttentionModel {
   static readonly snooze = snooze
   static readonly reopen = reopen
   static readonly isSnoozed = isSnoozed
+  static readonly expireUnseen = expireUnseen
   static readonly viewOf = viewOf
   static readonly countsOf = countsOf
   static readonly listView = listView

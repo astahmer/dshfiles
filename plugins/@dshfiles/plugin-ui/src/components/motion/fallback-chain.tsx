@@ -197,7 +197,7 @@ export function FallbackChain({
       className={cn('dshx-root dshx:@container dshx:flex dshx:flex-col', compact ? 'dshx:gap-1.5' : 'dshx:gap-3', className)}
       {...props}
     >
-      <header className={cn('dshx:flex dshx:min-w-0 dshx:items-center', compact ? 'dshx:gap-1.5 dshx:text-[11px]' : 'dshx:gap-3 dshx:text-sm')}>
+      <header className={cn('dshx:flex dshx:min-w-0 dshx:items-center', compact ? 'dshx:gap-1.5 dshx:text-2xs' : 'dshx:gap-3 dshx:text-sm')}>
         <h3 className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-medium">{heading}</h3>
         {summary !== undefined ? (
           <span className="dshx:flex dshx:min-w-0 dshx:shrink dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground">{summary}</span>
@@ -295,7 +295,7 @@ export function FallbackChain({
             </span>
             <span className="dshx:flex dshx:min-w-0 dshx:flex-col">
               <span className="dshx:text-sm dshx:font-medium">Request</span>
-              <span className="dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">{route}</span>
+              <span className="dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{route}</span>
             </span>
           </div>
         )}
@@ -508,7 +508,7 @@ const AttemptCard = React.forwardRef<
             <span
               aria-hidden
               className={cn(
-                'dshx:absolute dshx:-right-1.5 dshx:-bottom-1.5 dshx:inline-flex dshx:size-4 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-[10px] dshx:font-semibold dshx:ring-2 dshx:ring-card dshx:tabular-nums',
+                'dshx:absolute dshx:-right-1.5 dshx:-bottom-1.5 dshx:inline-flex dshx:size-4 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-2xs dshx:font-semibold dshx:ring-2 dshx:ring-card dshx:tabular-nums',
                 status === 'trying' && 'dshx:bg-info dshx:text-background',
                 status === 'failed' && 'dshx:bg-destructive dshx:text-background',
                 status === 'answered' && 'dshx:bg-success dshx:text-background',
@@ -519,7 +519,7 @@ const AttemptCard = React.forwardRef<
             </span>
           </span>
           <span className={cn('dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col', compact ? 'dshx:gap-0.5' : 'dshx:gap-1')}>
-            <span className={cn('dshx:flex dshx:min-w-0 dshx:items-baseline', compact ? 'dshx:gap-1 dshx:text-[11px]' : 'dshx:gap-2 dshx:text-sm')}>
+            <span className={cn('dshx:flex dshx:min-w-0 dshx:items-baseline', compact ? 'dshx:gap-1 dshx:text-2xs' : 'dshx:gap-2 dshx:text-sm')}>
               <span className={cn('dshx:font-medium', attempt.meta === undefined ? 'dshx:shrink-0' : 'dshx:min-w-0 dshx:truncate')}>{attempt.model}</span>
               {attempt.meta === undefined ? (
                 <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-compact:hidden">
@@ -534,7 +534,7 @@ const AttemptCard = React.forwardRef<
                 </span>
               )}
             </span>
-            <span className={cn('dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-2', compact ? 'dshx:text-[10px]' : 'dshx:text-sm')}>
+            <span className={cn('dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-2', compact ? 'dshx:text-2xs' : 'dshx:text-sm')}>
               <span ref={statusRef} className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', statusTone(status))}>
                 {status === 'trying' && attempt.statusLabel === undefined ? <ShimmerText className="dshx:text-info">Trying…</ShimmerText> : statusText(attempt)}
               </span>
@@ -548,7 +548,7 @@ const AttemptCard = React.forwardRef<
                   <span
                     key={square}
                     className={cn(
-                      'dshx:size-[5px] dshx:shrink-0 dshx:rounded-[1px]',
+                      'dshx:size-[5px] dshx:shrink-0 dshx:rounded-xs',
                       square >= filled && 'dshx:bg-muted-foreground/15',
                       square < filled && status === 'trying' && 'dshx:bg-info',
                       square < filled && status === 'failed' && 'dshx:bg-destructive/70',

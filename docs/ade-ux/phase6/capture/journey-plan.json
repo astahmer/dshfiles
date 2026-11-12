@@ -2,6 +2,8 @@
   {
     "name": "j0-seed-question-thread",
     "steps": [
+      "tap-if css \"[data-phone-back]\"",
+      "wait 600",
       "tap-tab new",
       "wait 1200",
       "fill css \"[role=textbox]\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"question\\\":\\\"Which layout should the phone notes use ({{nonce}})?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin\\\"},{\\\"label\\\":\\\"One flat list\\\"}]}],\\\"timeout\\\":-1}]]\"",
@@ -12,11 +14,13 @@
   {
     "name": "j1-open-thread-from-threads",
     "steps": [
-      "tap-tab threads",
+      "assert-no-css \"[data-phone-tab-bar]\"",
+      "tap css \"[data-phone-back]\"",
       "assert-css \"[data-phone-list] [data-destination-index=threads]\"",
       "tap css \"[data-phone-list] [data-work-status=needs-you]\"",
       "assert-css \"[data-phone-top-bar][data-phone-stage=thread]\"",
       "assert-no-css \"[data-phone-list]\"",
+      "assert-no-css \"[data-phone-tab-bar]\"",
       "assert-css \"[aria-label='Back to Threads']\""
     ]
   },
@@ -33,7 +37,7 @@
     "name": "j3-send-message",
     "steps": [
       "tap css \"[role=textbox]\"",
-      "fill css \"[role=textbox]\" \"Phone journey check {{nonce}} [[once call bash {\\\"command\\\":\\\"sleep 6 && echo phone-journey\\\"}]]\"",
+      "fill css \"[role=textbox]\" \"Phone journey check {{nonce}} [[stream 250]] [[answer word0 word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18 word19 word20 word21 word22 word23 word24 word25 word26 word27 word28 word29 word30 word31 word32 word33 word34 word35 word36 word37 word38 word39 word40 word41 word42 word43 word44 word45 word46 word47 word48 word49 word50 word51 word52 word53 word54 word55 word56 word57 word58 word59]]\"",
       "press Enter",
       "expect text \"Phone journey check*\""
     ]
@@ -45,6 +49,7 @@
       "tap css \"[data-phone-thread-menu] button[aria-label='Open right sidebar']\"",
       "assert-css \"[data-phone-sheet]\"",
       "tap css \"[data-phone-sheet] button[aria-label='New tab']\"",
+      "wait 1200",
       "tap css \"[data-phone-sheet] button:has-text('Changes')\"",
       "expect text \"Whole thread\""
     ]
@@ -57,31 +62,38 @@
     ]
   },
   {
-    "name": "j5-inbox-open-item",
+    "name": "j5-inbox-item-done",
     "steps": [
+      "tap css \"[data-phone-back]\"",
+      "assert-css \"[data-phone-tab-bar]\"",
       "tap-tab inbox",
       "assert-css \"[data-phone-title]:has-text('Inbox')\"",
+      "tap css \"[data-phone-list] [data-section=attention-inbox]\"",
+      "assert-css \"[data-phone-title]:has-text('Inbox')\"",
+      "wait 12000",
       "tap-if tab \"Other*\"",
       "assert-css \"[data-attention-item] button:has-text('Open')\"",
-      "tap css \"[data-attention-item] button:has-text('Open')\"",
-      "assert-css \"[data-phone-top-bar][data-phone-stage=thread]\"",
-      "assert-css \"[aria-label='Back to Inbox']\""
-    ]
-  },
-  {
-    "name": "j6-back-to-inbox",
-    "steps": [
-      "tap css \"[aria-label='Back to Inbox']\"",
-      "assert-css \"[data-phone-title]:has-text('Inbox')\"",
+      "tap css \"[data-attention-item] button:has-text('Done')\"",
+      "wait 1500",
+      "tap tab \"Done*\"",
       "assert-css \"[data-attention-item]\""
     ]
   },
   {
-    "name": "j7-inbox-item-done",
+    "name": "j6-inbox-open-item",
     "steps": [
-      "tap-if tab \"Other*\"",
-      "tap css \"[data-attention-item] button:has-text('Done')\"",
-      "wait 1500",
+      "tap css \"[data-attention-item] button:has-text('Open')\"",
+      "assert-css \"[data-phone-top-bar][data-phone-stage=thread]\"",
+      "assert-no-css \"[data-phone-tab-bar]\"",
+      "assert-css \"[aria-label='Back to Inbox']\""
+    ]
+  },
+  {
+    "name": "j7-back-to-inbox",
+    "steps": [
+      "tap css \"[aria-label='Back to Inbox']\"",
+      "assert-css \"[data-phone-title]:has-text('Inbox')\"",
+      "wait 800",
       "tap tab \"Done*\"",
       "assert-css \"[data-attention-item]\""
     ]
@@ -97,6 +109,17 @@
       "assert-css \"[data-phone-list] [data-destination-index=land]\"",
       "tap css \"[aria-label='Back to More']\"",
       "assert-css \"[data-phone-list] nav[aria-label='More destinations']\""
+    ]
+  },
+  {
+    "name": "j9-edge-swipe-back",
+    "steps": [
+      "tap-tab threads",
+      "tap css \"[data-phone-list] [data-work-status]\"",
+      "assert-css \"[data-phone-top-bar][data-phone-stage=thread]\"",
+      "edge-swipe",
+      "assert-css \"[data-phone-list] [data-destination-index=threads]\"",
+      "assert-css \"[data-phone-tab-bar]\""
     ]
   }
 ]

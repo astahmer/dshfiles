@@ -9,9 +9,7 @@ const Panel = (props: {
   readonly className?: string
   readonly children: React.ReactNode
 }): JSX.Element => (
-  <section
-    className={`dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-4 ${props.className ?? ''}`}
-  >
+  <section className={`dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:border-t dshx:border-border dshx:pt-4 ${props.className ?? ''}`}>
     <header className="dshx:flex dshx:flex-col dshx:gap-0.5">
       <h2 className="dshx:text-sm dshx:font-semibold dshx:text-foreground" data-usage-jev-card-title>
         {props.title}
@@ -23,7 +21,7 @@ const Panel = (props: {
 )
 
 const Tile = (props: { readonly label: string; readonly value: string; readonly detail?: React.ReactNode }): JSX.Element => (
-  <div className="dshx:min-w-0 dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:p-3">
+  <div className="dshx:min-w-0 dshx:py-1">
     <p className="dshx:text-xs dshx:text-muted-foreground">{props.label}</p>
     <p className="dshx:truncate dshx:text-lg dshx:font-semibold dshx:text-foreground">{props.value}</p>
     {props.detail === undefined ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{props.detail}</p>}
@@ -75,7 +73,7 @@ export const JevUsageCard = (props: { readonly usage: JevUsageView | undefined; 
                   value={maximumInputTokens === 0 ? 0 : (row.inputTokens / maximumInputTokens) * 100}
                   aria-valuetext={`${UsageFormattingModel.formatCount(row.inputTokens)} input tokens; ${row.calls.toLocaleString()} requests; ${UsageFormattingModel.formatCost(row.estimatedCostUsd)} estimated cost this month; bars are relative to the most-used credential`}
                 />
-                <p className="dshx:text-[11px] dshx:text-muted-foreground">
+                <p className="dshx:text-2xs dshx:text-muted-foreground">
                   {UsageFormattingModel.formatCount(row.inputTokens)} input tokens · {UsageFormattingModel.formatCount(row.outputTokens)} output · Backlog{' '}
                   {row.backlogCalls} / Memory {row.memoryCalls}
                 </p>

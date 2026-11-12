@@ -1,5 +1,17 @@
-/** Hues an account falls back to when it carries no usable accent; distinct in both themes. */
-export const ACCOUNT_HUES = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899', '#06B6D4', '#84CC16', '#F97316'] as const
+/**
+ * Hues an account falls back to when it carries no usable accent: the kit's categorical tokens (DESIGN.md › Colors),
+ * distinct from each other in both themes and retuned with them.
+ */
+export const ACCOUNT_HUES = [
+  'var(--dshx-kit-graph-1)',
+  'var(--dshx-kit-graph-2)',
+  'var(--dshx-kit-graph-3)',
+  'var(--dshx-kit-graph-4)',
+  'var(--dshx-kit-graph-5)',
+  'var(--dshx-kit-graph-6)',
+  'var(--dshx-kit-teal)',
+  'var(--dshx-kit-violet)',
+] as const
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/iu
 

@@ -163,8 +163,8 @@ export const AttachmentTray = (props: { readonly files: readonly ComposerFile[];
             >
               <FileIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />
               <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-                <span className="dshx:truncate dshx:text-[12px] dshx:text-foreground">{file.name}</span>
-                <span className="dshx:text-[11px] dshx:text-muted-foreground">{fileSizeLabel(file.bytes)}</span>
+                <span className="dshx:truncate dshx:text-xs dshx:text-foreground">{file.name}</span>
+                <span className="dshx:text-2xs dshx:text-muted-foreground">{fileSizeLabel(file.bytes)}</span>
               </span>
               <button
                 type="button"
@@ -202,7 +202,7 @@ export const AttachFilesButton = (props: {
         title={props.title}
         onMouseDown={event => event.preventDefault()}
         onClick={() => document.getElementById(id)?.click()}
-        className={cn('dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-[11px] dshx:text-muted-foreground dshx:hover:text-foreground', props.className)}
+        className={cn('dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground dshx:hover:text-foreground', props.className)}
       >
         {props.children ?? <PaperclipIcon aria-hidden className="dshx:size-3.5" />}
       </button>

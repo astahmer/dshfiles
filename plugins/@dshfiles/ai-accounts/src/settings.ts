@@ -44,6 +44,15 @@ export const aiAccountsSettings = defineSettings({
     usageOrder: Schema.array(Schema.string()).default([]),
     /** Account ids the usage strip and popover leave out. */
     hiddenUsageAccounts: Schema.array(Schema.string()).default([]),
+    /**
+     * An optional filter for the status strip (b:hbtt), set from an account's right-click menu: when it names accounts,
+     * only those are segments and the other enabled accounts count in +N. Empty: every enabled account, as many as fit.
+     */
+    usageStripPinned: Schema.array(Schema.string())
+      .default([])
+      .description('Accounts the status bar shows (pinned from an account’s right-click menu); empty shows every enabled account that fits.'),
+    /** Each status-bar segment's time to its reset after what is left (b:jaz6); dropped first from healthy accounts when room runs short. */
+    showResetTimes: Schema.boolean().default(true).description('Show reset times in the status bar'),
     /** Show each account's short name beside its meter in the sidebar usage strip. */
     usageShortNames: Schema.boolean().default(true),
     /** Account id → short name for the usage strip; an account without one uses its picker tag, then its initials. */

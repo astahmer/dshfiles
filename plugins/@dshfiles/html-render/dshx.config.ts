@@ -3,7 +3,7 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/html-render',
-  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/preview'] },
+  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/preview', '@dshfiles/plugin-ui'] },
   client: { entry: 'src/client-entry.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

@@ -5,7 +5,6 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
 import type { ReactNode } from 'react'
 import type { OnScreenProject } from './on-screen-project.js'
-import { TOUCH } from './touch.js'
 import type { TryItInput, TryItOutput } from './try-it-model.js'
 
 /** What Try it demonstrates: one catalogued feature or one pack, named for the dialog title. */
@@ -48,15 +47,13 @@ const ConfirmBody = (props: TryItDialogProps & { readonly target: TryItTarget })
         <DialogTitle>Try it: {props.target.title}</DialogTitle>
         <DialogDescription data-try-it-cost="">{TRY_IT_COST}</DialogDescription>
         <p className="dshx:text-sm dshx:text-muted-foreground" data-try-it-project="">
-          {props.project === null ? 'Starts in the Host default directory.' : `Starts in ${props.project.title}.`}
+          {props.project === null ? "Starts in DSH's default folder." : `Starts in ${props.project.title}.`}
         </p>
       </DialogHeader>
       {start.isError ? (
         <Alert role="alert" variant="destructive">
           <AlertTitle>No demo started</AlertTitle>
-          <AlertDescription>
-            {errorMessage(start.error, 'The Host did not answer. Check that the onboarding plugin is enabled, then try again.')}
-          </AlertDescription>
+          <AlertDescription>{errorMessage(start.error, 'No answer came back, so no thread was started. Try again.')}</AlertDescription>
         </Alert>
       ) : null}
       {refused === null ? null : (
@@ -68,17 +65,16 @@ const ConfirmBody = (props: TryItDialogProps & { readonly target: TryItTarget })
         </Alert>
       )}
       <DialogFooter>
-        <Button className={TOUCH} disabled={start.isPending} onClick={props.onClose} variant="outline">
+        <Button disabled={start.isPending} onClick={props.onClose} variant="outline">
           {refused === null ? 'Cancel' : 'Close'}
         </Button>
         {refused === null ? (
-          <Button className={TOUCH} disabled={start.isPending} onClick={() => start.mutate()}>
+          <Button disabled={start.isPending} onClick={() => start.mutate()}>
             {start.isPending ? <Spinner className="dshx:size-4" /> : null}
             {start.isError ? 'Try again' : 'Start demo'}
           </Button>
         ) : (
           <Button
-            className={TOUCH}
             onClick={() => {
               openThread(refused.sessionId)
               onClose()

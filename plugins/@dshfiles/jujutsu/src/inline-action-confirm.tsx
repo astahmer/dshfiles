@@ -19,7 +19,7 @@ export const InlineActionConfirm = (props: {
       {props.preview.summary}
     </p>
     {props.preview.detail.length > 0 && (
-      <pre className="dshx:max-h-40 dshx:overflow-auto dshx:rounded-sm dshx:bg-muted dshx:p-2 dshx:font-mono! dshx:text-[11px] dshx:whitespace-pre-wrap">
+      <pre className="dshx:max-h-40 dshx:overflow-auto dshx:rounded-sm dshx:bg-muted dshx:p-2 dshx:font-mono! dshx:text-2xs dshx:whitespace-pre-wrap">
         {props.preview.detail}
       </pre>
     )}

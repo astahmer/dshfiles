@@ -92,7 +92,7 @@ export const threadSidebarAutoSettleApi = defineApi({
   owner: '@dshfiles/thread-sidebar',
   methods: {
     status: method({
-      input: SchemaHelpers.strictStruct(Schema.Struct({})),
+      input: SchemaHelpers.toolInput({}),
       output: autoSettleStatusSchema,
       description:
         'Read the Host auto-settle state: whether idle or rebased auto-settle is on, the scan interval, the last and next scan, and the newest automatic settles with the trigger and reason behind each. Read-only.',

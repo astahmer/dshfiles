@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { planLegacyPreferencesMigration, type LegacyPreferences } from './legacy-preferences-migration.js'
 import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-view-preferences.js'
+import { DEFAULT_THREAD_BOARD_VIEW } from './thread-board-view.js'
 
 const customThreadViews: ThreadViewSettings = { ...DEFAULT_THREAD_VIEW_SETTINGS, showFilterControl: false }
 
 const legacyOf = (overrides: Partial<LegacyPreferences> = {}): LegacyPreferences => ({
   threadViews: { settings: DEFAULT_THREAD_VIEW_SETTINGS, doneFiltersMigrated: true, shippedFiltersMigrated: true },
   collapsedGroups: [],
+  boardView: null,
   ...overrides,
 })
 
@@ -57,5 +59,20 @@ describe('planLegacyPreferencesMigration', () => {
       host: hostOf(),
     })
     expect(patch).toEqual({ threadViews: customThreadViews, collapsedGroups: ['status:working'] })
+  })
+
+  it('moves a browser Board view once onto a Host that holds the default one (E9)', () => {
+    const board = { ...DEFAULT_THREAD_BOARD_VIEW, groupBy: 'project' as const, statusFilters: ['working' as const] }
+    expect(planLegacyPreferencesMigration({ legacy: legacyOf({ boardView: board }), host: hostOf() })).toEqual({ boardView: board })
+    // Another device already chose a Board view: the Host keeps it.
+    const chosen = { ...DEFAULT_THREAD_BOARD_VIEW, groupBy: 'date' as const }
+    expect(planLegacyPreferencesMigration({ legacy: legacyOf({ boardView: board }), host: hostOf({ boardView: chosen }) })).toEqual({})
+    // A default browser copy, or a Host that cannot hold the field yet (null), moves nothing.
+    expect(planLegacyPreferencesMigration({ legacy: legacyOf({ boardView: DEFAULT_THREAD_BOARD_VIEW }), host: hostOf() })).toEqual({})
+    expect(planLegacyPreferencesMigration({ legacy: legacyOf({ boardView: null }), host: hostOf() })).toEqual({})
+  })
+
+  it('keeps the organization default equal to the board-view default', () => {
+    expect(DEFAULT_PREFERENCES.boardView).toEqual(DEFAULT_THREAD_BOARD_VIEW)
   })
 })

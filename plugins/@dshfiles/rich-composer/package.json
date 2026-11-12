@@ -24,6 +24,14 @@
       "types": "./src/conversation-contract.ts",
       "default": "./dist/conversation-contract.js"
     },
+    "./thread-views": {
+      "types": "./src/thread-views.ts",
+      "default": "./dist/thread-views.js"
+    },
+    "./composer-more": {
+      "types": "./src/composer-more.ts",
+      "default": "./dist/composer-more.js"
+    },
     "./rich-text-editor": {
       "types": "./src/editor/index.ts",
       "default": "./dist/rich-text-editor.js"
@@ -68,12 +76,14 @@
     "@deepseek-ai/dsh-client-ui-renderer": "catalog:",
     "@deepseek-ai/dsh-client-ui-session": "catalog:",
     "@deepseek-ai/dsh-client-ui-settings": "catalog:",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-commands": "0.2.1-rc.2",
     "@deepseek-ai/dsh-file-reference": "0.2.1-rc.2",
     "@deepseek-ai/dsh-goal": "0.2.1-rc.2",
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-llm-retry": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-permission-presets": "0.2.1-rc.2",
     "@deepseek-ai/dsh-plan-mode": "0.2.1-rc.2",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-token-meter": "0.2.1-rc.2",
@@ -113,6 +123,7 @@
     "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-session": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-settings": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-session": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
@@ -151,10 +162,12 @@
         "@deepseek-ai/dsh-client-ui-renderer/client",
         "@deepseek-ai/dsh-client-ui-session/client",
         "@deepseek-ai/dsh-client-ui-settings/client",
+        "@deepseek-ai/dsh-client-ui-sidebar-right/client",
         "@deepseek-ai/dsh-commands/brand",
         "@deepseek-ai/dsh-goal/client",
         "@deepseek-ai/dsh-goal/types",
         "@deepseek-ai/dsh-llm-retry/types",
+        "@deepseek-ai/dsh-permission-presets/client",
         "@deepseek-ai/dsh-plan-mode/client",
         "@deepseek-ai/dsh-plan-mode/types",
         "@deepseek-ai/dsh-token-meter/client",

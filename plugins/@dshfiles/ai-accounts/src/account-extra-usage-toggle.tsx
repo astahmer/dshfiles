@@ -22,26 +22,25 @@ export const AccountExtraUsageToggle = (props: { readonly instanceId: string; re
   })
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
-      <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px]">
+      <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
         <Switch
           aria-label={`Use extra usage for ${props.name}`}
           checked={account?.useExtraUsage === true}
-          className="dshx:data-[state=checked]:bg-warning"
           disabled={account === undefined || file.isError || change.isPending}
           onCheckedChange={enabled => change.mutate(enabled)}
         />
         <span>Use extra usage</span>
       </label>
-      <p className="dshx:text-[11px] dshx:text-muted-foreground">
+      <p className="dshx:text-xs dshx:text-muted-foreground">
         {account?.useExtraUsage === true ? 'Spent plan windows draw paid extra usage.' : 'Spent plan windows stop this account instead of drawing overage.'}
       </p>
       {change.isError ? (
-        <p className="dshx:text-[11px] dshx:text-destructive" role="alert">
+        <p className="dshx:text-xs dshx:text-destructive" role="alert">
           {errorMessage(change.error, 'Could not change extra usage for this account. Try again.')}
         </p>
       ) : null}
       {file.isError ? (
-        <p className="dshx:text-[11px] dshx:text-destructive" role="alert">
+        <p className="dshx:text-xs dshx:text-destructive" role="alert">
           Account settings are unavailable. Reopen the popover to retry.
         </p>
       ) : null}

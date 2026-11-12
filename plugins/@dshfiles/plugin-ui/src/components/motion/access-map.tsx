@@ -189,7 +189,7 @@ export function AccessMap({
               key={label.id}
               style={{ left: label.x, top: label.y }}
               className={cn(
-                'dshx:pointer-events-none dshx:absolute dshx:z-10 dshx:-translate-x-1/2 dshx:-translate-y-1/2 dshx:rounded-full dshx:border dshx:bg-card dshx:px-1.5 dshx:py-px dshx:text-[10px] dshx:whitespace-nowrap dshx:@max-pane-narrow:hidden',
+                'dshx:pointer-events-none dshx:absolute dshx:z-10 dshx:-translate-x-1/2 dshx:-translate-y-1/2 dshx:rounded-full dshx:border dshx:bg-card dshx:px-1.5 dshx:py-px dshx:text-2xs dshx:whitespace-nowrap dshx:@max-pane-narrow:hidden',
                 label.open ? 'dshx:border-destructive/40 dshx:text-destructive' : 'dshx:border-border dshx:text-muted-foreground',
               )}
             >
@@ -228,7 +228,7 @@ export function AccessMap({
           >
             <NodeHeading node={target} fallbackIcon={<LockIcon />} />
             {target.fields?.map(field => (
-              <span key={field.name} className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:px-1 dshx:py-0.5 dshx:text-[11px]">
+              <span key={field.name} className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:px-1 dshx:py-0.5 dshx:text-2xs">
                 <span className="dshx:min-w-0 dshx:truncate dshx:text-foreground">{field.name}</span>
                 <span className="dshx:shrink-0 dshx:text-muted-foreground/70">{field.type}</span>
               </span>
@@ -248,7 +248,7 @@ function OpenCount({ count }: { readonly count: number }) {
       ref={ref}
       role="status"
       className={cn(
-        'dshx:shrink-0 dshx:rounded-full dshx:border dshx:px-2 dshx:py-0.5 dshx:text-[11px] dshx:font-medium',
+        'dshx:shrink-0 dshx:rounded-full dshx:border dshx:px-2 dshx:py-0.5 dshx:text-2xs dshx:font-medium',
         count > 0 ? 'dshx:border-destructive/50 dshx:text-destructive' : 'dshx:border-success/40 dshx:text-success',
       )}
     >
@@ -265,7 +265,7 @@ function NodeHeading({ node, fallbackIcon }: { readonly node: AccessNode; readon
       </span>
       <span className="dshx:flex dshx:min-w-0 dshx:flex-col">
         <span className="dshx:truncate dshx:text-xs dshx:font-semibold dshx:text-foreground">{node.label}</span>
-        {node.detail ? <span className="dshx:truncate dshx:text-[10px] dshx:text-muted-foreground">{node.detail}</span> : null}
+        {node.detail ? <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{node.detail}</span> : null}
       </span>
     </div>
   )
@@ -285,7 +285,7 @@ function SourceCard({ source, open, evidence }: { readonly source: AccessSource;
       >
         <span
           className={cn(
-            'dshx:grid dshx:size-6 dshx:shrink-0 dshx:place-items-center dshx:text-[9px] dshx:font-semibold dshx:[&_svg]:size-3.5',
+            'dshx:grid dshx:size-6 dshx:shrink-0 dshx:place-items-center dshx:text-2xs dshx:font-semibold dshx:[&_svg]:size-3.5',
             source.icon ? 'dshx:rounded-md dshx:bg-muted' : 'dshx:rounded-full dshx:bg-foreground dshx:text-background',
             source.icon && (open ? 'dshx:text-destructive' : 'dshx:text-muted-foreground'),
           )}
@@ -294,19 +294,19 @@ function SourceCard({ source, open, evidence }: { readonly source: AccessSource;
         </span>
         <span className="dshx:flex dshx:min-w-0 dshx:flex-col">
           <span className="dshx:truncate dshx:text-xs dshx:font-medium dshx:text-foreground">{source.label}</span>
-          {source.detail ? <span className="dshx:truncate dshx:text-[10px] dshx:text-muted-foreground">{source.detail}</span> : null}
+          {source.detail ? <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{source.detail}</span> : null}
         </span>
       </div>
       {evidence ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:pl-0.5">
-          <span className="dshx:text-[10px] dshx:font-medium dshx:text-destructive">{evidence.title}</span>
+          <span className="dshx:text-2xs dshx:font-medium dshx:text-destructive">{evidence.title}</span>
           <ul ref={evidenceRef} className="dshx:flex dshx:flex-col dshx:gap-1">
             {evidence.items.map(item => (
               <li
                 key={item.id}
-                className="dshx:flex dshx:w-fit dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:py-0.5 dshx:pr-1.5 dshx:pl-0.5 dshx:text-[10px]"
+                className="dshx:flex dshx:w-fit dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:py-0.5 dshx:pr-1.5 dshx:pl-0.5 dshx:text-2xs"
               >
-                <span className="dshx:rounded-[4px] dshx:bg-destructive/12 dshx:px-1 dshx:font-mono dshx:font-semibold dshx:text-destructive">{item.tag}</span>
+                <span className="dshx:rounded-sm dshx:bg-destructive/12 dshx:px-1 dshx:font-mono dshx:font-semibold dshx:text-destructive">{item.tag}</span>
                 <span className="dshx:text-muted-foreground">{item.label}</span>
               </li>
             ))}
@@ -354,7 +354,7 @@ function RuleRow({
         open ? 'dshx:border-destructive/60 dshx:bg-destructive/10' : 'dshx:border-transparent dshx:bg-muted',
       )}
     >
-      <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[11px]', open ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}>
+      <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-2xs', open ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}>
         {rule.verb}
       </span>
       <DropdownMenu>
@@ -363,7 +363,7 @@ function RuleRow({
             type="button"
             aria-label={`${rule.verb}: ${current?.label ?? 'choose access'}`}
             className={cn(
-              'dshx:flex dshx:h-6 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-[5px] dshx:px-1.5 dshx:text-[11px] dshx:font-medium dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:[&_svg]:size-3',
+              'dshx:flex dshx:h-6 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-1.5 dshx:text-2xs dshx:font-medium dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:[&_svg]:size-3',
               open ? 'dshx:text-destructive' : 'dshx:text-foreground',
             )}
           >

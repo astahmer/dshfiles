@@ -312,7 +312,7 @@ function StepNode({ step, index, next }: { readonly step: PipelineStep; readonly
           ) : (
             <span
               aria-hidden
-              className={cn('dshx:text-[11px] dshx:font-medium dshx:tabular-nums', step.state === 'running' ? 'dshx:text-info' : 'dshx:text-muted-foreground')}
+              className={cn('dshx:text-2xs dshx:font-medium dshx:tabular-nums', step.state === 'running' ? 'dshx:text-info' : 'dshx:text-muted-foreground')}
             >
               {index + 1}
             </span>
@@ -322,7 +322,7 @@ function StepNode({ step, index, next }: { readonly step: PipelineStep; readonly
       <span className={cn('dshx:max-w-full dshx:truncate dshx:text-xs', step.state === 'pending' ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}>
         {step.label}
       </span>
-      <span ref={durationRef} className="dshx:h-4 dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
+      <span ref={durationRef} className="dshx:h-4 dshx:font-mono dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
         {step.durationSeconds === undefined ? '' : `${step.durationSeconds.toFixed(1)}s`}
       </span>
     </li>

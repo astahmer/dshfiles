@@ -142,7 +142,7 @@ const CurrentChart = (props: { readonly accounts: readonly PaceAccount[]; readon
               <foreignObject height="20" width="72" x={x(account.x) + 10} y={y(account.used) - 10}>
                 <span
                   className={cn(
-                    'dshx:flex dshx:items-center dshx:gap-1 dshx:rounded dshx:bg-background/80 dshx:px-1 dshx:text-[12px] dshx:tabular-nums',
+                    'dshx:flex dshx:items-center dshx:gap-1 dshx:rounded dshx:bg-background/80 dshx:px-1 dshx:text-xs dshx:tabular-nums',
                     active ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
                   )}
                 >

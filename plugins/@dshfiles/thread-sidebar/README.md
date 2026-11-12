@@ -1,14 +1,24 @@
 # Thread Sidebar
 
-![All threads grouped by status: Needs you, Ready and Idle, with the status strip below](docs/screenshots/status-grouped-thread-list.png)
+![All threads grouped by status: line 1 is the thread (status glyph, title, time), line 2 is where it runs (project mark and name, a branch icon for its own workspace with one state word such as "1 to land"), and a working row says what it does now ("Running sleep 1800 · 1m 15s")](docs/screenshots/status-grouped-thread-list.png)
 
-![The fixed layout: a labelled rail of destinations beside the thread list](docs/screenshots/destination-rail.png)
+![Group by project, one click from the Filter menu: each section shows the project mark, name and count](docs/screenshots/group-by-project.png)
+
+![The rail of destinations beside the thread list: the default Sidebar pane](docs/screenshots/destination-rail.png)
+
+![A folder of your own on the rail, with its panels and Add panel](docs/screenshots/sidebar-folders.png)
+
+![Copy DSH URL for agents and Pair a phone in the rail's DSH actions, directly above Settings](docs/screenshots/rail-actions.png)
+
+![Above the first row: one search field, the project picker and one Filter menu (presets, Group by project, Group, Status, Source, Board, settings); a changed filter marks the preset edited and offers Save changes](docs/screenshots/list-filter-menu.png)
+
+![Filter presets: the Filter button names the active preset, and the menu's Presets section switches between them in one click](docs/screenshots/filter-presets.png)
 
 ![On a phone the rail becomes a bottom tab bar; More lists the other destinations](docs/screenshots/phone-tab-bar.png)
 
-![On a phone the stage is a stack: a top bar names the thread or page, Back returns to the list it came from, and Thread menu offers the thread-panel opener when its reader is mounted](docs/screenshots/phone-stack-navigation.png)
+![On a phone the stage is a stack: a top bar names the thread or page, Back (or a swipe from the left edge) returns to the list it came from, and inside a thread the tab bar steps aside](docs/screenshots/phone-stack-navigation.png)
 
-![On a touch screen each thread row has a ⋯ button that opens its actions menu](docs/screenshots/touch-row-menu.png)
+![On a touch screen each thread row has a ⋯ button that opens its actions menu as a bottom sheet](docs/screenshots/touch-row-menu.png)
 
 ![Where did a page go? lists each former sidebar page and opens its new home](docs/screenshots/moved-to-map.png)
 
@@ -29,6 +39,8 @@
 ![Several unsent drafts in the same project](docs/screenshots/typed-project-drafts.png)
 
 ![Group remote threads with each view](docs/screenshots/section-order.png)
+
+![Settings › About › Update DSH: What's new, what it rebuilds, then Restart when idle](docs/screenshots/update-dsh.png)
 
 ![Retained notification history with synthetic thread events](docs/screenshots/notification-history.png)
 
@@ -69,9 +81,13 @@ group the newest return to you comes first: the time the thread entered its grou
 finish, the settle), refined live while the page is open. Needs you and Failed (which shares the Needs you group) are a
 projection of the inbox: an open `@dshfiles/activity-timeline/attention-api` item whose subject is the thread
 (`src/inbox-signals.ts`), plus the questions, approvals, usage limits and interrupted turns this sidebar already
-classifies. Each row shows the kit's `StatusGlyph` (Working spins without colour; only Needs you, Failed and Ready
-draw the eye), the title, a muted second line with why it needs you, the agent preset, project and host, the elapsed
-time, and one inline verb when it needs you: **Answer** and **Approve** open the thread, where the card is answered in
+classifies. Each row has two lines (b:212a). Line 1 is the thread: the kit's `StatusGlyph` in its own 16 px seat
+(Working spins without colour; only Needs you, Failed and Ready draw the eye), the title and the elapsed time. Line 2 is
+where it runs: the project's 14 px mark under the glyph, why it needs you, the project name (left out under a project
+section, whose header names it; on a very short row it hides before the mark does), and, for a thread in its own jj
+workspace, a branch icon with at most one state word ("2 to land", "landed", "3 behind"). The workspace's
+`thread-xxxxxx` folder is never a label: it is in that icon's tooltip ("Own workspace · thread-e4fde2 · <path>") only.
+Then the agent preset and host, and and one inline verb when it needs you: **Answer** and **Approve** open the thread, where the card is answered in
 place; **Retry**, **Resume** and **Land** on an inbox item run that item's own verb through the inbox's `act`. The
 hover-action strip opens to the left of that verb and never over it, so the visible verb stays clickable. The Needs you
 group header offers **Resume all**: every row whose verb is Resume moves at once (three requests at a time), whether it
@@ -88,13 +104,25 @@ not compose.
 marking that item **Done** in the Inbox acknowledges the same turn here (the inbox emits `dshfiles/attention/done`),
 so the row's unread dot clears too. Done on an older turn's item leaves a newer finish unread.
 
+**Subagents roll up into their parent.** A subagent Session publishes no inbox item: the user acts on the parent
+thread, so the parent's item carries one line instead ("3 subagent turns finished; 1 failed."), counting the children
+that finished no later than the parent's turn. The lineage comes from the stored Session header only (origin and
+parent, cached; `src/session-lineage.ts`). Reading the parent clears its children's records, and the first reconcile
+after an upgrade clears child records whose parent was already read, so subagent items published before the roll-up
+resolve into Closed once.
+
+**New-thread cards.** The new-thread screen (rich-composer's `conversation.hero.suggestions` slot) shows up to three
+flat cards from the same sources as the list: **Resume** the most recent quiet thread (or one stopped and waiting to be
+resumed), **Review** a thread whose Inbox item offers Land (it opens the thread and its Changes view), and **Inbox** with
+the number of threads that need you. A card with no real data is not shown, so a fresh profile sees none.
+
 ## Notification history
 
 **Observe › Notifications** keeps the last 500 thread events, newest first, on the Host. The history includes finished, failed, and stopped turns, approval requests, and input requests. Recording does not depend on a browser being open, notification permissions, sound settings, or toast delivery. It follows the attention rule for subagents: child Sessions are recorded only when the `includeSubagentAttention` preference is on, exactly as their toasts are.
 
 **History** shows retained entries except dismissed ones. **Unread** filters unread entries. **Dismissed** lets you restore an entry without changing its read status. **Mark read**, **Mark unread**, and **Mark all read** affect notification history only. **Mark all read** also marks unread entries that are dismissed. They do not answer questions, resolve Inbox items, or change thread attention.
 
-**Open thread** opens an existing thread and marks its notification read. Archived threads offer **Restore and open thread**. An unavailable thread leaves its notification readable and dismissible. **Clear history** asks for confirmation and permanently deletes the captured retained entries, including dismissed entries. Notifications that arrive after the dialog opens remain. Threads are never deleted.
+**Open thread** opens an existing thread and marks its notification read. Archived threads offer **Restore and open thread**. An unavailable thread leaves its notification readable and dismissible. **Clear history**, in the page's ⋯ menu, asks for confirmation and permanently deletes the captured retained entries, including dismissed entries. Notifications that arrive after the dialog opens remain. Threads are never deleted. The page fills its pane; each entry shows how long ago it arrived (the full date is its accessible name) and the glyph of what it asked for: Needs you for an approval or a question, Failed for a failed turn, Ready otherwise, Idle once read. Inbox › Closed links here (b:ysaj).
 
 The versioned `thread_notification_history` storage domain holds one bounded snapshot. It stores event IDs, thread IDs, timestamps, categories, and read and dismissed flags. Finished-turn entries use a deterministic ID from the Session and turn sequence. A question request with a wait call ID uses that ID. Approval requests and unkeyed question requests have no stable occurrence ID on the Host event, so each live occurrence gets a unique ID. The history never replays old sessions, so that uniqueness cannot collide with a retained entry. Localized summaries come from fixed categories. Conversation contents, titles, approval details, question text, tool arguments, and raw errors are not stored. The UI resolves thread titles from the current session list.
 
@@ -113,10 +141,23 @@ Limitation: prepending places the observer ahead of automatic answerers too. A `
 ## Sidebar controls
 
 **Status strip item.** With `@dshfiles/frame-layout` as the frame, the sidebar adds the strip's "N working" item
-(top-level threads with a running turn; hidden while none run). In the fixed layout the account preview moved from
-above the sidebar footer into the strip's Quota item; free docking still seats it there.
+(top-level threads with a running turn; hidden while none run). The account preview moved from above the sidebar
+footer into the strip's Quota item; Workbench still offers it as a movable **Sidebar previews** view.
 
-**Fixed layout and destinations (default).** The left column is a labelled rail of eight destinations (plan
+**No foot row by default (b:4v6p).** The row under the list (Settings, More) is not drawn: the rail holds Settings,
+the pages and the DSH actions below. It comes back from Customize sidebar › **Show the row under the list**, or ⌘K
+**Sidebar: show the row under the list** (`showFooter`). Its entries stay mounted without tooltips.
+
+**DSH actions on the rail (b:kgcc).** A small group at the bottom of the rail, directly above Settings (below the
+folders and + New folder), expanded and collapsed alike: **Restart DSH** (only while the supervisor offers a restart;
+amber with a slow pulse while updates or a restart wait, its tooltip then names them), a pending **page reload** (amber;
+opens the list of updated plugins), **Copy DSH URL for agents** (the tooltip says Copied) and **Pair a phone** (only
+with phone-pairing; opens the pairing dialog). Each has a tooltip and an accessible name. They are actions, not
+folders, so the folder model never lists them. On a phone they are rows of a **DSH** section at the end of the More
+tab. ⌘K keeps all of them. Customize sidebar › **Show DSH actions on the rail** (`showRailActions`, on by default)
+turned off puts them back in the row under the list, which a pending restart or page reload then shows.
+
+**Rail and destinations.** The left column is a labelled rail of eight destinations (plan
 `docs/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread
 list with **Search threads**, the Sidebar settings gear and an icon for each of its sections beside them (Board);
 every other destination lists its sections, and choosing one opens that page in the stage. A destination with a
@@ -128,25 +169,57 @@ renders the Inbox's own `attention-inbox` glyph, so its Needs you badge appears 
 **New thread** sits in the header row (in the rail when collapsed). Collapsed, only the rail stays and its labels move
 into tooltips. Every load starts at Threads; the list then follows the page the stage shows.
 
-**Where did a page go?** (palette, and the link under every destination list) lists each former left-nav entry from
+**Where did a page go?** (a palette command; the sidebar no longer carries a link to it, b:hbtt) lists each former left-nav entry from
 the migration map (`src/moved-to.generated.ts`, written by `pnpm ade:migration-map`) with an Open button. Palette rows
 read `Observe › Usage` and still match the old names.
 
-**Layout: fixed | free docking.** Settings › Layout (setting `layoutMode`, also the palette's **Layout:** commands)
-switches to free docking, which mounts Workbench's movable left panes described below. Fixed never mounts that region,
-so the saved left layout and named layouts stay untouched and return with free docking.
+**One sidebar layout (b:952m).** There is one left column, not a Fixed and a Free docking one. Workbench's left docking
+region is always mounted behind the rail, and its default arrangement is the rail and its list as one **Sidebar** pane
+whose tab row is hidden. That pane moves, splits and floats like any pane (⌘K **Show tab rows**, then drag its tab);
+it cannot be closed, and ⌘K **Reset layout** (also found as "fixed layout" or "free
+docking") brings the default back. The sidebar root still renders the column and portals it into the element the
+visible Sidebar pane lends (`src/sidebar-dock-host.ts`), so moving it never remounts the list. Collapsed, on a phone and
+without the Workbench the rail and list stay inline. The palette's former **Layout: fixed / free docking** commands
+and the Settings › Layout switch are gone; `showMainTabs` alone decides the main tab rows.
 
-**Phone (below 640px).** The rail becomes a bottom tab bar: Threads, Inbox, New and More. Threads opens the list full
+The merge ran once per Host (marker `layoutMerge`): a former Fixed user starts from the default, and a left layout a
+browser still kept from an earlier docking session is saved as the named layout **Free docking (before merge)**; a
+former Free docking user keeps their left layout verbatim, with the row under the list and the main tab rows on. The
+retired `layoutMode` stays decodable, hidden, for one release. Named layouts survive.
+
+**Sidebar folders (b:952m).** The rail is a list of folders. The eight destinations are built-in folders (⋯ › **Hide
+folder**; shown again from the New folder dialog), and **+** at the rail's foot (⌘K **New sidebar folder**) adds one
+of your own with a title and an icon. A folder lists its panels: a page opens in the stage, a thread facet in the thread
+panel, any other view through the Workbench. Each row's ⋯ menu offers **Keep in sidebar** (docks it as a stacked pane
+under the Sidebar pane, then movable like any pane), **Move to folder…** and **Remove from folder**; rows also drag onto
+another row or a rail folder. **+ Add panel** lists the pages, thread panels and views this browser can show. Deleting a
+folder moves its panels to **Settings › Other pages**; every change shows an **Undo**. Collapsed, a folder opens a
+flyout of its rows. A pane's tab menu offers **Add to sidebar ▸ ‹folder›**, and ⌘K **Add ‹panel› to ‹folder›** files a
+panel in one of your folders. Threads stays first with its project groups; there are no folders of threads.
+
+Only your changes are stored, as `sidebarTree` in this namespace's Host settings: an empty tree is the default, so a
+page a plugin adds later still lands in its mapped folder. Every verb is a method of the `threadSidebarTreeApi` dshx
+API and an agent tool: `sidebar_tree_get`, `sidebar_panels_available` (the panels the open pages reported; it says when
+none did), `sidebar_folder_create`, `sidebar_folder_rename` (title, icon, hide or show), `sidebar_folder_move`,
+`sidebar_folder_delete` (`confirm: true`; restorable for 30 days), `sidebar_folder_restore`, `sidebar_panel_add`,
+`sidebar_panel_move`, `sidebar_panel_remove` and `sidebar_tree_reset` (`confirm: true`). Writes are serialized and
+recomputed on a settings conflict (`src/sidebar-tree-host.ts`).
+
+**Phone (below 640px).** The rail becomes a bottom tab bar: Threads, Inbox, Land and More. Threads opens the list full
 screen and opening a thread closes it again (the stage is pushed); a second tap on the open tab goes back; More lists
-the other destinations. The sidebar marks the document with `data-shell-phone-nav`, and frame-layout then gives the
-stage the full width and reserves the bar's height.
+the other folders, yours included, each expanding in place to its rows. The sidebar marks the document with `data-shell-phone-nav`, and frame-layout then gives the
+stage the full width and reserves the bar's height. Inside a thread the tab bar steps aside (`data-phone-in-thread`;
+the stage keeps only the home-indicator inset) and Back, or a swipe from the left screen edge, returns to the list.
+Pushing a thread or page over the list, and Back, slide through a View Transition (`data-phone-stack-motion`, rules in
+the kit stylesheet); without the API or with reduced motion they are instant. A turn that finishes while a page or the
+full-screen list covers the thread is not "watched": it stays in the Inbox until the thread is opened.
 
 **Navigation counter.** Each destination or section open (rail, tab bar, list, palette, moved-to) adds one to a private
 counter in this Host's runtime folder: ids and counts only, never a thread or its content. Agents read it with
 `shell_navigation_counts`; `shell_navigation_reset` clears it only with `confirm: true`.
 
-**Tabbed left pane (free docking).** With Layout set to free docking, Workbench tabs fill the left column. The flexible middle belongs to its `shell.left` slot:
-**Thread Sidebar: Navigation** and **Thread Sidebar: Threads** are reusable panels, not fixed sidebar furniture. Each group's **+**, named **New tab**, opens an actual chooser tab with **Choose a view**, **Search views**, **Rich Composer: Current conversation**, one **Settings Shell: Settings** hub and plugin views. **Pane options** sits at the group's far-right edge; there is no persistent Workbench toolbar. Threads retains **New thread**, **Search threads**, project creation,
+**Docked sidebar panes.** Workbench tabs fill the left column's docking region (its `shell.left` slot) behind the rail:
+**Navigation** and **Threads** are reusable panels, not fixed sidebar furniture. Each group's **+**, named **New tab**, opens an actual chooser tab with **Choose a view**, **Search views**, **Rich Composer: Current conversation**, one **Settings Shell: Settings** hub and plugin views. **Pane options** sits at the group's far-right edge; there is no persistent Workbench toolbar. Threads retains **New thread**, **Search threads**, project creation,
 filters, row actions and keyboard navigation. Its **Sidebar settings** gear opens
 **Customize sidebar** inside that same panel, including after moving it or hiding
 its tab row. The existing Root controller and preferences stay authoritative;
@@ -377,6 +450,29 @@ and keeps the rest for Back and Forward.
 
 ![An acknowledged recent idle thread remains in the date-grouped Done view.](docs/screenshots/thread-list-views-done.png)
 
+**Filter presets** (b:xpvk). The saved views are the Filter menu's presets: its
+**Presets** section comes first, one radio per enabled view, the active one
+checked, and the Filter button names it (`Filter: Needs you`). Changing a group,
+status or source filter afterwards never rewrites the preset: the change is a
+Host-synced `threadViews.draft`, the button reads `Filter: Needs you (edited)`
+with a dot, and the section offers **Save changes to “Needs you”** and **Discard
+changes**; changing the filters back drops the draft. **Save current filters as
+preset…** names a new preset (a dialog, pinned to the top on a phone so the
+keyboard never covers it) that stores the
+grouping, filters and the current project scope (`projectFilter`: an id, `''` for
+Unassigned, `null` for All projects), and applies it. **Preset options** holds
+**Rename…**, **Update with current filters**, **Delete…** (a confirmation, then an
+Undo notice that puts the preset back where it was), Mark all read / unread and
+**Manage presets…** (the view manager, where a built-in can be hidden). A built-in
+names no project scope, so applying it leaves the project picker alone. ⌘K lists
+one **Filter: ‹preset›** row per preset; in the thread list `[` and `]` step to the
+previous and next preset, wrapping (`1`–`9` answer in the peek and `G` starts the
+destination chord). Thread list settings › **Use filter presets** (on by default)
+turns the section, the trigger name, the keys and the ⌘K rows off; **Show filter
+presets as chips** (off by default) adds a row of preset chips under the header.
+Both are fields of the same `threadViews` document, so every browser and device
+sees the same presets.
+
 **Saved views.** The view row above the thread list is backed by validated view
 presets (`src/thread-view-preferences.ts`): each preset carries a name, order,
 its grouping/status/source filters, and whether its tab shows a count. The whole document is the
@@ -513,6 +609,12 @@ the same label. Identical rebuilds flag nothing. Host-only packages without a
 client bundle are not listed by that registry and are not tracked. Hosts
 started before this plugin version report nothing.
 
+**Updating DSH.** Settings › About › **Update DSH** checks `main@origin` for the checkout DSH runs from, lists What's
+new with what it would rebuild and whether a restart follows, and runs jj-integration's update job after a confirm
+(`dsh_update_check` / `dsh_update_apply` for agents). It ends where this plugin's restart verbs begin: when a Host
+bundle changed it offers **Restart when idle**, never a restart by itself. The status strip's **Update · N** item
+appears only while new revisions wait (or an update runs) and opens that section.
+
 **Restarting.** Restart now and Restart when idle exist only under the managed
 launcher (`scripts/supervise-dsh.mjs`). The Host writes the supervisor's request
 file, records running threads, asks DSH to exit with code 75 and then arms an
@@ -527,7 +629,8 @@ restart, so it reconnects without a new launch URL. After two minutes without
 a new Host the dialog says so, points at those log lines and offers Keep waiting
 and Reload page.
 
-**Restarting by itself (`autoRestartWhenIdle`, on by default).** A pending
+**Restarting by itself (`autoRestartWhenIdle`, off by default).** It acts on
+its own, so this fork ships it off (upstream ships it on). When on, a pending
 Host update restarts DSH without anyone asking: a plugin whose Host
 files changed since boot (the same set hmr-gate holds back) or a changed
 booted-profile manifest (`package.json` or `.dshfiles-profile-sync.json`, what
@@ -537,11 +640,15 @@ background job is running or stopping, and no thread has an open user question.
 Once that held for `autoRestartQuietSeconds` (default 60, 30–3600), it reads
 everything again and hands off through the managed restart above, which records
 any turn that still started so `resumeAfterRestart` can pick it up. The last
-30 s show **Restarting to apply updates in N s** in the status strip with
-**Postpone** (60 min); work that starts during the countdown cancels it and the
+30 s show **Restarting to apply updates in N s** on the rail's **Restart**
+(amber, pulsing; the same row under More › DSH on a phone), whose confirmation
+dialog offers **Postpone** (60 min) and, once postponed, **Resume automatic
+restart**. With **Show DSH actions on the rail** off, the status strip item
+shows the countdown and Postpone instead: one restart control either way; work that starts during the countdown cancels it and the
 quiet period starts over. A page that saw the countdown reloads once the new
-Host answers. Without the supervisor hand-off nothing restarts: the item's
-popover shows the launcher command (`$DSHFILES_DIR/scripts/dsh-launcher`).
+Host answers. Without the supervisor hand-off nothing restarts: the status strip item's
+popover shows the launcher command (`$DSHFILES_DIR/scripts/dsh-launcher`) with
+**Copy command** and **Turn off automatic restart**.
 Agent tools: `auto_restart_status` (read), `auto_restart_postpone` and
 `auto_restart_resume` (only when the user asked). The policy runs in the Host:
 a Host started before this version needs one restart to load it. Turn the
@@ -571,10 +678,10 @@ usable at any width.
 `sidebar.footer.above` (list, owner `{}`) remains the genuine full-width contributor seat for the AI Accounts usage strip. With the supported `shell.left` Workbench override, its existing Preview assembly is a regular docked tab group instead of a duplicate fixed strip. The actual public slot entries/subscription select this mode; there is no guessed global bridge or extra SDK field. A standalone Sidebar retains the fixed full-width fallback above its native foot; removing the override restores that fallback. The stock sidebar has no such seat, so an occupant retains its footer-action fallback and registers through `ctx.slots.inject`.
 
 **Workbench sidebar assemblies** are available through the **New tab** chooser while this sidebar root is mounted:
-**Thread Sidebar: Threads** hosts the actual `sidebar.workspaces` occupant in wide mode; **Thread Sidebar: Navigation** renders the actual
-`sidebar.panellist` glyphs inside live navigation buttons; **AI Accounts: Preview** hosts the current AI Accounts-only `sidebar.footer.above` contribution;
-**AI Accounts: Controls** hosts an AI Accounts-only `sidebar.footer.action` aggregate in wide mode. Mixed or unlabeled footer contributors instead use **Thread Sidebar: Plugin previews** or **Thread Sidebar: Plugin controls**; the sidebar never claims another plugin owns a mixed assembly. Each uses this root's authorized renderer,
-original owner props and normal query/settings/sidebar contexts. Its declared seats remain present, but the Preview is not mounted twice. The account-only Preview is initially seated below the existing left groups; prior saved placements win, and explicit closes remain closed. It has the same move/close/single-tab **Hide tab row** controls as any other view. Hover/focus the content's **Show tab row** control or use **Workbench: Show tab rows** to recover it; adding a second tab reveals the row and clears the hidden preference.
+**Threads** hosts the actual `sidebar.workspaces` occupant in wide mode; **Navigation** renders the actual
+`sidebar.panellist` glyphs inside live navigation buttons; **Quota** hosts the current AI Accounts-only `sidebar.footer.above` contribution;
+A footer aggregate with one labeled contributor takes that contributor's label (a legacy **Plugin: View** label shows as its view name); several or unlabeled contributors use **Sidebar previews** or **Sidebar controls**, so the sidebar never claims another plugin owns a mixed assembly and no pane title carries a plugin name. Each uses this root's authorized renderer,
+original owner props and normal query/settings/sidebar contexts. Its declared seats remain present, but the Preview is not mounted twice. The account-only Preview is initially seated below the existing left groups; prior saved placements win, and explicit closes remain closed. It has the same move/close/single-tab **Hide tab row** controls as any other view. Hover/focus the content's **Show tab row** control or use **Show tab rows** to recover it; adding a second tab reveals the row and clears the hidden preference.
 These are content assemblies, not fake independent copies of contextual message/turn/menu slots. The Settings
 launcher, brand and reopen badge remain sidebar chrome; Settings already has its own main/section panel adapters.
 
@@ -942,7 +1049,7 @@ plugin's `react-compiler-runtime` dependency are gone.
 
 ## Agent tools
 
-Saved views use the `thread-sidebar-views` API over the same `thread-sidebar.threadViews` Host settings the GUI edits. `thread_views_list` and `thread_view_get` return the actual view definitions, order, selection and revision. `thread_view_create`, `thread_view_update`, `thread_view_delete`, `thread_view_move` and `thread_view_select` create, rename, enable, filter, reorder, remove and select views; select also changes group/filter control visibility. Delete requires explicit `confirm: true`. Invalid or missing targets, duplicate names or ids, the twelve-view limit and removing the last enabled view are rejected. Writes update only the view document and use the settings revision to refuse concurrent edits instead of overwriting them.
+Saved views use the `thread-sidebar-views` API over the same `thread-sidebar.threadViews` Host settings the GUI edits. `thread_views_list` and `thread_view_get` return the actual view definitions, order, selection and revision. `thread_view_create`, `thread_view_update`, `thread_view_delete`, `thread_view_move` and `thread_view_select` create, rename, enable, filter, reorder, remove and select views; select also changes group/filter control visibility. Delete requires explicit `confirm: true` and returns the removed view with its `position`; `thread_view_create` with those fields restores it in place. As filter presets (b:xpvk): `thread_views_list` also reports `edited` (unsaved filters in `settings.draft`) and the list's `projectFilter`; `thread_view_create` with only `{ id, name }` saves the list's current filters, and `select: true` applies it; `thread_view_update { id, fromCurrent: true }` is **Save changes**; `thread_view_select` applies a preset (dropping the draft, setting its project scope) and switches `showPresets` / `showPresetChips`. Invalid or missing targets, duplicate names or ids, the twelve-view limit and removing the last enabled view are rejected. Writes update only the view document and use the settings revision to refuse concurrent edits instead of overwriting them.
 
 One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in
 `src/thread-actions-api.ts`) exposes the sidebar's thread and project actions to
@@ -1045,9 +1152,12 @@ directions (two threads that wake each other would keep each other running); an
 archived subscriber or target ends the edge — at once through this plugin's own
 archive path, and on the next notice pass for an archive made elsewhere — and a
 subscriber the Host no longer resolves loses its edge instead of retrying. The
-same state is the **Notify “…” when this thread finishes** submenu in a thread
-row's context menu — Off, Default level, Every turn, Landed/failed/question,
-Only when stuck or Never for the open thread watching that row; with several
+same state is the **Notify…** submenu in a thread row's context menu (also the
+phone action sheet a long press opens) — headed "When this thread finishes,
+notify “…”", with **Use default (Every turn)** (naming the current default
+level), Every turn, Landed, failed or a question, Only when stuck, and Off for
+the open thread watching that row (a pair stored at upstream's Never level shows
+as Off: it notifies as little); with several
 rows selected it sets that choice for all of them at once — and the
 `N notified` badge on a row that has subscribers; both read the one Host
 snapshot, refreshed by the API's `changed` event.
@@ -1155,6 +1265,6 @@ child does not edit the active profile or root workspace manifests/lockfiles.
 
 The row of a `subagent` or `subagent_fork` call reports the child rather than the call: Working, Finished, Interrupted or Idle, from the session status and the child's timing projection. These are agent states, deliberately not the job lifecycle: a child that went idle can be followed up. Opened, the row holds a client reference to the child and folds its event window into the current tool and the tail of its latest answer; collapsing releases it, and the window repaints on a timer rather than per token, so the parent transcript never re-renders for it. The row links to the child's thread, opens it beside the chat, and offers Stop behind a confirmation. Stop is the session's own cancel, which `interrupt_agent` also reaches; an interrupted child can be messaged again.
 
-A parent commonly ends its turn to wait for its children, which folds these rows, so working subagents also list above the composer (`conversation.input.dock`) with the same preview, and leave as they go idle. Two or more share a **Working subagents** header with their count; it collapses the whole group and stays collapsed while children start and finish.
+A parent commonly ends its turn to wait for its children, which folds these rows, so working subagents also list above the composer (`conversation.input.dock`) with the same preview, and leave as they go idle. Two or more fold into one row, **N subagents working**, closed by default like the background-jobs dock's; opening it lists each child, and the choice holds while children start and finish. A child that failed or needs you is not working, so it never hides in the fold.
 
 With `subagentRunCards` on (the default), a working child whose open turn, route and current tool are known renders as the kit's compact `AgentRunStatus` card instead of the one-line row: current tool, route, elapsed time from the turn's own start, the tool-call count as “Step n”, Stop behind the same confirmation and **Open thread**. There is no Pause: DSH has no Host verb that pauses a session. Pause, Stop and Open render only when the caller passes their handler, so the card never shows a disabled stand-in. A child missing any of those parts (no open turn yet, no route projection, no tool in flight) keeps the one-line row, and turning the setting off is that row for every child. The card fits a 390 px pane and every action is a kit button, so the coarse-pointer rules give it a 44 px hit area and it stays keyboard-operable.

@@ -2,7 +2,8 @@
 
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { TRANSCRIPT_VIEW_MODES, type TranscriptViewMode } from '../../chat-settings.ts'
+import { type TranscriptViewMode } from '../../chat-settings.ts'
+import { OFFERED_TRANSCRIPT_VIEW_MODES } from '../../transcript-view-modes.ts'
 import type { ChatKey } from '../locale.ts'
 import { COLLAPSE_TIMINGS, type CollapseTiming } from '../presentation-policy.ts'
 import { PreferenceRow } from './PreferenceRow.tsx'
@@ -56,7 +57,9 @@ export function TranscriptViewRow({
         description={t('settings.transcript.description')}
         value={mode}
         selectedLabel={t(LABELS[mode])}
-        options={TRANSCRIPT_VIEW_MODES.map(id => ({ id, label: t(LABELS[id]) }))}
+        // dshfiles (visual refresh T2.5): Summary / Normal / Verbose; a saved Standard stays listed while chosen.
+        options={(mode === 'standard' ? ['compact', 'standard', 'detailed', 'verbose'] as const : OFFERED_TRANSCRIPT_VIEW_MODES)
+          .map(id => ({ id, label: t(LABELS[id]) }))}
         onSelect={(value) => { setTranscriptView(value as TranscriptViewMode) }}
       />
       <PreferenceRow

@@ -20,6 +20,8 @@ import { AutoSettle, AutoSettleSources } from './auto-settle-host.js'
 import { ClientModules } from './client-modules-promise.js'
 import { FinishedTurnAttention } from './inbox-provider.js'
 import { InflightTurns } from './inflight-turns.js'
+import { LiveTurns } from './live-turns.js'
+import { threadSidebarLiveTurnsApi } from './live-turns-api.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadMentionCandidateApi } from './mention-candidate-api.js'
 import { resolveThreadMentionCandidate } from './mention-candidate.js'
@@ -45,6 +47,7 @@ import { RecoveryStore } from './restart-recovery.js'
 import { RestartControl, RestartDrain } from './restart.js'
 import { StateFiles } from './runtime-files.js'
 import { SessionEvents, attentionRecorder, inflightTracker } from './session-events.js'
+import { SessionLineage } from './session-lineage.js'
 import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
 import { threadSidebarSettings } from './settings.js'
 import { underSettledSession } from './settled-gate.js'
@@ -59,6 +62,8 @@ import { threadActionsApi } from './thread-actions-api.js'
 import { ThreadActions, threadCommandsLayer } from './thread-host-promise.js'
 import { threadViewsApi } from './thread-views-api.js'
 import { ThreadViews } from './thread-views-host.js'
+import { threadSidebarTreeApi } from './sidebar-tree-api.js'
+import { SidebarTrees } from './sidebar-tree-host.js'
 import { userNotificationApi } from './user-notification-api.js'
 import { UserNotifications } from './user-notification-host.js'
 
@@ -134,7 +139,7 @@ const autoRestart = Layer.unwrap(
 
 const autoSettle = AutoSettle.schedule().pipe(Layer.provideMerge(AutoSettle.layer), Layer.provideMerge(AutoSettleSources.layer))
 
-const threads = threadCommandsLayer.pipe(Layer.provideMerge(Layer.mergeAll(ThreadActions.layer, ThreadViews.layer)))
+const threads = threadCommandsLayer.pipe(Layer.provideMerge(Layer.mergeAll(ThreadActions.layer, ThreadViews.layer, SidebarTrees.layer)))
 
 const restartWithUpdates = autoRestart.pipe(
   Layer.provideMerge(restart),
@@ -150,6 +155,7 @@ const services = Layer.mergeAll(
   autoSettle,
   threads,
   MachineName.layer,
+  LiveTurns.layer,
   UserNotifications.layer,
 ).pipe(Layer.provideMerge(runtimeState))
 
@@ -163,7 +169,7 @@ const workers = Layer.mergeAll(
   subscriptionNoticer,
   subscriptionChangeEvents,
   autoRestartEvents,
-  FinishedTurnAttention.layer.pipe(Layer.provide(HostApis.layer)),
+  FinishedTurnAttention.layer.pipe(Layer.provide(Layer.mergeAll(HostApis.layer, SessionLineage.layer))),
 )
 
 const threadSidebarLayer = workers.pipe(Layer.provideMerge(services), Layer.provideMerge(hostEdge))
@@ -250,6 +256,9 @@ export default DshxPlugin.make({
     Api.bind(threadMentionCandidateApi, {
       resolve: input => resolveThreadMentionCandidate(input),
     }),
+    Api.bind(threadSidebarLiveTurnsApi, {
+      list: () => LiveTurns.use(live => live.list),
+    }),
     Api.bind(threadSidebarPluginUpdatesApi, {
       pending: () => ClientModules.use(modules => Effect.map(modules.pendingPlugins, plugins => ({ plugins: [...plugins] }))),
       clientUpdates: input => ClientModules.use(modules => modules.clientUpdates(input.revisions)),
@@ -327,6 +336,20 @@ export default DshxPlugin.make({
       delete: input => ThreadViews.use(views => views.delete(input)),
       move: input => ThreadViews.use(views => views.move(input)),
       select: input => ThreadViews.use(views => views.select(input)),
+    }),
+    Api.bind(threadSidebarTreeApi, {
+      get: () => SidebarTrees.use(trees => trees.get),
+      panelsAvailable: () => SidebarTrees.use(trees => trees.panelsAvailable),
+      reportPanels: input => SidebarTrees.use(trees => trees.reportPanels(input)),
+      folderCreate: input => SidebarTrees.use(trees => trees.folderCreate(input)),
+      folderUpdate: input => SidebarTrees.use(trees => trees.folderUpdate(input)),
+      folderMove: input => SidebarTrees.use(trees => trees.folderMove(input)),
+      folderDelete: input => SidebarTrees.use(trees => trees.folderDelete(input)),
+      folderRestore: input => SidebarTrees.use(trees => trees.folderRestore(input)),
+      panelAdd: input => SidebarTrees.use(trees => trees.panelAdd(input)),
+      panelMove: input => SidebarTrees.use(trees => trees.panelMove(input)),
+      panelRemove: input => SidebarTrees.use(trees => trees.panelRemove(input)),
+      reset: () => SidebarTrees.use(trees => trees.reset),
     }),
     Api.bind(threadSubscriptionsApi, {
       state: (input, call) => ThreadSubscriptionActions.use(actions => actions.state(input, call.caller)),

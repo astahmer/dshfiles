@@ -14,6 +14,9 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
+import { CheckCheckIcon, RefreshCwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { useCallback, useState, useSyncExternalStore } from 'react'
 import { notificationHistoryApi, type NotificationHistoryEntry } from './notification-history-api.js'
 import type { NotificationHistoryTranslate } from './notification-history-locales.js'
@@ -29,6 +32,23 @@ type HistoryAction =
   | { readonly kind: 'read'; readonly ids: readonly string[]; readonly read: boolean }
   | { readonly kind: 'dismiss'; readonly id: string; readonly dismissed: boolean }
 
+/**
+ * b:ysaj: an unread entry reads with the glyph of what it asked for (an approval or a question is Needs you, a failure
+ * is Failed, the rest Ready); a read one is Idle, seen with nothing pending.
+ */
+const statusOf = (entry: NotificationHistoryEntry): StatusGlyphState => {
+  if (entry.read) return 'idle'
+  if (entry.category === 'approval-needed' || entry.category === 'input-needed') return 'needs-you'
+  if (entry.category === 'failed') return 'failed'
+  return 'ready'
+}
+
+/** "5m ago", the way the other pages say it; the full date and time stay in the accessible name. */
+const ago = (at: number, now: number, t: NotificationHistoryTranslate): string => {
+  const age = relativeTime(at, now)
+  return age.unit === 'now' ? t('justNow') : t(`ago.${age.unit}`, { n: age.n })
+}
+
 export const NotificationHistoryPanel = (props: {
   readonly sessions: ISessions
   readonly workspaces: IWorkspaces
@@ -41,6 +61,7 @@ export const NotificationHistoryPanel = (props: {
   const [view, setView] = useState<HistoryView>('all')
   const [clearIds, setClearIds] = useState<readonly string[] | null>(null)
   const [navigationNotice, setNavigationNotice] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const sessions = useSyncExternalStore(
     useCallback(listener => props.sessions.list.subscribe(listener), [props.sessions]),
     () => props.sessions.list.getSnapshot(),
@@ -49,6 +70,7 @@ export const NotificationHistoryPanel = (props: {
     useCallback(listener => props.workspaces.list.subscribe(listener), [props.workspaces]),
     () => props.workspaces.list.getSnapshot(),
   )
+  const [openedAt] = useState(() => Date.now())
   const history = useQuery({
     queryKey: historyKey,
     queryFn: ({ signal }) => api.list({}, { signal }),
@@ -84,12 +106,46 @@ export const NotificationHistoryPanel = (props: {
   const visible = view === 'unread' ? unread : view === 'dismissed' ? dismissed : active
   const busy = transition.isPending || open.isPending || clear.isPending
   const failure = transition.error ?? open.error
+  // Ages read from the last fetch (the list polls), never from the clock during render.
+  const now = Math.max(openedAt, history.dataUpdatedAt)
   return (
     <Page
       scroll
       heading={t('title')}
       description={t('subtitle')}
-      className="dshx:mx-auto dshx:w-full dshx:max-w-3xl"
+      // Fills its pane (DESIGN.md: no centred column); Clear history loses work, so it waits in ⋯ behind a confirmation.
+      actions={[
+        // Only a refresh the user asked for spins: the 5 s background poll would make the header twitch.
+        {
+          id: 'refresh',
+          label: t('refresh'),
+          icon: <RefreshCwIcon aria-hidden />,
+          pending: refreshing,
+          onSelect: () => {
+            setRefreshing(true)
+            void history.refetch().finally(() => setRefreshing(false))
+          },
+        },
+        {
+          id: 'mark-all-read',
+          label: t('markAllRead'),
+          icon: <CheckCheckIcon aria-hidden />,
+          disabled: busy || entries.every(entry => entry.read),
+          onSelect: () => transition.mutate({ kind: 'read', ids: entries.filter(entry => !entry.read).map(entry => entry.id), read: true }),
+        },
+        {
+          id: 'clear',
+          label: t('clear'),
+          icon: <Trash2Icon aria-hidden />,
+          destructive: true,
+          placement: 'overflow',
+          disabled: busy || entries.length === 0,
+          onSelect: () => {
+            clear.reset()
+            setClearIds(entries.map(entry => entry.id))
+          },
+        },
+      ]}
       tabs={{
         label: t('title'),
         value: view,
@@ -103,30 +159,6 @@ export const NotificationHistoryPanel = (props: {
         ],
       }}
     >
-      <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2" role="toolbar" aria-label={t('title')}>
-        <Button size="sm" variant="outline" disabled={history.isFetching} onClick={() => void history.refetch()}>
-          {t('refresh')}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || entries.every(entry => entry.read)}
-          onClick={() => transition.mutate({ kind: 'read', ids: entries.filter(entry => !entry.read).map(entry => entry.id), read: true })}
-        >
-          {t('markAllRead')}
-        </Button>
-        <Button
-          size="sm"
-          variant="destructive"
-          disabled={busy || entries.length === 0}
-          onClick={() => {
-            clear.reset()
-            setClearIds(entries.map(entry => entry.id))
-          }}
-        >
-          {t('clear')}
-        </Button>
-      </div>
       {history.isPending ? <p role="status">{t('loading')}</p> : null}
       {history.error === null ? null : (
         <Alert variant="destructive">
@@ -160,10 +192,14 @@ export const NotificationHistoryPanel = (props: {
                 key={entry.id}
                 role="listitem"
                 data-notification-id={entry.id}
-                status={entry.read ? 'done' : 'ready'}
+                status={statusOf(entry)}
                 statusLabel={t(entry.read ? 'read' : 'unread')}
                 heading={t(entry.category)}
-                meta={<time dateTime={new Date(entry.at).toISOString()}>{new Date(entry.at).toLocaleString()}</time>}
+                meta={
+                  <time className="dshx:tabular-nums" dateTime={new Date(entry.at).toISOString()} aria-label={new Date(entry.at).toLocaleString()}>
+                    {ago(entry.at, now, t)}
+                  </time>
+                }
                 description={session?.displayTitle ?? t('missingThread')}
                 trailing={
                   <>

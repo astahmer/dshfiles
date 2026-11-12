@@ -3,6 +3,7 @@ import * as Schema from 'effect/Schema'
 import type { NestedSurfacePath } from './dock-regions.js'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import type { WorkbenchPanelDefinition } from './registry.js'
+import { SIDEBAR_PANE_ID } from './shell-merge.js'
 
 /** Every docked panel uses this one Dockview component; the panel id names the registry entry it renders. */
 export const WORKBENCH_COMPONENT = 'workbench-panel'
@@ -149,6 +150,15 @@ const applyDefaultLayout = (
   api.clear()
   if (defaultLayout === 'empty') return
   if (defaultLayout === 'threads') {
+    // One sidebar layout (b:952m): the rail-and-list pane alone, tab row hidden, is the old Fixed column. A thread
+    // sidebar too old to register it keeps the former Navigation-over-Threads default.
+    const sidebar = panels.find(panel => panel.id === SIDEBAR_PANE_ID)
+    if (sidebar !== undefined) {
+      const pane = api.addPanel({ id: sidebar.id, component: WORKBENCH_COMPONENT, title: sidebar.title })
+      pane.group.header.hidden = true
+      pane.api.setActive()
+      return
+    }
     const threads = panels.find(panel => panel.id === 'dshfiles-thread-sidebar.workbench-threads')
     const navigation = panels.find(panel => panel.id === 'dshfiles-thread-sidebar.workbench-navigation')
     if (threads === undefined) return

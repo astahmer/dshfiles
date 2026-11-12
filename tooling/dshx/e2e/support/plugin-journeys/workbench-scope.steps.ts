@@ -49,7 +49,7 @@ const main = (page: Page): Locator => page.locator('[data-workbench-region="main
 const tab = (page: Page, key: keyof typeof titles): Locator => main(page).getByRole('tab', { name: titles[key], exact: true })
 const body = (page: Page, sessionId: string): Locator => main(page).locator(`[data-workbench-panel-id=${JSON.stringify(tabPanelId(`thread:${sessionId}`))}]`)
 const composer = (page: Page, sessionId: string): Locator =>
-  body(page, sessionId).getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+  body(page, sessionId).getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })
 const order = (page: Page): Promise<string[]> =>
   main(page)
     .locator('[role="tab"] [data-workbench-tab-id]')

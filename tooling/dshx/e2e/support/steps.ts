@@ -92,6 +92,26 @@ const SETTINGS_LAUNCHER = '[data-slot="settings.launcher"] button'
 export const openSettingsDialog = async (page: Page, options?: { readonly timeoutMs?: number }): Promise<void> => {
   const clickOptions = options?.timeoutMs === undefined ? undefined : { timeout: options.timeoutMs }
   const launcher = page.locator(SETTINGS_LAUNCHER).first()
+  // The Fixed layout draws no foot row by default (b:4v6p), so its launcher is not shown: the rail's Settings opens it.
+  const destinations = page.getByRole('navigation', { name: 'Destinations', exact: true })
+  const rail = destinations
+    .getByRole('tab', { name: 'Settings', exact: true })
+    .or(destinations.getByRole('button', { name: 'Settings', exact: true }))
+    .first()
+  if (!(await launcher.isVisible()) && (await rail.isVisible())) {
+    await rail.click(clickOptions)
+    // The Settings destination lists "All settings" first; the page itself opens from there.
+    const all = page.getByRole('button', { name: /^All settings/u }).or(page.getByRole('option', { name: /^All settings/u })).first()
+    if (!(await settingsPage(page).isVisible().catch(() => false))) await all.click(clickOptions)
+    // The page stays in the stage; the rail goes back to Threads, as the foot row's launcher left it.
+    const threads = destinations.getByRole('tab', { name: 'Threads', exact: true })
+    await settingsPage(page).first().waitFor({ state: 'visible', ...clickOptions }).catch(() => undefined)
+    // Only for the stage page: a modal Settings dialog covers the rail and leaves no destination to restore.
+    const stagePage = page.locator('[data-settings-view]').first()
+    if ((await threads.count()) > 0 && (await stagePage.isVisible().catch(() => false)) && !(await page.getByRole('dialog').first().isVisible().catch(() => false)))
+      await threads.click(clickOptions)
+    return
+  }
   if (!(await launcher.isVisible())) {
     await page.getByRole('button', { name: 'Account menu', exact: true }).click(clickOptions)
   } else {

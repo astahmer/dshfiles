@@ -56,11 +56,12 @@ export const sessionSearchApi = defineApi({
         sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
         text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
         limit: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(FIND_LIMIT_MAX))),
+        newest: Schema.optional(Schema.Boolean),
       }),
       output: Schema.Struct({ ownsService: Schema.Boolean, matches: Schema.Array(findMatchSchema), hasMore: Schema.Boolean }),
       description:
-        'Find every event of one DSH thread (Session) whose text contains all words of `text` (the last word may be a prefix), in transcript order: the whole stored transcript, older turns and tool calls and results included (model thinking is not indexed). Each match has its event seq, type, time and a short snippet. `limit` defaults to 200. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.',
-      tool: { name: 'thread_find', readOnly: true, render: renderFind },
+        'Find every event of one DSH thread (Session) whose text contains all words of `text` (the last word may be a prefix), in transcript order: the whole stored transcript, older turns and tool calls and results included (model thinking is not indexed). Each match has its event seq, type, time and a short snippet. `limit` defaults to 200; with `newest: true` the newest `limit` matches are returned (still in transcript order), which is what a find bar starting from the tail reads. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.',
+      tool: { name: 'session_find_in_thread', readOnly: true, render: renderFind },
     }),
     // Added after the first release: a Host started before it answers with an unknown-endpoint error.
     promptHistory: method({

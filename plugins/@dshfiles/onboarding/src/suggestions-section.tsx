@@ -5,9 +5,9 @@ import { LightbulbIcon, LocateFixedIcon, RotateCcwIcon, SearchIcon, SettingsIcon
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState, type ReactNode } from 'react'
+import { pluginLabel } from './labels.js'
 import type { Suggestion, Suggestions, SuggestionsInput } from './suggestions-model.js'
 import { SuggestionsWindow, type FeaturedDay } from './suggestions-window.js'
-import { TOUCH } from './touch.js'
 
 export interface SuggestionsSectionProps {
   readonly enabled: boolean
@@ -51,7 +51,7 @@ const SuggestionItem = (props: {
         <div className="dshx:min-w-0 dshx:flex-1">
           <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2">
             <p className="dshx:min-w-0 dshx:text-sm dshx:font-medium">{row.title}</p>
-            <span className="dshx:text-xs dshx:text-muted-foreground">{row.plugin}</span>
+            <span className="dshx:text-xs dshx:text-muted-foreground">{pluginLabel(row.plugin)}</span>
           </div>
           <p className="dshx:text-xs dshx:text-muted-foreground">{suggestion.why}</p>
           <p className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{suggestion.evidence}</p>
@@ -59,14 +59,14 @@ const SuggestionItem = (props: {
       </div>
       <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
         {row.walkable ? (
-          <Button aria-label={`Show me where: ${row.title}`} className={TOUCH} onClick={() => props.showWhere(row.key)} size="sm" variant="outline">
+          <Button aria-label={`Show me where: ${row.title}`} onClick={() => props.showWhere(row.key)} size="sm" variant="outline">
             <LocateFixedIcon /> Show me where
           </Button>
         ) : null}
-        <Button aria-label={`Find in features: ${row.title}`} className={TOUCH} onClick={() => props.findFeature(row.title)} size="sm" variant="ghost">
+        <Button aria-label={`Find in features: ${row.title}`} onClick={() => props.findFeature(row.title)} size="sm" variant="ghost">
           <SearchIcon /> Find in features
         </Button>
-        <Button aria-label={`Dismiss: ${row.title}`} className={TOUCH} onClick={() => props.dismiss(suggestion.rule)} size="sm" variant="ghost">
+        <Button aria-label={`Dismiss: ${row.title}`} onClick={() => props.dismiss(suggestion.rule)} size="sm" variant="ghost">
           <XIcon /> Dismiss
         </Button>
       </div>
@@ -83,7 +83,7 @@ const Off = (props: { readonly openSetting: (() => void) | null }): ReactNode =>
       {props.openSetting === null ? (
         <p className="dshx:text-xs dshx:text-muted-foreground">Settings › Onboarding › suggestions</p>
       ) : (
-        <Button className={TOUCH} onClick={props.openSetting} size="sm" variant="outline">
+        <Button onClick={props.openSetting} size="sm" variant="outline">
           <SettingsIcon /> Turn on in Settings
         </Button>
       )}
@@ -118,11 +118,10 @@ export const SuggestionsSection = (props: SuggestionsSectionProps): ReactNode =>
     return (
       <PageSection data-suggestions="error" heading={HEADING}>
         <p className="dshx:text-sm dshx:text-muted-foreground">
-          Suggestions could not read this Host. If onboarding was updated since DSH started, restart DSH; otherwise check that the plugin is enabled in Settings
-          › Plugins, then try again.
+          Suggestions could not be loaded. Try again; if Getting started was updated since DSH started, restart DSH from the bottom of the rail first.
         </p>
         <div>
-          <Button className={TOUCH} onClick={() => void query.refetch()} size="sm" variant="outline">
+          <Button onClick={() => void query.refetch()} size="sm" variant="outline">
             Try again
           </Button>
         </div>
@@ -134,7 +133,7 @@ export const SuggestionsSection = (props: SuggestionsSectionProps): ReactNode =>
       <PageSection data-suggestions={value.state} heading={HEADING}>
         <p className="dshx:text-sm dshx:text-muted-foreground">{value.reason}</p>
         <div>
-          <Button className={TOUCH} onClick={() => void query.refetch()} size="sm" variant="outline">
+          <Button onClick={() => void query.refetch()} size="sm" variant="outline">
             Try again
           </Button>
         </div>
@@ -144,7 +143,7 @@ export const SuggestionsSection = (props: SuggestionsSectionProps): ReactNode =>
 
   const restore =
     window.dismissed > 0 ? (
-      <Button className={TOUCH} onClick={props.restoreDismissed} size="sm" variant="ghost">
+      <Button onClick={props.restoreDismissed} size="sm" variant="ghost">
         <RotateCcwIcon /> Restore {String(window.dismissed)} dismissed
       </Button>
     ) : null
@@ -171,7 +170,7 @@ export const SuggestionsSection = (props: SuggestionsSectionProps): ReactNode =>
       {window.featured === null ? null : <ul aria-label="Suggestion of the day">{item(window.featured, true)}</ul>}
       {window.rest.length === 0 ? null : (
         <div>
-          <Button aria-expanded={showAll} className={TOUCH} onClick={() => setShowAll(!showAll)} size="sm" variant="ghost">
+          <Button aria-expanded={showAll} onClick={() => setShowAll(!showAll)} size="sm" variant="ghost">
             {showAll ? 'Hide other suggestions' : `Show all suggestions (${String(window.rest.length)})`}
           </Button>
         </div>

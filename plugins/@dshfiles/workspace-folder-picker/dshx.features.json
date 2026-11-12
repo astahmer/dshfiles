@@ -6,16 +6,11 @@
       "id": "workspace-folder-add-flow",
       "title": "Add workspaces from the folder browser",
       "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it. Choosing a folder first reports what it is: no repository, a Git checkout with its origin and default branch, or a Jujutsu repository. A Git checkout offers Enable Jujutsu and add, which runs the same guarded colocated init the graph uses; a folder without a repository offers Initialize repository, which starts Jujutsu in place and keeps the files already in it. The project_inspect and project_init agent tools drive the same read and write. A repository can also check in dsh.project.json, read by project_config_read: icon path, default thread workspace, bookmark, trusted check ids and suggested scripts, where a missing or invalid file is reported instead of thrown. A repository with no origin says so and offers Publish privately or Publish publicly, which creates the GitHub repository, adds it as origin and pushes the bookmark. Settings › Projects shows the same file for a registered project: the declared values, the tier that wins for each key, and a Copy entry button per suggested script, which copies the trusted project-checks profile entry because nothing is imported automatically.",
-      "reach": [
-        "click button \"New session\"",
-        "click button \"Choose workspace\"",
-        "click menuitem \"Add workspace*\"",
-        "expect textbox \"Enter a folder path\""
-      ],
+      "reach": ["click button \"New session\"", "click button \"Choose project\"", "click menuitem \"Add folder*\"", "expect textbox \"Enter a folder path\""],
       "surfaces": ["client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Add workspace",
+      "currentSurface": "composer: Choose project › Add folder",
       "configuration": [],
       "states": [
         "closed",
@@ -138,19 +133,18 @@
     {
       "id": "project-clone",
       "title": "Add a project by cloning a repository",
-      "summary": "New → Clone repository… in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. A failed or cancelled job can be retried into the same folder as a new job; a clone that failed after git started checking files out keeps that partial tree, and its retry clears it first. Closing the dialog does not hide a running or failed clone: a shell overlaid notice keeps its phase, Cancel and Retry on screen. The project_clone, project_clone_jobs, project_clone_cancel and project_clone_retry agent tools drive the same jobs.",
+      "summary": "Clone repository… in the Add a project dialog (also in ⌘K) clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. A failed or cancelled job can be retried into the same folder as a new job; a clone that failed after git started checking files out keeps that partial tree, and its retry clears it first. Closing the dialog does not hide a running or failed clone: a shell overlaid notice keeps its phase, Cancel and Retry on screen. The project_clone, project_clone_jobs, project_clone_cancel and project_clone_retry agent tools drive the same jobs.",
       "reach": [
         "click button \"New session\"",
-        "click button \"Choose workspace\"",
-        "click menuitem \"Add workspace*\"",
-        "click button \"New\"",
-        "click menuitem \"Clone repository…\"",
+        "click button \"Choose project\"",
+        "click menuitem \"Add folder*\"",
+        "click button \"Clone repository…\"",
         "expect textbox \"Repository URL\""
       ],
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Add workspace › Clone repository",
+      "currentSurface": "composer: Choose project › Add folder › Clone repository",
       "configuration": [],
       "states": ["form", "cloning", "colocating", "registering", "succeeded", "failed", "cancelled", "retrying"],
       "failureModes": [
@@ -223,11 +217,11 @@
       "id": "project-registration-removal",
       "title": "Remove a project registration",
       "summary": "Remove a project from the New thread picker without deleting its folder or files; threads lose their project grouping.",
-      "reach": ["click button \"Choose workspace\"", "expect textbox \"Search projects or enter a folder path\""],
+      "reach": ["click button \"Choose project\"", "expect textbox \"Search projects or enter a folder path\""],
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Remove",
+      "currentSurface": "composer: Choose project › Remove",
       "configuration": [],
       "states": ["listed", "confirmation", "removed", "failed"],
       "failureModes": [
@@ -253,19 +247,18 @@
     {
       "id": "project-create",
       "title": "Create a new project",
-      "summary": "New → New project… in the Add workspace flow creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs. The same remote creation is available for an existing checkout through project_publish: it refuses no-repository, an existing origin, and a repository without commits, then pushes the bookmark with jj (git for a plain checkout).",
+      "summary": "New project… (the composer's and the thread list's project pickers, ⌘K, or the Add a project dialog; productivity pass Q5) creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs. The same remote creation is available for an existing checkout through project_publish: it refuses no-repository, an existing origin, and a repository without commits, then pushes the bookmark with jj (git for a plain checkout).",
       "reach": [
         "click button \"New session\"",
-        "click button \"Choose workspace\"",
-        "click menuitem \"Add workspace*\"",
-        "click button \"New\"",
-        "click menuitem \"New project…\"",
+        "click button \"Choose project\"",
+        "click menuitem \"Add folder*\"",
+        "click button \"New project…\"",
         "expect textbox \"Project name\""
       ],
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Add workspace › New project",
+      "currentSurface": "composer: Choose project › Add folder › New project",
       "configuration": [],
       "states": ["form", "creating", "created", "created-with-warning", "failed"],
       "failureModes": [
@@ -401,7 +394,7 @@
       ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › search"
+      "currentSurface": "composer: Choose project › search"
     },
     {
       "id": "keyboard-folder-selection",
@@ -433,7 +426,7 @@
       ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › keyboard rows"
+      "currentSurface": "composer: Choose project › keyboard rows"
     },
     {
       "id": "unregistered-recent-folders",
@@ -471,7 +464,7 @@
       ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Recent"
+      "currentSurface": "composer: Choose project › Recent"
     },
     {
       "id": "directory-only-mode",

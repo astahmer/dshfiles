@@ -35,7 +35,7 @@ const openChecks = async (page: Page): Promise<void> => {
     await checksPanel(page).getByRole('button', { name: 'Refresh project checks', exact: true }).click()
     return
   }
-  const composer = page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.pressSequentially('/project-checks')
   await expect(page.getByRole('option', { name: /^Project checks/ })).toBeVisible()
   await composer.press('Enter')
@@ -167,8 +167,8 @@ When('a thread is started in the {string} folder', async ({ page }: { page: Page
   const prompt = `project checks in the ${which} folder`
   await registerWorkspaceFolder(page, which === 'sibling' ? fixture.sibling : fixture.project)
   const composer = page
-    .getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
-    .or(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true }))
+    .getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
+    .or(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u }))
   await composer.fill(prompt)
   await composer.press('Enter')
   const sessionRow = page.getByRole('treeitem', { name: new RegExp(`project checks in the ${which}`) })
@@ -178,10 +178,10 @@ When('a thread is started in the {string} folder', async ({ page }: { page: Page
   await expect(
     page
       .getByRole('status')
-      .filter({ hasText: /^(Completed|Failed|Stopped|Cancelled)$/ })
+      .filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })
       .last(),
   ).toBeVisible({ timeout: 60_000 })
-  await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
   await expect(page.getByRole('dialog', { name: /^(?:Add an API key to get started|Get started)$/ })).toBeHidden()
 })
 
@@ -197,8 +197,8 @@ When('{string} is sent to the fake model', async ({ page }: { page: Page }, text
 When('the fake model is sent a message while the completion check runs and the turn is cancelled', async ({ page }: { page: Page }) => {
   const markerPath = join(fixtureFor(page).project, '.verification-started')
   const composer = page
-    .getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
-    .or(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true }))
+    .getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
+    .or(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u }))
   await composer.fill('finish the task')
   await composer.press('Enter')
   await recordAssertion(page, 'project-checks-cancel-aborts-running-verification', async () => {
@@ -330,8 +330,8 @@ When('the {string} folder is added as the New thread project', async ({ page }: 
 
 When('a message is sent while its workspace setup runs', async ({ page }: { page: Page }) => {
   const composer = page
-    .getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
-    .or(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true }))
+    .getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
+    .or(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u }))
   await composer.fill('project checks setup in the project folder')
   await composer.press('Enter')
   await recordAssertion(page, 'project-checks-setup-phase-is-visible-in-the-composer', async () => {

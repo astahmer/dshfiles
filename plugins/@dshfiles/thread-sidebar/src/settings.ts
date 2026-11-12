@@ -51,20 +51,30 @@ const threadViewsDefault = {
 export const threadSidebarSettings = defineSettings({
   namespace: 'thread-sidebar',
   schema: Schema.object({
-    layoutMode: Schema.union([
-      Schema.const('fixed').description('Fixed: the rail of destinations and one list'),
-      Schema.const('docking').description('Free docking: movable panes in the left column'),
-    ])
+    // Retired by the one sidebar layout (b:952m): decoded for one release so the merge knows which layout a person used.
+    layoutMode: Schema.union(['fixed', 'docking'] as const)
       .default(DEFAULT_PREFERENCES.layoutMode)
-      .description(
-        'Layout of the left column. Free docking brings back the movable panes and your saved docking layout; switching back keeps it for next time.',
-      ),
+      .hidden(),
+    // The merge marker: the layout the one-time merge found; null until a page migrated this Host.
+    layoutMerge: Schema.union([Schema.const(null), Schema.const('fixed'), Schema.const('docking')])
+      .default(DEFAULT_PREFERENCES.layoutMerge)
+      .hidden(),
     headerMode: Schema.union(['compact', 'expanded'] as const)
       .default(DEFAULT_PREFERENCES.headerMode)
       .description('Compact shows one scrollable icon row; expanded shows labels and folds into the icon row at 76px or less.'),
     hideBrandLogo: Schema.boolean()
       .default(DEFAULT_PREFERENCES.hideBrandLogo)
       .description('Hide the brand logo and name in the sidebar header to make room; the collapse button stays.'),
+    showFooter: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.showFooter)
+      .description(
+        'Show the row of controls under the thread list (Settings, More; Restart DSH, Copy URL and Pair a phone too while Show DSH actions on the rail is off). Off: those live in the rail and ⌘K.',
+      ),
+    showRailActions: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.showRailActions)
+      .description(
+        'Show DSH actions on the rail: Restart DSH, Copy DSH URL for agents and Pair a phone, directly above Settings (on a phone, under More › DSH). Off: they move to the row under the list, which a pending restart or page reload then shows; ⌘K keeps them either way.',
+      ),
     navigationDensity: Schema.union(['compact', 'comfortable'] as const)
       .default(DEFAULT_PREFERENCES.navigationDensity)
       .description('Row height of the expanded navigation list.'),
@@ -138,9 +148,9 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.resumeAfterRestartDelaySeconds)
       .description('Seconds to wait after DSH starts before the automatic resume, so plugins and providers finish loading.'),
     autoRestartWhenIdle: Schema.boolean()
-      .default(true)
+      .default(false)
       .description(
-        'Restart DSH by itself to apply a plugin or profile update that needs a Host restart, once no turn, subagent, background job or open question has run for the quiet period. A 30 s notice with Postpone comes first. Needs DSH started through the supervised launcher (scripts/dsh-launcher); otherwise the notice shows that command and nothing restarts.',
+        'Off by default: it restarts DSH without anyone asking. On: restart DSH by itself to apply a plugin or profile update that needs a Host restart, once no turn, subagent, background job or open question has run for the quiet period. A 30 s notice with Postpone comes first. Needs DSH started through the supervised launcher (scripts/dsh-launcher); otherwise the notice shows that command and nothing restarts.',
       ),
     autoRestartQuietSeconds: Schema.natural()
       .min(30)
@@ -252,6 +262,12 @@ export const threadSidebarSettings = defineSettings({
     hiddenFooterIds: ids(),
     // An internal document rather than a form field: the client validates it with the same zod schema it stores.
     threadViews: Schema.any().default(threadViewsDefault).hidden(),
+    // The rail's folders (b:952m): written by the Host's sidebar tree verbs, validated with the sidebar-tree schema.
+    sidebarTree: Schema.any().default({ revision: 0, folders: [], removed: [], tombstones: [] }).hidden(),
+    // The Board page's view (E9): the client validates it with the board-view schema, as it does the saved views.
+    boardView: Schema.any()
+      .default({ ...DEFAULT_PREFERENCES.boardView, statusFilters: [], collapsedGroups: [], collapsedSections: [] })
+      .hidden(),
   }),
   applies: 'live',
 })

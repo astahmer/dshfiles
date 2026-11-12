@@ -72,6 +72,34 @@ describe('land card machine', () => {
     actor.stop()
   })
 
+  it('Land & next opens the chosen thread only after a land that moved work', async () => {
+    const opened: string[] = []
+    const { actor } = start({ openThread: sessionId => opened.push(sessionId) })
+    actor.send({ type: 'ask', thread })
+    actor.send({ type: 'confirm', next: 'session-2' })
+    await waitFor(actor, snapshot => snapshot.matches('idle'))
+    expect(opened).toEqual(['session-2'])
+    expect(actor.getSnapshot().context.next).toBeNull()
+
+    const refused = start({ openThread: sessionId => opened.push(sessionId), land: async () => ({ ...landed, status: 'needs-description' }) })
+    refused.actor.send({ type: 'ask', thread })
+    refused.actor.send({ type: 'confirm', next: 'session-3' })
+    await waitFor(refused.actor, snapshot => snapshot.matches('idle'))
+    expect(opened).toEqual(['session-2'])
+    actor.stop()
+    refused.actor.stop()
+  })
+
+  it('plain Land opens nothing after landing', async () => {
+    const opened: string[] = []
+    const { actor } = start({ openThread: sessionId => opened.push(sessionId) })
+    actor.send({ type: 'ask', thread })
+    actor.send({ type: 'confirm' })
+    await waitFor(actor, snapshot => snapshot.matches('idle'))
+    expect(opened).toEqual([])
+    actor.stop()
+  })
+
   it('cancels a confirmation without calling the Host', () => {
     const { actor, calls } = start()
     actor.send({ type: 'ask', thread })
@@ -150,5 +178,59 @@ describe('land card machine', () => {
     actor.send({ type: 'ask', thread })
     expect(actor.getSnapshot().context.notice).toBeNull()
     actor.stop()
+  })
+})
+
+describe('Land & next and the change summary', () => {
+  const candidate = (path: string, overrides: Partial<ThreadView> = {}): ThreadView => ({ ...thread, path, sessionIds: [`session-${path}`], ...overrides })
+
+  it('picks the first other ready thread, the current repository first', async () => {
+    const { LandCardModel } = await import('./land-readiness.js')
+    const next = LandCardModel.nextReady({
+      currentPath: '/b-threads/thread-000001/',
+      repositories: [
+        { repoRoot: '/a', threads: [candidate('/a-threads/thread-0000a1')] },
+        {
+          repoRoot: '/b',
+          threads: [
+            candidate('/b-threads/thread-000001'),
+            candidate('/b-threads/thread-000002', { canRebase: false }),
+            candidate('/b-threads/thread-000003', { unlanded: [{ changeId: 'c', commitId: 'c', description: '', conflict: false }] }),
+            candidate('/b-threads/thread-000004', { integrationQueuedAt: 5 }),
+            candidate('/b-threads/thread-000005', { missing: true }),
+            candidate('/b-threads/thread-000006'),
+          ],
+        },
+      ],
+    })
+    expect(next).toEqual({ path: '/b-threads/thread-000006', sessionId: 'session-/b-threads/thread-000006' })
+  })
+
+  it('offers nothing when no other thread is ready', async () => {
+    const { LandCardModel } = await import('./land-readiness.js')
+    expect(LandCardModel.nextReady({ currentPath: '/x', repositories: [{ repoRoot: '/r', threads: [candidate('/x')] }] })).toBeUndefined()
+  })
+
+  it('summarises titles, the overflow and the size', async () => {
+    const { LandCardModel } = await import('./land-readiness.js')
+    const revisions = ['feat: one\nbody', 'fix: two', '', 'docs: four'].map((description, index) => ({ changeId: `abcdefgh${String(index)}xyz`, description }))
+    expect(
+      LandCardModel.changeSummary({
+        revisions,
+        files: [
+          { additions: 3, deletions: 1 },
+          { additions: 2, deletions: 0 },
+        ],
+      }),
+    ).toEqual({
+      titles: [
+        { changeId: 'abcdefgh', title: 'feat: one' },
+        { changeId: 'abcdefgh', title: 'fix: two' },
+        { changeId: 'abcdefgh', title: '(no description)' },
+      ],
+      more: 1,
+      stat: '2 files · +5 −1',
+    })
+    expect(LandCardModel.changeSummary({ revisions: [] }).stat).toBeUndefined()
   })
 })

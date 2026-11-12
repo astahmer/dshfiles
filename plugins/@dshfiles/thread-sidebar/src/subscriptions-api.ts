@@ -64,7 +64,7 @@ export const threadSubscriptionsApi = defineApi({
   owner: '@dshfiles/thread-sidebar',
   methods: {
     state: method({
-      input: Schema.Struct({
+      input: SchemaHelpers.toolInput({
         subscriberSessionId: Schema.optional(sessionIdSchema),
         targetSessionId: Schema.optional(sessionIdSchema),
       }),
@@ -74,7 +74,11 @@ export const threadSubscriptionsApi = defineApi({
       tool: { name: 'thread_subscriptions', readOnly: true, render: renderSubscriptions },
     }),
     subscribe: method({
-      input: Schema.Struct({ sessionId: sessionIdSchema, subscriberSessionId: Schema.optional(sessionIdSchema), level: Schema.optional(levelChoiceSchema) }),
+      input: SchemaHelpers.toolInput({
+        sessionId: sessionIdSchema,
+        subscriberSessionId: Schema.optional(sessionIdSchema),
+        level: Schema.optional(levelChoiceSchema),
+      }),
       output: threadSubscriptionsSchema,
       description: `Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) reaches the subscriber: it wakes an idle subscriber, joins a running one at its next step, and several ends merge into one notice. Defaults the subscriber to the calling thread. level picks which ends reach it: all, outcomes (landed, failed, question), stuck (failed, question, blocked, truncated) or never; default (or omitted on a new pair) follows the user's setting. Subscribing an existing pair changes its level; omitting level keeps it. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.`,
       tool: {
@@ -85,7 +89,7 @@ export const threadSubscriptionsApi = defineApi({
       },
     }),
     unsubscribe: method({
-      input: Schema.Struct({ sessionId: sessionIdSchema, subscriberSessionId: Schema.optional(sessionIdSchema) }),
+      input: SchemaHelpers.toolInput({ sessionId: sessionIdSchema, subscriberSessionId: Schema.optional(sessionIdSchema) }),
       output: threadSubscriptionsSchema,
       description: `Stop the notices for one pair: no further completion of the target reaches the subscriber. Defaults the subscriber to the calling thread. ${ONLY_WHEN_ASKED}`,
       tool: {

@@ -246,7 +246,7 @@
       ],
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call bash {\\\"command\\\":\\\"sleep 900\\\",\\\"description\\\":\\\"Hold a job past its turn\\\",\\\"run_in_background\\\":true}]]\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call bash {\\\"command\\\":\\\"sleep 900\\\",\\\"description\\\":\\\"Hold a job past its turn\\\",\\\"run_in_background\\\":true}]]\"",
         "press Enter",
         "click tab \"Observe\"",
         "click button \"Processes\"",
@@ -299,7 +299,7 @@
       "id": "thread-jobs-facet",
       "title": "Thread panel Jobs facet",
       "summary": "A Jobs tab in the thread panel (the right pane's tab chooser): this thread's background jobs with output and Stop, then each Processes view that can filter to one thread (its dev servers, the RAM its process trees use), and a link to Observe › Processes. Registered as a right-pane page tab type, so it follows the thread on stage without changing sidebar-right.",
-      "reach": ["seed tool-call-thread", "click button \"New tab\"", "click button \"Jobs*\"", "expect heading \"Jobs\""],
+      "reach": ["seed tool-call-thread", "press ControlOrMeta+Alt+KeyT", "click button \"Jobs*\"", "expect heading \"Jobs\""],
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -334,7 +334,7 @@
       "summary": "Under the tool card that started a background job, and above the composer while it runs, an expandable preview shows the job's lifecycle, progress and elapsed time and streams its output while open, with Stop behind a confirmation, the owning thread and a way to Processes.",
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"for i in 1 2 3 4 5 6 7 8 9 10; do echo compiled module $i; sleep 1; done; sleep 300\\\",\\\"description\\\":\\\"Build\\\",\\\"run_in_background\\\":true}]]\"",
+        "fill textbox \"commands, @ files or threads*\" \"[[call bash {\\\"command\\\":\\\"for i in 1 2 3 4 5 6 7 8 9 10; do echo compiled module $i; sleep 1; done; sleep 300\\\",\\\"description\\\":\\\"Build\\\",\\\"run_in_background\\\":true}]]\"",
         "press Enter",
         "expect region \"Running background jobs\"",
         "click button \"Show or hide the live output of *\"",

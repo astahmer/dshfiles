@@ -10,6 +10,7 @@ Feature: Right pane closes with its last tab
   @scenario:workbench.last-right-tab-close
   Scenario: Closing the final right tab hides the pane while another tab and explicit reopens remain valid
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar keeps the former Free docking panes
     When the unified right pane is revealed from the main Pane options
     And a Scratchpad view in the right pane receives a draft
     Then closing one of two right tabs keeps the other view and closing the last hides the pane

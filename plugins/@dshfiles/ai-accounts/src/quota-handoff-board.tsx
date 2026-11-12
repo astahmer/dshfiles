@@ -96,7 +96,7 @@ const PlanSection = (props: { readonly plan: HandoffPlan; readonly now: number; 
             {plan.lanes.map((lane, index) => (
               <div className="dshx:grid dshx:grid-cols-[minmax(6rem,9rem)_minmax(0,1fr)] dshx:items-center dshx:gap-2" key={lane.instanceId}>
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-                  <span aria-hidden className={cn('dshx:size-2.5 dshx:shrink-0 dshx:rounded-[2px]', toneOf(index))} />
+                  <span aria-hidden className={cn('dshx:size-2.5 dshx:shrink-0 dshx:rounded-xs', toneOf(index))} />
                   <span className="dshx:truncate">{lane.displayName}</span>
                 </span>
                 <span className="dshx:flex dshx:h-1.5">

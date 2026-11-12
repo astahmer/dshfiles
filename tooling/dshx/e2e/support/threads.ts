@@ -3,8 +3,8 @@ import { mkdtemp, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 
-const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
-const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
+const NEW_THREAD_COMPOSER = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 
 /** A fresh directory under the system temporary root, resolved so it matches the path the Host canonicalizes. */
 export const createScratchDirectory = async (prefix: string): Promise<string> => realpath(await mkdtemp(join(tmpdir(), prefix)))
@@ -15,8 +15,8 @@ const openSidebarAddWorkspace = async (page: Page): Promise<void> => {
 
 /** The New thread composer's project chip also opens Add workspace; a replaced sidebar (thread-sidebar) has no button. */
 export const openNewThreadAddWorkspace = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
-  await page.getByRole('menuitem', { name: /Add workspace/ }).click()
+  await page.getByRole('button', { name: /^Choose (?:project|workspace)$/u }).click()
+  await page.getByRole('menuitem', { name: /^Add (?:folder|workspace)/ }).click()
 }
 
 /** Register a folder through the Add workspace flow of @dshfiles/workspace-folder-picker; it becomes the New thread project. */
@@ -25,9 +25,9 @@ export const registerWorkspaceFolder = async (page: Page, path: string, open: (p
   await addWorkspaceFolderThroughDialog(page, path)
 }
 
-/** The Add workspace dialog itself, for a caller that already opened it from the New thread project chip. */
+/** The Add a project dialog itself, for a caller that already opened it from the New thread project chip. */
 export const addWorkspaceFolderThroughDialog = async (page: Page, path: string): Promise<void> => {
-  const picker = page.getByRole('dialog', { name: 'Add workspace' })
+  const picker = page.getByRole('dialog', { name: 'Add a project' })
   await expect(picker).toBeVisible()
   // The picker opens on the Host home and rewrites the path field when that first listing lands.
   await expect(picker.locator('p').filter({ hasText: /^\// }).first()).toBeVisible()
@@ -66,7 +66,7 @@ export const confirmFolderSetupStep = async (page: Page, path: string): Promise<
 
 /** Send a message from whichever composer is on screen and wait until that turn settles. */
 export const sendMessage = async (page: Page, text: string): Promise<void> => {
-  const settled = page.getByRole('status').filter({ hasText: /^(Completed|Failed|Stopped|Cancelled)$/ })
+  const settled = page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })
   const before = await settled.count()
   const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true }).or(page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true }))
   await composer.fill(text)
@@ -93,9 +93,9 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
     .first()
     .click()
   await expect(
-    page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true }).or(page.getByRole('textbox', { name: 'Choose workspace', exact: true })),
+    page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true }).or(page.getByRole('textbox', { name: /^Choose (?:project|workspace)$/u })),
   ).toBeVisible()
-  const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
+  const projectButton = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
   const expectedProject = input.project.startsWith('/') ? basename(input.project) : input.project
   if ((await projectButton.textContent())?.trim() !== expectedProject) {
     await projectButton.click()

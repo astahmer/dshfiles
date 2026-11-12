@@ -10,16 +10,12 @@
  * context; this package's own actions are entries like any plugin's. The
  * session and workspace hover cards are suppressed while a menu is open.
  */
+import { ArchiveIcon, ArchiveRestoreIcon, EllipsisIcon, PencilIcon, SquarePenIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import clsx from 'clsx'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import {
-  HoverCard, IconArchiveOutlineRegular, IconEditOutlineRegular,
-  IconEllipsisOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular,
-  IconNewChatOutlineRegular, IconPinFillRegular, IconTrashOutlineRegular,
-  IconTriangleRightFillRegular, IconUnarchiveOutlineRegular, Menu, relativeTime, StateDot, Tooltip,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { HoverCard, IconFolderCloseRegular, IconFolderOpenRegular, IconPinFillRegular, IconTriangleRightFillRegular, Menu, relativeTime, StateDot, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
@@ -236,8 +232,8 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
   const active = containsCurrentDescendant || (group.expanded && group.containsCurrent)
   const [menuOpen, setMenuOpen] = useState(false)
   const workspaceMenuItems = [
-    { id: 'rename', label: t('rename'), icon: <IconEditOutlineRegular /> },
-    { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutlineRegular />, danger: true },
+    { id: 'rename', label: t('rename'), icon: <PencilIcon size={14} strokeWidth={1.5} /> },
+    { id: 'delete', label: t('delete.workspace'), icon: <Trash2Icon size={14} strokeWidth={1.5} />, danger: true },
   ]
   const ownRow = (
     <div
@@ -289,7 +285,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
                 aria-label={t('actions.workspace.aria', { name: label })}
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
               >
-                <IconEllipsisOutlineRegular />
+                <EllipsisIcon size={14} strokeWidth={1.5} />
               </button>
             )}
           />
@@ -302,7 +298,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
             aria-label={t('actions.newSession.aria', { name: label })}
             onClick={(e) => { e.stopPropagation(); onCreate() }}
           >
-            <IconNewChatOutlineRegular />
+            <SquarePenIcon size={14} strokeWidth={1.5} />
           </button>
         </Tooltip>
       </span>
@@ -449,7 +445,7 @@ function SessionHoverContent({ node, now, renderSlot, t }: {
       ))}
       {node.archived && (
         <div className={clsx(css.hoverStatus, css.hoverArchived)}>
-          <IconArchiveOutlineRegular size={14} />
+          <ArchiveIcon strokeWidth={1.5} size={14} />
           <span>{t('row.archived')}</span>
         </div>
       )}
@@ -506,7 +502,7 @@ export function SearchResultItem({ result, currentId, onOpen, onUnarchive, t }: 
                 aria-label={t('menu.unarchiveSession')}
                 onClick={(e) => { e.stopPropagation(); onUnarchive(result.id) }}
               >
-                <IconUnarchiveOutlineRegular size={14} />
+                <ArchiveRestoreIcon strokeWidth={1.5} size={14} />
               </button>
             </Tooltip>
           </span>
@@ -675,7 +671,7 @@ export function SessionNodeItem({
                 aria-label={t('actions.session.aria', { name: title })}
                 onClick={() => { setMenuOpen(v => !v) }}
               >
-                <IconEllipsisOutlineRegular />
+                <EllipsisIcon size={14} strokeWidth={1.5} />
               </button>
             )}
           >

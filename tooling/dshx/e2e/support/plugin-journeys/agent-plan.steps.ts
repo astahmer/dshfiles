@@ -5,7 +5,7 @@ import { When, Then } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const STEPS = ['Read the pricing module', 'Fix the rounding bug', 'Run the cart tests'] as const
 
 const todoWrite = (statuses: readonly ('pending' | 'in_progress' | 'completed')[]): string =>
@@ -22,7 +22,7 @@ const openFreshThread = async (page: Page, prefix: string): Promise<void> => {
 /** A finished turn folds its tool rows: open each folded turn, then each folded plan group, so the cards show. */
 const revealPlanCards = async (page: Page): Promise<void> => {
   const folded = (text: RegExp) => page.locator('[aria-expanded="false"]').filter({ hasText: text })
-  for (const pattern of [/^Completed in/, /^Updated the plan/]) {
+  for (const pattern of [/^Worked for/, /^Updated the plan/]) {
     while ((await folded(pattern).count()) > 0) await folded(pattern).first().click()
   }
 }
@@ -116,12 +116,17 @@ Then('Ask to fix puts the failure into the composer', async ({ page }: { page: P
 
 When('the fake model answers once in a fresh workspace', async ({ page }: { page: Page }) => {
   await openFreshThread(page, 'compaction')
-  await send(page, 'Summarize the pricing module')
+  // b:ysaj: the reading lives in the context meter's panel, and the ring shows from 25% occupancy, so the fake provider
+  // reports 40K of its 128K window (31%, under the ~62K trigger) as prompt usage (`[[usage]]` applies to an `[[answer]]`).
+  await send(page, 'Summarize the pricing module [[usage 40000]] [[answer The pricing module rounds each line item.]]')
 })
 
 Then('the meter line says how many tokens are left before compaction', async ({ page }: { page: Page }) => {
+  // b:ysaj: the reading is a row of the context meter's panel, not a second meter-line item.
   await recordAssertion(page, 'agent-plan-compaction-meter-visible', async () => {
-    await expect(page.locator('[data-dshfiles-compaction-meter]')).toHaveText(/^compacts in ~\d+K$/, { timeout: 60_000 })
+    await expect(page.locator('[data-composer-dock] [data-dshfiles-compaction-meter]')).toHaveCount(0)
+    await page.locator('[data-context-meter]').first().click({ timeout: 60_000 })
+    await expect(page.locator('[data-context-detail] [data-dshfiles-compaction-meter]')).toHaveText(/^Compacts in ~\d+K$/, { timeout: 60_000 })
   })
   await finishJourneyAssertions(page)
 })

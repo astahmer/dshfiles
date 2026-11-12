@@ -81,7 +81,7 @@ const EventRow = (props: { readonly event: MemoryEvent; readonly openThread: (id
     <tr className="dshx:border-t dshx:border-border/70">
       <td className="dshx:whitespace-nowrap dshx:py-1.5 dshx:pr-3 dshx:tabular-nums dshx:text-muted-foreground">{PanelFormat.formatTime(props.event.at)}</td>
       <td className="dshx:py-1.5 dshx:pr-3">
-        <Badge variant="outline" className={cn('dshx:h-4 dshx:border-transparent dshx:px-1.5 dshx:text-[10px]', badge.className)}>
+        <Badge variant="outline" className={cn('dshx:h-4 dshx:border-transparent dshx:px-1.5 dshx:text-2xs', badge.className)}>
           {badge.label}
         </Badge>
       </td>
@@ -117,7 +117,7 @@ const PanelCard = (props: { readonly heading: string; readonly description?: str
   <section className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card/60 dshx:p-3">
     <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2">
       <h3 className="dshx:text-sm dshx:font-semibold">{props.heading}</h3>
-      {props.description === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{props.description}</span>}
+      {props.description === undefined ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.description}</span>}
     </div>
     {props.children}
   </section>
@@ -341,7 +341,7 @@ export const AnalyticsTab = (props: {
           </div>
           {events.length === 0 ? <p className="dshx:py-3 dshx:text-xs dshx:text-muted-foreground">No events in this window.</p> : null}
           <div className="dshx:overflow-auto">
-            <table className="dshx:w-full dshx:text-[11px]" aria-label="Recent memory events">
+            <table className="dshx:w-full dshx:text-2xs" aria-label="Recent memory events">
               <thead className="dshx:text-muted-foreground">
                 <tr>
                   <th className="dshx:py-1 dshx:pr-3 dshx:text-left dshx:font-medium">Time</th>
@@ -368,7 +368,7 @@ export const AnalyticsTab = (props: {
                 <li key={note.id}>
                   <button type="button" onClick={() => props.openNote(note.id)} className="dshx:flex dshx:w-full dshx:flex-col dshx:gap-1 dshx:text-left">
                     <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
-                      <span className="dshx:w-3 dshx:shrink-0 dshx:text-right dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">{index + 1}</span>
+                      <span className="dshx:w-3 dshx:shrink-0 dshx:text-right dshx:text-2xs dshx:tabular-nums dshx:text-muted-foreground">{index + 1}</span>
                       <span className={cn('dshx:flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md', tone.iconTile)}>
                         <tone.Icon className="dshx:size-3" />
                       </span>
@@ -388,7 +388,7 @@ export const AnalyticsTab = (props: {
           </ol>
         </PanelCard>
       </div>
-      <p className="dshx:pb-1 dshx:text-[11px] dshx:text-muted-foreground">
+      <p className="dshx:pb-1 dshx:text-2xs dshx:text-muted-foreground">
         Costs are list-price estimates from AI Accounts' models.dev catalog. Correction counts are heuristics over a 30-minute window after a citation.
       </p>
     </div>

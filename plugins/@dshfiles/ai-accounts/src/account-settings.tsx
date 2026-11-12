@@ -78,7 +78,7 @@ const AccountRoutingSettings = (props: SettingsProps): JSX.Element => (
       <span className="dshx:text-xs dshx:text-muted-foreground">Priority</span>
       <div className="dshx:min-w-0">
         <PriorityControl {...props} />
-        <p className="dshx:mt-1.5 dshx:text-[11px] dshx:text-muted-foreground">Lower numbers are tried first within {KIND_LABEL[props.draft.kind]}.</p>
+        <p className="dshx:mt-1.5 dshx:text-2xs dshx:text-muted-foreground">Lower numbers are tried first within {KIND_LABEL[props.draft.kind]}.</p>
       </div>
     </div>
     <RoutingSwitch draft={props.draft} state={props.state} />
@@ -106,15 +106,15 @@ const ExtraUsageSettings = (props: SettingsProps): JSX.Element | null => {
         <Switch
           aria-label="Use extra usage"
           checked={allowed}
-          className="dshx:mt-0.5 dshx:data-[state=checked]:bg-warning"
+          className="dshx:mt-0.5"
           onCheckedChange={enabled => void props.state.persist({ useExtraUsage: enabled })}
         />
         <span>
           <span className="dshx:block dshx:text-sm">Use extra usage</span>
           <span className="dshx:mt-1 dshx:block dshx:text-xs dshx:text-muted-foreground">
             {allowed
-              ? 'A spent session or weekly window draws the provider’s extra usage.'
-              : 'Off: once the session or weekly window is spent, routing skips this account and a turn stops with its reset time.'}
+              ? 'A spent 5-hour or weekly window draws the provider’s extra usage.'
+              : 'Off: once the 5-hour or weekly window is spent, routing skips this account and a turn stops with its reset time.'}
           </span>
         </span>
       </label>
@@ -257,7 +257,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
             {status?.checkedAt == null ? 'No provider check available' : new Date(status.checkedAt).toLocaleString()}
           </dd>
         </dl>
-        <p className="dshx:text-[11px] dshx:text-muted-foreground">
+        <p className="dshx:text-2xs dshx:text-muted-foreground">
           The account ID is its DSH route. Status reflects the last provider check, not a guarantee of future token validity.
         </p>
         <div className="dshx:flex dshx:justify-end">

@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
 import { parseSecretReference } from '@dshfiles/credential-port'
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
-import { DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
+import { DshxPlugin, HostContext, hostService, WebRoutes } from '@dshfiles/dshx/effect'
 import { Context, Duration, Effect, Layer, Option, Queue, Schedule, Schema, type Scope, Stream } from 'effect'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { configSchema, type ManagerConfig } from './config.js'
@@ -258,10 +258,7 @@ export class McpHost extends Context.Service<
       const serveRoute = (input: { readonly path: string; readonly handler: CallbackHandler }) =>
         Effect.gen(function* () {
           const run = yield* DshxPlugin.callback(input.handler)
-          yield* Effect.acquireRelease(
-            Effect.sync(() => webServer.register({ kind: 'exact', path: input.path, handler: (request, response) => run(request, response) })),
-            dispose => Effect.sync(dispose),
-          )
+          yield* WebRoutes.register(webServer, { kind: 'exact', path: input.path, handler: (request, response) => run(request, response) })
         })
 
       const referenceUpdates = Stream.callback<string>(queue =>

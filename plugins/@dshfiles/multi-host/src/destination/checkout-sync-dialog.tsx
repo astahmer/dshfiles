@@ -42,12 +42,12 @@ const RevisionList = (props: { readonly heading: string; readonly total: number;
             <code className="dshx:shrink-0 dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{revision.changeId.slice(0, 8)}</code>
             <span className="dshx:min-w-0 dshx:truncate">{revision.description || 'No description'}</span>
             {props.localEdits === true && (revision.description === '' || revision.description.toLowerCase() === 'wip') ? (
-              <Badge variant="secondary" className="dshx:shrink-0 dshx:text-[10px]">
+              <Badge variant="secondary" className="dshx:shrink-0 dshx:text-2xs">
                 Local edits
               </Badge>
             ) : null}
             {revision.conflict ? (
-              <Badge variant="outline" className="dshx:shrink-0 dshx:text-[10px]">
+              <Badge variant="outline" className="dshx:shrink-0 dshx:text-2xs">
                 Conflict
               </Badge>
             ) : null}
@@ -64,12 +64,12 @@ const WorkspaceRow = (props: { readonly workspace: Workspace; readonly current?:
   <li className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2 dshx:text-sm">
     <span className="dshx:font-medium">{props.workspace.name}</span>
     {props.current === true ? (
-      <Badge variant="secondary" className="dshx:text-[10px]">
+      <Badge variant="secondary" className="dshx:text-2xs">
         This checkout
       </Badge>
     ) : null}
     {props.workspace.blocksSync ? (
-      <Badge variant="outline" className="dshx:text-[10px]">
+      <Badge variant="outline" className="dshx:text-2xs">
         Blocks this sync
       </Badge>
     ) : null}

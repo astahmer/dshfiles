@@ -69,7 +69,7 @@ describe('native question inbox provider', () => {
     expect(inThread).toMatchObject({
       dedupeKey: 'session-root:call-2',
       verbs: ['Open', 'Done', 'Snooze', 'MuteSource'],
-      detail: 'Open the thread to answer it there.',
+      detail: 'Options: Deploy · Wait. Open the thread to choose: its form is still open there, and while it is, only that form takes the answer.',
     })
     expect(inThread).not.toHaveProperty('choices')
     expect(several).toMatchObject({ reason: 'Asks: Deploy the release now? (+1 more)', verbs: ['Open', 'Done', 'Snooze', 'MuteSource'] })

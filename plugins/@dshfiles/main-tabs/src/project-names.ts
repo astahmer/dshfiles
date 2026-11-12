@@ -1,13 +1,19 @@
+import { WorkspacePaths, type ThreadDirectories } from '@dshfiles/thread-sidebar/thread-directories'
+
 interface ProjectWorkspace {
   readonly workspaceId: string
   readonly path: string
 }
 
-/** Each project workspace's folder name, keyed by workspace id, for labels in front of thread titles. */
-const byWorkspaceId = (workspaces: readonly ProjectWorkspace[]): ReadonlyMap<string, string> =>
+/**
+ * Each workspace's project folder name, keyed by workspace id, for labels in front of thread titles. A thread workspace
+ * (`<repository>-threads/<name>`, or a provider-reported threads directory) carries its project's name, never its own
+ * folder: thread-sidebar names the thread first and the project second, and a tab says the same.
+ */
+const byWorkspaceId = (workspaces: readonly ProjectWorkspace[], threadDirectories?: ThreadDirectories): ReadonlyMap<string, string> =>
   new Map(
     workspaces.flatMap(workspace => {
-      const name = workspace.path.split(/[\\/]/).filter(Boolean).at(-1)
+      const name = WorkspacePaths.projectPathOf({ path: workspace.path, threadDirectories }).split(/[\\/]/).filter(Boolean).at(-1)
       return name === undefined ? [] : [[workspace.workspaceId, name] as const]
     }),
   )

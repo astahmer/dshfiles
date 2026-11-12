@@ -91,22 +91,28 @@ When('a disposable terminal workspace has a selected real conversation', async (
   await page.getByRole('button', { name: 'New thread', exact: true }).filter({ visible: true }).first().click()
   // Boot already shows a blank conversation, so New thread opens a second one; wait for it before using its chip.
   if (bootThreadId !== null) await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBe(bootThreadId)
-  await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+  await page.getByRole('button', { name: /^Choose (?:project|workspace)$/u }).click()
   const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
   await expect(picker).toBeVisible()
   await picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true }).fill(workspace)
   await picker.getByRole('button', { name: 'Register project', exact: true }).first().click()
   await expect(picker).toBeHidden()
   await confirmFolderSetupStep(page, workspace)
-  await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBeNull()
+  // Choosing the project moves the blank thread to a Session in that project a moment later (the URL follows it); until
+  // then the unowned thread's composer stays disabled. Read the id once the main pane's composer for it is editable.
+  const composerOf = (id: string) =>
+    pane(page, 'main')
+      .locator(`[data-conversation-session=${JSON.stringify(id)}]`)
+      .getByRole('textbox', {
+        name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/,
+      })
+  await expect(async () => {
+    const current = new URL(page.url()).searchParams.get('thread')
+    expect(current).not.toBeNull()
+    await expect(composerOf(current ?? '')).toBeEditable({ timeout: 1_000 })
+  }).toPass({ timeout: 30_000 })
   const sessionId = new URL(page.url()).searchParams.get('thread')
   if (sessionId === null) throw new Error('The actual terminal Session was not created')
-  const composer = pane(page, 'main')
-    .locator(`[data-conversation-session=${JSON.stringify(sessionId)}]`)
-    .getByRole('textbox', {
-      name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/,
-    })
-  await expect(composer).toBeEditable()
   journeys.set(page, { root, workspace, sessionId, terminals: new Map() })
 })
 
@@ -119,7 +125,7 @@ When('the {string} pane opens a genuine terminal from its view picker', async ({
   // The left footer Preview is also a regular group now. Select the actual
   // full-height Threads group, not a positional last button in compact chrome.
   const leftThreads = target
-    .getByRole('tab', { name: 'Thread Sidebar: Threads', exact: true })
+    .getByRole('tab', { name: 'Threads', exact: true })
     .locator('xpath=ancestor::*[contains(concat(" ",normalize-space(@class)," ")," dv-groupview ")][1]')
   await (region === 'left' ? leftThreads.getByRole('button', { name: 'New tab', exact: true }) : plus.first()).click()
   const chooser = target.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })

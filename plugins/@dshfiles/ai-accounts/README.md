@@ -10,6 +10,18 @@
 
 [Stalled-stream advice at 390 px](docs/screenshots/stalled-stream-recovery-mobile.png) · [Fall back on stalled streams setting](docs/screenshots/stalled-stream-fallback-setting.png)
 
+![The status strip: one compact segment per account (glyph, short name, meter, % left, reset time) as many as fit, then +N; the popover lists them by provider, least left first](docs/screenshots/status-strip-quota.png)
+
+In the frame's status strip each account is one compact segment, glyph · short name · 28 px meter · "51%", in the
+account order (b:hbtt): neutral, amber at 15% left or less, red "limit" once reached; an account that is off is dimmed,
+reads "off" and folds into `+N` first. Each segment ends with its binding window's reset, muted and compact on the same
+line (b:jaz6): "CC1 51% · 1d 21h", "CC3 limit · 2h 40m". The tooltip gives the full name and every window with its own
+reset ("Weekly limit: 51% left · resets in 1 d 21 h · Thu 03:00"). As many segments as the strip leaves room for
+(measured against its other items): healthy accounts drop their reset first, limited and low ones keep it, then `+N`.
+**Show reset times in the status bar** (`showResetTimes`, on) turns the times off. Right-click › Pin to the status bar
+makes the strip a filter (`usageStripPinned`): only pinned accounts are segments. The phone pill names at least three
+("CC1 10% · CC2 12% · CC3 limit 2h 40m +3"; a reset only at the limit); its sheet lists every account with its reset.
+
 AI Accounts runs several subscription accounts side by side. Codex, Claude,
 Mistral, OpenCode Go and Command Code accounts each become their own route in the
 model picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
@@ -345,9 +357,11 @@ log write restarts it: the chip errs quiet, never early.
 Lifetimes: Anthropic models 5 min, OpenAI and Codex models 10 min (the upper
 end of OpenAI's 5–10 min), detected from the models.dev id or the model name.
 Other routes stay quiet until Settings › AI Accounts › Idle prompt cache ›
-Cache lifetimes names one (`route/model = minutes`, or `route/*`). **Cache
-retention** sets what each account route actually asks its provider for:
-`route/model = long` or `route/* = short`, unset keeps the provider default.
+Cache lifetimes names one. **Cache retention** sets what each account route
+actually asks its provider for (long or short; unset keeps the provider
+default). Both are tables of rules, an account, a model (or All models) and a
+value each, with **Edit as text** for the `route/model = value` form
+(`route/*` for every model of an account).
 `long` asks Anthropic for a 1 h cache, OpenAI's Responses API for 24 h (or its
 declared 30 min mode), and nothing for a transport that does not support it.
 The chip's lifetime follows that choice: it reports the extended lifetime the

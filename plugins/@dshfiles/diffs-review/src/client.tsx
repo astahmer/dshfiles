@@ -34,6 +34,8 @@ const TURN_LINK_ID = '@dshfiles/diffs-review/turn-link'
 const TURN_LINK_KIND = 'dshfiles-diffs-review-turn-link'
 /** How long "Open in thread" waits for the chosen thread to come on screen before it gives up quietly. */
 const OPEN_IN_THREAD_TIMEOUT_MS = 5_000
+/** How often "Open in thread" looks whether the thread came on screen. */
+const OPEN_IN_THREAD_RETRY_MS = 120
 /** One diff-viewed batch write carries at most this many marks. */
 const MIGRATION_BATCH = 4_000
 
@@ -83,27 +85,38 @@ export default defineClientPlugin({
     }
     /** Bring a thread on screen, then open its Changes facet once its right pane follows it. */
     const openInThread: OpenInThread = (sessionId, request) => {
-      const openIfShown = (): boolean => {
-        if (ctx.sidebarRight.mounted.getSnapshot() !== sessionId) return false
+      const shown = (): boolean => ctx.sidebarRight.mounted.getSnapshot() === sessionId
+      const openChanges = (): void => {
         ctx.sidebarRight.openTab(CHANGES_TAB_KIND, { revealIfOpened: true, params: request ?? { scope: 'thread' } })
+        // openTab places the page but leaves a collapsed column collapsed; the user asked to see it.
+        if (!ctx.sidebarRight.isExpanded()) ctx.sidebarRight.toggleExpanded()
+      }
+      if (shown()) {
+        openChanges()
         return true
       }
-      if (openIfShown()) return true
-      ctx.uiWorkspace.openSession(SessionId(sessionId))
-      if (openIfShown()) return true
-      // The right pane follows the thread a moment after it comes on screen; a page still loading may never announce it,
-      // so the timeout checks once more before giving up.
-      let stop = (): void => {}
-      const timer = setTimeout(() => {
-        stop()
-        openIfShown()
-      }, OPEN_IN_THREAD_TIMEOUT_MS)
-      stop = ctx.sidebarRight.mounted.subscribe(() => {
-        if (!openIfShown()) return
-        clearTimeout(timer)
-        stop()
-      })
+      // main-tabs owns which thread the stage shows: ask it first (a handled event comes back cancelled), else native.
+      const tookIt = !window.dispatchEvent(new CustomEvent('dshfiles:open-thread', { detail: { sessionId, newTab: false }, cancelable: true }))
+      if (!tookIt) ctx.uiWorkspace.openSession(SessionId(sessionId))
+      // `mounted` moves before React renders the arriving Session's pane, whose seat takes commands only from that
+      // commit on (it may move synchronously, inside the dispatch above). Open once it has been on screen for a tick;
+      // a page still loading may never show it, so give up quietly after the timeout.
+      const deadline = Date.now() + OPEN_IN_THREAD_TIMEOUT_MS
+      let seen = false
+      const attempt = (): void => {
+        if (shown() && seen) {
+          openChanges()
+          return
+        }
+        seen = shown()
+        if (Date.now() < deadline) setTimeout(attempt, OPEN_IN_THREAD_RETRY_MS)
+      }
+      setTimeout(attempt, OPEN_IN_THREAD_RETRY_MS)
       return true
+    }
+
+    const openThread = (sessionId: string): void => {
+      openInThread(sessionId, { scope: 'thread' })
     }
 
     api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 40, label: 'Review' }, () => <GitPullRequest aria-hidden />)
@@ -157,6 +170,7 @@ export default defineClientPlugin({
         <PluginQueryProvider>
           <ChangesFacet
             openHistory={openHistory}
+            openThread={openThread}
             request={request}
             requestRevision={tab.navigation.revision}
             sessionId={sessionId === undefined ? undefined : String(sessionId)}

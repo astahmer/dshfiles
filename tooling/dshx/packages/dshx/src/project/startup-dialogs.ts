@@ -111,7 +111,25 @@ const registerPreviewNoticeDismissal = (page: Page): Promise<void> =>
     await clickContinue(previewNotice, 5_000)
   })
 
+/** `@dshfiles/onboarding`'s per-browser wizard outcome (src/wizard-store.ts), as its stored-value hook writes it. */
+const SETUP_WIZARD_OUTCOME_KEY = 'dshfiles.onboarding.wizard.v1'
+
+/**
+ * A fresh scratch profile has no AI account, so onboarding's setup wizard opens by itself: a fixed card over the top of
+ * the page (most of a phone screen). Drivers that walk other features start each page as if the user had skipped it,
+ * the same per-browser state Skip writes; a stored outcome is kept, and ⌘K Show the setup wizard still replays it.
+ */
+const markSetupWizardSkipped = (page: Page): Promise<void> =>
+  page.addInitScript(key => {
+    try {
+      if (window.localStorage.getItem(key) === null) window.localStorage.setItem(key, JSON.stringify('skipped'))
+    } catch {
+      // Storage off: the wizard opens and the step that meets it says so.
+    }
+  }, SETUP_WIZARD_OUTCOME_KEY)
+
 export class StartupDialogs {
+  static readonly markSetupWizardSkipped = markSetupWizardSkipped
   static readonly registerProviderSetupDismissal = registerProviderSetupDismissal
   static readonly dismissProviderSetupIfShown = dismissProviderSetupIfShown
   static readonly dismissProviderSetupDuringStartup = dismissProviderSetupDuringStartup

@@ -86,13 +86,13 @@
           "kind": "unit-test",
           "id": "rich-composer.phone-thread-menu",
           "file": "plugins/@dshfiles/rich-composer/src/conversation-composition.test.tsx",
-          "testName": "opens only its own phone menu with hideChrome=%s"
+          "testName": "lists phone thread menu tools in the ⋯ sheet, which is their launcher while its bar is on screen"
         },
         {
           "kind": "unit-test",
           "id": "rich-composer.native-view-editor-continuity",
           "file": "plugins/@dshfiles/rich-composer/src/conversation-composition.test.tsx",
-          "testName": "selects native child views independently in two fixed Sessions without replacing either editor"
+          "testName": "keeps Chat on the stage of two fixed Sessions, whatever view a Session stored, with no view tabs in the header"
         },
         {
           "kind": "gherkin",
@@ -146,8 +146,12 @@
         "The original clipboard HTML is never inserted into the composer DOM."
       ],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
-      "reachNarrow": ["click button \"New\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or threads\""],
+      "reachNarrow": [
+        "click button \"Back to Threads\"",
+        "click button \"New thread\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or threads\""
+      ],
       "verification": [
         {
           "kind": "gherkin",
@@ -191,13 +195,14 @@
       ],
       "reach": [
         "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "expect text \"Image 1\""
       ],
       "reachNarrow": [
-        "click button \"New\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "click button \"Back to Threads\"",
+        "click button \"New thread\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "expect text \"Image 1\""
       ],
@@ -255,13 +260,14 @@
       ],
       "reach": [
         "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "expect text \"Image 1\""
       ],
       "reachNarrow": [
-        "click button \"New\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "click button \"Back to Threads\"",
+        "click button \"New thread\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "expect text \"Image 1\""
       ],
@@ -371,8 +377,12 @@
         "Prompts older than the loaded event window are not recalled until the transcript loads them."
       ],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
-      "reachNarrow": ["click button \"New\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or threads\""],
+      "reachNarrow": [
+        "click button \"Back to Threads\"",
+        "click button \"New thread\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or threads\""
+      ],
       "onboarding": {
         "firstAction": "Press ArrowUp in an empty composer of a thread.",
         "doneWhen": "Your previous prompt fills the composer and Escape restores the draft."
@@ -442,8 +452,12 @@
         "Removing the file chip by hand dismisses the Paste as text notice."
       ],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
-      "reachNarrow": ["click button \"New\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or threads\""],
+      "reachNarrow": [
+        "click button \"Back to Threads\"",
+        "click button \"New thread\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or threads\""
+      ],
       "verification": [
         {
           "kind": "gherkin",
@@ -472,28 +486,22 @@
     },
     {
       "id": "composer-run-row",
-      "title": "Run row and meter line",
-      "summary": "A new thread shows one run row above its input: project \u00b7 host \u00b7 workspace \u00b7 agent mode \u00b7 file access \u00b7 model and account. Each segment is the owner plugin\u2019s own control placed through the composer\u2019s slots, with its jargon explained in a tooltip; defaults come from each owner: host, agent mode and model from their last choice, the workspace from the project\u2019s isolate-by-default setting. Once the thread has started the row collapses to one summary chip that leads the meter line under the input (context % \u00b7 cost and activity readings \u00b7 N queued); model and file access stay changeable in the toolbar. At phone width the row is one sideways-scrolling line.",
+      "title": "Run row, send states and meter line",
+      "summary": "A new thread carries its pre-send choices inside the composer card as quiet ghost pickers in the bottom bar: project · host · workspace · agent mode · file access after the + control, model and account beside Send. Each segment is the owner plugin’s own control placed through the composer’s slots, with its jargon explained in a tooltip; defaults come from each owner: host, agent mode and model from their last choice, the workspace from the project’s isolate-by-default setting, so a new thread with defaults needs no chip change. Send is one round button whose glyph says what a click does now (send, queue behind the running turn, steer into it, stop), with the context meter beside it. Once the thread has started the pickers collapse to one summary chip that leads the quiet meter line under the input (cost and activity readings · N queued); model and file access stay changeable in the toolbar. Below 560px the bar is one sideways-scrolling line with Send pinned, and the meter line scrolls instead of truncating.",
       "reach": [
-        "click button \"New session\"",
+        "click button \"New thread\"",
         "expect group \"Run settings\"",
-        "expect button \"Choose workspace\"",
+        "expect button \"Choose project\"",
         "expect button \"Run on Local\"",
-        "expect button \"Workspace: *\""
-      ],
-      "reachNarrow": [
-        "click button \"New\"",
-        "expect group \"Run settings\"",
-        "expect button \"Choose workspace\"",
-        "expect button \"Run on Local\"",
-        "expect button \"Workspace: *\""
+        "expect button \"Workspace: *\"",
+        "expect button \"Send message\""
       ],
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: run row above the new-thread input; summary chip on the meter line",
+      "currentSurface": "composer: pickers in the card’s bottom bar of a new thread; summary chip on the meter line",
       "configuration": [],
-      "states": ["new-thread", "started", "narrow"],
+      "states": ["new-thread", "started", "running", "narrow"],
       "failureModes": [
         "An absent segment owner drops its segment; the rest of the row still renders.",
         "A native seat that renders nothing on a blank thread (File access) leaves no empty gap."
@@ -509,19 +517,25 @@
           "kind": "unit-test",
           "id": "rich-composer.run-row-hero",
           "file": "plugins/@dshfiles/rich-composer/src/run-row.test.tsx",
-          "testName": "holds every pre-send choice in one row above the card on a new thread"
+          "testName": "holds every pre-send choice inside the card, after the + control, on a new thread"
         },
         {
           "kind": "unit-test",
           "id": "rich-composer.run-row-summary",
           "file": "plugins/@dshfiles/rich-composer/src/run-row.test.tsx",
           "testName": "collapses to a summary chip on the meter line once the thread has started"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.send-states",
+          "file": "plugins/@dshfiles/rich-composer/src/run-row.test.tsx",
+          "testName": "queues or steers a draft into a running turn, as Enter would"
         }
       ],
       "telemetry": [
         {
           "kind": "not-applicable",
-          "reason": "Client-only: the run row places other owners\u2019 controls and starts no Host work of its own."
+          "reason": "Client-only: the run row places other owners’ controls and starts no Host work of its own."
         }
       ]
     },

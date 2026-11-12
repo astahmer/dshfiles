@@ -2,7 +2,7 @@ import { expect, type Locator, type Page, type TestInfo } from '@playwright/test
 import { mkdir } from 'node:fs/promises'
 import { confirmFolderSetupStep } from './threads.js'
 
-const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
+const NEW_THREAD_COMPOSER = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
 
 /** The Session that owns the visible composer; the conversation root carries its id. */
 const composerSessionId = (page: Page): Promise<string | null> =>
@@ -27,14 +27,16 @@ export const startNewSession = async (page: Page): Promise<Locator> => {
     .first()
     .click()
   await expect.poll(() => composerSessionId(page), { timeout: 15_000 }).not.toBe(previousSession)
-  const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
+  const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER })
   await expect(composer).toBeEditable()
   return composer
 }
 
 /** M0 materializes a Host Session only after a real first submit. No step registration or profile side effects. */
 export const materializeNonblankThread = async (page: Page, prompt: string, testInfo: TestInfo): Promise<string> => {
-  const composer = page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/ })
+  const composer = page.getByRole('textbox', {
+    name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/,
+  })
   if (!(await composer.isVisible())) {
     await page
       .getByRole('button', { name: 'New thread', exact: true })
@@ -42,8 +44,8 @@ export const materializeNonblankThread = async (page: Page, prompt: string, test
       .first()
       .click()
   }
-  const chooseWorkspace = page.getByRole('button', { name: 'Choose workspace', exact: true })
-  if ((await chooseWorkspace.isVisible()) && (await chooseWorkspace.textContent())?.trim() === 'Choose workspace') {
+  const chooseWorkspace = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
+  if ((await chooseWorkspace.isVisible()) && /^Choose (?:project|workspace)$/u.test((await chooseWorkspace.textContent())?.trim() ?? '')) {
     await chooseWorkspace.click()
     const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
     await expect(picker).toBeVisible()

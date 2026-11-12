@@ -19,6 +19,8 @@
   ],
   "delta": [
     "src/native/contract/slots.ts",
+    "src/native/input/decorations.ts",
+    "src/native/input/editor/text-ref.ts",
     "src/native/contract/draft-editor.ts",
     "src/native/apply.ts",
     "src/native/locales.ts",
@@ -45,6 +47,7 @@
     "src/native/skeleton/ConversationWidthControls.tsx",
     "src/native/skeleton/ConversationRoot.module.css",
     "src/native/queue/QueueDock.tsx",
+    "src/native/queue/QueueDock.module.css",
     "src/native/service.ts",
     "src/native/draft.ts",
     "src/native/contract/snapshot.ts",
@@ -52,10 +55,12 @@
     "src/native/skeleton/ConversationHeader.tsx",
     "src/native/skeleton/TodoPanel.tsx",
     "src/native/skeleton/TodoPanel.module.css",
-    "src/native/skeleton/DefaultConversationViews.tsx",
+    "src/native/skeleton/EmptyHero.tsx",
+    "src/native/skeleton/HeroShell.module.css",
     "src/native/skeleton/control-row-layout.ts",
-    "src/native/input/decorations.ts",
-    "src/native/input/editor/text-ref.ts"
+    "src/native/skeleton/DefaultConversationViews.tsx",
+    "src/native/skeleton/ContextMeter.tsx",
+    "src/native/skeleton/ContextMeter.module.css"
   ],
   "added": [
     "src/native/conversation/live-bindings.test.ts",
@@ -72,10 +77,6 @@
     "src/native/input/machine.test.ts",
     "src/native/input/retained-send.test.ts",
     "src/native/input/retained-send.ts",
-    "src/native/skeleton/AnnotationsPill.module.css",
-    "src/native/skeleton/AnnotationsPill.tsx",
-    "src/native/skeleton/control-row-layout.test.ts",
-    "src/native/skeleton/run-row-placement.ts",
-    "src/native/skeleton/phone-thread-tools.ts"
+    "src/native/skeleton/AnnotationsPill.tsx"
   ]
 }

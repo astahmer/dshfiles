@@ -14,7 +14,7 @@ export const agentPlanSettings = defineSettings({
     failureCard: Schema.boolean().default(true).description('Add retry count, Retry and Ask to fix under turn errors and given-up model retries.'),
     compactionMeter: Schema.boolean()
       .default(true)
-      .description('Show how many tokens are left before automatic compaction, beside the context meter. Needs @dshfiles/context-compaction.'),
+      .description('Show how many tokens are left before automatic compaction in the context meter panel. Needs @dshfiles/context-compaction.'),
   }),
   applies: 'live',
 })

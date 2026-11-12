@@ -6,6 +6,7 @@ import { alternateModifierFor, primaryModifierFor } from './platform-modifier.js
 
 const collapsedSidebar = (page: Page) => page.locator('[data-sidebar-collapsed]')
 const composerInput = (page: Page) => page.getByRole('textbox').first()
+const cheatSheet = (page: Page) => page.locator('[data-shortcut-cheat-sheet]')
 
 const pressPrimaryB = async (page: Page): Promise<void> => {
   await page.keyboard.press(`${await primaryModifierFor(page)}+b`)
@@ -123,5 +124,88 @@ Then('primary+Shift+U runs {string} and primary+Shift+Y no longer does', async (
   await recordAssertion(page, 'editable-command-drops-its-default-keys', async () => expect(await runsOf(page)).toBe('0'))
   await page.keyboard.press(`${primary}+Shift+KeyU`)
   await recordAssertion(page, 'editable-command-runs-on-the-user-binding', () => expect(page.locator('body')).toHaveAttribute(RUNS_ATTRIBUTE, '1'))
+  await finishJourneyAssertions(page)
+})
+
+When(
+  '{string}, {string}, {string} and Option-J are typed into the composer',
+  async ({ page }: { page: Page }, first: string, second: string, third: string) => {
+    await page.keyboard.type(`${first}${second}`)
+    await page.keyboard.press('Shift+Slash')
+    await page.keyboard.press('Alt+KeyJ')
+    expect(third).toBe('?')
+  },
+)
+
+Then('the composer holds {string} and no shortcut ran', async ({ page }: { page: Page }, typed: string) => {
+  await recordAssertion(page, 'shortcuts-single-keys-type-in-the-composer', async () => {
+    await expect
+      .poll(async () =>
+        (
+          await composerInput(page).evaluate(element =>
+            element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement ? element.value : (element.textContent ?? ''),
+          )
+        ).includes(typed),
+      )
+      .toBe(true)
+    await expect(cheatSheet(page)).toHaveCount(0)
+  })
+})
+
+When('{string} is pressed outside any text field', async ({ page }: { page: Page }, key: string) => {
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  })
+  await page.keyboard.press(key === '?' ? 'Shift+Slash' : key)
+})
+
+Then('the keyboard shortcut sheet opens with its sections', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'shortcuts-question-mark-opens-the-sheet', async () => {
+    await expect(cheatSheet(page)).toBeVisible()
+    await expect(cheatSheet(page).getByRole('heading', { name: 'Global' })).toBeVisible()
+    await expect(cheatSheet(page).getByText('Keyboard shortcuts', { exact: true }).first()).toBeVisible()
+  })
+  await page.keyboard.press('Escape')
+  await expect(cheatSheet(page)).toHaveCount(0)
+  await finishJourneyAssertions(page)
+})
+
+When('the shortcut sheet is opened with primary+Slash', async ({ page }: { page: Page }) => {
+  await page.keyboard.press(`${await primaryModifierFor(page)}+Slash`)
+  await expect(cheatSheet(page)).toBeVisible()
+})
+
+const setSingleKeys = async (page: Page, on: boolean): Promise<void> => {
+  const toggle = cheatSheet(page).getByRole('switch', { name: 'Single-key shortcuts' })
+  await expect(toggle).toBeEnabled({ timeout: 20_000 })
+  if ((await toggle.getAttribute('aria-checked')) !== String(on)) await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-checked', String(on))
+  await page.keyboard.press('Escape')
+  await expect(cheatSheet(page)).toHaveCount(0)
+}
+
+When('single-key shortcuts are switched off in the sheet', async ({ page }: { page: Page }) => {
+  await setSingleKeys(page, false)
+})
+
+When('single-key shortcuts are switched on in the sheet', async ({ page }: { page: Page }) => {
+  await setSingleKeys(page, true)
+})
+
+Then('{string} no longer opens the shortcut sheet', async ({ page }: { page: Page }, _key: string) => {
+  await recordAssertion(page, 'shortcuts-single-keys-off-leaves-question-mark-alone', async () => {
+    await page.keyboard.press('Shift+Slash')
+    await expect(cheatSheet(page)).toHaveCount(0)
+  })
+})
+
+Then('{string} opens the shortcut sheet again', async ({ page }: { page: Page }, _key: string) => {
+  await recordAssertion(page, 'shortcuts-single-keys-on-restores-question-mark', async () => {
+    await expect(async () => {
+      await page.keyboard.press('Shift+Slash')
+      await expect(cheatSheet(page)).toBeVisible({ timeout: 2_000 })
+    }).toPass({ timeout: 15_000 })
+  })
+  await page.keyboard.press('Escape')
   await finishJourneyAssertions(page)
 })

@@ -86,7 +86,7 @@ function RosterRow({
         <SwapLine swapKey={`${agent.status}:${activityKey}`}>
           <span
             className={cn(
-              'dshx:block dshx:truncate dshx:text-[13px]',
+              'dshx:block dshx:truncate dshx:text-sm',
               agent.status === 'done' ? 'dshx:text-primary' : agent.status === 'failed' ? 'dshx:text-destructive' : 'dshx:text-muted-foreground',
             )}
           >

@@ -10,14 +10,15 @@ import { streamSSE, type SSEStreamingApi } from 'hono/streaming'
  * journey can drive real turns without a network or a subscription.
  *
  * The key decides the account: `-LIMITED` keys are rate limited on chat, `-BROKEN` keys fail the billing read,
- * `-EXHAUSTED` keys exercise quota recovery, and `-RESETTING` keys are exhausted until 5 seconds after their first turn,
+ * `-EXHAUSTED` keys exercise quota recovery, `-USED<N>` keys report N% of the weekly limit used, and `-RESETTING` keys are exhausted until 5 seconds after their first turn,
  * then answer. Every other key reports a 75%-left session window and a
  * 10%-left weekly window. A turn answers `Answered by <key suffix>` unless its latest message carries a directive:
  * `[[call TOOL {json}]]` calls any tool; `[[once call TOOL {json}]]` calls it only on its first match; `[[read PATH]]`
  * and `[[memory_search QUERY]]` call tools; `[[empty]]` settles with reasoning but no answer; `[[hold]]` keeps the
  * turn running until `releaseHeldTurns`; `[[title NAME]]` sets the thread name; `[[answer TEXT]]` returns markdown;
  * `[[fail TEXT]]` rejects the request with a non-retryable 400 carrying TEXT, so the turn ends in an error;
- * the turn after a tool result answers `Tool finished.`.
+ * the turn after a tool result answers `Tool finished.`, or TEXT when the message also carries `[[after TEXT]]`;
+ * `[[usage N]]` reports N prompt tokens on the answer, so the composer's context meter shows a chosen occupancy.
  *
  * E2E journeys start it per page; `dshx dev`'s `tool-call-thread` seed runs it as its own process.
  *
@@ -80,6 +81,8 @@ interface ToolCallDelta {
 
 /** One streamed assistant delta: text, reasoning, or tool calls. */
 interface ChatDelta {
+  /** Prompt tokens the final chunk reports as provider usage (`[[usage N]]`); not part of the streamed delta. */
+  readonly promptTokens?: number
   readonly role?: 'assistant'
   readonly content?: string | null
   readonly reasoning_content?: string
@@ -93,7 +96,8 @@ type ChatCompletionResult =
 
 let completionSequence = 0
 
-const writeStreamAnswer = async (stream: SSEStreamingApi, delta: ChatDelta, delayBetweenWordsMs = 0): Promise<void> => {
+const writeStreamAnswer = async (stream: SSEStreamingApi, input: ChatDelta, delayBetweenWordsMs = 0): Promise<void> => {
+  const { promptTokens, ...delta } = input
   const id = `fake-${String(++completionSequence).padStart(6, '0')}`
   const created = Math.floor(Date.now() / 1000)
   const chunk = (body: ChatDelta, finishReason: string | null): string =>
@@ -114,6 +118,17 @@ const writeStreamAnswer = async (stream: SSEStreamingApi, delta: ChatDelta, dela
     }
   }
   await stream.writeSSE({ data: chunk({}, delta.tool_calls === undefined ? 'stop' : 'tool_calls') })
+  if (promptTokens !== undefined)
+    await stream.writeSSE({
+      data: JSON.stringify({
+        id,
+        object: 'chat.completion.chunk',
+        created,
+        model: 'fake',
+        choices: [],
+        usage: { prompt_tokens: promptTokens, completion_tokens: 8, total_tokens: promptTokens + 8 },
+      }),
+    })
   await stream.writeSSE({ data: '[DONE]' })
 }
 
@@ -173,14 +188,17 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
   const parsedDelay = streamDirective === null ? null : Schema.decodeUnknownOption(streamDelaySchema)(Number(streamDirective[1]))
   if (parsedDelay !== null && !Option.isSome(parsedDelay)) return responseAnswer({ error: { message: 'Stream delay must be between 1 and 250 ms.' } }, 400)
   const streamDelayMs = parsedDelay !== null && Option.isSome(parsedDelay) ? parsedDelay.value : 0
-  if (last?.role === 'tool') return streamAnswer({ content: 'Tool finished.' })
+  // `[[after TEXT]]` answers TEXT after the turn's tool results, so a reply can cite a file the same turn wrote.
+  if (last?.role === 'tool') return streamAnswer({ content: /\[\[after ([\s\S]+?)\]\]/.exec(directiveText)?.[1] ?? 'Tool finished.' })
   if (directiveText.includes('[[empty]]')) return streamAnswer({ reasoning_content: 'Thinking without an answer.' })
   if (directiveText.includes('[[hold]]')) return { kind: 'held' }
   const failure = /\[\[fail ([^\]]+)\]\]/.exec(directiveText)
   if (failure?.[1] !== undefined) return responseAnswer({ error: { message: failure[1], type: 'invalid_request_error', code: 'FAKE_FAILURE' } }, 400)
 
+  const usage = /\[\[usage (\d+)\]\]/.exec(directiveText)?.[1]
+  const withUsage = (delta: ChatDelta): ChatDelta => (usage === undefined ? delta : { ...delta, promptTokens: Number(usage) })
   const answer = /\[\[answer ([\s\S]+?)\]\]/.exec(directiveText)
-  if (answer?.[1] !== undefined) return streamAnswer({ content: answer[1] }, streamDelayMs)
+  if (answer?.[1] !== undefined) return streamAnswer(withUsage({ content: answer[1] }), streamDelayMs)
 
   const calls = [...directiveText.matchAll(/\[\[(once )?call (\w+) (\{.*?\})\]\]/g)].flatMap(match => {
     const directive = match[0] ?? ''
@@ -201,7 +219,7 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
   if (search?.[1] !== undefined)
     return streamAnswer(toolCall('memory_search', JSON.stringify(search[2] === undefined ? { query: search[1] } : { query: search[1], scope: search[2] })))
 
-  return streamAnswer({ content: `Answered by ${input.key.slice(-6)}` }, streamDelayMs)
+  return streamAnswer(withUsage({ content: `Answered by ${input.key.slice(-6)}` }), streamDelayMs)
 }
 
 export const createFakeCommandCodeApp = (state: FakeCommandCodeState): Hono => {
@@ -212,7 +230,9 @@ export const createFakeCommandCodeApp = (state: FakeCommandCodeState): Hono => {
     if (key.endsWith('-BROKEN')) return context.json({ error: 'billing unavailable' }, 503)
     const quotaResetsAt = state.quotaResetsAt.get(key)
     const resetting = quotaResetsAt !== undefined && Date.now() < quotaResetsAt
-    const weeklyUsed = key.endsWith('-EXHAUSTED') || resetting ? 100 : 90
+    // `-USED<N>` keys report N% of the weekly limit used, so a scratch can show accounts at chosen levels (b:4v6p).
+    const chosen = /-USED(\d{1,3})$/u.exec(key)?.[1]
+    const weeklyUsed = key.endsWith('-EXHAUSTED') || resetting ? 100 : chosen === undefined ? 90 : Math.min(100, Number(chosen))
     return context.json({
       windowLimits: {
         fiveHour: { used: 25, cap: 100, resetAt: Date.now() + HOUR_MS },

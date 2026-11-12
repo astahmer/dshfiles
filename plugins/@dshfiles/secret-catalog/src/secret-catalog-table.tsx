@@ -41,7 +41,7 @@ const useSecretRowActions = (): SecretRowActions => {
 
 const NameCell = memo((props: { readonly row: SecretMetadata }): JSX.Element => (
   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
-    <span className="dshx:truncate dshx:font-mono dshx:text-[13px] dshx:font-semibold" title={props.row.variableName}>
+    <span className="dshx:truncate dshx:font-mono dshx:text-sm dshx:font-semibold" title={props.row.variableName}>
       {props.row.variableName}
     </span>
     <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">

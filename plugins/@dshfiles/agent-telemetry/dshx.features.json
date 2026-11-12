@@ -8,7 +8,7 @@
       "summary": "Each DSH turn becomes enter_ai_application_system → invoke_agent <agent> → react step → chat <model> and execute_tool <tool> spans with the GenAI semantic-convention attributes LoongSuite emitted (gen_ai.*, dsh.session.id/turn/step), exported through dshx tracing to the OTLP endpoint or the traces plugin's in-process receiver. Spans are no-ops until a destination exists; no launch environment gates the row.",
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[once call ai_accounts_native_providers {}]] [[once call subagent {\\\"description\\\":\\\"Child trace\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022echo child-trace\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Child trace\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+        "fill textbox \"commands, @ files or threads*\" \"[[once call ai_accounts_native_providers {}]] [[once call subagent {\\\"description\\\":\\\"Child trace\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022echo child-trace\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Child trace\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
         "press Enter",
         "expect text \"Child trace*\"",
         "click button \"Traces\"",
@@ -323,7 +323,12 @@
       "id": "span-cost",
       "title": "List-price cost on model spans",
       "summary": "Each chat span with token usage carries dshx.cost.usd and dshx.cost.price_id, and invoke_agent the sum of its turn's calls, priced from AI Accounts' models.dev catalog and account kinds by the same pricing code as the usage ledger. An unpriced route leaves the attribute off.",
-      "reach": ["seed tool-call-thread", "click tab \"Traces\"", "expect region \"Thread telemetry summary\""],
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"More thread actions\"",
+        "click menuitem \"Open Traces\"",
+        "expect region \"Thread telemetry summary\""
+      ],
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",

@@ -186,7 +186,7 @@ export const StartPage = (props: StartPageProps): ReactElement => {
                           <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-[3px]">
                             <span className="dshx:truncate dshx:text-sm dshx:leading-[1.4]">{suggestion.title}</span>
                             {suggestion.description === undefined ? null : (
-                              <span className="dshx:truncate dshx:text-[11px] dshx:leading-[1.4] dshx:text-(--dsw-alias-label-tertiary)">
+                              <span className="dshx:truncate dshx:text-2xs dshx:leading-[1.4] dshx:text-(--dsw-alias-label-tertiary)">
                                 {suggestion.description}
                               </span>
                             )}

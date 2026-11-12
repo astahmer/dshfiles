@@ -20,6 +20,10 @@
       "types": "./src/attention-openers.ts",
       "default": "./dist/attention-openers.js"
     },
+    "./quick-replies": {
+      "types": "./src/quick-replies.ts",
+      "default": "./dist/quick-replies.js"
+    },
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
@@ -51,6 +55,7 @@
     "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
+    "@deepseek-ai/dsh-host-webserver": "catalog:",
     "@deepseek-ai/dsh-storage": "catalog:",
     "@deepseek-ai/dsh-storage-domain": "catalog:",
     "@deepseek-ai/dsh-storage-json": "catalog:",

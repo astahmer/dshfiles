@@ -41,6 +41,8 @@
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
     "@deepseek-ai/dsh-agent": "catalog:",
+    "@deepseek-ai/dsh-api-session-controller": "catalog:",
+    "@deepseek-ai/dsh-api-workspace-controller": "catalog:",
     "@deepseek-ai/dsh-client-connection": "catalog:",
     "@deepseek-ai/dsh-client-locale": "catalog:",
     "@deepseek-ai/dsh-client-ui-settings": "catalog:",
@@ -71,6 +73,8 @@
     "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
     "@deepseek-ai/dsh-agent": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-api-session-controller": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-api-workspace-controller": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-connection": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-locale": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.2",
@@ -94,6 +98,8 @@
     "client": {
       "platform": "web",
       "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-api-workspace-controller",
         "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-settings",

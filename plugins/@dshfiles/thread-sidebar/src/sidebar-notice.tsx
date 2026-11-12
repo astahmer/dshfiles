@@ -4,7 +4,8 @@ import { XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 export interface SidebarNotice {
-  readonly tone: 'danger' | 'warning' | 'success'
+  /** `neutral` is a plain card: an agent's own message carries no status of its own. */
+  readonly tone: 'danger' | 'warning' | 'success' | 'neutral'
   readonly message: string
   readonly actionLabel?: string
   readonly onAction?: () => void
@@ -117,7 +118,7 @@ export const SidebarNoticeAlert = (props: {
     ) : null
   return (
     <Alert
-      variant={props.notice.tone === 'danger' ? 'destructive' : props.notice.tone}
+      variant={props.notice.tone === 'danger' ? 'destructive' : props.notice.tone === 'neutral' ? 'default' : props.notice.tone}
       className={cn(
         props.className,
         props.transient &&

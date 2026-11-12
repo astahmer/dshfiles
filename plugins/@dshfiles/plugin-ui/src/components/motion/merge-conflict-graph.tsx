@@ -199,7 +199,7 @@ function TargetRow({
         <CheckIcon className="dshx:size-2.5" strokeWidth={3.5} />
       </span>
     ) : (
-      <span className="dshx:flex dshx:size-3.5 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-warning dshx:text-[9px] dshx:font-bold dshx:text-background">
+      <span className="dshx:flex dshx:size-3.5 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-warning dshx:text-2xs dshx:font-bold dshx:text-background">
         !
       </span>
     )
@@ -284,7 +284,7 @@ function RevisionRow({
         {revision.bookmark ? (
           <span
             className={cn(
-              'dshx:shrink-0 dshx:rounded dshx:px-1 dshx:py-px dshx:font-mono dshx:text-[10.5px] dshx:@max-pane-narrow:hidden',
+              'dshx:shrink-0 dshx:rounded dshx:px-1 dshx:py-px dshx:font-mono dshx:text-2xs dshx:@max-pane-narrow:hidden',
               revision.muted ? laneChip.muted : laneChip[tone],
             )}
           >
@@ -298,7 +298,7 @@ function RevisionRow({
                 <TriangleAlertIcon role="img" aria-label="Conflict" className="dshx:size-3.5 dshx:text-warning" />
               ) : (
                 <span
-                  className="dshx:rounded dshx:bg-warning/15 dshx:px-1 dshx:text-[10.5px] dshx:font-medium dshx:text-warning"
+                  className="dshx:rounded dshx:bg-warning/15 dshx:px-1 dshx:text-2xs dshx:font-medium dshx:text-warning"
                   aria-label={`${revision.conflicts} conflicts`}
                 >
                   {revision.conflicts}
@@ -321,7 +321,7 @@ function RevisionRow({
         </span>
       ) : (
         <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-          <span className="dshx:font-mono dshx:text-[11px] dshx:@max-pane-narrow:hidden">{revision.hash}</span>
+          <span className="dshx:font-mono dshx:text-2xs dshx:@max-pane-narrow:hidden">{revision.hash}</span>
           {revision.author || revision.age ? (
             <span>
               {revision.author ? (

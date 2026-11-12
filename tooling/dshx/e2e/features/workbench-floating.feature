@@ -3,7 +3,7 @@ Feature: Window-wide floating panels from root Workbench panes
   @scenario:workbench.window-wide-floating
   Scenario: A real Threads tab floated from the left pane can move beyond that pane and dock elsewhere
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
-    And the sidebar uses Settings › Layout › Free docking
+    And the sidebar keeps the former Free docking panes
     When the real left Threads tab is floated from its context menu
     And its floating titlebar is dragged over the centre of the window
     Then the floating Threads body is visible and interactive outside the left pane without remounting
@@ -14,6 +14,7 @@ Feature: Window-wide floating panels from root Workbench panes
   @scenario:workbench.floating-overlap-order
   Scenario: Overlapping native floating windows keep their own chrome content and draft ordering
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar keeps the former Free docking panes
     When the real left Threads tab is floated from its context menu
     And its floating titlebar is dragged over the centre of the window
     Then the floating Threads body is visible and interactive outside the left pane without remounting
@@ -24,6 +25,7 @@ Feature: Window-wide floating panels from root Workbench panes
   @scenario:workbench.floating-source-offset
   Scenario: A right-pane float follows native content coordinates when its source origin moves
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar keeps the former Free docking panes
     When the unified right pane is revealed from the main Pane options
     And a Scratchpad view in the right pane receives a draft
     And the real right Scratchpad tab is floated from its context menu

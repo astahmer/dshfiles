@@ -2,7 +2,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { Button, IconPlusOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
+import { PlusIcon, SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
 import type { TerminalViewState, TerminalView } from '@deepseek-ai/dsh-api-terminal-controller/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
@@ -31,16 +32,14 @@ export function TerminalBody({ useTabInfo, useTerminal, useTheme, view, t, addEx
   useEffect(() => model.mount(), [model])
   if (state === undefined) return null
   const newTerminal = <Button variant="primary" size={state.issue === 'missingTerminal' ? 'md' : 'sm'}
-    icon={<span className={css.actionIcon} aria-hidden="true"><IconPlusOutlineRegular /></span>}
+    icon={<span className={css.actionIcon} aria-hidden="true"><PlusIcon size={16} strokeWidth={1.5} /></span>}
     onClick={() => { tab.actions.openTab('terminal', { replaceTab: true }) }}>
     {t('new')}
   </Button>
   if (state.issue === 'missingTerminal') return <section className={css.root} data-sidebar-terminal>
     <div className={css.empty}>
-      <svg width="36" height="36" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-        <rect x="3" y="5" width="22" height="19" rx="3" fill="#17191d" />
-        <path d="m8 10 4 4-4 4M15 18h5" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+      {/* dshfiles: lucide's terminal glyph in muted ink instead of a hard-coded dark tile (one icon family, theme colours). */}
+      <SquareTerminalIcon aria-hidden size={36} strokeWidth={1.25} className={css.emptyIcon} />
       <p className={css.emptyMessage} role="alert">{t('missingTerminal')}</p>
       {newTerminal}
     </div>

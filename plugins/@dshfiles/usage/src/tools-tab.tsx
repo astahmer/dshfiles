@@ -37,18 +37,18 @@ const ShareBar = (props: { readonly label: string; readonly detail: string; read
 )
 
 const Tile = (props: { readonly label: string; readonly value: string; readonly detail?: ReactNode }): JSX.Element => (
-  <div className="dshx:rounded-md dshx:border dshx:border-border dshx:px-3 dshx:py-2">
+  <div className="dshx:py-1">
     <dt className="dshx:text-xs dshx:text-muted-foreground">{props.label}</dt>
     <dd className="dshx:mt-0.5 dshx:text-base dshx:font-semibold dshx:tabular-nums">{props.value}</dd>
-    {props.detail === undefined ? null : <dd className="dshx:mt-0.5 dshx:text-[11px] dshx:text-muted-foreground">{props.detail}</dd>}
+    {props.detail === undefined ? null : <dd className="dshx:mt-0.5 dshx:text-2xs dshx:text-muted-foreground">{props.detail}</dd>}
   </div>
 )
 
 const Panel = (props: { readonly title: string; readonly description?: string; readonly children: ReactNode }): JSX.Element => (
-  <section className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:p-3">
+  <section className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:pt-4">
     <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2">
       <h3 className="dshx:text-sm dshx:font-semibold">{props.title}</h3>
-      {props.description === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{props.description}</span>}
+      {props.description === undefined ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.description}</span>}
     </div>
     {props.children}
   </section>
@@ -297,7 +297,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
               ))}
           </ol>
         )}
-        <p className="dshx:text-[11px] dshx:text-muted-foreground">
+        <p className="dshx:text-2xs dshx:text-muted-foreground">
           Only the size of a tool result is recorded (text characters), never its content; a call with no result size predates this measurement.
         </p>
       </Panel>
@@ -411,7 +411,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
             </table>
           </div>
         )}
-        <p className="dshx:text-[11px] dshx:text-muted-foreground">
+        <p className="dshx:text-2xs dshx:text-muted-foreground">
           Arguments, outputs, commands, paths and raw errors are never copied into this report. Times are wall clock and parallel calls can overlap.
         </p>
       </Panel>

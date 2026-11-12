@@ -103,32 +103,36 @@ export class ConversationWorkbenchSources {
     const registrations = new Map<string, { readonly definition: WorkbenchPanelDefinition; readonly dispose: () => void }>()
     const panelIds = new Map<string, string>()
 
+    /** One view of one thread, rendered through the authorized `conversation.session` declarer (no composer). */
+    const ViewPanel = ({ sessionId, viewId }: { readonly sessionId: SessionId; readonly viewId: string }): ReactNode => {
+      const capability = useSyncExternalStore(subscribe, snapshot, snapshot)
+      const [state, setState] = useState<{ readonly reference: SessionReference } | { readonly error: string }>()
+      useLayoutEffect(() => {
+        let active = true
+        let reference: SessionReference | undefined
+        try {
+          reference = ports.retain(sessionId)
+          // SessionProvider owns acquisition/settling. Never borrow its private binding here.
+          setState({ reference })
+          void reference.ready.catch(() => {
+            if (active) setState({ error: 'Thread unavailable. Close and reopen this panel to retry.' })
+          })
+        } catch {
+          setState({ error: 'Thread unavailable. Close and reopen this panel to retry.' })
+        }
+        return () => {
+          active = false
+          reference?.release()
+        }
+      }, [sessionId])
+      if (state !== undefined && 'error' in state) return <div role="alert">{state.error}</div>
+      if (capability === undefined || state === undefined || state.reference.sessionId !== sessionId) return <div role="status">Loading thread view…</div>
+      const Provider = capability.SessionProvider
+      return <Provider session={state.reference}>{capability.renderSlot(WORKBENCH_VIEW_SLOT, { viewId })}</Provider>
+    }
     const componentFor = (sessionId: SessionId, viewId: string): WorkbenchPanelDefinition['component'] =>
       function ConversationViewPanel() {
-        const capability = useSyncExternalStore(subscribe, snapshot, snapshot)
-        const [state, setState] = useState<{ readonly reference: SessionReference } | { readonly error: string }>()
-        useLayoutEffect(() => {
-          let active = true
-          let reference: SessionReference | undefined
-          try {
-            reference = ports.retain(sessionId)
-            // SessionProvider owns acquisition/settling. Never borrow its private binding here.
-            setState({ reference })
-            void reference.ready.catch(() => {
-              if (active) setState({ error: 'Conversation unavailable. Close and reopen this panel to retry.' })
-            })
-          } catch {
-            setState({ error: 'Conversation unavailable. Close and reopen this panel to retry.' })
-          }
-          return () => {
-            active = false
-            reference?.release()
-          }
-        }, [])
-        if (state !== undefined && 'error' in state) return <div role="alert">{state.error}</div>
-        if (capability === undefined || state === undefined) return <div role="status">Loading conversation view…</div>
-        const Provider = capability.SessionProvider
-        return <Provider session={state.reference}>{capability.renderSlot(WORKBENCH_VIEW_SLOT, { viewId })}</Provider>
+        return <ViewPanel sessionId={sessionId} viewId={viewId} />
       }
 
     // One panel per session × view: workbench listeners re-read every source per notification, so the whole pass is
@@ -167,6 +171,7 @@ export class ConversationWorkbenchSources {
     const disposeViews = ports.views.subscribe(sync)
     sync()
     return {
+      ViewPanel,
       // Root assembly supplies only its own legal child renderer and Provider. It never caches occurrence hooks.
       Root: (props: AuthorizedViews): ReactNode => {
         const { renderSlot, SessionProvider } = props

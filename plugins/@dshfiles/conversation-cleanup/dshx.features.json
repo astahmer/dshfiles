@@ -4,19 +4,19 @@
   "features": [
     {
       "id": "conversation-cleanup",
-      "title": "Permanently clean up settled or archived conversations",
-      "summary": "Preview cold local settled OR archived conversations, confirm the exact snapshot, and permanently delete their JSONL generations under native exclusive write leases. Loaded sessions and historical formats needing migration are protected. No automatic cleanup, restart or remote deletion.",
+      "title": "Permanently clean up done or archived threads",
+      "summary": "Preview cold local done (settled) OR archived threads, listed by title, confirm the exact snapshot, and permanently delete their JSONL generations under native exclusive write leases. Loaded threads and historical formats needing migration are protected. No automatic cleanup, restart or remote deletion.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
-        "click button \"Conversation cleanup\"",
+        "click button \"Thread cleanup\"",
         "click button \"Preview cleanup\"",
-        "expect text \"Conversations to delete\""
+        "expect text \"Threads to delete\""
       ],
       "surfaces": ["client", "host", "settings", "api", "tool"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "Settings: Conversation cleanup",
+      "currentSurface": "Settings: Thread cleanup",
       "configuration": [],
       "states": ["preview", "confirmation", "deleted", "skipped", "failed"],
       "failureModes": [

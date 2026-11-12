@@ -6,12 +6,15 @@
   flex: none;
 }
 
+/* Composer redesign (b:v9yh): a ring without text in a 28px square, beside Send. */
 .trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   flex: none;
-  padding: 1px 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: none;
   border-radius: var(--dsw-radius-sm);
   background: transparent;
@@ -38,9 +41,17 @@
 
 .fill {
   fill: none;
-  stroke: var(--dsw-alias-label-tertiary);
+  stroke: var(--dsw-alias-label-secondary);
   stroke-width: 2;
   stroke-linecap: round;
+}
+
+.trigger[data-context-tone='warn'] .fill {
+  stroke: var(--dsw-alias-state-warn-primary);
+}
+
+.trigger[data-context-tone='danger'] .fill {
+  stroke: var(--dsw-alias-state-error-primary);
 }
 
 .panel {
@@ -151,4 +162,19 @@
   margin: 0;
   font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-primary);
+}
+
+/* dshfiles (b:ysaj): readings other plugins add (compaction distance), below a hairline. */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.detail:empty,
+.detail:has(> [data-seat]:empty) {
+  display: none;
 }

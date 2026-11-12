@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PREFERENCES } from './organization.js'
 import { storedPreferences } from './preferences.js'
 import { registerSidebarWorkbenchPanels } from './workbench-panels.js'
+import { SidebarDockHost } from './sidebar-dock-host.js'
 import type { sidebarChildren } from './sidebar-contract.js'
 
 afterEach(() => {
@@ -103,7 +104,7 @@ describe('sidebar workbench panels', () => {
         expect(section.classList.contains('dshx:py-1')).toBe(true)
         expect(section.classList.contains('dshx:px-3')).toBe(true)
         expect(section.classList.contains('dshx:p-3')).toBe(false)
-      } else if (definition.id === 'dshfiles-thread-sidebar.workbench-navigation') {
+      } else if (definition.id === 'dshfiles-thread-sidebar.workbench-navigation' || definition.id === 'dshfiles-thread-sidebar.workbench-sidebar') {
         expect(section.classList.contains('dshx:p-3')).toBe(false)
       } else {
         expect(section.classList.contains('dshx:p-3')).toBe(true)
@@ -112,23 +113,36 @@ describe('sidebar workbench panels', () => {
     }
     source.dispose()
   })
-  it('registers the four real sidebar assemblies and disposes exactly its own entries', () => {
+  it('registers the five real sidebar assemblies, the one sidebar pane first, and disposes exactly its own entries', () => {
     const source = setup()
-    expect(source.registry.list().map(panel => panel.title)).toEqual([
-      'Thread Sidebar: Threads',
-      'Thread Sidebar: Plugin previews',
-      'Thread Sidebar: Plugin controls',
-      'Thread Sidebar: Navigation',
-    ])
-    expect(source.decorate).toHaveBeenCalledTimes(4)
+    expect(source.registry.list().map(panel => panel.title)).toEqual(['Sidebar', 'Threads', 'Sidebar previews', 'Sidebar controls', 'Navigation'])
+    expect(source.decorate).toHaveBeenCalledTimes(5)
     source.registry.register({ id: 'unrelated', title: 'Unrelated', component: () => null })
     source.dispose()
     expect(source.registry.list().map(panel => panel.id)).toEqual(['unrelated'])
   })
 
+  it('lends the visible Sidebar pane’s element to the root and refuses an ordinary close (b:952m)', () => {
+    const source = setup()
+    const definition = source.registry.get('dshfiles-thread-sidebar.workbench-sidebar')
+    if (definition === undefined) throw new Error('Sidebar pane missing')
+    const Panel = definition.component
+    const view = render(<Panel panelId={definition.id} />)
+    const lent = SidebarDockHost.get()
+    expect(lent?.getAttribute('data-sidebar-dock-host')).toBe('')
+    view.rerender(<Panel panelId={definition.id} visible={false} />)
+    expect(SidebarDockHost.get()).toBeNull()
+    view.rerender(<Panel panelId={definition.id} />)
+    expect(SidebarDockHost.get()).not.toBeNull()
+    view.unmount()
+    expect(SidebarDockHost.get()).toBeNull()
+    expect(() => definition.beforeClose?.()).toThrow(/Reset layout/u)
+    source.dispose()
+  })
+
   it('delegates the workspaces slot with genuine wide and expansion owner props', () => {
     const source = setup()
-    const definition = source.registry.list().find(panel => panel.title === 'Thread Sidebar: Threads')
+    const definition = source.registry.list().find(panel => panel.title === 'Threads')
     if (definition === undefined) throw new Error('Threads source missing')
     const Panel = definition.component
     render(<Panel panelId={definition.id} />)
@@ -187,7 +201,7 @@ describe('sidebar workbench panels', () => {
 
   it('retains footer contributions as the actual declared slots with their real owner shares', () => {
     const source = setup()
-    for (const title of ['Thread Sidebar: Plugin previews', 'Thread Sidebar: Plugin controls']) {
+    for (const title of ['Sidebar previews', 'Sidebar controls']) {
       const definition = source.registry.list().find(panel => panel.title === title)
       if (definition === undefined) throw new Error('Footer source missing')
       const Panel = definition.component
@@ -205,10 +219,10 @@ describe('sidebar workbench panels', () => {
       { name: 'root', children: { 'sidebar.footer.above': { kind: 'list', scope: 'root' }, 'sidebar.footer.action': { kind: 'list', scope: 'root' } } },
       ({ renderSlot }) => renderSlot('sidebar.footer.above', {}),
     )
-    let previewLabel = 'AI Accounts: Preview'
+    let previewLabel = 'Quota'
     const releasePreview = slots.register({ name: 'sidebar.footer.above', id: 'ai-accounts-usage-strip', label: () => previewLabel }, () => null)
-    const releaseMenu = slots.register({ name: 'sidebar.footer.action', id: 'ai-accounts-quota', label: 'AI Accounts: Usage menu' }, () => null)
-    const releaseEdge = slots.register({ name: 'sidebar.footer.action', id: 'ai-accounts-edge', label: 'AI Accounts: Edge preview' }, () => null)
+    const releaseMenu = slots.register({ name: 'sidebar.footer.action', id: 'ai-accounts-quota', label: 'Usage menu' }, () => null)
+    const releaseEdge = slots.register({ name: 'sidebar.footer.action', id: 'ai-accounts-edge', label: 'Quota edge preview' }, () => null)
     const locale = createSnapshotStore(0)
     const unsubscribe = vi.fn()
     const source = setup({
@@ -225,25 +239,25 @@ describe('sidebar workbench panels', () => {
     const actionsId = 'dshfiles-thread-sidebar.workbench-actions'
     const definition = source.registry.get(statusId)
     if (definition === undefined) throw new Error('Preview source missing')
-    expect(definition.title).toBe('AI Accounts: Preview')
-    expect(source.registry.get(actionsId)?.title).toBe('AI Accounts: Controls')
+    expect(definition.title).toBe('Quota')
+    expect(source.registry.get(actionsId)?.title).toBe('Sidebar controls')
     const Panel = definition.component
     const view = render(<Panel panelId={statusId} />)
-    const section = screen.getByRole('region', { name: 'AI Accounts: Preview' })
+    const section = screen.getByRole('region', { name: 'Quota' })
     await act(async () => {
       await Promise.resolve()
     })
     const notify = vi.fn()
     const stopWatching = source.registry.subscribe(notify)
     act(() => {
-      previewLabel = 'AI Accounts: Aperçu'
+      previewLabel = 'Quota (aperçu)'
       locale.set(1)
     })
     const updated = source.registry.get(statusId)
-    expect(updated?.title).toBe('AI Accounts: Aperçu')
+    expect(updated?.title).toBe('Quota (aperçu)')
     expect(updated?.component).toBe(Panel)
-    expect(screen.getByRole('region', { name: 'AI Accounts: Aperçu' })).toBe(section)
-    expect(source.decorate).toHaveBeenCalledTimes(4)
+    expect(screen.getByRole('region', { name: 'Quota (aperçu)' })).toBe(section)
+    expect(source.decorate).toHaveBeenCalledTimes(5)
     expect(notify).toHaveBeenCalledTimes(1)
     act(() => locale.set(2))
     expect(notify).toHaveBeenCalledTimes(1)
@@ -251,7 +265,7 @@ describe('sidebar workbench panels', () => {
       releasePreview()
       await Promise.resolve()
     })
-    expect(source.registry.get(statusId)?.title).toBe('Thread Sidebar: Plugin previews')
+    expect(source.registry.get(statusId)?.title).toBe('Sidebar previews')
     expect(source.registry.get(statusId)?.component).toBe(Panel)
     stopWatching()
     view.unmount()
@@ -273,13 +287,13 @@ describe('sidebar workbench panels', () => {
   })
 
   it.each([
-    { labels: ['AI Accounts: Preview', 'AI Accounts: Another preview'], preview: 'AI Accounts: Previews', controls: 'AI Accounts: Controls' },
-    { labels: ['AI Accounts: Preview', 'Other Plugin: Preview'], preview: 'Thread Sidebar: Plugin previews', controls: 'Thread Sidebar: Plugin controls' },
-    { labels: ['AI Accounts: Preview', ''], preview: 'Thread Sidebar: Plugin previews', controls: 'Thread Sidebar: Plugin controls' },
-    { labels: ['Preview'], preview: 'Thread Sidebar: Plugin previews', controls: 'Thread Sidebar: Plugin controls' },
-    { labels: ['AI Accounts:'], preview: 'Thread Sidebar: Plugin previews', controls: 'Thread Sidebar: Plugin controls' },
-    { labels: [': Preview'], preview: 'Thread Sidebar: Plugin previews', controls: 'Thread Sidebar: Plugin controls' },
-  ])('groups declared qualified prefixes without guessing ownership: $labels', ({ labels, preview, controls }) => {
+    { labels: ['Quota', 'Another preview'], preview: 'Sidebar previews', controls: 'Sidebar controls' },
+    { labels: ['Quota', ''], preview: 'Sidebar previews', controls: 'Sidebar controls' },
+    { labels: ['Quota'], preview: 'Quota', controls: 'Quota' },
+    { labels: ['AI Accounts: Preview'], preview: 'Preview', controls: 'Preview' },
+    { labels: ['AI Accounts:'], preview: 'Sidebar previews', controls: 'Sidebar controls' },
+    { labels: [''], preview: 'Sidebar previews', controls: 'Sidebar controls' },
+  ])('names a footer pane after its sole contributor, never after a plugin: $labels', ({ labels, preview, controls }) => {
     const source = setup()
     source.footerLabels.set({ 'sidebar.footer.above': labels, 'sidebar.footer.action': labels })
     expect(source.registry.get('dshfiles-thread-sidebar.workbench-status')?.title).toBe(preview)
@@ -359,7 +373,7 @@ describe('sidebar workbench panels', () => {
 
   it('renders a live empty Navigation assembly without inventing main identities', () => {
     const source = setup()
-    const definition = source.registry.list().find(panel => panel.title === 'Thread Sidebar: Navigation')
+    const definition = source.registry.list().find(panel => panel.title === 'Navigation')
     if (definition === undefined) throw new Error('Navigation source missing')
     const Panel = definition.component
     render(<Panel panelId={definition.id} />)

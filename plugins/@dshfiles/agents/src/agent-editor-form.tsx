@@ -236,7 +236,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
                   variant={draft.glyph === glyph ? 'secondary' : 'ghost'}
                   aria-label={`Use glyph ${glyph}`}
                   aria-pressed={draft.glyph === glyph}
-                  className="dshx:text-[15px]"
+                  className="dshx:text-base"
                   onClick={() => patch({ glyph })}
                 >
                   {glyph}

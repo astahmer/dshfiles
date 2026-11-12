@@ -5,7 +5,7 @@
     {
       "id": "one-shared-stylesheet",
       "title": "One shared plugin stylesheet",
-      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner.",
+      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner. The same sheet carries the generated default visual-refresh theme block (the first paint) (warm-stone palette, accent, status trios, radii, Shiki colours) that retunes the Host --dsw-* variables for native and plugin surfaces alike.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -28,6 +28,97 @@
         {
           "kind": "not-applicable",
           "reason": "Client-only: One shared plugin stylesheet renders browser state and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "appearance-theme",
+      "title": "Appearance theme: presets, palette and fonts",
+      "summary": "Settings \u203a General \u203a Appearance picks a colour preset (Warm stone default, Neutral, High contrast, Slate blue, Moss), optional hue, tint, accent and contrast overrides, and the UI and code fonts. The client regenerates the palette with the plugin-ui generator and injects it over the static first-paint theme only when it differs from the default, so native core surfaces (--dsw-* remap) and plugins follow at once in light and dark; theme_get reads it and theme_set changes or resets it.",
+      "onboarding": {
+        "firstAction": "Open Settings › General › Appearance and pick a preset, or change the accent and the interface font.",
+        "doneWhen": "The whole app takes the new colours and fonts at once, light and dark."
+      },
+      "reach": [
+        "click button \"Account menu\"",
+        "click menuitem \"Settings*\"",
+        "click button \"Appearance\"",
+        "expect text \"Colour preset for every surface*\""
+      ],
+      "surfaces": ["client", "host", "settings", "tool"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "Settings \u203a General \u203a Appearance; agent tools theme_get / theme_set",
+      "configuration": [
+        {
+          "key": "preset",
+          "defaultValue": "warm-stone",
+          "constraints": "warm-stone, neutral, high-contrast, slate-blue or moss.",
+          "coveredBy": ["ui-styles.appearance-defaults", "ui-styles.appearance-aa"]
+        },
+        {
+          "key": "greyHue / greyTint / accentHue / contrast",
+          "defaultValue": "empty (the preset's value)",
+          "constraints": "hue and accentHue 0\u2013360, chroma 0\u20130.03, contrast 1\u20131.5; every corner keeps WCAG AA text.",
+          "coveredBy": ["ui-styles.appearance-bounds", "ui-styles.appearance-aa"]
+        },
+        {
+          "key": "interfaceFont / codeFont",
+          "defaultValue": "geist / geist-mono",
+          "constraints": "geist or system; geist-mono or system. A family typed in Settings \u203a Font still wins.",
+          "coveredBy": ["ui-styles.appearance-defaults"]
+        }
+      ],
+      "states": ["default-static", "custom-injected", "cached-before-settings", "host-without-namespace"],
+      "failureModes": [
+        "A Host started before the Appearance settings existed reports the namespace unregistered; the client keeps the static default and injects nothing.",
+        "localStorage is unavailable (private mode, quota); the theme still applies, only a reload briefly shows the default until the settings mirror answers."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ui-styles.appearance-preset",
+          "featureFile": "tooling/dshx/e2e/features/ui-styles.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ui-styles.theme-agent-tools",
+          "featureFile": "tooling/dshx/e2e/features/ui-styles.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ui-styles.appearance-aa",
+          "file": "plugins/@dshfiles/plugin-ui/tests/appearance.test.ts",
+          "testName": "keeps AA at the corners of the custom bounds (%s)"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ui-styles.appearance-defaults",
+          "file": "plugins/@dshfiles/ui-styles/tests/appearance.test.ts",
+          "testName": "defaults to the static first-paint theme (warm stone, Geist, Geist Mono)"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ui-styles.appearance-bounds",
+          "file": "plugins/@dshfiles/ui-styles/tests/appearance.test.ts",
+          "testName": "refuses overrides outside the AA-tested bounds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ui-styles.theme-tool-round-trip",
+          "file": "plugins/@dshfiles/ui-styles/tests/appearance.test.ts",
+          "testName": "round-trips get \u2192 set \u2192 reset through the Host settings service"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },

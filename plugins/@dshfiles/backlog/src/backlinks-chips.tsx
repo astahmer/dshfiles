@@ -1,8 +1,7 @@
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import type { RevisionSectionTarget } from '@dshfiles/jj-integration/revision-sections'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import type { ThreadMenuSectionProps } from '@dshfiles/thread-sidebar/thread-menu-sections'
 import { ClipboardListIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 
@@ -58,35 +57,34 @@ export const RevisionBacklinks = (props: RevisionSectionTarget): JSX.Element | n
   )
 }
 
-/** Backlog items that link to a thread, as one count chip in its header that lists them. */
-export const ThreadBacklinks = (props: { readonly sessionId: string }): JSX.Element | null => {
+/**
+ * Backlog items that link to a thread, as one "Linked backlog items (N)" submenu of the thread header's `⋯`
+ * (thread-sidebar's ThreadMenuSections, b:ysaj): upstream's indigo count chip in the header row spent the accent on
+ * something that does not need the user. Choosing an item opens it in Backlog.
+ */
+export const ThreadBacklinks = (props: ThreadMenuSectionProps & { readonly openItem: (id: string | number) => void }): JSX.Element | null => {
   const items = useBacklinks([{ type: 'thread', target: props.sessionId }])
   if (items.length === 0) return null
-  const label = items.length === 1 ? '1 backlog item links here' : `${String(items.length)} backlog items link here`
+  const { Item, Sub, SubTrigger, SubContent } = props
+  const label = `Linked backlog items (${String(items.length)})`
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          aria-label={label}
-          className="dshx-root dshx:gap-1 dshx:text-info"
-          data-dshfiles-backlog-backlinks="thread"
-          size="xs"
-          type="button"
-          variant="ghost"
-        >
-          <ClipboardListIcon aria-hidden />
-          {items.length}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        // Focusing the first chip would open its preview card while the popover is still moving into place.
-        onOpenAutoFocus={event => event.preventDefault()}
-        className="dshx:flex dshx:w-80 dshx:max-w-[calc(100vw-2rem)] dshx:flex-col dshx:gap-2 dshx:p-3 dshx:text-xs"
-      >
-        <span className="dshx:text-muted-foreground">{label}</span>
-        <BacklinkChipList items={items} />
-      </PopoverContent>
-    </Popover>
+    <Sub>
+      <SubTrigger>
+        <span className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-2" data-dshfiles-backlog-backlinks="thread">
+          <ClipboardListIcon aria-hidden className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+          <span className="dshx:truncate">{label}</span>
+        </span>
+      </SubTrigger>
+      <SubContent aria-label={label}>
+        {items.map(item => (
+          <Item key={item.id} onSelect={() => props.openItem(item.id)}>
+            <span className="dshx:flex dshx:min-w-0 dshx:flex-col" data-dshfiles-backlog-backlink={BacklogReference.refOf(item)}>
+              <span className="dshx:truncate">{item.title}</span>
+              <span className="dshx:text-xs dshx:text-muted-foreground">{BacklogReference.label(BacklogReference.refOf(item))}</span>
+            </span>
+          </Item>
+        ))}
+      </SubContent>
+    </Sub>
   )
 }

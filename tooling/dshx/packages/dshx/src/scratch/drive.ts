@@ -93,8 +93,13 @@ const locate = (page: Page, by: string, rawName: string) => {
   if (by === 'text') return page.getByText(name, { exact }).filter({ visible: true }).first()
   if (by === 'label') return page.getByLabel(name, { exact }).first()
   if (by === 'title') return page.getByTitle(name, { exact }).first()
+  // The same holds for controls: a thread's composer stays mounted while hidden, so its More button would otherwise
+  // be the first match for a reach in the visible composer.
   // SAFETY: the catalog grammar admits any lowercase word; Playwright rejects an unknown ARIA role at run time.
-  return page.getByRole(by as Parameters<Page['getByRole']>[0], { name, exact }).first()
+  return page
+    .getByRole(by as Parameters<Page['getByRole']>[0], { name, exact })
+    .filter({ visible: true })
+    .first()
 }
 
 /** A reach `at <x>,<y>` picks a point of the element's own box; Playwright's default is its centre. */
@@ -170,6 +175,7 @@ export const scratchOpen = async (input: OpenInput): Promise<OpenResult> => {
   const viewport = input.narrow ? NARROW_VIEWPORT : DESKTOP_VIEWPORT
   await page.setViewportSize(viewport)
   await StartupDialogs.registerPreviewNoticeDismissal(page)
+  await StartupDialogs.markSetupWizardSkipped(page)
   const steps: OpenStepResult[] = []
   const openAppRoot = async (): Promise<void> => {
     await page.goto(state.launchUrl, { waitUntil: 'domcontentloaded' })

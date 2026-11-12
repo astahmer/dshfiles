@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react'
+import { useEffect, useState, type CSSProperties, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Composer, useContract } from '@dshfiles/dshx/client'
 import { SelectionAnnotation, type AssistantSelection } from '../../annotate-selection.ts'
@@ -88,7 +88,8 @@ export const AnnotateSelection = ({ sessionId, containerRef, t }: {
       type="button"
       data-annotate-selection
       className={css.annotate}
-      style={{ left, top: selected.rect.top }}
+      // --annotate-bottom serves touch, where the button sits under the selection (b:ysaj).
+      style={{ left, '--annotate-top': `${String(selected.rect.top)}px`, '--annotate-bottom': `${String(selected.rect.bottom)}px` } as CSSProperties}
       onMouseDown={event => event.preventDefault()}
       onClick={add}
     >

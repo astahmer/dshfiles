@@ -25,7 +25,7 @@ const LaneCell = (props: { readonly cell: CoverageCell }): JSX.Element => {
   return (
     <span
       className={cn(
-        'dshx:relative dshx:h-full dshx:rounded-[2px]',
+        'dshx:relative dshx:h-full dshx:rounded-xs',
         cell.kind === 'missing' && 'dshx:border dshx:border-dashed dshx:border-border/70',
         cell.kind === 'use' && !cell.projected && shadeOf(cell.used),
         cell.kind === 'use' && cell.projected && 'dshx:border dshx:border-dashed dshx:border-muted-foreground/40',
@@ -50,12 +50,12 @@ const LaneCell = (props: { readonly cell: CoverageCell }): JSX.Element => {
 const FreeLaneCell = (props: { readonly cell: FreeCell }): JSX.Element => {
   const { cell } = props
   if (cell.projected && (cell.kind === 'none' || cell.kind === 'none-work')) {
-    return <span className="dshx:h-full dshx:rounded-[2px] dshx:border dshx:border-dashed dshx:border-destructive" />
+    return <span className="dshx:h-full dshx:rounded-xs dshx:border dshx:border-dashed dshx:border-destructive" />
   }
   return (
     <span
       className={cn(
-        'dshx:h-full dshx:rounded-[2px]',
+        'dshx:h-full dshx:rounded-xs',
         cell.kind === 'missing' && 'dshx:border dshx:border-dashed dshx:border-border/70',
         cell.kind === 'all' && 'dshx:bg-foreground/10',
         cell.kind === 'some' && 'dshx:bg-foreground/35',
@@ -334,13 +334,13 @@ const WeeklyBars = (props: { readonly pool: Pool; readonly selectedWeek: number 
               )}
               key={week.start}
             >
-              <span className="dshx:text-[11px] dshx:tabular-nums dshx:text-destructive">
+              <span className="dshx:text-2xs dshx:tabular-nums dshx:text-destructive">
                 {week.projectedNoneFreeWorkHours > 0 ? '~' : ''}
                 {String(none)}
               </span>
               <span
                 className={cn(
-                  'dshx:w-full dshx:max-w-9 dshx:rounded-t-[3px]',
+                  'dshx:w-full dshx:max-w-9 dshx:rounded-t-xs',
                   week.projectedNoneFreeWorkHours > 0
                     ? 'dshx:border dshx:border-dashed dshx:border-destructive dshx:bg-destructive/20'
                     : 'dshx:bg-destructive/70',
@@ -361,15 +361,15 @@ const WeeklyBars = (props: { readonly pool: Pool; readonly selectedWeek: number 
       </div>
       <div className="dshx:flex dshx:flex-wrap dshx:gap-x-4 dshx:gap-y-1 dshx:text-xs dshx:text-muted-foreground">
         <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-          <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-[2px] dshx:bg-muted-foreground/45" />
+          <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-xs dshx:bg-muted-foreground/45" />
           Covered by a stand-in
         </span>
         <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-          <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-[2px] dshx:bg-destructive/70" />
+          <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-xs dshx:bg-destructive/70" />
           None free
         </span>
         <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-          <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-[2px] dshx:border dshx:border-dashed dshx:border-destructive" />
+          <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-xs dshx:border dshx:border-dashed dshx:border-destructive" />
           On pace
         </span>
       </div>
@@ -421,16 +421,16 @@ const CoverageLegend = (props: { readonly workHours: WorkHours }): JSX.Element =
       <span className="dshx:flex dshx:items-center dshx:gap-1.5">
         Use
         {SHADES.map(shade => (
-          <span aria-hidden className={cn('dshx:h-2.5 dshx:w-4 dshx:rounded-[2px]', shade)} key={shade} />
+          <span aria-hidden className={cn('dshx:h-2.5 dshx:w-4 dshx:rounded-xs', shade)} key={shade} />
         ))}
         under 25, 50, 75, 100%
       </span>
       <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-        <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-[2px] dshx:bg-destructive/30" />
+        <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-xs dshx:bg-destructive/30" />
         Runs out
       </span>
       <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-        <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-[2px] dshx:text-destructive/60" style={HATCH} />
+        <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-xs dshx:text-destructive/60" style={HATCH} />
         Locked
       </span>
       <span className="dshx:flex dshx:items-center dshx:gap-1.5">
@@ -449,7 +449,7 @@ const CoverageLegend = (props: { readonly workHours: WorkHours }): JSX.Element =
         ] as const
       ).map(([className, label]) => (
         <span className="dshx:flex dshx:items-center dshx:gap-1.5" key={label}>
-          <span aria-hidden className={cn('dshx:h-2.5 dshx:w-4 dshx:rounded-[2px]', className)} />
+          <span aria-hidden className={cn('dshx:h-2.5 dshx:w-4 dshx:rounded-xs', className)} />
           {label}
         </span>
       ))}
@@ -458,7 +458,7 @@ const CoverageLegend = (props: { readonly workHours: WorkHours }): JSX.Element =
         On pace
       </span>
       <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-        <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-[2px] dshx:border dshx:border-dashed dshx:border-border" />
+        <span aria-hidden className="dshx:h-2.5 dshx:w-4 dshx:rounded-xs dshx:border dshx:border-dashed dshx:border-border" />
         No reading or not yet
       </span>
     </div>

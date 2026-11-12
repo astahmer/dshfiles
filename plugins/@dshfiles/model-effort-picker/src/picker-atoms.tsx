@@ -17,7 +17,7 @@ export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey
       <span
         aria-hidden="true"
         className={cn(
-          'dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-[9px] dshx:font-semibold dshx:text-muted-foreground',
+          'dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground',
           className,
         )}
       >
@@ -38,7 +38,7 @@ export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey
 export const ProviderLabel = ({ label, className }: { readonly label: string; readonly className?: string }) => (
   <Tooltip>
     <TooltipTrigger asChild>
-      <span className={cn('dshx:min-w-0 dshx:truncate dshx:text-[10px] dshx:leading-none dshx:text-muted-foreground/80', className)} data-model-provider-label>
+      <span className={cn('dshx:min-w-0 dshx:truncate dshx:text-2xs dshx:leading-none dshx:text-muted-foreground/80', className)} data-model-provider-label>
         {label}
       </span>
     </TooltipTrigger>
@@ -51,7 +51,7 @@ export const EffortBars = ({ glyph, className }: { readonly glyph: EffortGlyph; 
   <span aria-hidden="true" className={cn('dshx:flex dshx:h-3.5 dshx:w-3.5 dshx:items-end dshx:justify-center dshx:gap-[1px]', className)}>
     {Array.from({ length: EFFORT_BAR_COUNT }, (_, index) => (
       <i
-        className={cn('dshx:block dshx:w-[1.5px] dshx:rounded-[1px]', index < glyph.filled ? TONE_FILL[glyph.tone] : 'dshx:bg-muted-foreground/25')}
+        className={cn('dshx:block dshx:w-[1.5px] dshx:rounded-xs', index < glyph.filled ? TONE_FILL[glyph.tone] : 'dshx:bg-muted-foreground/25')}
         key={index}
         style={{ height: `${EFFORT_BAR_HEIGHTS[index] ?? EFFORT_BAR_HEIGHTS[0]}px` }}
       />
@@ -75,7 +75,7 @@ export const AccountBadge = ({
     <TooltipTrigger asChild>
       <span
         className={cn(
-          'dshx:flex dshx:h-[17px] dshx:max-w-[5.5rem] dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[9.5px] dshx:leading-none dshx:text-muted-foreground',
+          'dshx:flex dshx:h-[17px] dshx:max-w-[5.5rem] dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-2xs dshx:leading-none dshx:text-muted-foreground',
           className,
         )}
         data-model-account-badge
@@ -88,9 +88,19 @@ export const AccountBadge = ({
   </Tooltip>
 )
 
-const quotaTone = (percent: number): string => (percent >= 50 ? 'dshx:text-muted-foreground/60' : percent >= 20 ? 'dshx:text-warning' : 'dshx:text-destructive')
+/** The quota convention every surface shares (ai-accounts `quotaTone`): muted while healthy, amber at 15% left or less, red once spent. */
+const quotaTone = (percent: number): string =>
+  Math.round(percent) <= 0 ? 'dshx:text-destructive' : percent <= 15 ? 'dshx:text-warning' : 'dshx:text-muted-foreground/60'
 
-/** Remaining quota, muted while healthy and stronger as it runs out. */
+/** Remaining quota as a bare number, for a control that already has its own tooltip (the detail panel's account chips). */
+export const QuotaPercent = ({ percent, onReserve, className }: { readonly percent: number; readonly onReserve: boolean; readonly className?: string }) => (
+  <span className={cn('dshx:text-2xs dshx:tabular-nums', quotaTone(percent), className)} data-model-quota-percent>
+    {onReserve ? '☾ ' : ''}
+    {Math.round(percent)}%
+  </span>
+)
+
+/** Remaining quota, muted while healthy; amber near the limit and red once it is reached. */
 export const QuotaText = ({
   percent,
   label,
@@ -104,7 +114,7 @@ export const QuotaText = ({
 }) => {
   const rounded = Math.round(percent)
   const text = (
-    <span className={cn('dshx:text-[10px] dshx:tabular-nums', quotaTone(percent), className)}>
+    <span className={cn('dshx:text-2xs dshx:tabular-nums', quotaTone(percent), className)}>
       {onReserve ? '☾ ' : ''}
       {rounded}%
     </span>

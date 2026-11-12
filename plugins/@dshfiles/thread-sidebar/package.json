@@ -53,6 +53,10 @@
       "types": "./src/thread-row-actions.ts",
       "default": "./dist/thread-row-actions.js"
     },
+    "./thread-menu-sections": {
+      "types": "./src/thread-menu-sections.ts",
+      "default": "./dist/thread-menu-sections.js"
+    },
     "./restart-sources": {
       "types": "./src/restart-sources.ts",
       "default": "./dist/restart-sources.js"
@@ -79,6 +83,7 @@
     "@dshfiles/activity-timeline": "workspace:*",
     "@dshfiles/agents": "workspace:*",
     "@dshfiles/ai-accounts": "workspace:*",
+    "@dshfiles/chat": "workspace:*",
     "@dshfiles/command-palette": "workspace:*",
     "@dshfiles/frame-layout": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",

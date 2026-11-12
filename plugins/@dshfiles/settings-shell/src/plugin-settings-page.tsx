@@ -48,9 +48,9 @@ export const PluginSettingsPageView = (props: {
     <section aria-label={props.page.title} className="dshx-root dshx:flex dshx:max-w-[760px] dshx:flex-col dshx:gap-1" data-settings-page={props.page.ns}>
       <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3">
         {props.nested === true ? (
-          <h3 className="dshx:m-0 dshx:min-w-0 dshx:text-[15px] dshx:font-semibold dshx:text-foreground">{props.page.title}</h3>
+          <h3 className="dshx:m-0 dshx:min-w-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{props.page.title}</h3>
         ) : (
-          <h2 className="dshx:m-0 dshx:min-w-0 dshx:text-[18px] dshx:font-semibold dshx:text-foreground">{props.page.title}</h2>
+          <h2 className="dshx:m-0 dshx:min-w-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{props.page.title}</h2>
         )}
         <ToggleGroup
           aria-label={props.t('view.label')}
@@ -70,8 +70,8 @@ export const PluginSettingsPageView = (props: {
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
-      {props.page.description !== '' && <p className="dshx:m-0 dshx:text-[13px] dshx:text-muted-foreground">{props.page.description}</p>}
-      {props.nested !== true && <p className="dshx:m-0 dshx:text-[12px] dshx:text-muted-foreground/80">{props.t('entry.scope')}</p>}
+      {props.page.description !== '' && <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">{props.page.description}</p>}
+      {props.nested !== true && <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground/80">{props.t('entry.scope')}</p>}
       {props.entry}
       <div className="dshx:mt-3" hidden={view !== 'form'}>
         <SettingsForm

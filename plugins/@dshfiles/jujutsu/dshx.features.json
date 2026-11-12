@@ -16,7 +16,7 @@
         "click button \"Compare\"",
         "expect region \"Revision comparison\"",
         "click combobox \"Comparison target\"",
-        "click option \"Another revision\u2026\"",
+        "click option \"Another revision…\"",
         "expect combobox \"Choose revision target\"",
         "click combobox \"Choose revision target\"",
         "expect combobox \"Search loaded revisions\""
@@ -41,7 +41,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph \u203a landmarks",
+      "currentSurface": "left-nav: Revision graph › landmarks",
       "configuration": [],
       "states": ["resolved", "missing", "ambiguous", "same", "ancestor", "descendant", "diverged", "filtered", "truncated"],
       "failureModes": [
@@ -258,7 +258,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "detail",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph \u203a revision detail",
+      "currentSurface": "left-nav: Revision graph › revision detail",
       "configuration": [
         {
           "key": "fileView",
@@ -321,7 +321,7 @@
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph \u203a selection strip",
+      "currentSurface": "left-nav: Revision graph › selection strip",
       "configuration": [],
       "states": ["empty", "one-selected", "several-selected", "open-failed"],
       "failureModes": [
@@ -352,18 +352,18 @@
     },
     {
       "id": "composer-context",
-      "title": "See the Jujutsu workspace and bookmark in the composer run summary",
-      "summary": "The change bar labels the net file diff as changes since branching from the selected base, reports revisions present only on @ or only on that base, and lets the base be a local or remote bookmark.",
+      "title": "See project and Jujutsu workspace context in the composer",
+      "summary": "The Changes pill in the thread header (and the phone top bar) reads the net file diff since branching from the selected base as +N −M, names the revisions present only on @ or only on that base in its tooltip, and opens the Changes view; the composer itself carries no changes bar.",
       "reach": ["seed rebase-ready-thread", "click button \"Changes since branching from main*\"", "expect text \"seeded-work.md\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "composer: Changes since branching from main",
+      "currentSurface": "thread header: Changes pill",
       "configuration": [
         {
           "key": "composerBar",
           "defaultValue": "true",
-          "constraints": "Boolean; show the composer change bar.",
+          "constraints": "Boolean; show the Changes pill in the thread header.",
           "choices": ["true", "false"],
           "coveredBy": ["jujutsu.composer-context"]
         },
@@ -458,7 +458,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph \u203a revision menu",
+      "currentSurface": "left-nav: Revision graph › revision menu",
       "configuration": [],
       "states": ["previewed", "confirmed", "cancelled", "expired", "stale", "failed"],
       "failureModes": [
@@ -521,7 +521,7 @@
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph \u203a workspace overflow chip",
+      "currentSurface": "left-nav: Revision graph › workspace overflow chip",
       "configuration": [],
       "states": ["collapsed", "expanded"],
       "failureModes": ["A failed workspace move is reported by the existing preview flow."],
@@ -543,7 +543,7 @@
     {
       "id": "workspace-at-revision",
       "title": "Create a workspace at a revision",
-      "summary": "Right-click a revision and choose New workspace here\u2026 to name and place an isolated JJ workspace in that row, then preview the setup only after explicit confirmation. Forking a session moved to the native Branch action.",
+      "summary": "Right-click a revision and choose New workspace here… to name and place an isolated JJ workspace in that row, then preview the setup only after explicit confirmation. Forking a session moved to the native Branch action.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -553,7 +553,7 @@
         "press Enter",
         "expect button \"Sample project*\"",
         "rightclick button \"Sample project*\"",
-        "click menuitem \"New workspace here\u2026\"",
+        "click menuitem \"New workspace here…\"",
         "expect group \"Create workspace at this revision\""
       ],
       "reachNarrow": [
@@ -572,7 +572,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph \u203a New workspace here",
+      "currentSurface": "left-nav: Revision graph › New workspace here",
       "configuration": [
         {
           "key": "headerToggle",
@@ -617,11 +617,11 @@
     {
       "id": "chat-references",
       "title": "Open Jujutsu references from a chat message",
-      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity \u2014 a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name \u2014 hovering it previews a bounded revision graph around it \u2014 its neighbourhood plus the working copy, main, main@origin and the default workspace, with separate Commit ID and Change ID labels \u2014 and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the referenced revision's first-line description in the native session-reference chip style with its icon, truncated when long; the accessible label and hover tooltip retain the full title and reference. Chat renders the links through its inline-reference registry; the titles of every chip a render pass mounts arrive in one batched Host request (`referenceTitles`, also the `jj_reference_titles` tool), and a link falls back to the bare reference if a title is unavailable.",
+      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity — a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name — hovering it previews a bounded revision graph around it — its neighbourhood plus the working copy, main, main@origin and the default workspace, with separate Commit ID and Change ID labels — and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the referenced revision's first-line description in the native session-reference chip style with its icon, truncated when long; the accessible label and hover tooltip retain the full title and reference. Chat renders the links through its inline-reference registry; the titles of every chip a render pass mounts arrive in one batched Host request (`referenceTitles`, also the `jj_reference_titles` tool), and a link falls back to the bare reference if a title is unavailable.",
       "reach": [
         "seed chat-reference-thread",
         "hover link \"Jujutsu bookmark: Sample project (main)\"",
-        "expect text \"Revision graph \u00b7 main\"",
+        "expect text \"Revision graph · main\"",
         "expect text \"default@*\"",
         "expect text \"Commit ID:*\"",
         "expect text \"Change ID:*\"",
@@ -669,7 +669,7 @@
         {
           "id": "jj-repository",
           "boundary": "Local bookmark names read through the composer context query; the reference must appear in a rendered message.",
-          "deterministicFake": "A real scratch jj repository with a `main` bookmark, and a Command Code account on the loopback fake provider answering `[[answer \u2026]]` so the code span is deterministic."
+          "deterministicFake": "A real scratch jj repository with a `main` bookmark, and a Command Code account on the loopback fake provider answering `[[answer …]]` so the code span is deterministic."
         }
       ],
       "verification": [
@@ -747,7 +747,7 @@
         "expect option \"sample*\"",
         "press Enter",
         "click button \"Repository actions\"",
-        "click menuitem \"Clean up JJ workspaces\u2026\"",
+        "click menuitem \"Clean up JJ workspaces…\"",
         "expect text \"Clean up workspaces\"",
         "expect checkbox \"Select all eligible items\"",
         "expect text \"No workspace qualifies.\"",
@@ -771,7 +771,7 @@
       "surfaces": ["client", "host"],
       "surface": "command",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph \u203a Clean up workspaces",
+      "currentSurface": "left-nav: Revision graph › Clean up workspaces",
       "configuration": [],
       "states": ["preset-threshold", "preview", "row-selection", "category-selection", "queued", "running", "done", "failed"],
       "failureModes": [
@@ -819,7 +819,7 @@
     {
       "id": "workspace-removal",
       "title": "Remove a workspace from the graph",
-      "summary": "Right-click a workspace pill, or a revision that holds one, and choose Remove workspace\u2026: the confirmation expands in that row, so a managed thread workspace is discarded whole after it names its unlanded revisions, while any other workspace is only forgotten and keeps its folder, files and commits.",
+      "summary": "Right-click a workspace pill, or a revision that holds one, and choose Remove workspace…: the confirmation expands in that row, so a managed thread workspace is discarded whole after it names its unlanded revisions, while any other workspace is only forgotten and keeps its folder, files and commits.",
       "reach": [
         "seed rebase-ready-thread",
         "click tab \"Land\"",
@@ -836,7 +836,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph \u203a Remove workspace",
+      "currentSurface": "left-nav: Revision graph › Remove workspace",
       "configuration": [],
       "states": ["thread-workspace", "plain-workspace", "removed", "refused"],
       "failureModes": [
@@ -880,7 +880,7 @@
     {
       "id": "source-control",
       "title": "Describe and review the working copy in Source Control",
-      "summary": "Source control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 \u2026 @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
+      "summary": "Source control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 … @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
       "reach": [
         "click tab \"Land\"",
         "click button \"Source control\"",
@@ -962,18 +962,18 @@
         "press Enter",
         "expect button \"Sample project*\"",
         "click button \"Open this repository in a new tab\"",
-        "expect tab \"Jujutsu \u00b7 sample*\"",
+        "expect tab \"Jujutsu · sample*\"",
         "expect button \"Locate Current\"",
         "click tab \"Land\"",
         "click button \"Source control\"",
         "expect textbox \"Working copy description\"",
-        "click tab \"Jujutsu \u00b7 sample*\"",
+        "click tab \"Jujutsu · sample*\"",
         "expect button \"Locate Current\""
       ],
       "surfaces": ["client", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
-      "currentSurface": "left-nav: Revision graph \u203a per-tab repository",
+      "currentSurface": "left-nav: Revision graph › per-tab repository",
       "configuration": [],
       "states": ["default-panel", "main-tab", "thread-side-panel", "dock", "restored"],
       "failureModes": [

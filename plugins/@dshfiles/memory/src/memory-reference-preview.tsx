@@ -44,7 +44,7 @@ const copyTextOf = (card: PreviewCard | undefined): string => {
 const SectionHeading = (props: { readonly heading: string; readonly trailing?: string }): JSX.Element => (
   <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
     <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.heading}</h4>
-    {props.trailing === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{props.trailing}</span>}
+    {props.trailing === undefined ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.trailing}</span>}
   </div>
 )
 
@@ -54,7 +54,7 @@ const ThreadLink = (props: { readonly sessionId: string; readonly onOpenThread: 
       <MessageSquareIcon className="dshx:size-4" />
     </span>
     <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-      <span className="dshx:text-[10px] dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">Thread</span>
+      <span className="dshx:text-2xs dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">Thread</span>
       <span className="dshx:truncate dshx:text-xs">{props.sessionId}</span>
     </div>
     <Button size="xs" variant="outline" onClick={() => props.onOpenThread(props.sessionId)}>
@@ -84,7 +84,7 @@ const NoteCard = (props: { readonly note: PanelNote; readonly onOpenThread: (ses
         ) : (
           <ThreadLink sessionId={props.note.sourceThread} onOpenThread={props.onOpenThread} />
         )}
-        <p className="dshx:text-[11px] dshx:text-muted-foreground">
+        <p className="dshx:text-2xs dshx:text-muted-foreground">
           {originLabels[props.note.origin]} · {PanelFormat.formatStamp(props.note.createdAt)}
           {props.note.sourceSeq === null ? '' : ` · message #${String(props.note.sourceSeq)}`}
         </p>
@@ -95,7 +95,7 @@ const NoteCard = (props: { readonly note: PanelNote; readonly onOpenThread: (ses
         <TooltipProvider delayDuration={500}>
           <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-2 dshx:text-xs">
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Project</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Project</dt>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <dd className="dshx:truncate">{PanelFormat.projectName(props.note.project)}</dd>
@@ -104,29 +104,29 @@ const NoteCard = (props: { readonly note: PanelNote; readonly onOpenThread: (ses
               </Tooltip>
             </div>
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Type</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Type</dt>
               <dd>{tone.label}</dd>
             </div>
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Status</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Status</dt>
               <dd>{noteStatusLabels[props.note.status]}</dd>
             </div>
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Scope</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Scope</dt>
               <dd className="dshx:truncate">{props.note.scope}</dd>
             </div>
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Created</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Created</dt>
               <dd>{PanelFormat.formatStamp(props.note.createdAt)}</dd>
             </div>
             <div className="dshx:flex dshx:flex-col">
-              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Updated</dt>
+              <dt className="dshx:text-2xs dshx:text-muted-foreground">Updated</dt>
               <dd>{PanelFormat.formatStamp(props.note.updatedAt)}</dd>
             </div>
           </dl>
         </TooltipProvider>
         {props.note.status === 'valid' ? null : (
-          <p className="dshx:text-[11px] dshx:text-muted-foreground">
+          <p className="dshx:text-2xs dshx:text-muted-foreground">
             {noteStatusLabels[props.note.status]}
             {props.note.reason === null ? '' : `: ${props.note.reason}`}
           </p>
@@ -149,8 +149,8 @@ const AttentionRow = (props: { readonly note: PanelNote; readonly onOpenNote: (i
           <tone.Icon className="dshx:size-3.5" />
         </span>
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-xs">{PanelFormat.noteExcerpt(props.note.text, 90)}</span>
-        <span className={cn('dshx:shrink-0 dshx:rounded-full dshx:px-1.5 dshx:py-px dshx:text-[10px]', tone.badge)}>{tone.label}</span>
-        <span className="dshx:shrink-0 dshx:text-[10px] dshx:text-muted-foreground">{PanelFormat.formatDay(props.note.updatedAt)}</span>
+        <span className={cn('dshx:shrink-0 dshx:rounded-full dshx:px-1.5 dshx:py-px dshx:text-2xs', tone.badge)}>{tone.label}</span>
+        <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">{PanelFormat.formatDay(props.note.updatedAt)}</span>
       </button>
     </li>
   )
@@ -179,13 +179,13 @@ const NotePreview = (props: {
   return (
     <Tabs value={tab} onValueChange={setTab} className="dshx:flex dshx:flex-col dshx:gap-3">
       <TabsList aria-label="Memory preview views" className="dshx:h-7 dshx:w-fit dshx:bg-muted/60">
-        <TabsTrigger value="details" className="dshx:text-[11px]">
+        <TabsTrigger value="details" className="dshx:text-2xs">
           Details
         </TabsTrigger>
-        <TabsTrigger value="related" className="dshx:text-[11px]">
+        <TabsTrigger value="related" className="dshx:text-2xs">
           Related{relatedNotes.length === 0 ? '' : ` (${String(relatedNotes.length)})`}
         </TabsTrigger>
-        <TabsTrigger value="history" className="dshx:text-[11px]">
+        <TabsTrigger value="history" className="dshx:text-2xs">
           History{versions.length <= 1 ? '' : ` (${String(versions.length)})`}
         </TabsTrigger>
       </TabsList>
@@ -232,7 +232,7 @@ const NotePreview = (props: {
                 >
                   n:{version.id}
                 </button>
-                <span className="dshx:text-[11px] dshx:text-muted-foreground">
+                <span className="dshx:text-2xs dshx:text-muted-foreground">
                   {PanelFormat.formatStamp(version.updatedAt)} · {noteStatusLabels[version.status]} · {originLabels[version.origin]}
                 </span>
                 <span className="dshx:text-xs">{PanelFormat.noteExcerpt(version.text, 160)}</span>
@@ -254,7 +254,7 @@ const DigestCard = (props: { readonly thread: PanelThread; readonly onOpenThread
       {props.thread.decision.length === 0 ? null : <p className="dshx:text-xs dshx:font-medium">{props.thread.decision}</p>}
       <Markdown text={props.thread.digest} />
     </div>
-    <p className="dshx:text-[11px] dshx:text-muted-foreground">
+    <p className="dshx:text-2xs dshx:text-muted-foreground">
       {props.thread.source === 'model' ? 'Written by a cheap model from the thread transcript.' : 'Built from the thread record without a model call.'}
     </p>
     <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Source and evidence">
@@ -266,7 +266,7 @@ const DigestCard = (props: { readonly thread: PanelThread; readonly onOpenThread
       <TooltipProvider delayDuration={500}>
         <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-2 dshx:text-xs">
           <div className="dshx:flex dshx:flex-col">
-            <dt className="dshx:text-[11px] dshx:text-muted-foreground">Project</dt>
+            <dt className="dshx:text-2xs dshx:text-muted-foreground">Project</dt>
             <Tooltip>
               <TooltipTrigger asChild>
                 <dd className="dshx:truncate">{PanelFormat.projectName(props.thread.project)}</dd>
@@ -275,7 +275,7 @@ const DigestCard = (props: { readonly thread: PanelThread; readonly onOpenThread
             </Tooltip>
           </div>
           <div className="dshx:flex dshx:flex-col">
-            <dt className="dshx:text-[11px] dshx:text-muted-foreground">Digested</dt>
+            <dt className="dshx:text-2xs dshx:text-muted-foreground">Digested</dt>
             <dd>{props.thread.digestedAt === null ? 'not yet' : PanelFormat.formatStamp(props.thread.digestedAt)}</dd>
           </div>
         </dl>
@@ -287,7 +287,7 @@ const DigestCard = (props: { readonly thread: PanelThread; readonly onOpenThread
 const ExcerptCard = (props: { readonly summary: string }): JSX.Element => (
   <div
     data-dshfiles-memory-body
-    className="dshx:whitespace-pre-wrap dshx:break-words dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/40 dshx:p-3 dshx:font-mono dshx:text-[11px] dshx:leading-relaxed"
+    className="dshx:whitespace-pre-wrap dshx:break-words dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/40 dshx:p-3 dshx:font-mono dshx:text-2xs dshx:leading-relaxed"
   >
     {props.summary}
   </div>
@@ -376,7 +376,7 @@ const CardHeader = (props: { readonly card: PreviewCard; readonly request: Memor
           </Badge>
         ) : null}
       </div>
-      <code className="dshx:shrink-0 dshx:rounded-md dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">
+      <code className="dshx:shrink-0 dshx:rounded-md dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">
         {props.request.id}
         {props.request.range === undefined ? '' : ` #${props.request.range}`}
       </code>

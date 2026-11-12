@@ -53,7 +53,7 @@ describe('thread attention', () => {
         yield* attention.recordFinish({ sessionId: 'thread', seq: 12, time: 4_000, reason: 'completed' })
         const recorded = yield* attention.snapshot
         expect(recorded.sessions).toEqual([
-          { sessionId: 'thread', version: 5_001, finishedAt: 4_000, finishedSeq: 12, finishedReason: 'completed', manuallyUnread: false },
+          { sessionId: 'thread', version: 5_001, finishedAt: 4_000, finishedSeq: 12, finishedReason: 'completed', manuallyUnread: false, firstUnreadSeq: 12 },
         ])
 
         expect((yield* attention.acknowledge({ sessionId: 'thread', version: 5_000 })).sessions).toHaveLength(1)
@@ -77,6 +77,29 @@ describe('thread attention', () => {
     ),
   )
 
+  it.effect('a later unseen finish keeps the first unseen one, so Chat can start the recap there', () =>
+    withAttention(5_000, () =>
+      Effect.gen(function* () {
+        const attention = yield* ThreadAttention
+        yield* attention.recordFinish({ sessionId: 'thread', seq: 12, time: 4_000, reason: 'completed' })
+        yield* attention.recordFinish({ sessionId: 'thread', seq: 20, time: 4_500, reason: 'error' })
+        const record = (yield* attention.snapshot).sessions[0]
+        expect(record).toMatchObject({ finishedSeq: 20, firstUnreadSeq: 12 })
+        // Reading the thread drops the record; the next unseen finish starts a new range.
+        yield* attention.clearUnread({ sessionId: 'thread', version: record?.version ?? 0 })
+        yield* attention.recordFinish({ sessionId: 'thread', seq: 30, time: 5_000, reason: 'completed' })
+        expect((yield* attention.snapshot).sessions[0]).toMatchObject({ finishedSeq: 30, firstUnreadSeq: 30 })
+      }),
+    ),
+  )
+
+  it('a record written before firstUnreadSeq existed starts the range at its newest finish', () => {
+    const legacy: ThreadAttentionView = { sessionId: 's', version: 1, finishedAt: 1, finishedSeq: 9, finishedReason: 'completed', manuallyUnread: false }
+    expect(ThreadAttentionStoreModel.firstUnreadSeq(legacy, 14)).toBe(9)
+    expect(ThreadAttentionStoreModel.firstUnreadSeq({ ...legacy, finishedAt: null, finishedSeq: null }, 14)).toBe(14)
+    expect(ThreadAttentionStoreModel.firstUnreadSeq(undefined, 14)).toBe(14)
+  })
+
   it.effect('marking a thread unread by hand keeps its finish, durably', () =>
     withAttention(7_000, root =>
       Effect.gen(function* () {
@@ -90,6 +113,7 @@ describe('thread attention', () => {
           finishedSeq: 3,
           finishedReason: 'error',
           manuallyUnread: true,
+          firstUnreadSeq: 3,
         })
         const markedOnly = yield* attention.markUnread({ sessionId: 'hand-marked' })
         expect(markedOnly.sessions.map(record => record.sessionId).sort()).toEqual(['hand-marked', 'thread'])
@@ -136,6 +160,8 @@ describe('thread attention', () => {
           finishedSeq: 3,
           finishedReason: 'completed',
           manuallyUnread: true,
+          // Its first unseen finish (seq 1) was never read: the unseen range still starts there.
+          firstUnreadSeq: 1,
         })
         expect(marked.sessions.find(record => record.sessionId === 'new')?.manuallyUnread).toBe(true)
       }),
@@ -175,6 +201,7 @@ describe('thread attention', () => {
           finishedSeq: 4,
           finishedReason: 'completed',
           manuallyUnread: false,
+          firstUnreadSeq: 4,
         })
         expect(byId.get('browser-only')?.finishedAt).toBe(500)
         expect(byId.has('nothing-to-say')).toBe(false)

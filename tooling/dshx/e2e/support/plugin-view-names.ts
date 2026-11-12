@@ -1,15 +1,16 @@
+import { ThreadListFilter } from './thread-list-filter.js'
 import type { Locator, Page } from '@playwright/test'
 
 /** Fixture vocabulary only: selectors require the exact qualified UI name, never a legacy fallback. */
 const reusableViewNames = new Map([
   ['Current conversation', 'Rich Composer: Current conversation'],
-  ['Threads', 'Thread Sidebar: Threads'],
-  ['Navigation', 'Thread Sidebar: Navigation'],
-  ['Sidebar status', 'AI Accounts: Preview'],
+  ['Threads', 'Threads'],
+  ['Navigation', 'Navigation'],
+  ['Sidebar status', 'Quota'],
   // Shared Workbench fixtures include native/unlabeled footer actions, so this aggregate has mixed owners.
-  ['Sidebar actions', 'Thread Sidebar: Plugin controls'],
+  ['Sidebar actions', 'Sidebar controls'],
   ['Backlog', 'Backlog'],
-  ['Editor', 'Editor: Files'],
+  ['Editor', 'Files'],
   ['Jujutsu', 'Revision graph'],
   ['Scratchpad', 'Workbench: Scratchpad'],
   ['Ticker', 'Workbench: Ticker'],
@@ -233,6 +234,11 @@ export const openGlobalPanel = async (page: Page, fixtureName: string): Promise<
   const rail = railLocations.get(reusableViewName(fixtureName))
   if (rail !== undefined && (await destinationTabs(page).isVisible())) {
     await destinationTabs(page).getByRole('tab', { name: rail.destination, exact: true }).click()
+    // The Threads pages (Board) are items of the thread list's Filter menu since productivity pass Q5 (T5.3).
+    if (rail.destination === 'Threads') {
+      await ThreadListFilter.clickItem(page, page.getByRole('region', { name: 'Threads', exact: true }), rail.section)
+      return
+    }
     await page
       .getByRole('navigation', { name: `${rail.destination} pages`, exact: true })
       .getByRole('button', { name: rail.section, exact: true })
