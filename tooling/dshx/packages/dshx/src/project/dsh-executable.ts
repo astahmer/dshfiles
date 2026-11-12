@@ -1,11 +1,16 @@
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { resolveExecutableOverride } from './executable-override.js'
 
-/** The CLI this checkout installed, when the caller has none on PATH (a CI runner has neither). */
+/**
+ * The CLI this checkout installed, found from the project up to the workspace root: a plugin without its own `dsh`
+ * devDependency must not fall back to a global core of another version.
+ */
 const checkoutDsh = (projectRoot: string): string | undefined => {
   const candidate = join(projectRoot, 'node_modules', '.bin', 'dsh')
-  return existsSync(candidate) ? candidate : undefined
+  if (existsSync(candidate)) return candidate
+  const parent = dirname(projectRoot)
+  return parent === projectRoot ? undefined : checkoutDsh(parent)
 }
 
 /**

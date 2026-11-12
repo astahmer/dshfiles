@@ -34,6 +34,17 @@ describe('verification DSH executable selection', () => {
     expect(await resolveDshExecutable('custom-dsh', {}, projectRoot)).toBe('custom-dsh')
   })
 
+  it('finds the workspace root CLI from a plugin without its own dsh', async () => {
+    const workspaceRoot = await root()
+    await mkdir(join(workspaceRoot, 'node_modules', '.bin'), { recursive: true })
+    const workspaceBin = join(workspaceRoot, 'node_modules', '.bin', 'dsh')
+    await writeFile(workspaceBin, '#!/bin/sh\n')
+    await chmod(workspaceBin, 0o700)
+    const pluginRoot = join(workspaceRoot, 'plugins', '@dshfiles', 'sample')
+    await mkdir(join(pluginRoot, 'node_modules'), { recursive: true })
+    expect(await resolveDshExecutable(undefined, {}, pluginRoot)).toBe(workspaceBin)
+  })
+
   it.each(['', 'dsh', './bin/dsh', '~/bin/dsh', '/tmp/invalid\0dsh'])(
     'rejects invalid overrides without falling back to a personal launcher: %j',
     async value => {
