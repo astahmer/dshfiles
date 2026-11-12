@@ -7,9 +7,9 @@ import z from '@deepseek-ai/schemastery'
 import { defineHost } from '@dshfiles/dshx/host'
 import { Option } from 'effect'
 import * as Schema from 'effect/Schema'
-import { IMAGE_GALLERY_SCOPE_FIELD, UNREAD_LANDING_FIELD } from './chat-settings.ts'
+import { CHAT_SETTINGS_NAMESPACE, IMAGE_GALLERY_SCOPE_FIELD, TRANSCRIPT_VIEW_FIELD, UNREAD_LANDING_FIELD } from './chat-settings.ts'
 import { transcriptViewApi } from './transcript-view-api.ts'
-import { CHAT_SETTINGS_NAMESPACE, savedTranscriptView, TRANSCRIPT_VIEW_FIELD, type TranscriptViewMode } from './transcript-view-modes.ts'
+import { savedTranscriptView, type TranscriptViewMode } from './transcript-view-modes.ts'
 
 import { ChatSettingsFields } from './chat-settings.ts'
 

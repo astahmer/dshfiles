@@ -86,6 +86,8 @@ const astGrepVendored = [
   'plugins/@dshfiles/agent-preset/src/native/**',
   'plugins/@dshfiles/rich-composer/src/native/**',
   'plugins/@dshfiles/chat/src/native/**',
+  // Chat's settings module keeps the native package's import surface for the forked views; oxlint ignores it too.
+  'plugins/@dshfiles/chat/src/chat-settings.ts',
   'plugins/@dshfiles/session-controller/src/native/**',
   'plugins/@dshfiles/subprocess-local/src/native/**',
   'plugins/@dshfiles/goal-tool/src/native/**',

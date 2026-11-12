@@ -1,7 +1,6 @@
 /** Composes viewport operations, reading policy, and history navigation for Chat. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
-import type { UnreadLanding } from '../../chat-settings.ts'
-import type { TranscriptViewMode } from '../../transcript-view-modes.ts'
+import type { TranscriptViewMode, UnreadLanding } from '../../chat-settings.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { useChatNavigation, type ChatNavigation, type ChatNavigationInput } from './use-chat-navigation.ts'
