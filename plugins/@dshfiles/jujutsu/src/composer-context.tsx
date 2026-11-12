@@ -4,6 +4,7 @@ import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/clie
 import { useSettings } from '@dshfiles/dshx/client'
 import { useProjectBookmark } from '@dshfiles/jj-integration/project-bookmark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { ComposerRow } from '@dshfiles/plugin-ui/components/composer-row'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { ChevronDownIcon, FileCodeIcon, FileDiffIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import * as Schema from 'effect/Schema'
 import { useAutoRefresh } from './auto-refresh.js'
 import { useOpenInEditor } from './open-in-editor.js'
@@ -47,17 +48,6 @@ export interface ComposerJujutsuServices {
 export interface ComposerSlotProps {
   readonly sessionId: SessionSummary['id']
   readonly jujutsu: ComposerJujutsuServices
-}
-
-// Inline instead of client.css so the plugin sheet stays byte-identical to the shared plugin-ui sheet; same
-// geometry as the shipped queue dock so the bar lines up with the composer card.
-const ABOVE_STYLE: CSSProperties = {
-  boxSizing: 'border-box',
-  width:
-    'calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset))',
-  maxWidth: 'calc(var(--dsh-composer-card-max-width) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset))',
-  margin: '0 auto',
-  flex: 'none',
 }
 
 const noStoredBases: Readonly<Record<string, string>> = {}
@@ -171,8 +161,8 @@ const BasePicker = (props: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button className="dshx:ml-auto dshx:max-w-[45%] dshx:text-muted-foreground" size="xs" type="button" variant="ghost">
-          <span>Compare with</span>
+        <Button className="dshx:text-muted-foreground" size="xs" type="button" variant="ghost">
+          <span className="dshx:@max-pane-compact:hidden">Compare with</span>
           <span className={cn('dshx:truncate dshx:font-mono! dshx:text-foreground', !props.repository.base.found && 'dshx:text-warning')}>
             {props.repository.base.label}
           </span>
@@ -270,60 +260,66 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
 
   return (
     <TooltipProvider delayDuration={500}>
-      <div
-        className="dshx-root dshx:mb-1.5 dshx:rounded-lg dshx:border dshx:bg-background/90 dshx:text-xs"
-        {...phoneTool.triggerProps}
+      <ComposerRow
+        className="dshx:mb-1.5"
         ref={context.ref}
-        style={ABOVE_STYLE}
-      >
-        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-1 dshx:py-0.5">
-          <Button
-            aria-expanded={expanded}
-            className="dshx:min-w-0 dshx:shrink dshx:justify-start dshx:overflow-hidden dshx:text-muted-foreground"
-            disabled={fileCount === 0}
-            onClick={() => setExpanded(open => !open)}
-            size="xs"
-            type="button"
-            variant="ghost"
-          >
-            <span className="dshx:font-medium dshx:text-foreground">{heading}</span>
+        {...phoneTool.triggerProps}
+        icon={<ChevronDownIcon className={cn('dshx:transition-transform', expanded && 'dshx:rotate-180')} />}
+        label={heading}
+        meta={
+          <>
             <span>·</span>
             {fileCount === 0 ? (
-              <span>{context.base.kind === 'parent' ? 'no working copy changes' : 'no net file changes'}</span>
+              <span className="dshx:min-w-0 dshx:truncate">
+                {context.base.kind === 'parent' ? 'no working copy changes' : 'no net file changes'}
+              </span>
             ) : (
               <>
-                <span>
+                <span className="dshx:shrink-0">
                   {fileCount} {fileCount === 1 ? 'file' : 'files'}
                   {repository.totals !== null && ','}
                 </span>
                 {repository.totals !== null && (
-                  <span className="dshx:font-mono! dshx:tabular-nums">
+                  <span className="dshx:shrink-0 dshx:font-mono! dshx:tabular-nums">
                     <span className="dshx:text-success">+{repository.totals.additions}</span>{' '}
                     <span className="dshx:text-destructive">−{repository.totals.deletions}</span>
                   </span>
                 )}
-                <ChevronDownIcon className={cn('dshx:transition-transform', expanded && 'dshx:rotate-180')} />
               </>
             )}
-          </Button>
-          <button
-            aria-label={'Review workspace changes: ' + revisionSummary}
-            className="dshx:min-w-0 dshx:truncate dshx:cursor-pointer dshx:text-muted-foreground dshx:underline-offset-2 dshx:hover:text-foreground dshx:hover:underline"
-            onClick={() => props.jujutsu.openWorkspaceReview(repository.root, String(props.sessionId))}
-            type="button"
-          >
-            {revisionSummary}
-          </button>
-          <BasePicker
-            choice={context.choice}
-            projectBookmark={context.projectBookmark}
-            onChoose={next => {
-              context.chooseBase(next)
-              setExpanded(false)
-            }}
-            repository={repository}
-          />
-        </div>
+          </>
+        }
+        actions={
+          <>
+            <button
+              aria-label={'Review workspace changes: ' + revisionSummary}
+              className="dshx:block dshx:max-w-[45vw] dshx:min-w-0 dshx:truncate dshx:cursor-pointer dshx:text-xs dshx:text-muted-foreground dshx:underline-offset-2 dshx:hover:text-foreground dshx:hover:underline dshx:@max-pane-narrow:hidden"
+              onClick={() => props.jujutsu.openWorkspaceReview(repository.root, String(props.sessionId))}
+              type="button"
+            >
+              {revisionSummary}
+            </button>
+            <BasePicker
+              choice={context.choice}
+              projectBookmark={context.projectBookmark}
+              onChoose={next => {
+                context.chooseBase(next)
+                setExpanded(false)
+              }}
+              repository={repository}
+            />
+          </>
+        }
+        expanded={expanded}
+        onSelect={
+          fileCount === 0
+            ? undefined
+            : () => {
+                setExpanded(open => !open)
+              }
+        }
+        selectLabel={`${heading}: ${fileCount} ${fileCount === 1 ? 'file' : 'files'} changed. Show the changed files`}
+      >
         {expanded && fileCount > 0 && (
           <ul className="dshx:max-h-56 dshx:overflow-y-auto dshx:border-t dshx:py-1">
             {repository.files.map(file => {
@@ -393,7 +389,7 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
             truncated={diffQuery.data?.truncated ?? false}
           />
         )}
-      </div>
+      </ComposerRow>
     </TooltipProvider>
   )
 }
