@@ -2,7 +2,7 @@ import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
-import { LlmRuntime, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import { SessionStore } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -105,8 +105,7 @@ describe('tweet context Host integration', () => {
         )
         expect(() => handle.agent.ctx.attachments).toThrow('cannot get property "attachments" without inject')
         const result = yield* Effect.promise(() =>
-          host.tools.execute({
-            callId: ToolCallId('tweet-context-call'),
+          host.runTool({
             name: 'tweet_context',
             arguments: { url: 'https://x.com/fixture/status/123' },
             agent: handle.agent,
@@ -198,8 +197,7 @@ describe('tweet context Host integration', () => {
           created => Effect.promise(() => created.dispose()),
         )
         const result = yield* Effect.promise(() =>
-          host.tools.execute({
-            callId: ToolCallId('tweet-context-live-call'),
+          host.runTool({
             name: 'tweet_context',
             arguments: { url: 'https://x.com/pitus_/status/2115019751646974021' },
             agent: handle.agent,

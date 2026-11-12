@@ -58,12 +58,7 @@ describe('agentsview Host', () => {
       await host.mount(agentsviewHost, { packageId: '@dshfiles/agentsview' })
       expect(TOOLS.map(name => host.tools.get(name)?.name)).toEqual(TOOLS)
       expect(recorder.named('plugin activate')).toHaveLength(0)
-      const listed = await host.tools.execute({
-        callId: 'call-1' as never,
-        name: 'agent_sessions_sources',
-        arguments: {},
-        signal: new AbortController().signal,
-      })
+      const listed = await host.runTool({ name: 'agent_sessions_sources' })
       expect(listed).toMatchObject({ isError: false })
       await host.connection.requestApi({ packageId: '@dshfiles/agentsview', apiId: 'agentsview', method: 'list', version: 1, input: {} })
       expect(recorder.named('plugin activate')).toHaveLength(1)

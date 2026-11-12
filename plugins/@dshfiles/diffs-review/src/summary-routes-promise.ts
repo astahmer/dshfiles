@@ -1,5 +1,7 @@
 import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-query'
+// Declares the `compaction` request purpose that `dshx/effect/llm` does not yet carry itself.
+import type {} from '@dshfiles/dshx/host'
 import { HostContext } from '@dshfiles/dshx/effect'
 import { Llm, LlmCallFailed } from '@dshfiles/dshx/effect/llm'
 import type { SessionId } from '@dshfiles/dshx/ids'

@@ -1,4 +1,3 @@
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from 'vitest'
@@ -15,12 +14,7 @@ describe('capabilities-hub Host', () => {
       expect(await client.overview({})).toEqual(CapabilitiesHub.overview())
 
       expect(host.tools.get('capabilities_hub_overview')?.name).toBe('capabilities_hub_overview')
-      const result = await host.tools.execute({
-        callId: ToolCallId('call-1'),
-        name: 'capabilities_hub_overview',
-        arguments: {},
-        signal: new AbortController().signal,
-      })
+      const result = await host.runTool({ name: 'capabilities_hub_overview' })
       expect(JSON.stringify(result)).toContain('DISABLE_TELEMETRY=1 npx skills@')
     } finally {
       await host.dispose()

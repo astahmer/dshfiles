@@ -6,7 +6,7 @@ import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import SandboxedFileSystem from '@deepseek-ai/dsh-fs-sandbox'
-import { LlmRuntime, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import SandboxPolicyService, { setSandboxMode, type Config as PolicyConfig } from '@deepseek-ai/dsh-sandbox-policy'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
@@ -56,13 +56,8 @@ async function fixture(defaultMode: Mode = 'workspace-write', sandboxed = true, 
   }
   const agent = await createAgent(workspace)
   const patch = (path: string, caller: Agent | null = agent, old = 'before', replacement = 'after') => {
-    const request = {
-      callId: ToolCallId(randomUUID()),
-      name: 'apply_patch',
-      arguments: { path, edits: [{ old, new: replacement }] },
-      signal: new AbortController().signal,
-    }
-    return host.tools.execute(caller === null ? request : { ...request, agent: caller })
+    const request = { name: 'apply_patch', arguments: { path, edits: [{ old, new: replacement }] } }
+    return host.runTool(caller === null ? request : { ...request, agent: caller })
   }
   return { host, agent, deployment, workspace, outside, createAgent, patch }
 }
@@ -159,12 +154,10 @@ describe('apply_patch real Host sandbox policy', () => {
     setSandboxMode(f.agent.session, 'read-only')
     const file = join(f.workspace, 'note.txt')
     await writeFile(file, 'before')
-    const result = await f.host.tools.execute({
-      callId: ToolCallId(randomUUID()),
+    const result = await f.host.runTool({
       name: 'apply_patch',
       arguments: { path: file, edits: [{ old: 'before', new: 'after' }], sandboxPolicy: { mode: 'danger-full-access', workspaceRoot: f.workspace } },
       agent: f.agent,
-      signal: new AbortController().signal,
     })
     expect(result).toMatchObject({ isError: true, error: { message: expect.stringContaining('sandboxPolicy') } })
     expect(await readFile(file, 'utf8')).toBe('before')

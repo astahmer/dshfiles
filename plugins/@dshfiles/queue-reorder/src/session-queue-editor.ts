@@ -30,7 +30,8 @@ import { startQueueTransfer, type QueueTransferActor } from './queue-transfer.js
  */
 
 type QueueApiClient = ApiClient<(typeof queueApi)['methods']>
-type AttachmentIdType = Parameters<SessionFace['readAttachment']>[0]
+type ImageAttachmentRef = Parameters<SessionFace['readAttachment']>[0]
+type AttachmentIdType = ImageAttachmentRef['attachmentId']
 type ReceiptId = Extract<PromptContentPart, { readonly type: 'file' }>['receiptId']
 
 interface DraftAttachmentApi {
@@ -79,6 +80,18 @@ const restoreComposerReferences = (composer: SessionInput | ReferenceRestoringCo
 
 const isAttachmentId = (value: string): value is AttachmentIdType => value.length > 0
 const isReceiptId = (value: string): value is ReceiptId => value.length > 0
+
+const imageReference = (attachment: QueuedImageAttachment, attachmentId: AttachmentIdType): ImageAttachmentRef => ({
+  attachmentId,
+  mediaType: attachment.mediaType,
+  bytes: attachment.bytes,
+  width: attachment.width,
+  height: attachment.height,
+  ...(attachment.name === undefined ? {} : { name: attachment.name }),
+  ...(attachment.originalDimensions === undefined
+    ? {}
+    : { originalDimensions: { width: attachment.originalDimensions.width, height: attachment.originalDimensions.height } }),
+})
 
 /** One upload wait never outlives a stuck network: Cancel reports the failure and stays retryable. */
 const UPLOAD_TIMEOUT_MS = 5 * 60_000
@@ -152,7 +165,7 @@ const toPromptPart = (part: { readonly type: 'text'; readonly text: string } | S
 const sessionQueueIo = (input: { readonly sessionId: SessionFace['sessionId']; readonly session: SessionFace }) => ({
   readImage: async (attachment: QueuedImageAttachment): Promise<File> => {
     if (!isAttachmentId(attachment.attachmentId)) throw new Error('image has no id')
-    const result = await input.session.readAttachment(attachment.attachmentId)
+    const result = await input.session.readAttachment(imageReference(attachment, attachment.attachmentId))
     if (!result.ok) throw new Error(result.error.message)
     const name = attachment.name ?? result.value.attachment.name ?? 'image'
     return new File([new Uint8Array(result.value.data)], name, { type: result.value.attachment.mediaType })

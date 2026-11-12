@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
-import { LlmRuntime, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import WorkingDirectoryService from '@deepseek-ai/dsh-working-directory'
@@ -60,9 +60,7 @@ const mountedSearch = Effect.gen(function* () {
     created => Effect.promise(() => created.dispose()),
   )
   const run = (name: 'grep' | 'glob', args: { readonly pattern: string; readonly path?: string }) =>
-    Effect.promise(() =>
-      handle.agent.ctx.tools.execute({ callId: ToolCallId(randomUUID()), name, arguments: args, signal: AbortSignal.timeout(60_000), agent: handle.agent }),
-    )
+    Effect.promise(() => host.runTool({ name, arguments: args, signal: AbortSignal.timeout(60_000), agent: handle.agent }))
   return { run, workspace }
 })
 

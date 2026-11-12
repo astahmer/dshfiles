@@ -31,9 +31,9 @@ test('previews a long body from its head, and still finds text behind a long whi
 test('previews each image and file in message order and skips text', () => {
   const blocks: readonly QueuedBlock[] = [
     { type: 'text', text: 'look' },
-    { type: 'image', attachment: { attachmentId: 'img-1', mediaType: 'image/png', name: 'shot.png' } },
+    { type: 'image', attachment: { attachmentId: 'img-1', mediaType: 'image/png', bytes: 3, width: 1, height: 1, name: 'shot.png' } },
     { type: 'file', attachment: { attachmentId: 'file-1', name: 'notes.md', bytes: 12 } },
-    { type: 'image', attachment: { attachmentId: 'img-1', mediaType: 'image/png' } },
+    { type: 'image', attachment: { attachmentId: 'img-1', mediaType: 'image/png', bytes: 3, width: 1, height: 1 } },
   ]
   assert.deepEqual(
     MessagePreviewModel.attachmentPreviews(blocks).map(preview => [preview.kind, preview.name, preview.key]),

@@ -1,4 +1,3 @@
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Schema } from 'effect'
@@ -51,7 +50,7 @@ const wireEnvelope = Schema.Struct({
 })
 
 type ApiInput = Parameters<TestHost['connection']['requestApi']>[0]['input']
-type ToolArguments = Parameters<TestHost['tools']['execute']>[0]['arguments']
+type ToolArguments = Parameters<TestHost['runTool']>[0]['arguments']
 
 const mountedQueue = Effect.gen(function* () {
   const inbox = liveSession()
@@ -76,7 +75,7 @@ const mountedQueue = Effect.gen(function* () {
       return Schema.decodeUnknownSync(wireEnvelope)(await response.json()).result
     })
   const runTool = (args: ToolArguments) =>
-    Effect.promise(() => host.tools.execute({ callId: ToolCallId('call-1'), name: 'queue_move', arguments: args, signal: new AbortController().signal }))
+    Effect.promise(() => host.runTool({ name: 'queue_move', arguments: args }))
   return { inbox, call, runTool }
 })
 

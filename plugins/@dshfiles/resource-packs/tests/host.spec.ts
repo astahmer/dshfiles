@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-import type { ToolExecutionInput } from '@deepseek-ai/dsh-tools'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, FileSystem, Path, Schema } from 'effect'
@@ -24,16 +22,7 @@ const decodeResourceEnvelope = Schema.decodeUnknownEffect(resourceEnvelope)
 const decodeResource = Schema.decodeUnknownEffect(resourceSchema)
 
 // oxlint-disable-next-line antislop/no-unknown-parameters -- The native tool pipeline is the boundary under test, including rejection of malformed arguments.
-const tool = (host: TestHostInstance, name: string, args: unknown) =>
-  Effect.promise(() =>
-    host.tools.execute({
-      // SAFETY: ToolCallId is an opaque string brand; a generated UUID is unique and no Agent or runtime structure is asserted.
-      callId: randomUUID() as ToolExecutionInput['callId'],
-      name,
-      arguments: args,
-      signal: new AbortController().signal,
-    }),
-  )
+const tool = (host: TestHostInstance, name: string, args: unknown) => Effect.promise(() => host.runTool({ name, arguments: args }))
 
 const mount = (host: TestHostInstance, plugin = createResourcePacksPlugin()) => Effect.promise(() => host.mount(plugin, { packageId: owner }))
 

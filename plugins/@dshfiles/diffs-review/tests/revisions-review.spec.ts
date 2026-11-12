@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
@@ -157,12 +156,7 @@ describe.skipIf(!jjAvailable)('combined revision review', () => {
       Effect.gen(function* () {
         const { host, workspace, ids } = yield* fixture
         const tool = yield* Effect.promise(() =>
-          host.tools.execute({
-            callId: ToolCallId('call-revisions'),
-            name: 'diffs_review_revisions',
-            arguments: { path: workspace, revisions: [ids.first, ids.third] },
-            signal: new AbortController().signal,
-          }),
+          host.runTool({ name: 'diffs_review_revisions', arguments: { path: workspace, revisions: [ids.first, ids.third] } }),
         )
         expect(tool).toMatchObject({ isError: false })
         const text = tool.content.map(block => (block.type === 'text' ? block.text : '')).join('\n')

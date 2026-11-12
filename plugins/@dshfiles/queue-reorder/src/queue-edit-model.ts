@@ -10,16 +10,22 @@ import * as Schema from 'effect/Schema'
  * record is decoded here once and kept across a reload.
  */
 
+const naturalNumberSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+
 const imageAttachmentSchema = Schema.Struct({
   attachmentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
-  mediaType: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  mediaType: Schema.Literals(['image/png', 'image/jpeg', 'image/webp', 'image/gif']),
+  bytes: naturalNumberSchema,
+  width: naturalNumberSchema,
+  height: naturalNumberSchema,
   name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(512))),
+  originalDimensions: Schema.optionalKey(Schema.Struct({ width: naturalNumberSchema, height: naturalNumberSchema })),
 })
 
 const fileAttachmentSchema = Schema.Struct({
   attachmentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
   name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
-  bytes: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  bytes: naturalNumberSchema,
 })
 
 const queuedBlockSchema = Schema.Union([

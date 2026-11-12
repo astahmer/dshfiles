@@ -55,8 +55,16 @@ export const createHtmlRenderHost = async (options: { readonly renderer?: Screen
   }
   const handle = await host.ctx.agents.create({ sessionId: SessionId(randomUUID()), meta: { cwd: workspace } })
   cleanups.push(() => handle.dispose())
-  const run = (name: string, args: JsonValue, callId: string = randomUUID()) =>
-    host.tools.execute({ callId: ToolCallId(callId), name, arguments: args, signal: AbortSignal.timeout(60_000), agent: handle.agent })
+  const run = async (name: string, args: JsonValue, callId: string = randomUUID()) => {
+    const batch = await host.tools.execute({
+      calls: [{ type: 'tool-call', id: ToolCallId(callId), name, arguments: JSON.stringify(args) }],
+      signal: AbortSignal.timeout(60_000),
+      agent: handle.agent,
+    })
+    const settled = batch.results[0]
+    if (settled === undefined) throw new Error(`The tool executor settled no result for ${name}.`)
+    return settled.result
+  }
   return {
     ctx: host.ctx,
     workspace,

@@ -1,4 +1,3 @@
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from 'vitest'
@@ -22,12 +21,7 @@ describe('plugin-guide Host', () => {
       expect(found.entries.map(entry => entry.publicSymbol)).toEqual(['PaletteActions'])
 
       expect(host.tools.get('plugin_guide_search')?.name).toBe('plugin_guide_search')
-      const result = await host.tools.execute({
-        callId: ToolCallId('call-1'),
-        name: 'plugin_guide_search',
-        arguments: { query: 'sidebar', kind: 'slot' },
-        signal: new AbortController().signal,
-      })
+      const result = await host.runTool({ name: 'plugin_guide_search', arguments: { query: 'sidebar', kind: 'slot' } })
       expect(JSON.stringify(result)).toContain('occupancy is never live')
     } finally {
       await host.dispose()

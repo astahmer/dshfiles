@@ -1,4 +1,3 @@
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { defineTool } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
@@ -122,23 +121,21 @@ describe('the policies plugin in the real tool runtime', () => {
         Effect.promise(() => host.mount(plugin, { packageId: '@dshfiles/policies' })),
         mounted => Effect.promise(() => mounted.dispose()),
       )
-      const signal = new AbortController().signal
-      const execute = (callId: string, command: string) =>
-        Effect.promise(() => host.tools.execute({ callId: ToolCallId(callId), name: 'shell', arguments: { command }, signal }))
+      const execute = (command: string) => Effect.promise(() => host.runTool({ name: 'shell', arguments: { command } }))
       const listRules = Effect.promise(() =>
         host.connection
           .requestApi({ packageId: '@dshfiles/policies', apiId: 'policies', method: 'list', version: 1, input: {} })
           .then(response => response.json()),
       )
 
-      const denied = yield* execute('call-1', 'rm -rf /')
-      const allowed = yield* execute('call-2', 'ls')
+      const denied = yield* execute('rm -rf /')
+      const allowed = yield* execute('ls')
       const listed = yield* listRules
       document = { ns: namespace, value: { rules: [] }, revision: 2 }
       host.ctx.emit('settings/document-updated', namespace, 2)
       // The API serves the same rules the guard reads, so an empty list proves the guard has the new revision.
       yield* waitUntil(Effect.map(listRules, rules => !JSON.stringify(rules).includes('no rm')))
-      const afterRemoval = yield* execute('call-3', 'rm -rf /tmp/x')
+      const afterRemoval = yield* execute('rm -rf /tmp/x')
 
       expect(denied.isError).toBe(true)
       expect(JSON.stringify(denied.content)).toContain('Denied by policy “no rm”: destructive')

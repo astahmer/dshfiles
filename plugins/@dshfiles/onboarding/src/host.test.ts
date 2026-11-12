@@ -2,7 +2,6 @@ import { execFileSync, spawn } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
@@ -99,12 +98,7 @@ describe('onboarding Host', () => {
       ])
 
       expect(host.tools.get('onboarding_overview')?.name).toBe('onboarding_overview')
-      const result = await host.tools.execute({
-        callId: ToolCallId('call-1'),
-        name: 'onboarding_overview',
-        arguments: { destination: 'land' },
-        signal: new AbortController().signal,
-      })
+      const result = await host.runTool({ name: 'onboarding_overview', arguments: { destination: 'land' } })
       expect(JSON.stringify(result)).toContain('## Setup checklist')
 
       const preview = await client.overview({ preview: { pack: 'planning', action: 'enable' }, limit: 1 })
@@ -152,24 +146,14 @@ describe('onboarding Host', () => {
       expect(tool?.name).toBe('onboarding_reach')
       expect(tool?.isConcurrencySafe?.({})).toBe(true)
       const text = JSON.stringify(
-        await host.tools.execute({
-          callId: ToolCallId('call-reach'),
-          name: 'onboarding_reach',
-          arguments: { key: 'thread-sidebar#idle-archive-policy' },
-          signal: new AbortController().signal,
-        }),
+        await host.runTool({ name: 'onboarding_reach', arguments: { key: 'thread-sidebar#idle-archive-policy' } }),
       )
       // The fork's thread-sidebar reaches its list views through the Filter menu.
       expect(text).toContain('1. Click \\"Filter: \\" (button)')
       expect(text).toContain('Right-click \\"Idle policy target\\" (button) — not replayable here')
       expect(text).toContain('Docs: https://github.com/astahmer/dshfiles/blob/main/plugins/@dshfiles/thread-sidebar/README.md')
       const phone = JSON.stringify(
-        await host.tools.execute({
-          callId: ToolCallId('call-reach-phone'),
-          name: 'onboarding_reach',
-          arguments: { key: 'memory#memory-panel' },
-          signal: new AbortController().signal,
-        }),
+        await host.runTool({ name: 'onboarding_reach', arguments: { key: 'memory#memory-panel' } }),
       )
       expect(phone).toContain('Desktop (640 px wide or more):\\n1. Click \\"Knowledge\\" (tab)')
       expect(phone).toContain(
@@ -215,12 +199,7 @@ describe('onboarding Host', () => {
       const tool = on.host.tools.get('onboarding_whats_new')
       expect(tool?.isConcurrencySafe?.({})).toBe(true)
       const text = JSON.stringify(
-        await on.host.tools.execute({
-          callId: ToolCallId('call-whats-new'),
-          name: 'onboarding_whats_new',
-          arguments: { limit: 5 },
-          signal: new AbortController().signal,
-        }),
+        await on.host.runTool({ name: 'onboarding_whats_new', arguments: { limit: 5 } }),
       )
       expect(on.bundleReads).toEqual(['read'])
       expect(text).toContain('does not link Getting started from a dshfiles checkout')
@@ -353,8 +332,8 @@ describe('onboarding Host', () => {
       await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
       return host
     }
-    const execute = (host: Awaited<ReturnType<typeof createTestHost>>, id: string) =>
-      host.tools.execute({ callId: ToolCallId(id), name: 'onboarding_suggestions', arguments: {}, signal: new AbortController().signal }).then(
+    const execute = (host: Awaited<ReturnType<typeof createTestHost>>) =>
+      host.runTool({ name: 'onboarding_suggestions' }).then(
         value => JSON.stringify(value),
         (error: unknown) => String(error),
       )
@@ -363,7 +342,7 @@ describe('onboarding Host', () => {
     try {
       const client = createHostApiClient(off.ctx, onboardingApi, '@test/caller')
       await expect(client.suggestions({})).rejects.toThrow(/suggestions are off/u)
-      expect(await execute(off, 'call-off')).toMatch(/Usage suggestions are off, so no usage was read/u)
+      expect(await execute(off)).toMatch(/Usage suggestions are off, so no usage was read/u)
       expect(off.tools.get('onboarding_suggestions')?.isConcurrencySafe?.({})).toBe(true)
       expect(reads).toEqual([])
     } finally {
@@ -394,7 +373,7 @@ describe('onboarding Host', () => {
         'onboarding.suggestions.state': 'ready',
         'onboarding.suggestions.count': 2,
       })
-      expect(await execute(on, 'call-on')).toContain('jj-integration#thread-destination')
+      expect(await execute(on)).toContain('jj-integration#thread-destination')
       expect(reads).toEqual(['activity:30', 'charts:purpose'])
       expect(recorder.named('onboarding suggestions read')).toHaveLength(1)
     } finally {
@@ -423,12 +402,7 @@ describe('onboarding Host', () => {
     try {
       await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
       const execute = (args: { readonly pack: string; readonly action: string; readonly confirm?: true; readonly plugins?: readonly string[] }) =>
-        host.tools.execute({
-          callId: ToolCallId(`call-${String(writes.length)}`),
-          name: 'onboarding_pack_apply',
-          arguments: args,
-          signal: new AbortController().signal,
-        })
+        host.runTool({ name: 'onboarding_pack_apply', arguments: args })
       const bare = await execute({ pack: 'planning', action: 'enable' }).then(
         value => JSON.stringify(value),
         (error: unknown) => String(error),
@@ -504,9 +478,7 @@ describe('onboarding Host', () => {
       host: Awaited<ReturnType<typeof createTestHost>>,
       args: { readonly feature?: string; readonly pack?: string; readonly project?: string; readonly confirm?: true },
     ) =>
-      host.tools
-        .execute({ callId: ToolCallId(`call-${String(created.length)}`), name: 'onboarding_try_it', arguments: args, signal: new AbortController().signal })
-        .then(
+      host.runTool({ name: 'onboarding_try_it', arguments: args }).then(
           value => JSON.stringify(value),
           (error: unknown) => String(error),
         )

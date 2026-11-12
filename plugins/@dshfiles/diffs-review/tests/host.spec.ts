@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
@@ -54,9 +53,7 @@ describe.skipIf(!jjAvailable)('diffs-review Host', () => {
         properties: { path: { type: 'string', description: 'Absolute path of the workspace to review.' } },
         required: ['path'],
       })
-      const tool = yield* Effect.promise(() =>
-        f.host.tools.execute({ callId: ToolCallId('call-1'), name: 'diffs_review', arguments: { path: f.workspace }, signal: new AbortController().signal }),
-      )
+      const tool = yield* Effect.promise(() => f.host.runTool({ name: 'diffs_review', arguments: { path: f.workspace } }))
       expect(tool).toMatchObject({ isError: false })
       expect(tool.content.map(block => (block.type === 'text' ? block.text : '')).join('\n')).toMatch(/^Diffs review · main\.\.@ · 1 file · \+1 −0/u)
     }),
@@ -76,9 +73,7 @@ describe.skipIf(!jjAvailable)('diffs-review Host', () => {
       const names = f.host.tools.schemas().map(schema => schema.name)
       expect(names).toEqual(expect.arrayContaining(['diffs_review', 'diffs_review_revisions', 'pulls_review', 'pulls_review_revisions']))
       const text = (name: string) =>
-        Effect.promise(() =>
-          f.host.tools.execute({ callId: ToolCallId(`call-${name}`), name, arguments: { path: f.workspace }, signal: new AbortController().signal }),
-        ).pipe(Effect.map(result => result.content.map(block => (block.type === 'text' ? block.text : '')).join('\n')))
+        Effect.promise(() => f.host.runTool({ name, arguments: { path: f.workspace } })).pipe(Effect.map(result => result.content.map(block => (block.type === 'text' ? block.text : '')).join('\n')))
       expect(yield* text('pulls_review')).toBe(yield* text('diffs_review'))
     }),
   )
@@ -86,14 +81,7 @@ describe.skipIf(!jjAvailable)('diffs-review Host', () => {
   it.effect('reports a missing workspace as a failed review the agent can read', () =>
     Effect.gen(function* () {
       const f = yield* fixture
-      const tool = yield* Effect.promise(() =>
-        f.host.tools.execute({
-          callId: ToolCallId('call-2'),
-          name: 'diffs_review',
-          arguments: { path: join(f.workspace, 'gone') },
-          signal: new AbortController().signal,
-        }),
-      )
+      const tool = yield* Effect.promise(() => f.host.runTool({ name: 'diffs_review', arguments: { path: join(f.workspace, 'gone') } }))
       expect(tool.content).toEqual([{ type: 'text', text: 'That thread workspace is no longer on disk.' }])
     }),
   )

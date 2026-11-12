@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-import type { ToolExecutionInput } from '@deepseek-ai/dsh-tools'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
@@ -59,13 +57,4 @@ export const requestApi = (host: TestHostInstance, method: string, input: unknow
   })
 
 // oxlint-disable-next-line antislop/no-unknown-parameters -- the native tool pipeline is the boundary under test, including malformed arguments.
-export const tool = (host: TestHostInstance, name: string, args: unknown) =>
-  Effect.promise(() =>
-    host.tools.execute({
-      // SAFETY: ToolCallId is an opaque string brand; a generated UUID is unique and no Agent structure is asserted.
-      callId: randomUUID() as ToolExecutionInput['callId'],
-      name,
-      arguments: args,
-      signal: new AbortController().signal,
-    }),
-  )
+export const tool = (host: TestHostInstance, name: string, args: unknown) => Effect.promise(() => host.runTool({ name, arguments: args }))
