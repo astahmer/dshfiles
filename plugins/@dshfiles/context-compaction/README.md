@@ -41,6 +41,23 @@ config:
 
 `startRatio` is a fraction of the threshold in (0, 1). Lower starts earlier, so the summary is more likely ready but covers a smaller span and is more likely to be followed by a second, blocking compaction. Requires automatic compaction (`auto`, on by default).
 
+## Loaded skills
+
+A compaction replaces the span it summarizes, and with it the bodies of the skills that span loaded, so a long thread loads the same skill again after each compaction (one thread loaded `dsh-sessions` 65 times). With `loadedSkills` on, each checkpoint appends a `<loaded-skills>` block after the summary: the skills that span loaded, read from the `skill` tool's results and from the block an earlier checkpoint kept, so the list survives every later compaction. **Off by default**: the block adds tokens to every later request.
+
+| `loadedSkills` | Kept in each checkpoint                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------------------------- |
+| `off`          | Nothing (default).                                                                                          |
+| `names`        | One line per skill: its name and directory, with a note that its instructions still apply.                  |
+| `bodies`       | The names, plus each skill's instructions up to 32,000 characters per checkpoint; the rest keep their name. |
+
+A skill quoted in conversation text does not count, only a tool result or a kept block. A skill result the tool-result pruner already shortened is kept as shortened.
+
+```yaml
+config:
+  loadedSkills: names
+```
+
 ## Idle compaction
 
 A thread left idle past its provider's prompt-cache lifetime re-sends its whole prompt uncached on the next message. One compaction shortly before that costs less when the thread resumes much later, and nothing when it never resumes. **Off by default**: each compaction is one billed request per idle thread, so turn it on only after a measurement shows it pays (b:7csc).

@@ -8,6 +8,7 @@ import { withSpan } from '@dshfiles/dshx/tracing'
 import { isDeepStrictEqual } from 'node:util'
 import { compactionSpec, type CompactionSpec } from './compaction-threshold.js'
 import { isProviderContextOverflow } from './context-overflow.js'
+import { withLoadedSkills, type LoadedSkillsMode } from './loaded-skills.js'
 import { selectCompactableRange, summarizationInputFor, type SummarizationInput, type SurfaceRange } from './surface-range.js'
 
 type SummaryResult = Awaited<ReturnType<BasicCompactionEngine['summarize']>>
@@ -86,6 +87,8 @@ export const compactionEngine = (options: {
    * instead of failing again at every step.
    */
   readonly isPersistentFailure: (error: unknown) => boolean
+  /** What each checkpoint keeps of the skills loaded in the span it replaces. */
+  readonly loadedSkills: LoadedSkillsMode
   /** Aborted when the plugin unloads: stops background summaries still in flight. */
   readonly signal: AbortSignal
 }) =>
@@ -129,6 +132,11 @@ export const compactionEngine = (options: {
     }
 
     protected override async summarize(input: SummarizationInput, agent: Agent, signal?: AbortSignal): Promise<SummaryResult> {
+      const result = await this.summarizeSpan(input, agent, signal)
+      return { ...result, summary: withLoadedSkills({ summary: result.summary, messages: input.messages, mode: options.loadedSkills }) }
+    }
+
+    private async summarizeSpan(input: SummarizationInput, agent: Agent, signal: AbortSignal | undefined): Promise<SummaryResult> {
       const prepared = this.prepared.get(agent.session)
       if (prepared !== undefined && isDeepStrictEqual(prepared.input, input)) {
         this.prepared.delete(agent.session)

@@ -120,6 +120,49 @@
       ]
     },
     {
+      "id": "loaded-skills",
+      "title": "Loaded skills kept in compaction checkpoints",
+      "summary": "Opt-in: each checkpoint lists the skills the span it replaces loaded (and, in bodies mode, keeps their instructions), so a long thread does not reload a skill only because a compaction dropped it. Off by default: the kept block adds tokens to every later request.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: appended to the checkpoint summary, no UI",
+      "configuration": [
+        {
+          "key": "loadedSkills",
+          "defaultValue": "off",
+          "constraints": "names adds one line per loaded skill to each checkpoint; bodies also keeps their instructions, up to 32,000 characters per checkpoint.",
+          "choices": ["off", "names", "bodies"],
+          "coveredBy": ["context-compaction.loaded-skills"]
+        }
+      ],
+      "states": ["off", "names", "bodies"],
+      "failureModes": [
+        "A skill result the tool-result pruner already shortened keeps only its shortened text in bodies mode.",
+        "Skills past the 32,000-character budget keep only their name and directory."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.loaded-skills",
+          "file": "tests/loaded-skills.spec.ts",
+          "testName": "carries the skills an earlier checkpoint kept into the next one"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "context-compaction.loaded-skills-browser-journey",
+          "reason": "This Host-only checkpoint text has no browser surface; unit tests drive it on replayed messages."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Pure text assembly inside the summary the existing context compaction summarize span already covers; no I/O of its own."
+        }
+      ]
+    },
+    {
       "id": "overflow-recognition",
       "title": "Provider context-overflow recognition",
       "summary": "Recognizes context-overflow failures the core does not code as CONTEXT_WINDOW_EXCEEDED (Anthropic, Gemini, Bedrock, llama.cpp, xAI, Moonshot, Copilot, GLM, Cohere wording, along the cause chain) and gives them the stock recovery: one overflow compaction, then a retry. Also ignores a compaction headroom buffer that would leave the model no pressure budget.",

@@ -18,9 +18,11 @@ import { DEFAULT_IDLE_COMPACTION, type IdleCompactionPolicy } from './idle-compa
 import { idleGenerationStart } from './idle-generation.js'
 import { compactionEngine, type SummaryRequest } from './compaction-engine.js'
 import { isProviderContextOverflow } from './context-overflow.js'
+import type { LoadedSkillsMode } from './loaded-skills.js'
 import { sweepIdleCompaction, type IdleCompactionCandidate } from './idle-compaction-sweep.js'
 
 const SWEEP_INTERVAL = Duration.minutes(1)
+const DEFAULT_LOADED_SKILLS: LoadedSkillsMode = 'off'
 
 /** The Session controller refused one idle compaction; `text` is its own explanation. */
 class IdleCompactionRefused extends Schema.TaggedError<IdleCompactionRefused>()('IdleCompactionRefused', { text: Schema.String }) {
@@ -56,6 +58,8 @@ const CompactionConfig = Schema.Struct({
   idleCacheStrategy: Schema.Literals(['off', 'compact']).pipe(Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_IDLE_COMPACTION.strategy))),
   // Off by default: a prepared summary the conversation moves past is a billed request that is thrown away.
   backgroundSummary: BackgroundSummaryConfig.pipe(Schema.withDecodingDefaultKey(Effect.succeed({ enabled: false }))),
+  // Off by default: the kept list, and more so the kept instructions, add tokens to every later request.
+  loadedSkills: Schema.Literals(['off', 'names', 'bodies']).pipe(Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_LOADED_SKILLS))),
   idle: IdleCompactionConfig.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
 })
 
@@ -153,6 +157,7 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
         },
         background: config.backgroundSummary,
         isPersistentFailure: error => error instanceof CompactionBudgetExceeded || (error instanceof ContextCompactionFailure && error.reason !== 'model-info'),
+        loadedSkills: config.loadedSkills,
         signal: engineAbort.signal,
       })
       yield* Effect.acquireRelease(
