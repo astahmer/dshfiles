@@ -58,6 +58,21 @@ describe('what remote threads wait on', () => {
     stop()
   })
 
+  it('asks a live stream again once a minute, not every 15 s, and reads once at boot while it connects', async () => {
+    const { sessionInteractions, stop } = fixture(async () => ({ ok: true as const, interactions: [] }))
+    events.handlers?.onStatus('connecting')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sessionInteractions).toHaveBeenCalledTimes(1)
+    events.handlers?.onStatus('live')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sessionInteractions).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(59_000)
+    expect(sessionInteractions).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(sessionInteractions).toHaveBeenCalledTimes(3)
+    stop()
+  })
+
   it('polls without the event stream', async () => {
     const { sessionInteractions, stop } = fixture(async () => ({ ok: true as const, interactions: [] }))
     await vi.advanceTimersByTimeAsync(0)

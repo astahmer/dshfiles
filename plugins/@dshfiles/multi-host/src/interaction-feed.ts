@@ -2,8 +2,11 @@ import { isApiOwnerMissing, type ApiClient } from '@dshfiles/dshx/api'
 import { subscribeApiEvent } from '@dshfiles/dshx/client'
 import type { multiHostApi, RemoteInteraction } from './api.js'
 
-/** A connected event stream announces every change; this only covers a missed frame. */
-const liveInterval = 15_000
+/**
+ * A connected event stream announces every change, and a stream that drops reports a non-live status and reads again
+ * once live, so this only covers a frame lost while the stream stayed up.
+ */
+const liveInterval = 60_000
 /** Without the event stream this read is the feed. */
 const fallbackInterval = 2_000
 /** A Host that keeps failing, such as an older one that lacks the method until it restarts, is asked rarely. */
@@ -63,7 +66,9 @@ export const watchRemoteInteractions = (input: {
     onEvent: () => void read(),
     onStatus: status => {
       interval = status === 'live' ? liveInterval : fallbackInterval
-      void read()
+      // Turning live may have missed events; any other status only changes the cadence of the read already scheduled.
+      if (status === 'live') void read()
+      else if (!reading) schedule()
     },
   })
   void read()
