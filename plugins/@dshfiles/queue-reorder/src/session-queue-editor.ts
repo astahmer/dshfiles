@@ -298,13 +298,37 @@ const createEditor = (input: {
   })
 }
 
-const editors = new Map<string, { readonly session: SessionFace; readonly editor: QueueEditor; readonly release: () => void }>()
+const editors = new Map<SessionFace['sessionId'], { readonly session: SessionFace; readonly editor: QueueEditor; readonly release: () => void }>()
+const transfers = new Map<SessionFace['sessionId'], { readonly session: SessionFace; readonly actor: QueueTransferActor }>()
 
 /**
- * The editor for one session, kept for the page's lifetime so an edit survives switching threads. During attachment
- * loading and while a record is open, the session stays retained so the async edit can finish against its owner.
+ * Drop the idle editors and transfers of Sessions the controller released: each holds its whole Session (event window,
+ * conversation, composer), so keeping one per visited thread grew the tab by megabytes per thread. A busy one stays
+ * until it settles; an open edit record is also persisted, so a released editor restores it on the next visit.
+ */
+const releaseUnbound = (ctx: Context): void => {
+  for (const [sessionId, entry] of editors) {
+    if (ctx.sessions.binding(sessionId)?.session === entry.session) continue
+    if (QueueEditModel.retainsSession(entry.editor.getSnapshot())) continue
+    editors.delete(sessionId)
+    entry.release()
+    entry.editor.dispose()
+  }
+  for (const [sessionId, entry] of transfers) {
+    if (ctx.sessions.binding(sessionId)?.session === entry.session) continue
+    if (!entry.actor.getSnapshot().matches('idle')) continue
+    transfers.delete(sessionId)
+    entry.actor.stop()
+  }
+}
+
+/**
+ * The editor for one session, kept while the controller keeps its Session so an edit survives switching threads.
+ * During attachment loading and while a record is open, the session stays retained so the async edit can finish
+ * against its owner.
  */
 const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['sessionId']): QueueEditor | undefined => {
+  releaseUnbound(ctx)
   const binding = ctx.sessions.binding(sessionId)
   const scoped = ctx.sessions.scope(sessionId)
   if (binding === undefined || scoped === undefined) return undefined
@@ -349,8 +373,6 @@ const sessionImageReader = (ctx: Context, sessionId: SessionFace['sessionId']): 
   return binding === undefined ? undefined : sessionQueueIo({ sessionId, session: binding.session }).readImage
 }
 
-const transfers = new Map<string, { readonly session: SessionFace; readonly actor: QueueTransferActor }>()
-
 /** Main view retention a just-opened thread takes before this plugin lets go of its own reference. */
 const OPEN_TIMEOUT_MS = 5_000
 
@@ -379,10 +401,11 @@ const conversationOf = (ctx: Context, sessionId: SessionFace['sessionId']) => {
 }
 
 /**
- * The "Move to thread" flow for one session's queue, kept for the page's lifetime like the editor: opening the
- * target thread unmounts this dock, and the move must still finish.
+ * The "Move to thread" flow for one session's queue, kept like the editor: opening the target thread unmounts this
+ * dock, and the move must still finish.
  */
 const sessionQueueTransfer = (ctx: Context, sessionId: SessionFace['sessionId']): QueueTransferActor | undefined => {
+  releaseUnbound(ctx)
   const binding = ctx.sessions.binding(sessionId)
   const source = conversationOf(ctx, sessionId)
   if (binding === undefined || source === undefined) return undefined
