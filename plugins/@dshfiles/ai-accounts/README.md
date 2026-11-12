@@ -394,6 +394,10 @@ and fails over only while it is unavailable. Priority chooses the first healthy
 compatible account in account-list order; move accounts up or down within each
 provider group to change that order. Round-robin advances within each compatible
 provider/model group, while Balanced favors accounts used least recently.
+A thread whose selection names a provider this Host no longer serves (a removed
+account) moves to an enabled, healthy account route offering the same model as
+the turn starts; the picker shows that route. With no such route the turn stops
+with `NO_ADAPTER`: pick a model from a configured provider, or add the account.
 
 ## Usage
 
@@ -444,11 +448,12 @@ as file placeholders, then fail the turn or hand the failure to DSH's own retry
 and compaction. Defaults: connection → retry twice, then fail over; exhausted →
 Luna Reserve, then fail over; rate limit → fail over, then wait up to a minute;
 sign-in and oversized stay with DSH. A fail-over cools the account that failed
-and selects its stand-in for the Session, keeping the model and reasoning
-effort, so the retry and the picker both name the account now serving the
-conversation; like any picker change, it also becomes the default model for new
-Sessions. Switch back from the picker once the failed account recovers. Each
-step shows as a retry row in the turn. Large
+and retries the same step on its stand-in: the request keeps the step's model
+and reasoning effort and only the account on the wire changes. It also selects
+the stand-in for the Session, so the picker and later steps name the account now
+serving the conversation; like any picker change, it also becomes the default
+model for new Sessions. Switch back from the picker once the failed account
+recovers. Each step shows as a retry row in the turn. Large
 tool outputs are never trimmed.
 
 ### Fast mode
@@ -463,27 +468,37 @@ reasoning effort, across provider kinds (Codex, then Claude, then OpenCode). Edi
 it from the **Fallbacks** section of the composer model picker: **Add current
 selection**, move rungs up or down, remove them, or switch to **Default** to edit
 the chain every thread without its own follows (**Use default** drops a
-thread's own chain). When a chain has routes it replaces the same-provider
-fail-over step above: a failure whose kind fails over (connection, rate limit,
-exhausted by default) moves the turn to the next enabled, healthy rung after the
-current one, never one the turn already tried. Sticky distribution never walks
-the chain, except for a stalled stream: with **Fall back on stalled streams**
-(Settings › AI Accounts › Failure recovery, `stalledStreamFallback`, off by
-default, needs transport fail-over on) a request that sends no data until its
-idle timeout (`pi-ai stream idle timeout after …ms`) moves to the thread's
-stored chain after its transport retries, under any distribution. Each retry row
-of a stalled stream names the route, model and how long it stayed silent; a turn
-it stops tells the user to Resume or pick another model, and how to turn the
-fallback on. The fail-over selects the fallback for the Session like an account
-fail-over does. **After a fallback answers** chooses whether the thread stays
-there (default; the provider's prompt cache stays warm) or returns to its
-selection when the turn ends; **Return to selection** goes back by hand. The
+thread's own chain). A thread with no chain of its own walks its provider
+kind's sibling accounts, one rung each. When a chain has routes it replaces the
+same-provider fail-over step above: a failure whose kind fails over (connection,
+rate limit, exhausted by default) moves the work to the next enabled, healthy
+rung after the current one, never one the interrupted work already tried. Sticky
+distribution never walks the chain, except for a stalled stream: with **Fall
+back on stalled streams** (Settings › AI Accounts › Failure recovery,
+`stalledStreamFallback`, off by default, needs transport fail-over on) a request
+that sends no data until its idle timeout (`pi-ai stream idle timeout after …ms`)
+moves to the thread's stored chain after its transport retries, under any
+distribution. Each retry row of a stalled stream names the route, model and how
+long it stayed silent; a turn it stops tells the user to Resume or pick another
+model, and how to turn the fallback on.
+
+DSH fixes a step's provider, model and effort before it sends anything, so a
+rung cannot take over the failed step. The fail-over selects the fallback for
+the Session (the picker names it, and the fallback's own effort replaces the
+failed route's), the turn ends with the provider's error and a retry row naming
+the fallback, and a follow-up turn starts on the fallback by itself with a
+`[ai-accounts fail-over]` message asking the agent to continue where it stopped.
+No follow-up starts when you stop the turn, queue a message or pick another
+model before it settles. **After a fallback answers** chooses whether the thread
+stays there (default; the provider's prompt cache stays warm) or returns to its
+selection when the follow-up turn ends; **Return to selection** goes back by
+hand. The
 chain and the fallback serving each thread live in Host storage. Agents read and
 change them through `model_fallback_state`, `set_model_fallback_chain`,
 `set_model_fallback_return` and `return_to_selected_model`; other plugins import
 the contract from `@dshfiles/ai-accounts/model-fallback-api`. A native provider
 has no cooldown signal, so a spent native rung is only skipped for the rest of
-the turn that hit it.
+the turn that hit it and its follow-up turns.
 
 When a turn stops on an exhausted quota, the Session is listed under **Quota
 recovery** in the account's panel. **Resume now** queues a recovery prompt;

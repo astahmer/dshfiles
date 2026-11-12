@@ -1,5 +1,5 @@
 import type { Agent, RequestErrorAction } from '@deepseek-ai/dsh-agent'
-import type { LlmCallConfig, LlmFailure } from '@deepseek-ai/dsh-llm'
+import type { LlmCallConfig, LlmFailure, UserMessage } from '@deepseek-ai/dsh-llm'
 import type {} from '@dshfiles/request-messages'
 import { Context, Effect } from 'effect'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
@@ -22,6 +22,8 @@ interface FailedRequest extends StepPosition {
 
 /** The routing decisions one agent's Cordis waterfalls run, as Effects over the plugin services. */
 export interface AgentRoutingHandlers {
+  /** Runs synchronously while DSH claims a step's input, before it fixes the step's model selection. */
+  readonly claimed: (claimed: { readonly messageId: UserMessage['id']; readonly turn: number }) => Effect.Effect<void>
   readonly request: (position: StepPosition, proposed: LlmCallConfig) => Effect.Effect<LlmCallConfig, unknown>
   readonly requestError: (failed: FailedRequest, next: Effect.Effect<RequestErrorAction>) => Effect.Effect<RequestErrorAction>
   readonly requestMessagesShrink: (position: StepPosition) => boolean
@@ -36,6 +38,7 @@ export interface AgentRoutingHandlers {
 export class RequestRoutingHooks {
   static register(agent: Agent, services: Context.Context<never>, handlers: AgentRoutingHandlers): () => void {
     const run = Effect.runPromiseWith(services)
+    const offClaimed = agent.ctx.on('agent/inbox/claimed', ({ message, turn }) => Effect.runSyncWith(services)(handlers.claimed({ messageId: message.id, turn })))
     const offRequest = agent.ctx.on(
       'agent/request',
       async ({ turn, step }, next) => {
@@ -56,6 +59,7 @@ export class RequestRoutingHooks {
       { prepend: true },
     )
     return () => {
+      offClaimed()
       offRequest()
       offTurnStopping()
       offRequestError()

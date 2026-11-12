@@ -72,7 +72,7 @@ describe('ai-accounts quota inbox provider', () => {
     const host = await createTestHost()
     const prompts: SessionPromptRequest[] = []
     const sessionController = {
-      inspect: async () => ({ events: [] }),
+      events: async () => ({ records: [], hasMore: false, cursor: 0 }),
       prompt: async (request: SessionPromptRequest) => {
         prompts.push(request)
         return { accepted: true as const }

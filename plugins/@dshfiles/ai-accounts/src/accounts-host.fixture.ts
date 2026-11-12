@@ -230,7 +230,7 @@ const start = async (input: StartInput): Promise<AccountsHost> => {
       selected.push(request)
     },
   })
-  if (input.userSelections === true) ctx.sessionProjections.register(userSelectionProjection)
+  if (input.userSelections === true) await ctx.sessionProjections.register(userSelectionProjection)
   const retryAfterMs = input.retryAfterMs
   if (retryAfterMs !== undefined) {
     ctx.on('llm/stream', (_options, next) => withProviderRetryAfter(next(), retryAfterMs))

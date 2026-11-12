@@ -5,7 +5,7 @@ import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { ModelSelection, SessionController, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 
 import { SessionId } from '@deepseek-ai/dsh-session'
-import { ScheduleId, type ScheduleRecord } from '@deepseek-ai/dsh-schedule'
+import { ScheduleId, type ScheduleCatalogEntry, type ScheduleRecord, type ScheduleService } from '@deepseek-ai/dsh-schedule'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-agent'
@@ -24,6 +24,7 @@ import { resetAtFromMessage } from './quota-reset.js'
 const MAX_CONTINUATIONS = 500
 const CONTINUATION_RETENTION_MS = 30 * 24 * 60 * 60_000
 const AUTO_RESUME_DELAY_MS = 60_000
+const SCHEDULE_PAGE_SIZE = 500
 const SNOOZE_MS = {
   'one-hour': 60 * 60_000,
   'four-hours': 4 * 60 * 60_000,
@@ -31,15 +32,12 @@ const SNOOZE_MS = {
 } as const
 
 type QuotaContinuationDomain = Domain<typeof quotaContinuationDomain>
-type SchedulePort = Pick<NonNullable<Context['schedule']>, 'create' | 'delete' | 'list'>
+type SchedulePort = Pick<ScheduleService, 'create' | 'edit' | 'list'>
 type SessionControllerService = SessionController
-type SessionInspectionEvents = Awaited<ReturnType<SessionControllerService['inspect']>>['events']
 type SessionListItems = Awaited<ReturnType<SessionControllerService['list']>>['items']
+type SessionWireEvent = Awaited<ReturnType<SessionControllerService['events']>>['records'][number]['event']
 type SessionControllerPort = {
-  inspect: (
-    sessionId: Parameters<SessionControllerService['inspect']>[0],
-    signal?: Parameters<SessionControllerService['inspect']>[1],
-  ) => Promise<{ readonly events: SessionInspectionEvents }>
+  events: SessionControllerService['events']
   prompt: SessionControllerService['prompt']
   list?: SessionControllerService['list']
   selectModel?: SessionControllerService['selectModel']
@@ -112,6 +110,36 @@ const hasNewerUserWork = (record: QuotaContinuationRecord, activities: readonly 
   activities.some(activity => activity.seq >= record.failedSeq && activity.continuationId !== record.continuationId)
 
 const completedTurnEnd = Schema.Struct({ reason: Schema.Struct({ kind: Schema.Literal('completed') }) })
+
+const userMessageData = Schema.Struct({
+  content: Schema.Array(Schema.Struct({ type: Schema.String, text: Schema.optionalKey(Schema.String) })),
+  source: Schema.Struct({ kind: Schema.String, rpcId: Schema.optionalKey(Schema.Unknown) }),
+})
+
+const wireUserActivity = (event: SessionWireEvent): UserActivityIdentity | undefined => {
+  if (event.type !== 'user/message') return undefined
+  const message = AiAccountsSchema.decodeResult(userMessageData, event.data)
+  return message._tag === 'Success' ? QuotaContinuationMessage.userActivityForMessage(message.success) : undefined
+}
+
+/** Reads the Session log backwards until it covers `sinceSeq`, without activating a cold Session. */
+const userActivitiesSince = async (
+  controller: Pick<SessionControllerPort, 'events'>,
+  sessionId: SessionId,
+  sinceSeq: number,
+  signal: AbortSignal,
+): Promise<SessionUserActivity[]> => {
+  const activities: SessionUserActivity[] = []
+  let beforeSeq: number | undefined
+  for (;;) {
+    const page = await controller.events({ address: { kind: 'session', sessionId }, ...(beforeSeq === undefined ? {} : { beforeSeq }) }, signal)
+    const events = page.records.map(record => record.event)
+    activities.push(...collectUserActivities(events, wireUserActivity))
+    const oldest = events[0]
+    if (!page.hasMore || oldest === undefined || oldest.seq <= sinceSeq) return activities
+    beforeSeq = oldest.seq
+  }
+}
 
 /** Whether a turn finished normally after `seq`: then the work the recovery stood for is done and it is not taken up again. */
 const turnCompletedSince = (agent: Pick<QuotaFailureAgent, 'session'>, seq: number): boolean => {
@@ -210,11 +238,26 @@ const createQuotaContinuationService = ({
     return storage.size < MAX_CONTINUATIONS
   }
 
-  const scheduleMatches = async (record: QuotaContinuationRecord) => {
+  const activeSchedules = async (scheduler: SchedulePort): Promise<ScheduleCatalogEntry[]> => {
+    const items: ScheduleCatalogEntry[] = []
+    for (;;) {
+      const page = await scheduler.list({ active: true, limit: SCHEDULE_PAGE_SIZE, offset: items.length })
+      items.push(...page.items)
+      if (page.shown === 0 || items.length >= page.total) return items
+    }
+  }
+
+  const scheduleMatches = async (record: QuotaContinuationRecord): Promise<ScheduleCatalogEntry[]> => {
     const scheduler = schedule()
     if (scheduler === undefined) return []
-    const tasks = await scheduler.list({ sessionId: SessionId(record.sessionId) })
-    return tasks.filter(task => task.prompt === QuotaContinuationMessage.promptFor(record.continuationId))
+    const prompt = QuotaContinuationMessage.promptFor(record.continuationId)
+    return (await activeSchedules(scheduler)).filter(
+      task => task.target.kind === 'session' && task.target.sessionId === record.sessionId && task.prompt === prompt,
+    )
+  }
+
+  const deleteSchedule = async (scheduler: SchedulePort, id: ScheduleRecord['id']): Promise<void> => {
+    await scheduler.edit({ id, action: 'delete' })
   }
 
   const cancelScheduled = async (record: QuotaContinuationRecord): Promise<void> => {
@@ -224,7 +267,7 @@ const createQuotaContinuationService = ({
       const matches = await scheduleMatches(record)
       const ids = new Set(matches.map(task => task.id))
       if (record.scheduleId !== null) ids.add(scheduleIdFor(record.scheduleId))
-      await Promise.all([...ids].map(id => scheduler.delete({ sessionId: SessionId(record.sessionId), id })))
+      await Promise.all([...ids].map(id => deleteSchedule(scheduler, id)))
     } catch (error) {
       context.logger.warn(`ai-accounts: could not remove a stale quota recovery schedule: ${String(error)}`)
     }
@@ -250,7 +293,7 @@ const createQuotaContinuationService = ({
       const matches = await scheduleMatches(record)
       const existing = matches[0]
       if (existing !== undefined) {
-        await Promise.all(matches.slice(1).map(task => scheduler.delete({ sessionId: SessionId(record.sessionId), id: task.id })))
+        await Promise.all(matches.slice(1).map(task => deleteSchedule(scheduler, task.id)))
         const storage = await table()
         await storage.update(record.continuationId, current => (current.state === 'waiting' ? { ...current, scheduleId: existing.id } : current))
         return
@@ -260,15 +303,16 @@ const createQuotaContinuationService = ({
       const marginMs = record.resetAt === null ? 0 : AUTO_RESUME_DELAY_MS
       const scheduledAt = Math.max(dueAt, record.snoozedUntil ?? 0, now()) + marginMs
       const afterSeconds = Math.max(1, Math.ceil((scheduledAt - now()) / 1_000))
-      const created = await scheduler.create(SessionId(record.sessionId), {
+      const created = await scheduler.create({
         title: 'Quota recovery',
         prompt: QuotaContinuationMessage.promptFor(record.continuationId),
-        after_seconds: afterSeconds,
+        timing: { kind: 'after', after_seconds: afterSeconds },
+        target: { kind: 'session', sessionId: SessionId(record.sessionId) },
       })
       const storage = await table()
       await storage.update(record.continuationId, current => (current.state === 'waiting' ? { ...current, scheduleId: created.id } : current))
       const current = storage.get(record.continuationId)
-      if (current?.state !== 'waiting') await scheduler.delete({ sessionId: SessionId(record.sessionId), id: created.id })
+      if (current?.state !== 'waiting') await deleteSchedule(scheduler, created.id)
     } catch (error) {
       context.logger.warn(`ai-accounts: automatic quota recovery could not be scheduled: ${String(error)}`)
     }
@@ -604,10 +648,7 @@ const createQuotaContinuationService = ({
       if (controller === undefined || (selection !== undefined && controller.selectModel === undefined)) return { accepted: false }
 
       try {
-        const inspected = await controller.inspect(SessionId(current.sessionId), AbortSignal.timeout(15_000))
-        const activities = collectUserActivities<SessionInspectionEvents[number]>(inspected.events, event =>
-          event.type === 'user/message' ? QuotaContinuationMessage.userActivityForMessage(event.data) : undefined,
-        )
+        const activities = await userActivitiesSince(controller, SessionId(current.sessionId), current.failedSeq, AbortSignal.timeout(15_000))
         if (hasNewerUserWork(current, activities)) {
           await invalidate(current, 'newerWork')
           return { accepted: false }

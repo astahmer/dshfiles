@@ -125,6 +125,7 @@
     "@deepseek-ai/dsh-session-format-v3-to-v4": "0.2.2-rc.1",
     "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.2-rc.1",
     "@deepseek-ai/dsh-session-projection": "catalog:",
+    "@deepseek-ai/dsh-session-title-llm": "0.2.2-rc.1",
     "@deepseek-ai/dsh-storage": "catalog:",
     "@deepseek-ai/dsh-storage-domain": "catalog:",
     "@deepseek-ai/dsh-storage-json": "catalog:",

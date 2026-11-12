@@ -15,6 +15,7 @@ const memoryTable = <Value>(): KvTable<string, Value> => {
       rows.set(key, value)
     },
     delete: async key => rows.delete(key),
+    deleteMany: async keys => keys.filter(key => rows.delete(key)).length,
     update: async (key, change) => {
       const current = rows.get(key)
       if (current === undefined) throw new Error('missing row')

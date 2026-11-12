@@ -1,8 +1,8 @@
-import type { Agent, RequestErrorAction } from '@deepseek-ai/dsh-agent'
-import type { GenerateOptions, LlmCallConfig, LlmFailure, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import type { Agent, ModelSelection, RequestErrorAction } from '@deepseek-ai/dsh-agent'
+import type { GenerateOptions, LlmCallConfig, LlmFailure, StreamChunk, UserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
-import { threadModelPolicySchema, type ThreadModelPolicy, type ThreadModelSelection } from '@dshfiles/session-controller/thread-model-api'
+import type { ThreadModelPolicy, ThreadModelSelection } from '@dshfiles/session-controller/thread-model-api'
 import { Context, Effect, FiberMap, HashMap, Layer, Option, Ref, type Scope } from 'effect'
 import { AccountPool, creditServedAttempt } from './account-pool.js'
 import { AccountSettings } from './account-settings-service.js'
@@ -65,13 +65,24 @@ export interface RoutingWorld {
   }) => Effect.Effect<void, AutomaticSelectionRefused>
 }
 
-const chainSelection = (route: FallbackRoute | undefined) => (route === undefined ? undefined : ModelFallbackModel.selectionFor(route))
+const nativeSelection = (route: FallbackRoute): ModelSelection =>
+  route.reasoningEffort === undefined
+    ? { provider: route.provider, model: route.model }
+    : { provider: route.provider, model: route.model, reasoningEffort: ReasoningEffortId(route.reasoningEffort) }
+
+const continuationText = (input: { readonly from: string; readonly to: string }): string =>
+  `[ai-accounts fail-over] The previous request failed on ${input.from}, so this thread moved to ${input.to}. Continue the interrupted work from where it stopped. Check the recorded tool outcomes first and ask before repeating anything that may already have taken effect.`
 
 /**
  * Request routing: which account each request goes out on, and what a failed request does next. The Cordis
  * waterfalls (`agent/request`, `agent/request-error`, `agent/request-messages`, `agent/turn-stopping`) run the
  * handlers below as Effects; `llm/stream` is synchronous, so it decides from the current `Ref` state. Per-agent
  * listeners live in one scope per agent, closed when the agent is disposed or the plugin unloads.
+ *
+ * DSH fixes each step's provider, model and effort before `agent/request`, which may not change them. A route change
+ * is therefore an `agent.model.select()` for a later step: while the step's input is claimed (a selection naming a
+ * provider with no adapter), or after a failed request (a fallback chain hop, which ends the step and continues the
+ * turn on the fallback). Account fail-over keeps the step's route and moves only the wire account in `llm/stream`.
  */
 export class RequestRouting extends Context.Service<
   RequestRouting,
@@ -88,12 +99,11 @@ export class RequestRouting extends Context.Service<
     const settings = yield* AccountSettings
     const host = yield* HostContext
     const activeRoutes = yield* Ref.make(HashMap.empty<string, ActiveRoute>())
+    const continuations = yield* Ref.make(HashMap.empty<string, UserMessage['id']>())
     const retryWait = yield* RetryWait
 
-    const threadPolicyFor = (agent: Agent): ThreadModelPolicy | null => {
-      const policy = threadModelPolicySchema.safeParse(host.ctx.sessionProjections.stateOf(agent.session, 'threadModelPolicy'))
-      return policy.success ? policy.data : null
-    }
+    const threadPolicyFor = (agent: Agent): ThreadModelPolicy | null =>
+      host.ctx.sessionProjections.snapshot(agent.session, ['threadModelPolicy']).values.threadModelPolicy ?? null
     const prefersSelectedProvider = (agent: Agent, provider: string, model: string): boolean => {
       const policy = threadPolicyFor(agent)
       return policy?.preferSelectedProvider === true && policy.selection?.provider === provider && policy.selection.model === model
@@ -117,37 +127,58 @@ export class RequestRouting extends Context.Service<
       const selectAutomaticModel = (agent: Agent, selection: ThreadModelSelection, expectedRevision: number) =>
         world.selectModel({ agent, selection, expectedRevision, legacy: threadPolicyFor(agent) === null })
 
-      const onAgentRequest = Effect.fn('ai-accounts agent request')(function* (
-        agent: Agent,
-        requestPolicy: ThreadRequestPolicy,
-        position: { readonly turn: number; readonly step: number },
-        proposed: LlmCallConfig,
-      ) {
-        const id = agent.id
-        const routes = world.routes()
-        if (prefersSelectedProvider(agent, proposed.provider, proposed.model)) world.fallbackRouter.returnToSelection(id)
-        const fallback = world.fallbackRouter.routeRequest({ sessionId: id, turn: position.turn, request: proposed })
-        let request: LlmCallConfig = proposed
-        if (fallback !== undefined) {
-          // The proposed effort belongs to the route the fallback replaces.
-          const { reasoningEffort: _replacedEffort, ...proposedRest } = proposed
-          request = { ...proposedRest, provider: fallback.provider, model: fallback.model }
-          if (fallback.reasoningEffort !== undefined) request = { ...request, reasoningEffort: ReasoningEffortId(fallback.reasoningEffort) }
-        }
-        const preflight = RequestAccountRouting.selectionPreflight({
-          provider: request.provider,
-          model: request.model,
-          routes,
+      const preflightFor = (selection: Pick<ModelSelection, 'provider' | 'model'>) =>
+        RequestAccountRouting.selectionPreflight({
+          provider: selection.provider,
+          model: selection.model,
+          routes: world.routes(),
           nativeProviders: world.nativeProviders(),
           offersModel: world.offersModel,
           pool: pool.view,
         })
+
+      const onClaimed = Effect.fn('ai-accounts inbox claimed')(function* (
+        agent: Agent,
+        claimed: { readonly messageId: UserMessage['id']; readonly turn: number },
+      ) {
+        const continuation = Option.getOrUndefined(HashMap.get(yield* Ref.get(continuations), agent.id))
+        if (continuation === claimed.messageId) {
+          yield* Ref.update(continuations, pending => HashMap.remove(pending, agent.id))
+          world.fallbackRouter.continueTurn({ sessionId: agent.id, turn: claimed.turn })
+        }
+        const current = agent.model.current()
+        if (current === undefined) return
+        const preflight = preflightFor(current)
+        if (preflight.kind !== 'route') return
+        yield* Effect.logWarning(`ai-accounts: selection names provider "${current.provider}" with no adapter; moving the thread to ${preflight.provider}`)
+        agent.model.select({ ...current, provider: preflight.provider })
+      })
+
+      const onAgentRequest = Effect.fn('ai-accounts agent request')(function* (
+        agent: Agent,
+        requestPolicy: ThreadRequestPolicy,
+        position: { readonly turn: number; readonly step: number },
+        request: LlmCallConfig,
+      ) {
+        const id = agent.id
+        const routes = world.routes()
+        if (prefersSelectedProvider(agent, request.provider, request.model)) world.fallbackRouter.returnToSelection(id)
+        world.fallbackRouter.observeRequest({ sessionId: id, turn: position.turn, request })
+        const preflight = preflightFor(request)
         if (preflight.kind === 'unserved') return yield* Effect.fail(RequestAccountRouting.unservedProviderError(request.provider))
         if (preflight.kind === 'route') {
-          yield* Effect.logWarning(
-            `ai-accounts: selection names provider "${request.provider}" with no adapter; serving this request from ${preflight.provider}`,
+          // Claiming the step's input normally moves such a selection; a step that claimed nothing still holds it.
+          agent.model.select(
+            request.reasoningEffort === undefined
+              ? { provider: preflight.provider, model: request.model }
+              : { provider: preflight.provider, model: request.model, reasoningEffort: request.reasoningEffort },
           )
-          request = { ...request, provider: preflight.provider }
+          return yield* Effect.fail(
+            new LlmError(
+              `No adapter serves provider "${request.provider}" on this Host, so the thread now uses ${preflight.provider} for the same model. Send your message again.`,
+              'NO_ADAPTER',
+            ),
+          )
         }
         if (!routes.has(request.provider)) {
           yield* forgetRoute(id)
@@ -278,21 +309,14 @@ export class RequestRouting extends Context.Service<
         }
         const retryId = action.retryId
         if (!isRetryId(retryId)) return yield* next
-        const notice = retryNotice(action, {
-          retryId,
-          turn,
-          step,
-          provider: requestProvider,
-          failure,
-          model: requestConfig()?.model,
-          label: target => {
-            // Chain targets are `provider/model`; account ids never hold a slash.
-            const slash = target.indexOf('/')
-            const targetProvider = slash < 0 ? target : target.slice(0, slash)
-            const name = routes.get(targetProvider)?.displayName ?? targetProvider
-            return slash < 0 ? name : `${name} · ${target.slice(slash + 1)}`
-          },
-        })
+        const label = (target: string): string => {
+          // Chain targets are `provider/model`; account ids never hold a slash.
+          const slash = target.indexOf('/')
+          const targetProvider = slash < 0 ? target : target.slice(0, slash)
+          const name = routes.get(targetProvider)?.displayName ?? targetProvider
+          return slash < 0 ? name : `${name} · ${target.slice(slash + 1)}`
+        }
+        const notice = retryNotice(action, { retryId, turn, step, provider: requestProvider, failure, model: requestConfig()?.model, label })
         yield* Effect.logInfo(`ai-accounts: ${notice.failure.message}`)
         agent.session.append('llm/retry', notice)
         const delayMs = action.step.kind === 'retry' || action.step.kind === 'wait' ? action.step.delayMs : 0
@@ -301,12 +325,17 @@ export class RequestRouting extends Context.Service<
           yield* retainUserSelection
           return { kind: 'retry' as const }
         }
+        if (action.step.kind === 'failover' && !world.routes().has(action.step.to)) {
+          const config = requestConfig()
+          return yield* continueOnFallback(agent, {
+            expectedRevision: active?.selectionRevision ?? requestPolicy.revision,
+            from: config === undefined ? label(requestProvider) : label(ModelFallbackModel.routeKey(config)),
+            signal,
+          })
+        }
         agent.session.append('llm/retry-started', { retryId: notice.retryId, turn, step, retry: notice.retry })
-        // The retry re-reads the Session selection, so it opens on the stand-in route and the picker follows.
-        const followed =
-          action.step.kind === 'failover' && !world.routes().has(action.step.to)
-            ? chainSelection(world.fallbackRouter.active(id))
-            : FailureRecoveryModel.selectionAfter({ action, config: requestConfig() })
+        // The step keeps its route and `llm/stream` puts the stand-in account on the wire; later steps open on it.
+        const followed = FailureRecoveryModel.selectionAfter({ action, config: requestConfig() })
         if (followed !== undefined) {
           yield* selectAutomaticModel(agent, followed, active?.selectionRevision ?? requestPolicy.revision).pipe(
             Effect.catch(() =>
@@ -320,6 +349,46 @@ export class RequestRouting extends Context.Service<
         return { kind: 'retry' as const }
       })
 
+      /**
+       * A chain hop changes the route, which DSH only accepts for a later step: select the fallback now, let this step
+       * fail, and once the turn has ended queue a continuation turn that opens on the fallback. A user who cancels,
+       * queues work or picks another model in between keeps their choice and gets no continuation.
+       */
+      const continueOnFallback = Effect.fn('ai-accounts fallback continuation')(function* (
+        agent: Agent,
+        input: { readonly expectedRevision: number; readonly from: string; readonly signal: AbortSignal },
+      ) {
+        const route = world.fallbackRouter.active(agent.id)
+        const policy = threadPolicyFor(agent)
+        if (route === undefined || (policy !== null && policy.revision !== input.expectedRevision)) {
+          yield* pool.transact(view => {
+            view.unbind(agent.id)
+            world.fallbackRouter.returnToSelection(agent.id)
+          })
+          return undefined
+        }
+        agent.model.select(nativeSelection(route))
+        const message = createUserMessage({
+          content: [{ type: 'text', text: continuationText({ from: input.from, to: `${world.routes().get(route.provider)?.displayName ?? route.provider} · ${route.model}` }) }],
+          source: { kind: 'user' },
+        })
+        const resume = Effect.gen(function* () {
+          yield* Effect.promise(() => agent.whenIdle())
+          const current = agent.model.current()
+          const userActed =
+            input.signal.aborted ||
+            agent.inbox.nextTurn.length > 0 ||
+            agent.inbox.nextStep.length > 0 ||
+            current === undefined ||
+            !ModelFallbackModel.sameRoute(current, route)
+          if (userActed) return
+          yield* Ref.update(continuations, pending => HashMap.set(pending, agent.id, message.id))
+          agent.followup(message)
+        }).pipe(Effect.catchCause(cause => Effect.logWarning('ai-accounts: the turn stopped on its fallback without continuing', cause)))
+        yield* Effect.forkDetach(resume)
+        return undefined
+      })
+
       const onRequestMessages = (agent: Agent, position: { readonly turn: number; readonly step: number }) =>
         world.recovery.shrinkActive(agent.id, position.turn, position.step)
 
@@ -328,6 +397,7 @@ export class RequestRouting extends Context.Service<
           Effect.sync(() => {
             const requestPolicy = new ThreadRequestPolicy(agent, () => threadPolicyFor(agent))
             const removeHooks = RequestRoutingHooks.register(agent, services, {
+              claimed: claimed => onClaimed(agent, claimed),
               request: (position, proposed) => onAgentRequest(agent, requestPolicy, position, proposed),
               requestError: (failed, next) => onRequestError(agent, requestPolicy, failed, next),
               requestMessagesShrink: position => onRequestMessages(agent, position),
@@ -354,6 +424,7 @@ export class RequestRouting extends Context.Service<
       yield* HostEvents.on('agent/disposed', ({ agent }) =>
         Effect.gen(function* () {
           yield* forgetRoute(agent.id)
+          yield* Ref.update(continuations, pending => HashMap.remove(pending, agent.id))
           world.servingAccount.clear(agent.id)
           world.recovery.forget(agent.id)
           world.fallbackRouter.forget(agent.id)

@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import * as Schema from 'effect/Schema'
 import {
   SESSION_COST_PROJECTION_KEY,
@@ -189,20 +190,11 @@ const costProjectionDefinition = {
     // The state keeps the view object, so a selection-only change publishes nothing.
     view: (state: CostState): SessionCostView => state.view,
   },
-}
+} satisfies ProjectionDefinition<typeof SESSION_COST_PROJECTION_KEY, CostState>
 
-interface ProjectionRegistry {
-  readonly register: (definition: typeof costProjectionDefinition) => () => void
-}
-
-const isProjectionRegistry = (value: unknown): value is ProjectionRegistry =>
-  typeof value === 'object' && value !== null && 'register' in value && typeof value.register === 'function'
-
-/** Registers only when the Host runs a projection registry; an older Host simply has no cost readout. */
+/** Registers only when the Host runs a projection registry; the injected fiber's disposal releases the unit. */
 export const installCostProjection = (ctx: Context): void => {
-  ctx.inject(['sessionProjections'], scoped => {
-    const registry: unknown = scoped.get('sessionProjections')
-    if (!isProjectionRegistry(registry)) return
-    scoped.effect(() => registry.register(costProjectionDefinition), 'ai-accounts cost projection')
+  ctx.inject(['sessionProjections'], async scoped => {
+    await scoped.sessionProjections.register(costProjectionDefinition)
   })
 }

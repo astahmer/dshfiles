@@ -277,6 +277,31 @@ parts have no supported Host verb and stay approximations:
    watched; an unsent composer draft survives only where the draft owner
    persists it.
 
+## Same-step model fallback (DSH 0.2.2-rc.1, 2026-11-12)
+
+`@deepseek-ai/dsh-agent-loop` 0.2.2 fixes provider, model and reasoning effort
+from `agent.model.current()` in `preStep`, before `agent/pre-step`.
+`prepareRequest` runs on every attempt of the in-step retry loop and throws when
+an `agent/request` handler changes them. `agent/request-error` can only return
+`{ kind: 'retry' }` (same fixed selection) or nothing (the step throws, the turn
+ends `error`). A failed request therefore cannot move to another provider or
+model inside the same step or turn.
+
+ai-accounts' Priority fallback chain now selects the fallback with
+`agent.model.select()`, lets the step fail, and starts a follow-up turn with a
+plugin-authored `[ai-accounts fail-over]` message after `whenIdle()`. Costs: the
+transcript shows an error turn and a synthetic continuation prompt instead of a
+silent retry; the model re-plans the interrupted step; a message the user queued
+during the failing turn does not auto-run (DSH latches no wake for input sent to
+a driver that then errors, and the plugin skips its continuation then).
+Account-level fail-over within one provider route is unaffected: `llm/stream`
+picks the wire account.
+
+Missing seam: a request-error action such as `{ kind: 'retry', selection }` that
+re-fixes the selection for the retry (re-resolving tools and the system prompt
+as `preStep` does), or a supported way to end a step without error and re-enter
+`preStep` in the same turn.
+
 ## Upstream tracker
 
 Reports the community already filed against the installed runtime. Read these

@@ -7,7 +7,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
-import { ScheduleId, createAfterScheduleRecord } from '@deepseek-ai/dsh-schedule'
+import { ScheduleId, createAfterScheduleRecord, type ScheduleCatalogEntry, type ScheduleService } from '@deepseek-ai/dsh-schedule'
 import type { SessionController } from '@deepseek-ai/dsh-api-session-controller'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
@@ -15,10 +15,12 @@ import { createQuotaContinuationService, type QuotaFailureAgent } from './quota-
 import { QuotaContinuationMessage } from './quota-continuation-message.js'
 import { quotaContinuationDomain } from './quota-continuation-store.js'
 
-type SchedulePort = Pick<NonNullable<Context['schedule']>, 'create' | 'delete' | 'list'>
-type ScheduleCreateRequest = Parameters<NonNullable<Context['schedule']>['create']>[1]
-type ScheduleRecord = Awaited<ReturnType<NonNullable<Context['schedule']>['create']>>
+type SchedulePort = Pick<ScheduleService, 'create' | 'edit' | 'list'>
 type SessionPromptRequest = Parameters<SessionController['prompt']>[0]
+type WireEventData = Awaited<ReturnType<SessionController['events']>>['records'][number]['event']['data']
+
+/** The Session Controller sends committed event data as JSON; the round trip is that wire encoding. */
+const wireData = (data: unknown): WireEventData => JSON.parse(JSON.stringify(data))
 
 const openContext = async (root: string) => {
   const context = new Context()
@@ -35,27 +37,41 @@ const createFailureAgent = (id: string, seq = 12): QuotaFailureAgent => ({
 })
 
 const createScheduleFixture = (now: () => number) => {
-  const rows = new Map<string, ScheduleRecord[]>()
-  const requests: ScheduleCreateRequest[] = []
+  const rows = new Map<string, ScheduleCatalogEntry[]>()
+  const requests: Array<{ readonly title: string; readonly prompt: string; readonly after_seconds: number }> = []
   let nextId = 0
 
   const schedule: SchedulePort = {
-    create: async (sessionId, request) => {
-      const afterSeconds = request.after_seconds
-      if (afterSeconds === undefined) throw new Error('Quota recovery must use a relative one-shot schedule.')
-      requests.push(request)
-      const record = createAfterScheduleRecord(ScheduleId(`quota-${++nextId}`), request.prompt, afterSeconds, now(), request.title)
+    create: async request => {
+      if (request.timing.kind !== 'after' || request.target?.kind !== 'session') throw new Error('Quota recovery must use a relative one-shot schedule on its thread.')
+      const sessionId = request.target.sessionId
+      requests.push({ title: request.title, prompt: request.prompt, after_seconds: request.timing.after_seconds })
+      const record: ScheduleCatalogEntry = {
+        ...createAfterScheduleRecord(ScheduleId(`quota-${++nextId}`), request.prompt, request.timing.after_seconds, now(), request.title),
+        target: request.target,
+        involvedSessionIds: [sessionId],
+        status: 'active',
+      }
       rows.set(sessionId, [...(rows.get(sessionId) ?? []), record])
       return record
     },
-    delete: async ({ sessionId, id }) => {
-      const previous = rows.get(sessionId) ?? []
-      const next = previous.filter(record => record.id !== id)
-      if (previous.length === next.length) return { id, deleted: false, code: 'schedule_not_found' }
-      rows.set(sessionId, next)
-      return { id, deleted: true }
+    edit: async request => {
+      if (request.action !== 'delete') throw new Error('Quota recovery only deletes its schedules.')
+      for (const [sessionId, previous] of rows) {
+        const next = previous.filter(record => record.id !== request.id)
+        if (next.length === previous.length) continue
+        rows.set(sessionId, next)
+        return { id: request.id, deleted: true }
+      }
+      return { id: request.id, code: 'schedule_not_found' }
     },
-    list: async ({ sessionId }) => rows.get(sessionId) ?? [],
+    list: async (request = {}) => {
+      const all = [...rows.values()].flat()
+      const limit = request.limit ?? 100
+      const offset = request.offset ?? 0
+      const items = all.slice(offset, offset + limit)
+      return { items, shown: items.length, total: all.length, limit, offset }
+    },
   }
 
   return { schedule, requests, rows }
@@ -213,7 +229,7 @@ describe('quota continuation service', () => {
     const selectedModels: Parameters<SessionController['selectModel']>[0][] = []
     const scheduler = createScheduleFixture(now)
     const sessionController = {
-      inspect: async () => ({ events: [] }),
+      events: async () => ({ records: [], hasMore: false, cursor: 0 }),
       selectModel: async (request: Parameters<SessionController['selectModel']>[0]) => {
         selectedModels.push(request)
         return { selected: request }
@@ -284,7 +300,11 @@ describe('quota continuation service', () => {
         context,
         readResetAt: async () => null,
         sessionController: {
-          inspect: async () => ({ events: session.ownEvents() }),
+          events: async () => ({
+            records: session.ownEvents().map(event => ({ type: 'event' as const, event: { type: event.type, seq: event.seq, time: event.time, data: wireData(event.data) } })),
+            hasMore: false,
+            cursor: session.seq,
+          }),
           prompt: async (request: SessionPromptRequest) => {
             prompts.push(request)
             return { accepted: true as const }
@@ -356,7 +376,7 @@ describe('quota continuation service', () => {
         readResetAt: async () => null,
         archivedSessionIds: () => [archivedSessionId],
         sessionController: {
-          inspect: async () => ({ events: [] }),
+          events: async () => ({ records: [], hasMore: false, cursor: 0 }),
           prompt: async () => ({ accepted: true as const }),
           list: async () => ({
             items: [
@@ -438,7 +458,7 @@ describe('quota continuation service', () => {
         context,
         readResetAt: async () => null,
         sessionController: {
-          inspect: async () => ({ events: [] }),
+          events: async () => ({ records: [], hasMore: false, cursor: 0 }),
           prompt: async () => ({ accepted: true as const }),
           list: async () => ({
             items: [{ sessionId: subagentSessionId, updatedAt: 5_000, running: false, blank: false, agentAvailable: false, origin: 'subagent' }],

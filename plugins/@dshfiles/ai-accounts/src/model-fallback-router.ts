@@ -13,10 +13,6 @@ interface RequestRoute {
 interface Standing {
   readonly route: FallbackRoute
   readonly from: FallbackRoute
-  /** The route that failed over to this one, which the retry may still propose; in memory only, a retry never outlives the Host. */
-  readonly replaced: FallbackRoute | undefined
-  /** The turn the fail-over happened in; a later turn proposing the old route means the user picked it again. */
-  readonly turn: number | undefined
 }
 
 interface TurnState {
@@ -41,10 +37,10 @@ const asRoute = (route: RequestRoute): FallbackRoute =>
  * fail-over, and a kind that must never fall back (Claude) has no siblings to walk. With `stalledStreamFallback` on,
  * a stream that went silent walks the stored chain under any distribution.
  *
- * The Host moves the Session selection to the fallback after a fail-over, so the picker names it and later turns
- * stay on it. The router remembers which selection the fallback stands in for, so the thread can return to it (on
- * request, or at the next turn under the `next-turn` policy), and puts the fallback on a retry that still proposes
- * the failed route when the selection could not be moved.
+ * DSH fixes a step's model before its requests, so the Host moves the Session selection to the fallback for the
+ * next step and continues the interrupted turn there; the picker names the fallback and later turns stay on it. The
+ * router remembers which selection the fallback stands in for, so the thread can return to it (on request, or at
+ * the next turn under the `next-turn` policy). A request that proposes any other route means the user picked again.
  */
 export const createModelFallbackRouter = (deps: {
   readonly store: () => ModelFallbackStore | undefined
@@ -66,8 +62,7 @@ export const createModelFallbackRouter = (deps: {
   const standingFor = (sessionId: string): Standing | undefined => {
     const cached = standings.get(sessionId)
     if (cached !== undefined) return cached ?? undefined
-    const stored = deps.store()?.activeFor(sessionId)
-    const standing = stored === undefined ? null : { ...stored, replaced: undefined, turn: undefined }
+    const standing = deps.store()?.activeFor(sessionId) ?? null
     standings.set(sessionId, standing)
     return standing ?? undefined
   }
@@ -111,22 +106,17 @@ export const createModelFallbackRouter = (deps: {
     /** Whether this thread fails over along its fallback chain instead of across compatible accounts. */
     walksChain: (sessionId: string): boolean => chainFor(sessionId).length > 0,
 
-    /** The fallback to put on the request DSH proposed, or undefined to send it as proposed. */
-    routeRequest: (input: { readonly sessionId: string; readonly turn: number; readonly request: RequestRoute }): FallbackRoute | undefined => {
-      const state = turnFor(input.sessionId, input.turn)
-      const decide = (route: FallbackRoute | undefined): FallbackRoute | undefined => {
-        state.last = route ?? asRoute(input.request)
-        return route
-      }
+    /** Note the route a request goes out on; one other than the standing fallback means the user picked again. */
+    observeRequest: (input: { readonly sessionId: string; readonly turn: number; readonly request: RequestRoute }): void => {
+      turnFor(input.sessionId, input.turn).last = asRoute(input.request)
       const standing = standingFor(input.sessionId)
-      if (standing === undefined || ModelFallbackModel.sameRoute(input.request, standing.route)) return decide(undefined)
-      const proposesFailed =
-        ModelFallbackModel.sameRoute(input.request, standing.from) ||
-        (standing.replaced !== undefined && ModelFallbackModel.sameRoute(input.request, standing.replaced))
-      if (proposesFailed && standing.turn === input.turn && chainFor(input.sessionId, input.request, state.stalled).length > 0) return decide(standing.route)
-      // The user picked a model again, or the chain stopped applying: the fallback no longer stands in for anything.
-      stand(input.sessionId, null)
-      return decide(undefined)
+      if (standing !== undefined && !ModelFallbackModel.sameRoute(input.request, standing.route)) stand(input.sessionId, null)
+    },
+
+    /** The turn continuing a failed-over one walks on from the routes that turn already tried. */
+    continueTurn: (input: { readonly sessionId: string; readonly turn: number }): void => {
+      const state = turns.get(input.sessionId)
+      if (state !== undefined && state.turn < input.turn) turns.set(input.sessionId, { ...state, turn: input.turn })
     },
 
     /** Ordered route keys the failing request may move to, or undefined when the thread walks accounts instead. */
@@ -160,8 +150,7 @@ export const createModelFallbackRouter = (deps: {
       const chain = state?.derivedChain ?? chainFor(input.sessionId)
       const route = chain.find(candidate => ModelFallbackModel.routeKey(candidate) === input.to)
       if (route === undefined || state?.last === undefined) return undefined
-      const replaced = asRoute(state.last)
-      stand(input.sessionId, { route, from: standingFor(input.sessionId)?.from ?? replaced, replaced, turn: state.turn })
+      stand(input.sessionId, { route, from: standingFor(input.sessionId)?.from ?? asRoute(state.last) })
       return route
     },
 

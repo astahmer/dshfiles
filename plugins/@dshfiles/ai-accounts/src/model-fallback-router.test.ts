@@ -18,6 +18,7 @@ const memoryTable = <Value>(): KvTable<string, Value> => {
       rows.set(key, value)
     },
     delete: async key => rows.delete(key),
+    deleteMany: async keys => keys.filter(key => rows.delete(key)).length,
     update: async (key, change) => {
       const current = rows.get(key)
       if (current === undefined) throw new Error('missing row')
@@ -46,7 +47,7 @@ const setup = async (options: { readonly distribution?: Distribution; readonly s
       throw new Error(message)
     },
   })
-  const failOver = (input: { readonly turn: number; readonly from: typeof codex | typeof claude }) => {
+  const failOver = (input: { readonly from: FallbackRoute }) => {
     const candidates = router.candidates({ sessionId: 'thread', current: input.from, now: 1_000 })
     const to = candidates?.[0]
     if (to !== undefined) router.bind({ sessionId: 'thread', to })
@@ -58,89 +59,103 @@ const setup = async (options: { readonly distribution?: Distribution; readonly s
 describe('model fallback router', () => {
   it('leaves threads alone outside Priority or without a chain', async () => {
     const { router } = await setup({ distribution: 'sticky' })
+    router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
     expect(router.candidates({ sessionId: 'thread', current: codex, now: 1_000 })).toBeUndefined()
-    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })).toBeUndefined()
+    expect(router.active('thread')).toBeUndefined()
   })
 
   it('keeps a stalled stream off the chain outside Priority unless stalled-stream fallback is on', async () => {
     const { router } = await setup({ distribution: 'sticky' })
-    router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
     expect(router.candidates({ sessionId: 'thread', current: codex, now: 1_000, stalled: true })).toBeUndefined()
   })
 
   it('walks the stored chain for a stalled stream under Sticky when stalled-stream fallback is on', async () => {
     const { router } = await setup({ distribution: 'sticky', stalledStreamFallback: true })
-    router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
     expect(router.candidates({ sessionId: 'thread', current: codex, now: 1_000 })).toBeUndefined()
     expect(router.candidates({ sessionId: 'thread', current: codex, now: 1_000, stalled: true })).toEqual([
       'claude-work/claude-opus-5-5',
       'opencode-go/glm-5.3',
     ])
     expect(router.bind({ sessionId: 'thread', to: 'claude-work/claude-opus-5-5' })).toEqual(claude)
-    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })).toEqual(claude)
-  })
-
-  it('puts the fallback on a retry that still proposes the failed route and stays there by default', async () => {
-    const { router, failOver } = await setup()
-    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })).toBeUndefined()
-    expect(failOver({ turn: 1, from: codex })).toEqual(['claude-work/claude-opus-5-5', 'opencode-go/glm-5.3'])
-
-    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })).toEqual(claude)
-    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: claude })).toBeUndefined()
-    expect(router.turnEnded('thread')).toBeUndefined()
-    expect(router.routeRequest({ sessionId: 'thread', turn: 2, request: claude })).toBeUndefined()
     expect(router.active('thread')).toEqual(claude)
   })
 
-  it('never tries the same route twice in one turn and walks on from the fallback', async () => {
+  it('stands on the fallback the next step selects and stays there by default', async () => {
     const { router, failOver } = await setup()
-    router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })
-    failOver({ turn: 1, from: codex })
-    router.routeRequest({ sessionId: 'thread', turn: 1, request: claude })
-    expect(failOver({ turn: 1, from: claude })).toEqual(['opencode-go/glm-5.3'])
-    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: claude })).toEqual(opencode)
+    router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    expect(failOver({ from: codex })).toEqual(['claude-work/claude-opus-5-5', 'opencode-go/glm-5.3'])
+    expect(router.active('thread')).toEqual(claude)
+
+    router.observeRequest({ sessionId: 'thread', turn: 2, request: claude })
+    expect(router.turnEnded('thread')).toBeUndefined()
+    router.observeRequest({ sessionId: 'thread', turn: 3, request: claude })
+    expect(router.active('thread')).toEqual(claude)
+  })
+
+  it('walks on from the routes a continued turn already tried instead of wrapping back', async () => {
+    const { router, failOver } = await setup()
+    router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    failOver({ from: codex })
+    router.continueTurn({ sessionId: 'thread', turn: 2 })
+    router.observeRequest({ sessionId: 'thread', turn: 2, request: claude })
+    expect(failOver({ from: claude })).toEqual(['opencode-go/glm-5.3'])
+    router.continueTurn({ sessionId: 'thread', turn: 3 })
+    router.observeRequest({ sessionId: 'thread', turn: 3, request: opencode })
+    expect(router.candidates({ sessionId: 'thread', current: opencode, now: 1_000 })).toEqual([])
     expect(router.returnToSelection('thread')).toEqual(codex)
+  })
+
+  it('starts a fresh walk in a turn that does not continue a fail-over', async () => {
+    const { router, failOver } = await setup()
+    router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    failOver({ from: codex })
+    router.observeRequest({ sessionId: 'thread', turn: 2, request: claude })
+    failOver({ from: claude })
+    router.observeRequest({ sessionId: 'thread', turn: 3, request: opencode })
+    expect(router.candidates({ sessionId: 'thread', current: opencode, now: 1_000 })).toEqual(['claude-work/claude-opus-5-5'])
   })
 
   it('hands the selection back at the end of the turn under the next-turn policy', async () => {
     const { store, router, failOver } = await setup()
     await store.setReturnPolicy('next-turn')
-    router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })
-    failOver({ turn: 1, from: codex })
+    router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    failOver({ from: codex })
 
     expect(router.turnEnded('thread')).toEqual(codex)
     expect(router.active('thread')).toBeUndefined()
     expect(router.turnEnded('thread')).toBeUndefined()
   })
 
-  it('hands the selection back when asked and forgets the fallback when the user picks another model', async () => {
+  it('hands the selection back when asked and forgets the fallback when a request names another route', async () => {
     const asked = await setup()
-    asked.router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })
-    asked.failOver({ turn: 1, from: codex })
+    asked.router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    asked.failOver({ from: codex })
     expect(asked.router.returnToSelection('thread')).toEqual(codex)
     expect(asked.router.active('thread')).toBeUndefined()
 
     const picked = await setup()
-    picked.router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })
-    picked.failOver({ turn: 1, from: codex })
-    expect(picked.router.routeRequest({ sessionId: 'thread', turn: 2, request: opencode })).toBeUndefined()
+    picked.router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    picked.failOver({ from: codex })
+    picked.router.observeRequest({ sessionId: 'thread', turn: 2, request: opencode })
     expect(picked.router.active('thread')).toBeUndefined()
 
     const repicked = await setup()
-    repicked.router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })
-    repicked.failOver({ turn: 1, from: codex })
-    expect(repicked.router.routeRequest({ sessionId: 'thread', turn: 2, request: codex })).toBeUndefined()
+    repicked.router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    repicked.failOver({ from: codex })
+    repicked.router.observeRequest({ sessionId: 'thread', turn: 2, request: codex })
     expect(repicked.router.active('thread')).toBeUndefined()
   })
 
   it('keeps a fallback across a Host restart', async () => {
     const first = await setup()
-    first.router.routeRequest({ sessionId: 'thread', turn: 1, request: codex })
-    first.failOver({ turn: 1, from: codex })
+    first.router.observeRequest({ sessionId: 'thread', turn: 1, request: codex })
+    first.failOver({ from: codex })
 
     const restarted = await setup({ store: first.store })
     expect(restarted.router.active('thread')).toEqual(claude)
-    expect(restarted.router.routeRequest({ sessionId: 'thread', turn: 3, request: claude })).toBeUndefined()
+    restarted.router.observeRequest({ sessionId: 'thread', turn: 3, request: claude })
     expect(restarted.router.active('thread')).toEqual(claude)
   })
 })
@@ -180,12 +195,13 @@ describe('per-provider family chain', () => {
     const { router } = familyRouter({ siblings: codexFamily })
     const from = { provider: 'codex-emialex', model: 'gpt-6' }
 
-    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: from })).toBeUndefined()
+    router.observeRequest({ sessionId: 'thread', turn: 1, request: from })
     expect(router.candidates({ sessionId: 'thread', current: from, now: 1_000 })).toEqual(['codex-alex2/gpt-6', 'opencode-go-alex/gpt-6'])
 
     router.bind({ sessionId: 'thread', to: 'codex-alex2/gpt-6' })
     expect(router.active('thread')).toEqual({ provider: 'codex-alex2', model: 'gpt-6' })
-    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: from })).toEqual({ provider: 'codex-alex2', model: 'gpt-6' })
+    router.observeRequest({ sessionId: 'thread', turn: 2, request: { provider: 'codex-alex2', model: 'gpt-6' } })
+    expect(router.active('thread')).toEqual({ provider: 'codex-alex2', model: 'gpt-6' })
   })
 
   it('leaves Sticky threads and kinds without siblings on account fail-over', () => {

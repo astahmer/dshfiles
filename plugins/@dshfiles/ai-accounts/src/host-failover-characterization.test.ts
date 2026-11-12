@@ -5,6 +5,7 @@ import { servingAccountSnapshotSchema } from './serving-account-api.js'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-session-title-llm'
 import { afterEach, describe, expect, it } from 'vitest'
 
 /**
@@ -40,6 +41,16 @@ const nextTick = (): Promise<void> => new Promise(resolve => setImmediate(resolv
 const until = async (condition: () => boolean): Promise<void> => {
   for (let attempt = 0; attempt < 10_000 && !condition(); attempt++) await nextTick()
   if (!condition()) throw new Error('The condition never held.')
+}
+
+const turnEnds = (agent: Agent): readonly unknown[] => eventsOfType(agent, 'turn/end').map(event => (event.type === 'turn/end' ? event.data : undefined))
+
+/** A fallback chain hop ends the failed turn and queues the continuation once that turn has settled. */
+const askThroughFailover = async (host: AccountsHost, agent: Agent, text: string): Promise<void> => {
+  const settled = turnEnds(agent).length + 2
+  await host.ask(agent, text)
+  await until(() => turnEnds(agent).length >= settled)
+  await agent.whenIdle()
 }
 
 const servingSnapshot = (host: AccountsHost, sessionId: string) =>
@@ -101,10 +112,10 @@ describe('agent/request-error fail-over', { timeout: 30_000 }, () => {
     expect(host.selected).toEqual([{ sessionId: 'thread-1', provider: 'cc_b', model: FIXTURE_MODEL, reasoningEffort: 'high' }])
   })
 
-  it('drops the proposed effort when a Priority fallback route replaces the failed one', async () => {
+  it('ends the step on a Priority fallback hop and continues the turn on the fallback, dropping the replaced effort', async () => {
     const host = await start({ accounts: [{ id: 'cc_a' }, { id: 'cc_b' }], distribution: 'priority', replies: [rateLimited] })
     const agent = await host.startThread({ sessionId: 'thread-1', provider: 'cc_a', reasoningEffort: 'high' })
-    await host.ask(agent, 'hello')
+    await askThroughFailover(host, agent, 'hello')
 
     expect(host.chats.map(chat => [chat.account, chat.reasoningEffort])).toEqual([
       ['cc_a', 'high'],
@@ -114,11 +125,22 @@ describe('agent/request-error fail-over', { timeout: 30_000 }, () => {
       { provider: 'cc_a', model: FIXTURE_MODEL, reasoningEffort: 'high' },
       { provider: 'cc_b', model: FIXTURE_MODEL },
     ])
+    expect(retryRows(agent).map(event => event.type)).toEqual(['llm/retry'])
     expect(retryRows(agent)[0]?.data).toMatchObject({
       provider: 'cc_a',
       failure: { code: 'ACCOUNT_FAILOVER', message: expect.stringMatching(/^Switched from Account cc_a to Account cc_b · gpt-6-luna after: 429/u) },
     })
-    expect(host.selected).toEqual([{ sessionId: 'thread-1', provider: 'cc_b', model: FIXTURE_MODEL }])
+    expect(eventsOfType(agent, 'model/selection').map(event => event.data)).toEqual([{ provider: 'cc_b', model: FIXTURE_MODEL }])
+    expect(agent.model.current()).toEqual({ provider: 'cc_b', model: FIXTURE_MODEL })
+    expect(host.selected).toEqual([])
+    expect(turnEnds(agent)).toEqual([
+      { turn: 1, reason: { kind: 'error', error: expect.objectContaining({ code: 'RATE_LIMIT' }) } },
+      { turn: 2, reason: { kind: 'completed' } },
+    ])
+    const continuation = eventsOfType(agent, 'user/message').at(-1)
+    expect(continuation?.type === 'user/message' ? continuation.data.content : undefined).toEqual([
+      { type: 'text', text: expect.stringMatching(/^\[ai-accounts fail-over\] The previous request failed on Account cc_a · gpt-6-luna, so this thread moved to Account cc_b · gpt-6-luna\./u) },
+    ])
 
     await host.ask(agent, 'again')
     expect(host.chats.map(chat => chat.account)).toEqual(['cc_a', 'cc_b', 'cc_b'])
@@ -205,13 +227,15 @@ describe('agent/request-error fail-over', { timeout: 30_000 }, () => {
 })
 
 describe('agent/request routing', { timeout: 30_000 }, () => {
-  it('serves a selection that names no adapter from an account route offering the same model', async () => {
+  it('moves a selection that names no adapter to an account route offering the same model before the step', async () => {
     const host = await start({ accounts: [{ id: 'cc_a' }, { id: 'cc_b' }], distribution: 'sticky' })
-    const agent = await host.startThread({ sessionId: 'thread-1', provider: 'retired_account' })
+    const agent = await host.startThread({ sessionId: 'thread-1', provider: 'retired_account', reasoningEffort: 'high' })
     await host.ask(agent, 'hello')
 
-    expect(host.chats.map(chat => chat.account)).toEqual(['cc_a'])
-    expect(requestConfigs(agent)).toEqual([{ provider: 'cc_a', model: FIXTURE_MODEL }])
+    expect(host.chats.map(chat => [chat.account, chat.reasoningEffort])).toEqual([['cc_a', 'high']])
+    expect(requestConfigs(agent)).toEqual([{ provider: 'cc_a', model: FIXTURE_MODEL, reasoningEffort: 'high' }])
+    expect(eventsOfType(agent, 'model/selection').map(event => event.data)).toEqual([{ provider: 'cc_a', model: FIXTURE_MODEL, reasoningEffort: 'high' }])
+    expect(turnEnds(agent)).toEqual([{ turn: 1, reason: { kind: 'completed' } }])
   })
 
   it('refuses a selection no account or native provider serves with NO_ADAPTER before any request', async () => {
@@ -285,7 +309,7 @@ describe('llm/stream attribution', { timeout: 30_000 }, () => {
   it('takes the first healthy account for a Priority side request instead of the cooling selected route', async () => {
     const host = await start({ accounts: [{ id: 'cc_a' }, { id: 'cc_b' }], distribution: 'priority', replies: [rateLimited] })
     const agent = await host.startThread({ sessionId: 'thread-1', provider: 'cc_a' })
-    await host.ask(agent, 'hello')
+    await askThroughFailover(host, agent, 'hello')
     const side = host.host.ctx.llm.stream({
       provider: 'cc_a',
       model: FIXTURE_MODEL,

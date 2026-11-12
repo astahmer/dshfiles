@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { setImmediate } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { ScheduleId, createAfterScheduleRecord } from '@deepseek-ai/dsh-schedule'
+import { ScheduleId, createAfterScheduleRecord, type ScheduleCatalogEntry, type ScheduleService } from '@deepseek-ai/dsh-schedule'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
@@ -18,8 +18,7 @@ import { createQuotaContinuationService, type QuotaFailureAgent } from './quota-
  * recovery per thread even under concurrent failures, the capacity rule, and one Schedule task per recovery.
  * Storage is the real JSON storage domain; only the Schedule service is a recording stand-in.
  */
-type SchedulePort = Pick<NonNullable<Context['schedule']>, 'create' | 'delete' | 'list'>
-type ScheduleRecord = Awaited<ReturnType<NonNullable<Context['schedule']>['create']>>
+type SchedulePort = Pick<ScheduleService, 'create' | 'edit' | 'list'>
 
 const NOW = 1_800_000_000_000
 const MINUTE = 60_000
@@ -39,25 +38,42 @@ const openContext = async (root: string): Promise<Context> => {
 }
 
 const recordingSchedule = () => {
-  const rows = new Map<string, ScheduleRecord[]>()
-  const created: Array<{ readonly sessionId: string; readonly afterSeconds: number | undefined }> = []
+  const rows = new Map<string, ScheduleCatalogEntry[]>()
+  const created: Array<{ readonly sessionId: string; readonly afterSeconds: number }> = []
   const deleted: string[] = []
   let nextId = 0
   const schedule: SchedulePort = {
-    create: async (sessionId, request) => {
-      created.push({ sessionId, afterSeconds: request.after_seconds })
-      const record = createAfterScheduleRecord(ScheduleId(`quota-${String(++nextId)}`), request.prompt, request.after_seconds ?? 1, NOW, request.title)
+    create: async request => {
+      if (request.timing.kind !== 'after' || request.target?.kind !== 'session') throw new Error('Quota recovery must use a relative one-shot schedule on its thread.')
+      const sessionId = request.target.sessionId
+      created.push({ sessionId, afterSeconds: request.timing.after_seconds })
+      const record: ScheduleCatalogEntry = {
+        ...createAfterScheduleRecord(ScheduleId(`quota-${String(++nextId)}`), request.prompt, request.timing.after_seconds, NOW, request.title),
+        target: request.target,
+        involvedSessionIds: [sessionId],
+        status: 'active',
+      }
       rows.set(sessionId, [...(rows.get(sessionId) ?? []), record])
       return record
     },
-    delete: async ({ sessionId, id }) => {
-      deleted.push(String(id))
-      const previous = rows.get(sessionId) ?? []
-      const next = previous.filter(record => record.id !== id)
-      rows.set(sessionId, next)
-      return previous.length === next.length ? { id, deleted: false, code: 'schedule_not_found' } : { id, deleted: true }
+    edit: async request => {
+      if (request.action !== 'delete') throw new Error('Quota recovery only deletes its schedules.')
+      deleted.push(String(request.id))
+      for (const [sessionId, previous] of rows) {
+        const next = previous.filter(record => record.id !== request.id)
+        if (next.length === previous.length) continue
+        rows.set(sessionId, next)
+        return { id: request.id, deleted: true }
+      }
+      return { id: request.id, code: 'schedule_not_found' }
     },
-    list: async ({ sessionId }) => rows.get(sessionId) ?? [],
+    list: async (request = {}) => {
+      const all = [...rows.values()].flat()
+      const limit = request.limit ?? 100
+      const offset = request.offset ?? 0
+      const items = all.slice(offset, offset + limit)
+      return { items, shown: items.length, total: all.length, limit, offset }
+    },
   }
   return { schedule, rows, created, deleted }
 }
@@ -203,10 +219,11 @@ describe('one Schedule task per recovery', () => {
     const [continuation] = (await first.service.list()).continuations
     if (continuation === undefined) throw new Error('The recovery was not stored.')
     await first.close()
-    await scheduler.schedule.create(SessionId('thread-1'), {
+    await scheduler.schedule.create({
       title: 'Quota recovery',
       prompt: QuotaContinuationMessage.promptFor(continuation.continuationId),
-      after_seconds: 30,
+      timing: { kind: 'after', after_seconds: 30 },
+      target: { kind: 'session', sessionId: SessionId('thread-1') },
     })
     const [kept, duplicate] = scheduler.rows.get('thread-1') ?? []
 
