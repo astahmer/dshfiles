@@ -69,6 +69,8 @@ const openThroughRail = async (page: Page, timeoutMs: number, target: { readonly
 }
 
 const openAIAccountsPanel = async (page: Page, timeoutMs: number): Promise<void> => {
+  const wizard = page.locator('[data-setup-wizard]')
+  if (await wizard.isVisible()) await wizard.getByRole('button', { name: 'Skip', exact: true }).click({ timeout: timeoutMs })
   const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
   if (await accounts.isVisible()) return
   if (await openThroughRail(page, timeoutMs, { destination: 'Settings', section: 'AI accounts' })) {

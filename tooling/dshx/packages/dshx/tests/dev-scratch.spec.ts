@@ -394,6 +394,20 @@ describe('dshx dev scratch commands', () => {
     }
   })
 
+  it('dismisses the setup wizard before seeding an AI account', async () => {
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
+    try {
+      const page = await browser.newPage()
+      await page.setContent(
+        `<section data-setup-wizard="account"><button onclick="this.parentElement.remove()">Skip</button></section><aside role="complementary" aria-label="Provider accounts">Accounts</aside>`,
+      )
+      await ScratchSeedRuntime.openAIAccountsPanel(page, 1_000)
+      expect(await page.locator('[data-setup-wizard]').count()).toBe(0)
+    } finally {
+      await browser.close()
+    }
+  })
+
   it('seeds Backlog Jev enabled idempotently through Settings', async () => {
     const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
     try {
