@@ -54,7 +54,7 @@ describe('backlog @ mentions', () => {
     const session = { sessionId: 'session-abc123' } as never
     const candidates = await source.candidates(session, request('b:image') as never)
     expect(candidates[0]?.label).toBe('Image: image.png')
-    expect(JSON.parse(candidates[0]?.value ?? '{}')).toEqual({ ref: '12', title })
+    expect(candidates[0]?.value).toBe(JSON.stringify({ ref: '12', title }))
   })
 
   it('sends a chip as text naming b:<id>, so the thread signal sees it', async () => {
