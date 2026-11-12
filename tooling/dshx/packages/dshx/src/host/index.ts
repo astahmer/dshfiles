@@ -5,6 +5,8 @@ export const defineHost = HostDefinitionModel.define
 export const definePromptContext = HostDefinitionModel.definePromptContext
 export const definePromptSection = HostDefinitionModel.definePromptSection
 export { defineTool } from '@deepseek-ai/dsh-tools'
+export { pluginToolCatalog } from '../api/tool-catalog.js'
+export type { PluginToolCatalogEntry } from '../api/tool-catalog.js'
 import { HostApiClientModel } from '../api/host-client.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import { PluginStorageModel } from './plugin-storage.js'

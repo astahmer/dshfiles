@@ -11,7 +11,7 @@ Neither restates a tool: each lists and calls the dshx API methods that already 
 
 ## The catalog
 
-`pluginToolCatalog({ listing })` (`@dshfiles/dshx/api`, also in the Host public API) turns the `@dshfiles/dshx`
+`pluginToolCatalog({ listing })` (`@dshfiles/dshx/host`) turns the `@dshfiles/dshx`
 `registry` v1 `list` result into entries `{ name, description, readOnly, owner, apiId, version, method, inputSchema,
 takesInput }`. It joins `apis[].methods[].tool` with `tools[]` by name, keeps only `source: 'api'` tools (the only ones
 an API route can call), projects the input schema the way the agent tool does, and counts a tool without

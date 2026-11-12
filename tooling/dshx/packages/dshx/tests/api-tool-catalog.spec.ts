@@ -1,7 +1,7 @@
 import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
-import { defineApi, dshxRegistryApi, method, pluginToolCatalog, type RegistryListing } from '../src/api/index.js'
-import { createHostApiClient, defineHost } from '../src/host/index.js'
+import { defineApi, dshxRegistryApi, method, type RegistryListing } from '../src/api/index.js'
+import { createHostApiClient, defineHost, pluginToolCatalog } from '../src/host/index.js'
 import { createTestHost } from '../src/testing/index.js'
 
 const listing: RegistryListing = {

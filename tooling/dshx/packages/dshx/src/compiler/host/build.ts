@@ -200,6 +200,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const runOutsideReload = ReloadTransactionModel.runOutside',
           'export const scheduleOutsideReload = ReloadTransactionModel.schedule',
           "export { defineTool } from '@deepseek-ai/dsh-tools'",
+          `export { pluginToolCatalog } from ${JSON.stringify(API_TOOL_CATALOG_PATH)}`,
           `import { HostApiClientModel } from ${JSON.stringify(API_HOST_CLIENT_PATH)}`,
           'export const createHostApiClient = HostApiClientModel.create',
           'export const isApiServed = HostApiClientModel.isServed',
@@ -228,7 +229,6 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const event = ApiDefinitionModel.event',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           `export { zodSchemaFromEffect } from ${JSON.stringify(API_ZOD_VIEW_PATH)}`,
-          `export { pluginToolCatalog } from ${JSON.stringify(API_TOOL_CATALOG_PATH)}`,
           '',
         ].join('\n')
       }

@@ -1,5 +1,6 @@
 import * as Schema from 'effect/Schema'
-import { dshxRegistryApi, pluginToolCatalog } from '../api/index.js'
+import { dshxRegistryApi } from '../api/index.js'
+import { pluginToolCatalog } from '../api/tool-catalog.js'
 import { jsonValueSchema } from '../json.js'
 import { DshPlatformError } from '../platform/client.js'
 import { connectDshxApi, createDshxApiCaller } from '../platform/dshx-api.js'

@@ -128,7 +128,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/host/index.ts:13",
+      "source": "tooling/dshx/packages/dshx/src/host/index.ts:15",
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
     },
@@ -3328,7 +3328,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 124 catalog feature(s)",
+        "Used by 126 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
