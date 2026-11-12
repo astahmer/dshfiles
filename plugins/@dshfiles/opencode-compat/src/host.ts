@@ -5,13 +5,21 @@ import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { Context, Effect, Layer, Stream } from 'effect'
 import { compatApi } from './api.js'
 import type { Domains } from './context.js'
+import { sessionDomain } from './domains/session.js'
+import { skillDomain } from './domains/skill.js'
+import { storageDomain } from './domains/storage.js'
 import { createToolDomain } from './domains/tool.js'
 import { start, type PluginStatus } from './runtime.js'
 import { compatSettings } from './settings.js'
 
 const CompatSettings = Settings.Tag<SettingsValue<typeof compatSettings.schema>>(compatSettings.namespace)
 
-const createDomains = ({ ctx }: { readonly ctx: CordisContext }): Domains => ({ tool: createToolDomain({ ctx }) })
+const createDomains = ({ ctx }: { readonly ctx: CordisContext }): Domains => ({
+  skill: input => skillDomain({ ctx, input }),
+  session: input => sessionDomain({ ctx, input }),
+  storage: input => storageDomain({ ctx, input }),
+  tool: createToolDomain({ ctx }),
+})
 
 class Runtime extends Context.Service<Runtime, { readonly status: Effect.Effect<readonly PluginStatus[]> }>()('@dshfiles/opencode-compat/Runtime') {}
 

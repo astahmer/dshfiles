@@ -95,6 +95,58 @@
           "source": "agent-tool"
         }
       ]
+    },
+    {
+      "id": "skills-context-storage",
+      "title": "OpenCode skills, context hooks and storage",
+      "summary": "Maps plugin-owned skills, prompt assembly hooks and durable JSON storage into DSH.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "settings: dshfiles-opencode-compat",
+      "configuration": [],
+      "states": ["loaded", "disposed"],
+      "failureModes": ["Unavailable Host services or invalid storage values prevent plugin setup."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "opencode-compat.skills-context-storage",
+          "file": "plugins/@dshfiles/opencode-compat/src/domains.test.ts",
+          "testName": "maps skills, context hooks and durable plugin storage"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "opencode-compat.domains-no-browser",
+          "reason": "Host-only compatibility domains have no browser surface."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "opencode-storage get",
+          "file": "plugins/@dshfiles/opencode-compat/src/domains.test.ts",
+          "testName": "maps skills, context hooks and durable plugin storage"
+        },
+        {
+          "kind": "custom",
+          "span": "opencode-storage set",
+          "file": "plugins/@dshfiles/opencode-compat/src/domains.test.ts",
+          "testName": "maps skills, context hooks and durable plugin storage"
+        },
+        {
+          "kind": "custom",
+          "span": "opencode-storage remove",
+          "file": "plugins/@dshfiles/opencode-compat/src/domains.test.ts",
+          "testName": "maps skills, context hooks and durable plugin storage"
+        },
+        {
+          "kind": "custom",
+          "span": "opencode-storage scan",
+          "file": "plugins/@dshfiles/opencode-compat/src/domains.test.ts",
+          "testName": "maps skills, context hooks and durable plugin storage"
+        }
+      ]
     }
   ]
 }

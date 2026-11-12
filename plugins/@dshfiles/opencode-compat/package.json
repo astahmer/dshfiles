@@ -27,7 +27,13 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-agent": "catalog:",
     "@deepseek-ai/dsh-llm": "catalog:",
+    "@deepseek-ai/dsh-skill": "catalog:",
+    "@deepseek-ai/dsh-storage": "catalog:",
+    "@deepseek-ai/dsh-storage-domain": "catalog:",
+    "@deepseek-ai/dsh-storage-json": "catalog:",
+    "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/dshx": "workspace:*",
@@ -38,6 +44,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.0 <5.0.0",
     "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-storage-domain": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "^3.18.4"
   },
