@@ -121,7 +121,7 @@ catalog:
   ws: 8.21.3
   xstate: 5.33.2
   yaml: 2.9.1
-  zod: 4.4.3
+  zod: 4.6.6
 
 dedupePeerDependents: true
 # Name peer variants by peer versions only. Core packages peer on each other in cycles
