@@ -6,6 +6,8 @@ const MAX_SUGGESTIONS = 5
 /** Directories one project walk may list before it gives up; a miss should cost a fraction of a second. */
 const MAX_DIRECTORIES = 2000
 const MAX_DEPTH = 8
+/** A hint is optional: past this budget the read reports plain FS_NOT_FOUND. */
+const DEADLINE_MS = 500
 const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'target', 'coverage'])
 
 const stem = (name: string): string => {
@@ -87,7 +89,9 @@ const findInProject = async (input: {
 
 /**
  * Paths the model probably meant by a missing `requestedPath`: close names in its directory, then files with the same
- * name elsewhere in the project. Listing goes through `ctx.fs`, so the provider's own resolution rules apply.
+ * name elsewhere in the project. Listing goes through `ctx.fs`, so the provider's own resolution rules apply. Never
+ * throws: a failure, cancellation or the deadline keeps the suggestions found so far, so the caller's FS_NOT_FOUND
+ * error survives.
  */
 export const suggestMissingPaths = async (input: {
   readonly ctx: Context
@@ -95,19 +99,23 @@ export const suggestMissingPaths = async (input: {
   readonly resolveOptions: { readonly cwd?: string; readonly signal?: AbortSignal }
 }): Promise<string[]> => {
   const { ctx, requestedPath } = input
-  const signal = input.resolveOptions.signal
+  const signal = AbortSignal.any([AbortSignal.timeout(DEADLINE_MS), ...(input.resolveOptions.signal === undefined ? [] : [input.resolveOptions.signal])])
+  const resolveOptions = { ...input.resolveOptions, signal }
   const wanted = basename(requestedPath)
   const directory = dirname(requestedPath)
-  const directoryTarget = await ctx.fs.resolve(directory, input.resolveOptions)
-  const directoryInfo = await ctx.fs.stat(directoryTarget, signal)
-  const siblings =
-    directoryInfo?.type === 'directory'
-      ? closeNames({ wanted, names: (await listNames(ctx, directoryTarget, signal)).map(entry => entry.name) }).map(name =>
-          directory === '.' ? name : join(directory, name),
-        )
-      : []
-  if (siblings.length >= MAX_SUGGESTIONS) return siblings
-  const root = await ctx.fs.resolve('.', input.resolveOptions)
-  const elsewhere = (await findInProject({ ctx, wanted, root, signal })).filter(path => path !== requestedPath && !siblings.includes(path))
-  return [...siblings, ...elsewhere].slice(0, MAX_SUGGESTIONS)
+  const siblings: string[] = []
+  try {
+    const directoryTarget = await ctx.fs.resolve(directory, resolveOptions)
+    const directoryInfo = await ctx.fs.stat(directoryTarget, signal)
+    if (directoryInfo?.type === 'directory') {
+      const names = (await listNames(ctx, directoryTarget, signal)).map(entry => entry.name)
+      siblings.push(...closeNames({ wanted, names }).map(name => (directory === '.' ? name : join(directory, name))))
+    }
+    if (siblings.length >= MAX_SUGGESTIONS) return siblings
+    const root = await ctx.fs.resolve('.', resolveOptions)
+    const elsewhere = (await findInProject({ ctx, wanted, root, signal })).filter(path => path !== requestedPath && !siblings.includes(path))
+    return [...siblings, ...elsewhere].slice(0, MAX_SUGGESTIONS)
+  } catch {
+    return siblings
+  }
 }
