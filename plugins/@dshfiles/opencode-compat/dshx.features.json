@@ -60,6 +60,41 @@
           "testName": "records a load span with identity and counts but no options"
         }
       ]
+    },
+    {
+      "id": "plugin-tools",
+      "title": "Run OpenCode plugin tools and tool hooks",
+      "summary": "Tools an OpenCode plugin adds through ctx.tool.transform become DSH agent tools; its execute.before and execute.after hooks run on every DSH tool call, denying calls or replacing result content.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "agent tools contributed by configured plugins",
+      "configuration": [],
+      "states": ["registered", "denied", "rewritten-content"],
+      "failureModes": [
+        "A tool whose input schema cannot become object JSON Schema is not registered and is listed in opencode_plugins_status.",
+        "A before-hook that rewrites tool input denies the call, because DSH freezes arguments (Host gap 112)."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "opencode-compat.tools",
+          "file": "plugins/@dshfiles/opencode-compat/src/domains/tool.test.ts",
+          "testName": "runs and reloads compat tools and hooks in the real tool runtime"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "opencode-compat.tools-browser",
+          "reason": "Host-only tools; the scratch-DSH journey that calls a plugin tool through a fake model lands with the representative-plugin slice."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
     }
   ]
 }
