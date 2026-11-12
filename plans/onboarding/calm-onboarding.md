@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-12. Follows [README.md](README.md) (P1–P5a shipped). Packs are done and out of scope here except as the tier carrier.
 
-**Resume here:** decisions taken (bottom). P5b and S1 are done; next C1 + C2 + C4 and Z1, then S2.
+**Resume here:** decisions taken (bottom). P5b, S1, Z1, C1, C2 and C4 are done; next S1b (calm Review screen), C3, C5, C6 and S2.
 
 ## Why
 
@@ -25,15 +25,15 @@
 
 ### C. Calm first run (inside DSH)
 
-| Step | Work                                                                                                                                                                                          | Size |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| C1   | One first-run surface: hide the upstream DeepSeek Preview Notice on dshfiles profiles; the setup wizard becomes the non-modal card the plan promised (resumes at its step after a setup link) | S    |
-| C2   | Empty-thread hero (v0 item, restored): one sentence plus at most 3 suggested first tasks, from the detected project                                                                           | S    |
-| C3   | Empty states teach: a next action on the 15 most-seen empty states (v0's #1), one sentence each                                                                                               | M    |
-| C4   | User-facing copy: What's new reads changes, not commit titles; no package ids or plugin names; feature rows show the benefit, not `currentSurface`                                            | S    |
-| C5   | Getting started moves to the top of the rail while setup is incomplete, then folds into ⌘K and Knowledge                                                                                      | S    |
-| C6   | Show me where walks repaired for the redesign (four walks still click a bare "Settings"; settle the phone path) and a test that resolves every `reach` start against the current shell        | M    |
-| C7   | Visual gallery (accepted A9/A10, never built): a thumbnail per curated feature from the README screenshots, and a one-page cheat sheet                                                        | M    |
+| Step | Work                                                                                                                                                                                          | Size | Status                                                                                                                                          |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1   | One first-run surface: hide the upstream DeepSeek Preview Notice on dshfiles profiles; the setup wizard becomes the non-modal card the plan promised (resumes at its step after a setup link) | S    | done: `jj:prvsmusu` (settings-shell `previewNotice`, default off), `jj:rktpnown` (top-right card, non-modal phone sheet, step kept per browser) |
+| C2   | Empty-thread hero (v0 item, restored): one sentence plus at most 3 suggested first tasks, from the detected project                                                                           | S    | done: `jj:yrryotwk` (onboarding fills `conversation.hero.suggestions` until the first thread has a message; `starterTasks` setting)             |
+| C3   | Empty states teach: a next action on the 15 most-seen empty states (v0's #1), one sentence each                                                                                               | M    |                                                                                                                                                 |
+| C4   | User-facing copy: What's new reads changes, not commit titles; no package ids or plugin names; feature rows show the benefit, not `currentSurface`                                            | S    | done: `jj:tpqsxorr` (What's new, feature rows, pack and suggestion labels), `jj:lwquyymw` (New tab chooser drops `Plugin: ` prefixes)           |
+| C5   | Getting started moves to the top of the rail while setup is incomplete, then folds into ⌘K and Knowledge                                                                                      | S    |                                                                                                                                                 |
+| C6   | Show me where walks repaired for the redesign (four walks still click a bare "Settings"; settle the phone path) and a test that resolves every `reach` start against the current shell        | M    |                                                                                                                                                 |
+| C7   | Visual gallery (accepted A9/A10, never built): a thumbnail per curated feature from the README screenshots, and a one-page cheat sheet                                                        | M    |                                                                                                                                                 |
 
 ### Z. Zen mode
 
@@ -86,6 +86,13 @@ Local only: time from first boot to first finished thread, wizard completion and
 3. C3, C5, C6.
 4. D1 → D2 → D3; Z2; S2 → S3.
 5. C7, D4, S4, S5, M.
+
+### C1 + C2 + C4 notes
+
+1. Scratch DSH (17 bundles, 1440×900 and 390×844, fresh browser contexts): one dialog on first load, the card, `aria-modal="false"`, no inert root and no sheet overlay; no Preview Notice; the step survives a reload; a first task lands in the composer unsent; What's new has no `feat(`/`fix(` text; pack cards carry no plugin chips; the chooser lists **Settings** and **Terminal**.
+2. The pack change dialog still names plugins (`pluginLabel`): it previews package installs, where the package is the unit. Revisit with D1.
+3. Unverified: an upstream What's new detail in a browser (the scratch checkout had no diverging remote; unit-tested), the phone rail path to Getting started in an isolated composition (the native drawer opens over **More**; reached through ⌘K instead), and `check:e2e onboarding|workbench` (journeys edited, not run).
+4. Repository ratchets already red on `main` before this work: `check:copy` (`main-tabs` PWA shortcut prefix, a `rich-composer` reach step) and `check:design-tokens` (other plugins).
 
 ## Decisions (2026-11-12)
 
