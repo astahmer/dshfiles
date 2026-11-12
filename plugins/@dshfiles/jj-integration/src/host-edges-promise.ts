@@ -8,6 +8,7 @@ import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { HostContext, hostService } from '@dshfiles/dshx/effect'
 import { Cache, Clock, Context, Duration, Effect, Exit, Layer } from 'effect'
 import { HostCallFailed } from './errors.js'
+import { promptedTurnCountProjection } from './prompted-turn-count.js'
 import { SETTLED_THREADS_NAMESPACE, parseSettledStatus } from './settle-cleanup.js'
 import { SESSION_ACTIVITY_PROJECTIONS, ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 
@@ -309,3 +310,14 @@ export class SettledThreads extends Context.Service<SettledThreads, { readonly r
 }
 
 export const HostEdgesLive = Layer.mergeAll(WorkspaceRegistry.layer, SessionReads.layer, SessionPrompt.layer, ActivityLog.layer, SettledThreads.layer)
+
+/** The panel's per-thread message count, listed in place of the whole `turnOutline`. */
+export const PromptedTurnCountLive = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const { ctx } = yield* HostContext
+    yield* Effect.acquireRelease(
+      Effect.promise(() => ctx.sessionProjections.register(promptedTurnCountProjection)),
+      handle => Effect.promise(() => handle.dispose()),
+    )
+  }),
+)

@@ -55,9 +55,8 @@ import { ThreadSubscriptionActions } from './subscription-actions.js'
 import { subscriptionChangeEvents, subscriptionNoticeHostLayer, subscriptionNoticer } from './subscription-notices-host.js'
 import { threadSubscriptionsApi } from './subscriptions-api.js'
 import { ThreadSubscriptions } from './subscriptions-store.js'
-import { SidebarHost } from './sidebar-host-promise.js'
+import { SidebarHost, modelRouteProjection } from './sidebar-host-promise.js'
 import { SidebarSettings } from './sidebar-settings.js'
-import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { ThreadActions, threadCommandsLayer } from './thread-host-promise.js'
 import { threadViewsApi } from './thread-views-api.js'
@@ -86,17 +85,6 @@ const settledGate = Layer.effectDiscard(
       })
       return settled ? Effect.succeed({ kind: 'reject' as const }) : next
     })
-  }),
-)
-
-/** The provenance projection that labels a subagent with the model route it ran on. */
-const modelRouteProjection = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const { ctx } = yield* HostContext
-    yield* Effect.acquireRelease(
-      Effect.promise(() => ctx.sessionProjections.register(threadSidebarModelRouteProjection)),
-      handle => Effect.promise(() => handle.dispose()),
-    )
   }),
 )
 

@@ -1,7 +1,7 @@
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { Git } from '@dshfiles/git-cli'
 import { Jj, JjViewReads } from '@dshfiles/jj-cli'
-import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
@@ -13,7 +13,7 @@ import { AutoIntegration } from './auto-integration.js'
 import { Cleanup } from './cleanup.js'
 import { DshUpdate } from './dsh-update.js'
 import { Executables } from './executables-promise.js'
-import { HostEdgesLive } from './host-edges-promise.js'
+import { HostEdgesLive, PromptedTurnCountLive } from './host-edges-promise.js'
 import { HostHooksLive, rebaseCommand } from './host-hooks-promise.js'
 import { IntegrationQueue } from './integration-queue.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
@@ -22,7 +22,6 @@ import { WorkspaceProcesses } from './workspace-processes.js'
 import { Landing } from './landing.js'
 import { MaintenanceLive } from './maintenance.js'
 import { ProjectBookmarks } from './project-bookmarks.js'
-import { promptedTurnCountProjection } from './prompted-turn-count.js'
 import { RepoLocks } from './repo-locks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
@@ -40,17 +39,6 @@ const MAX_JJ_STDOUT_BYTES = 512 * 1024
 const MAX_JJ_STDERR_BYTES = 64 * 1024
 
 const PlatformLive = Layer.mergeAll(DshChildProcessSpawner.layer, NodeFileSystem.layer, NodePath.layer)
-
-/** The panel's per-thread message count, listed in place of the whole `turnOutline`. */
-const PromptedTurnCountLive = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const { ctx } = yield* HostContext
-    yield* Effect.acquireRelease(
-      Effect.promise(() => ctx.sessionProjections.register(promptedTurnCountProjection)),
-      handle => Effect.promise(() => handle.dispose()),
-    )
-  }),
-)
 
 const BaseLive = Layer.mergeAll(
   PromptedTurnCountLive,

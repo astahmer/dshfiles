@@ -16,6 +16,7 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Context, Effect, Layer, Option } from 'effect'
 import type { RebasedThread } from './rebased-threads.js'
 import { HostCallFailed, HostCapabilityMissing } from './sidebar-errors.js'
+import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
 import { loadThreadDirectories } from './thread-directories-promise.js'
 import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
 
@@ -229,3 +230,14 @@ export class SidebarHost extends Context.Service<
     }),
   )
 }
+
+/** The provenance projection that labels a subagent with the model route it ran on. */
+export const modelRouteProjection = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const { ctx } = yield* HostContext
+    yield* Effect.acquireRelease(
+      Effect.promise(() => ctx.sessionProjections.register(threadSidebarModelRouteProjection)),
+      handle => Effect.promise(() => handle.dispose()),
+    )
+  }),
+)
