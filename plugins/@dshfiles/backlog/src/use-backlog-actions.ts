@@ -103,6 +103,7 @@ export const useBacklogActions = () => {
   const enrichTweet = useMutation({ mutationFn: (input: Parameters<typeof api.enrichTweet>[0]) => api.enrichTweet(input), onSuccess: invalidate })
   const removeFile = useMutation({ mutationFn: (input: Parameters<typeof api.removeFile>[0]) => api.removeFile(input), onSuccess: invalidate })
   const triage = useMutation({ mutationKey: BACKLOG_TRIAGE_MUTATION_KEY, mutationFn: (id: number) => api.triage({ id }), onSuccess: invalidate })
+  const regenerateImageTitle = useMutation({ mutationFn: (id: number) => api.regenerateImageTitle({ id }), onSuccess: invalidate })
   const backfillTriage = useMutation({
     mutationFn: (request: { readonly retriage: boolean }) => api.backfillTriage(request),
   })
@@ -125,6 +126,7 @@ export const useBacklogActions = () => {
     enrichTweet,
     removeFile,
     triage,
+    regenerateImageTitle,
     backfillTriage,
     applyProposal,
     dismissProposal,

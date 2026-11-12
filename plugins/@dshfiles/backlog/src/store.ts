@@ -16,6 +16,7 @@ import {
   type BacklogFreshness,
   type BacklogHumanField,
   type BacklogItem,
+  type BacklogImageTitleJob,
   type BacklogKind,
   type BacklogCriterion,
   type BacklogLink,
@@ -154,6 +155,9 @@ export interface BacklogRevertStale {
   readonly message: string
 }
 
+/** What writing a title generated from an image did: `stale` kept a title someone else wrote first. */
+type BacklogImageTitleWrite = BacklogResult<BacklogDetail> | { readonly ok: false; readonly reason: 'stale' | 'replaced' }
+
 const DEFAULT_LIST_LIMIT = 100
 const MAX_LIST_LIMIT = 2_000
 
@@ -265,6 +269,9 @@ const byActivity = (left: BacklogItem, right: BacklogItem): number =>
 const notFound = { ok: false, reason: 'not-found' } as const
 
 const found = <T>(value: T): BacklogResult<T> => ({ ok: true, value })
+
+/** The item without its title-from-image state: what a write that owns the attempt leaves behind. */
+const withoutImageTitleJob = ({ imageTitleJob: _imageTitleJob, ...rest }: BacklogItem): BacklogItem => rest
 
 type EventDraft = Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId' | 'origin'>
 
@@ -818,6 +825,25 @@ export class BacklogStore extends Context.Service<
     readonly triageCandidates: (scope: BackfillScope) => Effect.Effect<BackfillSelection>
     /** Records that triage looked at an item and found nothing to change, without making the item look recently active. */
     readonly markTriaged: (id: number) => Effect.Effect<void, BacklogWriteFailed>
+    /**
+     * Records the title-from-image attempt on an item, without making it look recently active. A failed attempt only lands
+     * when it still owns the item, so a slow one cannot overwrite a newer attempt's state.
+     */
+    readonly recordImageTitleJob: (input: {
+      readonly id: number
+      readonly job: BacklogImageTitleJob | null
+    }) => Effect.Effect<BacklogResult<void>, BacklogWriteFailed>
+    /**
+     * Writes a title the model generated, in one serialized read-check-write: refused as `stale` when the item's title
+     * changed since the attempt started (a person or an agent edited it) and as `replaced` when a newer attempt owns it.
+     * Either refusal leaves the title that is there alone; both attempts clear their own pending state.
+     */
+    readonly applyImageTitle: (input: {
+      readonly id: number
+      readonly startedAt: number
+      readonly expectedTitle: string
+      readonly title: string
+    }) => Effect.Effect<BacklogImageTitleWrite, BacklogWriteFailed>
     readonly propose: (input: { readonly id: number; readonly proposal: BacklogProposal }) => Detailed
     /**
      * Applies a proposal. For `system` (automatic triage) fields the user set by hand are left alone; for a person or an
@@ -1696,6 +1722,44 @@ export class BacklogStore extends Context.Service<
         )
       }, serialized)
 
+      const recordImageTitleJob = Effect.fn('backlog store record image title job')(function* (input: {
+        readonly id: number
+        readonly job: BacklogImageTitleJob | null
+      }) {
+        const item = yield* find(input.id)
+        if (item === undefined) return notFound
+        const job = input.job
+        if (job !== null && job.state === 'failed' && item.imageTitleJob !== undefined && item.imageTitleJob.startedAt !== job.startedAt)
+          return found(undefined)
+        const next = job === null ? (item.imageTitleJob === undefined ? item : withoutImageTitleJob(item)) : { ...item, imageTitleJob: job }
+        if (next === item) return found(undefined)
+        yield* persist(next, 'system')
+        return found(undefined)
+      }, serialized)
+
+      const applyImageTitle = Effect.fn('backlog store apply image title')(function* (input: {
+        readonly id: number
+        readonly startedAt: number
+        readonly expectedTitle: string
+        readonly title: string
+      }) {
+        const item = yield* find(input.id)
+        if (item === undefined) return notFound
+        if (item.imageTitleJob?.startedAt !== input.startedAt) return { ok: false as const, reason: 'replaced' as const }
+        if (item.title !== input.expectedTitle) {
+          yield* persist(withoutImageTitleJob(item), 'system')
+          return { ok: false as const, reason: 'stale' as const }
+        }
+        const title = input.title.slice(0, BacklogItems.maxTitleChars)
+        const change: BacklogChange = { title }
+        change.links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(title)])
+        const result = yield* changed(item, { kind: 'system' }, { kind: 'edited', detail: `title "${title}" from its image` }, change)
+        const next = withoutImageTitleJob(result.next)
+        yield* persist(next, result.origin)
+        yield* announceEvent(next)
+        return found(yield* detailOf(next))
+      }, serialized)
+
       const propose = Effect.fn('backlog store propose')(function* (input: { readonly id: number; readonly proposal: BacklogProposal }) {
         const lookup = yield* refLookup
         return yield* withItem(input.id, item =>
@@ -1923,6 +1987,8 @@ export class BacklogStore extends Context.Service<
           ),
         triageCandidates: scope => Effect.map(Ref.get(state), current => BacklogBackfill.select([...current.records.values()], scope)),
         markTriaged,
+        recordImageTitleJob,
+        applyImageTitle,
         propose,
         applyProposal,
         applySignal,

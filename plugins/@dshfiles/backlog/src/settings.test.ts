@@ -12,6 +12,11 @@ describe('backlog settings', () => {
     expect(backlogSettings.schema({ idleThreadNudgeDays: 7 }).idleThreadNudgeDays).toBe(7)
   })
 
+  it('keeps the capture-time vision title off until asked for', () => {
+    expect(backlogSettings.schema({}).imageTitle).toBe(false)
+    expect(backlogSettings.schema({ imageTitle: true }).imageTitle).toBe(true)
+  })
+
   it('keeps plain replies as context unless smart thread routing is enabled', () => {
     const settings = backlogSettings.schema({})
     expect(settings.smartThreadRouting).toBe(false)

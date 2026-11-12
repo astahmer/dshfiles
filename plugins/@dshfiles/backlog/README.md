@@ -461,6 +461,19 @@ looked at (after changing the prompt or model). An item triage found nothing to 
 nothing to change" event without being bumped to fresh, so the next run skips it instead of reviving old
 work.
 
+### Titles for image-only items
+
+An item captured with only an image shows `Image: <filename>` in the lists without spending anything. Turn on
+`imageTitle` (Settings → `dshfiles-backlog`, off by default) to have the triage model read the image once, right after
+the capture, and write a title of at most about 8 words. The call rides the `triageProvider`/`triageModel` route, so a
+model whose route does not declare image input is skipped instead of called.
+
+Every attempt is tracked on the item as `imageTitleJob`: `pending` while the model reads the image, `failed` with the
+reason and what to change when it wrote nothing. The item's detail shows that line, with **Try again**, and an agent runs
+the same verb as `backlog_regenerate_title` when the user asked. The title write is conditional: it happens only when the
+item still shows the title the attempt started with, so a title edited by a person or an agent meanwhile always wins.
+Each attempt is one `backlog image title` span with the item id and its outcome.
+
 ## Lifecycle signals
 
 On by default (`lifecycleSignals`). Items move without anyone filing them:
@@ -550,6 +563,7 @@ dropping the rest of the draft.
 | `backlog_revert`                 | write: put back the value a field held before one recorded change; refused when it changed again since; needs `confirm: true`            |
 | `backlog_export`                 | write a new file: JSONL (items, optionally the op log) or an SQLite copy; changes no item                                                |
 | `backlog_triage`                 | write: run triage on one item now                                                                                                        |
+| `backlog_regenerate_title`       | write (model call): name an item from its image with the triage vision model; keeps a title edited while it ran                          |
 | `backlog_triage_backfill`        | write: triage items captured before triage was set up, oldest first; over 5 items needs `confirm: true`                                  |
 | `backlog_start_thread`           | write: start one thread for items, in the item project's own jj workspace, linked                                                        |
 | `backlog_projects`               | read: per-project counts, who needs you, people; `hideAgentItems` counts like the views                                                  |

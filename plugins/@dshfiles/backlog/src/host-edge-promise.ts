@@ -1,4 +1,4 @@
-import type { ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
+import type { ImageAttachmentRef, ImageMediaType, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import type {
   PromptContentPart,
   SessionCreateRequest,
@@ -15,7 +15,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { HostContext } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer } from 'effect'
-import { SessionsUnavailable, ThreadContextNotDelivered, TweetImageInvalid } from './errors.js'
+import { BacklogImageInvalid, SessionsUnavailable, ThreadContextNotDelivered, TweetImageInvalid } from './errors.js'
 
 /**
  * The one edge that adapts DSH's Promise Host services for the backlog: interruption aborts each call, every failure is
@@ -156,18 +156,36 @@ export class HostAttachments extends Context.Service<
   HostAttachments,
   {
     readonly readImage: (reference: ImageAttachmentRef) => Effect.Effect<StoredImageAttachment, TweetImageInvalid>
+    /** Admits one image already in the item's own storage, so a model call can carry it as a durable image block. */
+    readonly admitImage: (input: {
+      readonly mediaType: ImageMediaType
+      readonly data: string
+      readonly name: string
+    }) => Effect.Effect<ImageAttachmentRef, BacklogImageInvalid>
   }
 >()('@dshfiles/backlog/HostAttachments') {
   static readonly layer = Layer.effect(
     HostAttachments,
     Effect.gen(function* () {
       const host = yield* HostContext
+      const attachmentsOf = () => host.ctx.get('attachments')
       return HostAttachments.of({
         readImage: reference =>
           Effect.gen(function* () {
-            const attachments = host.ctx.get('attachments')
+            const attachments = attachmentsOf()
             if (attachments === undefined) return yield* new TweetImageInvalid({})
             return yield* Effect.tryPromise(() => attachments.readImage(reference)).pipe(Effect.mapError(cause => new TweetImageInvalid({ cause })))
+          }),
+        admitImage: input =>
+          Effect.gen(function* () {
+            const attachments = attachmentsOf()
+            if (attachments === undefined) return yield* new BacklogImageInvalid({})
+            const admitted = yield* Effect.tryPromise(() =>
+              attachments.admitPromptContent([{ type: 'image', mediaType: input.mediaType, data: input.data, name: input.name }]),
+            ).pipe(Effect.mapError(cause => new BacklogImageInvalid({ cause })))
+            const part = admitted[0]
+            if (part?.type !== 'image') return yield* new BacklogImageInvalid({})
+            return part.attachment
           }),
       })
     }),

@@ -32,6 +32,7 @@ import { BacklogRepo } from './backlog-repo.js'
 import { LegacyBacklogTables } from './legacy-tables.js'
 import { LeaseSweep } from './lease-sweep.js'
 import { LifecycleSignals } from './lifecycle-signals.js'
+import { ImageTitles } from './image-title-service.js'
 import { GateWatch } from './gate-watch.js'
 import { BacklogMainBranch } from './main-branch.js'
 import { ScheduledRules } from './scheduled-rules.js'
@@ -83,6 +84,7 @@ const backlogServices = Layer.mergeAll(
   ReplyGenerator.layer,
   BacklogSync.layer,
   ShippedSummaries.layer,
+  ImageTitles.layer,
 ).pipe(
   Layer.provideMerge(Triage.layer),
   Layer.provideMerge(BacklogSyncEngine.layer),
@@ -233,10 +235,12 @@ const backlogHandlers = Api.handlers(backlogApi, {
       const text = command === null || command.text === '' ? fields.text : command.text
       const detail = yield* store.capture({ ...fields, text, actor, ...(project !== undefined && { project }), ...(template !== undefined && { template }) })
       yield* Triage.use(triage => triage.schedule(detail.item.id))
+      yield* ImageTitles.use(titles => titles.schedule(detail.item.id))
       yield* TweetImport.use(tweets => tweets.schedule(detail.item.id))
       return detail
     }),
   triage: input => Effect.flatMap(itemIdOf(input.id), id => Triage.use(triage => AiActivity.use(activity => activity.track(triage.item(id))))),
+  regenerateImageTitle: input => Effect.flatMap(itemIdOf(input.id), id => ImageTitles.use(titles => titles.regenerate(id))),
   backfillTriage: ({ confirm, ...input }, call) =>
     AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_triage_backfill', limit: input.limit } }).pipe(
       Effect.andThen(TriageBackfill.use(backfill => backfill.start(input))),

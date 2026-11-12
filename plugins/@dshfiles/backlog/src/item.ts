@@ -134,6 +134,16 @@ const proposalSchema = Schema.Struct({
   at: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
 })
 
+/**
+ * One attempt to name an image-only item: `pending` while the vision model reads the image, `failed` after a skip or an
+ * error, with the reason and what to change so the next attempt can write a title.
+ */
+const imageTitleJobSchema = Schema.Struct({
+  state: Schema.Literals(['pending', 'failed']),
+  startedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  message: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(400))),
+})
+
 /** `URL.canParse` keeps the absolute-URL check the previous string rule applied while the value stays a string. */
 const absoluteUrl = Schema.makeFilter((value: string) => (URL.canParse(value) ? undefined : 'Expected an absolute URL.'))
 const tweetContextUrlSchema = Schema.String.check(Schema.isMaxLength(2_048), absoluteUrl)
@@ -167,6 +177,8 @@ const itemSchema = Schema.Struct({
   /** Every event since capture, derived from the op log: nothing is trimmed, a view condenses instead. */
   events: Schema.Array(eventSchema),
   proposal: Schema.optionalKey(Schema.NullOr(proposalSchema)),
+  /** The title-from-image attempt in flight, or the last one that wrote nothing, for the item's detail to show. */
+  imageTitleJob: Schema.optionalKey(imageTitleJobSchema),
   attention: Schema.optionalKey(attentionSchema),
   acknowledgedAt: Schema.optionalKey(Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)))),
   snoozedUntil: Schema.optionalKey(Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)))),
@@ -196,6 +208,7 @@ export type BacklogPriority = typeof prioritySchema.Type
 export type BacklogCriterion = typeof criterionSchema.Type
 export type BacklogPlanApproval = typeof planApprovalSchema.Type
 export type BacklogProposal = typeof proposalSchema.Type
+export type BacklogImageTitleJob = typeof imageTitleJobSchema.Type
 export type BacklogKind = typeof kindSchema.Type
 export type BacklogStatus = typeof statusSchema.Type
 export type BacklogLink = typeof linkSchema.Type
@@ -463,6 +476,7 @@ export class BacklogItems {
   static readonly tweetContextUrlSchema = tweetContextUrlSchema
   static readonly itemSchema = itemSchema
   static readonly proposalSchema = proposalSchema
+  static readonly imageTitleJobSchema = imageTitleJobSchema
   static readonly linkSchema = linkSchema
   static readonly kindSchema = kindSchema
   static readonly statusSchema = statusSchema

@@ -4,7 +4,7 @@
     {
       "id": "capture-and-triage",
       "title": "Capture anything and let it sort itself",
-      "summary": "One capture box and one agent tool take free text; kind, title, tags and links (items, threads, jj revisions, branches, URLs) are derived from it, and an agent capture links its thread and project.",
+      "summary": "One capture box and one agent tool take free text; kind, title, tags and links (items, threads, jj revisions, branches, URLs) are derived from it, and an agent capture links its thread and project. With its setting on, an image-only capture is named by the vision model of the triage route; a slow answer never replaces a title edited meanwhile.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -42,12 +42,20 @@
       "surface": "destinationSection",
       "destination": "work",
       "currentSurface": "left-nav: Backlog",
-      "configuration": [],
+      "configuration": [
+        {
+          "key": "dshfiles-backlog.imageTitle",
+          "defaultValue": "false",
+          "constraints": "Boolean; the capture-time vision title spends tokens on its own, so it is off until enabled. An explicit regenerate still runs when the user asked.",
+          "coveredBy": ["backlog.capture-and-triage-host-image-title-off", "backlog.capture-and-triage-host-image-title-vision"]
+        }
+      ],
       "states": ["inbox", "triaged"],
       "failureModes": [
         "An unknown prefix stays in the title and the item becomes a task.",
         "A storage write failure is logged and the in-memory item stays readable.",
-        "A capture the Host refuses puts its text back in the box with Retry; a box holding only blank lines after a send counts as empty."
+        "A capture the Host refuses puts its text back in the box with Retry; a box holding only blank lines after a send counts as empty.",
+        "An image title attempt either writes a short title or records why on the item, with what to change; a title edited while the model runs wins."
       ],
       "externalDependencies": [],
       "onboarding": {
@@ -108,6 +116,30 @@
           "kind": "gherkin",
           "id": "backlog.composer-retry",
           "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.capture-and-triage-host-image-title-off",
+          "file": "plugins/@dshfiles/backlog/src/image-title-service.test.ts",
+          "testName": "skips the model call when the setting is off"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.capture-and-triage-host-image-title-vision",
+          "file": "plugins/@dshfiles/backlog/src/image-title-service.test.ts",
+          "testName": "names an image-only item with the triage route and records one bounded span"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.capture-and-triage-host-image-title-no-vision",
+          "file": "plugins/@dshfiles/backlog/src/image-title-service.test.ts",
+          "testName": "skips a route without image input and records a recovery hint"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.capture-and-triage-host-image-title-stale",
+          "file": "plugins/@dshfiles/backlog/src/image-title-service.test.ts",
+          "testName": "keeps a title edited while the job runs"
         }
       ],
       "telemetry": [
@@ -124,6 +156,12 @@
           "span": "backlog legacy import",
           "file": "plugins/@dshfiles/backlog/src/backlog-repo.test.ts",
           "testName": "imports the JSON domains once, with their files, mappings and id counter, and records one bounded span"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog image title",
+          "file": "plugins/@dshfiles/backlog/src/image-title-service.test.ts",
+          "testName": "names an image-only item with the triage route and records one bounded span"
         }
       ]
     },

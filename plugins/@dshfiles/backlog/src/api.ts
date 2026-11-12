@@ -596,6 +596,17 @@ const renderClaim = (result: typeof detailResultSchema.Type): string =>
     ? `${renderItemPreview(result.value.item)}\n${result.value.lease === null ? 'No claim held.' : `Claimed by ${result.value.lease.holder} until ${new Date(result.value.lease.expiresAt).toISOString()}; any write by it renews the claim.`}`
     : 'No backlog item found.'
 
+const imageTitleOutcomeSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTitleChars)) }),
+  Schema.Struct({
+    ok: Schema.Literal(false),
+    reason: Schema.Literals(['not-found', 'no-image', 'no-model', 'no-vision', 'stale', 'failed']),
+    message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(400)),
+  }),
+])
+
+const renderImageTitle = (output: typeof imageTitleOutcomeSchema.Type): string => (output.ok ? `Named it "${output.title}".` : output.message)
+
 const writeNote = "Only for the user's request or this thread's own task."
 
 /** No default: a bare agent request cannot run a guarded write. */
@@ -1111,6 +1122,13 @@ export const backlogApi = defineApi({
       description:
         'Run automatic triage on one item now (Jev and the configured cheap model). A confident answer applies, skipping fields the user set by hand; otherwise it is left as a proposal on the item.',
       tool: { name: 'backlog_triage', readOnly: false, render: renderDetailPreview },
+    }),
+    regenerateImageTitle: method({
+      input: Schema.Struct({ id: itemKeySchema }),
+      output: imageTitleOutcomeSchema,
+      description:
+        'Name an item from its image with the configured triage vision model: it writes a short title unless the title changed while the model ran. Runs only when the user asked; the capture-time automatic pass is the `imageTitle` setting.',
+      tool: { name: 'backlog_regenerate_title', readOnly: false, render: renderImageTitle },
     }),
     backfillTriage: method({
       input: Schema.Struct({

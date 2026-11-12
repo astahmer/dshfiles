@@ -43,6 +43,7 @@ const setOpSchema = Schema.Union([
   setOf('createdAt', Schema.Number),
   setOf('lastActivityAt', Schema.Number),
   setOf('proposal', Schema.NullOr(BacklogItems.proposalSchema)),
+  setOf('imageTitleJob', BacklogItems.imageTitleJobSchema),
   setOf('attention', BacklogItems.attentionSchema),
   setOf('acknowledgedAt', nullableTime),
   setOf('snoozedUntil', nullableTime),
@@ -66,6 +67,7 @@ const setOpSchema = Schema.Union([
 
 const optionalFields = [
   'proposal',
+  'imageTitleJob',
   'attention',
   'acknowledgedAt',
   'snoozedUntil',
@@ -189,6 +191,9 @@ const applySet = (item: MutableItem, op: typeof setOpSchema.Type): void => {
     case 'proposal':
       item.proposal = op.value
       return
+    case 'imageTitleJob':
+      item.imageTitleJob = op.value
+      return
     case 'attention':
       item.attention = op.value
       return
@@ -252,6 +257,9 @@ const unsetField = (item: MutableItem, field: OptionalField): void => {
   switch (field) {
     case 'proposal':
       delete item.proposal
+      return
+    case 'imageTitleJob':
+      delete item.imageTitleJob
       return
     case 'attention':
       delete item.attention
@@ -391,6 +399,8 @@ const setOpFor = (
       return { kind: 'set', field, value: next.events }
     case 'proposal':
       return next.proposal === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.proposal }
+    case 'imageTitleJob':
+      return next.imageTitleJob === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.imageTitleJob }
     case 'attention':
       return next.attention === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.attention }
     case 'acknowledgedAt':

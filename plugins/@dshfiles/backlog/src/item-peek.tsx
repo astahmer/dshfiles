@@ -66,7 +66,15 @@ import { useComposerFiles } from './composer-attachments.js'
 import { fileInput, type ComposerFile } from './composer-files.js'
 import type { ComposerThread } from './composer.js'
 import type { BacklogAttachment } from './item.js'
-import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLink, type BacklogProposal, type BacklogRelation } from './item.js'
+import {
+  BacklogItems,
+  type BacklogAttention,
+  type BacklogEvent,
+  type BacklogImageTitleJob,
+  type BacklogLink,
+  type BacklogProposal,
+  type BacklogRelation,
+} from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { AttachmentMedia, ItemFiles } from './item-files.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
@@ -988,6 +996,27 @@ const CommentBox = (props: {
   )
 }
 
+/** One image title attempt in flight or failed: the pending line, or the reason and the retry that names it again. */
+const ImageTitleNotice = (props: { readonly id: number; readonly job: BacklogImageTitleJob }): JSX.Element => {
+  const actions = useBacklogActions()
+  const pending = props.job.state === 'pending'
+  return (
+    <div
+      role="status"
+      className="dshx:flex dshx:items-start dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-xs"
+    >
+      <span className="dshx:min-w-0 dshx:flex-1 dshx:text-muted-foreground">
+        {pending ? 'Naming this item from its image…' : (props.job.message ?? 'The image did not name this item.')}
+      </span>
+      {pending ? null : (
+        <Button size="xs" variant="ghost" disabled={actions.regenerateImageTitle.isPending} onClick={() => actions.regenerateImageTitle.mutate(props.id)}>
+          Try again
+        </Button>
+      )}
+    </div>
+  )
+}
+
 const SnoozeMenu = (props: { readonly id: number; readonly snoozedUntil: number | null }): JSX.Element => {
   const actions = useBacklogActions()
   const until = (hours: number): number => Date.now() + hours * HOUR_MS
@@ -1306,6 +1335,7 @@ const PeekBody = (props: {
               className="dshx:flex dshx:flex-col dshx:gap-3 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
             >
               <TitleField id={item.id} title={item.title} />
+              {item.imageTitleJob === undefined ? null : <ImageTitleNotice id={item.id} job={item.imageTitleJob} />}
               <div className="dshx:-ml-1.5 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
                 <ItemPickers.Status
                   itemLabel={BacklogReference.labelOf(item)}

@@ -72,6 +72,16 @@ export class EmptyReply extends Schema.TaggedError<EmptyReply>()('EmptyReply', {
   }
 }
 
+export class BacklogImageInvalid extends Schema.TaggedError<BacklogImageInvalid>()(
+  'BacklogImageInvalid',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'backlog-image-invalid' },
+) {
+  override get message(): string {
+    return "The item's image could not be read back from storage. Remove and re-attach it, or try another image."
+  }
+}
+
 export class AttachmentExportFailed extends Schema.TaggedError<AttachmentExportFailed>()(
   'AttachmentExportFailed',
   { itemId: Schema.Number, ref: Schema.optional(Schema.String), attachmentId: Schema.String, cause: Schema.optional(Schema.Defect()) },

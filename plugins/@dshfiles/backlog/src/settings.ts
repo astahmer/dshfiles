@@ -24,6 +24,11 @@ export const backlogSettings = defineSettings({
       .default('')
       .description('Provider id for the triage model (as the model picker names it). Empty skips the model; Jev alone still triages.'),
     triageModel: Schema.string().default('').description('A cheap model on that provider, e.g. a flash or haiku model.'),
+    imageTitle: Schema.boolean()
+      .default(false)
+      .description(
+        'Title image-only items with a vision model: after you capture an image with no text, the triage model reads it and writes a short title. Off keeps the image label and spends no tokens; the item’s Try again button and the backlog_regenerate_title tool still run when you ask. Needs a triage provider and model whose route accepts image input.',
+      ),
     applyThreshold: Schema.number()
       .min(0)
       .max(1)

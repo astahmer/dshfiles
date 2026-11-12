@@ -80,6 +80,7 @@ describe('backlog tool exposure', () => {
       'backlog_read_file',
       'backlog_ready',
       'backlog_referencing',
+      'backlog_regenerate_title',
       'backlog_release',
       'backlog_remove_file',
       'backlog_revert',
