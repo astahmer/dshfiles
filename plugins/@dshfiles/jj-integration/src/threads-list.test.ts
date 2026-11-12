@@ -181,4 +181,56 @@ describe.skipIf(!jjAvailable)('threads.list against real jj', () => {
       await threads.dispose()
     }
   })
+
+  it('re-reads only the workspaces whose working copy or target moved since the last scan', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'jj-threads-list-pinned-')))
+    roots.push(root)
+    const repoRoot = join(root, 'repo')
+    const directory = `${repoRoot}-threads`
+    roots.push(directory)
+    jj(root, 'git', 'init', repoRoot)
+    jj(repoRoot, 'config', 'set', '--repo', 'user.name', 'Test')
+    jj(repoRoot, 'config', 'set', '--repo', 'user.email', 'test@example.com')
+    await writeFile(join(repoRoot, 'shared.txt'), 'one\n')
+    jj(repoRoot, 'commit', '-m', 'base')
+    jj(repoRoot, 'bookmark', 'create', 'main', '-r', '@-')
+    const names = ['thread-aaaaaa', 'thread-bbbbbb']
+    await mkdir(directory, { recursive: true })
+    for (const name of names) jj(repoRoot, 'workspace', 'add', '--name', name, '-r', 'main', join(directory, name))
+    await writeFile(join(directory, 'thread-aaaaaa', 'a.txt'), 'a\n')
+    jj(join(directory, 'thread-aaaaaa'), 'describe', '-m', 'a draft')
+
+    /** How many workspaces each scan's shared log read: two `contained_in` marks per workspace. */
+    const workspaceReads: number[] = []
+    const threads = ThreadWorkspacesTestSupport.promiseThreads({
+      executor: input => {
+        const template = input.args.at(-1) ?? ''
+        if (input.args.includes('log') && template.startsWith('separate(')) workspaceReads.push((template.split('contained_in(').length - 1) / 2)
+        return ThreadWorkspacesTestSupport.spawnJj(input)
+      },
+    })
+    try {
+      await threads.list(repoRoot)
+      expect(workspaceReads).toEqual([2])
+
+      // Another agent's operation in a workspace that is not a thread moves the operation head only.
+      jj(repoRoot, 'describe', '-m', 'project work')
+      const unmoved = await threads.list(repoRoot)
+      expect(workspaceReads).toEqual([2])
+      for (const status of unmoved) expect({ unlanded: status.unlanded, behindCount: status.behindCount }).toEqual(perWorkspaceRead(repoRoot, status.name))
+
+      await writeFile(join(directory, 'thread-bbbbbb', 'b.txt'), 'b\n')
+      jj(join(directory, 'thread-bbbbbb'), 'describe', '-m', 'b draft')
+      const oneMoved = await threads.list(repoRoot)
+      expect(workspaceReads).toEqual([2, 1])
+      expect(oneMoved.map(status => status.unlanded.map(revision => revision.description))).toEqual([['a draft'], ['b draft']])
+
+      jj(repoRoot, 'bookmark', 'set', 'main', '-r', '@')
+      const targetMoved = await threads.list(repoRoot)
+      expect(workspaceReads).toEqual([2, 1, 2])
+      for (const status of targetMoved) expect({ unlanded: status.unlanded, behindCount: status.behindCount }).toEqual(perWorkspaceRead(repoRoot, status.name))
+    } finally {
+      await threads.dispose()
+    }
+  })
 })

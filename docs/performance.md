@@ -3,6 +3,35 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Thread workspace scans pinned to commits (2026-11-12)
+
+Same live window: `thread workspaces list` spawned 74 `jj log` reads at about 2.1 s each, 88 s of jj in 39 minutes. One
+read answers every thread workspace of the repository (58 on dshfiles): its unlanded revisions and, the expensive half,
+`latest((::main ~ ::<name>@) ~ empty(), 1001)`, evaluated again by each workspace's `contained_in` mark (revset alone
+1.4 s, unlanded halves alone 0.1 s). It already runs with `--ignore-working-copy`; `latest(…, 1001)` is the only bound
+that keeps the displayed count; `--at-op` would key on the same moving head; concurrent identical reads already share
+one process through `JjViewReads` and the single-flight scan. What it lacked: the view-read cache keys on the operation
+head, which any agent's snapshot moves, so every scan paid for all 58 workspaces although one or two had changed.
+
+Fix: `workspace list` now also prints each workspace's working-copy commit, the target is read as commit ids, and the
+query names those commits instead of `<name>@` and the bookmark. A workspace's halves are then a function of two commit
+ids, kept in a 512-entry map; a scan reads only the workspaces whose working copy or target moved. Same output on the
+dshfiles repository (byte-identical for all 58). Regression check: `threads-list.test.ts` "re-reads only the
+workspaces whose working copy or target moved since the last scan" (two workspaces read again after another
+workspace's operation before, none after; one after one thread moves; all after `main` moves).
+
+Replay of the live window on the dshfiles store (read-only, `--at-op` at the operation current every 32 s, 74 scans):
+
+| `thread workspaces list` halves read | Before (every workspace) | After (moved workspaces only)               |
+| ------------------------------------ | ------------------------ | ------------------------------------------- |
+| `jj log` spawns                      | 74                       | 34 (40 scans need none)                     |
+| per scan, median                     | 2,631 ms (55–58 read)    | 0 ms (0 read); 1–3 workspaces 105–237 ms    |
+| jj time in 39 minutes                | 198.7 s                  | 10.0 s, of which 2.9 s the first, cold scan |
+
+The replay times the old query (workspace names and the bookmark) and the new one (commit ids, only the workspaces
+not read at an earlier sample) at each sampled operation; `jj log` over all 58 workspaces by name and by commit id
+printed the same bytes in the same 2.8–3.4 s, and one workspace alone took 105–118 ms.
+
 ## Inbox thread titles from the activity cache (2026-11-12)
 
 Same live window (17:36–18:15): `jj-integration attention reconcile` ran 102 times at 4.6 s mean, and 19 of the 47

@@ -35,10 +35,12 @@ import { LAND_ATTEMPTS, runVerifiedLand, type LandSettlement, type LandStepResul
  */
 const STATUS_READ_CONCURRENCY = 8
 /**
- * Workspaces answered by one `jj log` in a repository scan. Each adds about 300 bytes to the revset and template
+ * Workspaces answered by one `jj log` in a repository scan. Each adds about 500 bytes to the revset and template
  * arguments, so this stays well under Linux's 128 KiB limit for a single argument.
  */
 const MAX_WORKSPACES_PER_READ = 128
+/** Workspace scan results kept by working-copy and target commits: a few per thread workspace across recent lands. */
+const MAX_WORKSPACE_HALVES_ENTRIES = 512
 
 const REVISION_TEMPLATE = 'change_id ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ description.first_line() ++ "\\n"'
 const LAND_REVISION_TEMPLATE =
@@ -341,6 +343,7 @@ const make = Effect.gen(function* () {
   const warming = yield* FiberMap.make<string>()
   // A spare exists in `jj workspace list` before its record is written; until then it is still not a thread.
   const sparesBeingAdded = yield* Ref.make<ReadonlySet<string>>(new Set())
+  const workspaceHalves = yield* Ref.make<ReadonlyMap<string, { readonly unlanded: readonly ThreadRevision[]; readonly behindLength: number }>>(new Map())
 
   const bookmarkFor = projectBookmarks.bookmarkFor
 
@@ -420,11 +423,15 @@ const make = Effect.gen(function* () {
    * `<index><half>` marks of every workspace that has it. `--no-graph` prints the union in index order, the order each
    * workspace's own read printed its subset in.
    */
-  const workspacesRevisions = Effect.fnUntraced(function* (input: { readonly names: readonly string[]; readonly target: string; readonly cwd: string }) {
+  const workspacesRevisions = Effect.fnUntraced(function* (input: {
+    readonly workingCopies: readonly string[]
+    readonly target: string
+    readonly cwd: string
+  }) {
     const asTemplateString = (revset: string) => revset.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
-    const halves = input.names.map(name => ({
-      unlanded: unlandedRevset(name, input.target),
-      behind: `latest(${behindRevset(`${name}@`, input.target)}, ${MAX_BEHIND_REVISIONS + 1})`,
+    const halves = input.workingCopies.map(workingCopy => ({
+      unlanded: `(::${workingCopy} ~ ::${input.target}) ~ empty()`,
+      behind: `latest(${behindRevset(workingCopy, input.target)}, ${MAX_BEHIND_REVISIONS + 1})`,
     }))
     const marks = halves.map(
       (half, index) =>
@@ -442,7 +449,7 @@ const make = Effect.gen(function* () {
       ],
       input.cwd,
     )
-    const marked = classifyWorkspaceRevisions(lines(output), input.names.length)
+    const marked = classifyWorkspaceRevisions(lines(output), input.workingCopies.length)
     if (marked === undefined) return yield* jjFailed('JJ returned incomplete revision metadata; refusing to continue.')
     return yield* Effect.forEach(marked, entry => Effect.all({ unlanded: parseRevisionLines(entry.unlanded), behind: parseRevisionLines(entry.behind) }))
   })
@@ -685,17 +692,19 @@ const make = Effect.gen(function* () {
     return commitId
   })
 
-  const targetRevset = Effect.fnUntraced(function* (repoRoot: string, target?: string) {
+  /** The target as a revset, and the commits it named when read. */
+  const resolveTarget = Effect.fnUntraced(function* (repoRoot: string, target?: string) {
     const name = target ?? (yield* bookmarkFor(repoRoot))
     const local = yield* revisions(bookmarkRevset(name), repoRoot, { observe: true })
-    if (local.length > 0) return bookmarkRevset(name)
+    if (local.length > 0) return { revset: bookmarkRevset(name), commitIds: local.map(revision => revision.commitId) }
     const remoteRevset = `remote_bookmarks(${exactBookmarkNamePattern(name)}, remote=${exactBookmarkNamePattern('origin')})`
     const remote = yield* revisions(remoteRevset, repoRoot, { observe: true })
     const remoteCommit = remote[0]
-    if (remote.length === 1 && remoteCommit !== undefined) return knownCommitRevset(remoteCommit.commitId)
-    if (remote.length > 1) return remoteRevset
-    return bookmarkRevset(name)
+    if (remote.length === 1 && remoteCommit !== undefined) return { revset: knownCommitRevset(remoteCommit.commitId), commitIds: [remoteCommit.commitId] }
+    if (remote.length > 1) return { revset: remoteRevset, commitIds: remote.map(revision => revision.commitId) }
+    return { revset: bookmarkRevset(name), commitIds: [] }
   })
+  const targetRevset = (repoRoot: string, target?: string) => Effect.map(resolveTarget(repoRoot, target), resolved => resolved.revset)
   const unlandedRevset = (name: string, target: string): string => `(::${name}@ ~ ::${target}) ~ empty()`
   /**
    * What removing a workspace abandons. Revisions a bookmark reaches stay: `jj abandon` deletes a bookmark that points at
@@ -782,27 +791,64 @@ const make = Effect.gen(function* () {
 
   const list = Effect.fn('thread workspaces list')(function* (repoRoot: string) {
     const directory = yield* threadsDirectory(repoRoot)
-    const listedNames = (yield* jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"'], repoRoot)).split('\n')
+    const listed = lines(yield* jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\t" ++ self.target().commit_id() ++ "\\n"'], repoRoot)).map(
+      line => {
+        const separator = line.lastIndexOf('\t')
+        return separator < 0 ? { name: line, commitId: '' } : { name: line.slice(0, separator), commitId: line.slice(separator + 1) }
+      },
+    )
     // Snapshot before reading the record: a spare that leaves the set has already written it.
     const inFlightSpares = yield* Ref.get(sparesBeingAdded)
     const spares = new Set(Object.values(yield* readSpares(repoRoot)))
-    const names = listedNames.filter(name => name.length > 0 && !spares.has(name) && !inFlightSpares.has(name))
+    const named = listed.filter(entry => entry.name.length > 0 && !spares.has(entry.name) && !inFlightSpares.has(entry.name))
     const rebaseMetadata = yield* readRebaseMetadata(repoRoot)
-    const target = yield* targetRevset(repoRoot)
+    // Pinned to commits, a workspace's halves stay true at any later operation; most scans then re-read only the
+    // workspaces whose working copy moved since the last one.
+    const target = yield* resolveTarget(repoRoot)
+    const pinnedTarget = target.commitIds.length === 0 ? 'none()' : target.commitIds.map(knownCommitRevset).join(' | ')
     const workspaces = (yield* Effect.forEach(
-      names,
-      name =>
-        Effect.map(exists(path.join(directory, name, '.jj')), present => (present || ThreadWorkspaceModel.isManagedName(name) ? [{ name, present }] : [])),
+      named,
+      entry =>
+        Effect.map(exists(path.join(directory, entry.name, '.jj')), present =>
+          present || ThreadWorkspaceModel.isManagedName(entry.name)
+            ? [{ ...entry, present, key: isCommitId(entry.commitId) ? `${repoRoot}\0${entry.commitId}\0${pinnedTarget}` : undefined }]
+            : [],
+        ),
       { concurrency: STATUS_READ_CONCURRENCY },
     )).flat()
-    const chunks = Array.from({ length: Math.ceil(workspaces.length / MAX_WORKSPACES_PER_READ) }, (_, index) =>
-      workspaces.slice(index * MAX_WORKSPACES_PER_READ, (index + 1) * MAX_WORKSPACES_PER_READ),
+    const known = yield* Ref.get(workspaceHalves)
+    const unread = workspaces.filter(workspace => workspace.key === undefined || !known.has(workspace.key))
+    const chunks = Array.from({ length: Math.ceil(unread.length / MAX_WORKSPACES_PER_READ) }, (_, index) =>
+      unread.slice(index * MAX_WORKSPACES_PER_READ, (index + 1) * MAX_WORKSPACES_PER_READ),
     )
-    const states = (yield* Effect.forEach(chunks, chunk => workspacesRevisions({ names: chunk.map(workspace => workspace.name), target, cwd: repoRoot }), {
-      concurrency: STATUS_READ_CONCURRENCY,
-    })).flat()
-    const statuses = workspaces.map((workspace, index) => {
-      const state = states[index] ?? { unlanded: [], behind: [] }
+    const states = (yield* Effect.forEach(
+      chunks,
+      chunk =>
+        workspacesRevisions({
+          workingCopies: chunk.map(workspace => (workspace.key === undefined ? `${workspace.name}@` : knownCommitRevset(workspace.commitId))),
+          target: pinnedTarget,
+          cwd: repoRoot,
+        }),
+      { concurrency: STATUS_READ_CONCURRENCY },
+    )).flat()
+    const read = new Map(
+      unread.map((workspace, index) => [workspace, { unlanded: states[index]?.unlanded ?? [], behindLength: states[index]?.behind.length ?? 0 }]),
+    )
+    yield* Ref.update(workspaceHalves, current => {
+      const next = new Map(current)
+      for (const [workspace, halves] of read) {
+        if (workspace.key === undefined) continue
+        next.delete(workspace.key)
+        next.set(workspace.key, halves)
+      }
+      for (const key of next.keys()) {
+        if (next.size <= MAX_WORKSPACE_HALVES_ENTRIES) break
+        next.delete(key)
+      }
+      return next
+    })
+    return workspaces.map(workspace => {
+      const state = read.get(workspace) ?? (workspace.key === undefined ? undefined : known.get(workspace.key)) ?? { unlanded: [], behindLength: 0 }
       return withRebaseMetadata(
         {
           name: workspace.name,
@@ -810,13 +856,12 @@ const make = Effect.gen(function* () {
           repoRoot,
           missing: !workspace.present,
           unlanded: state.unlanded,
-          behind: state.behind.length > 0,
-          behindCount: Math.min(state.behind.length, MAX_BEHIND_REVISIONS),
+          behind: state.behindLength > 0,
+          behindCount: Math.min(state.behindLength, MAX_BEHIND_REVISIONS),
         },
         rebaseMetadata[workspace.name],
       )
     })
-    return statuses
   })
 
   const reviewHistory = Effect.fn('thread workspaces review history')(function* (input: { readonly repoRoot: string; readonly name: string }) {
