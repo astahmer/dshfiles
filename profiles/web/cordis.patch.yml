@@ -41,7 +41,7 @@
 # seconds to keep working while the question stays answerable; a later answer is
 # steered in as a user-question-reply message. Preset children are config data,
 # not Loader rows, and a patch replaces a row's whole `config`, so this restates
-# the shipped `preset-standard` declaration (@deepseek-ai/dsh-web-app 0.2.2-rc.1,
+# the shipped `preset-standard` declaration (@deepseek-ai/dsh-web-app 0.2.2-rc.2,
 # presets/standard.patch.yml) with only `tool-ask-user.config` added. Re-sync it
 # when DSH ships a new standard preset: 0.2.1 added the `time-context`,
 # `tool-schedule` and `tool-plugin-market` rows, dropped the subagent
@@ -50,7 +50,10 @@
 # removed the `tool-subagent-control/list-agents` module (its row fails to
 # load), renamed the subagent `modelSelectionSettings` option to
 # `modelSelection` + `modelDiscovery`, added `tool-fs.applyPatch` (off), and
-# enables `tool-plugin-manager` whenever a profile context exists.
+# enables `tool-plugin-manager` whenever a profile context exists. 0.2.2-rc.2
+# added the `tool-office` row and `tool-subagent-control.interrupt: false`, and
+# points `skill-filesystem` at the preset package's bundled `skills` directory,
+# which this restatement leaves out: its path resolves from the shipped patch.
 - id: preset-standard
   name: '@deepseek-ai/dsh-agent-preset'
   config:
@@ -140,6 +143,8 @@
         config:
           - id: tool-subagent-control
             name: '@deepseek-ai/dsh-tool-subagent-control'
+            config:
+              interrupt: false
           # @dshfiles/tool-subagent: the model-selection policy follows the saved setting in running Sessions (b:rmkm).
           # Outside the managed region: an existing profile needs the same `name` edit on both delegation rows.
           - id: tool-subagent
@@ -179,6 +184,8 @@
           searchTimeoutMs: 60000
       - id: present
         name: '@deepseek-ai/dsh-tool-present'
+      - id: tool-office
+        name: '@deepseek-ai/dsh-tool-office'
       - id: tool-plugin-manager
         name: '@deepseek-ai/dsh-plugin-manager/tools'
         disabled: !!js "!ctx.get('profileContext')"
