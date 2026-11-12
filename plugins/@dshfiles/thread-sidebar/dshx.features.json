@@ -3808,7 +3808,7 @@
     {
       "id": "subagent-live-preview",
       "title": "Live subagent preview in the transcript and above the composer",
-      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working children above the composer share a \"Working subagents\" header with their count that collapses them all, and stays collapsed while children start and finish.",
+      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working children above the composer share a \"Working subagents\" header with their count that collapses them all, and stays collapsed while children start and finish. With subagentRunCards on (the default) a working child whose open turn, route and tool are known becomes a compact run card: current tool, route, elapsed time, step count, Stop behind a confirmation and Open thread. A child with any of those parts missing keeps its one-line row, and the setting's off state is that row.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or sessions*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
@@ -3821,8 +3821,28 @@
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: subagent tool row; composer dock while the child works",
-      "configuration": [],
-      "states": ["starting", "failed-to-start", "working", "finished", "interrupted", "idle", "stop-armed", "stopping", "progress-unavailable"],
+      "configuration": [
+        {
+          "key": "subagentRunCards",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the compact run card instead of the one-line row above the composer.",
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.subagent-live-preview"]
+        }
+      ],
+      "states": [
+        "starting",
+        "failed-to-start",
+        "working",
+        "finished",
+        "interrupted",
+        "idle",
+        "stop-armed",
+        "stopping",
+        "progress-unavailable",
+        "run-card",
+        "run-card-row-fallback"
+      ],
       "failureModes": [
         "A child that cannot be opened keeps its row and thread link, and says live progress is unavailable.",
         "A failed stop leaves the child working and points to its thread, where Stop is also available."
@@ -3830,7 +3850,7 @@
       "externalDependencies": [
         {
           "id": "@deepseek-ai/dsh-api-session-controller",
-          "boundary": "Holds a client reference to the child session only while the row is open and reads its event window; Stop goes through the child's session cancel, which routes to the parent interrupt.",
+          "boundary": "Holds a client reference to the child session while its row is open or its run card shows, and reads its event window; Stop goes through the child's session cancel, which routes to the parent interrupt. The card's clock and route come from the child's subagentTiming and threadSidebarModelRoute projections, so it never guesses either.",
           "deterministicFake": "src/subagent-provenance/subagent-feed.test.ts drives a fake event source; the row test uses a fake binding."
         }
       ],
@@ -3869,6 +3889,30 @@
           "id": "thread-sidebar.subagent-dock-group-collapse",
           "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
           "testName": "collapses every working child under one header and keeps it collapsed as children come and go"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-run-card",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
+          "testName": "shows the compact run card for a working child whose turn, route and tool are known"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-run-card-fallback",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
+          "testName": "keeps the one-line row until the open turn is known"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-run-card-actions",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
+          "testName": "stops the child through its interrupt after a confirmation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-run-card-no-fake-actions",
+          "file": "plugins/@dshfiles/plugin-ui/tests/agent-run-status.test.tsx",
+          "testName": "renders only the actions whose handler exists, never a disabled stand-in"
         }
       ],
       "telemetry": [

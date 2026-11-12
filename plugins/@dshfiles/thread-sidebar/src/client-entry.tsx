@@ -20,7 +20,7 @@ import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type Transl
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { createApiClient, defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient, hasHostCommandRegistry, runHostCommand, useSettings } from '@dshfiles/dshx/client'
 import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
 import { WorkingStatusItem, WorkingStatusModel } from './working-status-item.js'
 import { RestartStatusItem } from './restart-status-item.js'
@@ -65,6 +65,7 @@ import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PaletteBridge } from './palette-bridge.js'
 import './client.css'
 import { NotificationSettingsTab, SettingsTab } from './settings-tab.js'
+import { threadSidebarSettings } from './settings.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { NotificationHistoryPanel } from './notification-history-panel.js'
 import { notificationHistoryLocale } from './notification-history-locales.js'
@@ -941,15 +942,19 @@ export default defineClient({
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
         { name: 'conversation.input.dock', id: 'thread-sidebar-subagents-live', order: 4, inject: sessionId => ({ sessionId }) },
-        decorate((props: PropsRuntime<'conversation.input.dock'> & { readonly sessionId: SessionSummary['id'] }) => (
-          <SubagentPreviewDock
-            key={props.sessionId}
-            useSessions={props.useSessions}
-            useSessionStatus={props.useSessionStatus}
-            sessionId={props.sessionId}
-            preview={subagentPreview}
-          />
-        )),
+        decorate((props: PropsRuntime<'conversation.input.dock'> & { readonly sessionId: SessionSummary['id'] }) => {
+          const runCards = useSettings(threadSidebarSettings).value?.subagentRunCards ?? true
+          return (
+            <SubagentPreviewDock
+              key={props.sessionId}
+              useSessions={props.useSessions}
+              useSessionStatus={props.useSessionStatus}
+              sessionId={props.sessionId}
+              preview={subagentPreview}
+              runCards={runCards}
+            />
+          )
+        }),
       ),
     )
     const SubagentRow = decorate((props: SubagentToolViewProps) => <SubagentProvenanceToolRow {...props} preview={subagentPreview} />)

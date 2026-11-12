@@ -21,44 +21,74 @@ export interface AgentRunStep {
 export interface AgentRunStatusProps extends Omit<React.HTMLAttributes<HTMLElement>, 'children' | 'title'> {
   /** What the run is for ("Fix the flaky webhook test"); the header shows it while the step row shows the current step. */
   readonly heading: string
-  readonly model: string
+  /** Omitted when the run's route is unknown; the header and step row keep the card. */
+  readonly model?: string
   /** Steps so far, oldest first; the last one is the current step. */
   readonly steps: readonly AgentRunStep[]
-  readonly totalSteps: number
+  /** 1-based position of the current step when `steps` does not list the whole run (a live feed keeps one); defaults to `steps.length`. */
+  readonly stepIndex?: number
+  /** Steps the run expects in total; omitted when unknown, which hides the counted target and the rail. */
+  readonly totalSteps?: number
   /** Epoch ms the run started (header clock). */
   readonly startedAt: number
   readonly endedAt?: number
   readonly state: AgentRunState
   /** Glyph in the spinner ring; defaults to an asterisk. */
   readonly glyph?: LucideIcon
+  /** Override any visible string; each defaults to English. */
+  readonly labels?: Partial<AgentRunStatusLabels>
   readonly onPauseToggle?: () => void
   readonly onStop?: () => void
   readonly onOpen?: () => void
   readonly openLabel?: string
 }
 
-const stateLabel = {
+/** Every visible string, so a localized surface does not ship the English defaults. */
+export interface AgentRunStatusLabels {
+  readonly running: string
+  readonly paused: string
+  readonly done: string
+  readonly stopped: string
+  readonly failed: string
+  readonly step: string
+  readonly of: string
+  readonly pause: string
+  readonly resume: string
+  readonly stop: string
+  readonly elapsed: string
+}
+
+const defaultLabels: AgentRunStatusLabels = {
   running: 'Running',
   paused: 'Paused',
   done: 'Completed',
   stopped: 'Stopped',
   failed: 'Failed',
-} as const satisfies Record<AgentRunState, string>
+  step: 'Step',
+  of: 'of',
+  pause: 'Pause',
+  resume: 'Resume',
+  stop: 'Stop',
+  elapsed: 'Elapsed',
+}
 
 /**
  * Compact live status card for one agent run: a spinning ring around the agent glyph, the current step shimmering,
- * a live clock, "Step n of N" with a segmented progress rail, and Pause / Stop / Open run. Step changes blur in,
+ * a live clock, "Step n of N" with a segmented progress rail when the total is known, and the actions the caller
+ * really has — Pause, Stop and Open run each render only when their handler is passed. Step changes blur in,
  * segments fill on a spring, and the ring settles into a check (or cross) when the run ends.
  */
 export function AgentRunStatus({
   heading,
   model,
   steps,
+  stepIndex,
   totalSteps,
   startedAt,
   endedAt,
   state,
   glyph,
+  labels: labelOverrides,
   onPauseToggle,
   onStop,
   onOpen,
@@ -66,16 +96,20 @@ export function AgentRunStatus({
   className,
   ...props
 }: AgentRunStatusProps) {
+  const labels = { ...defaultLabels, ...labelOverrides }
   const current = steps[steps.length - 1]
-  const index = Math.min(steps.length, totalSteps)
+  const counted = totalSteps !== undefined && totalSteps > 0
+  const position = stepIndex ?? steps.length
+  const index = Math.min(position, totalSteps ?? position)
   const active = state === 'running'
   const finished = state === 'done' || state === 'stopped' || state === 'failed'
   const CurrentIcon = current?.icon
+  const hasAction = onPauseToggle !== undefined || onStop !== undefined || onOpen !== undefined
   return (
     <section
-      aria-label={`Agent run: ${heading}, ${stateLabel[state].toLowerCase()}`}
+      aria-label={`Agent run: ${heading}, ${labels[state].toLowerCase()}`}
       className={cn(
-        'dshx:@container dshx:flex dshx:flex-col dshx:gap-4 dshx:rounded-2xl dshx:border dshx:border-border dshx:bg-card dshx:p-4 dshx:text-card-foreground dshx:shadow-sm',
+        'dshx:@container dshx:flex dshx:flex-col dshx:gap-4 dshx:rounded-2xl dshx:border dshx:border-border dshx:bg-card dshx:p-4 dshx:text-card-foreground dshx:shadow-sm dshx:@max-pane-narrow:gap-3 dshx:@max-pane-narrow:p-3',
         className,
       )}
       {...props}
@@ -87,31 +121,34 @@ export function AgentRunStatus({
             {heading}
           </ShimmerText>
           <Swap swapKey={state} className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-            <span aria-live="polite">{stateLabel[state]}</span>
+            <span aria-live="polite">{labels[state]}</span>
           </Swap>
         </div>
         <ElapsedClock
           startedAt={startedAt}
           endedAt={endedAt}
           running={active}
-          aria-label="Elapsed"
+          aria-label={labels.elapsed}
           className="dshx:shrink-0 dshx:font-mono dshx:text-sm dshx:text-muted-foreground"
         />
       </header>
 
       <div className="dshx:flex dshx:flex-col dshx:gap-2">
         <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:text-xs dshx:text-muted-foreground">
-          <span className="dshx:min-w-0 dshx:truncate">{model}</span>
+          {model === undefined ? null : <span className="dshx:min-w-0 dshx:truncate">{model}</span>}
           <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-            Step <RollingNumber value={index} /> of {totalSteps}
+            {labels.step} <RollingNumber value={index} />
+            {counted ? ` ${labels.of} ${String(totalSteps)}` : null}
           </span>
         </div>
-        <SegmentRail
-          total={totalSteps}
-          done={finished && state === 'done' ? totalSteps : Math.max(0, index - 1)}
-          current={finished ? -1 : index - 1}
-          paused={state === 'paused'}
-        />
+        {counted ? (
+          <SegmentRail
+            total={totalSteps}
+            done={finished && state === 'done' ? totalSteps : Math.max(0, index - 1)}
+            current={finished ? -1 : index - 1}
+            paused={state === 'paused'}
+          />
+        ) : null}
       </div>
 
       {current ? (
@@ -128,33 +165,35 @@ export function AgentRunStatus({
         </Swap>
       ) : null}
 
-      <footer className="dshx:flex dshx:items-center dshx:gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="dshx:rounded-full dshx:px-3.5"
-          onClick={onPauseToggle}
-          disabled={finished || onPauseToggle === undefined}
-          aria-pressed={state === 'paused'}
-        >
-          {state === 'paused' ? <PlayIcon aria-hidden /> : <PauseIcon aria-hidden />}
-          <span className="dshx:@max-pane-narrow:sr-only">{state === 'paused' ? 'Resume' : 'Pause'}</span>
-        </Button>
-        <Button variant="outline" size="sm" className="dshx:rounded-full dshx:px-3.5" onClick={onStop} disabled={finished || onStop === undefined}>
-          <SquareIcon aria-hidden />
-          <span className="dshx:@max-pane-narrow:sr-only">Stop</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="dshx:ml-auto dshx:rounded-full dshx:text-muted-foreground"
-          onClick={onOpen}
-          disabled={onOpen === undefined}
-        >
-          {openLabel}
-          <ArrowUpRightIcon aria-hidden />
-        </Button>
-      </footer>
+      {hasAction ? (
+        <footer className="dshx:flex dshx:items-center dshx:gap-2">
+          {onPauseToggle === undefined ? null : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="dshx:rounded-full dshx:px-3.5"
+              onClick={onPauseToggle}
+              disabled={finished}
+              aria-pressed={state === 'paused'}
+            >
+              {state === 'paused' ? <PlayIcon aria-hidden /> : <PauseIcon aria-hidden />}
+              <span className="dshx:@max-pane-narrow:sr-only">{state === 'paused' ? labels.resume : labels.pause}</span>
+            </Button>
+          )}
+          {onStop === undefined ? null : (
+            <Button variant="outline" size="sm" className="dshx:rounded-full dshx:px-3.5" onClick={onStop} disabled={finished}>
+              <SquareIcon aria-hidden />
+              <span className="dshx:@max-pane-narrow:sr-only">{labels.stop}</span>
+            </Button>
+          )}
+          {onOpen === undefined ? null : (
+            <Button variant="ghost" size="sm" className="dshx:ml-auto dshx:rounded-full dshx:text-muted-foreground" onClick={onOpen}>
+              {openLabel}
+              <ArrowUpRightIcon aria-hidden />
+            </Button>
+          )}
+        </footer>
+      ) : null}
     </section>
   )
 }

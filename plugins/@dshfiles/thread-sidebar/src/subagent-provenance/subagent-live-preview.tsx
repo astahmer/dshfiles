@@ -4,6 +4,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from '../locales.js'
 import { createSubagentFeedStore, type SubagentFeed, type SubagentFeedStore, type SubagentPreviewState } from './subagent-feed.js'
+import { failureMessage, useSubagentStop } from './subagent-stop.js'
 
 export type SubagentPreviewTranslate = TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
 
@@ -30,17 +31,22 @@ const STATE_KEY = {
 export const subagentStateLabel = (t: SubagentPreviewTranslate, state: SubagentPreviewState): string => t(STATE_KEY[state])
 
 type Feed =
+  | { readonly kind: 'idle' }
   | { readonly kind: 'loading' }
   | { readonly kind: 'ready'; readonly store: SubagentFeedStore; readonly binding: SessionBinding }
   | { readonly kind: 'failed'; readonly message: string }
 
-const failureOf = (error: unknown): string => (error instanceof Error ? error.message : String(error))
-
 /** Opening the child loads its history, so it happens per expansion and ends with it. */
-const useChildFeed = (input: { readonly childId: string; readonly retainChild: SubagentPreviewBindings['retainChild'] }): Feed => {
+export const useChildFeed = (input: {
+  readonly childId: string
+  readonly retainChild: SubagentPreviewBindings['retainChild']
+  readonly enabled?: boolean
+}): Feed => {
   const { childId, retainChild } = input
+  const enabled = input.enabled ?? true
   const [feed, setFeed] = useState<Feed>({ kind: 'loading' })
   useEffect(() => {
+    if (!enabled) return undefined
     const controller = new AbortController()
     let store: SubagentFeedStore | undefined
     setFeed({ kind: 'loading' })
@@ -53,7 +59,7 @@ const useChildFeed = (input: { readonly childId: string; readonly retainChild: S
           setFeed({ kind: 'ready', store, binding })
         },
         (error: unknown) => {
-          if (!controller.signal.aborted) setFeed({ kind: 'failed', message: failureOf(error) })
+          if (!controller.signal.aborted) setFeed({ kind: 'failed', message: failureMessage(error) })
         },
       )
       return () => {
@@ -62,40 +68,24 @@ const useChildFeed = (input: { readonly childId: string; readonly retainChild: S
         reference.release()
       }
     } catch (error) {
-      setFeed({ kind: 'failed', message: failureOf(error) })
+      setFeed({ kind: 'failed', message: failureMessage(error) })
       return undefined
     }
-  }, [childId, retainChild])
-  return feed
+  }, [childId, retainChild, enabled])
+  return enabled ? feed : { kind: 'idle' }
 }
-
-type Stop = { readonly kind: 'idle' } | { readonly kind: 'armed' } | { readonly kind: 'stopping' } | { readonly kind: 'failed'; readonly message: string }
 
 const StopChild = (props: { readonly binding: SessionBinding; readonly t: SubagentPreviewTranslate }): JSX.Element => {
   const t = props.t
-  const [stop, setStop] = useState<Stop>({ kind: 'idle' })
-  const confirm = (): void => {
-    setStop({ kind: 'stopping' })
-    props.binding.session.cancel().then(
-      result => setStop(result.ok ? { kind: 'idle' } : { kind: 'failed', message: result.error.message }),
-      (error: unknown) => setStop({ kind: 'failed', message: failureOf(error) }),
-    )
-  }
-  const armed = stop.kind === 'armed'
+  const { stop, armed, requestStop, cancel } = useSubagentStop({ binding: props.binding, t })
   return (
     <>
       {armed ? (
-        <Button size="xs" variant="ghost" className="dshx:shrink" onClick={() => setStop({ kind: 'idle' })}>
+        <Button size="xs" variant="ghost" className="dshx:shrink" onClick={cancel}>
           {t('subagentPreviewKeepWorking')}
         </Button>
       ) : null}
-      <Button
-        size="xs"
-        variant={armed ? 'destructive' : 'outline'}
-        className="dshx:shrink"
-        disabled={stop.kind === 'stopping'}
-        onClick={() => (armed ? confirm() : setStop({ kind: 'armed' }))}
-      >
+      <Button size="xs" variant={armed ? 'destructive' : 'outline'} className="dshx:shrink" disabled={stop.kind === 'stopping'} onClick={requestStop}>
         {t(armed ? 'subagentPreviewConfirmStop' : 'subagentPreviewStop')}
       </Button>
       {stop.kind === 'failed' ? <span className="dshx:basis-full dshx:text-destructive">{t('subagentPreviewStopFailed', { error: stop.message })}</span> : null}
@@ -136,27 +126,32 @@ export const SubagentLivePreview = (
     readonly childId: string
     readonly state: SubagentPreviewState
     readonly onTurnState: (lastTurnCompleted: boolean | undefined) => void
+    /** Off when the surface around the preview already renders Stop and Open thread (the run card does). */
+    readonly showActions?: boolean
   },
 ): JSX.Element => {
   const { t, childId, state } = props
   const feed = useChildFeed({ childId, retainChild: props.retainChild })
+  const showActions = props.showActions ?? true
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:text-xs">
       {feed.kind === 'loading' ? <p className="dshx:text-muted-foreground">{t('subagentPreviewLoading')}</p> : null}
       {feed.kind === 'failed' ? <p className="dshx:text-destructive">{t('subagentPreviewUnavailable', { error: feed.message })}</p> : null}
       {feed.kind === 'ready' ? <FeedLine store={feed.store} t={t} onTurnState={props.onTurnState} /> : null}
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        <Button size="xs" variant="link" className="dshx:shrink" onClick={() => props.openChild(childId)}>
-          {t('subagentPreviewOpenThread')}
-        </Button>
-        {props.canOpenAside(childId) ? (
-          <Button size="xs" variant="ghost" className="dshx:shrink" onClick={() => props.openChildAside(childId)}>
-            {t('subagentPreviewOpenAside')}
+      {showActions ? (
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          <Button size="xs" variant="link" className="dshx:shrink" onClick={() => props.openChild(childId)}>
+            {t('subagentPreviewOpenThread')}
           </Button>
-        ) : null}
-        <span className="dshx:flex-1" />
-        {state === 'working' && feed.kind === 'ready' ? <StopChild binding={feed.binding} t={t} /> : null}
-      </div>
+          {props.canOpenAside(childId) ? (
+            <Button size="xs" variant="ghost" className="dshx:shrink" onClick={() => props.openChildAside(childId)}>
+              {t('subagentPreviewOpenAside')}
+            </Button>
+          ) : null}
+          <span className="dshx:flex-1" />
+          {state === 'working' && feed.kind === 'ready' ? <StopChild binding={feed.binding} t={t} /> : null}
+        </div>
+      ) : null}
     </div>
   )
 }
