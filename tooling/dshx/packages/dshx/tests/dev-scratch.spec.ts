@@ -7,6 +7,8 @@ import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import * as Schema from 'effect/Schema'
+import { parse } from 'yaml'
 import { chromium } from 'playwright'
 import { chromiumLaunchOptions } from '../src/project/chromium-launch-options.js'
 import { runCli } from '../src/cli/run.js'
@@ -15,6 +17,7 @@ import { StartupDialogs } from '../src/project/startup-dialogs.js'
 import { ScratchReaperRuntime } from '../src/scratch/reaper.js'
 import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME, ScratchSeedRuntime } from '../src/scratch/seed.js'
 import { DEFAULT_WARN_MINUTES, ScratchStateRuntime, type ScratchState } from '../src/scratch/state.js'
+import { ScratchBootModel } from '../src/scratch/up.js'
 
 const run = async (argv: readonly string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }> => {
   const stdout = new PassThrough()
@@ -493,6 +496,32 @@ describe('dshx dev scratch commands', () => {
     const result = await run(['dev', 'up', '--port', '3080', '--state-dir', stateDir, '--json'])
     expect(result.code).toBe(1)
     expect(envelope(result.stdout).error?.code).toBe('live-port')
+  })
+
+  it('gives the phone plugins free ports in a scratch instead of the live Host port 3443', async () => {
+    const patchSchema = Schema.Array(
+      Schema.Struct({
+        id: Schema.String,
+        config: Schema.Struct({
+          proxyPort: Schema.optional(Schema.Number),
+          gatewayPort: Schema.optional(Schema.Number),
+          autoServe: Schema.optional(Schema.Boolean),
+          port: Schema.optional(Schema.Number),
+        }),
+      }),
+    )
+    const { cordisPatch } = await ScratchBootModel.cordisPatch(['@dshfiles/phone-access', '@dshfiles/phone-pairing', '@dshfiles/traces'])
+    const rows = Schema.decodeUnknownSync(patchSchema)(parse(cordisPatch ?? ''))
+    expect(rows.map(row => row.id)).toEqual(['dshfiles-traces', 'dshfiles-phone-access', 'dshfiles-phone-pairing'])
+    expect(rows[0]?.config.port).toBe(0)
+    expect(rows[1]?.config.proxyPort).not.toBe(3443)
+    expect(rows[1]?.config.autoServe).toBe(false)
+    expect(rows[2]?.config.gatewayPort).not.toBe(3443)
+    expect(rows[1]?.config.proxyPort).not.toBe(rows[2]?.config.gatewayPort)
+  })
+
+  it('leaves the scratch patch empty when no bundle needs a row', async () => {
+    expect(await ScratchBootModel.cordisPatch(['@dshfiles/thread-sidebar'])).toEqual({})
   })
 
   it('restores the Host entry a pending-restart seed changed, and only on a real down', async () => {

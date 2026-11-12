@@ -79,12 +79,30 @@ const stopGroup = async (pid: number): Promise<void> => {
 }
 
 /**
- * Loader rows a scratch Host needs that the bundles do not compose. The traces receiver (@dshfiles/traces) defaults to the
- * standard OTLP port 4318, which the live Host or an external viewer may own; a scratch takes any free port instead and
- * its panel shows which one.
+ * Loader rows a scratch Host needs that the bundles do not compose, or whose defaults bind a fixed loopback port
+ * beside the live Host. The traces receiver (@dshfiles/traces) defaults to the standard OTLP port 4318; the phone
+ * plugins default to 3443 for their proxy and gateway. The live Host already owns those, so a scratch takes free
+ * ports instead, and its phone-access row never runs Tailscale Serve, which would repoint the phone origin at the
+ * scratch.
  */
-const scratchCordisPatch = (packageIds: readonly string[]): { readonly cordisPatch?: string } =>
-  packageIds.includes('@dshfiles/traces') ? { cordisPatch: '- id: dshfiles-traces\n  config:\n    port: 0\n' } : {}
+export class ScratchBootModel {
+  static readonly cordisPatch = async (packageIds: readonly string[]): Promise<{ readonly cordisPatch?: string }> => {
+    const rows: string[] = []
+    if (packageIds.includes('@dshfiles/traces')) rows.push('- id: dshfiles-traces\n  config:\n    port: 0')
+    const reserved = new Set<number>()
+    const freePort = async (): Promise<number> => {
+      let port = await findFreePort()
+      while (reserved.has(port)) port = await findFreePort()
+      reserved.add(port)
+      return port
+    }
+    if (packageIds.includes('@dshfiles/phone-access'))
+      rows.push(`- id: dshfiles-phone-access\n  config:\n    proxyPort: ${String(await freePort())}\n    autoServe: false`)
+    if (packageIds.includes('@dshfiles/phone-pairing'))
+      rows.push(`- id: dshfiles-phone-pairing\n  config:\n    gatewayPort: ${String(await freePort())}`)
+    return rows.length === 0 ? {} : { cordisPatch: rows.join('\n') }
+  }
+}
 
 /**
  * The owned bundles a scratch composes when `up` names none: the ones the checked-in web profile seed depends on, so the
@@ -171,7 +189,7 @@ export const scratchUp = async (
   options.onProgress('installing the scratch profile')
   const prepared = await prepareComposedBootProfile([firstBundle, ...otherBundles], {
     additionalBundleIds: options.bundles,
-    ...scratchCordisPatch(bundles.map(bundle => bundle.packageId)),
+    ...(await ScratchBootModel.cordisPatch(bundles.map(bundle => bundle.packageId))),
   })
   const home = prepared.homeRoot
   let hostPid: number | undefined
