@@ -788,7 +788,14 @@ const upgrade = async (version, { turnModel, dropPatches = false } = {}) => {
     )
   }
   log('dsh-lkg: making sure a healthy snapshot captures the installation before the upgrade')
-  const before = await snapshot({ label: 'before upgrade', ifChanged: true })
+  // Plugins already moved to the new core cannot boot on the live one, so a fresh snapshot would always fail; a
+  // healthy snapshot of the live core carries its own plugin bundles and is a complete recovery point.
+  const currentId = currentVersionId()
+  const current = currentId === undefined ? undefined : readJson(join(VERSIONS, currentId, 'manifest.json'))
+  const before =
+    current?.health?.healthy === true && current.versions?.dsh === liveVersion
+      ? { id: currentId, health: current.health }
+      : await snapshot({ label: 'before upgrade', ifChanged: true })
   if (before.health?.healthy !== true) fail(`the current snapshot ${before.id} is not recorded healthy; run \`verify\` or \`snapshot\` first`)
 
   const work = join(STATE, `upgrade-${version}-${randomUUID().slice(0, 8)}`)
