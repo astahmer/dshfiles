@@ -318,6 +318,13 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             style={popoverWidth === null ? undefined : { width: popoverWidth }}
             onOpenAutoFocus={event => {
               event.preventDefault()
+              // On a touch screen a focused search raises the on-screen keyboard over the sheet: start on the model in
+              // use instead, and the search keyboard comes up only when the user taps the field.
+              if (window.matchMedia('(pointer: coarse)').matches) {
+                const list = modelListRef.current
+                list?.querySelector<HTMLButtonElement>('button[data-model-picker-option][aria-pressed="true"]:not(:disabled)')?.focus({ preventScroll: true })
+                return
+              }
               searchInputRef.current?.focus()
             }}
             onEscapeKeyDown={(event: KeyboardEvent) => {
