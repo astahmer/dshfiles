@@ -21,6 +21,8 @@ interface GateRecord {
   readonly hostPath: string | undefined
   loaded: string | undefined
   disk: string | undefined
+  /** A client change was held back and not yet released; a package tracked but never changed is not waiting. */
+  held: boolean
 }
 
 export type GateVerdict = { readonly action: 'apply' } | { readonly action: 'defer'; readonly reason: GateReason }
@@ -140,7 +142,7 @@ export class HmrGateModel {
 
   /** First sight of a package. `loaded` stays undefined when the Host may have read an older artifact than `digest`. */
   track(id: string, hostPath: string | undefined, digest: string | undefined, loaded: string | undefined): GateVerdict {
-    this.records.set(id, { id, hostPath, loaded, disk: digest })
+    this.records.set(id, { id, hostPath, loaded, disk: digest, held: false })
     return { action: 'apply' }
   }
 
@@ -149,7 +151,8 @@ export class HmrGateModel {
     const record = this.records.get(id)
     if (record === undefined || record.hostPath === undefined) return { action: 'apply' }
     record.disk = disk
-    return record.loaded === disk ? { action: 'apply' } : { action: 'defer', reason: 'host-artifact-changed' }
+    record.held = record.loaded !== disk
+    return record.held ? { action: 'defer', reason: 'host-artifact-changed' } : { action: 'apply' }
   }
 
   /**
@@ -162,6 +165,7 @@ export class HmrGateModel {
       if (record.hostPath === undefined) continue
       if (!filenames.includes(record.hostPath)) continue
       record.loaded = record.disk
+      record.held = false
       released.push(record.id)
     }
     return released
@@ -170,9 +174,7 @@ export class HmrGateModel {
   deferred(): readonly string[] {
     const ids: string[] = []
     for (const record of this.records.values()) {
-      if (record.hostPath === undefined) continue
-      if (record.loaded === record.disk) continue
-      ids.push(record.id)
+      if (record.held) ids.push(record.id)
     }
     return ids
   }

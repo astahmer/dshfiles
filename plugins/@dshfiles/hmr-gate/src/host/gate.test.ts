@@ -69,6 +69,14 @@ describe('HmrGateModel', () => {
     expect(gate.observe('pkg', 'disk-digest')).toEqual({ action: 'apply' })
   })
 
+  it('does not report a package installed after Host start until its client actually changes', () => {
+    const gate = new HmrGateModel()
+    gate.track('live-installed', '/pkg/dist/index.js', 'disk-digest', undefined)
+    expect(gate.deferred()).toEqual([])
+    gate.observe('live-installed', 'disk-digest')
+    expect(gate.deferred()).toEqual(['live-installed'])
+  })
+
   it('always applies a package without a Host half', () => {
     const gate = new HmrGateModel()
     gate.track('client-only', undefined, undefined, undefined)
