@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-models@0.2.1-rc.2 (MIT): `OnboardingModal.js`, `WelcomeNotice.js`,
+ * Ported from @deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.1 (MIT): `OnboardingModal.js`, `WelcomeNotice.js`,
  * `welcome-store.js`, `onboarding-copy.js` and the welcome copy of its dictionaries. The native step keeps its
  * acknowledgement in the `ui-settings-general` namespace, which only the switched-off native row serves, so this copy
  * shadows the `welcome-notice` onboarding entry and keeps it in this plugin's own namespace instead.

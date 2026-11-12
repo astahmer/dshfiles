@@ -1,4 +1,5 @@
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+import type {} from '@deepseek-ai/dsh-tool-executor-ptc/types'
 import { attentionApi, type AttentionActOutcome, type AttentionActRequest, type AttentionDraft } from '@dshfiles/activity-timeline/attention-api'
 import { DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'

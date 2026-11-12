@@ -1,6 +1,5 @@
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { GoalRef, GoalView } from '@deepseek-ai/dsh-goal'
-import type {} from '@deepseek-ai/dsh-session-projection'
 import { HostContext } from '@dshfiles/dshx/effect'
 import type { SessionId } from '@dshfiles/dshx/ids'
 import { Context, Effect, Layer, Schema } from 'effect'
@@ -41,7 +40,7 @@ export class GoalHost extends Context.Service<
       return GoalHost.of({
         liveAgent: sessionId => ctx.agents.get(sessionId),
         isInitiating: agent => ctx.agents.get(agent.id) === agent && ctx.agents.currentInitiator() === agent,
-        openTurnStartSeq: agent => ctx.sessionProjections.stateOf(agent.session, 'turnBoundary')?.openTurnStartSeq,
+        openTurnStartSeq: agent => ctx.agents.turnBoundaryOf(agent.session).openTurnStartSeq,
         goal: agent => Effect.try({ try: () => ctx.goals.get(agent), catch: failed('read') }),
         pause: input => Effect.try({ try: () => ctx.goals.pause(input.agent, input.ref), catch: failed('pause', input.ref.id) }),
         extend: input =>

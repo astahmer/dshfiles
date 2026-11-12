@@ -1,3 +1,4 @@
+import type {} from '@deepseek-ai/dsh-api-remote-access/client'
 import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ClientReleaseChange } from '@deepseek-ai/dsh-client-modules/client'
@@ -142,7 +143,7 @@ const CurrentVersion = (props: { readonly t: ShellTranslate }): JSX.Element => {
 export default defineClient({
   name: '@dshfiles/settings-shell',
   locales: [shellLocale, welcomeLocale],
-  inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout', 'modules'],
+  inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout', 'modules', 'remoteAccess'],
   setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
     // A newer DSH release is a quiet banner above the General rows, not a preference row (visual refresh T4.4).
@@ -620,49 +621,52 @@ export default defineClient({
       )
     }
 
-    ctx.slots.inject('sidebar.settings', () => {
-      const disposeCommand = ctx.shortcuts.register({
-        id: openSettingsCommand,
-        label: () => t('shortcut.open'),
-        aliases: ['settings', 'preferences'],
-        defaults: {
-          'desktop:macos': { code: 'Comma', modifiers: ['primary'] },
-          'desktop:windows': { code: 'Comma', modifiers: ['primary'] },
-          'desktop:linux': { code: 'Comma', modifiers: ['primary'] },
-          'web:macos': { code: 'Comma', modifiers: ['primary', 'alt'] },
-          'web:windows': { code: 'Comma', modifiers: ['primary', 'alt'] },
-        },
-        regions: ['page', 'editable', 'terminal'],
-        modals: [],
-        resolve: ({ modal }) => {
-          if (modal !== null) return { status: 'blocked', reason: 'modal' }
-          return {
-            status: 'handled',
-            // Mod+, toggles the Settings page in the stage.
-            run: () => (actor.getSnapshot().matches('tab') ? deps.closeSettings() : deps.openSettings()),
-          }
-        },
-      })
-      const disposeSlot = ctx.slots.register(
-        { name: 'sidebar.settings', locale: SHELL_LOCALE_NAMESPACE, children: SHELL_CHILDREN },
-        decorate((props: { readonly wide: boolean; readonly t: ShellTranslate; readonly renderSlot: ShellRenderSlot }) => (
-          <>
-            <WorkbenchSources renderSlot={props.renderSlot} />
-            <ShellRoot
-              deps={deps}
-              renderSlot={props.renderSlot}
-              surface={<Surface renderSlot={props.renderSlot} t={props.t} />}
-              t={props.t}
-              wide={props.wide}
-            />
-          </>
-        )),
-      )
-      return () => {
-        disposeCommand()
-        disposeSlot()
-      }
-    })
+    // The settings shell reads this Host's configuration, so it follows access to its description.
+    ctx.remoteAccess.whenAccess('settings/describe', () =>
+      ctx.slots.inject('sidebar.settings', () => {
+        const disposeCommand = ctx.shortcuts.register({
+          id: openSettingsCommand,
+          label: () => t('shortcut.open'),
+          aliases: ['settings', 'preferences'],
+          defaults: {
+            'desktop:macos': { code: 'Comma', modifiers: ['primary'] },
+            'desktop:windows': { code: 'Comma', modifiers: ['primary'] },
+            'desktop:linux': { code: 'Comma', modifiers: ['primary'] },
+            'web:macos': { code: 'Comma', modifiers: ['primary', 'alt'] },
+            'web:windows': { code: 'Comma', modifiers: ['primary', 'alt'] },
+          },
+          regions: ['page', 'editable', 'terminal'],
+          modals: [],
+          resolve: ({ modal }) => {
+            if (modal !== null) return { status: 'blocked', reason: 'modal' }
+            return {
+              status: 'handled',
+              // Mod+, toggles the Settings page in the stage.
+              run: () => (actor.getSnapshot().matches('tab') ? deps.closeSettings() : deps.openSettings()),
+            }
+          },
+        })
+        const disposeSlot = ctx.slots.register(
+          { name: 'sidebar.settings', locale: SHELL_LOCALE_NAMESPACE, children: SHELL_CHILDREN },
+          decorate((props: { readonly wide: boolean; readonly t: ShellTranslate; readonly renderSlot: ShellRenderSlot }) => (
+            <>
+              <WorkbenchSources renderSlot={props.renderSlot} />
+              <ShellRoot
+                deps={deps}
+                renderSlot={props.renderSlot}
+                surface={<Surface renderSlot={props.renderSlot} t={props.t} />}
+                t={props.t}
+                wide={props.wide}
+              />
+            </>
+          )),
+        )
+        return () => {
+          disposeCommand()
+          disposeSlot()
+        }
+      }),
+    )
 
     // Every dshx plugin's own Plugins page draws its settings with the same controls as Settings.
     const PluginsPageSettings = (props: SettingsPageRendererProps): JSX.Element | null => {

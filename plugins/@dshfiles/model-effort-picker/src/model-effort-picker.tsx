@@ -23,7 +23,7 @@ import { englishModelPicker, type ModelPickerTranslate } from './locales.js'
 import { modelEffortPickerSettings } from './settings.js'
 import { selectionFailureNotice } from './session-presence.js'
 
-type Props = ModelSelectInjected & {
+type Props = Omit<ModelSelectInjected, 'resolveText'> & {
   readonly locked: boolean
   readonly sessionId: string
   /** The picker's locale seat (`dshfiles.modelPicker`); English when absent. */

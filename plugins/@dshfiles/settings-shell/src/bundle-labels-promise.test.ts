@@ -13,6 +13,7 @@ const bundle: BundleInfo = {
   installed: true,
   optional: false,
   removable: true,
+  updatable: false,
   description: 'Threads beside the chat',
   meta: { title: { en: 'Thread Sidebar', zh: '线程侧栏' } },
   rows: [{ rowId: 'dshfiles-thread-sidebar', moduleName: '@dshfiles/thread-sidebar' }],

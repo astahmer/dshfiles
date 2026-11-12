@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2 (MIT): `DesktopUpdateIndicator.js` and
+ * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.1 (MIT): `DesktopUpdateIndicator.js` and
  * `desktop-update-source.js`. Optional Electron update status; the native shell owns actions and Web owns copy.
  */
 import { DownloadIcon, LoaderCircleIcon } from '@dshfiles/plugin-ui/icons'
@@ -71,6 +71,7 @@ const updateCopy = (state: DesktopUpdatePresentation, t: ShellTranslate): Update
         'stop-failed': t('desktop.update.stopFailed'),
         'tasks-changed': t('desktop.update.tasksChanged'),
         'tasks-unavailable': t('desktop.update.tasksUnavailable'),
+        'fullscreen-timeout': t('desktop.update.fullscreenTimeout'),
       }[state.failure ?? 'install'],
     }
   }

@@ -247,7 +247,7 @@ const shellZh = {
   'releaseNotice.off': '已关闭 DSH 版本自动检查',
 } satisfies Record<keyof typeof shellEn, string>
 
-// Ported verbatim from @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2 (MIT), lib/client.js `zh` and `en`.
+// Ported verbatim from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.1 (MIT), lib/client.js `zh` and `en`.
 const zh = {
   trigger: '设置',
   'shortcut.open': '打开设置',
@@ -269,6 +269,7 @@ const zh = {
   'desktop.update.stopFailed': '未能安全停止任务，更新尚未安装，请稍后重试。',
   'desktop.update.tasksChanged': '有新任务开始运行，请重新确认是否停止任务并更新。',
   'desktop.update.tasksUnavailable': '无法确认任务状态，请在工作区就绪后重试更新。',
+  'desktop.update.fullscreenTimeout': '无法退出全屏，请退出全屏后重试更新',
   title: '设置',
   close: '关闭',
   openDocument: '打开配置文件',
@@ -314,6 +315,7 @@ const en = {
   'desktop.update.stopFailed': 'Could not safely stop the tasks. The update has not been installed. Please try again later.',
   'desktop.update.tasksChanged': 'New tasks have started. Confirm again to stop the tasks and update.',
   'desktop.update.tasksUnavailable': 'Task status is unavailable. Try updating again when the workspace is ready.',
+  'desktop.update.fullscreenTimeout': 'Could not exit fullscreen. Exit fullscreen, then retry the update.',
   title: 'Settings',
   close: 'Close',
   openDocument: 'Open configuration file',

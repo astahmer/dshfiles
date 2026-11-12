@@ -104,6 +104,7 @@
         "@deepseek-ai/dsh-client-ui-primitives"
       ],
       "external": [
+        "@deepseek-ai/dsh-client-store",
         "@dshfiles/shared-runtime"
       ]
     }

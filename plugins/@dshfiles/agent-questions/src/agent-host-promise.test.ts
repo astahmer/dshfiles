@@ -17,7 +17,7 @@ describe('NativeQuestions.listTargets', () => {
         created => Effect.promise(() => created.dispose()),
       )
       let corpusListings = 0
-      host.ctx.provide('sessionProjections', { register: () => () => undefined })
+      host.ctx.provide('sessionProjections', { register: async () => ({ dispose: async () => undefined }) })
       host.ctx.provide('sessions', {
         list: () => [{ id: 'session-root' }, { id: 'session-child' }],
         get: () => undefined,
@@ -46,7 +46,7 @@ describe('NativeQuestions.listTargets', () => {
         Effect.promise(() => createTestHost()),
         created => Effect.promise(() => created.dispose()),
       )
-      host.ctx.provide('sessionProjections', { register: () => () => undefined })
+      host.ctx.provide('sessionProjections', { register: async () => ({ dispose: async () => undefined }) })
       host.ctx.provide('sessions', { list: () => [], get: () => undefined })
       host.ctx.provide('sessionQuery', {
         listSessions: async () => [

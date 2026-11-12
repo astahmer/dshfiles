@@ -12,9 +12,13 @@ const modelSchema = Schema.Struct({
 })
 const scheduleEntrySchema = Schema.Struct({
   id: Schema.String.check(Schema.isMinLength(1)),
-  sessionId: Schema.String.check(Schema.isMinLength(1)),
   title: Schema.optional(Schema.String),
-  status: Schema.Literals(['active', 'inactive']),
+  status: Schema.Literals(['active', 'paused', 'ended']),
+  target: Schema.Union([
+    Schema.Struct({ kind: Schema.Literals(['session', 'new_once']), sessionId: Schema.String }),
+    Schema.Struct({ kind: Schema.Literal('new') }),
+  ]),
+  involvedSessionIds: Schema.Array(Schema.String),
 })
 const scheduleCatalogSchema = Schema.Array(scheduleEntrySchema)
 
@@ -122,12 +126,15 @@ export class AgentDispatch {
     })
   }
 
-  /** The schedules catalog, narrowed to the threads one agent started; decoded once at the client boundary. */
+  /** The schedules catalog, narrowed to tasks that deliver to or were managed from one agent's threads; decoded once at the client boundary. */
   static schedules(value: typeof scheduleCatalogSchema.Encoded, sessionIds: readonly string[]): AgentScheduleRow[] {
     const wanted = new Set(sessionIds)
-    return Schema.decodeUnknownSync(scheduleCatalogSchema)(value)
-      .filter(entry => wanted.has(entry.sessionId))
-      .map(entry => ({ id: entry.id, sessionId: entry.sessionId, title: entry.title ?? 'Reminder', status: entry.status }))
+    return Schema.decodeUnknownSync(scheduleCatalogSchema)(value).flatMap(entry => {
+      const targetSessionIds = entry.target.kind === 'new' ? [] : [entry.target.sessionId]
+      const sessionId = [...targetSessionIds, ...entry.involvedSessionIds].find(id => wanted.has(id))
+      if (sessionId === undefined) return []
+      return [{ id: entry.id, sessionId, title: entry.title ?? 'Reminder', status: entry.status === 'active' ? 'active' : 'inactive' }]
+    })
   }
 
   static title(request: AgentDispatchRequest): string {

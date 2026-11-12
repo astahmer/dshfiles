@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-file-drag/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -16,7 +17,7 @@ import { ATTACHMENT_GALLERY_LOCALE_NAMESPACE, attachmentGalleryLocale } from './
 export default defineClient({
   name: '@dshfiles/attachment-gallery',
   locales: [attachmentGalleryLocale],
-  inject: ['slots'],
+  inject: ['slots', 'fileDrag'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(ATTACHMENT_GALLERY_LOCALE_NAMESPACE)
     const galleryLabels = AttachmentGalleryLabelsModel.imageLightboxLabels(translate)
@@ -38,6 +39,7 @@ export default defineClient({
         name: 'conversation.images.content',
         scope: 'root',
         locale: 'conversation',
+        inject: () => ({ fileDrag: ctx.fileDrag.actions }),
       },
       decorate(GallerySlot),
     )

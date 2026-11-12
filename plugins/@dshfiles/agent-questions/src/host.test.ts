@@ -57,7 +57,7 @@ const mountedQuestions = Effect.gen(function* () {
       list: () => [...agents.values()],
       get: (id: string) => (agents.has(id) ? { header: { cwd: workspace, parentSession: parentOf.get(id) } } : undefined),
     },
-    sessionProjections: { register: () => () => undefined },
+    sessionProjections: { register: async () => ({ dispose: async () => undefined }) },
     sessionQuery: { listSessions: async () => [], observeSession: async () => Promise.reject(new Error('no session log in this test')) },
     subagents: {
       sendMessage: async (_from: TestAgent, _to: string, content: ReadonlyArray<{ readonly text: string }>) => {

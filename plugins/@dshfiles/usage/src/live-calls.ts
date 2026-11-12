@@ -12,7 +12,10 @@ import type { RequestPurpose, RequestRow, TokenUsage } from './fold.js'
 /** The digest call shares `compaction` purpose with native compaction. */
 const MEMORY_DIGEST_SYSTEM_PREFIX = 'You write the digest of one finished'
 
-export const livePurposeOf = (options: Pick<GenerateOptions, 'purpose' | 'system' | 'toolHistory'>): RequestPurpose | null => {
+// Purposes are declared by their producers (compaction, session titles, memory); this observer reads them as opaque metadata.
+type ObservedRequest = Pick<GenerateOptions, 'system' | 'toolHistory'> & { readonly purpose?: string | undefined }
+
+export const livePurposeOf = (options: ObservedRequest): RequestPurpose | null => {
   if (options.purpose === 'session-title') return 'title'
   if (options.purpose === 'compaction') return (options.system ?? '').startsWith(MEMORY_DIGEST_SYSTEM_PREFIX) ? 'memory' : 'compaction'
   if (options.toolHistory !== undefined) return null

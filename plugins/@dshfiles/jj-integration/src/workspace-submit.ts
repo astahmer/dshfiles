@@ -1,11 +1,11 @@
-import type { ComposerBlocks } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ComposerBlocks, InputState } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceToggle, type WorkspaceToggleActor } from './workspace-toggle-machine.js'
 
 type ComposerState = {
   readonly draft: string
   readonly attachmentIds: readonly string[]
-  readonly phase: 'plain' | 'adjudicating' | 'claimed' | 'submitting'
+  readonly phase: InputState['phase']
   /** Reference chips in the draft; a draft holding any is not moved as plain text. */
   readonly occurrences?: readonly unknown[]
 }

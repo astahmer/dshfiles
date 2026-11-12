@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import GoalService from '@deepseek-ai/dsh-goal'
-import { createAssistantMessage, createUserMessage, LlmRuntime, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage, createUserMessage, LlmRuntime } from '@deepseek-ai/dsh-llm'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { createTestHost } from '@dshfiles/dshx/testing'
@@ -95,14 +95,7 @@ describe('goal-stall-guard wiring', () => {
     Effect.gen(function* () {
       const f = yield* fixture()
       expect(['extend_goal_budget', 'complete_blocked_goal'].map(name => f.host.tools.get(name)?.name)).toEqual(['extend_goal_budget', 'complete_blocked_goal'])
-      const refused = yield* Effect.promise(() =>
-        f.host.tools.execute({
-          callId: ToolCallId(randomUUID()),
-          name: 'complete_blocked_goal',
-          arguments: { evidence: 'every requirement verified' },
-          signal: new AbortController().signal,
-        }),
-      )
+      const refused = yield* Effect.promise(() => f.host.runTool({ name: 'complete_blocked_goal', arguments: { evidence: 'every requirement verified' } }))
       expect(refused).toMatchObject({ isError: true, error: { message: 'Goal continuation requires an active Agent.' } })
     }),
   )

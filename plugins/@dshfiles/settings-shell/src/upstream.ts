@@ -5,11 +5,11 @@
  */
 export const PORTED_FROM = {
   packageName: '@deepseek-ai/dsh-client-ui-settings-general',
-  version: '0.2.1-rc.2',
+  version: '0.2.2-rc.1',
 } as const
 
 /** The welcome notice step, ported because it stores its acknowledgement in the switched-off row's namespace. */
 export const WELCOME_PORTED_FROM = {
   packageName: '@deepseek-ai/dsh-client-ui-settings-models',
-  version: '0.2.1-rc.2',
+  version: '0.2.2-rc.1',
 } as const

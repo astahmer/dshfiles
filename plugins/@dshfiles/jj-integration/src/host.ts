@@ -46,8 +46,8 @@ const PromptedTurnCountLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const { ctx } = yield* HostContext
     yield* Effect.acquireRelease(
-      Effect.sync(() => ctx.sessionProjections.register(promptedTurnCountProjection)),
-      unregister => Effect.sync(() => unregister()),
+      Effect.promise(() => ctx.sessionProjections.register(promptedTurnCountProjection)),
+      handle => Effect.promise(() => handle.dispose()),
     )
   }),
 )

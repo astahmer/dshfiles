@@ -181,6 +181,11 @@ export default defineClient({
     const plugin = metadata?.plugin
     if (plugin !== undefined) ctx.effect(() => PaletteBridge.connect(plugin), 'thread-sidebar: palette bridge')
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
+    const entryPins = createSnapshotStore<readonly string[]>([])
+    const entryActions: ObservableSnapshot<boolean> = {
+      getSnapshot: () => ctx.slots.entriesOfSlot('sidebar.panellist.actions').length > 0,
+      subscribe: listener => ctx.slots.subscribe('sidebar.panellist.actions', listener),
+    }
     const syncPanels = (): void => {
       const next = ctx.slots
         .entriesOfSlot('sidebar.panellist')
@@ -750,9 +755,18 @@ export default defineClient({
       startSession,
       toggleSidebar: () => ctx.layout.toggleSidebar(),
       selectPanel: id => ctx.layout.selectPanel(id),
+      setPinned: (id, pinned) => {
+        const unpinned = entryPins.getSnapshot()
+        if (pinned === !unpinned.includes(id)) return
+        entryPins.set(pinned ? unpinned.filter(candidate => candidate !== id) : [...unpinned, id])
+      },
+      // This sidebar sends no product analytics.
+      trackEntryClick: () => {},
       hooks: {
         panels,
         shortcuts: ctx.shortcuts.catalog,
+        entryPins,
+        entryActions,
       },
     })
 

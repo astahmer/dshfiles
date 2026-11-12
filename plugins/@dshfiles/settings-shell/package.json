@@ -47,6 +47,7 @@
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.2-rc.1",
     "@deepseek-ai/dsh-api-gateway": "catalog:",
+    "@deepseek-ai/dsh-api-remote-access": "0.2.2-rc.1",
     "@deepseek-ai/dsh-api-remotes": "catalog:",
     "@deepseek-ai/dsh-api-session-controller": "catalog:",
     "@deepseek-ai/dsh-api-settings-controller": "catalog:",
@@ -80,6 +81,7 @@
     "@deepseek-ai/cordis": "~4.1.0",
     "@deepseek-ai/dsh": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-api-gateway": ">=0.2.2-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-api-remote-access": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-api-remotes": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-api-session-controller": ">=0.2.2-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-api-settings-controller": ">=0.2.2-rc.1 <0.3.0-0",
@@ -108,6 +110,7 @@
       "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-api-gateway",
+        "@deepseek-ai/dsh-api-remote-access",
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-api-session-controller",
         "@deepseek-ai/dsh-client-connection",

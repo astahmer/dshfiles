@@ -1,6 +1,7 @@
 import { BlockAssembler, createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { DshxPlugin } from '@dshfiles/dshx/effect'
+import type {} from '@dshfiles/dshx/host'
 import { hostService } from '@dshfiles/dshx/effect/host-context'
 import { Llm } from '@dshfiles/dshx/effect/llm'
 import { selectSummaryRoute, type SummarizerPolicy, type SummarizerRouteState, type SummaryEffort } from '@dshfiles/optmem-core/summary-routes'

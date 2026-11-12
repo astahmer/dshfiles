@@ -94,8 +94,8 @@ const modelRouteProjection = Layer.effectDiscard(
   Effect.gen(function* () {
     const { ctx } = yield* HostContext
     yield* Effect.acquireRelease(
-      Effect.sync(() => ctx.sessionProjections.register(threadSidebarModelRouteProjection)),
-      unregister => Effect.sync(() => unregister()),
+      Effect.promise(() => ctx.sessionProjections.register(threadSidebarModelRouteProjection)),
+      handle => Effect.promise(() => handle.dispose()),
     )
   }),
 )

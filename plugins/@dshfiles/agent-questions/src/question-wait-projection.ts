@@ -1,6 +1,7 @@
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-tool-executor-ptc/types'
 import { isTimedAskUserQuestionSchema } from '@deepseek-ai/dsh-user-questions'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { Schema } from 'effect'

@@ -110,6 +110,7 @@ const props = (): SubagentHeaderLineageProps => ({
   usePanelInfo: unavailable,
   useResource: unavailable,
   useAccess: unavailable,
+  useContextMenu: unavailable,
   useSessionRetainInfo: unavailable,
   useWorkspaces: unavailable,
   useProjection: (key: Parameters<SubagentHeaderLineageProps['useProjection']>[0]) => (key === 'threadSidebarModelRoute' ? 'openai/gpt-6.1-luna' : undefined),
@@ -119,6 +120,7 @@ const props = (): SubagentHeaderLineageProps => ({
   inputActions: {
     captureInsertion: unavailable,
     insertText: unavailable,
+    insertQuote: unavailable,
     setDraft: unavailable,
     persistDraft: unavailable,
     addAttachments: unavailable,

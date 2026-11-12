@@ -310,9 +310,13 @@ const start = async (
   })
   const registeredProjections = new Set<string>()
   host.ctx.provide('sessionProjections', {
-    register: (projection: { readonly key: string }) => {
+    register: async (projection: { readonly key: string }) => {
       registeredProjections.add(projection.key)
-      return () => registeredProjections.delete(projection.key)
+      return {
+        dispose: async () => {
+          registeredProjections.delete(projection.key)
+        },
+      }
     },
   })
   host.ctx.on('dshfiles/activity/event', payload => {

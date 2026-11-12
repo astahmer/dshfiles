@@ -6,7 +6,10 @@ import {
   ScheduleId,
   ScheduleInputError,
   resolveRecurringOccurrence,
-  type RecurringScheduleRecord,
+  type CronScheduleRecord,
+  type DailyScheduleRecord,
+  type EveryScheduleRecord,
+  type WeeklyScheduleRecord,
 } from '@deepseek-ai/dsh-schedule'
 
 /**
@@ -21,6 +24,8 @@ export type Timing =
 
 export type TimingResult<A> = { readonly ok: true; readonly value: A } | { readonly ok: false; readonly message: string }
 
+type TimingRecord = CronScheduleRecord | DailyScheduleRecord | WeeklyScheduleRecord | EveryScheduleRecord
+
 /** The record fields the Schedule domain reads; the title and prompt never leave this module. */
 const PLACEHOLDER = 'project automation'
 const ID = ScheduleId('project-automation')
@@ -34,7 +39,7 @@ const failure = (cause: unknown): TimingResult<never> => {
 /** The Schedule domain reads `HH:mm:ss`; a person (or an agent) writes `09:00`. */
 const withSeconds = (time: string): string => (/^\d{2}:\d{2}$/u.test(time.trim()) ? `${time.trim()}:00` : time.trim())
 
-const recordOf = (timing: Timing, now: number): RecurringScheduleRecord => {
+const recordOf = (timing: Timing, now: number): TimingRecord => {
   switch (timing.kind) {
     case 'cron':
       return createCronScheduleRecord(ID, PLACEHOLDER, { expression: timing.expression, time_zone: timing.timeZone }, now, PLACEHOLDER)
@@ -53,7 +58,7 @@ const recordOf = (timing: Timing, now: number): RecurringScheduleRecord => {
   }
 }
 
-const timingOf = (record: RecurringScheduleRecord): Timing => {
+const timingOf = (record: TimingRecord): Timing => {
   switch (record.kind) {
     case 'cron':
       return { kind: 'cron', expression: record.expression, timeZone: record.timeZone }
@@ -67,7 +72,7 @@ const timingOf = (record: RecurringScheduleRecord): Timing => {
 }
 
 /** The record the resolver reads for a committed target: the canonical rule plus the earliest unaccepted instant. */
-const committed = (timing: Timing, scheduledAt: string): RecurringScheduleRecord => {
+const committed = (timing: Timing, scheduledAt: string): TimingRecord => {
   switch (timing.kind) {
     case 'cron':
       return { id: ID, kind: 'cron', title: PLACEHOLDER, prompt: PLACEHOLDER, expression: timing.expression, timeZone: timing.timeZone, scheduledAt }

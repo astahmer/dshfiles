@@ -148,8 +148,8 @@ export class NativeQuestions extends Context.Service<
       const host = yield* HostContext
       const context = host.ctx
       yield* Effect.acquireRelease(
-        Effect.sync(() => context.sessionProjections.register(questionWaitProjectionDefinition)),
-        unregister => Effect.sync(() => (typeof unregister === 'function' ? unregister() : undefined)),
+        Effect.promise(() => context.sessionProjections.register(questionWaitProjectionDefinition)),
+        handle => Effect.promise(() => handle.dispose()),
       )
       const liveRootIds = () => new Set(context.agents.roots().map(agent => String(agent.id)))
       return NativeQuestions.of({

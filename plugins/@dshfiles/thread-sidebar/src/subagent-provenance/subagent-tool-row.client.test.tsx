@@ -87,12 +87,14 @@ const props = ({
   // SAFETY: an empty status map holds nothing to misread.
   useSessionStatus: selector => selector(new Map<string, never>() as never),
   useSessionRetainInfo: unused,
+  useContextMenu: unused,
   useChat: unused,
   useConversation: unused,
   useInput: unused,
   inputActions: {
     captureInsertion: unused,
     insertText: unused,
+    insertQuote: unused,
     setDraft: unused,
     persistDraft: unused,
     addAttachments: unused,

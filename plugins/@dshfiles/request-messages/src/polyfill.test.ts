@@ -3,6 +3,7 @@ import { LlmAdapter, LlmRuntime, createUserMessage, markAgentLoopRequest, type G
 import SessionStore, { Session, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import type {} from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Exit, Scope } from 'effect'
