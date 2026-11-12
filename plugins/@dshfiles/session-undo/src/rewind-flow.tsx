@@ -1,5 +1,5 @@
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
-import { isApiError } from '@dshfiles/dshx/api'
+import { isApiError, type ApiClient, type ApiContract } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import {
   AlertDialog,
@@ -12,7 +12,8 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { CheckpointGraph } from '@dshfiles/plugin-ui/components/motion/checkpoint-graph'
-import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useSessionOnScreen } from '@dshfiles/plugin-ui/hooks/session-on-screen'
+import { errorMessage, queryOptions, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 import { sessionUndoApi } from './api.js'
 import type { SessionUndoKey } from './locales.js'
@@ -40,17 +41,27 @@ export const lastIndexOf = (checkpoints: readonly { readonly turn: number }[], t
   return -1
 }
 
+type SessionUndoClient = typeof sessionUndoApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
+
 export const historyQueryKey = (sessionId: string) => ['session-undo', 'history', sessionId] as const
+
+/**
+ * Main tabs keep every visited thread's composer mounted, and each polled its own history, so a page with four open
+ * threads read four histories every 15 s. A thread off screen still reads once on mount, so a side-panel composer
+ * shows its controls; only the thread the main view shows keeps polling.
+ */
+export const undoHistoryQuery = (input: { readonly api: Pick<SessionUndoClient, 'history'>; readonly sessionId: string; readonly onScreen: boolean }) =>
+  queryOptions({
+    queryKey: historyQueryKey(input.sessionId),
+    queryFn: ({ signal }) => input.api.history({ sessionId: input.sessionId }, { signal }),
+    refetchInterval: input.onScreen ? 15_000 : false,
+    retry: false,
+  })
 
 /** The thread's recorded turns; every control of one thread shares this query. */
 export const useUndoHistory = (sessionId: string) => {
   const api = useApi(sessionUndoApi)
-  return useQuery({
-    queryKey: historyQueryKey(sessionId),
-    queryFn: ({ signal }) => api.history({ sessionId }, { signal }),
-    refetchInterval: 15_000,
-    retry: false,
-  })
+  return useQuery(undoHistoryQuery({ api, sessionId, onScreen: useSessionOnScreen(sessionId) }))
 }
 
 /**
