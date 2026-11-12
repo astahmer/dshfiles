@@ -1,41 +1,43 @@
 # Guided onboarding and feature discovery
 
+**Next:** [calm-onboarding.md](calm-onboarding.md) plans the follow-up (setup outside DSH, calm first run, zen mode, progressive disclosure), with its research in [research/](research/).
+
 **Resume here:** P1–P4 and P5a are on `main`. Only P5b remains: every UI plugin joins a pack or an explicit infrastructure exemption, enforced by `features:check`. It waits on the user’s choice (A: place feature plugins in packs plus an exemption list; B: all into Core; C: drop the pack rule).
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
 **Status:** P0–P4 and P5a landed on `main` (2026-11-11): 85 `onboarding` blocks on 70 UI plugins, 9 infrastructure-only plugins exempt, `features:check` fails a UI plugin without a block, curation now list-based (curated set unchanged at 284). P5b (pack membership) waits on a user decision.
 
-| Phase | Work                                                                                                                                                                | Status      |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| P0    | Audience, owner, curated list, blocking-or-not, gallery home, packs                                                                                                 | done        |
-| P1    | Generated catalog + `onboarding` block schema + Knowledge section + gallery + packs (read-only) + self-ticking checklist + palette + wizard + `onboarding_overview` | done        |
-| P2    | **Enable / Disable pack** (exact preview, reversible) + **Show me where** (replay `reach` against the live UI)                                                      | done        |
-| P3    | **What's new** from jj/git history (since last visit; upstream since fork point) + opt-in usage suggestions                                                         | done        |
-| P4    | Agent-led demo in a scratch thread (off by default) + `dshx init` profile composer + generated docs page per pack                                                   | done        |
+| Phase | Work                                                                                                                                                                | Status                            |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| P0    | Audience, owner, curated list, blocking-or-not, gallery home, packs                                                                                                 | done                              |
+| P1    | Generated catalog + `onboarding` block schema + Knowledge section + gallery + packs (read-only) + self-ticking checklist + palette + wizard + `onboarding_overview` | done                              |
+| P2    | **Enable / Disable pack** (exact preview, reversible) + **Show me where** (replay `reach` against the live UI)                                                      | done                              |
+| P3    | **What's new** from jj/git history (since last visit; upstream since fork point) + opt-in usage suggestions                                                         | done                              |
+| P4    | Agent-led demo in a scratch thread (off by default) + `dshx init` profile composer + generated docs page per pack                                                   | done                              |
 | P5    | AGENTS.md rule (each new plugin ships an onboarding block and joins a pack) + `features:check` error for a UI plugin without one                                    | P5a done; P5b waits on a decision |
 
 ### P2 progress
 
-| Step | Work                                                                                                                  | Status              |
-| ---- | --------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| 1    | Exact preview (install / change / fine / kept / blocked / prerequisites / restart) per pack, from live plugin state    | done: `jj:rromxyqx` |
-| 2    | Apply through the plugin manager, install through the checkout's `dshx add`, one at a time, cancellable, never a restart | done: `jj:rromxyqx` |
-| 3    | `onboarding_pack_apply` write tool (needs `confirm: true`, refuses a bare request) + preview through `onboarding_overview` | done: `jj:rromxyqx` |
-| 4    | Credential-aware account checklist item (AI accounts read, provider routes only as fallback)                          | done: `jj:rromxyqx` |
-| 5    | Show me where: `onboarding_reach` read tool + walk overlay replaying `reach`, unsupported steps explained             | done: `jj:xynxyzsx`, `jj:nwynnrsw`, `jj:trqvxxvq` |
-| 6    | Audit: cleared the lint/Effect ratchet debt P1–P2 added (JSON.parse + casts, cascading ternary, `void then`, inline Promise adapters) | done: `jj:llpxvroo` |
+| Step | Work                                                                                                                                  | Status                                            |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| 1    | Exact preview (install / change / fine / kept / blocked / prerequisites / restart) per pack, from live plugin state                   | done: `jj:rromxyqx`                               |
+| 2    | Apply through the plugin manager, install through the checkout's `dshx add`, one at a time, cancellable, never a restart              | done: `jj:rromxyqx`                               |
+| 3    | `onboarding_pack_apply` write tool (needs `confirm: true`, refuses a bare request) + preview through `onboarding_overview`            | done: `jj:rromxyqx`                               |
+| 4    | Credential-aware account checklist item (AI accounts read, provider routes only as fallback)                                          | done: `jj:rromxyqx`                               |
+| 5    | Show me where: `onboarding_reach` read tool + walk overlay replaying `reach`, unsupported steps explained                             | done: `jj:xynxyzsx`, `jj:nwynnrsw`, `jj:trqvxxvq` |
+| 6    | Audit: cleared the lint/Effect ratchet debt P1–P2 added (JSON.parse + casts, cascading ternary, `void then`, inline Promise adapters) | done: `jj:llpxvroo`                               |
 
 ### P1 progress
 
-| Step | Work                                                                                               | Status              |
-| ---- | -------------------------------------------------------------------------------------------------- | ------------------- |
-| 1    | `onboarding` block in the dshx feature catalog schema (valid and invalid cases tested)             | done: `jj:ourwpqzn` |
-| 2    | Plugin scaffold, packs data, curated list, catalog generator + staleness test                      | done: `jj:lmwrwqwu` |
-| 3    | Host API: overview + self-ticking checklist (`gh` span), `onboarding_overview` read tool, settings | done: `jj:lmwrwqwu` |
-| 4    | Client: Knowledge section page (checklist, packs, features), palette + New tab, wizard step        | done: `jj:zqpnxvso` |
-| 5    | Feature catalog, journey, 390 px check, screenshots, README                                        | done: `jj:zqpnxvso` |
-| 6    | Landed fixups: lockfile importer, `plugin-guide` catalog, boot-task inputs, `profiles/web` seed row; onboarding catalog already current, e2e re-run 2/2 | done |
+| Step | Work                                                                                                                                                    | Status              |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 1    | `onboarding` block in the dshx feature catalog schema (valid and invalid cases tested)                                                                  | done: `jj:ourwpqzn` |
+| 2    | Plugin scaffold, packs data, curated list, catalog generator + staleness test                                                                           | done: `jj:lmwrwqwu` |
+| 3    | Host API: overview + self-ticking checklist (`gh` span), `onboarding_overview` read tool, settings                                                      | done: `jj:lmwrwqwu` |
+| 4    | Client: Knowledge section page (checklist, packs, features), palette + New tab, wizard step                                                             | done: `jj:zqpnxvso` |
+| 5    | Feature catalog, journey, 390 px check, screenshots, README                                                                                             | done: `jj:zqpnxvso` |
+| 6    | Landed fixups: lockfile importer, `plugin-guide` catalog, boot-task inputs, `profiles/web` seed row; onboarding catalog already current, e2e re-run 2/2 | done                |
 
 ### P1 follow-ups
 
@@ -389,4 +391,4 @@ None open: P0 closed all seven (owner, audience, blocking, gallery home, screens
 | 2026-11-11 | The wizard is a non-modal card, not a dialog                                                            | A modal is a gate in practice and failed the scratch boot's no-modal-overlay check; Escape and Skip close the card |
 | 2026-11-11 | A Show me where walk moves focus to its card's first button                                             | Keyboard users must reach Next and End; the walk is user-started, so focus follows the user's action               |
 | 2026-11-11 | What's new reads history on the Host at request time, not a build-time list                             | A generated list with a staleness test would fail CI on every unrelated commit                                     |
-| 2026-11-11 | Phone walks use an optional `reachNarrow` catalog path                                                  | Desktop `reach` targets controls that do not render below 640 px                                                  |
+| 2026-11-11 | Phone walks use an optional `reachNarrow` catalog path                                                  | Desktop `reach` targets controls that do not render below 640 px                                                   |
