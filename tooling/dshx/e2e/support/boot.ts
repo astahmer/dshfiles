@@ -15,6 +15,7 @@ import { recordScratchProcess, scratchLedgerPath } from '../../scripts/reap-scra
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 import { createScratchHostLifecycle, type ScratchHostInstance } from './scratch-host-lifecycle.js'
 import { AI_ACCOUNTS_WORKSPACE_SEED_KEY, seedAiAccountsWorkspace } from './ai-accounts-workspace.js'
+import { SCRATCH_WORKSPACE_SEED_KEY, seedScratchWorkspace } from './scratch-workspace.js'
 import { startHostEgressGuard } from './host-egress-guard.js'
 
 // Registry dependencies come from the checked-in seed, not the live ~/.dsh profile, so a journey (and its cached
@@ -446,8 +447,11 @@ export const bootComposedPluginProfile = async (request: {
     profileLabel: request.profileLabel,
     timeoutMs: request.timeoutMs ?? 90_000,
     additionalBundleIds: request.additionalBundleIds ?? [],
-    ...(request.seedHome === undefined ? {} : { seedHome: request.seedHome }),
-    ...(request.seedKey === undefined ? {} : { seedKey: request.seedKey }),
+    // Every isolated boot starts from a seeded Workspace, as `dshx dev up` does: a browser-created default Workspace
+    // races the journey's first click, and the client does not retry the restoration it cancelled (b:kk6n). A caller's
+    // own seed owns the workspace when it provides one (AI Accounts registers its own canonical project).
+    seedHome: request.seedHome ?? seedScratchWorkspace,
+    seedKey: request.seedKey ?? SCRATCH_WORKSPACE_SEED_KEY,
     ...(request.cordisPatch === undefined ? {} : { cordisPatch: request.cordisPatch }),
     ...(request.hostEnv === undefined ? {} : { hostEnv: request.hostEnv }),
   }

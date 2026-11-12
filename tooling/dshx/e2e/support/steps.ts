@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page, type Request } from '@playwright/test'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
@@ -104,8 +104,7 @@ export const openSettingsDialog = async (page: Page, options?: { readonly timeou
  * Settings as the composition draws it: `@dshfiles/settings-shell`'s one page in the stage (docs/ade-ux §4.6), or the
  * native Settings dialog in an isolated composition that does not load the shell.
  */
-export const settingsPage = (page: Page): Locator =>
-  page.locator('[data-settings-view]').or(page.getByRole('dialog', { name: 'Settings', exact: true }))
+export const settingsPage = (page: Page): Locator => page.locator('[data-settings-view]').or(page.getByRole('dialog', { name: 'Settings', exact: true }))
 
 const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
 
@@ -136,6 +135,80 @@ const evidenceStatus = (status: string | undefined): EvidenceStatus => {
 // A prewarmed sibling exists for the *next* scenario of this worker and is dropped when nobody takes it: see
 // `prewarmSibling`/`closePrewarmedProfiles` in boot.ts, which also stop the last one on process exit.
 
+/**
+ * The Host API requests of one page: those in flight, and when one last started or settled. A long-lived stream (a
+ * plugin's event feed) stays in flight for the page's life and must not read as an unfinished startup, so quiet means
+ * "the client issued nothing new", not "nothing is open".
+ */
+interface HostRequestTracker {
+  readonly inFlight: Set<Request>
+  lastActivityAt: number
+}
+
+const hostRequestTrackers = new WeakMap<Page, HostRequestTracker>()
+
+const hostRequestPath = (request: Request): string => {
+  try {
+    return new URL(request.url()).pathname
+  } catch {
+    return request.url()
+  }
+}
+
+const isHostRequest = (request: Request): boolean => hostRequestPath(request).startsWith('/api/')
+
+/** Install the startup-navigation reader for one page, before its first navigation. */
+const trackHostRequests = (page: Page): void => {
+  const tracker: HostRequestTracker = { inFlight: new Set(), lastActivityAt: Date.now() }
+  hostRequestTrackers.set(page, tracker)
+  page.on('request', request => {
+    if (!isHostRequest(request)) return
+    tracker.inFlight.add(request)
+    tracker.lastActivityAt = Date.now()
+  })
+  const settled = (request: Request): void => {
+    if (!tracker.inFlight.delete(request)) return
+    tracker.lastActivityAt = Date.now()
+  }
+  page.on('requestfinished', settled)
+  page.on('requestfailed', settled)
+}
+
+/** The composer a blank Session shows while it has no Workspace, i.e. while the client still restores the main view. */
+const workspaceLessComposer = (page: Page): Locator => page.getByRole('textbox', { name: 'Choose workspace', exact: true })
+
+/** Longer than the client takes to issue the next request of one startup navigation, short enough not to stall a journey. */
+const STARTUP_NAVIGATION_QUIET_MS = 500
+const STARTUP_NAVIGATION_TIMEOUT_MS = 30_000
+
+/**
+ * Wait for the client's own startup navigation to finish before a journey drives the page.
+ *
+ * DSH restores the main view from the browser after boot. With no Workspace stored it resolves the native Documents
+ * folder for the default one — `workspace/initializeDefault`, an `osascript` lookup on macOS, bounded by the Host's
+ * 10 s deadline — and then opens a Session on it. Both steps are navigations, `LayoutController.beginNavigation`
+ * cancels the previous one, and the client never retries a restoration it cancelled. A click inside that window
+ * therefore leaves a Session that can never show its composer ("Choose a workspace to start"): b:kk6n. `dshx dev up`
+ * seeds a Workspace before its Host starts, which is the only reason a person never walks into the window.
+ */
+export const waitForClientStartupNavigation = async (page: Page, timeoutMs = STARTUP_NAVIGATION_TIMEOUT_MS): Promise<void> => {
+  const tracker = hostRequestTrackers.get(page)
+  if (tracker === undefined) throw new Error('the client startup navigation cannot be read: its Host request tracker was never installed')
+  const deadline = Date.now() + timeoutMs
+  let pending = 'no observation yet'
+  while (Date.now() < deadline) {
+    const choosingWorkspace = await workspaceLessComposer(page).count()
+    const quietFor = Date.now() - tracker.lastActivityAt
+    if (choosingWorkspace === 0 && quietFor >= STARTUP_NAVIGATION_QUIET_MS) return
+    const inFlight = [...tracker.inFlight].map(hostRequestPath)
+    pending = `${String(choosingWorkspace)} composer(s) asking for a workspace, ${String(inFlight.length)} Host request(s) in flight (${inFlight.slice(0, 3).join(', ') || 'none'}), last Host activity ${String(quietFor)}ms ago`
+    await page.waitForTimeout(100)
+  }
+  throw new Error(
+    `The client did not finish its startup navigation within ${String(timeoutMs)}ms: ${pending}. A journey that interacts before it does cancels the first-use Workspace bootstrap, which the client never retries (b:kk6n).`,
+  )
+}
+
 Before(async ({ page, $testInfo }) => {
   const scenarioId = scenarioIdOfTest($testInfo)
   const replayable = (process.env.DSHX_E2E_SKIP_SCENARIOS ?? '').split(',').filter(Boolean)
@@ -163,7 +236,12 @@ Before(async ({ page, $testInfo }) => {
     if (message.type() === 'error') diagnostics.push(`console.error: ${message.text().replaceAll(PRIVATE_URL, '<private-url>')}`)
   })
   page.on('pageerror', error => diagnostics.push(`pageerror: ${error.message.replaceAll(PRIVATE_URL, '<private-url>')}`))
-  page.on('requestfailed', request => diagnostics.push(`requestfailed: ${request.resourceType()} ${request.failure()?.errorText ?? 'unknown'}`))
+  // Name the request, not just its resource type: an aborted startup bootstrap read exactly like a cancelled
+  // EventSource in the evidence until the path was recorded (b:kk6n).
+  page.on('requestfailed', request =>
+    diagnostics.push(`requestfailed: ${request.method()} ${hostRequestPath(request)} ${request.resourceType()} ${request.failure()?.errorText ?? 'unknown'}`),
+  )
+  trackHostRequests(page)
   page.on('response', response => {
     if (response.status() >= 400) diagnostics.push(`http ${response.status()}: ${response.request().resourceType()}`)
   })
@@ -294,6 +372,8 @@ export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProf
     const interactive = await readProfileOutcome(page, profile)
     assertClientBootReady(interactive, profile, 'The isolated scratch profile failed during startup handoff.')
     expect(interactive.slotFailures, 'The isolated scratch profile lost a Slot during startup handoff.').toEqual([])
+    // The journey owns the page from here: its first click must not cancel the client's own startup navigation.
+    await waitForClientStartupNavigation(page)
     traceBootPhase('profile-interactive', readyStartedAt, profile.profile)
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
