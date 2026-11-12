@@ -275,6 +275,8 @@ export default defineClient({
       },
       captureReferences: () => captureComposerReferences(),
       restoreReferences: input => restoreComposerReferences(input),
+      composerDrafts: () =>
+        Object.fromEntries(Object.entries(sessionDrafts()?.list.getSnapshot() ?? {}).map(([sessionId, draft]) => [sessionId, draft?.workspaceId])),
     })
     const destinationServices: DestinationBarServices = {
       workspaces: ctx.workspaces,

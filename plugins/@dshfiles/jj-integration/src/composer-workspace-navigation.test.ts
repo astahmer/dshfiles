@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
+import { arrivalTimeoutMessage, createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
 
 type ComposerWorkspaceNavigationInput = Parameters<typeof createComposerWorkspaceNavigation>[0]
 
-const navigationFixture = (callbacks: Partial<Pick<ComposerWorkspaceNavigationInput, 'captureReferences' | 'restoreReferences'>> = {}) => {
+const navigationFixture = (
+  callbacks: Partial<Pick<ComposerWorkspaceNavigationInput, 'captureReferences' | 'restoreReferences'>> & {
+    readonly composerDrafts?: () => Readonly<Record<string, string | undefined>>
+  } = {},
+) => {
   let selected = 'project'
   const listeners = new Set<() => void>()
   const navigation = createComposerWorkspaceNavigation({
@@ -14,15 +18,49 @@ const navigationFixture = (callbacks: Partial<Pick<ComposerWorkspaceNavigationIn
     },
     captureReferences: callbacks.captureReferences ?? (() => undefined),
     restoreReferences: callbacks.restoreReferences ?? (() => Promise.resolve()),
+    composerDrafts: callbacks.composerDrafts ?? (() => ({})),
   })
   const arrive = (workspaceId: string) => {
     selected = workspaceId
     for (const listener of listeners) listener()
   }
-  return { navigation, arrive, listeners }
+  return {
+    navigation,
+    arrive,
+    listeners,
+    notify: () => {
+      for (const listener of listeners) listener()
+    },
+  }
 }
 
 describe('composer-owned workspace navigation', () => {
+  it('follows the fresh draft the native pick opens in the target before the Session list reports it', async () => {
+    // A local blank draft is not a listed Session yet: the composer is in the target Workspace while
+    // `selectedWorkspace` still answers the one it left.
+    const drafts = new Map<string, string | undefined>([['draft-source', 'project']])
+    const fixture = navigationFixture({ composerDrafts: () => Object.fromEntries(drafts) })
+    fixture.navigation.bind(workspaceId => {
+      drafts.set('draft-target', workspaceId)
+      fixture.notify()
+    })
+    const opened = fixture.navigation.open('thread', new AbortController().signal)
+    const resolved = await Promise.race([
+      opened.then(
+        () => true,
+        () => false,
+      ),
+      new Promise<boolean>(resolve => setTimeout(() => resolve(false), 500)),
+    ])
+    expect(resolved).toBe(true)
+    expect(fixture.listeners.size).toBe(0)
+  })
+
+  it('names a recovery step instead of showing the raw timeout reason', () => {
+    expect(arrivalTimeoutMessage('thread-ab')).toContain('thread-ab')
+    expect(arrivalTimeoutMessage('thread-ab')).toMatch(/pick that workspace again|reload the page/iu)
+  })
+
   it('picks immediately through the native composer without waiting for a Session route', () => {
     const fixture = navigationFixture()
     const picked: string[] = []

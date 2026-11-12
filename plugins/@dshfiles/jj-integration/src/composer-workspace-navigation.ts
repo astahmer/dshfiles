@@ -6,6 +6,9 @@ export type ComposerReferenceHandoff = Pick<InputState, 'draft' | 'occurrences'>
 // waiting for that branch, that first Session can take well past 15 seconds.
 const ARRIVAL_TIMEOUT_MS = 120_000
 
+export const arrivalTimeoutMessage = (workspaceId: string): string =>
+  `DSH did not open the new thread in ${workspaceId} within ${String(Math.round(ARRIVAL_TIMEOUT_MS / 1000))} seconds. Pick that workspace again, or reload the page if it stays unreachable.`
+
 export const createComposerWorkspaceNavigation = (input: {
   readonly selectedWorkspace: () => string | undefined
   readonly subscribe: (listener: () => void) => () => void
@@ -15,6 +18,12 @@ export const createComposerWorkspaceNavigation = (input: {
     readonly handoff: ComposerReferenceHandoff
     readonly signal: AbortSignal
   }) => Promise<void>
+  /**
+   * The composer's local drafts by Session, with the Workspace each one belongs to. The native picker creates a fresh
+   * draft in the target Workspace, so one that was not there before the pick is the arrival itself — even while the
+   * Session list does not report that blank draft yet, which is what `selectedWorkspace` alone cannot observe.
+   */
+  readonly composerDrafts: () => Readonly<Record<string, string | undefined>>
 }) => {
   let pick: ((workspaceId: string) => void) | undefined
 
@@ -35,6 +44,13 @@ export const createComposerWorkspaceNavigation = (input: {
     signal.throwIfAborted()
     if (input.selectedWorkspace() === workspaceId) return Promise.resolve()
     const handoff = input.captureReferences()
+    const draftsBeforeThePick = new Set(Object.keys(input.composerDrafts()))
+    const arrived = (): boolean => {
+      if (input.selectedWorkspace() === workspaceId) return true
+      return Object.entries(input.composerDrafts()).some(
+        ([sessionId, workspaceIdOfDraft]) => workspaceIdOfDraft === workspaceId && !draftsBeforeThePick.has(sessionId),
+      )
+    }
     // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot the initiating composer; navigation remounts and replaces its binding.
     const select = pick
     if (select === undefined) return Promise.reject(new Error('The new-thread composer is no longer mounted.'))
@@ -46,11 +62,12 @@ export const createComposerWorkspaceNavigation = (input: {
       }
       const abort = () => {
         cleanup()
-        reject(lifetime.reason)
+        // Only the switch itself asked for this abort; an arrival that never came needs a message with a next step.
+        reject(signal.aborted ? (signal.reason ?? new Error('Opening that workspace was cancelled.')) : new Error(arrivalTimeoutMessage(workspaceId)))
       }
       let resolving = false
       const changed = () => {
-        if (input.selectedWorkspace() !== workspaceId || resolving) return
+        if (!arrived() || resolving) return
         resolving = true
         cleanup()
         if (handoff === undefined) {
