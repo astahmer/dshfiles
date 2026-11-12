@@ -26,6 +26,12 @@ export interface FlowMotionRows {
   reveal(element: HTMLElement): void
   /** @param element - row whose active transition should be cancelled without hiding it. */
   cancelMotion(element: HTMLElement): void
+  /**
+   * Hide a row at once, outside a motion scope; the owning viewport measures the layout first.
+   * @param element - visible row.
+   * @param commit - applies the hidden state.
+   */
+  hideNow?(element: HTMLElement, commit: () => void): void
 }
 
 /** Geometry captured before one fold batch changes its boxes. */
@@ -139,9 +145,13 @@ interface OwnedBox {
  * Create animation coordination without cross-viewport broadcasts.
  * @param driver - the viewport's driver for the next batch; null while detached.
  * @param foldingChanged - disable or restore this viewport's native scroll anchoring.
+ * @param beforeInstantHide - measures the layout before a row hides at once outside a motion scope.
  * @returns stable callbacks and cleanup for this viewport's animations.
  */
-export function createFlowMotion(driver: () => InputFoldDriver | null, foldingChanged: (active: boolean) => void): FlowMotion {
+export function createFlowMotion(
+  driver: () => InputFoldDriver | null, foldingChanged: (active: boolean) => void,
+  beforeInstantHide?: (element: HTMLElement) => void,
+): FlowMotion {
   const running = new Map<HTMLElement, () => void>()
   let folding = 0
   const foldIdleListeners = new Set<() => void>()
@@ -192,10 +202,16 @@ export function createFlowMotion(driver: () => InputFoldDriver | null, foldingCh
 
   function runBatch(current: InputFoldDriver): void {
     // Every member continues from the size it has now, so the driver's measured layout and its change
-    // amounts describe the same boxes: a closing box may have moved on its own transition or sit inside a
-    // row that finished closing, and a revealing box may have grown part of the way on its own transition.
+    // amounts describe the same boxes: a closing box may have moved on its own transition, and a revealing
+    // box may have grown part of the way on its own transition.
     for (const box of [...boxes.values()]) {
       if (!batchMember(box)) continue
+      // A row that finished closing is `hidden="until-found"`, which skips its contents without removing
+      // their boxes: a box under it still reports its own size but contributes nothing to the flow.
+      if (box.element.parentElement?.closest('[hidden]') != null) {
+        box.finish()
+        continue
+      }
       const height = box.element.offsetHeight
       const marginTop = Number.parseFloat(getComputedStyle(box.element).marginTop) || 0
       if (!box.closing) {
@@ -497,8 +513,13 @@ export function createFlowMotion(driver: () => InputFoldDriver | null, foldingCh
     for (const cancel of [...running.values()]) cancel()
   }
 
+  function hideNow(element: HTMLElement, commit: () => void): void {
+    beforeInstantHide?.(element)
+    commit()
+  }
+
   return {
-    collapse, reveal, cancelMotion, foldActive, onFoldIdle, cancelInput, resumeInput, clear,
+    collapse, reveal, cancelMotion, foldActive, onFoldIdle, cancelInput, resumeInput, clear, hideNow,
     inputActive: () => batch.kind === 'running'
       || (batch.kind === 'scheduled' && [...boxes.values()].some(box => box.closing && batchMember(box))),
   }
@@ -516,6 +537,7 @@ function useFlowTransition(motion: FlowMotionRows | undefined, grow: boolean): H
     if (hidden) {
       if (hiddenOrCollapsing(element)) return
       if (mounted && element.closest(MOTION_SCOPE) !== null && motion !== undefined) motion.collapse(element, commit)
+      else if (mounted && motion?.hideNow !== undefined) motion.hideNow(element, commit)
       else commit()
       return
     }

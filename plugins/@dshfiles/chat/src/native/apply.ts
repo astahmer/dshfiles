@@ -1,4 +1,6 @@
+import type {} from '@deepseek-ai/dsh-client-ui-context-menu/client'
 /** Register the Chat Conversation target, renderers, stats, and details surface. */
+import type {} from '@deepseek-ai/dsh-client-ui-file-drag/client'
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -12,7 +14,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-browser/client'
 import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 // The `file` entry of `SidebarRightResourceParamsMap`, which types `{ params: { line } }` below.
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client'
-import { fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
+import { fileAddressFor, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 // Type-only service and declaration merges used by the apply world.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -21,13 +23,15 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {
   ChatFlowDataInjected, ChatFlowInjected, ChatNodeInjected, ChatScrollPosition, ChatViewInjected,
-  QuotaNoticeInjected, QuotaNoticeState, TurnTailOwnerProps,
+  QuotaNoticeInjected, QuotaNoticeState,
 } from './contract/slots.ts'
 import type { ChatSnapshot } from './contract/snapshot.ts'
 import { EMPTY_CHAT_SNAPSHOT } from './contract/snapshot.ts'
 import { ApprovalCommand } from './chat/ApprovalCommand.tsx'
+import { sessionFilePath } from './file-path.ts'
 import { ChatView } from './chat/ChatView.tsx'
 import { openChatExternalLink } from './chat/external-link-opening.ts'
 import { sessionSidebar } from './chat/session-sidebar.ts'
@@ -38,7 +42,7 @@ import { UserContent } from './chat/UserContent.tsx'
 import { ActivityPill, UsagePill } from './chat/StatsPills.tsx'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { QuotaNoticeHost } from './chat/QuotaNoticeHost.tsx'
-import { en, NS, zh } from './locale.ts'
+import { en, ja, es, fr, de, ru, pt, NS, zh } from './locale.ts'
 import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/TranscriptViewRow.tsx'
 import { createChatStore } from './stores.ts'
 import { TranscriptViewPolicy } from './transcript-view.ts'
@@ -82,7 +86,7 @@ export const CHAT_NODE_INJECT: ChatNodeInjected = {
 /** Services required by the Chat target and its presentation registrations. */
 export const inject = [
   'slots', 'sessions', 'uiWorkspace', 'uiSession', 'uiConversation', 'locale',
-  'configForms', 'remote', 'remote.session', 'sidebarRight',
+  'configForms', 'connection', 'remote', 'remote.session', 'sidebarRight', 'fileDrag',
 ]
 
 /**
@@ -140,7 +144,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
     resolve: binding => ({ hooks: { chat: chatSource(binding) } }),
   })
 
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-chat: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-chat: dictionaries')
   const t = ctx.locale.bind(NS)
   const chatStore = createChatStore()
   const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
@@ -173,12 +177,8 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       }),
     }, LinkOpeningRow))
   })
-  // dshfiles (visual refresh T2.5): without a saved choice a touch phone gets Summary, other browsers Normal.
-  const transcriptView = new TranscriptViewPolicy(chatSettings, deviceDefaultTranscriptView({
-    desktopApp: 'dshDesktop' in globalThis,
-    coarsePointer: typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches,
-  }))
-  const presentation = derivePresentationPolicy(transcriptView.mode, transcriptView.collapseTiming)
+  const transcriptView = new TranscriptViewPolicy(chatSettings, 'dshDesktop' in globalThis ? 'standard' : DEFAULT_TRANSCRIPT_VIEW_MODE)
+  const presentation = derivePresentationPolicy(transcriptView.mode, transcriptView.collapseTiming, transcriptView.foldedReplies)
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
   const imageGalleryScope = new ImageGalleryScopePolicy(chatSettings)
   const unreadLanding = new UnreadLandingPolicy(chatSettings)
@@ -229,17 +229,24 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
     order: 12,
     locale: NS,
     inject: (): TranscriptViewRowInjected => ({
-      hooks: { transcriptView: transcriptView.mode, collapseTiming: transcriptView.collapseTiming },
+      hooks: {
+        transcriptView: transcriptView.mode,
+        collapseTiming: transcriptView.collapseTiming,
+        foldedReplies: transcriptView.foldedReplies,
+      },
       setTranscriptView: (mode) => { transcriptView.setMode(mode) },
       setCollapseTiming: (timing) => { transcriptView.setCollapseTiming(timing) },
+      setFoldedReplies: (replies) => { transcriptView.setFoldedReplies(replies) },
     }),
   }, TranscriptViewRow))
 
-  const nodeSources = (binding: SessionBinding): ChatFlowDataInjected => {
+  // dshfiles fork: this program also loads the Host half of dsh-client-connection, whose `connection`
+  // service type (HostConnectionHandle) wins the Context merge; the Client service is the ConnectionHandle.
+  const connectionState = (ctx.get('connection') as unknown as ConnectionHandle).state
+  const nodeSources = (binding: SessionBinding): Pick<ChatViewInjected, 'keyedHooks'> => {
     const chat = chatSource(binding)
     const conversation = ctx.uiConversation.binding(binding)
     return {
-      hooks: { presentation, imageGalleryScope: imageGalleryScope.scope, unreadLanding: unreadLanding.landing },
       keyedHooks: {
         chatNode: key => chat.getSnapshot().nodes.source(key),
         chatNodeBottom: key => chat.getSnapshot().nodes.bottomSource(key),
@@ -256,8 +263,9 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
     },
     inject: (sessionId: SessionId): ChatFlowDataInjected => {
       const binding = ctx.sessions.binding(sessionId)
-      if (binding === undefined) return detachedFlow(presentation, imageGalleryScope.scope, unreadLanding.landing)
-      return nodeSources(binding)
+      const hooks = { presentation, connectionState }
+      if (binding === undefined) return detachedFlow(hooks)
+      return { ...nodeSources(binding), hooks }
     },
   }, ChatFlow))
 
@@ -270,36 +278,49 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       locale: NS,
       children: {
         'conversation.chat.flow': { kind: 'single', scope: 'session', inject: CHAT_FLOW_INJECT },
+        'conversation.chat.text-interaction': { kind: 'keyed', scope: 'session' },
       },
       store: chatStore,
       inject: (sessionId: SessionId): ChatViewInjected => {
         const binding = ctx.sessions.binding(sessionId)
-        if (binding === undefined) return detachedView(presentation, imageGalleryScope.scope, unreadLanding.landing)
+        const hooks = {
+          presentation,
+          interactionIds: ctx.uiConversation.interactions,
+          imageGalleryScope: imageGalleryScope.scope,
+          unreadLanding: unreadLanding.landing,
+        }
+        if (binding === undefined) return detachedView(hooks, ctx.fileDrag.actions)
         const session = binding.session
         const chat = chatSource(binding)
         return {
           ...nodeSources(binding),
-          fileMentions: (owner: TurnTailOwnerProps) => ctx.get('chatFileMentions')?.forClosing(owner, sessionId),
+          fileDrag: ctx.fileDrag.actions,
+          hooks,
+          dispatchInteraction: gesture => ctx.uiConversation.interactions.dispatch(sessionId, gesture),
           // Files open in the right Sidebar, not in a desktop application: the
           // content stays in the product, beside the conversation that produced
-          // it. A relative path, or an absolute one inside the session's
-          // workspace, is addressed under this session's scope,
-          // `dsh-resource://file/session/<id>/<path>`; an absolute path
-          // elsewhere keeps its absolute spelling in the same Session's address.
-          // Which tab type claims the
-          // address is the Sidebar's decision, not this call site's.
+          // it. A relative path resolves from the Session's working directory
+          // at click time, which a directory change can move away from the
+          // workspace root; links from earlier Turns follow later changes. A
+          // path inside the workspace is addressed under this
+          // session's scope, `dsh-resource://file/session/<id>/<path>`; an
+          // absolute path elsewhere keeps its absolute spelling in the same
+          // Session's address. Which tab type claims the address is the
+          // Sidebar's decision, not this call site's.
           // A line travels as a navigation parameter, not as part of the
           // address: the file is one piece of content whether it is opened at
           // its top or at line 400, so the same tab is revealed and told where
           // to land.
           openFile: async (path, options) => {
             const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
-            const url = fileAddressFor(sessionId, cwd, path)
+            const current = session.projections.faceOf('workingDirectory').getSnapshot() as string | null | undefined
+            const url = fileAddressFor(sessionId, cwd, resolveWorkspacePath(current ?? undefined, path))
             const sidebar = sessionSidebar(ctx.sidebarRight, sessionId)
             if (options?.line === undefined) sidebar.openResource(url)
             else sidebar.openResource(url, { params: { line: options.line } })
             await Promise.resolve()
           },
+          resolveFilePath: sessionFilePath(ctx, sessionId),
           openExternalLink: (href) => {
             const url = new URL(href)
             openChatExternalLink({

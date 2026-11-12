@@ -40,6 +40,8 @@ export interface AssistantMarkdownProps extends
   blocks: readonly AssistantBlock[]
   reasoningTimings: readonly (ReasoningBlockTiming | undefined)[]
   streaming: boolean
+  /** Only finalized durable Assistant messages supply selection sources. */
+  textInteractionSource?: boolean
   /** Frozen partial of an aborted turn: rendered with a stopped marker. */
   interrupted?: boolean | undefined
   /** Hide reasoning that belongs to the Turn-level process disclosure. */
@@ -60,8 +62,8 @@ export interface AssistantMarkdownProps extends
 
 /** Renders non-blank reasoning blocks as independent disclosures alongside the response. */
 export const AssistantMarkdown = memo(function AssistantMarkdown({
-  blocks, reasoningTimings, streaming, interrupted, loadImage, groupPart, useDisclosure,
-  reasoningHidden = false, usePresentation, revealProcess, mentions, renderSlot, useGroupAction, filler = false, t,
+  blocks, reasoningTimings, streaming, textInteractionSource = false, interrupted, loadImage, groupPart, useDisclosure,
+  reasoningHidden = false, usePresentation, revealProcess, mentions, renderSlot, useGroupAction, t,
 }: AssistantMarkdownProps) {
   // Stable per locale revision (t identity changes on switch): a fresh object
   // per render would rebuild MarkdownText's component table every chunk.
@@ -97,6 +99,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
             labels={labels}
             fileMentions={mentions}
             pathImages={pathImages}
+            textInteractionSource={textInteractionSource}
           />,
         )
         break
@@ -110,7 +113,8 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
             useGroupAction={useGroupAction}
           >
             <ReasoningRow text={block.text} running={streaming && i === last} timing={reasoningTimings[i]}
-              usePresentation={usePresentation} useDisclosure={useDisclosure} renderSlot={renderSlot} t={t} />
+              usePresentation={usePresentation} useDisclosure={useDisclosure} renderSlot={renderSlot}
+              textInteractionSource={textInteractionSource} t={t} />
           </ProcessReasoning>,
         )
         break

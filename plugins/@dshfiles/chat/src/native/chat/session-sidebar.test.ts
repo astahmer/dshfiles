@@ -22,6 +22,7 @@ const recordingSidebar = (calls: unknown[][]): ISidebarRight => ({
   split: () => undefined,
   float: () => {},
   dock: () => {},
+  hide: () => {},
 })
 
 it('opens links for the conversation Session when the owned Sidebar supports it', () => {

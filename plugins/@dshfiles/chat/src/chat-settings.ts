@@ -43,6 +43,24 @@ export type CollapseTiming = typeof COLLAPSE_TIMINGS[number]
 /** Preserve completion-time folding when no timing preference is saved. */
 export const DEFAULT_COLLAPSE_TIMING: CollapseTiming = 'completion'
 
+/** Field carrying which Assistant replies stay visible in a folded Turn. */
+export const FOLDED_REPLIES_FIELD = 'foldedReplies'
+
+/** Assistant replies kept visible while a completed Turn folds its process: every reply, or only the final answer. */
+export const FOLDED_REPLIES = ['all', 'final'] as const
+
+/** Which Assistant replies stay visible while a completed Turn folds its process. */
+export type FoldedReplies = typeof FOLDED_REPLIES[number]
+
+/** Keep every Assistant reply visible when no folded-reply preference is saved. */
+export const DEFAULT_FOLDED_REPLIES: FoldedReplies = 'all'
+
+/** Work-details presentation modes a user can choose. */
+export const TRANSCRIPT_VIEW_MODES = ['compact', 'standard', 'detailed', 'verbose'] as const
+
+/** Work-details presentation mode. */
+export type TranscriptViewMode = typeof TRANSCRIPT_VIEW_MODES[number]
+
 /**
  * Saved value from the two-mode generation of this setting. Read as `detailed`;
  * never offered as a choice and never written back.
@@ -81,6 +99,8 @@ export interface ChatSettings {
   transcriptView?: TranscriptViewMode | typeof LEGACY_TRANSCRIPT_VIEW_MODE | typeof LEGACY_EXPANDED_TRANSCRIPT_VIEW_MODE | null
   /** Independent collapse timing; absence preserves completion-time folding. */
   collapseTiming?: CollapseTiming
+  /** Replies kept visible in a folded Turn; absence keeps every reply. */
+  foldedReplies?: FoldedReplies
   /** Detail level for composer statistics and completed-Turn usage. */
   performanceUsage: PerformanceUsageMode
   /** Default destination for Chat HTTP(S) links. */
@@ -94,6 +114,7 @@ export interface ChatSettings {
 /** Durable Chat schema; also the wire envelope the browser scope validates against. */
 export const ChatSettingsFields = {
   [COLLAPSE_TIMING_FIELD]: z.union([...COLLAPSE_TIMINGS]).default(DEFAULT_COLLAPSE_TIMING),
+  [FOLDED_REPLIES_FIELD]: z.union([...FOLDED_REPLIES]).default(DEFAULT_FOLDED_REPLIES),
   [IMAGE_GALLERY_SCOPE_FIELD]: z.union([...IMAGE_GALLERY_SCOPES]).default(DEFAULT_IMAGE_GALLERY_SCOPE),
   [UNREAD_LANDING_FIELD]: z.union([...UNREAD_LANDINGS]).default(DEFAULT_UNREAD_LANDING),
   linkOpening: z.union(['sidebar', 'new-tab']).default(DEFAULT_LINK_OPENING),

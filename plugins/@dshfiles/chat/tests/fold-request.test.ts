@@ -3,8 +3,8 @@ import { applyFoldRequest, noFoldRequest } from '../src/native/chat/fold-request
 
 describe('fold request', () => {
   it('keeps a tail request until a batch takes it over, then clears it', () => {
-    const requested = applyFoldRequest(noFoldRequest, { kind: 'requestTail' }).request
-    expect(requested).toEqual({ status: 'requested', landing: 'tail' })
+    const requested = applyFoldRequest(noFoldRequest, { kind: 'requestTail', input: true }).request
+    expect(requested).toEqual({ status: 'requested', landing: 'tail', input: true })
     const retarget = vi.fn()
     const step = applyFoldRequest(requested, { kind: 'begin', landing: 'tail', retarget })
     expect(step.request).toEqual({ status: 'running', landing: 'tail', retarget })
@@ -21,10 +21,16 @@ describe('fold request', () => {
   it('retargets a running batch instead of leaving a second request beside it', () => {
     const retarget = vi.fn()
     const running = applyFoldRequest(noFoldRequest, { kind: 'begin', landing: 'anchored', retarget }).request
-    const step = applyFoldRequest(running, { kind: 'requestTail' })
+    const step = applyFoldRequest(running, { kind: 'requestTail', input: true })
     expect(step).toEqual({ request: { status: 'running', landing: 'tail', retarget }, retarget: true })
     expect(step.request.status === 'running' && step.request.retarget).toBe(retarget)
     expect(applyFoldRequest(running, { kind: 'begin', landing: 'tail', retarget: vi.fn() }).request).toBe(running)
+  })
+
+  it('keeps an input request marked when a content change repeats it', () => {
+    const byInput = applyFoldRequest(noFoldRequest, { kind: 'requestTail', input: true }).request
+    expect(applyFoldRequest(byInput, { kind: 'requestTail', input: false }).request)
+      .toEqual({ status: 'requested', landing: 'tail', input: true })
   })
 
   it('has no retarget callback to call once a batch finished', () => {
@@ -32,8 +38,8 @@ describe('fold request', () => {
     const running = applyFoldRequest(noFoldRequest, { kind: 'begin', landing: 'tail', retarget }).request
     const finished = applyFoldRequest(running, { kind: 'finish' }).request
     expect(finished.status).toBe('none')
-    expect(applyFoldRequest(finished, { kind: 'requestTail' })).toEqual({
-      request: { status: 'requested', landing: 'tail' },
+    expect(applyFoldRequest(finished, { kind: 'requestTail', input: false })).toEqual({
+      request: { status: 'requested', landing: 'tail', input: false },
       retarget: false,
     })
     expect(retarget).not.toHaveBeenCalled()

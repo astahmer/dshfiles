@@ -1,6 +1,4 @@
-import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import type { ChatPresentationPolicy } from './native/presentation-policy.ts'
-import type { ImageGalleryScope, UnreadLanding } from './chat-settings.ts'
+import type { FileDragActions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatFlowDataInjected, ChatViewInjected } from './native/contract/slots.ts'
 
 /**
@@ -20,28 +18,26 @@ const EMPTY_NODE = { getSnapshot: () => undefined, subscribe: () => () => {} }
 const EMPTY_BOTTOM = { getSnapshot: () => false, subscribe: () => () => {} }
 const EMPTY_PROCESS = { getSnapshot: () => undefined, subscribe: () => () => {} }
 
+const EMPTY_KEYED_HOOKS: ChatFlowDataInjected['keyedHooks'] = {
+  chatNode: () => EMPTY_NODE,
+  chatNodeBottom: () => EMPTY_BOTTOM,
+  chatNodeProcess: () => EMPTY_PROCESS,
+  chatGroup: () => undefined,
+}
+
 /** Empty node sources for a detached flow: every key resolves to nothing. */
-export const detachedFlow = (
-  presentation: ObservableSnapshot<ChatPresentationPolicy>,
-  imageGalleryScope: ObservableSnapshot<ImageGalleryScope>,
-  unreadLanding: ObservableSnapshot<UnreadLanding>,
-): ChatFlowDataInjected => ({
-  hooks: { presentation, imageGalleryScope, unreadLanding },
-  keyedHooks: {
-    chatNode: () => EMPTY_NODE,
-    chatNodeBottom: () => EMPTY_BOTTOM,
-    chatNodeProcess: () => EMPTY_PROCESS,
-    chatGroup: () => undefined,
-  },
+export const detachedFlow = (hooks: ChatFlowDataInjected['hooks']): ChatFlowDataInjected => ({
+  hooks,
+  keyedHooks: EMPTY_KEYED_HOOKS,
 })
 
 /** Detached view: empty sources plus inert actions, so nothing renders and nothing throws. */
-export const detachedView = (
-  presentation: ObservableSnapshot<ChatPresentationPolicy>,
-  imageGalleryScope: ObservableSnapshot<ImageGalleryScope>,
-  unreadLanding: ObservableSnapshot<UnreadLanding>,
-): ChatViewInjected => ({
-  ...detachedFlow(presentation, imageGalleryScope, unreadLanding),
+export const detachedView = (hooks: ChatViewInjected['hooks'], fileDrag: FileDragActions): ChatViewInjected => ({
+  hooks,
+  keyedHooks: EMPTY_KEYED_HOOKS,
+  fileDrag,
+  resolveFilePath: path => path,
+  dispatchInteraction: () => null,
   openExternalLink: noop,
   openFile: async () => {},
   loadOlder: noop,
@@ -50,5 +46,4 @@ export const detachedView = (
   chatScroll: { save: noop, read: () => null },
   seenAnswer: { read: () => null, markSeen: noop },
   forkAt: noop,
-  fileMentions: () => undefined,
 })

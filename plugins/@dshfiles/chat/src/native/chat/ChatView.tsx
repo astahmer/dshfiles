@@ -8,7 +8,9 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
-import { Button, classifyLinkPath, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  Button, classifyLinkPath, IconChevronDownOutlineRegular, MarkdownDelegateProvider, Modal, type MarkdownMenuTarget,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@dshfiles/plugin-ui/components/image-lightbox'
 import { endInteractionAfterPaint } from '@dshfiles/dshx/tracing/client'
 import { isAtOrOutside } from '../contract/group-tree.ts'
@@ -22,21 +24,16 @@ import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.t
 import { chatRenderKey } from './render-entry.ts'
 import { ConversationViewOpenerContext, useChatFocus } from '../../chat-focus-reveal.ts'
 import { InlineReferenceScope } from '../../inline-references.tsx'
-import { mergeTurnRailItems } from './turn-rail-items.ts'
-import { TurnMarksModel, type TurnMarkFilter } from '../../turn-marks.ts'
-import { SinceYouLeftModel, ThreadToolsModel, type SinceYouLeftNote } from '../../thread-tools.ts'
-import { ChatViewRegistry } from './chat-view-registry.ts'
-import { ThreadFindBar } from './ThreadFindBar.tsx'
-import { ThreadFindModel } from './thread-find-model.ts'
-import { TurnsSheet } from './TurnsSheet.tsx'
-import { SinceYouLeftRecapModel } from './since-you-left.ts'
-import { SinceYouLeftCard, SinceYouLeftContext, type SinceYouLeftPlacement } from './SinceYouLeftCard.tsx'
+import { mergeTurnRailItems, turnStarts } from './turn-rail-items.ts'
+import { TranscriptFind } from '../../transcript-find.ts'
+import { TranscriptFindBar } from '../../transcript-find-bar.tsx'
+import { useTextInteraction } from './text-interaction.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
 import { ImagePreviewRequestModel, type ImagePreview } from '../../image-preview-request.ts'
 import { FileOpenRequestModel, type FileOpenRequest } from '../../file-open-request.ts'
 import { MOTION_TAIL_MS, motionTailNext, type MotionTail } from '../../motion-tail.ts'
-import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
+import { fileMediaUrl, resolveWorkspacePath, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import css from './ChatView.module.css'
 
 /** Host/OS refusal text for the file-open dialog; empty throws keep a locale fallback. */
@@ -76,9 +73,23 @@ type PendingInput = PendingSubmission | InboxState['next-step'][number]
  */
 export function ChatView({
   useSession, useChat, useConversation, useSessions, renderSlot, useImageGalleryScope, useUnreadLanding,
-  sessionId, openFile, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, seenAnswer, forkAt, fileMentions,
-  usePresentation, useProjection, t, viewRequest, completeViewRequest, openView,
+  sessionId, openFile, openExternalLink, resolveFilePath, useContextMenu,
+  loadOlder, loadThrough, loadImage, inspectCall, chatScroll, seenAnswer, forkAt,
+  usePresentation, useProjection, useInteractionIds, dispatchInteraction, t, fileDrag,
+  viewRequest, completeViewRequest, openView,
 }: ChatViewSlotProps) {
+  const { getTriggerProps } = useContextMenu()
+  const getMarkdownTriggerProps = useCallback((target: MarkdownMenuTarget) => getTriggerProps(() => {
+    switch (target.kind) {
+      case 'file': return { kind: 'file', value: { sessionId, path: resolveFilePath(target.path),
+        ...(target.line === undefined ? {} : { line: target.line }) } }
+      case 'url': return { kind: 'url', value: { sessionId, url: target.url } }
+      case 'image': return { kind: 'image', value: { sessionId, url: target.url,
+        ...(target.name === undefined ? {} : { name: target.name }),
+        ...(target.mediaType === undefined ? {} : { mediaType: target.mediaType }),
+        ...(target.path === undefined ? {} : { path: resolveFilePath(target.path) }) } }
+    }
+  }), [getTriggerProps, resolveFilePath, sessionId])
   const order = useChat(s => s.order)
   const groupedView = useConversation(snapshot => snapshot.views.grouped('chat'))
   const groupedEntries = groupedView?.entries
@@ -109,12 +120,14 @@ export function ChatView({
   // Workspace root off the session list row: path summaries display relative to it.
   const cwd = useSessions(s => s.byId[sessionId]?.cwd)
   const fileImages = useMemo(() => ({
+    fileDrag,
     resolve: (path: string) => fileMediaUrl(document.baseURI, resolveWorkspacePath(cwd, path)),
+    resourceAddress: (path: string) => sessionFileAddress(sessionId, resolveWorkspacePath(cwd, path)),
     labels: {
       open: t('image.open'), loading: t('image.loading'), failed: t('image.failed'),
       dialog: t('image.dialog'), close: t('image.close'),
     },
-  }), [cwd, t])
+  }), [cwd, t, fileDrag, sessionId])
   const [imagePreview, setImagePreview] = useState<ImagePreview<LightboxImage>>(() =>
     ImagePreviewRequestModel.imagePreviewClosed<LightboxImage>(),
   )
@@ -319,6 +332,7 @@ export function ChatView({
     lastIsUser: lastKey !== null && nodeStore.get(lastKey)?.kind === 'user',
     steeringId,
     submissionId: visibleSubmissions.at(-1)?.requestId ?? null,
+    submissionSteers: visibleSubmissions.at(-1)?.placement === 'steering',
     loadedTurns: turnNavigationItems,
     transcriptView,
     unread,
@@ -333,6 +347,9 @@ export function ChatView({
     sessionId, viewRequest, completeViewRequest, ready: scroll.initialized,
     railItems, navigateToTurn: scroll.navigateToTurn, listRef: scroll.listRef,
   })
+  const interactionSurfaceRef = useRef<HTMLDivElement>(null)
+  const interactionIds = useInteractionIds(ids => ids)
+  const textInteraction = useTextInteraction(scroll.columnRef, interactionSurfaceRef, dispatchInteraction, interactionIds)
   const flowContext = useMemo<ChatFlowHookContext>(() => ({ motion: scroll.motion }), [scroll.motion])
 
   // dshfiles (productivity pass Q4): long-thread tools — find, the typed turn map, the Turns sheet, Since you left.
@@ -567,18 +584,30 @@ export function ChatView({
               <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} onVisible={scroll.loadEarlier} fillSteps={fillSteps} />
             )}
             {transcript.hasMore && loadingOlder && <div className={css.older}>{t('loading')}</div>}
-            <MarkdownDelegateProvider openFile={requestOpenImageAwareFile} openExternalLink={requestOpenMarkdownExternalLink} fileImages={fileImages}>
+            <MarkdownDelegateProvider
+              getTriggerProps={getMarkdownTriggerProps}
+              openFile={requestOpenImageAwareFile}
+              openExternalLink={requestOpenMarkdownExternalLink}
+              fileImages={fileImages}
+            >
               <InlineReferenceScope sessionId={sessionId} cwd={cwd}>
               <ConversationViewOpenerContext.Provider value={openView}>
               <SinceYouLeftContext.Provider value={sincePlacement}>
                 {renderSlot('conversation.chat.flow', {
                   entries: transcript.entries, pendingInputs, lastInputTurn, deferCollapse,
-                  cwd, openFile: requestOpenImageAwareFile, inspectCall, forkAt, loadImage, useProjection, fileMentions,
+                  cwd, openFile: requestOpenImageAwareFile, inspectCall, forkAt, loadImage, useProjection,
                 }, { hookContext: flowContext })}
               </SinceYouLeftContext.Provider>
               </ConversationViewOpenerContext.Provider>
               </InlineReferenceScope>
             </MarkdownDelegateProvider>
+            <div ref={interactionSurfaceRef} className={css.textInteraction} data-text-interaction-surface=""
+              aria-hidden={textInteraction.active === null}>
+              {textInteraction.active !== null && renderSlot('conversation.chat.text-interaction', {
+                trigger: textInteraction.active.trigger, readText: textInteraction.readText,
+                dismiss: textInteraction.dismiss, clearSelection: textInteraction.clearSelection,
+              }, { entryKey: textInteraction.active.id })}
+            </div>
             {/* No pending placeholders: questions (ui-user-questions) and approvals
                 (ApprovalPanel) both take over the composer, so a flow card would
                 double-render the same wait. */}

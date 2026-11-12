@@ -31,6 +31,8 @@ interface AssistantState {
   readonly turn: number
   readonly step: number
   readonly blocks: readonly (AssistantBlock | undefined)[]
+  /** Missing indices are invisible; same-kind appends preserve already-visible blocks. */
+  readonly visibleByIndex: readonly boolean[]
   readonly reasoningTimings: readonly (ReasoningBlockTiming | undefined)[]
   readonly visibleBlocks: number
   readonly firstVisibleSeq: number | undefined
@@ -45,6 +47,7 @@ function initialState(turn: number, step: number): AssistantState {
     turn,
     step,
     blocks: [],
+    visibleByIndex: [],
     reasoningTimings: [],
     visibleBlocks: 0,
     firstVisibleSeq: undefined,
@@ -59,37 +62,17 @@ function compactBlocks(blocks: readonly (AssistantBlock | undefined)[]): Assista
   return blocks.filter((block): block is AssistantBlock => block !== undefined)
 }
 
+function blockIsVisible(block: AssistantBlock | undefined): boolean {
+  if (block === undefined || block.kind === 'tool-call') return false
+  if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
+  return true
+}
+
 function compactReasoningTimings(
   blocks: readonly (AssistantBlock | undefined)[],
   timings: readonly (ReasoningBlockTiming | undefined)[],
 ): (ReasoningBlockTiming | undefined)[] {
   return blocks.flatMap((block, index) => block === undefined ? [] : [timings[index]])
-}
-
-/** Streamed text blocks are cons strings; testing the whole text would flatten (copy) it once per chunk. */
-const textVisibility = new WeakMap<AssistantBlock, boolean>()
-
-function blockIsVisible(block: AssistantBlock | undefined): boolean {
-  if (block === undefined || block.kind === 'tool-call') return false
-  if (block.kind !== 'text' && block.kind !== 'reasoning') return true
-  const known = textVisibility.get(block)
-  if (known !== undefined) return known
-  const visible = /\S/u.test(block.text)
-  textVisibility.set(block, visible)
-  return visible
-}
-
-function appendText(previous: AssistantBlock | undefined, kind: 'text' | 'reasoning', delta: string): AssistantBlock {
-  const continued = previous?.kind === kind
-  const block: AssistantBlock = { kind, text: (continued ? previous.text : '') + delta }
-  textVisibility.set(block, (continued && blockIsVisible(previous)) || /\S/u.test(delta))
-  return block
-}
-
-function countVisibleBlocks(blocks: readonly AssistantBlock[]): number {
-  let count = 0
-  for (const block of blocks) if (blockIsVisible(block)) count++
-  return count
 }
 
 function hasVisibleContent(blocks: readonly AssistantBlock[]): boolean {
@@ -126,32 +109,36 @@ function updateChunk(
   const reasoningTimings = [...state.reasoningTimings]
   let changedIndex = -1
   let previousVisible = false
+  let nextVisible = false
   switch (chunk.type) {
     case 'block-start':
       changedIndex = chunk.index
-      previousVisible = blockIsVisible(blocks[chunk.index])
+      previousVisible = state.visibleByIndex[chunk.index] === true
       blocks[chunk.index] = emptyAssistantBlock(chunk.blockType)
       if (chunk.blockType === 'reasoning') reasoningTimings[chunk.index] = { startedAt: time }
+      nextVisible = blockIsVisible(blocks[chunk.index])
       break
     case 'text-delta': {
       const previous = blocks[chunk.index]
       changedIndex = chunk.index
-      previousVisible = blockIsVisible(previous)
-      blocks[chunk.index] = appendText(previous, 'text', chunk.text)
+      previousVisible = state.visibleByIndex[chunk.index] === true
+      blocks[chunk.index] = { kind: 'text', text: (previous?.kind === 'text' ? previous.text : '') + chunk.text }
+      nextVisible = (previous?.kind === 'text' && previousVisible) || chunk.text.trim() !== ''
       break
     }
     case 'reasoning-delta': {
       const previous = blocks[chunk.index]
       changedIndex = chunk.index
-      previousVisible = blockIsVisible(previous)
-      blocks[chunk.index] = appendText(previous, 'reasoning', chunk.text)
+      previousVisible = state.visibleByIndex[chunk.index] === true
+      blocks[chunk.index] = { kind: 'reasoning', text: (previous?.kind === 'reasoning' ? previous.text : '') + chunk.text }
+      nextVisible = (previous?.kind === 'reasoning' && previousVisible) || chunk.text.trim() !== ''
       reasoningTimings[chunk.index] ??= { startedAt: time }
       break
     }
     case 'tool-call-delta': {
       const previous = blocks[chunk.index]
       changedIndex = chunk.index
-      previousVisible = blockIsVisible(previous)
+      previousVisible = state.visibleByIndex[chunk.index] === true
       // Tool Nodes own streamed arguments; Assistant protocol blocks retain identity until full settlement.
       blocks[chunk.index] = {
         kind: 'tool-call',
@@ -163,8 +150,9 @@ function updateChunk(
     }
     case 'block-end':
       changedIndex = chunk.index
-      previousVisible = blockIsVisible(blocks[chunk.index])
+      previousVisible = state.visibleByIndex[chunk.index] === true
       blocks[chunk.index] = toAssistantBlock(chunk.block)
+      nextVisible = blockIsVisible(blocks[chunk.index])
       if (chunk.block.type === 'reasoning') {
         const timing = reasoningTimings[chunk.index]
         if (timing !== undefined) reasoningTimings[chunk.index] = { ...timing, endedAt: time }
@@ -177,11 +165,18 @@ function updateChunk(
   }
   const visibleBlocks = state.visibleBlocks
     - Number(previousVisible)
-    + Number(blockIsVisible(blocks[changedIndex]))
+    + Number(nextVisible)
+  let visibleByIndex = state.visibleByIndex
+  if (previousVisible !== nextVisible) {
+    const next = [...visibleByIndex]
+    next[changedIndex] = nextVisible
+    visibleByIndex = next
+  }
   const firstToken = isTokenDelta(chunk)
   return {
     ...state,
     blocks,
+    visibleByIndex,
     reasoningTimings,
     visibleBlocks,
     ...visibleBlocks > 0 && state.firstVisibleSeq === undefined
@@ -199,6 +194,7 @@ function settleMessage(
   event: SessionEvent<'assistant/message'>,
 ): AssistantState {
   const blocks = toAssistantBlocks(event.data.message.content)
+  const visibleByIndex = blocks.map(blockIsVisible)
   const reasoningTimings = [...state.reasoningTimings]
   for (let index = 0; index < state.blocks.length; index++) {
     if (state.blocks[index]?.kind !== 'reasoning') continue
@@ -208,8 +204,9 @@ function settleMessage(
   return {
     ...state,
     blocks,
+    visibleByIndex,
     reasoningTimings,
-    visibleBlocks: countVisibleBlocks(blocks),
+    visibleBlocks: visibleByIndex.reduce((count, visible) => count + Number(visible), 0),
     final: match,
     usage: event.data.usage,
   }

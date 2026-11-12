@@ -1,7 +1,7 @@
 /** Reusable user contents inside a caller-owned message row. */
 import { Fragment } from 'react'
 import type { FactoryComponentPropsOf } from '@deepseek-ai/dsh-client-ui-slots'
-import { fileExtension, FileTypeIcon, fileSizeText, JsonBlock } from '@deepseek-ai/dsh-client-ui-primitives'
+import { fileExtension, FileTypeIcon, fileSizeText, JsonBlock, UserMessageBubble } from '@deepseek-ai/dsh-client-ui-primitives'
 import { InlineReferenceText } from '../../inline-references.tsx'
 import css from './MessageItem.module.css'
 import { userImageReferenceParts } from './user-image-references.js'
@@ -70,12 +70,7 @@ FactoryComponentPropsOf<'conversation.chat.user.content'>) {
             ))}
         </div>
       )}
-      {showBubble && <div
-        className={css.bubble}
-        data-code-like={(!hasFence && looksLikeCode(text)) || undefined}
-        data-prompt-fold={fold.lines === null ? undefined : fold.open ? 'open' : 'closed'}
-      >
-        <div ref={fold.ref} className={css.bubbleBody}>
+      {showBubble && <UserMessageBubble data-message-bubble="" data-text-interaction-source="">
         {imageParts.parts.map((part, index) => {
           if (part.type === 'text') {
             // dshfiles (productivity pass T1.4): a pasted fence reads as a small code card, not raw ``` markers.
@@ -104,13 +99,7 @@ FactoryComponentPropsOf<'conversation.chat.user.content'>) {
         {extraBlocks.map((block, index) => (
           <JsonBlock key={index} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />
         ))}
-        </div>
-      </div>}
-      {showBubble && fold.lines !== null && (
-        <button type="button" className={css.foldToggle} aria-expanded={fold.open} onClick={fold.toggle}>
-          {fold.open ? t('message.prompt.showLess') : t('message.prompt.showAll', { lines: fold.lines })}
-        </button>
-      )}
+      </UserMessageBubble>}
       {referenceLabels.length > 0 && (
         <div className={css.referenceSummary}>
           <InlineReferenceText text={t('message.referenceSummary', { labels: referenceLabels.join(t('message.referenceSeparator')) })} surface="summary" />

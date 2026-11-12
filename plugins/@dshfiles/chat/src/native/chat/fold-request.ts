@@ -7,11 +7,12 @@ export type FoldLanding = 'anchored' | 'tail'
 
 export type FoldRequest =
   | { readonly status: 'none' }
-  | { readonly status: 'requested'; readonly landing: FoldLanding }
+  /** `input`: the reader's own input asked for the tail, rather than a content change such as a Turn ending. */
+  | { readonly status: 'requested'; readonly landing: FoldLanding; readonly input: boolean }
   | { readonly status: 'running'; readonly landing: FoldLanding; readonly retarget: () => void }
 
 export type FoldRequestEvent =
-  | { readonly kind: 'requestTail' }
+  | { readonly kind: 'requestTail'; readonly input: boolean }
   | { readonly kind: 'begin'; readonly landing: FoldLanding; readonly retarget: () => void }
   | { readonly kind: 'finish' }
 
@@ -33,7 +34,10 @@ export function applyFoldRequest(request: FoldRequest, event: FoldRequestEvent):
   switch (event.kind) {
     case 'requestTail':
       if (request.status === 'running') return { request: { ...request, landing: 'tail' }, retarget: true }
-      return { request: { status: 'requested', landing: 'tail' }, retarget: false }
+      return {
+        request: { status: 'requested', landing: 'tail', input: event.input || (request.status === 'requested' && request.input) },
+        retarget: false,
+      }
     case 'begin':
       if (request.status === 'running') return { request, retarget: false }
       return { request: { status: 'running', landing: event.landing, retarget: event.retarget }, retarget: false }

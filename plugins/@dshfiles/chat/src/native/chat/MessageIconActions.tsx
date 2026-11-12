@@ -5,10 +5,10 @@
 // usage); times leave the row for the transcript's time dividers (TimeDivider.tsx), so `time` only feeds an accessible
 // label and the `clock` side keeps the row's layout.
 
-import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { CheckIcon, CopyIcon, EllipsisIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { Tooltip, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useId, type ReactNode } from 'react'
+import {
+  IconBranchOutlineRegular, IconCheckOutlineRegular, IconCopyOutlineRegular, Tooltip, useClipboardCopy,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import css from './MessageIconActions.module.css'
 
@@ -49,37 +49,23 @@ export function MessageIconActions({
   extraActions, usageAction, t,
 }: MessageIconActionsProps) {
   const reasonId = useId()
-  // Same success chrome as CodeBlock: a short check swap after the write,
-  // gated so re-clicks during the window neither re-copy nor stack timers.
-  const [copied, setCopied] = useState(false)
-  const copyPending = useRef(false)
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const copyEpoch = useRef(0)
-  useEffect(() => () => {
-    copyEpoch.current += 1
-    copyPending.current = false
-    if (copyTimer.current !== null) clearTimeout(copyTimer.current)
-  }, [])
-  const onCopy = useCallback(() => {
-    if (copied || copyPending.current) return
-    const epoch = copyEpoch.current
-    copyPending.current = true
-    void writeClipboard(text).then((ok) => {
-      if (epoch !== copyEpoch.current) return
-      copyPending.current = false
-      if (!ok) return
-      setCopied(true)
-      copyTimer.current = setTimeout(() => {
-        copyTimer.current = null
-        setCopied(false)
-      }, 1000)
-    })
-  }, [copied, text])
-  const more = clock === 'end' && (extraActions != null || onBranch !== undefined || usageAction != null)
-  // dshfiles (b:ysaj): inside the ⋯ menu the branch verb is a labelled row like the plugins' rows (Trace, Add to
-  // backlog, Restore), not a bare icon in a line of mixed icons and words.
-  const branch = onBranch !== undefined && (
-        <Tooltip label={branchUnavailable ? t('message.branchUnavailable') : t('message.branch')} side="bottom">
+  const { copied, onCopy } = useClipboardCopy(text)
+  const clockEl = time === undefined ? null : (
+    <span className={clock === 'start' ? css.timeStart : css.timeEnd}>
+      {formatMessageClock(time, t, day)}
+    </span>
+  )
+  return (
+    <div className={className === undefined ? css.actions : `${css.actions} ${className}`} data-clock={clock}>
+      {clock === 'start' ? clockEl : null}
+      <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
+        <button type="button" className={css.action} aria-label={copied ? t('copied') : t('copy')} onClick={onCopy}>
+          {copied ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
+        </button>
+      </Tooltip>
+      {extraActions}
+      {onBranch !== undefined && (
+        <Tooltip label={branchUnavailable ? t('message.branchUnavailable') : t('message.branch')} side="bottom" openOnClick={branchUnavailable}>
           {/* Native disabled buttons do not deliver the hover/focus events Tooltip needs. */}
           <button
             type="button"

@@ -8,6 +8,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   IconGaugeOutlineRegular: () => null,
   useAnchoredPosition: () => null,
   useDismissOnOutsidePointer: () => undefined,
+  Tooltip: ({ children }: { children: ReactNode }) => children,
 }))
 import { UsagePill, type UsagePillProps } from '../src/native/chat/StatsPills.tsx'
 import type { SessionUsageCostOwnerProps } from '../src/session-usage-cost.ts'
