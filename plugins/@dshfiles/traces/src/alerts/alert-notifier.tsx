@@ -1,13 +1,11 @@
 import { Toast } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useApi, usePlugin } from '@dshfiles/dshx/client'
-import { useQuery } from '@dshfiles/plugin-ui/query'
+import { usePlugin } from '@dshfiles/dshx/client'
 import * as Schema from 'effect/Schema'
 import { useEffect, useState } from 'react'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import type { AlertEvent } from './alert-types.js'
-import { tracesAlertsApi } from './alerts-api.js'
 import type { TracesAlertsTranslate } from './alerts-locale.js'
-import { alertsQueries } from './alerts-queries.js'
+import { useAlertsFeed } from './alerts-queries.js'
 
 const TOAST_HOLD_MS = 8_000
 /** An event older than this when a tab first sees it (a reload after a long absence) is history, not news. */
@@ -42,10 +40,9 @@ const titleOf = (event: AlertEvent, t: TracesAlertsTranslate): string => `${even
  */
 export const AlertNotifier = (props: { readonly onOpenAlerts: () => void; readonly t: TracesAlertsTranslate }): JSX.Element | null => {
   const t = props.t
-  const client = useApi(tracesAlertsApi)
   const plugin = usePlugin()
   const announcedId = storedAnnouncedId.useValue()
-  const feed = useQuery(alertsQueries.feed(client, announcedId))
+  const feed = useAlertsFeed(announcedId)
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
 
   useEffect(() => {

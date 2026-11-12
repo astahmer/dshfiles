@@ -30,7 +30,7 @@ import { AlertRuleDialog, AlertRuleLabels } from './alert-rule-dialog.js'
 import type { AlertEvent, AlertRule, AlertRuleDraft, AlertRuleView, AlertSeverity } from './alert-types.js'
 import { tracesAlertsApi } from './alerts-api.js'
 import type { TracesAlertsTranslate } from './alerts-locale.js'
-import { alertsKeys, alertsOwnerMissing, alertsQueries } from './alerts-queries.js'
+import { alertsKeys, alertsOwnerMissing, alertsQueries, useAlertsFeed } from './alerts-queries.js'
 
 const numeric = 'dshx:text-right dshx:font-mono dshx:text-xs'
 
@@ -444,8 +444,4 @@ export const AlertsView = (props: {
 }
 
 /** The firing count the panel shows on its Alerts tab and above its tabs; null while unknown or on a Host without alerts. */
-export const useFiringCount = (): number | null => {
-  const client = useApi(tracesAlertsApi)
-  const feed = useQuery(alertsQueries.feed(client, null))
-  return feed.data?.firing ?? null
-}
+export const useFiringCount = (): number | null => useAlertsFeed(null).data?.firing ?? null

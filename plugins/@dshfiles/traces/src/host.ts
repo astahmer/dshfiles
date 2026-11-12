@@ -4,7 +4,7 @@ import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { otlpExportTarget } from '@dshfiles/dshx/tracing'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Stream } from 'effect'
 import { FetchHttpClient } from 'effect/http'
 import { AlertAttention } from './alerts/alert-attention.js'
 import { AlertEngine } from './alerts/alert-engine.js'
@@ -42,9 +42,27 @@ const Storage = Layer.unwrap(
 
 const ReceiverLive = Receiver.layer.pipe(Layer.provide(Layer.mergeAll(OtlpIngest.layer, Forwarder.layer.pipe(Layer.provide(FetchHttpClient.layer)))))
 
+/** Tell browsers to read the alert feed again; a burst of events in one evaluation becomes one read. */
+const AlertEvents = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const engine = yield* AlertEngine
+    yield* engine.recorded.pipe(
+      Stream.groupedWithin(Number.MAX_SAFE_INTEGER, '100 millis'),
+      Stream.runForEach(() =>
+        Api.publish({ contract: tracesAlertsApi, event: 'changed', payload: {} }).pipe(
+          Effect.catchTag('PublishEventError', error => Effect.logWarning('traces: alert change event refused', error.message)),
+        ),
+      ),
+      DshxPlugin.detached,
+      Effect.forkScoped,
+    )
+  }),
+)
+
 const TracesLive = Layer.mergeAll(
   RetentionWorker,
   AlertWorker,
+  AlertEvents,
   EventLoopStallMonitor.layer,
   LocalEndpointLive,
   AlertAttention.layer.pipe(Layer.provide(HostApis.layer)),

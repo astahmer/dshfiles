@@ -1,8 +1,9 @@
 import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { retryOnceUnlessTimedOut, runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { queryOptions, resourceQueryOptions } from '@dshfiles/plugin-ui/query'
-import type { tracesAlertsApi } from './alerts-api.js'
+import { queryOptions, resourceQueryOptions, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useApi, useApiEvent } from '@dshfiles/dshx/client'
+import { tracesAlertsApi } from './alerts-api.js'
 
 export type AlertsClient = typeof tracesAlertsApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
 
@@ -19,7 +20,7 @@ const FEED_POLL_MS = 15_000
 export const alertsOwnerMissing = (error: unknown): boolean => error instanceof Error && isApiOwnerMissing(error)
 
 const pollUnlessMissing =
-  (intervalMs: number) =>
+  (intervalMs: number | false) =>
   (query: { readonly state: { readonly error: unknown } }): number | false =>
     alertsOwnerMissing(query.state.error) ? false : intervalMs
 
@@ -31,11 +32,23 @@ export const alertsQueries = {
       refetchInterval: pollUnlessMissing(STATE_POLL_MS),
       retry: (failures, error) => !alertsOwnerMissing(error) && retryOnceUnlessTimedOut(failures, error),
     }),
-  /** Read through the page-wide resource store, so the badge, the panel and the notifier share one read per id. */
-  feed: (client: AlertsClient, afterId: number | null) =>
+  /**
+   * Read through the page-wide resource store, so the badge, the panel and the notifier share one read per id. The
+   * feed changes only when an alert fires or resolves, which the `changed` event announces: it polls only while that
+   * event stream is not live.
+   */
+  feed: (client: AlertsClient, afterId: number | null, eventsLive: boolean) =>
     queryOptions({
       ...resourceQueryOptions({ queryKey: [...alertsKeys.feed, afterId] as const, client, method: 'feed', input: { afterId } }),
-      refetchInterval: pollUnlessMissing(FEED_POLL_MS),
+      refetchInterval: pollUnlessMissing(eventsLive ? false : FEED_POLL_MS),
       retry: false,
     }),
+}
+
+/** The alert feed after `afterId`, read again on each `changed` event. */
+export const useAlertsFeed = (afterId: number | null) => {
+  const client = useApi(tracesAlertsApi)
+  const queryClient = useQueryClient()
+  const events = useApiEvent(tracesAlertsApi, 'changed', () => void queryClient.invalidateQueries({ queryKey: alertsKeys.feed }))
+  return useQuery(alertsQueries.feed(client, afterId, events === 'live'))
 }

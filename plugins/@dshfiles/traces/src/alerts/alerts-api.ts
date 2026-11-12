@@ -1,4 +1,4 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, event, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import { alertFeedSchema, alertRuleDraftSchema, alertRuleSchema, alertsSnapshotSchema, evaluationSummarySchema } from './alert-types.js'
 
@@ -70,6 +70,12 @@ export const tracesAlertsApi = defineApi({
       description:
         'Evaluate every enabled alert rule now instead of at the next minute; transitions are recorded and announced as on the timer. Run only when the user asked to evaluate alerts now.',
       tool: { name: 'traces_alerts_evaluate', readOnly: false, render: compactJson },
+    }),
+  },
+  events: {
+    changed: event({
+      schema: Schema.Struct({}),
+      description: 'An alert fired or resolved. Read feed again.',
     }),
   },
 })

@@ -3,7 +3,7 @@ import { HostContext } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { defineHost } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
-import { Effect, Layer, ManagedRuntime } from 'effect'
+import { Effect, Layer, ManagedRuntime, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { ALERT_FIRING_SOURCE, AlertAttention } from './alert-attention.js'
 import { AlertEngine } from './alert-engine.js'
@@ -98,6 +98,7 @@ describe('traces alert inbox provider', () => {
         remove: unused,
         mute: unused,
         feed: unused,
+        recorded: Stream.empty,
         snapshot: () =>
           Effect.sync((): AlertsSnapshot => ({
             rules,

@@ -1,5 +1,5 @@
 import { pluginAttributes } from '@dshfiles/dshx/tracing'
-import { Clock, Context, Deferred, Effect, Layer, Option, Ref, Schema } from 'effect'
+import { Clock, Context, Deferred, Effect, Layer, Option, PubSub, Ref, Schema, Stream } from 'effect'
 import { TraceRepo } from '../trace-repo.js'
 import { AlertEvaluator, initialAlertState, type AlertMeasurement } from './alert-evaluator.js'
 import { AlertRepo, type AlertRuleLimitReached, type AlertRuleNotFound } from './alert-repo.js'
@@ -48,6 +48,8 @@ export class AlertEngine extends Context.Service<
     readonly mute: (input: { readonly id: string; readonly minutes: number | null }) => Effect.Effect<AlertRule, AlertRuleNotFound>
     readonly snapshot: (input: { readonly historyLimit: number }) => Effect.Effect<AlertsSnapshot>
     readonly feed: (input: { readonly afterId: number | null }) => Effect.Effect<AlertFeed>
+    /** Each event as it is recorded: the feed and the firing count change only with one. */
+    readonly recorded: Stream.Stream<AlertEvent>
   }
 >()('@dshfiles/traces/AlertEngine') {
   static readonly layer = Layer.effect(
@@ -58,6 +60,7 @@ export class AlertEngine extends Context.Service<
       const attention = yield* ThreadAttention
       const lastEvaluatedAt = yield* Ref.make<number | null>(null)
       const inFlight = yield* Ref.make(Option.none<EvaluationRun>())
+      const recorded = yield* PubSub.unbounded<AlertEvent>()
       const scope = yield* Effect.scope
 
       const measureRule = Effect.fnUntraced(function* (rule: AlertRule, at: number) {
@@ -93,7 +96,7 @@ export class AlertEngine extends Context.Service<
         readonly delivery: Delivery
       }) {
         const muted = AlertEvaluator.isMuted(input.rule, input.at)
-        return yield* alerts.appendEvent({
+        const event = yield* alerts.appendEvent({
           ruleId: input.rule.id,
           ruleName: input.rule.name,
           severity: input.rule.severity,
@@ -110,6 +113,8 @@ export class AlertEngine extends Context.Service<
           threadsMarked: input.delivery.threadsMarked,
           deliveryError: input.delivery.deliveryError,
         })
+        yield* PubSub.publish(recorded, event)
+        return event
       })
 
       const evaluateRules = Effect.gen(function* () {
@@ -209,7 +214,7 @@ export class AlertEngine extends Context.Service<
         } satisfies AlertFeed
       })
 
-      return AlertEngine.of({ evaluate, save, remove, mute, snapshot, feed })
+      return AlertEngine.of({ evaluate, save, remove, mute, snapshot, feed, recorded: Stream.fromPubSub(recorded) })
     }),
   )
 }

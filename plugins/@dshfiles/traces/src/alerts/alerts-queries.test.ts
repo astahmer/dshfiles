@@ -18,11 +18,22 @@ describe('alerts feed query', () => {
     const panel = new QueryClient()
     const notifier = new QueryClient()
     const [badge, banner] = await Promise.all([
-      panel.fetchQuery(alertsQueries.feed(createApiClient(connection.context, tracesAlertsApi, '@dshfiles/traces'), null)),
-      notifier.fetchQuery(alertsQueries.feed(createApiClient(connection.context, tracesAlertsApi, '@dshfiles/traces'), null)),
+      panel.fetchQuery(alertsQueries.feed(createApiClient(connection.context, tracesAlertsApi, '@dshfiles/traces'), null, false)),
+      notifier.fetchQuery(alertsQueries.feed(createApiClient(connection.context, tracesAlertsApi, '@dshfiles/traces'), null, false)),
     ])
     expect(badge).toEqual({ latestEventId: 7, firing: 2, events: [] })
     expect(banner).toEqual(badge)
     expect(connection.call).toHaveBeenCalledTimes(1)
+  })
+
+  it('polls only while the change event stream is not live', () => {
+    const client = createApiClient(feedConnection().context, tracesAlertsApi, '@dshfiles/traces')
+    const intervalOf = (eventsLive: boolean) => {
+      const interval = alertsQueries.feed(client, null, eventsLive).refetchInterval
+      // SAFETY: the interval reads only the query's error.
+      return typeof interval === 'function' ? interval({ state: { error: null } } as never) : interval
+    }
+    expect(intervalOf(true)).toBe(false)
+    expect(intervalOf(false)).toBe(15_000)
   })
 })

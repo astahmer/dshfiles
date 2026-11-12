@@ -6,7 +6,7 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { SqliteStore } from '@dshfiles/sqlite-store'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { afterEach, describe, expect, it } from '@effect/vitest'
-import { Effect, Layer, Ref, type Scope } from 'effect'
+import { Effect, Fiber, Layer, Ref, Stream, type Scope } from 'effect'
 import { TestClock } from 'effect/testing'
 import type { NormalizedSpan } from '../otlp/normalize.js'
 import { AlertRepoTest, TraceRepoTest } from '../test-layers.test-support.js'
@@ -188,6 +188,20 @@ describe('alert engine', () => {
         expect(yield* engine.evaluate()).toMatchObject({ transitions: 1, firing: 0 })
         expect((yield* engine.snapshot({ historyLimit: 10 })).history.map(event => event.kind)).toEqual(['resolved', 'firing'])
         expect(yield* Ref.get(marked)).toEqual(['session-failing'])
+      }),
+    ),
+  )
+
+  it.effect('announces each recorded event, so browsers read the feed when it changes instead of polling it', () =>
+    withEngine(
+      Effect.fn(function* ({ engine, traces }) {
+        yield* engine.save(errorRule)
+        const announced = yield* engine.recorded.pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
+        yield* Effect.yieldNow
+        yield* failingMinute(traces, START)
+        yield* engine.evaluate()
+        const [event] = yield* Fiber.join(announced)
+        expect(event).toMatchObject({ kind: 'firing', id: (yield* engine.feed({ afterId: null })).latestEventId })
       }),
     ),
   )
