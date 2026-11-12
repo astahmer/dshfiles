@@ -1,3 +1,4 @@
+import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
 import { Composer, useApi, useContract, useSettings } from '@dshfiles/dshx/client'
 import { ComposerBar, type ComposerBarPlacement } from '@dshfiles/rich-composer/composer-more'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
@@ -8,9 +9,10 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
+import { useSessionOnScreen } from '@dshfiles/plugin-ui/hooks/session-on-screen'
 import { AlarmClockIcon, PencilIcon, SendIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, queryOptions, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
@@ -34,14 +36,22 @@ export type LoadModels = () => Promise<readonly ModelGroup[]>
 
 const sendsKey = (sessionId: string) => ['queue-reorder', 'scheduled-sends', sessionId] as const
 
-/** Polls while mounted so a send the Host delivered (or another tab scheduled) leaves or joins the list. */
+type ScheduledSendClient = typeof scheduledSendApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
+
+/**
+ * Polls so a send the Host delivered (or another tab scheduled) leaves or joins the list. Main tabs keep every visited
+ * thread's dock mounted, so only the thread the main view shows polls; the others read once when they mount.
+ */
+export const scheduledSendsQuery = (input: { readonly api: Pick<ScheduledSendClient, 'list'>; readonly sessionId: string; readonly onScreen: boolean }) =>
+  queryOptions({
+    queryKey: sendsKey(input.sessionId),
+    queryFn: ({ signal }) => input.api.list({ sessionId: input.sessionId }, { signal }),
+    refetchInterval: input.onScreen ? 15_000 : false,
+  })
+
 const useScheduledSends = (sessionId: string) => {
   const api = useApi(scheduledSendApi)
-  return useQuery({
-    queryKey: sendsKey(sessionId),
-    queryFn: ({ signal }) => api.list({ sessionId }, { signal }),
-    refetchInterval: 15_000,
-  })
+  return useQuery(scheduledSendsQuery({ api, sessionId, onScreen: useSessionOnScreen(sessionId) }))
 }
 
 const useNow = (): Date => {
