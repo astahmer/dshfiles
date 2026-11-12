@@ -45,6 +45,7 @@
     "@deepseek-ai/dsh-commands": "catalog:",
     "@deepseek-ai/dsh-compaction": "catalog:",
     "@deepseek-ai/dsh-compaction-basic": "catalog:",
+    "@deepseek-ai/dsh-compaction-tool-result-pruner": "catalog:",
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-token-meter": "catalog:",
