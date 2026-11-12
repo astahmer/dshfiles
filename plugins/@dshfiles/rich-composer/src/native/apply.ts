@@ -398,7 +398,8 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     const commands = scope.get('commandUi') as FileCommandRegistry
     scope.effect(() => commands.register({
       name: 'file',
-      label: () => t('input.file'),
+      // A touch device's file picker is the system's Photos / Camera / Files sheet: name what it offers there.
+      label: () => t(typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 'input.photosFiles' : 'input.file'),
       icon: IconPaperclipOutlineRegular,
       available: session => inputHub.canPickFiles(session.sessionId),
       ui: { kind: 'action', run: (session) => { inputHub.pickFiles(session.sessionId) } },
