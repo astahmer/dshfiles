@@ -68,8 +68,9 @@ const buildPlugin = plugin =>
 
 /** The owned bundles a plugin needs at runtime, transitively: their Loader rows provide the services it injects. */
 const bundleDependencies = async (plugin, plugins, seen = new Set([plugin.id])) => {
-  const { dependencies = {} } = JSON.parse(await readFile(resolve(plugin.dir, 'package.json'), 'utf8'))
-  const direct = plugins.filter(candidate => !seen.has(candidate.id) && Object.hasOwn(dependencies, candidate.id))
+  const { dependencies = {}, peerDependencies = {} } = JSON.parse(await readFile(resolve(plugin.dir, 'package.json'), 'utf8'))
+  const needed = (id) => Object.hasOwn(dependencies, id) || Object.hasOwn(peerDependencies, id)
+  const direct = plugins.filter(candidate => !seen.has(candidate.id) && needed(candidate.id))
   for (const dependency of direct) seen.add(dependency.id)
   const nested = []
   for (const dependency of direct) nested.push(...(await bundleDependencies(dependency, plugins, seen)))
