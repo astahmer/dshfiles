@@ -19,6 +19,7 @@ import {
   chmodSync,
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -27,6 +28,7 @@ import {
   rmSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -674,7 +676,16 @@ const snapshot = async ({ label, ifChanged = false, candidateGlobal, turn } = {}
   for (const entry of linkedPackages) {
     const link = join(profileNodeModules, entry.name)
     thawed(link)
-    rmSync(link, { recursive: true, force: true })
+    // The profile's links are relative, so in staging they dangle, and Node 24.11's rmSync leaves a dangling link in place.
+    const isLink = (() => {
+      try {
+        return lstatSync(link).isSymbolicLink()
+      } catch {
+        return false
+      }
+    })()
+    if (isLink) unlinkSync(link)
+    else rmSync(link, { recursive: true, force: true })
     symlinkSync(join(final, entry.relative, '@dshfiles', entry.name), link)
   }
   const profileManifest = join(staging, 'profile', 'package.json')
