@@ -3,6 +3,43 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Per-thread polls in background main tabs (2026-11-12, issue #142)
+
+Scratch Host (`dshx dev up`, every bundle `profiles/web` loads, three seeded threads in the jj `sample` project),
+headless Chromium, `har-capture.mjs --seconds 90 --switches 12 --switch-every 5 --visit 'tab:Threads'`: 90 s idle on
+the landing thread, 12 switches over the three threads 5 s apart, then 90 s idle again. Calls are counted per
+`dshx-batch` call, not per POST.
+
+Main tabs keep every visited thread's composer, header and transcript mounted. Four per-thread reads polled for every
+mounted thread, so after visiting three threads each one ran three or four times over: session-undo `history` and
+queue-reorder `scheduled-sends/list` (15 s each), preview `devServers` (10 s) and chat `chat-resume/available` (30 s
+while a Retry or Resume shows). Each now polls only for the thread the main view shows
+(`@dshfiles/plugin-ui/hooks/session-on-screen`, the `Composer` contract's `current`, or preview's `onScreen`); a thread
+off screen still reads once when it mounts, so a side-panel composer shows its controls. The multi-host interaction
+feed asked a live event stream every 15 s; it now asks once a minute (a dropped stream already re-reads when it turns
+live again), and a non-live status no longer triggers an extra read.
+
+| Calls per minute (same script)    | Before | After |
+| --------------------------------- | ------ | ----- |
+| idle, landing thread only         | 40.0   | 40.0  |
+| while switching                   | 143    | 104   |
+| idle after visiting three threads | 74.4   | 44.5  |
+| `session-undo/history`, after     | 11.3   | 4.3   |
+| `scheduled-sends/list`, after     | 11.3   | 4.3   |
+| `preview/devServers`, after       | 18.4   | 6.5   |
+| `chat-resume/available`, after    | 5.7    | 2.2   |
+| `multi-host/sessionInteractions`  | 4.8    | 1.0   |
+
+The interaction-feed row is a separate 150 s idle capture after rebuilding multi-host and user-questions, which
+bundles its own copy of the feed (reads at 61 s and 121 s, against every 15 s before). Regression checks: `undo-history-poll.test.ts`, `scheduled-sends-poll.test.ts`,
+`dev-server-poll.test.ts`, chat `tests/resume-interrupted.test.tsx`, multi-host `interaction-feed.test.ts`.
+
+Still polling at idle on one thread (owners for the next pass): thread-sidebar's usage-limit row reads
+`ai-accounts/quotaContinuations` every 15 s with no continuation; traces `traces-alerts/feed` every 15 s; the
+on-screen thread's undo history and scheduled sends every 15 s (no Host event announces a new checkpoint or
+schedule); multi-host `threadList` and `list` every 30 s. Per switch, `browser-traces/export` (1) and
+`jujutsu-composer/context` (≈1, the duplicate noted on 2026-11-09) remain.
+
 ## Folder locations expire spread out (2026-11-12)
 
 The live traces showed bursts of 70–80 `jj root` spawns in one repository scan: every registered folder's location is
