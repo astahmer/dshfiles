@@ -7,9 +7,13 @@ import { ResumeInterruptedAction, resumeAvailabilityRefetchInterval } from '../s
 afterEach(cleanup)
 
 it('stops polling unavailable tasks and backs off checks for resumable tasks', () => {
-  expect(resumeAvailabilityRefetchInterval(undefined)).toBe(false)
-  expect(resumeAvailabilityRefetchInterval(false)).toBe(false)
-  expect(resumeAvailabilityRefetchInterval(true)).toBe(30_000)
+  expect(resumeAvailabilityRefetchInterval({ available: undefined, onScreen: true })).toBe(false)
+  expect(resumeAvailabilityRefetchInterval({ available: false, onScreen: true })).toBe(false)
+  expect(resumeAvailabilityRefetchInterval({ available: true, onScreen: true })).toBe(30_000)
+})
+
+it('stops checking an offered resume in a thread kept mounted in a background tab', () => {
+  expect(resumeAvailabilityRefetchInterval({ available: true, onScreen: false })).toBe(false)
 })
 
 it('hides unavailable stopped tasks', async () => {
