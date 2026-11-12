@@ -12,6 +12,7 @@ import { bootComposedPluginProfile } from '../boot.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, visitIsolatedPluginProfile, settingsNavEntry } from '../steps.js'
 import { confirmFolderSetupStep, createScratchDirectory, registerWorkspaceFolder, selectModelForNewThread, sendMessage } from '../threads.js'
 import { ThreadSidebarJourney } from '../thread-list-grouping.js'
+import { openKeyboardShortcutsEditor } from './keyboard-shortcuts-editor.js'
 import { primaryModifierFor } from './platform-modifier.js'
 
 const MAIN_LAYOUT_KEY = 'dshfiles.workbench.layout.v1'
@@ -337,9 +338,7 @@ const BOTTOM_PANEL_COMMAND_TITLE = 'Toggle the bottom panel'
 
 When('the bottom-panel shortcut is rebound to primary+Shift+J in Keyboard shortcuts', async ({ page }: { page: Page }) => {
   const primary = await primaryModifierFor(page)
-  await page.keyboard.press(`${primary}+Slash`)
-  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
-  await expect(dialog).toBeVisible()
+  const dialog = await openKeyboardShortcutsEditor(page)
   await dialog.getByRole('button', { name: `Edit shortcut for ${BOTTOM_PANEL_COMMAND_TITLE}` }).click()
   await expect(dialog.getByText('Press a shortcut')).toBeVisible()
   await page.keyboard.press(`${primary}+Shift+KeyJ`)
