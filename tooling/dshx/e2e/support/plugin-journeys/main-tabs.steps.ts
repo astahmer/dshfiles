@@ -15,6 +15,11 @@ const strip = (page: Page) => page.getByRole('tablist', { name: 'Open views', ex
 const nativeTabName = (name: string): string | RegExp =>
   name === 'Plugins' || name === 'Automation tasks' || name === 'Settings' ? name : viewNamePattern(name)
 const tab = (page: Page, name: string) => strip(page).getByRole('tab', { name: nativeTabName(name), exact: true })
+/**
+ * The Jujutsu page carries no title heading since its own header became the tab strip's job, so its repository control
+ * is what proves the panel, not another page, is on the stage.
+ */
+const jujutsuPage = (page: Page) => page.locator('[data-slot="main"]').getByRole('button', { name: 'Choose repository', exact: true })
 /** Each tab as "<name>" plus "*" when active, "(preview)" and "(pinned)" markers, in strip order. */
 const tabSummary = (page: Page): Promise<readonly string[]> =>
   strip(page)
@@ -530,7 +535,7 @@ Then('Jujutsu is a main tab again and the side panel dropped its tab', async ({ 
 Then('the tabs come back with the pin and the Jujutsu tab is active again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-restore-after-reload', async () => {
     await expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'History*'])
-    await expect(page.getByRole('heading', { name: 'Jujutsu', exact: true })).toBeVisible()
+    await expect(jujutsuPage(page)).toBeVisible()
   })
 })
 
@@ -638,7 +643,7 @@ When('Jujutsu is typed into the Start search and Enter picks it', async ({ page 
 Then('Jujutsu replaced the Start tab', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-start-page-pick-replaces-tab', async () => {
     await expect.poll(() => tabSummary(page)).toEqual(['Plugins', 'History*'])
-    await expect(page.getByRole('heading', { name: 'Jujutsu', exact: true })).toBeVisible()
+    await expect(jujutsuPage(page)).toBeVisible()
   })
 })
 
