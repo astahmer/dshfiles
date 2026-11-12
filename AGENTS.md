@@ -1,7 +1,7 @@
 # dshfiles
 
 Shared DeepSeek Harness (DSH) setup: marketplace plugins we adopt, and plugins
-we own. It runs on stock DSH 0.2.2-rc.1 with no core patches. The global
+we own. It runs on stock DSH 0.2.2-rc.2 with no core patches. The global
 contract (`~/.dsh/AGENTS.md`) holds harness-neutral defaults; this file holds
 dshfiles and DSH rules.
 

@@ -57,7 +57,7 @@ receive this stability promise.
 
 ## What DSH 0.2.2-rc.1 changed
 
-The workspace pins DSH `0.2.2-rc.1` (Cordis `4.1.0`). It stays inside
+The workspace pins DSH `0.2.2-rc.2` (Cordis `4.1.0`); 0.2.2-rc.1 brought these changes. It stays inside
 protocol-2; these are the `@dshfiles/dshx/host` and `@dshfiles/dshx/testing`
 migrations it forced:
 
