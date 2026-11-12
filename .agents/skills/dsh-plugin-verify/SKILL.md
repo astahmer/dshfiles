@@ -26,7 +26,7 @@ Diff the failing paths against your own change before editing the plugin.
 ```sh
 cd plugins/@dshfiles/<plugin>
 pnpm typecheck && pnpm test && pnpm build
-fnm exec --using=22.23.3 node -e "import('./dist/index.js')"   # 22.23.3 = .node-version, the DSH Node
+fnm exec --using=24.11.1 node -e "import('./dist/index.js')"   # 24.11.1 = .node-version, the DSH Node
 ```
 
 An import failure here is exactly what shows up at boot as "did not activate". `dist/` is not versioned.
@@ -46,7 +46,7 @@ declarations (`DshxFeatureCatalogSchema.safeParse is not a function`). Rebuild b
 Then the catalog contract, spans included:
 
 ```sh
-fnm exec --using=22.23.3 pnpm --dir tooling/dshx run features:check
+fnm exec --using=24.11.1 pnpm --dir tooling/dshx run features:check
 ```
 
 A new or changed feature lists `telemetry`; new Host I/O (fetch, socket, child process, subprocess spawn) opens a span

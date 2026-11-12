@@ -25,7 +25,7 @@ If none applies, stop: **Clean**.
 ## Process
 
 1. **Hygiene.**
-   `fnm exec --using=22.23.3 pnpm --dir tooling/dshx run features:check` — every
+   `fnm exec --using=24.11.1 pnpm --dir tooling/dshx run features:check` — every
    catalog parses, `reach` steps match the grammar and end with `expect`, and
    every feature's `telemetry` holds (automatic sources backed by Host code,
    custom spans emitted and asserted by a `recordSpans()` test, Host I/O

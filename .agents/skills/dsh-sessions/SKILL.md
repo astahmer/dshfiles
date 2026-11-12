@@ -15,7 +15,7 @@ run them only when the user asked for that action.
 `dshx` is not on PATH. From any dshfiles checkout:
 
 ```sh
-dshx() { fnm exec --using=22.23.3 node ~/dev/dshfiles/tooling/dshx/packages/dshx/dist/cli/bin.js "$@"; }
+dshx() { fnm exec --using=24.11.1 node ~/dev/dshfiles/tooling/dshx/packages/dshx/dist/cli/bin.js "$@"; }
 ```
 
 It reaches the live DSH through, in order: `--url`, `$DSHX_URL`, then
