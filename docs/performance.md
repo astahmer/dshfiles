@@ -3,6 +3,50 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Idle polls replaced by Host change events (2026-11-12, issue #142)
+
+Same scratch workload as the next section (`har-capture.mjs --seconds 90 --switches 12 --switch-every 5 --visit
+'tab:Threads'`, three seeded threads, census windows: idle 30–95 s, switching 95–155 s, idle after 160 s to the end).
+The reads that still polled on one idle thread now follow a Host event and poll only while the page's dshx event
+stream is not live (or, for the host directory and remote threads, every five minutes as a fallback for a file another
+process wrote):
+
+1. `ai-accounts/quotaContinuations`: the Host publishes `quotaContinuationsChanged` after each write to the recovery
+   domain (`domain/changed`); the sidebar's usage-limit row still polls every 15 s while a recovery waits, since its
+   reset turning it ready is a clock change, not a write.
+2. `traces-alerts/feed`: the alert engine streams each recorded event, and `traces` publishes `changed`; the firing
+   count changes only with an event.
+3. `scheduled-sends/list` and `session-undo/history`: `changed` from the scheduled-send store's change stream, and
+   `historyChanged { sessionId }` from the undo domain's `domain/changed`.
+4. `multi-host/threadList` and `multi-host/list`: `inventoryChanged` after a directory write, a remote-thread record and
+   a runtime connection opening, closing or failing (`InventoryPoll` in `@dshfiles/multi-host/destination`).
+5. `multi-host/sessionInteractions`: multi-host and user-questions share one page-wide feed (`globalThis`, since each
+   bundles its own copy), and a feed whose event stream is still connecting reads when it turns live instead of
+   reading at boot and again on live.
+
+| Calls per minute (same script)     | Before | After |
+| ---------------------------------- | ------ | ----- |
+| idle after visiting three threads  | 39.8   | 20.6  |
+| while switching                    | 85.0   | 76.0  |
+| boot (first 30 s, calls)           | 77     | 65    |
+| `quotaContinuations`, after        | 4.4    | 0     |
+| `traces-alerts/feed`, after        | 3.7    | 0     |
+| `scheduled-sends/list`, after      | 4.4    | 0     |
+| `session-undo/history`, after      | 4.4    | 0     |
+| `multi-host/threadList`, after     | 2.2    | 0     |
+| `multi-host/list`, idle            | 2.8    | 0     |
+| `sessionInteractions`, boot calls  | 2      | 1     |
+
+A turn on the scratch Host published two `historyChanged` events and the on-screen composer read its history 0.5 s
+later. Regression checks: multi-host `interaction-feed.test.ts`, `inventory-changes.test.ts`,
+`destination/inventory-poll.test.ts`; ai-accounts `quota-continuation-service.test.ts` ("announces each stored…");
+thread-sidebar `usage-limit-poll.test.ts`; traces `alert-engine.test.ts` ("announces each recorded event…") and
+`alerts-queries.test.ts`; queue-reorder `host.test.ts` ("announces a scheduled send change…") and
+`scheduled-sends-poll.test.ts`; session-undo `undo-history-poll.test.ts`.
+
+Left at idle: thread-sidebar attention `changesSince`, `preview/devServers` on the on-screen thread, `annotations/list`,
+`worktree-memory/scratchHosts` and `chat-resume/available` (about 2–6 calls per minute each).
+
 ## Per-thread polls in background main tabs (2026-11-12, issue #142)
 
 Scratch Host (`dshx dev up`, every bundle `profiles/web` loads, three seeded threads in the jj `sample` project),
