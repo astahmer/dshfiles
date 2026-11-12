@@ -5,10 +5,9 @@
  */
 import { RowGestureModel, useRowGestures, type RowGestures, type RowSwipeSide } from '@dshfiles/plugin-ui/hooks/row-gestures'
 
-export { ROW_SWIPE_COMMIT_PX } from '@dshfiles/plugin-ui/hooks/row-gestures'
 export type RowSwipeAction = 'done' | 'pin'
 
-const ACTION_OF: Readonly<Record<RowSwipeSide, RowSwipeAction>> = { left: 'done', right: 'pin' }
+const ACTION_OF = { left: 'done', right: 'pin' } as const satisfies Readonly<Record<RowSwipeSide, RowSwipeAction>>
 const actionOf = (side: RowSwipeSide | undefined): RowSwipeAction | undefined => (side === undefined ? undefined : ACTION_OF[side])
 
 export const RowSwipeModel = {

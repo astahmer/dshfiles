@@ -2,7 +2,7 @@
 
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { type TranscriptViewMode } from '../../chat-settings.ts'
+import { type TranscriptViewMode } from '../../transcript-view-modes.ts'
 import { OFFERED_TRANSCRIPT_VIEW_MODES } from '../../transcript-view-modes.ts'
 import type { ChatKey } from '../locale.ts'
 import { COLLAPSE_TIMINGS, type CollapseTiming } from '../presentation-policy.ts'

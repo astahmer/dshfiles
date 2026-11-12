@@ -68,7 +68,7 @@ export default defineClient({
     ThreadFindPort.set((input, signal) => {
       const findInThread = finder.findInThread
       if (findInThread === undefined) return Promise.reject(new Error('Thread search is not installed.'))
-      return findInThread(input, { signal })
+      return findInThread(input, { signal }).then(ThreadFindPort.decodeReply)
     })
     // One registry serves these keys, the palette and the `?` sheet; each acts on the Chat view the user is in.
     plugin.add(Command, {

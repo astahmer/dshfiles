@@ -249,7 +249,11 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     const threadActions = registeredActions.flatMap(action =>
       action.group !== 'thread' || action.isAvailable?.(props.context) === false
         ? []
-        : [{ ...action, label: textOf(action.label), ...(action.heading === undefined ? {} : { heading: textOf(action.heading) }) }],
+        : [
+            action.heading === undefined
+              ? { ...action, label: textOf(action.label) }
+              : { ...action, label: textOf(action.label), heading: textOf(action.heading) },
+          ],
     )
     const byKind = [
       ...registeredActions.filter(action => action.group !== 'command' && action.group !== 'thread'),

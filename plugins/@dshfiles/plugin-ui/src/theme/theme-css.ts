@@ -13,7 +13,7 @@
  * surface turns warm at once), then the aliases with a clear job are pinned to the 11 palette steps. Regenerate with
  * `node plugins/@dshfiles/plugin-ui/scripts/emit-theme-css.ts`; a ui-styles test fails when the file drifts.
  */
-import { hexToOklch, NEUTRAL_STEP_NAMES, palette, toCss, WARM_STONE, type Oklch, type Palette, type PaletteInput, type Scheme } from './palette.ts'
+import { PaletteMath, NEUTRAL_STEP_NAMES, WARM_STONE, type Oklch, type Palette, type PaletteInput, type Scheme } from './palette.ts'
 
 export const LIGHT_SELECTOR = 'html body'
 export const DARK_SELECTOR = 'body[data-ds-dark-theme][data-ds-dark-theme]'
@@ -22,7 +22,7 @@ export const DARK_SELECTOR = 'body[data-ds-dark-theme][data-ds-dark-theme]'
 export const HOST_RADII = { xs: 4, sm: 6, md: 8, lg: 12, xl: 12, panel: 16 } as const
 
 /** The Host static neutral ramps (0.2.1-rc.2 values), re-tinted at their own lightness. */
-export const HOST_NEUTRAL_RAMPS: Readonly<Record<string, string>> = {
+export const HOST_NEUTRAL_RAMPS = {
   'neutral-00': '#ffffff',
   'neutral-50': '#fafafa',
   'neutral-100': '#f5f5f5',
@@ -58,10 +58,10 @@ export const HOST_NEUTRAL_RAMPS: Readonly<Record<string, string>> = {
   'neutral-bluish-900': '#1b1b1c',
   'neutral-bluish-950': '#151517',
   'neutral-bluish-1000': '#0f1115',
-}
+} as const satisfies Readonly<Record<string, string>>
 
 /** The Host brand ramp, moved onto the accent hue at its own lightness and chroma. */
-export const HOST_BRAND_RAMP: Readonly<Record<string, string>> = {
+export const HOST_BRAND_RAMP = {
   'deepseek-50': '#edf3fe',
   'deepseek-100': '#e4edfd',
   'deepseek-200': '#d3e2ff',
@@ -72,7 +72,7 @@ export const HOST_BRAND_RAMP: Readonly<Record<string, string>> = {
   'deepseek-600': '#4868b2',
   'deepseek-800': '#34415b',
   'deepseek-900': '#283142',
-}
+} as const satisfies Readonly<Record<string, string>>
 
 type Ref = number | string
 type AliasRow = readonly [name: string, light: Ref, dark: Ref]
@@ -144,12 +144,12 @@ export const HOST_ALIASES: readonly AliasRow[] = [
 /** Syntax hues for Shiki's `css-variables` theme (keyword red, constant blue, parameter orange, function violet, string teal). */
 const SYNTAX_HUES = { keyword: 20, constant: 245, parameter: 55, function: 300, string: 210 } as const
 
-export function syntaxColor(hue: number, scheme: Scheme): Oklch {
+function syntaxColor(hue: number, scheme: Scheme): Oklch {
   return scheme === 'dark' ? { l: 0.79, c: 0.11, h: hue } : { l: 0.5, c: 0.14, h: hue }
 }
 
 function retint(hex: string, hue: number, chroma: number): Oklch {
-  const { l } = hexToOklch(hex)
+  const { l } = PaletteMath.hexToOklch(hex)
   // Pure white and black stay off the ends: the spec avoids `#000`, and a warm white still reads white.
   return { l: Math.min(Math.max(l, 0.12), 0.995), c: chroma, h: hue }
 }
@@ -157,22 +157,22 @@ function retint(hex: string, hue: number, chroma: number): Oklch {
 function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[] {
   const out: string[] = []
   const push = (name: string, value: string) => out.push(`  ${name}: ${value};`)
-  p.neutral.forEach((color, step) => push(`--dshx-tone-${step}`, toCss(color)))
+  p.neutral.forEach((color, step) => push(`--dshx-tone-${step}`, PaletteMath.toCss(color)))
   NEUTRAL_STEP_NAMES.forEach((name, step) => push(`--dshx-tone-${name}`, tone(step)))
-  push('--dshx-tone-accent', toCss(p.accent.fg))
-  push('--dshx-tone-accent-bg', toCss(p.accent.bg))
-  push('--dshx-tone-accent-border', toCss(p.accent.border))
-  push('--dshx-tone-accent-on-solid', toCss(p.accent.onSolid))
+  push('--dshx-tone-accent', PaletteMath.toCss(p.accent.fg))
+  push('--dshx-tone-accent-bg', PaletteMath.toCss(p.accent.bg))
+  push('--dshx-tone-accent-border', PaletteMath.toCss(p.accent.border))
+  push('--dshx-tone-accent-on-solid', PaletteMath.toCss(p.accent.onSolid))
   for (const key of ['success', 'warning', 'danger', 'info'] as const) {
-    push(`--dshx-tone-${key}`, toCss(p[key].fg))
-    push(`--dshx-tone-${key}-bg`, toCss(p[key].bg))
-    push(`--dshx-tone-${key}-border`, toCss(p[key].border))
+    push(`--dshx-tone-${key}`, PaletteMath.toCss(p[key].fg))
+    push(`--dshx-tone-${key}-bg`, PaletteMath.toCss(p[key].bg))
+    push(`--dshx-tone-${key}-border`, PaletteMath.toCss(p[key].border))
   }
   const fill = p.neutral[1]?.c ?? 0
-  for (const [name, hex] of Object.entries(HOST_NEUTRAL_RAMPS)) push(`--dsw-static-${name}`, toCss(retint(hex, input.hue, fill)))
+  for (const [name, hex] of Object.entries(HOST_NEUTRAL_RAMPS)) push(`--dsw-static-${name}`, PaletteMath.toCss(retint(hex, input.hue, fill)))
   for (const [name, hex] of Object.entries(HOST_BRAND_RAMP)) {
-    const { l, c } = hexToOklch(hex)
-    push(`--dsw-static-${name}`, toCss({ l, c, h: input.accentHue }))
+    const { l, c } = PaletteMath.hexToOklch(hex)
+    push(`--dsw-static-${name}`, PaletteMath.toCss({ l, c, h: input.accentHue }))
   }
   const dark = p.scheme === 'dark'
   for (const [name, light, darkRef] of HOST_ALIASES) {
@@ -180,7 +180,7 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
     push(name, typeof ref === 'number' ? tone(ref) : ref)
   }
   // Shiki `css-variables` theme: every token colour is `var(--shiki-token-*)` with no fallback.
-  const syntax = (hue: number) => toCss(syntaxColor(hue, p.scheme))
+  const syntax = (hue: number) => PaletteMath.toCss(syntaxColor(hue, p.scheme))
   push('--shiki-token-comment', tone(8))
   push('--shiki-token-punctuation', tone(9))
   push('--shiki-token-constant', syntax(SYNTAX_HUES.constant))
@@ -197,11 +197,11 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
 }
 
 /** The declarations of one scheme's block; the runtime theme (`appearance.ts`) reuses them under its own selectors. */
-export function blockDeclarations(input: Omit<PaletteInput, 'scheme'>, scheme: Scheme): string[] {
-  return declarations(palette({ ...input, scheme }), input)
+function blockDeclarations(input: Omit<PaletteInput, 'scheme'>, scheme: Scheme): string[] {
+  return declarations(PaletteMath.palette({ ...input, scheme }), input)
 }
 
-export function themeCss(input: Omit<PaletteInput, 'scheme'> = WARM_STONE): string {
+function themeCss(input: Omit<PaletteInput, 'scheme'> = WARM_STONE): string {
   const radii = Object.entries(HOST_RADII).map(([name, px]) => `  --dsw-radius-${name}: ${px}px;`)
   const block = (selector: string, scheme: Scheme) => [`${selector} {`, ...blockDeclarations(input, scheme), '}'].join('\n')
   return [
@@ -218,11 +218,19 @@ export function themeCss(input: Omit<PaletteInput, 'scheme'> = WARM_STONE): stri
 }
 
 /** Every Host `--dsw-*` name this block overrides; the ui-styles guard test checks each still exists in the Host sheet. */
-export function overriddenHostVariables(): readonly string[] {
+function overriddenHostVariables(): readonly string[] {
   return [
     ...Object.keys(HOST_RADII).map(name => `--dsw-radius-${name}`),
     ...Object.keys(HOST_NEUTRAL_RAMPS).map(name => `--dsw-static-${name}`),
     ...Object.keys(HOST_BRAND_RAMP).map(name => `--dsw-static-${name}`),
     ...HOST_ALIASES.map(([name]) => name),
   ]
+}
+
+/** The generated theme stylesheet: Host variable blocks and syntax colours from a palette input. */
+export class ThemeCss {
+  static readonly syntaxColor = syntaxColor
+  static readonly blockDeclarations = blockDeclarations
+  static readonly themeCss = themeCss
+  static readonly overriddenHostVariables = overriddenHostVariables
 }

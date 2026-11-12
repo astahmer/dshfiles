@@ -42,7 +42,7 @@ const entriesOf = (
   id: string,
 ) => read.tree.folders.find(folder => folder.id === id)?.entries.map(entry => entry.viewId)
 
-const decodes = (schema: Schema.Codec<unknown, unknown>, input: unknown): boolean =>
+const decodeStrict = (schema: Schema.Codec<unknown, unknown>, input: unknown): boolean =>
   Option.isSome(Schema.decodeUnknownOption(schema)(input, { onExcessProperty: 'error' }))
 
 describe('Host sidebar folders (b:952m)', () => {
@@ -167,12 +167,12 @@ describe('Host sidebar folders (b:952m)', () => {
   )
 
   it('requires explicit confirmation for destructive verbs and a change for an update', () => {
-    expect(decodes(sidebarFolderDeleteSchema, { id: 'review' })).toBe(false)
-    expect(decodes(sidebarFolderDeleteSchema, { id: 'review', confirm: false })).toBe(false)
-    expect(decodes(sidebarFolderDeleteSchema, { id: 'review', confirm: true })).toBe(true)
-    expect(decodes(sidebarTreeResetSchema, {})).toBe(false)
-    expect(decodes(sidebarTreeResetSchema, { confirm: true })).toBe(true)
-    expect(decodes(sidebarFolderUpdateSchema, { id: 'review' })).toBe(false)
-    expect(decodes(sidebarFolderUpdateSchema, { id: 'review', hidden: true })).toBe(true)
+    expect(decodeStrict(sidebarFolderDeleteSchema, { id: 'review' })).toBe(false)
+    expect(decodeStrict(sidebarFolderDeleteSchema, { id: 'review', confirm: false })).toBe(false)
+    expect(decodeStrict(sidebarFolderDeleteSchema, { id: 'review', confirm: true })).toBe(true)
+    expect(decodeStrict(sidebarTreeResetSchema, {})).toBe(false)
+    expect(decodeStrict(sidebarTreeResetSchema, { confirm: true })).toBe(true)
+    expect(decodeStrict(sidebarFolderUpdateSchema, { id: 'review' })).toBe(false)
+    expect(decodeStrict(sidebarFolderUpdateSchema, { id: 'review', hidden: true })).toBe(true)
   })
 })

@@ -15,7 +15,8 @@ export interface PeekChoice {
 }
 
 export interface PeekCardProps {
-  readonly title: string
+  /** The peeked row's own words: a thread's title, an inbox item's reason. */
+  readonly heading: string
   readonly status?: StatusGlyphState
   readonly statusLabel?: string
   /** The thread's latest reply; absent for a subject that is not a thread. */
@@ -38,6 +39,26 @@ export interface PeekCardProps {
   }
 }
 
+/** The latest reply in a peek: a spinner while it loads, the failure, a "no reply" line, or its last paragraph. */
+const PeekReplyBody = (props: { readonly reply: LastReplyState; readonly labels: PeekCardProps['labels'] }): React.JSX.Element | null => {
+  const { reply, labels } = props
+  if (reply.status === 'idle') return null
+  if (reply.status === 'loading')
+    return (
+      <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground">
+        <Spinner />
+        {labels.loading}
+      </span>
+    )
+  if (reply.status === 'failed') return <span className="dshx:text-muted-foreground">{reply.message}</span>
+  if (reply.text === '') return <span className="dshx:text-muted-foreground">{labels.noReply}</span>
+  return (
+    <p data-peek-reply="" className="dshx:max-h-40 dshx:overflow-y-auto dshx:break-words dshx:whitespace-pre-wrap dshx:text-foreground">
+      {LastReplyModel.lastParagraph(reply.text)}
+    </p>
+  )
+}
+
 /** The body of a Space peek: what the row would show if you opened it, without leaving the list. */
 export const PeekCard = (props: PeekCardProps): React.JSX.Element => {
   const reply = props.reply
@@ -47,7 +68,7 @@ export const PeekCard = (props: PeekCardProps): React.JSX.Element => {
         {props.status === undefined ? null : (
           <StatusGlyph status={props.status} className="dshx:mt-0.5" {...(props.statusLabel === undefined ? {} : { label: props.statusLabel })} />
         )}
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:font-semibold dshx:break-words">{props.title}</span>
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:font-semibold dshx:break-words">{props.heading}</span>
       </div>
       {props.question === undefined ? null : (
         <div className="dshx:flex dshx:flex-col dshx:gap-2">
@@ -74,20 +95,7 @@ export const PeekCard = (props: PeekCardProps): React.JSX.Element => {
       {reply === undefined || reply.status === 'idle' ? null : (
         <section aria-label={props.labels.lastReply} className="dshx:flex dshx:flex-col dshx:gap-1">
           <span className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.labels.lastReply}</span>
-          {reply.status === 'loading' ? (
-            <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground">
-              <Spinner />
-              {props.labels.loading}
-            </span>
-          ) : reply.status === 'failed' ? (
-            <span className="dshx:text-muted-foreground">{reply.message}</span>
-          ) : reply.text === '' ? (
-            <span className="dshx:text-muted-foreground">{props.labels.noReply}</span>
-          ) : (
-            <p data-peek-reply="" className="dshx:max-h-40 dshx:overflow-y-auto dshx:break-words dshx:whitespace-pre-wrap dshx:text-foreground">
-              {LastReplyModel.lastParagraph(reply.text)}
-            </p>
-          )}
+          <PeekReplyBody reply={reply} labels={props.labels} />
         </section>
       )}
       {props.facts === undefined || props.facts.length === 0 ? null : (
@@ -128,6 +136,7 @@ export const RowPeek = (props: {
   if (props.anchor === null) return null
   return (
     <Popover open={props.open} onOpenChange={props.onOpenChange} modal={false}>
+      {/* SAFETY: the anchor is non-null past the guard above, and the ref is rewritten from it on every render. */}
       <PopoverAnchor virtualRef={anchorRef as React.RefObject<HTMLElement>} />
       <PopoverContent
         data-row-peek=""

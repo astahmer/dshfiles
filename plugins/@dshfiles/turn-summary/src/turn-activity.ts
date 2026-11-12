@@ -1,8 +1,6 @@
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
 import { EditLines, type LineCounts } from './edit-lines.js'
 
-export type { LineCounts } from './edit-lines.js'
-
 export interface ToolCallRecord {
   readonly callId: string
   readonly name: string

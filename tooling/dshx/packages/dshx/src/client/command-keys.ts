@@ -30,42 +30,50 @@ export interface ParsedKeys {
   readonly characterKey: boolean
 }
 
-const NAMED: Readonly<Record<string, string>> = {
-  ',': 'Comma',
-  '.': 'Period',
-  '/': 'Slash',
-  '\\': 'Backslash',
-  ';': 'Semicolon',
-  "'": 'Quote',
-  '[': 'BracketLeft',
-  ']': 'BracketRight',
-  '-': 'Minus',
-  '=': 'Equal',
-  '`': 'Backquote',
-  enter: 'Enter',
-  return: 'Enter',
-  escape: 'Escape',
-  esc: 'Escape',
-  space: 'Space',
-  tab: 'Tab',
-  backspace: 'Backspace',
-  delete: 'Delete',
-  up: 'ArrowUp',
-  down: 'ArrowDown',
-  left: 'ArrowLeft',
-  right: 'ArrowRight',
-  arrowup: 'ArrowUp',
-  arrowdown: 'ArrowDown',
-  arrowleft: 'ArrowLeft',
-  arrowright: 'ArrowRight',
-  home: 'Home',
-  end: 'End',
-}
+const NAMED = new Map<string, string>([
+  [',', 'Comma'],
+  ['.', 'Period'],
+  ['/', 'Slash'],
+  ['\\', 'Backslash'],
+  [';', 'Semicolon'],
+  ["'", 'Quote'],
+  ['[', 'BracketLeft'],
+  [']', 'BracketRight'],
+  ['-', 'Minus'],
+  ['=', 'Equal'],
+  ['`', 'Backquote'],
+  ['enter', 'Enter'],
+  ['return', 'Enter'],
+  ['escape', 'Escape'],
+  ['esc', 'Escape'],
+  ['space', 'Space'],
+  ['tab', 'Tab'],
+  ['backspace', 'Backspace'],
+  ['delete', 'Delete'],
+  ['up', 'ArrowUp'],
+  ['down', 'ArrowDown'],
+  ['left', 'ArrowLeft'],
+  ['right', 'ArrowRight'],
+  ['arrowup', 'ArrowUp'],
+  ['arrowdown', 'ArrowDown'],
+  ['arrowleft', 'ArrowLeft'],
+  ['arrowright', 'ArrowRight'],
+  ['home', 'Home'],
+  ['end', 'End'],
+])
 
 /** Symbols typed with Shift on a US layout: the step matches the code with Shift, or the typed character itself. */
-const SHIFTED: Readonly<Record<string, string>> = { '?': 'Slash' }
+const SHIFTED = new Map<string, string>([['?', 'Slash']])
 
 const PRIMARY = new Set(['mod', 'primary', 'cmd', 'command', 'ctrl', 'control', 'meta'])
+
+/** The `KeyboardEvent.code` for one lower-case key name: a letter, a digit, a function key or a named key. */
+const codeOf = (lower: string): string | undefined => {
+  if (/^[a-z]$/u.test(lower)) return `Key${lower.toUpperCase()}`
+  if (/^\d$/u.test(lower)) return `Digit${lower}`
+  if (/^f\d{1,2}$/u.test(lower)) return lower.toUpperCase()
+  return NAMED.get(lower)
+}
 
 const parseStep = (step: string): KeyStep | undefined => {
   // `Mod++` would name the plus key; nothing binds it, so a trailing empty part is a typo.
@@ -83,15 +91,9 @@ const parseStep = (step: string): KeyStep | undefined => {
     else return undefined
   }
   const lower = name.toLowerCase()
-  const shifted = SHIFTED[name]
+  const shifted = SHIFTED.get(name)
   if (shifted !== undefined) return { code: shifted, primary, shift: true, alt, char: name }
-  const code = /^[a-z]$/u.test(lower)
-    ? `Key${lower.toUpperCase()}`
-    : /^\d$/u.test(lower)
-      ? `Digit${lower}`
-      : /^f\d{1,2}$/u.test(lower)
-        ? lower.toUpperCase()
-        : NAMED[lower]
+  const code = codeOf(lower)
   if (code === undefined) return undefined
   return { code, primary, shift, alt }
 }
@@ -121,36 +123,38 @@ const parse = (spec: string): ParsedKeys | undefined => {
   }
 }
 
+/** The keycap a code shows when no typed character names it. */
+const CAPS = new Map<string, string>([
+  ['Enter', '↵'],
+  ['Escape', 'Esc'],
+  ['Space', 'Space'],
+  ['Tab', 'Tab'],
+  ['Backspace', '⌫'],
+  ['Delete', 'Del'],
+  ['ArrowUp', '↑'],
+  ['ArrowDown', '↓'],
+  ['ArrowLeft', '←'],
+  ['ArrowRight', '→'],
+  ['Comma', ','],
+  ['Period', '.'],
+  ['Slash', '/'],
+  ['Backslash', '\\'],
+  ['Semicolon', ';'],
+  ['Quote', "'"],
+  ['BracketLeft', '['],
+  ['BracketRight', ']'],
+  ['Minus', '-'],
+  ['Equal', '='],
+  ['Backquote', '`'],
+  ['Home', 'Home'],
+  ['End', 'End'],
+])
+
 const capOf = (code: string, char: string | undefined): string => {
   if (char !== undefined) return char
   if (/^Key[A-Z]$/u.test(code)) return code.slice(3)
   if (/^Digit\d$/u.test(code)) return code.slice(5)
-  const caps: Readonly<Record<string, string>> = {
-    Enter: '↵',
-    Escape: 'Esc',
-    Space: 'Space',
-    Tab: 'Tab',
-    Backspace: '⌫',
-    Delete: 'Del',
-    ArrowUp: '↑',
-    ArrowDown: '↓',
-    ArrowLeft: '←',
-    ArrowRight: '→',
-    Comma: ',',
-    Period: '.',
-    Slash: '/',
-    Backslash: '\\',
-    Semicolon: ';',
-    Quote: "'",
-    BracketLeft: '[',
-    BracketRight: ']',
-    Minus: '-',
-    Equal: '=',
-    Backquote: '`',
-    Home: 'Home',
-    End: 'End',
-  }
-  return caps[code] ?? code
+  return CAPS.get(code) ?? code
 }
 
 /** Keycaps of one spec, one array per step: `Mod+Shift+K` → `[['⌘', '⇧', 'K']]`, `G I` → `[['G'], ['I']]`. */
@@ -198,7 +202,7 @@ const isMacPlatform = (platform: string | undefined): boolean =>
   (platform === 'MacIntel' || platform === 'macOS' || platform === 'macos' || platform.startsWith('Mac') || /iPhone|iPad|iPod/u.test(platform))
 
 /** The current browser runs on macOS or iOS, where the primary modifier is ⌘. */
-const currentIsMac = (): boolean => typeof navigator !== 'undefined' && isMacPlatform(navigator.platform)
+const currentIsMac = (): boolean => 'navigator' in globalThis && isMacPlatform(navigator.platform)
 
 export class CommandKeys {
   static readonly parse = parse

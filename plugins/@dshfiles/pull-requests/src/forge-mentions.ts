@@ -14,10 +14,10 @@ export interface ForgeSearchResult {
 }
 
 /** The command a recovery row copies. */
-const RECOVERY_COMMAND: Record<ForgeSearchUnavailable['reason'], string> = {
+const RECOVERY_COMMAND = {
   'gh-missing': 'https://cli.github.com',
   'signed-out': 'gh auth login',
-}
+} as const satisfies Record<ForgeSearchUnavailable['reason'], string>
 const RECOVERY_VALUE = 'recovery:'
 
 /** One row instead of an empty list: what to do so `#` can list issues and pull requests. */

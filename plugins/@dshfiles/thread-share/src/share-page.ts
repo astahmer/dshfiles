@@ -1,4 +1,4 @@
-import { standaloneColours, type StandaloneColours } from '@dshfiles/plugin-ui/theme/palette'
+import { PaletteMath, type StandaloneColours } from '@dshfiles/plugin-ui/theme/palette'
 
 /**
  * The share page and the static export: one self-contained HTML document with inline CSS, no script, no external
@@ -42,8 +42,8 @@ const renderMessage = (text: string): string => {
 }
 
 /** The exported page cannot read the Host variables: it carries the generated default palette (DESIGN.md › Colors). */
-const LIGHT = standaloneColours('light')
-const DARK = standaloneColours('dark')
+const LIGHT = PaletteMath.standaloneColours('light')
+const DARK = PaletteMath.standaloneColours('dark')
 const pageVariables = (colours: StandaloneColours): string =>
   `--bg:${colours.panel};--fg:${colours.text};--muted:${colours.muted};--card:${colours.bg};--border:${colours.line};--user:${colours.accentBg};--code:${colours.raised};--danger:${colours.danger}`
 

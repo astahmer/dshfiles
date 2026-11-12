@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RestartBridge, type RestartRequest } from './restart-bridge.js'
 import type { AutoRestartStatusWire } from './restart-api.js'
 
-const autoStatus: { current: AutoRestartStatusWire | undefined } = { current: undefined }
+/** The status the mocked Host read answers; each test sets it. */
+interface AutoStatusHolder {
+  current: AutoRestartStatusWire | undefined
+}
+
+const autoStatus: AutoStatusHolder = { current: undefined }
 
 vi.mock('@dshfiles/dshx/client', async importOriginal => ({
   ...(await importOriginal<typeof import('@dshfiles/dshx/client')>()),

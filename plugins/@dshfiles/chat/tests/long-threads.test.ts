@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { findInLoadedRows, findTextRanges } from '../src/native/chat/find-reveal.ts'
 import { SinceYouLeftRecapModel } from '../src/native/chat/since-you-left.ts'
 import { ThreadFindModel, type FindHit } from '../src/native/chat/thread-find-model.ts'
@@ -221,11 +221,13 @@ describe('since you left: recap math', () => {
 
 describe('thread tools handoff', () => {
   it('delivers a find or Turns request once, to the addressed thread, until it expires', () => {
-    const heard = vi.fn()
-    const stop = ThreadToolsModel.listen('session-a', heard)
+    let heard = 0
+    const stop = ThreadToolsModel.listen('session-a', () => {
+      heard += 1
+    })
     ThreadToolsModel.request({ sessionId: 'session-a', tool: 'turns', now: 1_000 })
     ThreadToolsModel.request({ sessionId: 'session-b', tool: 'find', now: 1_000 })
-    expect(heard).toHaveBeenCalledTimes(1)
+    expect(heard).toBe(1)
     expect(ThreadToolsModel.take('session-a', 1_001)).toBe('turns')
     expect(ThreadToolsModel.take('session-a', 1_002)).toBeNull()
     expect(ThreadToolsModel.take('session-b', 999_999)).toBeNull()

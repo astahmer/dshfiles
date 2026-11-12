@@ -10,14 +10,14 @@ const en = {
   fanOutNeedsTwo: 'Choose at least two models.',
 }
 
-const zh: Record<keyof typeof en, string> = {
+const zh = {
   selectSeveral: '多选',
   selectSeveralHint: '选择 2 到 6 个模型，然后分发。按住 Shift 点击或长按模型效果相同。',
   selected: '已选 {count} 个',
   clear: '清除',
   fanOut: '分发…',
   fanOutNeedsTwo: '至少选择两个模型。',
-}
+} satisfies Record<keyof typeof en, string>
 
 export type ModelPickerKey = keyof typeof en
 export type ModelPickerTranslate = (key: ModelPickerKey, params?: Readonly<Record<string, string | number>>) => string

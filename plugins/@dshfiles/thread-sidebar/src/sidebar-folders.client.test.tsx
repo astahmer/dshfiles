@@ -6,7 +6,7 @@ import { DestinationSelection, DestinationShell, NEW_FOLDER_EVENT, type Destinat
 import { Destinations } from './destinations.js'
 import type { FolderActions, SidebarFolderUi } from './sidebar-folders.js'
 import { EMPTY_SIDEBAR_TREE, SidebarTreeModel, SidebarTrees, type SidebarTree } from './sidebar-tree.js'
-import { workbenchLayoutReset } from '@dshfiles/workbench/shell-merge'
+import { WorkbenchPorts } from '@dshfiles/workbench/shell-merge'
 
 const panels = [
   { id: 'dshfiles-thread-board', label: 'Thread Sidebar: Board', order: 2 },
@@ -189,7 +189,7 @@ describe('Sidebar folders on the rail (b:952m)', () => {
     renderShell({ folderUi: folderUi(reviewTree()) })
     fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
     expect(screen.getByRole('tab', { name: 'Observe' }).getAttribute('aria-selected')).toBe('true')
-    act(() => workbenchLayoutReset().notify())
+    act(() => WorkbenchPorts.layoutReset().notify())
     expect(screen.getByRole('tab', { name: 'Threads' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByText('Thread list')).toBeTruthy()
   })

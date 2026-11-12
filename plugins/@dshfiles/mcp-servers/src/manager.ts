@@ -26,10 +26,10 @@ import { PendingAuthorizations } from './pending-authorizations.js'
 import { makeClientReconciler, type ClientTarget } from './reconcile.js'
 import { RegistrySearch } from './registry-search.js'
 import { McpServerStateModel } from './server-state.js'
-import { standaloneColours } from '@dshfiles/plugin-ui/theme/palette'
+import { PaletteMath } from '@dshfiles/plugin-ui/theme/palette'
 
 /** The OAuth callback tab cannot read the Host theme; it uses the generated dark palette. */
-const SIGN_IN_PAGE = standaloneColours('dark')
+const SIGN_IN_PAGE = PaletteMath.standaloneColours('dark')
 
 export const OAUTH_CALLBACK_PATH = '/api/dshfiles-mcp-servers/oauth/callback'
 const CREDENTIAL_SCOPE = 'mcp-servers'

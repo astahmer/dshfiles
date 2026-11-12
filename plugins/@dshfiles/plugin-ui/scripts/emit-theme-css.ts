@@ -8,10 +8,10 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { themeCss } from '../src/theme/theme-css.ts'
+import { ThemeCss } from '../src/theme/theme-css.ts'
 
 const target = fileURLToPath(new URL('../../ui-styles/src/theme.generated.css', import.meta.url))
-const css = themeCss()
+const css = ThemeCss.themeCss()
 
 if (process.argv.includes('--check')) {
   const current = readFileSync(target, 'utf8')

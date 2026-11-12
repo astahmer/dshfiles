@@ -23,14 +23,34 @@ export type LastReplyState =
   | { readonly status: 'ready'; readonly text: string }
   | { readonly status: 'failed'; readonly message: string }
 
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === 'object' && value !== null
+/** The fields a peek reads from an `assistant/message` event, each still unchecked. */
+interface AssistantData {
+  readonly message?: unknown
+}
+interface AssistantMessage {
+  readonly content?: unknown
+}
+interface ContentPart {
+  readonly type?: unknown
+  readonly text?: unknown
+}
 
-const messageText = (message: unknown): string | undefined => {
-  if (!isRecord(message) || !Array.isArray(message.content)) return undefined
-  const text = message.content
-    .flatMap(part => (isRecord(part) && part.type === 'text' && typeof part.text === 'string' ? [part.text] : []))
-    .join('\n')
-    .trim()
+/** Any non-null object reads as one of the field interfaces above: every field is optional and still unchecked. */
+const isFields = (value: unknown): value is object => typeof value === 'object' && value !== null
+
+const readPartText = (part: unknown): readonly string[] => {
+  if (!isFields(part)) return []
+  const { type, text }: ContentPart = part
+  return type === 'text' && typeof text === 'string' ? [text] : []
+}
+
+const readMessageText = (data: unknown): string | undefined => {
+  if (!isFields(data)) return undefined
+  const { message }: AssistantData = data
+  if (!isFields(message)) return undefined
+  const { content }: AssistantMessage = message
+  if (!Array.isArray(content)) return undefined
+  const text = content.flatMap(readPartText).join('\n').trim()
   return text === '' ? undefined : text
 }
 
@@ -38,8 +58,8 @@ const messageText = (message: unknown): string | undefined => {
 const lastAssistantText = (entries: readonly PeekEventEntry[]): string | undefined => {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index]
-    if (entry?.event.type !== 'assistant/message' || !isRecord(entry.event.data)) continue
-    const text = messageText(entry.event.data.message)
+    if (entry?.event.type !== 'assistant/message') continue
+    const text = readMessageText(entry.event.data)
     if (text !== undefined) return text
   }
   return undefined

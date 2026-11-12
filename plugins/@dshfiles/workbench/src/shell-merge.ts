@@ -63,7 +63,7 @@ declare global {
   var dshfilesWorkbenchShellMergeV1: ShellMergePort | undefined
 }
 
-export const workbenchShellMerge = (): ShellMergePort => (globalThis.dshfilesWorkbenchShellMergeV1 ??= createShellMergePort())
+const workbenchShellMerge = (): ShellMergePort => (globalThis.dshfilesWorkbenchShellMergeV1 ??= createShellMergePort())
 
 export interface ShellMergePlan {
   /** The named layouts to write, or undefined when they stay as they are. */
@@ -136,7 +136,7 @@ declare global {
   var dshfilesWorkbenchLeftKeepV1: LeftKeepPort | undefined
 }
 
-export const workbenchLeftKeep = (): LeftKeepPort => (globalThis.dshfilesWorkbenchLeftKeepV1 ??= createLeftKeepPort())
+const workbenchLeftKeep = (): LeftKeepPort => (globalThis.dshfilesWorkbenchLeftKeepV1 ??= createLeftKeepPort())
 
 /** One sidebar folder a pane can be added to (b:952m). */
 export interface SidebarFolderTarget {
@@ -207,4 +207,11 @@ const createLayoutResetPort = (): LayoutResetPort => {
   }
 }
 
-export const workbenchLayoutReset = (): LayoutResetPort => (globalThis.dshfilesWorkbenchLayoutResetV1 ??= createLayoutResetPort())
+const workbenchLayoutReset = (): LayoutResetPort => (globalThis.dshfilesWorkbenchLayoutResetV1 ??= createLayoutResetPort())
+
+/** The process-wide ports the workbench and the sidebar share across bundle copies. */
+export class WorkbenchPorts {
+  static readonly shellMerge = workbenchShellMerge
+  static readonly leftKeep = workbenchLeftKeep
+  static readonly layoutReset = workbenchLayoutReset
+}

@@ -99,7 +99,7 @@ import { SidebarCatalog } from './sidebar-catalog.js'
 import { useSidebarFolders } from './sidebar-folders.js'
 import { threadSidebarTreeApi } from './sidebar-tree-api.js'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
-import { workbenchShellMerge } from '@dshfiles/workbench/shell-merge'
+import { WorkbenchPorts } from '@dshfiles/workbench/shell-merge'
 import { createPortal } from 'react-dom'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
@@ -296,7 +296,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     if (decision === null) return
     mergeFiled.current = true
     if (decision.hostPatch !== null) updatePreferences(decision.hostPatch)
-    workbenchShellMerge().request(decision.request)
+    WorkbenchPorts.shellMerge().request(decision.request)
   }, [settingsSettled, hostBacked, layoutMergeOnHost, preferences, updatePreferences])
   const contributedSections = useRegistry(DestinationSections)
   const destinations = useMemo(() => Destinations.resolve(panels, contributedSections), [panels, contributedSections])

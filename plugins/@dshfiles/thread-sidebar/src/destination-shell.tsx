@@ -1,4 +1,4 @@
-import { workbenchLayoutReset } from '@dshfiles/workbench/shell-merge'
+import { WorkbenchPorts } from '@dshfiles/workbench/shell-merge'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -81,7 +81,7 @@ const focusLanding = (destination: DestinationId): void => {
 }
 
 /** `G` then this key opens the destination (plan Q2 keymap); the rail tooltips show it. */
-export const DESTINATION_GO_KEYS: Readonly<Record<DestinationId, string>> = {
+export const DESTINATION_GO_KEYS = {
   threads: 'G T',
   inbox: 'G I',
   land: 'G L',
@@ -90,7 +90,7 @@ export const DESTINATION_GO_KEYS: Readonly<Record<DestinationId, string>> = {
   observe: 'G O',
   knowledge: 'G K',
   settings: 'G S',
-}
+} as const satisfies Readonly<Record<DestinationId, string>>
 
 const memoryValues = new Map<string, string>()
 const memoryStorage = {
@@ -653,7 +653,7 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
     return () => window.removeEventListener(SHOW_DESTINATION_EVENT, onShow)
   }, [collapsed, toggleSidebar, setDestination, railFolders])
   // Reset layout (Workbench) brings the default Sidebar pane back: show its thread list, the list a Reset recovers.
-  useEffect(() => workbenchLayoutReset().subscribe(() => setDestination(HOME_DESTINATION)), [setDestination])
+  useEffect(() => WorkbenchPorts.layoutReset().subscribe(() => setDestination(HOME_DESTINATION)), [setDestination])
   useEffect(() => {
     const onNewFolder = (): void => {
       if (collapsed) toggleSidebar()
@@ -876,6 +876,9 @@ const PhoneNavigation = (
   }
   /** Push the stage over the list (a thread or page was picked): close the list once. */
   const pushStage = (): void => moveStack('push', false)
+  // The selection effect below pushes with the latest stack mover without re-running on its identity.
+  const pushStageLatest = useRef(pushStage)
+  pushStageLatest.current = pushStage
   useLayoutEffect(() => {
     const root = document.documentElement
     root.setAttribute('data-shell-phone-nav', '')
@@ -920,7 +923,7 @@ const PhoneNavigation = (
     shown.current = { thread: props.selectedThreadId, panel: props.activePanelId, stage: props.stageThreadId ?? null, session: props.stageSessionId ?? null }
     if (changed && listOpen) {
       setMoreOpen(false)
-      pushStage()
+      pushStageLatest.current()
     }
   }, [props.selectedThreadId, props.activePanelId, props.stageThreadId, props.stageSessionId, listOpen, toggleSidebar, props.destinations])
   const open = (next: DestinationId): void => {

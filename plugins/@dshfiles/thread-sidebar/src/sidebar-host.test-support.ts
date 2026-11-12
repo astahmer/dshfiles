@@ -45,6 +45,8 @@ export const fakeSidebarHost = (fake: FakeHost, options: { readonly exitHook?: b
       threadDirectories: Effect.succeed(new Map()),
       archivedSessionIds: Effect.succeed([]),
       pinnedSessionIds: Effect.succeed([]),
+      sessionHeader: () => Effect.succeedNone,
+      sessionTitles: Effect.succeed(new Map()),
       flushPersistence: Effect.flatMap(Ref.get(fake.persistenceFails), fails =>
         fails ? Effect.fail(new HostCallFailed({ operation: 'flush session persistence' })) : Effect.void,
       ),

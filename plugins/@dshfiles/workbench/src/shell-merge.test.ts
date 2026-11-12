@@ -1,7 +1,7 @@
 import { Orientation, type SerializedDockview } from 'dockview-react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WORKBENCH_COMPONENT } from './layout-store.js'
-import { SHELL_MERGE_BACKUP_NAME, ShellMerge, SIDEBAR_PANE_ID, workbenchLayoutReset, workbenchLeftKeep, workbenchShellMerge } from './shell-merge.js'
+import { WorkbenchPorts, SHELL_MERGE_BACKUP_NAME, ShellMerge, SIDEBAR_PANE_ID } from './shell-merge.js'
 
 const layout = (ids: readonly string[]): SerializedDockview => ({
   grid: { root: { type: 'branch', data: [] }, width: 280, height: 800, orientation: Orientation.VERTICAL },
@@ -52,13 +52,13 @@ describe('ShellMerge.plan', () => {
 
 describe('workbenchShellMerge', () => {
   it('keeps the latest request until the Workbench takes it, whichever bundle loads first', () => {
-    workbenchShellMerge().request({ former: 'fixed', firstOnHost: false })
+    WorkbenchPorts.shellMerge().request({ former: 'fixed', firstOnHost: false })
     const listener = vi.fn()
-    const unsubscribe = workbenchShellMerge().subscribe(listener)
-    workbenchShellMerge().request({ former: 'docking', firstOnHost: true })
+    const unsubscribe = WorkbenchPorts.shellMerge().subscribe(listener)
+    WorkbenchPorts.shellMerge().request({ former: 'docking', firstOnHost: true })
     expect(listener).toHaveBeenCalledOnce()
-    expect(workbenchShellMerge().take()).toEqual({ former: 'docking', firstOnHost: true })
-    expect(workbenchShellMerge().take()).toBeUndefined()
+    expect(WorkbenchPorts.shellMerge().take()).toEqual({ former: 'docking', firstOnHost: true })
+    expect(WorkbenchPorts.shellMerge().take()).toBeUndefined()
     unsubscribe()
   })
 })
@@ -66,26 +66,26 @@ describe('workbenchShellMerge', () => {
 describe('workbenchLeftKeep', () => {
   it('queues the final keep intent per panel until the left region takes it', () => {
     const listener = vi.fn()
-    workbenchLeftKeep().subscribe(listener)
-    workbenchLeftKeep().request({ viewId: 'traces', keep: true })
-    workbenchLeftKeep().request({ viewId: 'usage', keep: true })
-    workbenchLeftKeep().request({ viewId: 'traces', keep: false })
+    WorkbenchPorts.leftKeep().subscribe(listener)
+    WorkbenchPorts.leftKeep().request({ viewId: 'traces', keep: true })
+    WorkbenchPorts.leftKeep().request({ viewId: 'usage', keep: true })
+    WorkbenchPorts.leftKeep().request({ viewId: 'traces', keep: false })
     expect(listener).toHaveBeenCalledTimes(3)
-    expect(workbenchLeftKeep().take()).toEqual([
+    expect(WorkbenchPorts.leftKeep().take()).toEqual([
       { viewId: 'usage', keep: true },
       { viewId: 'traces', keep: false },
     ])
-    expect(workbenchLeftKeep().take()).toEqual([])
+    expect(WorkbenchPorts.leftKeep().take()).toEqual([])
   })
 })
 
 describe('workbenchLayoutReset', () => {
   it('tells every subscriber once per Reset layout and stops after unsubscribe', () => {
     const listener = vi.fn()
-    const stop = workbenchLayoutReset().subscribe(listener)
-    workbenchLayoutReset().notify()
+    const stop = WorkbenchPorts.layoutReset().subscribe(listener)
+    WorkbenchPorts.layoutReset().notify()
     stop()
-    workbenchLayoutReset().notify()
+    WorkbenchPorts.layoutReset().notify()
     expect(listener).toHaveBeenCalledTimes(1)
   })
 })

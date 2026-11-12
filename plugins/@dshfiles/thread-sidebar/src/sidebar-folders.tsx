@@ -47,7 +47,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
-import { SidebarFolderTargets, workbenchLeftKeep } from '@dshfiles/workbench/shell-merge'
+import { SidebarFolderTargets, WorkbenchPorts } from '@dshfiles/workbench/shell-merge'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { createElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -115,10 +115,10 @@ export interface SidebarFolderUi {
 const decodeTree = Schema.decodeUnknownOption(sidebarTreeSchema)
 
 const KEPT_STORAGE_KEY = 'dshfiles.thread-sidebar.kept-panes.v1'
+const decodeKept = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.String)))
 const readKept = (): readonly string[] => {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(KEPT_STORAGE_KEY) ?? '[]')
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : []
+    return Option.getOrElse(decodeKept(localStorage.getItem(KEPT_STORAGE_KEY) ?? '[]'), () => [])
   } catch {
     return []
   }
@@ -185,12 +185,15 @@ export const useSidebarFolders = (input: {
   const run = useCallback((write: () => Promise<SidebarTreeOutput>, done?: FolderUndo) => {
     // A new change retires the last one's Undo at once: an Undo still on screen must never undo an older change.
     setNotice(null)
-    void write().then(
-      () => {
+    const settle = async (): Promise<void> => {
+      try {
+        await write()
         if (done !== undefined) setNotice(done)
-      },
-      (error: unknown) => setNotice({ tone: 'danger', message: messageOf(error) }),
-    )
+      } catch (error) {
+        setNotice({ tone: 'danger', message: messageOf(error) })
+      }
+    }
+    void settle()
   }, [])
 
   const folderTitle = (id: string): string => latest.current.find(folder => folder.id === id)?.title ?? id
@@ -199,10 +202,15 @@ export const useSidebarFolders = (input: {
     () => ({
       createFolder: (title, icon) => {
         setNotice(null)
-        void api.folderCreate({ title, icon }).then(
-          result => setNotice(undoable(`Folder “${title}” created.`, () => run(() => api.folderDelete({ id: result.folderId, confirm: true })))),
-          (error: unknown) => setNotice({ tone: 'danger', message: messageOf(error) }),
-        )
+        const create = async (): Promise<void> => {
+          try {
+            const result = await api.folderCreate({ title, icon })
+            setNotice(undoable(`Folder “${title}” created.`, () => run(() => api.folderDelete({ id: result.folderId, confirm: true }))))
+          } catch (error) {
+            setNotice({ tone: 'danger', message: messageOf(error) })
+          }
+        }
+        void create()
       },
       updateFolder: (id, change) => {
         const before = latest.current.find(folder => folder.id === id)
@@ -256,8 +264,8 @@ export const useSidebarFolders = (input: {
   useEffect(() => {
     const kept = new Set(folders.flatMap(folder => folder.entries.filter(entry => entry.keep).map(entry => entry.viewId)))
     const applied = new Set(readKept())
-    for (const viewId of kept) if (!applied.has(viewId)) workbenchLeftKeep().request({ viewId, keep: true })
-    for (const viewId of applied) if (!kept.has(viewId)) workbenchLeftKeep().request({ viewId, keep: false })
+    for (const viewId of kept) if (!applied.has(viewId)) WorkbenchPorts.leftKeep().request({ viewId, keep: true })
+    for (const viewId of applied) if (!kept.has(viewId)) WorkbenchPorts.leftKeep().request({ viewId, keep: false })
     if (kept.size !== applied.size || [...kept].some(viewId => !applied.has(viewId))) writeKept([...kept])
   }, [folders])
 

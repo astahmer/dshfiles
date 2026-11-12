@@ -1,8 +1,9 @@
 /**
- * One push delivery and the choice of what to push (productivity pass T6.5). Pure apart from the one `fetch` per
- * device, which runs in a `web-push send` span (push service host and status only, never the endpoint or payload).
+ * One push delivery and the choice of what to push (productivity pass T6.5). Pure apart from the one push request
+ * per device, which runs in a `web-push send` span (push service host and status only, never the endpoint or payload).
  */
-import { withSpan } from '@dshfiles/dshx/tracing'
+import { Effect } from 'effect'
+import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 import type { AttentionItem } from './attention-api.js'
 import { WebPushCrypto, type PushSubscriptionKeys, type VapidKeys } from './web-push-crypto.js'
 
@@ -55,45 +56,58 @@ const failureMessage = (status: number): string => {
   return `The push service answered ${String(status)}; later items will try again. If it persists, turn push off and on again on that device.`
 }
 
+/** The push service's answer as an outcome: accepted, forgotten (drop the device), or refused with what to do. */
+const outcomeOf = (status: number): PushOutcome => {
+  if (status >= 200 && status < 300) return { kind: 'sent' }
+  if (status === 404 || status === 410) return { kind: 'gone' }
+  return { kind: 'failed', message: failureMessage(status) }
+}
+
+/**
+ * Push one payload to one subscription. Never fails: an unreachable service is a `failed` outcome. The HTTP client's
+ * own span is off, so neither the endpoint (it holds the subscription's secret) nor the payload reaches a trace.
+ */
 const send = (input: {
   readonly subscription: PushSubscriptionKeys
   readonly keys: VapidKeys
   readonly payload: PushPayload
   readonly subject: string
   readonly nowSeconds: number
-  readonly fetch?: typeof fetch
-}): Promise<PushOutcome> => {
+}): Effect.Effect<PushOutcome, never, HttpClient.HttpClient> => {
   const service = new URL(input.subscription.endpoint).host
-  return withSpan('web-push send', { attributes: { 'server.address': service } }, async span => {
+  return Effect.gen(function* () {
+    const client = yield* HttpClient.HttpClient
     const body = WebPushCrypto.encrypt(input.subscription, Buffer.from(JSON.stringify(input.payload)))
-    try {
-      const response = await (input.fetch ?? fetch)(input.subscription.endpoint, {
-        method: 'POST',
-        redirect: 'error',
-        headers: {
-          TTL: '86400',
-          Urgency: 'high',
-          'Content-Encoding': 'aes128gcm',
-          'Content-Type': 'application/octet-stream',
-          Authorization: WebPushCrypto.vapidAuthorization({
-            endpoint: input.subscription.endpoint,
-            keys: input.keys,
-            subject: input.subject,
-            nowSeconds: input.nowSeconds,
-          }),
-        },
-        body: new Uint8Array(body),
-        signal: AbortSignal.timeout(15_000),
-      })
-      span.setAttribute('http.response.status_code', response.status)
-      if (response.ok) return { kind: 'sent' }
-      if (response.status === 404 || response.status === 410) return { kind: 'gone' }
-      return { kind: 'failed', message: failureMessage(response.status) }
-    } catch (error) {
-      span.setAttribute('error.type', error instanceof Error ? error.name : 'unknown')
-      return { kind: 'failed', message: `The push service at ${service} could not be reached from the Host; later items will try again.` }
-    }
-  })
+    const request = HttpClientRequest.post(input.subscription.endpoint).pipe(
+      HttpClientRequest.setHeaders({
+        TTL: '86400',
+        Urgency: 'high',
+        'Content-Encoding': 'aes128gcm',
+        Authorization: WebPushCrypto.vapidAuthorization({
+          endpoint: input.subscription.endpoint,
+          keys: input.keys,
+          subject: input.subject,
+          nowSeconds: input.nowSeconds,
+        }),
+      }),
+      HttpClientRequest.bodyUint8Array(new Uint8Array(body), 'application/octet-stream'),
+    )
+    return yield* client.execute(request).pipe(
+      Effect.timeout('15 seconds'),
+      Effect.provideService(FetchHttpClient.RequestInit, { redirect: 'error' }),
+      Effect.provideService(HttpClient.TracerDisabledWhen, () => true),
+      Effect.matchEffect({
+        onFailure: error =>
+          Effect.annotateCurrentSpan('error.type', error._tag).pipe(
+            Effect.as<PushOutcome>({
+              kind: 'failed',
+              message: `The push service at ${service} could not be reached from the Host; later items will try again.`,
+            }),
+          ),
+        onSuccess: response => Effect.annotateCurrentSpan('http.response.status_code', response.status).pipe(Effect.as(outcomeOf(response.status))),
+      }),
+    )
+  }).pipe(Effect.withSpan('web-push send', { attributes: { 'server.address': service } }))
 }
 
 export class WebPushSend {

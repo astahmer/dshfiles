@@ -15,8 +15,15 @@ const markers = Layer.succeed(
   }),
 )
 
-const event = (sessionId: string, type: string, time: number, data?: unknown): SessionEvent =>
-  ({ sessionId, event: { type, seq: time, time, ...(data === undefined ? {} : { data }) } }) as SessionEvent
+interface CallData {
+  readonly name?: string
+  readonly arguments?: string
+}
+
+const event = (sessionId: string, type: string, time: number, data?: CallData): SessionEvent => {
+  const base = { type, seq: time, time }
+  return { sessionId, origin: undefined, parentSessionId: undefined, event: data === undefined ? base : Object.assign(base, { data }) }
+}
 
 const fold = (events: readonly SessionEvent[]): LiveTurnsState => events.reduce(LiveTurnsModel.apply, new Map())
 
@@ -48,10 +55,10 @@ describe('live turns', () => {
 
   it('names other tools without leaking long arguments', () => {
     const base = { startedAt: 0, step: null, edited: [] }
-    expect(LiveTurnsModel.describeCall(base, 'web_search', '{}').step).toBe('Searching the web')
-    expect(LiveTurnsModel.describeCall(base, 'subagent', '{}').step).toBe('Delegating to a subagent')
-    expect(LiveTurnsModel.describeCall(base, 'backlog_update', 'not json').step).toBe('Using backlog update')
-    const long = LiveTurnsModel.describeCall(base, 'bash', JSON.stringify({ command: 'x'.repeat(200) })).step
+    expect(LiveTurnsModel.describeCall(base, 'web_search', LiveTurnsModel.readArguments('{}')).step).toBe('Searching the web')
+    expect(LiveTurnsModel.describeCall(base, 'subagent', LiveTurnsModel.readArguments('{}')).step).toBe('Delegating to a subagent')
+    expect(LiveTurnsModel.describeCall(base, 'backlog_update', LiveTurnsModel.readArguments('not json')).step).toBe('Using backlog update')
+    const long = LiveTurnsModel.describeCall(base, 'bash', LiveTurnsModel.readArguments(JSON.stringify({ command: 'x'.repeat(200) }))).step
     expect(long.length).toBeLessThanOrEqual(70)
     expect(long.endsWith('…')).toBe(true)
   })

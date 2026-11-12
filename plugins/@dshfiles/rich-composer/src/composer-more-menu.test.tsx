@@ -5,7 +5,10 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComposerBarPlacement, ComposerMoreItem } from './composer-more.ts'
 
-const registry = vi.hoisted(() => ({ items: [] as ComposerMoreItem[] }))
+const registry = vi.hoisted(() => {
+  const items: ComposerMoreItem[] = []
+  return { items }
+})
 vi.mock('@dshfiles/dshx/client', async importOriginal => ({
   ...(await importOriginal<typeof import('@dshfiles/dshx/client')>()),
   useRegistry: () => registry.items,
@@ -113,10 +116,8 @@ describe('composer More menu', () => {
     vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
       const style = realStyle(element, pseudo)
       if (!(element instanceof HTMLElement) || element.getAttribute('data-slot') !== 'dropdown-menu-content') return style
-      return new Proxy(style, {
-        get: (target, key) =>
-          key === 'animationName' ? (element.getAttribute('data-state') === 'closed' ? 'exit' : 'enter') : Reflect.get(target, key, target),
-      })
+      Object.defineProperty(style, 'animationName', { configurable: true, get: () => (element.getAttribute('data-state') === 'closed' ? 'exit' : 'enter') })
+      return style
     })
     if (typeof globalThis.CSS?.escape !== 'function') vi.stubGlobal('CSS', { escape: (value: string) => value })
     const opened = { open: (): void => undefined }

@@ -24,8 +24,24 @@ const safeStorage = (): StorageLike | undefined => {
   }
 }
 
+/** The part of an element the runtime style element uses. */
+export interface ThemeStyleElement {
+  id: string
+  textContent: string | null
+  readonly tagName: string
+  readonly parentNode: object | null
+  remove(): void
+}
+
+/** The part of a document the runtime style element needs; a real `document` is one. */
+export interface ThemeDocument<Element extends ThemeStyleElement> {
+  getElementById(id: string): Element | null
+  createElement(tag: 'style'): Element
+  readonly head: { append(element: Element): void }
+}
+
 /** Put `css` into the runtime style element, or remove the element when `css` is empty. */
-export function applyThemeCss(doc: Pick<Document, 'getElementById' | 'createElement' | 'head'>, css: string): void {
+function applyThemeCss<Element extends ThemeStyleElement>(doc: ThemeDocument<Element>, css: string): void {
   const existing = doc.getElementById(RUNTIME_STYLE_ID)
   if (css === '') {
     existing?.remove()
@@ -37,7 +53,7 @@ export function applyThemeCss(doc: Pick<Document, 'getElementById' | 'createElem
   if (style.parentNode === null) doc.head.append(style)
 }
 
-export function readCachedThemeCss(storage: StorageLike | undefined = safeStorage()): string {
+function readCachedThemeCss(storage: StorageLike | undefined = safeStorage()): string {
   try {
     return storage?.getItem(RUNTIME_CACHE_KEY) ?? ''
   } catch {
@@ -45,11 +61,18 @@ export function readCachedThemeCss(storage: StorageLike | undefined = safeStorag
   }
 }
 
-export function writeCachedThemeCss(css: string, storage: StorageLike | undefined = safeStorage()): void {
+function writeCachedThemeCss(css: string, storage: StorageLike | undefined = safeStorage()): void {
   try {
     if (css === '') storage?.removeItem(RUNTIME_CACHE_KEY)
     else storage?.setItem(RUNTIME_CACHE_KEY, css)
   } catch {
     // Private mode or a full quota: the theme still applies, only the reload cache is lost.
   }
+}
+
+/** The runtime theme style element and its first-paint cache. */
+export class RuntimeTheme {
+  static readonly applyThemeCss = applyThemeCss
+  static readonly readCachedThemeCss = readCachedThemeCss
+  static readonly writeCachedThemeCss = writeCachedThemeCss
 }

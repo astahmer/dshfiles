@@ -13,6 +13,12 @@ import { DEFAULT_THREAD_VIEW_SETTINGS, ThreadViewPreferencesModel, threadViewSet
 const MAX_ISSUE = 500
 
 /** No saved view has this id. */
+
+/** What a delete removed, filled in by the write step once the view is found. */
+interface DeleteOutcome {
+  deleted?: { readonly view: ThreadView; readonly position: number }
+}
+
 export class ThreadViewNotFound extends Schema.TaggedError<ThreadViewNotFound>()(
   'ThreadViewNotFound',
   { id: Schema.String.check(Schema.isMaxLength(64)), cause: Schema.optional(Schema.Defect()) },
@@ -166,15 +172,15 @@ export class ThreadViews extends Context.Service<
           return yield* change(({ settings: current }) => {
             if (current.views.some(candidate => candidate.id === input.id)) return Effect.fail(new ThreadViewExists({ id: input.id }))
             const filters = ThreadViewPreferencesModel.currentThreadViewFilters(current)
-            const view: ThreadView = {
+            const base: ThreadView = {
               id: input.id,
               name: input.name,
               enabled: input.enabled ?? true,
               groupBy: input.groupBy ?? filters.groupBy,
               statusFilters: input.statusFilters ?? filters.statusFilters,
               sourceFilter: input.sourceFilter ?? filters.sourceFilter,
-              ...(input.projectFilter === undefined ? {} : { projectFilter: input.projectFilter }),
             }
+            const view = input.projectFilter === undefined ? base : { ...base, projectFilter: input.projectFilter }
             const inserted = ThreadViewPreferencesModel.insertThreadView(current, view, input.position)
             return Effect.succeed(input.select === true && view.enabled ? ThreadViewPreferencesModel.applyThreadViewPreset(inserted, view.id) : inserted)
           })
@@ -190,19 +196,19 @@ export class ThreadViews extends Context.Service<
               const currentView = yield* viewOf(enabled, view.id)
               const projectFilter = patch.projectFilter === undefined ? currentView.projectFilter : patch.projectFilter
               const { projectFilter: _previous, ...rest } = currentView
-              return ThreadViewPreferencesModel.saveThreadView(enabled, {
+              const saved: ThreadView = {
                 ...rest,
                 name: patch.name === undefined ? currentView.name : patch.name,
                 groupBy: patch.groupBy ?? currentView.groupBy,
                 statusFilters: patch.statusFilters ?? currentView.statusFilters,
                 sourceFilter: patch.sourceFilter ?? currentView.sourceFilter,
-                ...(projectFilter === undefined ? {} : { projectFilter }),
-              })
+              }
+              return ThreadViewPreferencesModel.saveThreadView(enabled, projectFilter === undefined ? saved : { ...saved, projectFilter })
             }),
           )
         }),
         delete: Effect.fn('thread views delete')(function* (input) {
-          const removed: { deleted?: { readonly view: ThreadView; readonly position: number } } = {}
+          const removed: DeleteOutcome = {}
           const written = yield* change(({ settings: current }) =>
             Effect.gen(function* () {
               const view = yield* viewOf(current, input.id)

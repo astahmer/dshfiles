@@ -84,6 +84,22 @@ const Impact = (props: { readonly check: UpdateCheck }): JSX.Element | null => {
   )
 }
 
+type UpdateJob = NonNullable<UpdateCheck['job']>
+
+const jobHeadline = (job: UpdateJob): string => {
+  if (job.state === 'running') return job.phase === 'fetching' ? 'Fetching…' : 'Syncing the checkout and rebuilding…'
+  if (job.state === 'done') return 'Updated'
+  if (job.state === 'refused') return 'Stopped before changing anything'
+  return 'Update failed'
+}
+
+/** The status-strip word for the update: running, stopped, how many commits wait, or nothing to say. */
+const statusLabel = (job: UpdateCheck['job'], failed: boolean, incomingCount: number): string | undefined => {
+  if (job?.state === 'running') return 'Updating DSH…'
+  if (failed) return 'Update stopped'
+  return incomingCount > 0 ? `Update · ${String(incomingCount)}` : undefined
+}
+
 const JobState = (props: { readonly check: UpdateCheck; readonly restartAvailable: boolean; readonly waitingLabel: string | null }): JSX.Element | null => {
   const job = props.check.job
   if (job === null) return null
@@ -96,15 +112,7 @@ const JobState = (props: { readonly check: UpdateCheck; readonly restartAvailabl
     >
       <p className={cn('dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm', failed && 'dshx:text-destructive')} role={failed ? 'alert' : 'status'}>
         {job.state === 'running' ? <Spinner /> : null}
-        {job.state === 'running'
-          ? job.phase === 'fetching'
-            ? 'Fetching…'
-            : 'Syncing the checkout and rebuilding…'
-          : job.state === 'done'
-            ? 'Updated'
-            : job.state === 'refused'
-              ? 'Stopped before changing anything'
-              : 'Update failed'}
+        {jobHeadline(job)}
       </p>
       {job.message === null ? null : (
         <p className={cn('dshx:text-xs dshx:break-words', failed ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}>{job.message}</p>
@@ -289,8 +297,7 @@ const UpdateStatusView = (props: StatusItemProps): JSX.Element | null => {
   if (data === undefined || data.checkout === null) return null
   const job = data.job
   const failed = job !== null && (job.state === 'failed' || job.state === 'refused') && data.incomingCount > 0
-  const label =
-    job?.state === 'running' ? 'Updating DSH…' : failed ? 'Update stopped' : data.incomingCount > 0 ? `Update · ${String(data.incomingCount)}` : undefined
+  const label = statusLabel(job, failed, data.incomingCount)
   if (label === undefined) return null
   return (
     <span

@@ -5,9 +5,9 @@ import { Settings } from '@dshfiles/dshx/effect/settings'
 import { Effect, Layer } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { themeApi } from '../src/api.ts'
-import { applyThemeCss, readCachedThemeCss, RUNTIME_CACHE_KEY, RUNTIME_STYLE_ID, writeCachedThemeCss } from '../src/runtime-theme.ts'
+import { RuntimeTheme, RUNTIME_CACHE_KEY, RUNTIME_STYLE_ID } from '../src/runtime-theme.ts'
 import { appearanceSettings, UI_STYLES_SETTINGS_NAMESPACE } from '../src/settings.ts'
-import { nextAppearance, normaliseAppearance, themeState } from '../src/theme-state.ts'
+import { ThemeStateModel } from '../src/theme-state.ts'
 
 const patch = readFileSync(join(process.cwd(), 'cordis.patch.yml'), 'utf8')
 const fonts = readFileSync(join(process.cwd(), 'src/fonts.css'), 'utf8')
@@ -20,8 +20,8 @@ describe('Appearance settings', () => {
 
   it('defaults to the static first-paint theme (warm stone, Geist, Geist Mono)', () => {
     const value = appearanceSettings.schema({})
-    expect(normaliseAppearance(value)).toEqual(DEFAULT_APPEARANCE)
-    expect(themeState(normaliseAppearance(value), 'light').isDefault).toBe(true)
+    expect(ThemeStateModel.normaliseAppearance(value)).toEqual(DEFAULT_APPEARANCE)
+    expect(ThemeStateModel.themeState(ThemeStateModel.normaliseAppearance(value), 'light').isDefault).toBe(true)
   })
 
   it('lists every preset the plugin-ui generator knows', () => {
@@ -43,29 +43,29 @@ describe('Appearance settings', () => {
 })
 
 describe('theme_set transitions', () => {
-  const start = normaliseAppearance({})
+  const start = ThemeStateModel.normaliseAppearance({})
 
   it('applies a preset and clears overrides it was not given', () => {
-    const custom = nextAppearance(start, { accentHue: 20 })
+    const custom = ThemeStateModel.nextAppearance(start, { accentHue: 20 })
     expect(custom).toMatchObject({ preset: 'warm-stone', accentHue: 20 })
-    const moss = nextAppearance(custom, { preset: 'moss' })
+    const moss = ThemeStateModel.nextAppearance(custom, { preset: 'moss' })
     expect(moss).toEqual({ ...DEFAULT_APPEARANCE, preset: 'moss' })
-    expect(nextAppearance(custom, { preset: 'moss', contrast: 1.2 })).toEqual({ ...DEFAULT_APPEARANCE, preset: 'moss', contrast: 1.2 })
+    expect(ThemeStateModel.nextAppearance(custom, { preset: 'moss', contrast: 1.2 })).toEqual({ ...DEFAULT_APPEARANCE, preset: 'moss', contrast: 1.2 })
   })
 
   it('keeps overrides across a font change and clears one with null', () => {
-    const custom = nextAppearance(start, { greyHue: 200, greyTint: 0.01 })
-    const fonts = nextAppearance(custom, { interfaceFont: 'system' })
+    const custom = ThemeStateModel.nextAppearance(start, { greyHue: 200, greyTint: 0.01 })
+    const fonts = ThemeStateModel.nextAppearance(custom, { interfaceFont: 'system' })
     expect(fonts).toMatchObject({ greyHue: 200, greyTint: 0.01, interfaceFont: 'system' })
-    expect(nextAppearance(fonts, { greyHue: null })).not.toHaveProperty('greyHue')
+    expect(ThemeStateModel.nextAppearance(fonts, { greyHue: null })).not.toHaveProperty('greyHue')
   })
 
   it('resets to the defaults', () => {
-    const custom = nextAppearance(start, { preset: 'high-contrast', interfaceFont: 'system', accentHue: 30 })
-    expect(themeState(custom, 'dark').isDefault).toBe(false)
-    const reset = nextAppearance(custom, { reset: true })
+    const custom = ThemeStateModel.nextAppearance(start, { preset: 'high-contrast', interfaceFont: 'system', accentHue: 30 })
+    expect(ThemeStateModel.themeState(custom, 'dark').isDefault).toBe(false)
+    const reset = ThemeStateModel.nextAppearance(custom, { reset: true })
     expect(reset).toEqual(DEFAULT_APPEARANCE)
-    expect(themeState(reset, 'dark')).toMatchObject({ isDefault: true, preset: 'warm-stone', greyHue: 65, accentHue: 270, scheme: 'dark' })
+    expect(ThemeStateModel.themeState(reset, 'dark')).toMatchObject({ isDefault: true, preset: 'warm-stone', greyHue: 65, accentHue: 270, scheme: 'dark' })
   })
 
   it('round-trips get → set → reset through the Host settings service', async () => {
@@ -73,14 +73,14 @@ describe('theme_set transitions', () => {
     const layer = Settings.layerTest(UI_STYLES_SETTINGS_NAMESPACE, appearanceSettings.schema({}))
     const program = Effect.gen(function* () {
       const settings = yield* Tag
-      const set = (input: Parameters<typeof nextAppearance>[1]) =>
+      const set = (input: Parameters<typeof ThemeStateModel.nextAppearance>[1]) =>
         Effect.gen(function* () {
           const snapshot = yield* settings.snapshot
-          const next = nextAppearance(normaliseAppearance(snapshot.value), input)
+          const next = ThemeStateModel.nextAppearance(ThemeStateModel.normaliseAppearance(snapshot.value), input)
           yield* settings.replace(appearanceSettings.schema(next), snapshot.revision)
-          return themeState(normaliseAppearance(yield* settings.get), 'light')
+          return ThemeStateModel.themeState(ThemeStateModel.normaliseAppearance(yield* settings.get), 'light')
         })
-      const before = themeState(normaliseAppearance(yield* settings.get), 'light')
+      const before = ThemeStateModel.themeState(ThemeStateModel.normaliseAppearance(yield* settings.get), 'light')
       const changed = yield* set({ preset: 'slate-blue', codeFont: 'system' })
       const serif = yield* set({ readingFont: 'serif' })
       const reset = yield* set({ reset: true })
@@ -131,15 +131,14 @@ describe('runtime style element', () => {
       },
     },
   }
-  const asDoc = doc as unknown as Parameters<typeof applyThemeCss>[0]
 
   it('adds, updates and removes one style element', () => {
-    applyThemeCss(asDoc, 'a{}')
+    RuntimeTheme.applyThemeCss<FakeElement>(doc, 'a{}')
     expect(doc.getElementById(RUNTIME_STYLE_ID)?.textContent).toBe('a{}')
-    applyThemeCss(asDoc, 'b{}')
+    RuntimeTheme.applyThemeCss<FakeElement>(doc, 'b{}')
     expect(doc.nodes.size).toBe(1)
     expect(doc.getElementById(RUNTIME_STYLE_ID)?.textContent).toBe('b{}')
-    applyThemeCss(asDoc, '')
+    RuntimeTheme.applyThemeCss<FakeElement>(doc, '')
     expect(doc.getElementById(RUNTIME_STYLE_ID)).toBeNull()
   })
 
@@ -150,12 +149,12 @@ describe('runtime style element', () => {
       setItem: (k: string, v: string) => void store.set(k, v),
       removeItem: (k: string) => void store.delete(k),
     }
-    writeCachedThemeCss('x{}', storage)
-    expect(readCachedThemeCss(storage)).toBe('x{}')
+    RuntimeTheme.writeCachedThemeCss('x{}', storage)
+    expect(RuntimeTheme.readCachedThemeCss(storage)).toBe('x{}')
     expect(store.has(RUNTIME_CACHE_KEY)).toBe(true)
-    writeCachedThemeCss('', storage)
+    RuntimeTheme.writeCachedThemeCss('', storage)
     expect(store.size).toBe(0)
-    expect(readCachedThemeCss(undefined)).toBe('')
+    expect(RuntimeTheme.readCachedThemeCss(undefined)).toBe('')
   })
 
   it('never throws when storage is unavailable', () => {
@@ -168,7 +167,7 @@ describe('runtime style element', () => {
       },
       removeItem: () => undefined,
     }
-    expect(readCachedThemeCss(broken)).toBe('')
-    expect(() => writeCachedThemeCss('x{}', broken)).not.toThrow()
+    expect(RuntimeTheme.readCachedThemeCss(broken)).toBe('')
+    expect(() => RuntimeTheme.writeCachedThemeCss('x{}', broken)).not.toThrow()
   })
 })

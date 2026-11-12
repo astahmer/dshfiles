@@ -26,7 +26,16 @@ import { CodeFold, type FoldableCodeBlockProps } from './code-fold.js'
 /** Which Chat surface rendered the Markdown: an assistant answer, or other transcript Markdown (reasoning, summaries). */
 export type MarkdownSurface = 'answer' | 'fenced'
 
-type ElementProps = { readonly children?: ReactNode; readonly dangerouslySetInnerHTML?: unknown; readonly 'data-dsh-markdown'?: MarkdownSurface }
+type ElementProps = {
+  readonly children?: ReactNode
+  readonly dangerouslySetInnerHTML?: unknown
+  readonly 'data-dsh-markdown'?: MarkdownSurface
+  readonly 'data-callout'?: CalloutKind
+  readonly 'data-file-chip'?: 'mention' | 'link'
+}
+
+/** A node's children as a list: one child, or the array the renderer passed. */
+const childList = (children: ReactNode): readonly ReactNode[] => (Array.isArray(children) ? children : [children])
 
 /** Elements a code card never sits inside: links, controls, math, inline code, a code block's own `pre`. */
 const SKIPPED = new Set(['a', 'button', 'code', 'kbd', 'samp', 'script', 'style', 'textarea', 'svg', 'math', 'input', 'select', 'pre'])
@@ -79,56 +88,74 @@ type MentionButtonProps = { readonly children?: ReactNode; readonly title?: unkn
 const mentionValue = (node: ReactElement<ElementProps>): { readonly button: ReactElement<MentionButtonProps>; readonly value: string } | undefined => {
   const child = node.props.children
   if (!isValidElement<MentionButtonProps>(child) || child.type !== 'button' || typeof child.props.onClick !== 'function') return undefined
-  const parts = Array.isArray(child.props.children) ? (child.props.children as readonly ReactNode[]) : [child.props.children]
-  const value = parts.at(-1)
+  const value = childList(child.props.children).at(-1)
   return typeof value === 'string' ? { button: child, value } : undefined
 }
 
+interface FileLinkProps {
+  readonly file: { readonly path: string }
+}
+
 /** A native Markdown file link (`[text](path#L24)` with an opener): a component element carrying `file.path`. */
-const isFileLink = (node: ReactElement): boolean => {
+const isFileLink = (node: ReactElement): node is ReactElement<FileLinkProps> => {
   if (typeof node.type === 'string' || node.type === Fragment) return false
-  const file = (node.props as { readonly file?: { readonly path?: unknown } }).file
-  return typeof file?.path === 'string'
+  const props: unknown = node.props
+  if (typeof props !== 'object' || props === null || !('file' in props)) return false
+  const file: unknown = props.file
+  return typeof file === 'object' && file !== null && 'path' in file && typeof file.path === 'string'
 }
 
 /** GitHub alert kinds and how Chat shows them; the tone picks a status trio in `ui-styles`' `transcript.css`. */
-const CALLOUTS: Readonly<Record<string, { readonly title: string; readonly Icon: LucideIcon }>> = {
+interface Callout {
+  readonly title: string
+  readonly Icon: LucideIcon
+}
+
+const CALLOUTS = {
   note: { title: 'Note', Icon: InfoIcon },
   tip: { title: 'Tip', Icon: LightbulbIcon },
   important: { title: 'Important', Icon: MessageSquareWarningIcon },
   warning: { title: 'Warning', Icon: TriangleAlertIcon },
   caution: { title: 'Caution', Icon: OctagonAlertIcon },
-}
+} as const satisfies Readonly<Record<string, Callout>>
+
+type CalloutKind = keyof typeof CALLOUTS
+
+const isCalloutKind = (value: string): value is CalloutKind => Object.hasOwn(CALLOUTS, value)
 
 const CALLOUT_MARKER = /^\s*\[!(note|tip|important|warning|caution)\][ \t]*(?:\r?\n)?/i
 
 /** The callout a blockquote opens with, and the quote's children with the marker taken out. */
-const calloutOf = (node: ReactElement<ElementProps>): { readonly kind: string; readonly children: readonly ReactNode[] } | undefined => {
-  const children = Array.isArray(node.props.children) ? (node.props.children as readonly ReactNode[]) : [node.props.children]
+interface CalloutMatch {
+  readonly kind: CalloutKind
+  readonly children: readonly ReactNode[]
+}
+
+const calloutOf = (node: ReactElement<ElementProps>): CalloutMatch | undefined => {
+  const children = childList(node.props.children)
   const index = children.findIndex(child => isValidElement(child))
   const first = children[index]
   if (!isValidElement<ElementProps>(first) || first.type !== 'p') return undefined
-  const runs = Array.isArray(first.props.children) ? (first.props.children as readonly ReactNode[]) : [first.props.children]
+  const runs = childList(first.props.children)
   const head = runs[0]
   if (typeof head !== 'string') return undefined
   const match = CALLOUT_MARKER.exec(head)
   const kind = match?.[1]?.toLowerCase()
-  if (match === null || kind === undefined) return undefined
+  if (match === null || kind === undefined || !isCalloutKind(kind)) return undefined
   const rest = [head.slice(match[0].length), ...runs.slice(1)].filter(run => run !== '')
   const paragraph = rest.length === 0 ? null : cloneElement(first, undefined, ...rest)
   return { kind, children: [...children.slice(0, index), ...(paragraph === null ? [] : [paragraph]), ...children.slice(index + 1)] }
 }
 
-const renderCallout = (node: ReactElement<ElementProps>, kind: string, children: readonly ReactNode[]): ReactNode => {
-  const callout = CALLOUTS[kind] ?? CALLOUTS.note
-  if (callout === undefined) return node
+const renderCallout = (node: ReactElement<ElementProps>, kind: CalloutKind, children: readonly ReactNode[]): ReactNode => {
+  const callout = CALLOUTS[kind]
   const title = createElement(
     'p',
     { key: 'callout-title', 'data-callout-title': '' },
     createElement(callout.Icon, { size: 14, strokeWidth: 1.75, 'aria-hidden': true }),
     callout.title,
   )
-  return cloneElement(node as ReactElement<Record<string, unknown>>, { 'data-callout': kind }, title, ...children)
+  return cloneElement(node, { 'data-callout': kind }, title, ...children)
 }
 
 const DETAILS_OPEN = /^\s*<details(\s+open)?\s*>\s*(?:<summary>([\s\S]*?)<\/summary>)?([\s\S]*)$/i
@@ -205,7 +232,7 @@ const detailsElement = (frame: DetailsFrame, index: number): ReactNode =>
 /** Every file path the message references, so colliding names can be told apart. */
 const collectPaths = (node: ReactNode, into: string[]): void => {
   if (Array.isArray(node)) {
-    for (const child of node as readonly ReactNode[]) collectPaths(child, into)
+    for (const child of childList(node)) collectPaths(child, into)
     return
   }
   if (!isValidElement<ElementProps>(node)) return
@@ -215,7 +242,7 @@ const collectPaths = (node: ReactNode, into: string[]): void => {
     return
   }
   if (isFileLink(node)) {
-    into.push(String((node.props as { readonly file: { readonly path: string } }).file.path))
+    into.push(node.props.file.path)
     return
   }
   if (typeof node.type === 'string' && SKIPPED.has(node.type)) return
@@ -237,7 +264,7 @@ const collisionsOf = (tree: ReactNode): string => {
 /** Punctuation that belongs to the reference before it: a chip is one box, so a line could otherwise break before it. */
 const TRAILING_PUNCTUATION = /^[,.;:!?)\]]+/
 
-const isChip = (node: ReactNode): node is ReactElement => isValidElement<Record<string, unknown>>(node) && node.props['data-file-chip'] !== undefined
+const isChip = (node: ReactNode): node is ReactElement => isValidElement<ElementProps>(node) && node.props['data-file-chip'] !== undefined
 
 /** Keep a chip and the punctuation right after it on one line (`pricing.ts:2,` never wraps before the comma). */
 const glueChipPunctuation = (children: readonly ReactNode[]): ReactNode[] => {
@@ -274,6 +301,8 @@ const transformNode = (node: ReactNode, state: MarkdownProseState): ReactNode =>
   const cached = state.cache.get(node)
   if (cached !== undefined) return cached
   if (node.type === state.codeBlock) {
+    // SAFETY: the node's type is the native code card component the renderer draws fences with, so its props are that
+    // component's FoldableCodeBlockProps.
     const block = node as ReactElement<FoldableCodeBlockProps>
     const result = createElement(CodeFold, { key: node.key, block })
     state.cache.set(node, result)
@@ -283,9 +312,9 @@ const transformNode = (node: ReactNode, state: MarkdownProseState): ReactNode =>
     const mention = mentionValue(node)
     if (mention === undefined) return node
     const colliding = new Set(state.collisions === '' ? [] : state.collisions.split('\n'))
-    const parts = Array.isArray(mention.button.props.children) ? (mention.button.props.children as readonly ReactNode[]) : []
+    const parts = Array.isArray(mention.button.props.children) ? childList(mention.button.props.children) : []
     const button = cloneElement(mention.button, undefined, ...parts.slice(0, -1), fileChipLabel(mention.value, colliding))
-    const result = cloneElement(node as ReactElement<Record<string, unknown>>, { 'data-file-chip': 'mention' }, button)
+    const result = cloneElement(node, { 'data-file-chip': 'mention' }, button)
     state.cache.set(node, result)
     return result
   }
@@ -321,7 +350,7 @@ const transform = (tree: ReactNode, state: MarkdownProseState, surface: Markdown
     state.collisions = collisions
     state.cache = new WeakMap()
   }
-  const rootChildren = Array.isArray(tree.props.children) ? wrapDetails(tree.props.children as readonly ReactNode[]) : tree.props.children
+  const rootChildren = Array.isArray(tree.props.children) ? wrapDetails(childList(tree.props.children)) : tree.props.children
   const children = rootChildren === undefined ? undefined : transformChildren(rootChildren, state)
   const props = { 'data-dsh-markdown': surface }
   return children === undefined || (children === tree.props.children && rootChildren === tree.props.children)

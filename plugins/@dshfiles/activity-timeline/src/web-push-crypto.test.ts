@@ -1,4 +1,5 @@
 import { createDecipheriv, createECDH, createPublicKey, hkdfSync, randomBytes, verify } from 'node:crypto'
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { WebPushCrypto } from './web-push-crypto.js'
 
@@ -44,7 +45,7 @@ describe('WebPushCrypto', () => {
     const [, token, k] = header.match(/^vapid t=([^,]+), k=(.+)$/u) ?? []
     expect(k).toBe(keys.publicKey)
     const [h, c, s] = (token ?? '').split('.')
-    expect(JSON.parse(Buffer.from(c ?? '', 'base64url').toString())).toEqual({
+    expect(Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))(Buffer.from(c ?? '', 'base64url').toString())).toEqual({
       aud: 'https://web.push.apple.com',
       exp: 1_000 + 43_200,
       sub: 'mailto:dsh@localhost',

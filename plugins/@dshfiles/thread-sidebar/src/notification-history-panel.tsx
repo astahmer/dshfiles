@@ -70,6 +70,7 @@ export const NotificationHistoryPanel = (props: {
     useCallback(listener => props.workspaces.list.subscribe(listener), [props.workspaces]),
     () => props.workspaces.list.getSnapshot(),
   )
+  const [openedAt] = useState(() => Date.now())
   const history = useQuery({
     queryKey: historyKey,
     queryFn: ({ signal }) => api.list({}, { signal }),
@@ -105,7 +106,8 @@ export const NotificationHistoryPanel = (props: {
   const visible = view === 'unread' ? unread : view === 'dismissed' ? dismissed : active
   const busy = transition.isPending || open.isPending || clear.isPending
   const failure = transition.error ?? open.error
-  const now = Date.now()
+  // Ages read from the last fetch (the list polls), never from the clock during render.
+  const now = Math.max(openedAt, history.dataUpdatedAt)
   return (
     <Page
       scroll

@@ -64,14 +64,14 @@ const draftOf = (view: ThreadAttentionView, children: readonly ThreadAttentionVi
   if (view.finishedAt !== null && view.finishedReason !== null) {
     const copy = FINISH_COPY[view.finishedReason]
     const detail = childLine(view, children)
-    return {
+    const draft: AttentionDraft = {
       dedupeKey: `${view.sessionId}:turn:${String(view.finishedSeq ?? view.finishedAt)}`,
       subject: { kind: 'session', id: view.sessionId },
       reason: headline(title, copy.reason, copy.titled),
-      ...(detail === undefined ? {} : { detail }),
       severity: copy.severity,
       verbs: ['Open', 'Done', 'Snooze', 'MuteSource'],
     }
+    return detail === undefined ? draft : { ...draft, detail }
   }
   if (view.manuallyUnread) {
     return {
@@ -160,8 +160,9 @@ const make = Effect.gen(function* () {
    */
   const reconcile = Effect.fn('thread-sidebar attention reconcile')(function* () {
     const views = (yield* attention.snapshot).sessions
-    const roots = new Map<string, string>()
-    for (const view of views) roots.set(view.sessionId, yield* lineage.rootOf(view.sessionId))
+    const roots = new Map<string, string>(
+      yield* Effect.forEach(views, view => lineage.rootOf(view.sessionId).pipe(Effect.map(root => [view.sessionId, root] as const))),
+    )
     const stale = staleChildren(views, roots, previousRoots)
     previousRoots = rootSessionIds(views, roots)
     if (stale.length > 0) yield* attention.clearUnreadMany(stale)

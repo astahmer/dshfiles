@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { OwnWorkspaceModel } from './own-workspace.js'
 
-const t = ((key: string, params?: Record<string, unknown>) => `${key}${params === undefined ? '' : ` ${JSON.stringify(params)}`}`) as never
+const t = ((key: string, params?: Readonly<Record<string, string | number>>) => `${key}${params === undefined ? '' : ` ${JSON.stringify(params)}`}`) as never
 
 describe('OwnWorkspaceModel', () => {
   it('is undefined for a thread in the project checkout', () => {

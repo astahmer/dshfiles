@@ -1,5 +1,5 @@
 import { DshxPlugin } from '@dshfiles/dshx/effect'
-import { Context, Effect, Layer, Ref, Stream } from 'effect'
+import { Context, Effect, Layer, Option, Ref, Schema, Stream } from 'effect'
 import { InflightTurns, type InflightTurn } from './inflight-turns.js'
 import { SessionEvents, type SessionEvent } from './session-events.js'
 
@@ -31,8 +31,6 @@ export type LiveTurnsState = ReadonlyMap<string, TurnState>
 const MAX_LIVE_TURNS = 500
 const MAX_STEP_LENGTH = 60
 
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === 'object' && value !== null && !Array.isArray(value)
-
 const clip = (text: string): string => {
   const line = text.replace(/\s+/g, ' ').trim()
   return line.length > MAX_STEP_LENGTH ? `${line.slice(0, MAX_STEP_LENGTH - 1)}…` : line
@@ -43,21 +41,32 @@ const basename = (path: string): string => path.split(/[\\/]/).filter(Boolean).a
 /** `mcp__dsh__bash` and `bash` are the same tool to a reader. */
 const toolName = (name: string): string => (name.split('__').at(-1) ?? name).toLowerCase()
 
-const parseArguments = (raw: unknown): Readonly<Record<string, unknown>> => {
-  if (isRecord(raw)) return raw
-  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 200_000) return {}
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    return isRecord(parsed) ? parsed : {}
-  } catch {
-    return {}
-  }
+/** The few argument fields the activity line reads; every other field of a tool's input is ignored. */
+const callArgumentsSchema = Schema.Struct({
+  command: Schema.optional(Schema.String),
+  cmd: Schema.optional(Schema.String),
+  file_path: Schema.optional(Schema.String),
+  filePath: Schema.optional(Schema.String),
+  path: Schema.optional(Schema.String),
+})
+type CallArguments = typeof callArgumentsSchema.Type
+type ArgumentKey = keyof CallArguments
+
+/** Tool arguments arrive as an object or as the model's JSON text; anything else reads as no arguments. */
+const decodeCallArguments = Schema.decodeUnknownOption(Schema.Union([callArgumentsSchema, Schema.fromJsonString(callArgumentsSchema)]))
+
+const toolCallSchema = Schema.Struct({ data: Schema.Struct({ name: Schema.String, arguments: Schema.optional(Schema.Unknown) }) })
+const decodeToolCall = Schema.decodeUnknownOption(toolCallSchema)
+
+const readArguments = (raw: unknown): CallArguments => {
+  if (typeof raw === 'string' && (raw.length === 0 || raw.length > 200_000)) return {}
+  return Option.getOrElse(decodeCallArguments(raw), () => ({}))
 }
 
-const stringField = (args: Readonly<Record<string, unknown>>, ...keys: readonly string[]): string | undefined => {
+const stringField = (args: CallArguments, ...keys: readonly ArgumentKey[]): string | undefined => {
   for (const key of keys) {
     const value = args[key]
-    if (typeof value === 'string' && value.trim() !== '') return value
+    if (value !== undefined && value.trim() !== '') return value
   }
   return undefined
 }
@@ -65,43 +74,54 @@ const stringField = (args: Readonly<Record<string, unknown>>, ...keys: readonly 
 const EDIT_TOOLS = new Set(['edit', 'write', 'apply_patch', 'editor_write', 'str_replace_editor', 'multiedit', 'notebookedit'])
 const SHELL_TOOLS = new Set(['bash', 'shell', 'pwsh', 'powershell', 'terminal', 'exec', 'multi_host_exec'])
 
-/** The words for one tool call, and the turn's edited files after it. */
-const describeCall = (state: TurnState, name: string, rawArguments: unknown): { readonly step: string; readonly edited: readonly string[] } => {
+/** One tool call in words, and the turn's edited files after it. */
+interface CallStep {
+  readonly step: string
+  readonly edited: readonly string[]
+}
+
+const FIXED_STEPS = new Map<string, string>([
+  ['grep', 'Searching'],
+  ['glob', 'Searching'],
+  ['find_threads', 'Searching'],
+  ['memory_search', 'Searching'],
+  ['web_search', 'Searching the web'],
+  ['web_fetch', 'Reading a web page'],
+  ['subagent', 'Delegating to a subagent'],
+  ['subagent_fork', 'Delegating to a subagent'],
+  ['workflow', 'Delegating to a subagent'],
+  ['ask_user_question', 'Asking you a question'],
+  ['todo_write', 'Planning'],
+])
+
+const describeCall = (state: TurnState, name: string, args: CallArguments): CallStep => {
   const tool = toolName(name)
-  const args = parseArguments(rawArguments)
+  const unchanged = (step: string): CallStep => ({ step, edited: state.edited })
   if (SHELL_TOOLS.has(tool)) {
     const command = stringField(args, 'command', 'cmd')
-    return { step: command === undefined ? 'Running a command' : `Running ${clip(command.split('\n')[0] ?? command)}`, edited: state.edited }
+    return unchanged(command === undefined ? 'Running a command' : `Running ${clip(command.split('\n')[0] ?? command)}`)
   }
   if (EDIT_TOOLS.has(tool)) {
     const path = stringField(args, 'file_path', 'path', 'filePath')
     const edited = path === undefined || state.edited.includes(path) ? state.edited : [...state.edited, path].slice(-50)
-    if (edited.length > 1) return { step: `Editing ${String(edited.length)} files`, edited }
-    return { step: path === undefined ? 'Editing a file' : `Editing ${clip(basename(path))}`, edited }
+    const step = edited.length > 1 ? `Editing ${String(edited.length)} files` : path === undefined ? 'Editing a file' : `Editing ${clip(basename(path))}`
+    return { step, edited }
   }
   if (tool === 'read' || tool === 'read_image') {
     const path = stringField(args, 'file_path', 'path')
-    return { step: path === undefined ? 'Reading a file' : `Reading ${clip(basename(path))}`, edited: state.edited }
+    return unchanged(path === undefined ? 'Reading a file' : `Reading ${clip(basename(path))}`)
   }
-  if (tool === 'grep' || tool === 'glob' || tool === 'find_threads' || tool === 'memory_search') return { step: 'Searching', edited: state.edited }
-  if (tool === 'web_search') return { step: 'Searching the web', edited: state.edited }
-  if (tool === 'web_fetch') return { step: 'Reading a web page', edited: state.edited }
-  if (tool === 'subagent' || tool === 'subagent_fork' || tool === 'workflow') return { step: 'Delegating to a subagent', edited: state.edited }
-  if (tool === 'ask_user_question') return { step: 'Asking you a question', edited: state.edited }
-  if (tool === 'todo_write') return { step: 'Planning', edited: state.edited }
-  return { step: `Using ${clip(tool.replaceAll('_', ' '))}`, edited: state.edited }
+  return unchanged(FIXED_STEPS.get(tool) ?? `Using ${clip(tool.replaceAll('_', ' '))}`)
 }
 
 /** Fold one Session event into the live turns; every other event leaves the state as it is (same reference). */
 const apply = (state: LiveTurnsState, input: SessionEvent): LiveTurnsState => {
-  const event: unknown = input.event
-  if (!isRecord(event) || typeof event.type !== 'string') return state
-  const { sessionId } = input
+  const { sessionId, event } = input
   switch (event.type) {
     case 'turn/start': {
       const next = new Map(state)
       next.delete(sessionId)
-      next.set(sessionId, { startedAt: typeof event.time === 'number' ? event.time : Date.now(), step: null, edited: [] })
+      next.set(sessionId, { startedAt: event.time, step: null, edited: [] })
       while (next.size > MAX_LIVE_TURNS) {
         const oldest = next.keys().next()
         if (oldest.done === true) break
@@ -117,9 +137,9 @@ const apply = (state: LiveTurnsState, input: SessionEvent): LiveTurnsState => {
     }
     case 'tool/call': {
       const turn = state.get(sessionId)
-      const data = event.data
-      if (turn === undefined || !isRecord(data) || typeof data.name !== 'string') return state
-      const described = describeCall(turn, data.name, data.arguments)
+      const call = decodeToolCall(event)
+      if (turn === undefined || Option.isNone(call)) return state
+      const described = describeCall(turn, call.value.data.name, readArguments(call.value.data.arguments))
       if (described.step === turn.step && described.edited === turn.edited) return state
       return new Map(state).set(sessionId, { ...turn, ...described })
     }
@@ -147,6 +167,7 @@ export class LiveTurnsModel {
   static readonly apply = apply
   static readonly snapshot = snapshot
   static readonly describeCall = describeCall
+  static readonly readArguments = readArguments
 }
 
 export class LiveTurns extends Context.Service<LiveTurns, { readonly list: Effect.Effect<{ readonly turns: readonly LiveTurn[]; readonly now: number }> }>()(

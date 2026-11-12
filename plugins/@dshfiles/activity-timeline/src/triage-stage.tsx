@@ -108,6 +108,13 @@ export const TriageBar = (props: TriageBarProps): React.JSX.Element => {
   )
 }
 
+const replyText = (t: InboxTranslate, reply: LastReplyState): string => {
+  if (reply.status === 'loading') return t('peekLoading')
+  if (reply.status === 'failed') return reply.message
+  if (reply.status !== 'ready') return ''
+  return reply.text === '' ? t('peekNoReply') : LastReplyModel.lastParagraph(reply.text, 900)
+}
+
 /** The thread's last reply under the item, so most items can be judged without opening the thread. */
 export const TriageReply = (props: { readonly t: InboxTranslate; readonly reply: LastReplyState }): React.JSX.Element | null => {
   const reply = props.reply
@@ -116,13 +123,7 @@ export const TriageReply = (props: { readonly t: InboxTranslate; readonly reply:
     <section aria-label={props.t('peekLastReply')} className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3">
       <span className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.t('peekLastReply')}</span>
       <p data-triage-reply="" className="dshx:text-sm dshx:break-words dshx:whitespace-pre-wrap">
-        {reply.status === 'loading'
-          ? props.t('peekLoading')
-          : reply.status === 'failed'
-            ? reply.message
-            : reply.text === ''
-              ? props.t('peekNoReply')
-              : LastReplyModel.lastParagraph(reply.text, 900)}
+        {replyText(props.t, reply)}
       </p>
     </section>
   )

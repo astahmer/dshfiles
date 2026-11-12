@@ -1,4 +1,5 @@
 import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { ShortcutCatalogEntry, Shortcuts } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { Command, CommandKeys, createSettingsClientRuntime, defineClient, runHostCommand, type Subscribable } from '@dshfiles/dshx/client'
 import { CheatSheet, CheatSheetState } from './cheat-sheet.js'
@@ -16,40 +17,19 @@ import { shortcutsSettings } from './settings.js'
  */
 type Layout = ILayout
 
-interface HostCatalog {
-  readonly catalog: { getSnapshot(): unknown; subscribe(listener: () => void): () => void }
-}
-
-const isHostCatalog = (value: unknown): value is HostCatalog =>
-  typeof value === 'object' &&
-  value !== null &&
-  'catalog' in value &&
-  typeof value.catalog === 'object' &&
-  value.catalog !== null &&
-  'getSnapshot' in value.catalog &&
-  typeof value.catalog.getSnapshot === 'function'
-
 const NO_ROWS: readonly HostShortcutRow[] = []
 
-/** The Host registry's catalog rows that have keycaps, read defensively: it is another package's snapshot. */
-const hostRows = (shortcuts: unknown): Subscribable<readonly HostShortcutRow[]> | undefined => {
-  if (!isHostCatalog(shortcuts)) return undefined
-  let source: unknown
+/** The Host registry's catalog rows that have keycaps; the registry is absent on a Host without the shortcuts service. */
+const hostRows = (shortcuts: Shortcuts | undefined): Subscribable<readonly HostShortcutRow[]> | undefined => {
+  if (shortcuts === undefined) return undefined
+  let source: readonly ShortcutCatalogEntry[] | undefined
   let rows: readonly HostShortcutRow[] = NO_ROWS
   return {
     get: () => {
       const snapshot = shortcuts.catalog.getSnapshot()
       if (snapshot === source) return rows
       source = snapshot
-      rows = Array.isArray(snapshot)
-        ? snapshot.flatMap((entry: unknown): HostShortcutRow[] => {
-            if (typeof entry !== 'object' || entry === null) return []
-            const { id, label, keys } = entry as { id?: unknown; label?: unknown; keys?: unknown }
-            if (typeof id !== 'string' || typeof label !== 'string' || !Array.isArray(keys)) return []
-            const caps = keys.filter((key): key is string => typeof key === 'string')
-            return caps.length === 0 ? [] : [{ id, label, keys: caps }]
-          })
-        : NO_ROWS
+      rows = snapshot.flatMap(({ id, label, keys }): HostShortcutRow[] => (keys.length === 0 ? [] : [{ id, label, keys }]))
       return rows
     },
     subscribe: listener => shortcuts.catalog.subscribe(listener),

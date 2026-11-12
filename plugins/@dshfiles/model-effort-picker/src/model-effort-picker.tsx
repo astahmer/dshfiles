@@ -101,9 +101,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     [profiles.data],
   )
   // b:16yr: one row per model; the detail panel chooses the account.
+  const selected = state.current
   const rows = useMemo(
-    () => ModelPickerModel.modelRows({ groups: filteredGroups, current: state.current, providerOf: id => providerLabels.get(id) }),
-    [filteredGroups, state.current, providerLabels],
+    () => ModelPickerModel.modelRows({ groups: filteredGroups, current: selected, providerOf: id => providerLabels.get(id) }),
+    [filteredGroups, selected, providerLabels],
   )
   const quotas = useMemo(
     () =>

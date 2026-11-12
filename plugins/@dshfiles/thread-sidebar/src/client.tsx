@@ -1246,12 +1246,12 @@ const coarsePointer = (): boolean => {
  * same size so every title starts on one line. Never a status colour: the status glyph beside it is the only signal.
  */
 /** The project's 14px mark on a row's second line (b:212a): where the thread runs, beside the project name. */
-const RowProjectMark = memo((props: { readonly path: string | undefined; readonly title: string | undefined }): JSX.Element =>
+const RowProjectMark = memo((props: { readonly path: string | undefined; readonly label: string | undefined }): JSX.Element =>
   props.path === undefined ? (
     <span aria-hidden="true" className="dshx:inline-flex dshx:size-3.5 dshx:shrink-0" data-thread-project-mark="none" />
   ) : (
-    <span aria-hidden="true" className="dshx:inline-flex dshx:size-3.5 dshx:shrink-0" data-thread-project-mark={props.title ?? ''}>
-      <ProjectIcon path={props.path} label={props.title} className="dshx:size-3.5" />
+    <span aria-hidden="true" className="dshx:inline-flex dshx:size-3.5 dshx:shrink-0" data-thread-project-mark={props.label ?? ''}>
+      <ProjectIcon path={props.path} label={props.label} className="dshx:size-3.5" />
     </span>
   ),
 )
@@ -1282,9 +1282,8 @@ const OwnWorkspaceIndicator = (props: {
           {state === undefined ? null : (
             <span
               className="dshx:whitespace-nowrap"
-              {...(state.kind === 'landed'
-                ? { 'data-testid': 'thread-sidebar-rebased-tag', ...(state.at === undefined ? {} : { 'data-landed-at': String(state.at) }) }
-                : {})}
+              data-testid={state.kind === 'landed' ? 'thread-sidebar-rebased-tag' : undefined}
+              data-landed-at={state.kind === 'landed' && state.at !== undefined ? String(state.at) : undefined}
             >
               {state.text}
             </span>
@@ -1654,7 +1653,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       so the project name lines up with the title. Its 8px gap matches line 1's. */}
                   {leadSeat || showMark ? (
                     <span className="dshx:mr-0.5 dshx:inline-flex dshx:w-4 dshx:shrink-0 dshx:justify-center">
-                      {showMark ? <RowProjectMark path={props.workspacePath} title={props.workspaceTitle} /> : null}
+                      {showMark ? <RowProjectMark path={props.workspacePath} label={props.workspaceTitle} /> : null}
                     </span>
                   ) : null}
                   {liveStep === undefined ? null : (
@@ -5295,6 +5294,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     peekSession === undefined
       ? undefined
       : (jjRepositories.data?.repositories ?? []).flatMap(repository => repository.threads).find(thread => thread.sessionIds.includes(peekSession.id))
+  // Whether the pending revisions can land now: unknown until jj has checked, and nothing to say without any.
+  const peekLanding = ((): readonly string[] => {
+    if (peekWorkspace === undefined || peekWorkspace.unlanded.length === 0) return []
+    if (peekWorkspace.canRebase === true) return [tSidebar('threadSidebarPeekCanLand')]
+    if (peekWorkspace.canRebase === false) return [tSidebar('threadSidebarPeekBlocked')]
+    return []
+  })()
   const peekFacts =
     peekSession === undefined
       ? []
@@ -5304,13 +5310,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             ? []
             : [tSidebar('threadSidebarPeekPending', { count: peekWorkspace.unlanded.length })]),
           ...((peekWorkspace?.behindCount ?? 0) > 0 ? [tSidebar('threadSidebarPeekBehind', { count: peekWorkspace?.behindCount ?? 0 })] : []),
-          ...(peekWorkspace === undefined || peekWorkspace.unlanded.length === 0
-            ? []
-            : peekWorkspace.canRebase === true
-              ? [tSidebar('threadSidebarPeekCanLand')]
-              : peekWorkspace.canRebase === false
-                ? [tSidebar('threadSidebarPeekBlocked')]
-                : []),
+          ...peekLanding,
         ]
   // ⌘K on a focused or selected row lists that thread's verbs first (plan Q2 T2.4). The palette takes focus when it
   // opens, so the row the user was on is remembered until focus lands somewhere that is neither the list nor a dialog.
@@ -5423,13 +5423,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // ⌘K "Filter: ‹preset›" rows (b:xpvk): one per enabled preset, re-registered only when the presets' ids or names change.
   const presetPaletteState = useRef({ apply: selectThreadViewPreset, activeId: listThreadView.id, edited: presetEdited })
   presetPaletteState.current = { apply: selectThreadViewPreset, activeId: listThreadView.id, edited: presetEdited }
-  const presetPaletteKey = presetsOn
-    ? JSON.stringify(threadViewSettings.views.filter(view => view.enabled).map(view => [view.id, threadViewPresetLabel(view, tSidebar)]))
-    : ''
+  const presetPaletteEntries = presetsOn
+    ? threadViewSettings.views.filter(view => view.enabled).map(view => [view.id, threadViewPresetLabel(view, tSidebar)] as const)
+    : []
+  // The actions re-register only when an id or label changes; the effect reads the entries the key was made from.
+  const presetPaletteKey = presetsOn ? JSON.stringify(presetPaletteEntries) : ''
+  const presetPaletteLatest = useRef(presetPaletteEntries)
+  presetPaletteLatest.current = presetPaletteEntries
   useEffect(() => {
     if (!isPrimarySurface || presetPaletteKey === '') return
-    // SAFETY: the key is this effect's own JSON.stringify of [id, label] pairs above.
-    const presets = JSON.parse(presetPaletteKey) as readonly (readonly [string, string])[]
+    const presets = presetPaletteLatest.current
     return PaletteBridge.addActions(
       presets.map(([id, label]) => ({
         id: `@dshfiles/thread-sidebar/filter-preset/${id}`,
@@ -6010,21 +6013,25 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               >
                 {showGroupControl ? (
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        // Readable at 200px (T1.3): the icon says "group by", so the value keeps the whole width.
-                        className="dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground"
-                        title={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
-                        aria-label={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
-                      >
-                        <LayersIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
-                        <span className="dshx:truncate">{props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}</span>
-                        <ChevronDownIcon className="dshx:ml-auto dshx:size-3 dshx:shrink-0" aria-hidden="true" />
-                      </Button>
-                    </DropdownMenuTrigger>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            // Readable at 200px (T1.3): the icon says "group by", so the value keeps the whole width.
+                            className="dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground"
+                            aria-label={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
+                          >
+                            <LayersIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+                            <span className="dshx:truncate">{props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}</span>
+                            <ChevronDownIcon className="dshx:ml-auto dshx:size-3 dshx:shrink-0" aria-hidden="true" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>{`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}</TooltipContent>
+                    </Tooltip>
                     <DropdownMenuContent align="start" className="dshx-root dshx:min-w-48">
                       <DropdownMenuLabel>{props.tSidebar('threadSidebarGroupBy')}</DropdownMenuLabel>
                       <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
@@ -6039,20 +6046,24 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 ) : null}
                 {showFilterControl ? (
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground"
-                        title={`${props.tSidebar('threadSidebarFilter')}: ${activeFilterSummary}`}
-                        aria-label={`${props.tSidebar('threadSidebarFilter')}: ${activeFilterSummary}`}
-                      >
-                        <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
-                        <span className="dshx:truncate">{activeFilterSummary}</span>
-                        <ChevronDownIcon className="dshx:ml-auto dshx:size-3 dshx:shrink-0" aria-hidden="true" />
-                      </Button>
-                    </DropdownMenuTrigger>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground"
+                            aria-label={`${props.tSidebar('threadSidebarFilter')}: ${activeFilterSummary}`}
+                          >
+                            <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+                            <span className="dshx:truncate">{activeFilterSummary}</span>
+                            <ChevronDownIcon className="dshx:ml-auto dshx:size-3 dshx:shrink-0" aria-hidden="true" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>{`${props.tSidebar('threadSidebarFilter')}: ${activeFilterSummary}`}</TooltipContent>
+                    </Tooltip>
                     <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52">
                       <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterStatus')}</DropdownMenuLabel>
                       <DropdownMenuCheckboxItem
@@ -6691,7 +6702,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {peekSession === undefined ? null : (
             <RowPeek anchor={peekAnchor} open onOpenChange={open => (open ? undefined : setPeekId(null))}>
               <PeekCard
-                title={peekSession.displayTitle}
+                heading={peekSession.displayTitle}
                 {...(peekStatus === undefined ? {} : { status: peekStatus.status })}
                 reply={peekReply}
                 {...(peekSignal?.choices === undefined
@@ -6718,10 +6729,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       variant="ghost"
                       data-peek-actions=""
                       onClick={() => {
-                        const anchor = peekAnchor
                         setPeekId(null)
                         requestAnimationFrame(() =>
-                          ThreadRowMenu.open(anchor?.closest<HTMLElement>('article[data-thread-id]') ?? null, anchor ?? document.body),
+                          ThreadRowMenu.open(peekAnchor?.closest<HTMLElement>('article[data-thread-id]') ?? null, peekAnchor ?? document.body),
                         )
                       }}
                     >

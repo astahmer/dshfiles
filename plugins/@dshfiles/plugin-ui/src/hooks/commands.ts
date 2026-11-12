@@ -31,14 +31,14 @@ export const useCommands = (plugin: PluginContext | undefined, commands: readonl
     const current = (id: string): CommandItem | undefined => latest.current.find(command => command.id === id)
     const disposers = latest.current.map(command => {
       const { run: _run, region, ...rest } = command
-      return plugin.add(Command, {
+      const entry = {
         ...rest,
-        ...(region === undefined ? {} : { region: () => current(command.id)?.region?.() }),
-        run: trigger => {
+        run: (trigger: Parameters<CommandItem['run']>[0]) => {
           const live = current(command.id)
           return live === undefined ? false : live.run(trigger)
         },
-      })
+      }
+      return plugin.add(Command, region === undefined ? entry : { ...entry, region: () => current(command.id)?.region?.() })
     })
     return () => {
       for (const dispose of disposers) dispose()

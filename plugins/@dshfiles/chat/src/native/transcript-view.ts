@@ -5,9 +5,10 @@ import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { CollapseTiming } from './presentation-policy.ts'
 import {
   COLLAPSE_TIMING_FIELD, DEFAULT_COLLAPSE_TIMING,
-  DEFAULT_TRANSCRIPT_VIEW_MODE, LEGACY_TRANSCRIPT_VIEW_MODE, LEGACY_EXPANDED_TRANSCRIPT_VIEW_MODE, TRANSCRIPT_VIEW_FIELD,
-  type ChatSettings, type TranscriptViewMode,
+  DEFAULT_TRANSCRIPT_VIEW_MODE, LEGACY_TRANSCRIPT_VIEW_MODE, LEGACY_EXPANDED_TRANSCRIPT_VIEW_MODE,
+  type ChatSettings,
 } from '../chat-settings.ts'
+import { TRANSCRIPT_VIEW_FIELD, type TranscriptViewMode } from '../transcript-view-modes.ts'
 
 /** Live work-details preference consumed by Chat and its Settings row. */
 export class TranscriptViewPolicy {

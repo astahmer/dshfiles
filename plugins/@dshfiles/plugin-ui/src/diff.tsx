@@ -46,19 +46,19 @@ const subscribeToDarkTheme = (onChange: () => void): (() => void) => {
  * renderer refuses a grammar whose own names miss the language it asked for ("No returned grammar declares
  * javascript"). Ask for the grammar's own name instead.
  */
-const GRAMMAR_NAME: Readonly<Record<string, 'typescript' | 'tsx'>> = {
-  javascript: 'typescript',
-  js: 'typescript',
-  mjs: 'typescript',
-  cjs: 'typescript',
-  jsx: 'tsx',
-}
+const GRAMMAR_NAME = new Map<string, 'typescript' | 'tsx'>([
+  ['javascript', 'typescript'],
+  ['js', 'typescript'],
+  ['mjs', 'typescript'],
+  ['cjs', 'typescript'],
+  ['jsx', 'tsx'],
+])
 
 /** Render grammars outside the slim Shiki set as plain text instead of failing to highlight. */
 const withHighlightableLanguage = (file: FileDiffMetadata): FileDiffMetadata => {
   const language = file.lang ?? getFiletypeFromFileName(file.name)
   if (language === 'text') return file
-  const grammar = GRAMMAR_NAME[language]
+  const grammar = GRAMMAR_NAME.get(language)
   if (grammar !== undefined) return { ...file, lang: grammar }
   return language in bundledLanguages ? file : { ...file, lang: 'text' }
 }

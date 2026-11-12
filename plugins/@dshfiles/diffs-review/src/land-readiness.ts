@@ -114,16 +114,19 @@ const nextReady = (input: {
   return undefined
 }
 
+/** What landing moves: the first titles, how many more, and the size in one line. */
+export interface ChangeSummary {
+  readonly titles: readonly { readonly changeId: string; readonly title: string }[]
+  readonly more: number
+  readonly stat: string | undefined
+}
+
 /** What landing moves, in one line the card reads before the checks: titles first, then the size. */
 const changeSummary = (input: {
   readonly revisions: readonly { readonly changeId: string; readonly description: string }[]
   readonly files?: readonly { readonly additions: number; readonly deletions: number }[] | undefined
   readonly shown?: number
-}): {
-  readonly titles: readonly { readonly changeId: string; readonly title: string }[]
-  readonly more: number
-  readonly stat: string | undefined
-} => {
+}): ChangeSummary => {
   const shown = input.shown ?? 3
   const titles = input.revisions.slice(0, shown).map(revision => ({
     changeId: revision.changeId.slice(0, 8),

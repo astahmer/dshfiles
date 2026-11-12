@@ -10,7 +10,7 @@
  * while its tab rows are hidden (showMainTabs off, productivity pass Q5), and in the phone shell, where the workbench hides
  * tab rows and the conversation header moves into the top bar's menu.
  */
-import type { DockviewApi, DockviewGroupPanel, DockviewPanelApi } from 'dockview-react'
+import type { DockviewApi, DockviewPanelApi } from 'dockview-react'
 import { createContext, useContext, useLayoutEffect, useState } from 'react'
 import { TabRows } from './tab-row-visibility.js'
 
@@ -36,11 +36,23 @@ const phoneShell = (): boolean =>
  */
 export const MAIN_TABS_ATTRIBUTE = 'data-workbench-main-tabs'
 export const mainTabsHidden = (): boolean => document.documentElement.getAttribute(MAIN_TABS_ATTRIBUTE) === 'hidden'
-const hiddenMainRow = (group: DockviewGroupPanel): boolean => mainTabsHidden() && group.element.closest("[data-workbench-region='main']") !== null
+/** The part of a Dockview group a header seat reads: its element and whether its tab row is hidden. */
+export interface SeatGroup {
+  readonly element: HTMLElement
+  readonly header: { readonly hidden: boolean }
+}
+
+/** The part of a Dockview panel API a header seat reads. */
+export interface SeatPanel {
+  readonly group: SeatGroup
+  readonly isVisible: boolean
+}
+
+const hiddenMainRow = (group: SeatGroup): boolean => mainTabsHidden() && group.element.closest("[data-workbench-region='main']") !== null
 
 export class HeaderSeats {
   /** The group's seat element, created on first use just before its right-hand actions. */
-  static seatOf(group: DockviewGroupPanel): HTMLElement | null {
+  static seatOf(group: SeatGroup): HTMLElement | null {
     const header = group.element.querySelector(':scope > .dv-tabs-and-actions-container')
     if (!(header instanceof HTMLElement)) return null
     const existing = header.querySelector(`:scope > [${SEAT_ATTRIBUTE}]`)
@@ -52,13 +64,13 @@ export class HeaderSeats {
   }
 
   /** The row width left beside the tabs (their full scroll width, so a seated header does not count against it). */
-  static freeWidth(group: DockviewGroupPanel): number {
+  static freeWidth(group: SeatGroup): number {
     const tabs = group.element.querySelector(':scope > .dv-tabs-and-actions-container .dv-tabs-container')
     return group.element.clientWidth - (tabs instanceof HTMLElement ? tabs.scrollWidth : 0)
   }
 
   /** Where this panel's header belongs now: its group's seat, or null for inline. */
-  static resolve(api: DockviewPanelApi): HTMLElement | null {
+  static resolve(api: SeatPanel): HTMLElement | null {
     const group = api.group
     if (!api.isVisible || group.header.hidden || phoneShell() || hiddenMainRow(group) || HeaderSeats.freeWidth(group) < SEAT_MIN_FREE_PX) return null
     return HeaderSeats.seatOf(group)

@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineClient, useApi } from '@dshfiles/dshx/client'
 import {
   AlertDialog,
@@ -34,7 +35,7 @@ const useThreadName = (sessions: ISessions, workspaces: IWorkspaces, t: CleanupT
   const project = EntityLabels.useWorkspaceLabel(workspaces)
   return useCallback(
     (sessionId: string) => {
-      const summary = snapshot.byId[sessionId as keyof typeof snapshot.byId]
+      const summary = snapshot.byId[SessionId(sessionId)]
       const title = summary?.displayTitle?.trim() ?? ''
       if (title !== '') return title
       return summary?.cwd === undefined || summary.cwd === null ? t('untitled') : `${t('untitled')} · ${project({ path: summary.cwd })}`

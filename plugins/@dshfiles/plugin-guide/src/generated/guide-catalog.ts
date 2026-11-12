@@ -564,7 +564,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: SHORT_NAME_MAX_LENGTH, LOW_QUOTA_PERCENT, UsageOverviewModel"
+        "Also exports: SHORT_NAME_MAX_LENGTH, LOW_QUOTA_PERCENT, MeterLines, SegmentSplit, SegmentFit, UsageOverviewModel"
       ],
       "source": "plugins/@dshfiles/ai-accounts/src/usage-overview-model.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -2994,7 +2994,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/workbench/shell-merge",
       "summary": "One sidebar layout (b:952m): the Fixed and Free docking left columns merged into one docking region whose default arrangement is the old Fixed rail and list, as one pane (`SIDEBAR_PANE_ID`) whose tab row is hidden. The sidebar owns which layout a person used before the merge (its Host-synced `layoutMode`); the Workben…",
-      "publicSymbol": "SIDEBAR_PANE_ID, SHELL_MERGE_BACKUP_NAME, FormerShellLayout, ShellMergeRequest, ShellMergePort, workbenchShellMerge",
+      "publicSymbol": "SIDEBAR_PANE_ID, SHELL_MERGE_BACKUP_NAME, FormerShellLayout, ShellMergeRequest, ShellMergePort, ShellMergePlan",
       "importFrom": "@dshfiles/workbench/shell-merge",
       "owner": "@dshfiles/workbench",
       "scope": "client or host",
@@ -3005,7 +3005,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: ShellMergePlan, ShellMerge, LeftKeepRequest, LeftKeepPort, workbenchLeftKeep, SidebarFolderTarget, SidebarFoldersProvider, SidebarFolderTargets, LayoutResetPort, workbenchLayoutReset"
+        "Also exports: ShellMerge, LeftKeepRequest, LeftKeepPort, SidebarFolderTarget, SidebarFoldersProvider, SidebarFolderTargets, LayoutResetPort, WorkbenchPorts"
       ],
       "source": "plugins/@dshfiles/workbench/src/shell-merge.ts",
       "docs": "docs/plugin-boundaries.md",

@@ -2,9 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { TURN_MARKS_FILE_LIMIT } from '@dshfiles/chat/turn-marks'
 import { TURN_MARKS_TURN_LIMIT, TurnMarksProjectionModel, turnMarksProjectionDefinition, type TurnMarksState } from './turn-marks-projection.js'
 
+interface TestEvent {
+  readonly type: string
+  readonly seq: number
+  readonly data: object
+}
+
+interface ToolArguments {
+  readonly file_path?: string
+  readonly content?: string
+  readonly old_string?: string
+  readonly new_string?: string
+  readonly questions?: readonly string[]
+}
+
 let seq = 0
 const start = (turn: number) => ({ type: 'turn/start', seq: ++seq, data: { turn } })
-const call = (turn: number, callId: string, name: string, args: unknown) => ({
+const call = (turn: number, callId: string, name: string, args: ToolArguments): TestEvent => ({
   type: 'tool/call',
   seq: ++seq,
   data: { turn, callId, name, arguments: JSON.stringify(args) },
@@ -12,7 +26,7 @@ const call = (turn: number, callId: string, name: string, args: unknown) => ({
 const result = (callId: string, isError = false) => ({ type: 'tool/result', seq: ++seq, data: { message: { toolCallId: callId, isError, content: [] } } })
 const end = (turn: number, kind = 'completed') => ({ type: 'turn/end', seq: ++seq, data: { turn, reason: { kind } } })
 
-const fold = (events: readonly unknown[], from: TurnMarksState = TurnMarksProjectionModel.initialState()): TurnMarksState =>
+const fold = (events: readonly TestEvent[], from: TurnMarksState = TurnMarksProjectionModel.initialState()): TurnMarksState =>
   events.reduce<TurnMarksState>((state, event) => TurnMarksProjectionModel.applyEvent(state, event), from)
 
 describe('turn marks projection', () => {
@@ -63,7 +77,7 @@ describe('turn marks projection', () => {
   })
 
   it('caps files per Turn and Turns per thread', () => {
-    const events: unknown[] = [start(6)]
+    const events: TestEvent[] = [start(6)]
     for (let index = 0; index < TURN_MARKS_FILE_LIMIT + 3; index += 1) {
       events.push(call(6, `f${index}`, 'write', { file_path: `f${index}.ts`, content: 'a\n' }), result(`f${index}`))
     }

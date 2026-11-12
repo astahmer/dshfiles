@@ -71,6 +71,7 @@ export const useEdgeSwipeBack = (enabled: boolean, back: () => void): void => {
     const end = (event: TouchEvent): void => {
       if (gesture === undefined) return
       const touch = find(event.changedTouches, gesture.id)
+      // oxlint-disable-next-line antislop/no-passthrough-variable -- a snapshot: `gesture` is cleared on the next line.
       const current = gesture
       gesture = undefined
       if (touch !== undefined && EdgeSwipeModel.commits(current.intent, touch.clientX - current.x)) backRef.current()

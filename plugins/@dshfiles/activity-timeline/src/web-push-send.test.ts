@@ -1,32 +1,45 @@
 import { createECDH, randomBytes } from 'node:crypto'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { Effect } from 'effect'
+import { FetchHttpClient } from 'effect/http'
 import { describe, expect, it, vi } from 'vitest'
 import type { AttentionItem } from './attention-api.js'
 import { WebPushCrypto } from './web-push-crypto.js'
 import { WebPushSend } from './web-push-send.js'
 import { WEB_PUSH_WORKER_SOURCE } from './web-push-worker.js'
 
-const item = (overrides: Partial<AttentionItem> = {}): AttentionItem =>
-  ({
-    id: 'item-1',
-    source: 'agent-questions.native-question',
-    dedupeKey: 'session-1:call-1',
-    subject: { kind: 'session', id: 'session-1' },
-    reason: 'Asks: Deploy the release now?',
-    detail: null,
-    severity: 'blocking',
-    verbs: ['Open', 'Done'],
-    choices: [],
-    openedAt: 1_000,
-    updatedAt: 1_000,
-    occurrences: 1,
-    resolvedAt: null,
-    doneAt: null,
-    seenAt: null,
-    snoozedUntil: null,
-    snoozeUntilChange: false,
-    ...overrides,
-  }) as AttentionItem
+const item = (overrides: Partial<AttentionItem> = {}): AttentionItem => ({
+  id: 'item-1',
+  source: 'agent-questions.native-question',
+  dedupeKey: 'session-1:call-1',
+  fingerprint: 'f',
+  subject: { kind: 'session', id: 'session-1' },
+  reason: 'Asks: Deploy the release now?',
+  detail: null,
+  severity: 'blocking',
+  verbs: ['Open', 'Done'],
+  choices: [],
+  createdAt: 1_000,
+  openedAt: 1_000,
+  updatedAt: 1_000,
+  occurrences: 1,
+  resolvedAt: null,
+  doneAt: null,
+  snoozedUntil: null,
+  snoozeUntilChange: false,
+  ...overrides,
+})
+
+/** One send through the fetch HTTP client over `fetch`, with spans going to the dshx recorder. */
+const sendWith = (fetch: typeof globalThis.fetch, input: Parameters<typeof WebPushSend.send>[0]) =>
+  Effect.runPromise(
+    WebPushSend.send(input).pipe(
+      Effect.provide(FetchHttpClient.layer),
+      Effect.provideService(FetchHttpClient.Fetch, fetch),
+      Effect.provide(DshxEffect.tracerLayer),
+    ),
+  )
 
 const subscription = () => {
   const receiver = createECDH('prime256v1')
@@ -60,19 +73,18 @@ describe('WebPushSend', () => {
 
   it('records a web-push send span with the push service host and status, never the endpoint or payload', async () => {
     using recorder = recordSpans()
-    const fetch = vi.fn(async () => new Response(null, { status: 201 }))
-    const outcome = await WebPushSend.send({
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response(null, { status: 201 }))
+    const outcome = await sendWith(fetch, {
       subscription: subscription(),
       keys: WebPushCrypto.generateVapidKeys(),
       payload: WebPushSend.payloadOf(item()),
       subject: 'mailto:dsh-inbox@localhost',
       nowSeconds: 1_000,
-      fetch: fetch as unknown as typeof globalThis.fetch,
     })
     expect(outcome).toEqual({ kind: 'sent' })
-    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
-    expect(url).toBe('https://web.push.apple.com/QGx-secret-token')
-    const headers = new Headers(init.headers)
+    const [url, init] = fetch.mock.calls[0] ?? []
+    expect(String(url)).toBe('https://web.push.apple.com/QGx-secret-token')
+    const headers = new Headers(init?.headers)
     expect(headers.get('content-encoding')).toBe('aes128gcm')
     expect(headers.get('authorization')).toMatch(/^vapid t=.+, k=.+$/u)
     const span = recorder.span('web-push send')
@@ -82,11 +94,11 @@ describe('WebPushSend', () => {
 
   it('reports a forgotten subscription as gone and another refusal with what to do', async () => {
     const base = { subscription: subscription(), keys: WebPushCrypto.generateVapidKeys(), payload: WebPushSend.payloadOf(item()), subject: 's', nowSeconds: 1 }
-    const gone = await WebPushSend.send({ ...base, fetch: (async () => new Response(null, { status: 410 })) as unknown as typeof fetch })
+    const gone = await sendWith(async () => new Response(null, { status: 410 }), base)
     expect(gone).toEqual({ kind: 'gone' })
-    const refused = await WebPushSend.send({ ...base, fetch: (async () => new Response(null, { status: 403 })) as unknown as typeof fetch })
+    const refused = await sendWith(async () => new Response(null, { status: 403 }), base)
     expect(refused.kind === 'failed' && refused.message).toMatch(/Turn push off and on again/u)
-    const offline = await WebPushSend.send({ ...base, fetch: (async () => Promise.reject(new TypeError('fetch failed'))) as unknown as typeof fetch })
+    const offline = await sendWith(async () => Promise.reject(new TypeError('fetch failed')), base)
     expect(offline.kind === 'failed' && offline.message).toMatch(/could not be reached/u)
   })
 

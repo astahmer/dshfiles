@@ -4,8 +4,7 @@ import z from '@deepseek-ai/schemastery'
 import { TRANSCRIPT_VIEW_FIELD, TRANSCRIPT_VIEW_MODES, type TranscriptViewMode } from './transcript-view-modes.ts'
 
 // dshfiles: the namespace, field and modes live in the dependency-free transcript-view-modes module, which Chat's
-// view-mode agent tools (host.ts) import too.
-export { CHAT_SETTINGS_NAMESPACE, TRANSCRIPT_VIEW_FIELD, TRANSCRIPT_VIEW_MODES, type TranscriptViewMode } from './transcript-view-modes.ts'
+// view-mode agent tools (host.ts) import too; import them from there.
 
 /** Field carrying the independent work-details collapse timing. */
 export const COLLAPSE_TIMING_FIELD = 'collapseTiming'

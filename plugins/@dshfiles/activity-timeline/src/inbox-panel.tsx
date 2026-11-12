@@ -797,7 +797,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   const liveItems = data?.items ?? EMPTY_ITEMS
   const liveIds = useMemo(() => liveItems.map(item => item.id), [liveItems])
   const shownItems = HeldOrder.hold(liveItems, held)
-  const shownIds = shownItems.map(item => item.id)
+  const shownIds = useMemo(() => shownItems.map(item => item.id), [shownItems])
   const updates = HeldOrder.pending(liveIds, held)
   const holdOrder = (reason: 'hover' | 'focus', on: boolean): void => {
     holding.current = { ...holding.current, [reason]: on }
@@ -817,7 +817,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   useEffect(() => {
     if (cursor !== null && !shownIds.includes(cursor)) setCursor(InboxKeys.afterRemoval(previousIds.current, shownIds, cursor))
     previousIds.current = shownIds
-  })
+  }, [cursor, shownIds])
   useEffect(() => {
     setCursor(null)
     setSelected([])
@@ -1312,7 +1312,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
           {cursorItem === undefined ? null : (
             <RowPeek anchor={peekAnchor} open={peeking} onOpenChange={setPeeking} side="bottom">
               <PeekCard
-                title={cursorItem.reason}
+                heading={cursorItem.reason}
                 status={statusOf(cursorItem, view)}
                 statusLabel={statusLabelOf(statusOf(cursorItem, view), t)}
                 {...(cursorItem.subject.kind === 'session' ? { reply } : {})}

@@ -6,7 +6,7 @@
  * there is no flash and no second copy of the block.
  */
 import { WARM_STONE, type PaletteInput } from './palette.ts'
-import { blockDeclarations, themeCss } from './theme-css.ts'
+import { ThemeCss } from './theme-css.ts'
 
 export type ThemePresetId = 'warm-stone' | 'neutral' | 'high-contrast' | 'slate-blue' | 'moss'
 export type UiFont = 'geist' | 'system'
@@ -21,8 +21,10 @@ export interface ThemePreset extends ThemeInput {
 }
 
 /** Every preset; each passes the WCAG AA text checks in both schemes (`plugin-ui/tests/appearance.test.ts`). */
+const WARM_STONE_PRESET: ThemePreset = { id: 'warm-stone', label: 'Warm stone', description: 'Warm grey with an indigo accent (default).', ...WARM_STONE }
+
 export const THEME_PRESETS: readonly ThemePreset[] = [
-  { id: 'warm-stone', label: 'Warm stone', description: 'Warm grey with an indigo accent (default).', ...WARM_STONE },
+  WARM_STONE_PRESET,
   { id: 'neutral', label: 'Neutral', description: 'Pure grey with an indigo accent.', hue: 65, chroma: 0, accentHue: 270, contrast: 1 },
   {
     id: 'high-contrast',
@@ -66,8 +68,8 @@ export const APPEARANCE_BOUNDS = {
   contrast: { min: 1, max: 1.5 },
 } as const
 
-export function findPreset(id: string): ThemePreset {
-  return THEME_PRESETS.find(preset => preset.id === id) ?? (THEME_PRESETS[0] as ThemePreset)
+function findPreset(id: string): ThemePreset {
+  return THEME_PRESETS.find(preset => preset.id === id) ?? WARM_STONE_PRESET
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
@@ -75,7 +77,7 @@ const pick = (override: number | undefined, fallback: number, key: keyof typeof 
   typeof override === 'number' && Number.isFinite(override) ? clamp(override, APPEARANCE_BOUNDS[key].min, APPEARANCE_BOUNDS[key].max) : fallback
 
 /** The generator input for some Appearance settings: the preset, then each override inside its bounds. */
-export function resolveAppearance(settings: Partial<AppearanceSettings> | undefined): ThemeInput {
+function resolveAppearance(settings: Partial<AppearanceSettings> | undefined): ThemeInput {
   const preset = findPreset(settings?.preset ?? DEFAULT_PRESET)
   return {
     hue: pick(settings?.greyHue, preset.hue, 'hue'),
@@ -85,7 +87,7 @@ export function resolveAppearance(settings: Partial<AppearanceSettings> | undefi
   }
 }
 
-export function isDefaultInput(input: ThemeInput): boolean {
+function isDefaultInput(input: ThemeInput): boolean {
   return (
     input.hue === WARM_STONE.hue && input.chroma === WARM_STONE.chroma && input.accentHue === WARM_STONE.accentHue && input.contrast === WARM_STONE.contrast
   )
@@ -99,16 +101,16 @@ export function isDefaultInput(input: ThemeInput): boolean {
 export const RUNTIME_LIGHT_SELECTOR = 'html:root body'
 export const RUNTIME_DARK_SELECTOR = 'body[data-ds-dark-theme][data-ds-dark-theme][data-ds-dark-theme]'
 
-const UI_FONT_STACKS: Readonly<Record<UiFont, string>> = {
+const UI_FONT_STACKS = {
   geist:
     "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif",
   system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif",
-}
-const CODE_FONT_STACKS: Readonly<Record<CodeFont, string>> = {
+} as const satisfies Readonly<Record<UiFont, string>>
+const CODE_FONT_STACKS = {
   'geist-mono':
     "'Geist Mono', 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei', monospace",
   system: "'SF Mono', ui-monospace, 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei', monospace",
-}
+} as const satisfies Readonly<Record<CodeFont, string>>
 
 /**
  * The reading serif: system faces only (Charter on Apple devices, Iowan Old Style, then Georgia everywhere), so choosing
@@ -127,11 +129,11 @@ export const DEFAULT_FONT_STACKS = { text: UI_FONT_STACKS.geist, code: CODE_FONT
  * The CSS the runtime injects for some Appearance settings, or `''` when they reproduce the static default. Palette
  * and font overrides are independent: a font-only change emits only the font block.
  */
-export function runtimeThemeCss(settings: Partial<AppearanceSettings> | undefined): string {
+function runtimeThemeCss(settings: Partial<AppearanceSettings> | undefined): string {
   const input = resolveAppearance(settings)
   const parts: string[] = []
   if (!isDefaultInput(input)) {
-    const block = (selector: string, scheme: 'light' | 'dark') => [`${selector} {`, ...blockDeclarations(input, scheme), '}'].join('\n')
+    const block = (selector: string, scheme: 'light' | 'dark') => [`${selector} {`, ...ThemeCss.blockDeclarations(input, scheme), '}'].join('\n')
     parts.push(block(RUNTIME_LIGHT_SELECTOR, 'light'), block(RUNTIME_DARK_SELECTOR, 'dark'))
   }
   const uiFont = settings?.interfaceFont ?? DEFAULT_APPEARANCE.interfaceFont
@@ -157,6 +159,15 @@ export function runtimeThemeCss(settings: Partial<AppearanceSettings> | undefine
 }
 
 /** The static block for a preset, for review tables. */
-export function presetThemeCss(id: ThemePresetId): string {
-  return themeCss(resolveAppearance({ preset: id }))
+function presetThemeCss(id: ThemePresetId): string {
+  return ThemeCss.themeCss(resolveAppearance({ preset: id }))
+}
+
+/** Appearance settings resolved to theme presets, inputs and runtime CSS. */
+export class AppearanceModel {
+  static readonly findPreset = findPreset
+  static readonly resolveAppearance = resolveAppearance
+  static readonly isDefaultInput = isDefaultInput
+  static readonly runtimeThemeCss = runtimeThemeCss
+  static readonly presetThemeCss = presetThemeCss
 }

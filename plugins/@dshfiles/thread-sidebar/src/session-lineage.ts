@@ -1,6 +1,5 @@
-import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { HostContext } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer, Option } from 'effect'
+import { SidebarHost } from './sidebar-host-promise.js'
 
 /** The stored Session header fields the roll-up needs: whether a Session is a subagent, and whose. */
 export interface LineageHeader {
@@ -71,7 +70,7 @@ export class SessionLineage extends Context.Service<
   static readonly layer = Layer.effect(
     SessionLineage,
     Effect.gen(function* () {
-      const { ctx } = yield* HostContext
+      const host = yield* SidebarHost
       const cache = new Map<string, LineageHeader | undefined>()
       const remember = (sessionId: string, header: LineageHeader | undefined): void => {
         if (cache.size >= MAX_CACHED_HEADERS) {
@@ -82,40 +81,20 @@ export class SessionLineage extends Context.Service<
       }
       const headerOf = (sessionId: string): Effect.Effect<LineageHeader | undefined> => {
         if (cache.has(sessionId)) return Effect.succeed(cache.get(sessionId))
-        const persistence = ctx.get('sessionPersistence')
-        if (persistence === undefined) return Effect.succeed(undefined)
-        return Effect.tryPromise(signal => persistence.stat(SessionId(sessionId), { signal })).pipe(
-          Effect.option,
-          Effect.map(snapshot => {
-            const header = Option.getOrUndefined(snapshot)?.header
-            const lineage: LineageHeader | undefined =
-              header === undefined
-                ? undefined
-                : { subagent: header.origin === 'subagent', parentSessionId: header.parentSession === undefined ? undefined : String(header.parentSession) }
-            // A missing header may appear once the Session is written; only a read header is final.
-            if (lineage !== undefined) remember(sessionId, lineage)
-            return lineage
-          }),
+        return host.sessionHeader(sessionId).pipe(
+          Effect.map(Option.getOrUndefined),
+          // An unreadable header ends the walk here; it is not cached, so the next reconcile reads it again.
+          Effect.orElseSucceed(() => undefined),
+          // A missing header may appear once the Session is written; only a read header is final.
+          Effect.tap(lineage => Effect.sync(() => (lineage === undefined ? undefined : remember(sessionId, lineage)))),
         )
       }
       // Titles change with renames, so they are read per reconcile rather than cached with the lineage.
       const titles = (sessionIds: readonly string[]): Effect.Effect<ReadonlyMap<string, string>> => {
-        const controller = ctx.get('sessionController')
-        if (controller === undefined || sessionIds.length === 0) return Effect.succeed(new Map())
+        if (sessionIds.length === 0) return Effect.succeed(new Map())
         const wanted = new Set(sessionIds)
-        // The controller fills only the projections a request names (jj-integration asks the same way); the request type
-        // does not list the field, so it travels as a plain object.
-        const request: Parameters<typeof controller.list>[0] & { readonly projections: readonly string[] } = { projections: ['title'] }
-        return Effect.tryPromise(signal => controller.list(request, signal)).pipe(
-          Effect.map(
-            result =>
-              new Map(
-                result.items.flatMap(item => {
-                  const title = item.projections?.values.title
-                  return wanted.has(item.sessionId) && typeof title === 'string' && title.trim() !== '' ? [[String(item.sessionId), title.trim()] as const] : []
-                }),
-              ),
-          ),
+        return host.sessionTitles.pipe(
+          Effect.map((all): ReadonlyMap<string, string> => new Map([...all].filter(([sessionId]) => wanted.has(sessionId)))),
           Effect.orElseSucceed((): ReadonlyMap<string, string> => new Map()),
         )
       }

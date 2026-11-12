@@ -56,8 +56,12 @@ const count = (states: readonly RunFoldMemberState[]): RunFoldCounts => {
 }
 
 /** The summary's glyph: a problem outranks work in progress, which outranks a settled run. */
-const glyph = (counts: RunFoldCounts): RunFoldStatus =>
-  counts.failed > 0 ? 'failed' : counts.needsYou > 0 ? 'needs-you' : counts.working > 0 ? 'working' : counts.stopped === counts.total ? 'stopped' : 'done'
+const glyph = (counts: RunFoldCounts): RunFoldStatus => {
+  if (counts.failed > 0) return 'failed'
+  if (counts.needsYou > 0) return 'needs-you'
+  if (counts.working > 0) return 'working'
+  return counts.stopped === counts.total ? 'stopped' : 'done'
+}
 
 /** One kind's share of a run. */
 export interface RunFoldGroup {

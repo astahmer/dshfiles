@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ROW_SWIPE_COMMIT_PX, RowSwipeModel } from './row-swipe.js'
+import { ROW_SWIPE_COMMIT_PX } from '@dshfiles/plugin-ui/hooks/row-gestures'
+import { RowSwipeModel } from './row-swipe.js'
 
 describe('RowSwipeModel', () => {
   it('locks the gesture to the axis it leaves the tap slop on', () => {

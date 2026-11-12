@@ -3,27 +3,26 @@ import type { AttentionItem } from './attention-api.js'
 import { HeldOrder } from './held-order.js'
 import { InboxKeys } from './inbox-keys.js'
 
-const item = (input: Partial<AttentionItem> & Pick<AttentionItem, 'id'>): AttentionItem =>
-  ({
-    source: 'test.source',
-    dedupeKey: input.id,
-    subject: { kind: 'session', id: `session-${input.id}` },
-    reason: input.id,
-    detail: null,
-    severity: 'blocking',
-    verbs: ['Done', 'Snooze'],
-    choices: [],
-    fingerprint: 'f',
-    createdAt: 1,
-    openedAt: 1,
-    updatedAt: 1,
-    occurrences: 1,
-    resolvedAt: null,
-    doneAt: null,
-    snoozedUntil: null,
-    snoozeUntilChange: false,
-    ...input,
-  }) as AttentionItem
+const item = (input: Partial<AttentionItem> & Pick<AttentionItem, 'id'>): AttentionItem => ({
+  source: 'test.source',
+  dedupeKey: input.id,
+  subject: { kind: 'session', id: `session-${input.id}` },
+  reason: input.id,
+  detail: null,
+  severity: 'blocking',
+  verbs: ['Done', 'Snooze'],
+  choices: [],
+  fingerprint: 'f',
+  createdAt: 1,
+  openedAt: 1,
+  updatedAt: 1,
+  occurrences: 1,
+  resolvedAt: null,
+  doneAt: null,
+  snoozedUntil: null,
+  snoozeUntilChange: false,
+  ...input,
+})
 
 describe('InboxKeys', () => {
   it('answers only a recommended choice on Enter and never runs Land', () => {

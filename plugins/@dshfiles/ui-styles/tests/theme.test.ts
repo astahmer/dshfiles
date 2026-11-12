@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { contrastRatio, palette, WARM_STONE } from '@dshfiles/plugin-ui/theme/palette'
-import { DARK_SELECTOR, LIGHT_SELECTOR, syntaxColor, themeCss } from '@dshfiles/plugin-ui/theme/css'
+import { PaletteMath, WARM_STONE } from '@dshfiles/plugin-ui/theme/palette'
+import { ThemeCss, DARK_SELECTOR, LIGHT_SELECTOR } from '@dshfiles/plugin-ui/theme/css'
 import { describe, expect, it } from 'vitest'
 
 const generated = readFileSync(join(process.cwd(), 'src/theme.generated.css'), 'utf8')
@@ -9,7 +9,7 @@ const client = readFileSync(join(process.cwd(), 'src/client.css'), 'utf8')
 
 describe('theme block', () => {
   it('is the current generator output (run plugin-ui/scripts/emit-theme-css.ts after changing the palette)', () => {
-    expect(generated).toBe(themeCss())
+    expect(generated).toBe(ThemeCss.themeCss())
   })
 
   it('is imported unlayered by the injected sheet', () => {
@@ -29,8 +29,8 @@ describe('theme block', () => {
 
   it('keeps Shiki token colours readable on the code block', () => {
     for (const scheme of ['light', 'dark'] as const) {
-      const code = palette({ ...WARM_STONE, scheme }).neutral[1]!
-      for (const hue of [20, 245, 55, 300, 210]) expect(contrastRatio(syntaxColor(hue, scheme), code)).toBeGreaterThanOrEqual(4.5)
+      const code = PaletteMath.palette({ ...WARM_STONE, scheme }).neutral[1]!
+      for (const hue of [20, 245, 55, 300, 210]) expect(PaletteMath.contrastRatio(ThemeCss.syntaxColor(hue, scheme), code)).toBeGreaterThanOrEqual(4.5)
     }
   })
 })

@@ -2,7 +2,7 @@ import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { memo, useEffect, useMemo, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { threadSidebarLiveTurnsApi } from './live-turns-api.js'
 
 /**
@@ -93,7 +93,7 @@ export const LiveElapsed = memo((props: { readonly startedAt: number; readonly a
 })
 
 /** Every shimmer starts at the same phase of the page clock, so a list of working rows sweeps in step. */
-const shimmerDelay = (): string => `-${String(Math.round((typeof performance === 'undefined' ? 0 : performance.now()) % 2200))}ms`
+const shimmerDelay = (): string => `-${String(Math.round(('performance' in globalThis ? performance.now() : 0) % 2200))}ms`
 
 /**
  * The working step in the shimmer, then the elapsed time. `active` false (off screen) pauses both. Colourless: the
@@ -101,7 +101,7 @@ const shimmerDelay = (): string => `-${String(Math.round((typeof performance ===
  */
 export const LiveActivityLine = memo(
   (props: { readonly step: string; readonly startedAt: number | undefined; readonly active: boolean; readonly className?: string }): JSX.Element => {
-    const delay = useMemo(shimmerDelay, [])
+    const delay = useMemo(() => shimmerDelay(), [])
     return (
       <span className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1', props.className)} data-live-activity="">
         <span
@@ -164,16 +164,24 @@ export const useLiveTurns = (runningIds: readonly string[], listReady: boolean):
   })
   // Where an older Host has no read, this tab remembers when it saw each thread start running. A thread already running
   // when the list first rendered has no known start (null), so it shows its step without a made-up clock.
-  const seenStarts = useRef<Map<string, number | null> | null>(null)
+  // The clock is read after the render that saw the change, so a new start shows from the next frame on.
+  const [seenStarts, setSeenStarts] = useState<ReadonlyMap<string, number | null> | null>(null)
+  useEffect(() => {
+    // Until the session list has loaded, every running thread counts as already running.
+    if (!listReady) return
+    const now = Date.now()
+    setSeenStarts(current => {
+      const running = new Set(runningIds)
+      const next = new Map<string, number | null>(current ?? runningIds.map(id => [id, null]))
+      for (const id of next.keys()) if (!running.has(id)) next.delete(id)
+      for (const id of runningIds) if (!next.has(id)) next.set(id, now)
+      const same = current !== null && current.size === next.size && [...next].every(([id, start]) => current.get(id) === start)
+      return same ? current : next
+    })
+  }, [runningIds, listReady])
   const previous = useRef<ReadonlyMap<string, LiveTurnView>>(EMPTY_TURNS)
   return useMemo(() => {
-    const now = Date.now()
-    const running = new Set(runningIds)
-    // Until the session list has loaded, every running thread counts as already running.
-    if (seenStarts.current === null && listReady) seenStarts.current = new Map(runningIds.map(id => [id, null]))
-    const seen = seenStarts.current ?? new Map<string, number | null>(runningIds.map(id => [id, null]))
-    for (const id of seen.keys()) if (!running.has(id)) seen.delete(id)
-    for (const id of runningIds) if (!seen.has(id)) seen.set(id, now)
+    const seen = seenStarts ?? new Map<string, number | null>()
     const data = query.data
     const skew = data === undefined ? 0 : data.readAt - data.now
     const host = new Map((data?.turns ?? []).map(turn => [turn.sessionId, turn]))
@@ -184,7 +192,7 @@ export const useLiveTurns = (runningIds: readonly string[], listReady: boolean):
     }
     previous.current = stabilize(previous.current, next)
     return previous.current
-  }, [runningIds, listReady, query.data])
+  }, [runningIds, seenStarts, query.data])
 }
 
 export class LiveActivityModel {

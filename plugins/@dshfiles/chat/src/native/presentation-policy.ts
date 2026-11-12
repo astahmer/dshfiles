@@ -1,7 +1,8 @@
 /** Chat presentation derived from Host-backed detail and collapse timing. */
 
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import type { CollapseTiming, TranscriptViewMode } from '../chat-settings.ts'
+import type { CollapseTiming } from '../chat-settings.ts'
+import type { TranscriptViewMode } from '../transcript-view-modes.ts'
 export { COLLAPSE_TIMINGS, type CollapseTiming } from '../chat-settings.ts'
 
 /** Presentation capabilities that one work-details mode enables. */

@@ -241,8 +241,8 @@ const useSegmentCapacity = (input: {
         others += element.scrollWidth
       }
       let fixed = 0
-      for (const child of Array.from(root.children) as HTMLElement[]) {
-        if (child.matches('[data-quota-segment], [data-quota-overflow], [data-quota-measure]')) continue
+      for (const child of root.children) {
+        if (!(child instanceof HTMLElement) || child.matches('[data-quota-segment], [data-quota-overflow], [data-quota-measure]')) continue
         fixed += child.offsetWidth + 4
       }
       const ownStyle = own === null ? null : getComputedStyle(own)

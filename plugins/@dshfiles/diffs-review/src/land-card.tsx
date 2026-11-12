@@ -293,7 +293,8 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
             Undo
           </Button>
         </div>
-      ) : thread !== null && revisions.length > 0 ? (
+      ) : null}
+      {thread !== null && thread.integrationQueuedAt === undefined && revisions.length > 0 ? (
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
           <Button
             aria-describedby={readiness.reason === undefined ? undefined : 'land-card-reason'}
@@ -321,7 +322,8 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
             </p>
           )}
         </div>
-      ) : extraActions !== null && extraActions.length > 0 ? (
+      ) : null}
+      {(thread === null || (thread.integrationQueuedAt === undefined && revisions.length === 0)) && extraActions !== null && extraActions.length > 0 ? (
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">{extraActions}</div>
       ) : null}
       {notice === null ? null : (

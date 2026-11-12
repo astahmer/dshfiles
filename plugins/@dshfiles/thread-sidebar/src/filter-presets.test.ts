@@ -1,3 +1,4 @@
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { presetNameIssue } from './filter-presets.js'
 import {
@@ -113,7 +114,8 @@ describe('filter presets (b:xpvk)', () => {
       ...Model.editThreadViewFilters(Model.createPresetFromCurrent(working(), { id: 'mine', name: 'Mine', workspaceFilter: '' }), { groupBy: 'date' }),
       showPresetChips: true,
     }
-    const encoded = JSON.parse(JSON.stringify(document))
+    // What a store round trip hands back: the JSON text read as plain data.
+    const encoded = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))(JSON.stringify(document))
     expect(Model.decodeThreadViewSettings(encoded)).toEqual(document)
     // A document written before presets decodes with them on and chips off.
     const { showPresets: _on, showPresetChips: _chips, ...older } = DEFAULT_THREAD_VIEW_SETTINGS

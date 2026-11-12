@@ -22,15 +22,15 @@ export interface HostShortcutRow {
   readonly keys: readonly string[]
 }
 
-const SCOPE_TITLES: Readonly<Record<string, string>> = {
-  global: 'Global',
-  page: 'Global',
-  'not-typing': 'Global',
-  list: 'Lists',
-  triage: 'Triage',
-  changes: 'Changes',
-  composer: 'Composer',
-}
+const SCOPE_TITLES = new Map<string, string>([
+  ['global', 'Global'],
+  ['page', 'Global'],
+  ['not-typing', 'Global'],
+  ['list', 'Lists'],
+  ['triage', 'Triage'],
+  ['changes', 'Changes'],
+  ['composer', 'Composer'],
+])
 
 /**
  * Host registry labels use the core's words ("New Session", "Search sessions"). The sheet speaks the glossary
@@ -86,7 +86,7 @@ const sections = (input: {
       return parsed !== undefined && (input.singleKeys || !parsed.characterKey)
     })
     if (specs.length === 0) continue
-    add(command.section ?? SCOPE_TITLES[command.scope ?? 'global'] ?? 'Global', {
+    add(command.section ?? SCOPE_TITLES.get(command.scope ?? 'global') ?? 'Global', {
       id: command.id,
       label: command.title,
       keys: CommandKeys.compact(specs),

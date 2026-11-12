@@ -17,9 +17,9 @@ const rowOf = (input: { readonly available: number; readonly expanded: number[];
       : row.hasAttribute('data-model-compact')
         ? (input.compact[index] ?? 0)
         : (input.expanded[index] ?? 0)
-  row.getBoundingClientRect = () => ({ width: input.available }) as DOMRect
+  row.getBoundingClientRect = () => new DOMRect(0, 0, input.available, 0)
   items.forEach((item, index) => {
-    item.getBoundingClientRect = () => ({ width: widthOf(index) }) as DOMRect
+    item.getBoundingClientRect = () => new DOMRect(0, 0, widthOf(index), 0)
   })
   document.body.append(row)
   return row
@@ -80,7 +80,8 @@ describe('the new-thread bar (b:gyk7)', () => {
 describe('an item on a line of its own (b:4qjm)', () => {
   it('leaves the phone place chip out of the line it would otherwise crowd', () => {
     const row = rowOf({ available: 200, expanded: [300, 28, 90, 28], compact: [300, 28, 40, 28], icon: [300, 28, 40, 28] })
-    const place = row.firstElementChild as HTMLElement
+    const place = row.firstElementChild
+    if (!(place instanceof HTMLElement)) throw new Error('the row has no place chip')
     place.setAttribute('data-row-break', '')
     place.style.flexBasis = '100%'
     const stop = observeControlRow(row)

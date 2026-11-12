@@ -61,33 +61,64 @@ export type TurnMarkFilter = 'all' | 'questions' | 'errors' | 'edits'
 
 export const TURN_MARK_FILTERS: readonly TurnMarkFilter[] = ['all', 'questions', 'errors', 'edits']
 
-type Fields = Readonly<Record<string, unknown>>
-const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+/** A wire file entry's fields, each still unchecked. */
+interface FileFields {
+  readonly path?: unknown
+  readonly added?: unknown
+  readonly removed?: unknown
+}
 
-const narrowFile = (value: unknown): TurnMarkFile | undefined => {
-  if (typeof value !== 'object' || value === null) return undefined
-  const file = value as Fields
-  const path = file['path']
-  if (typeof path !== 'string' || path === '' || !isCount(file['added']) || !isCount(file['removed'])) return undefined
-  return { path, added: file['added'], removed: file['removed'] }
+/** A wire Turn entry's fields, each still unchecked. */
+interface EntryFields {
+  readonly turn?: unknown
+  readonly seq?: unknown
+  readonly question?: unknown
+  readonly questionOpen?: unknown
+  readonly failed?: unknown
+  readonly files?: unknown
+  readonly fileCount?: unknown
+  readonly added?: unknown
+  readonly removed?: unknown
+}
+
+const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+const isFlag = (value: unknown): value is boolean => typeof value === 'boolean'
+/** Any non-null object reads as one of the field interfaces above: every field is optional and still unchecked. */
+const isFields = (value: unknown): value is object => typeof value === 'object' && value !== null
+
+const parseFile = (value: unknown): TurnMarkFile | undefined => {
+  if (!isFields(value)) return undefined
+  const { path, added, removed }: FileFields = value
+  if (typeof path !== 'string' || path === '' || !isCount(added) || !isCount(removed)) return undefined
+  return { path, added, removed }
 }
 
 /**
  * One wire entry, narrowed by hand: the map re-reads every Turn's entry when the projection changes, so a schema decode
  * per entry would sit on a long thread's open path. A malformed entry is dropped.
  */
-const narrowEntry = (value: unknown): TurnMark | undefined => {
-  if (typeof value !== 'object' || value === null) return undefined
-  const entry = value as Fields
-  const { turn, seq, fileCount, added, removed, files } = entry
+const parseEntry = (value: unknown): TurnMark | undefined => {
+  if (!isFields(value)) return undefined
+  const { turn, seq, question, questionOpen, failed, fileCount, added, removed, files }: EntryFields = value
   if (!isCount(turn) || !isCount(seq) || !isCount(fileCount) || !isCount(added) || !isCount(removed) || !Array.isArray(files)) return undefined
-  if (typeof entry['question'] !== 'boolean' || typeof entry['questionOpen'] !== 'boolean' || typeof entry['failed'] !== 'boolean') return undefined
+  if (!isFlag(question) || !isFlag(questionOpen) || !isFlag(failed)) return undefined
   const narrowed: TurnMarkFile[] = []
   for (const file of files) {
-    const next = narrowFile(file)
+    const next = parseFile(file)
     if (next !== undefined) narrowed.push(next)
   }
-  return { turn, seq, question: entry['question'], questionOpen: entry['questionOpen'], failed: entry['failed'], files: narrowed, fileCount, added, removed }
+  return { turn, seq, question, questionOpen, failed, files: narrowed, fileCount, added, removed }
+}
+
+/** Narrow the projection's wire value, entry by entry: a malformed entry is dropped, never the whole map. */
+const parseMarks = (value: unknown): ReadonlyMap<number, TurnMark> => {
+  if (!Array.isArray(value) || value.length === 0) return EMPTY
+  const marks = new Map<number, TurnMark>()
+  for (const raw of value) {
+    const entry = parseEntry(raw)
+    if (entry !== undefined) marks.set(entry.turn, entry)
+  }
+  return marks
 }
 
 const EMPTY: ReadonlyMap<number, TurnMark> = new Map()
@@ -96,19 +127,8 @@ const EMPTY: ReadonlyMap<number, TurnMark> = new Map()
 export class TurnMarksModel {
   static readonly key = TURN_MARKS_PROJECTION_KEY
 
-  /**
-   * Narrow the projection's wire value, entry by entry: a malformed entry is dropped, never the whole map.
-   * @returns marks by Turn number; empty when the projection is absent.
-   */
-  static readonly byTurn = (value: unknown): ReadonlyMap<number, TurnMark> => {
-    if (!Array.isArray(value) || value.length === 0) return EMPTY
-    const marks = new Map<number, TurnMark>()
-    for (const raw of value) {
-      const entry = narrowEntry(raw)
-      if (entry !== undefined) marks.set(entry.turn, entry)
-    }
-    return marks
-  }
+  /** @returns marks by Turn number; empty when the projection is absent. */
+  static readonly byTurn = parseMarks
 
   static readonly kindOf = (mark: TurnMark | undefined): TurnMarkKind => {
     if (mark === undefined) return 'prompt'

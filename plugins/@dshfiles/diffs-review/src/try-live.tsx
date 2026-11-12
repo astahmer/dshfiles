@@ -11,9 +11,9 @@ import { useState } from 'react'
 
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
 
-const Group = (props: { readonly title: string; readonly names: readonly string[]; readonly empty: string; readonly testId: string }): JSX.Element => (
+const Group = (props: { readonly heading: string; readonly names: readonly string[]; readonly empty: string; readonly testId: string }): JSX.Element => (
   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1" data-testid={props.testId}>
-    <h4 className="dshx:text-xs dshx:font-medium">{props.title}</h4>
+    <h4 className="dshx:text-xs dshx:font-medium">{props.heading}</h4>
     {props.names.length === 0 ? (
       <p className={HINT}>{props.empty}</p>
     ) : (
@@ -41,12 +41,12 @@ const Impact = (props: { readonly impact: LandImpactView }): JSX.Element => {
         from
         {plan.restartNeeded ? ', and DSH needs a restart to load all of it.' : ', and everything applies without a restart.'}
       </p>
-      <Group empty="No plugin client changes." names={live} testId="try-live-hot" title="Hot-reloads in open tabs" />
+      <Group empty="No plugin client changes." names={live} testId="try-live-hot" heading="Hot-reloads in open tabs" />
       <Group
         empty="Nothing waits for a restart."
         names={restart.length === 0 && plan.restartNeeded ? plan.restartReasons : restart}
         testId="try-live-restart"
-        title="Needs a restart"
+        heading="Needs a restart"
       />
       {plan.installs.length === 0 ? null : <p className={HINT}>Reinstalls dependencies in {plan.installs.join(', ')}.</p>}
     </div>

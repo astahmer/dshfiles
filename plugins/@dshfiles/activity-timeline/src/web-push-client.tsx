@@ -3,6 +3,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { Option, Schema } from 'effect'
 import { useEffect, useId } from 'react'
 import type { InboxTranslate } from './inbox-locales.js'
 import { webPushApi, WEB_PUSH_WORKER_PATH, WEB_PUSH_WORKER_SCOPE } from './web-push-api.js'
@@ -13,29 +14,36 @@ type Support = 'supported' | 'ios-home-screen' | 'unsupported'
 
 /** Push needs a service worker and the Push API; on iOS both exist only in a Home Screen app (iOS 16.4+). */
 const support = (): Support => {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') return 'unsupported'
+  if (typeof window === 'undefined') return 'unsupported'
   if ('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext) return 'supported'
   const ios = /iPhone|iPad|iPod/u.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   return ios ? 'ios-home-screen' : 'unsupported'
 }
 
+/** Device and browser names by user-agent pattern, first match wins (Chrome on iOS says Safari too, so it comes first). */
+const DEVICES = [
+  [/iPhone/u, 'iPhone'],
+  [/iPad/u, 'iPad'],
+  [/Android/u, 'Android'],
+  [/Mac OS X/u, 'Mac'],
+  [/Windows/u, 'Windows'],
+] as const
+const BROWSERS = [
+  [/CriOS|Chrome/u, 'Chrome'],
+  [/Firefox|FxiOS/u, 'Firefox'],
+  [/Safari/u, 'Safari'],
+] as const
+
 /** A name the device list can show, from the browser's own description; no identifier leaves the device. */
 const deviceLabel = (): string => {
   const agent = navigator.userAgent
-  const device = /iPhone/u.test(agent)
-    ? 'iPhone'
-    : /iPad/u.test(agent)
-      ? 'iPad'
-      : /Android/u.test(agent)
-        ? 'Android'
-        : /Mac OS X/u.test(agent)
-          ? 'Mac'
-          : /Windows/u.test(agent)
-            ? 'Windows'
-            : 'Device'
-  const browser = /CriOS|Chrome/u.test(agent) ? 'Chrome' : /Firefox|FxiOS/u.test(agent) ? 'Firefox' : /Safari/u.test(agent) ? 'Safari' : 'browser'
+  const device = DEVICES.find(([pattern]) => pattern.test(agent))?.[1] ?? 'Device'
+  const browser = BROWSERS.find(([pattern]) => pattern.test(agent))?.[1] ?? 'browser'
   return `${device} · ${browser}`
 }
+
+/** The worker's "open this item" message; anything else on the channel is ignored. */
+const decodeOpenMessage = Schema.decodeUnknownOption(Schema.Struct({ type: Schema.Literal('dshfiles-web-push-open'), url: Schema.String }))
 
 const keyBytes = (base64url: string): Uint8Array<ArrayBuffer> => {
   const text = atob(base64url.replaceAll('-', '+').replaceAll('_', '/'))
@@ -59,10 +67,8 @@ const Control = (props: { readonly t: InboxTranslate }): JSX.Element | null => {
   useEffect(() => {
     if (mode !== 'supported') return
     const open = (event: MessageEvent): void => {
-      const data: unknown = event.data
-      if (typeof data !== 'object' || data === null || (data as { type?: unknown }).type !== 'dshfiles-web-push-open') return
-      const url = (data as { url?: unknown }).url
-      if (typeof url === 'string' && new URL(url).origin === window.location.origin) window.location.assign(url)
+      const message = decodeOpenMessage(event.data)
+      if (Option.isSome(message) && new URL(message.value.url).origin === window.location.origin) window.location.assign(message.value.url)
     }
     navigator.serviceWorker.addEventListener('message', open)
     return () => navigator.serviceWorker.removeEventListener('message', open)

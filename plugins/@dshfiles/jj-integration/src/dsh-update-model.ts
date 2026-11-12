@@ -90,7 +90,12 @@ export const landImpactSchema = Schema.Struct({
 export type LandImpactView = typeof landImpactSchema.Type
 
 /** hmr-gate's rule, applied to the plan: client-only bundles hot-reload, a changed Host half waits for a restart. */
-const impactGroups = (plan: CheckoutPlanView): { readonly live: readonly string[]; readonly restart: readonly string[] } => ({
+interface ImpactGroups {
+  readonly live: readonly string[]
+  readonly restart: readonly string[]
+}
+
+const impactGroups = (plan: CheckoutPlanView): ImpactGroups => ({
   live: plan.plugins.filter(plugin => plugin.client && !plugin.host).map(plugin => plugin.name),
   restart: plan.plugins.filter(plugin => plugin.host).map(plugin => plugin.name),
 })

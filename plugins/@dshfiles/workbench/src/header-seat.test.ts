@@ -1,17 +1,16 @@
 // @vitest-environment jsdom
-import type { DockviewGroupPanel, DockviewPanelApi } from 'dockview-react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { HeaderSeats, SEAT_MIN_FREE_PX } from './header-seat.js'
+import { HeaderSeats, SEAT_MIN_FREE_PX, type SeatGroup, type SeatPanel } from './header-seat.js'
 
-const group = (options: { readonly width: number; readonly hidden?: boolean }) => {
+const group = (options: { readonly width: number; readonly hidden?: boolean }): SeatGroup => {
   const element = document.createElement('div')
   element.innerHTML =
     '<div class="dv-tabs-and-actions-container"><div class="dv-scrollable"><div class="dv-tabs-container"></div></div><div class="dv-void-container"></div><div class="dv-right-actions-container"></div></div>'
   Object.defineProperty(element, 'clientWidth', { configurable: true, value: options.width })
   document.body.append(element)
-  return { element, header: { hidden: options.hidden ?? false } } as unknown as DockviewGroupPanel
+  return { element, header: { hidden: options.hidden ?? false } }
 }
-const panel = (owner: DockviewGroupPanel, visible = true) => ({ group: owner, isVisible: visible }) as unknown as DockviewPanelApi
+const panel = (owner: SeatGroup, visible = true): SeatPanel => ({ group: owner, isVisible: visible })
 
 afterEach(() => {
   document.body.replaceChildren()

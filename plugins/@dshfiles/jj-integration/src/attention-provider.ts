@@ -214,10 +214,12 @@ const make = Effect.gen(function* () {
     const sessionIds = [...threads, ...titledOnly].flatMap(thread => thread.sessionIds.slice(-1))
     const activity = sessionIds.length === 0 ? new Map() : yield* sessions.listActivity(sessionIds).pipe(Effect.orElseSucceed(() => new Map()))
     const facts = new Map<string, ReadyFacts>()
-    for (const thread of threads) {
+    // One workspace after another: each stat is a jj process, and jj answers a repeat from its view-read cache.
+    const stats = yield* Effect.forEach(threads, statOf)
+    for (const [index, thread] of threads.entries()) {
       const sessionId = thread.sessionIds.at(-1)
       const title = sessionId === undefined ? undefined : activity.get(sessionId)?.title
-      facts.set(thread.path, { threadTitle: typeof title === 'string' && title.trim() !== '' ? title.trim() : undefined, stat: yield* statOf(thread) })
+      facts.set(thread.path, { threadTitle: typeof title === 'string' && title.trim() !== '' ? title.trim() : undefined, stat: stats[index] })
     }
     for (const thread of titledOnly) {
       const sessionId = thread.sessionIds.at(-1)

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { LayoutMerge, SidebarDockHost } from './sidebar-dock-host.js'
 import { SidebarPreferencesModel } from './preferences.js'
 import { DEFAULT_PREFERENCES } from './organization.js'
@@ -49,8 +49,10 @@ describe('LayoutMerge.decide (b:952m)', () => {
 
 describe('SidebarDockHost', () => {
   it('publishes the lent element and ignores a stale release', () => {
-    const listener = vi.fn()
-    const unsubscribe = SidebarDockHost.subscribe(listener)
+    let notified = 0
+    const unsubscribe = SidebarDockHost.subscribe(() => {
+      notified += 1
+    })
     const first = document.createElement('div')
     const second = document.createElement('div')
     const releaseFirst = SidebarDockHost.attach(first)
@@ -59,7 +61,7 @@ describe('SidebarDockHost', () => {
     expect(SidebarDockHost.get()).toBe(second)
     releaseSecond()
     expect(SidebarDockHost.get()).toBeNull()
-    expect(listener).toHaveBeenCalledTimes(3)
+    expect(notified).toBe(3)
     unsubscribe()
   })
 })

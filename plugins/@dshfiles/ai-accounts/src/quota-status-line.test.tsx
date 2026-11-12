@@ -15,11 +15,23 @@ const host = vi.hoisted(() => ({
   usage: vi.fn<AccountsClient['usage']>(),
   refreshUsage: vi.fn<AccountsClient['refreshUsage']>(),
 }))
-const settings = vi.hoisted(() => ({
-  value: { hiddenUsageAccounts: [], usageShortNameOverrides: {}, edgeWidget: false },
-  set: vi.fn(async () => true),
-  unset: vi.fn(async () => true),
-}))
+/** The status-line settings these tests read and flip; the optional ones are absent unless a test sets them. */
+interface StatusLineSettings {
+  hiddenUsageAccounts: string[]
+  usageShortNameOverrides: Record<string, string>
+  edgeWidget: boolean
+  usageShortNames?: boolean
+  showResetTimes?: boolean
+}
+
+const settings = vi.hoisted(() => {
+  const value: StatusLineSettings = { hiddenUsageAccounts: [], usageShortNameOverrides: {}, edgeWidget: false }
+  return {
+    value,
+    set: vi.fn(async () => true),
+    unset: vi.fn(async () => true),
+  }
+})
 vi.mock('@dshfiles/dshx/client', async importOriginal => ({
   ...(await importOriginal<typeof import('@dshfiles/dshx/client')>()),
   useApi: () => host,
@@ -62,7 +74,7 @@ const mount = async (input: {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
   const container = document.createElement('div')
   container.setAttribute('data-status-strip', 'full')
-  container.getBoundingClientRect = () => ({ width: input.stripWidth ?? 1400 }) as DOMRect
+  container.getBoundingClientRect = () => new DOMRect(0, 0, input.stripWidth ?? 1400, 0)
   document.body.append(container)
   const root = createRoot(container)
   roots.push({ root, container, client })
@@ -152,7 +164,7 @@ describe('quota status line', () => {
   })
 
   it('names a segment by its short name, or in full once short names are off', async () => {
-    const value = settings.value as Record<string, unknown>
+    const { value } = settings
     value.usageShortNameOverrides = { cc1: 'WRK' }
     try {
       const named = await mount({ cards: [card('cc1', 'Command Code 1', 51)] })
@@ -197,7 +209,7 @@ describe('quota status line', () => {
   })
 
   it('hides reset times when Show reset times is off (b:jaz6)', async () => {
-    const value = settings.value as Record<string, unknown>
+    const { value } = settings
     value.showResetTimes = false
     try {
       const container = await mount({ cards: [card('fine', 'Fine', 51), card('spent', 'Spent', 0)] })

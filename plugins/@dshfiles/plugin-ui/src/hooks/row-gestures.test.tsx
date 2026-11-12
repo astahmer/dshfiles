@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ROW_LONG_PRESS_MS, ROW_SWIPE_COMMIT_PX, RowGestureModel, useRowGestures } from './row-gestures.js'
 
-const pointer = (type: string, x: number, y: number, extra: Record<string, unknown> = {}) => {
+const pointer = (type: string, x: number, y: number, extra: { readonly pointerType?: string } = {}) => {
   const row = document.createElement('div')
   return {
     type,

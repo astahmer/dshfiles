@@ -11,6 +11,7 @@ import { Api, DshxPlugin, hostService, WebRoutes } from '@dshfiles/dshx/effect'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { Clock, Context, Effect, Layer, Option, Schema, Stream, SynchronizedRef } from 'effect'
+import { FetchHttpClient, HttpClient } from 'effect/http'
 import { AttentionInbox } from './attention-store.js'
 import { WebPushCrypto, type VapidKeys } from './web-push-crypto.js'
 import { webPushApi, WEB_PUSH_WORKER_PATH, type WebPushDevice, type WebPushStatus } from './web-push-api.js'
@@ -64,6 +65,7 @@ const publicDevice = (device: DeviceRecord): WebPushDevice => ({
 })
 
 const make = Effect.gen(function* () {
+  const client = yield* HttpClient.HttpClient
   const storageFailed = (operation: string) => (cause: unknown) => new WebPushStorageFailed({ operation, cause })
   const domain = yield* (yield* StorageDomain).open(webPushDomain).pipe(Effect.mapError(storageFailed('open')))
   const keysTable = domain.table('keys')
@@ -100,8 +102,8 @@ const make = Effect.gen(function* () {
       device =>
         Effect.gen(function* () {
           const now = yield* Clock.currentTimeMillis
-          const outcome = yield* Effect.promise(() =>
-            WebPushSend.send({ subscription: device, keys, payload, subject: VAPID_SUBJECT, nowSeconds: Math.floor(now / 1000) }),
+          const outcome = yield* WebPushSend.send({ subscription: device, keys, payload, subject: VAPID_SUBJECT, nowSeconds: Math.floor(now / 1000) }).pipe(
+            Effect.provideService(HttpClient.HttpClient, client),
           )
           if (outcome.kind === 'gone') {
             yield* dropDevice(device.id)
@@ -211,7 +213,8 @@ export class WebPush extends Context.Service<
     ) => Effect.Effect<{ readonly sent: number; readonly failed: number; readonly errors: readonly string[] }, WebPushStorageFailed>
   }
 >()('@dshfiles/activity-timeline/WebPush') {
-  static readonly layer = Layer.effect(WebPush, make)
+  /** Pushes go out through the fetch HTTP client. */
+  static readonly layer = Layer.effect(WebPush, make).pipe(Layer.provide(FetchHttpClient.layer))
 }
 
 export const webPushHandlers = Api.handlers(webPushApi, {

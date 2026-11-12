@@ -244,6 +244,7 @@ const install = (target: Window, options: ShortcutLayerOptions): (() => void) =>
     const bindings = options.bindings()
     const singleKeysOn = singleKeys()
 
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- a snapshot: `pending` is cleared on the next line.
     const waiting = pending
     pending = undefined
     if (waiting !== undefined && now() - waiting.at <= CommandKeys.SEQUENCE_MS) {
@@ -303,7 +304,6 @@ const normalizeScope = (scope: string | undefined): ShortcutScope => {
 }
 
 export class ShortcutKeyboardModel {
-  static readonly isMacPlatform = CommandKeys.isMacPlatform
   /** Whether the event landed somewhere that consumes plain character keys. */
   static readonly isEditableTarget = isEditableTarget
 

@@ -32,7 +32,13 @@ export interface ThreadFindAnswer {
 /** The find bar shows the newest 500 matches and "500+" past them rather than paging. */
 export const THREAD_FIND_LIMIT = 500
 
+/** session-search's decoded answer. */
+export type ThreadFindReply = typeof findInThreadSchema.Type
+
 const decode = Schema.decodeUnknownOption(findInThreadSchema)
+
+/** The registered call's answer read at Chat's boundary; undefined when it is not the shape this view reads. */
+const decodeReply = (raw: unknown): ThreadFindReply | undefined => Option.getOrUndefined(decode(raw))
 
 /** The registered API identity the port calls. */
 export const SESSION_SEARCH_FIND_API = { owner: '@dshfiles/session-search', id: 'session-search', version: 1, methods: ['findInThread'] } as const
@@ -40,7 +46,7 @@ export const SESSION_SEARCH_FIND_API = { owner: '@dshfiles/session-search', id: 
 export type ThreadFindCall = (
   input: { readonly sessionId: string; readonly text: string; readonly limit: number; readonly newest: boolean },
   signal: AbortSignal,
-) => Promise<unknown>
+) => Promise<ThreadFindReply | undefined>
 
 /** The search could not run; `missing` means no plugin serves it (the loaded-window fallback applies). */
 export class ThreadFindUnavailable extends Error {
@@ -59,6 +65,8 @@ declare global {
 
 export class ThreadFindPort {
   /** Client-entry wires the registered API client once. */
+  static readonly decodeReply = decodeReply
+
   static readonly set = (next: ThreadFindCall | null): void => {
     globalThis.__dshfilesChatThreadFind = next
   }
@@ -70,11 +78,9 @@ export class ThreadFindPort {
   static readonly search = async (input: { readonly sessionId: string; readonly query: string }, signal: AbortSignal): Promise<ThreadFindAnswer> => {
     const call = globalThis.__dshfilesChatThreadFind
     if (call === null || call === undefined) throw new ThreadFindUnavailable(true, 'Thread search is not installed.')
-    const raw = await call({ sessionId: input.sessionId, text: input.query, limit: THREAD_FIND_LIMIT, newest: true }, signal)
-    const decoded = decode(raw)
-    if (Option.isNone(decoded))
+    const answer = await call({ sessionId: input.sessionId, text: input.query, limit: THREAD_FIND_LIMIT, newest: true }, signal)
+    if (answer === undefined)
       throw new ThreadFindUnavailable(false, 'Thread search answered in a shape this view does not read. Update @dshfiles/session-search and restart DSH.')
-    const answer = decoded.value
     return {
       state: answer.ownsService ? 'ready' : 'unavailable',
       total: answer.matches.length + (answer.hasMore ? 1 : 0),

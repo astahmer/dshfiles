@@ -66,7 +66,7 @@ import { NewThreadSource } from './new-thread-source.js'
 import { TabRows } from './tab-row-visibility.js'
 import { MAIN_TABS_ATTRIBUTE, mainTabsHidden } from './header-seat.js'
 import { SidebarPreviewMigration } from './sidebar-preview-migration.js'
-import { ShellMerge, SIDEBAR_PANE_ID, workbenchLayoutReset, workbenchLeftKeep, workbenchShellMerge } from './shell-merge.js'
+import { WorkbenchPorts, ShellMerge, SIDEBAR_PANE_ID } from './shell-merge.js'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { PhoneSheet, phoneAwareDockActions, usePhoneSheetOpen, usePhoneWidth } from './phone-sheet.js'
 
@@ -1034,7 +1034,7 @@ export default defineClient({
     const applyLeftKeeps = (): void => {
       const left = regions.get('left')
       if (left === undefined) return
-      const requests = workbenchLeftKeep().take()
+      const requests = WorkbenchPorts.leftKeep().take()
       if (requests.length === 0) return
       for (const request of requests) {
         const definition = registry.get(request.viewId) ?? registry.list().find(panel => panel.mainPanelId === request.viewId)
@@ -1066,7 +1066,7 @@ export default defineClient({
       }
       leftStore.set(left.toJSON())
     }
-    ctx.effect(() => workbenchLeftKeep().subscribe(applyLeftKeeps), 'workbench: keep-in-sidebar requests')
+    ctx.effect(() => WorkbenchPorts.leftKeep().subscribe(applyLeftKeeps), 'workbench: keep-in-sidebar requests')
     const resetLayout = (): void => {
       if (resettingLayout) return
       resettingLayout = true
@@ -1089,7 +1089,7 @@ export default defineClient({
           },
           restoreMain: () => {
             resettingLayout = false
-            workbenchLayoutReset().notify()
+            WorkbenchPorts.layoutReset().notify()
             const main = regions.get('main')
             if (ctx.get('mainSurface')?.mode() === 'workbench') {
               const channel = workbenchTabs()
@@ -1490,7 +1490,7 @@ export default defineClient({
       // One sidebar layout (b:952m): apply the sidebar's merge request once per browser (see shell-merge.ts).
       useEffect(() => {
         if (!settingsReady) return
-        const merge = workbenchShellMerge()
+        const merge = WorkbenchPorts.shellMerge()
         const apply = (): void => {
           const request = merge.take()
           if (request === undefined) return

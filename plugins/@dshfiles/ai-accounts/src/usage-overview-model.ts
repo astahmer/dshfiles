@@ -74,6 +74,24 @@ const hasQuota = (card: OverviewCard): boolean => card.usage.status === 'ok' && 
 
 const resetOrder = (resetsAt: number | null): number => resetsAt ?? Number.POSITIVE_INFINITY
 
+/** A sidebar meter's two lines: the percent left and the reset in words; either may be hidden. */
+export interface MeterLines {
+  readonly percent: string | null
+  readonly reset: string | null
+}
+
+/** The status-line segments that fit inline, and the rest for the overflow menu. */
+export interface SegmentSplit {
+  readonly inline: readonly AccountSummaryItem[]
+  readonly overflow: readonly AccountSummaryItem[]
+}
+
+/** How many segments fit, and whether they all keep their reset times or only the urgent ones do. */
+export interface SegmentFit {
+  readonly count: number
+  readonly resets: 'all' | 'urgent'
+}
+
 export class UsageOverviewModel {
   static sortWindows = <Window extends { readonly label: string }>(windows: readonly Window[]): Window[] =>
     [...windows].sort((left, right) => windowRank(left.label) - windowRank(right.label))
@@ -227,11 +245,7 @@ export class UsageOverviewModel {
    * is known. Every quota surface says what is left ("51% left"), never a bare
    * percent, and the reset in words ("resets in 2 h"), never a glyph.
    */
-  static meterLines = (
-    item: QuotaSummaryItem,
-    now: number,
-    label: 'both' | 'percent' | 'reset',
-  ): { readonly percent: string | null; readonly reset: string | null } => {
+  static meterLines = (item: QuotaSummaryItem, now: number, label: 'both' | 'percent' | 'reset'): MeterLines => {
     // The sidebar meter is a narrow two-line card, so its reset keeps the short units ("resets in 2h 0m").
     const short = UsageOverviewModel.formatResetShort(item.resetsAt, now)
     const reset = short === null || label === 'percent' ? null : short === 'now' ? 'resetting' : `resets in ${short}`
@@ -297,7 +311,7 @@ export class UsageOverviewModel {
     readonly activeId?: string | null
     /** How many segments fit; `Infinity` while the strip is not measured (tests, first paint). */
     readonly capacity: number
-  }): { readonly inline: readonly AccountSummaryItem[]; readonly overflow: readonly AccountSummaryItem[] } => {
+  }): SegmentSplit => {
     const pinned = input.pinned ?? []
     const pins = pinned.length === 0 ? [] : input.items.filter(item => pinned.includes(item.instanceId))
     const candidates = pins.length > 0 ? pins : [...input.items]
@@ -392,7 +406,7 @@ export class UsageOverviewModel {
     readonly budget: number
     readonly moreWidth: number
     readonly gap?: number
-  }): { readonly count: number; readonly resets: 'all' | 'urgent' } => {
+  }): SegmentFit => {
     const gap = input.gap ?? 0
     const all = UsageOverviewModel.fitCount(input.full, input.budget, input.moreWidth, gap)
     if (all >= input.full.length) return { count: all, resets: 'all' }

@@ -3,7 +3,9 @@ import { CommandKeys } from '@dshfiles/dshx/client'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { ShortcutKeyboardModel, ShortcutLayer, type ShortcutBinding, type ShortcutScope } from './keyboard.js'
 
-const mac = (): boolean => ShortcutKeyboardModel.isMacPlatform(window.navigator.platform)
+const mac = (): boolean => CommandKeys.isMacPlatform(window.navigator.platform)
+/** A layout box list for jsdom, which lays nothing out: an array already is a DOMRectList apart from `item`. */
+const rectList = (...rects: DOMRect[]): DOMRectList => Object.assign(rects, { item: (index: number): DOMRect | null => rects[index] ?? null })
 const primaryHeld = (): KeyboardEventInit => (mac() ? { metaKey: true } : { ctrlKey: true })
 
 const binding = (
@@ -30,11 +32,11 @@ const stepOf = (spec: string) => {
 
 describe('isMacPlatform', () => {
   it.each(['MacIntel', 'macOS', 'MacPPC', 'iPhone'])('treats %s as macOS', platform => {
-    expect(ShortcutKeyboardModel.isMacPlatform(platform)).toBe(true)
+    expect(CommandKeys.isMacPlatform(platform)).toBe(true)
   })
 
   it.each(['Win32', 'Linux x86_64', ''])('treats %s as not macOS', platform => {
-    expect(ShortcutKeyboardModel.isMacPlatform(platform)).toBe(false)
+    expect(CommandKeys.isMacPlatform(platform)).toBe(false)
   })
 })
 
@@ -321,7 +323,7 @@ describe('ShortcutLayer', () => {
     const run = vi.fn()
     const triage = element('section', { 'data-shortcut-scope': 'triage', 'data-shortcut-ambient': '' })
     // jsdom lays nothing out; give the region a box so it counts as shown.
-    triage.getClientRects = () => [new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList
+    triage.getClientRects = () => rectList(new DOMRect(0, 0, 10, 10))
     bindings = [binding('E', run, 'triage', { region: () => triage })]
     install()
     document.body.dispatchEvent(press('e'))

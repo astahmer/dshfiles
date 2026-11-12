@@ -48,9 +48,10 @@ export const planLegacyPreferencesMigration = (input: {
   // chosen Board view keeps it (another device chose it).
   const legacyBoard = input.legacy.boardView
   const boardView = legacyBoard !== null && !isDefaultBoardView(legacyBoard) && isDefaultBoardView(input.host.boardView) ? legacyBoard : null
-  return {
-    ...(threadViewsChanged ? { threadViews: migrated } : {}),
-    ...(collapsedGroups === null ? {} : { collapsedGroups }),
-    ...(boardView === null ? {} : { boardView }),
-  }
+  // Only what moved is written: an absent key leaves the Host's value as it is.
+  let changes: Partial<SidebarPreferences> = {}
+  if (threadViewsChanged) changes = { ...changes, threadViews: migrated }
+  if (collapsedGroups !== null) changes = { ...changes, collapsedGroups }
+  if (boardView !== null) changes = { ...changes, boardView }
+  return changes
 }

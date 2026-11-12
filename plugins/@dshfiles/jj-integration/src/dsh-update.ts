@@ -18,6 +18,14 @@ import { JjSettings } from './jj-settings.js'
 import { ThreadWorkspaceModel } from './thread-workspace-model.js'
 import { WorkspaceSync } from './workspace-sync.js'
 
+/** How the target bookmark relates to its remote: the relation, the tip to show, and the commits only the local side has. */
+interface OriginRead {
+  readonly origin: OriginRelation
+  readonly tip: string | null
+  readonly localOnly: number
+}
+const originRead = (origin: OriginRelation, tip: string | null, localOnly: number): OriginRead => ({ origin, tip, localOnly })
+
 const JJ_READ_TIMEOUT = Duration.seconds(60)
 const PLAN_TIMEOUT = Duration.minutes(2)
 const MAX_INCOMING = 50
@@ -130,16 +138,16 @@ export class DshUpdate extends Context.Service<
         Effect.gen(function* () {
           // A bookmark both sides moved is conflicted after a fetch (two targets): that is diverged history, never "no bookmark".
           const locals = lines(yield* read(['log', '--no-graph', '-r', `present(${localRevset(target.bookmark)})`, '-T', 'commit_id ++ "\\n"'], target.path))
-          if (locals.length > 1) return { origin: 'diverged' as OriginRelation, tip: null, localOnly: locals.length - 1 }
+          if (locals.length > 1) return originRead('diverged', null, locals.length - 1)
           const local = Option.fromUndefinedOr(locals[0])
           const remote = yield* commitOf(remoteRevset(target.bookmark, target.remote), target.path)
-          if (Option.isNone(remote)) return { origin: 'no-remote' as OriginRelation, tip: Option.getOrNull(local), localOnly: 0 }
-          if (Option.isNone(local)) return { origin: 'origin-ahead' as OriginRelation, tip: remote.value, localOnly: 0 }
+          if (Option.isNone(remote)) return originRead('no-remote', Option.getOrNull(local), 0)
+          if (Option.isNone(local)) return originRead('origin-ahead', remote.value, 0)
           const localOnly = yield* count(`::${commitRevset(local.value)} ~ ::${commitRevset(remote.value)}`, target.path)
-          if (local.value === remote.value) return { origin: 'same' as OriginRelation, tip: local.value, localOnly }
-          if (yield* isAncestor(local.value, remote.value, target.path)) return { origin: 'origin-ahead' as OriginRelation, tip: remote.value, localOnly }
-          if (yield* isAncestor(remote.value, local.value, target.path)) return { origin: 'local-ahead' as OriginRelation, tip: local.value, localOnly }
-          return { origin: 'diverged' as OriginRelation, tip: local.value, localOnly }
+          if (local.value === remote.value) return originRead('same', local.value, localOnly)
+          if (yield* isAncestor(local.value, remote.value, target.path)) return originRead('origin-ahead', remote.value, localOnly)
+          if (yield* isAncestor(remote.value, local.value, target.path)) return originRead('local-ahead', local.value, localOnly)
+          return originRead('diverged', local.value, localOnly)
         })
 
       const planFor = (target: CheckoutTarget, revision: string) =>

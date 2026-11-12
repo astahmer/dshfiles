@@ -1,22 +1,22 @@
 import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
-import { Effect, Option } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { themeApi } from './api.js'
 import { appearanceSettings, UI_STYLES_SETTINGS_NAMESPACE } from './settings.js'
-import { nextAppearance, normaliseAppearance, themeState } from './theme-state.js'
+import { ThemeStateModel } from './theme-state.js'
 
 type AppearanceValue = SettingsValue<typeof appearanceSettings.schema>
 const AppearanceSettings = Settings.Tag<AppearanceValue>(UI_STYLES_SETTINGS_NAMESPACE)
+
+const decodeThemePreference = Schema.decodeUnknownOption(Schema.Struct({ preference: Schema.String }))
 
 /** The Host's light/dark preference (`ui-theme.preference`), reported by `theme_get`; never written here. */
 const readScheme = Effect.gen(function* () {
   const forms = yield* Effect.option(hostService('settings'))
   if (Option.isNone(forms)) return 'unknown'
   const row = forms.value.describe().find(item => item.ns === 'ui-theme')
-  const value: unknown = row?.value
-  const preference = typeof value === 'object' && value !== null && 'preference' in value ? value.preference : undefined
-  return typeof preference === 'string' ? preference : 'unknown'
+  return Option.match(decodeThemePreference(row?.value), { onNone: () => 'unknown', onSome: ({ preference }) => preference })
 }).pipe(Effect.catchCause(() => Effect.succeed('unknown')))
 
 /**
@@ -33,16 +33,16 @@ export default DshxPlugin.make({
         Effect.gen(function* () {
           const settings = yield* AppearanceSettings
           const value = yield* settings.get
-          return themeState(normaliseAppearance(value), yield* readScheme)
+          return ThemeStateModel.themeState(ThemeStateModel.normaliseAppearance(value), yield* readScheme)
         }),
       set: input =>
         Effect.gen(function* () {
           const settings = yield* AppearanceSettings
           const snapshot = yield* settings.snapshot
-          const next = nextAppearance(normaliseAppearance(snapshot.value), input)
+          const next = ThemeStateModel.nextAppearance(ThemeStateModel.normaliseAppearance(snapshot.value), input)
           // Decoding through the contract validates the value and gives it the stored type; unset overrides stay absent.
           yield* settings.replace(appearanceSettings.schema(next), snapshot.revision)
-          return themeState(next, yield* readScheme)
+          return ThemeStateModel.themeState(next, yield* readScheme)
         }),
     }),
   ],

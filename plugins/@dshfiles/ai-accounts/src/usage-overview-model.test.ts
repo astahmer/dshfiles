@@ -372,19 +372,18 @@ describe('strip short names', () => {
 describe('status-bar reset times (b:jaz6)', () => {
   const MINUTE = 60_000
   it('formats compact units, minutes under an hour, nothing once due', () => {
-    const item = (resetsAt: number | null, extra: Partial<AccountSummaryItem> = {}): AccountSummaryItem =>
-      ({
-        instanceId: 'a',
-        displayName: 'A',
-        shortName: 'A',
-        kind: 'codex',
-        windowLabel: 'Weekly limit',
-        percentRemaining: 51,
-        resetsAt,
-        exhausted: false,
-        onReserve: false,
-        ...extra,
-      }) as AccountSummaryItem
+    const item = (resetsAt: number | null, extra: Partial<AccountSummaryItem> = {}): AccountSummaryItem => ({
+      instanceId: 'a',
+      displayName: 'A',
+      shortName: 'A',
+      kind: 'codex',
+      windowLabel: 'Weekly limit',
+      percentRemaining: 51,
+      resetsAt,
+      exhausted: false,
+      onReserve: false,
+      ...extra,
+    })
     expect(UsageOverviewModel.segmentReset(item((45 * 60 + 30) * MINUTE), 0)).toBe('1d 21h')
     expect(UsageOverviewModel.segmentReset(item((3 * 60 + 12) * MINUTE + 59_000), 0)).toBe('3h 12m')
     expect(UsageOverviewModel.segmentReset(item(12 * MINUTE + 5_000), 0)).toBe('12m')

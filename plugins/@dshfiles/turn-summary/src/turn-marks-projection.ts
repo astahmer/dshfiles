@@ -10,6 +10,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { TURN_MARKS_FILE_LIMIT, TURN_MARKS_PROJECTION_KEY, turnMarksViewSchema, type TurnMark, type TurnMarkFile } from '@dshfiles/chat/turn-marks'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { EditLines } from './edit-lines.js'
 
@@ -42,24 +43,44 @@ export type TurnMarksState = typeof stateSchema.Type
 const initialState = (): TurnMarksState => ({ turns: [], open: null })
 
 /**
- * The event fields the fold reads, narrowed by hand: the registry runs this for every event of every live Session, so
- * it checks `type` first and reads only the few fields it needs (no schema decode on the hot path).
+ * The event fields the fold reads, each still unchecked: the registry runs this for every event of every live Session,
+ * so it checks `type` first and narrows only the few fields it needs by hand (no schema decode on the hot path).
  */
-type Fields = Readonly<Record<string, unknown>>
-const record = (value: unknown): Fields | undefined => (typeof value === 'object' && value !== null ? (value as Fields) : undefined)
-const count = (value: unknown): number | undefined => (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined)
-const text = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined)
+interface EventFields {
+  readonly type?: unknown
+  readonly seq?: unknown
+  readonly data?: unknown
+}
+interface DataFields {
+  readonly turn?: unknown
+  readonly callId?: unknown
+  readonly name?: unknown
+  readonly arguments?: unknown
+  readonly message?: unknown
+  readonly reason?: unknown
+}
+interface MessageFields {
+  readonly toolCallId?: unknown
+  readonly isError?: unknown
+}
+interface ReasonFields {
+  readonly kind?: unknown
+}
+/** Any non-null object reads as one of the field interfaces above: every field is optional and still unchecked. */
+const asFields = (value: unknown): object | undefined => (typeof value === 'object' && value !== null ? value : undefined)
+const asCount = (value: unknown): number | undefined => (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined)
+const asText = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined)
+
+/** Edit tools name their file `file_path` (native) or `path` (apply_patch and MCP copies). */
+const decodeEditArguments = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ file_path: Schema.optional(Schema.String), path: Schema.optional(Schema.String) })),
+)
 
 const editPath = (argumentsText: string): string | undefined => {
-  try {
-    const parsed: unknown = JSON.parse(argumentsText)
-    if (typeof parsed !== 'object' || parsed === null) return undefined
-    const record = parsed as { readonly file_path?: unknown; readonly path?: unknown }
-    const path = typeof record.file_path === 'string' ? record.file_path : typeof record.path === 'string' ? record.path : undefined
-    return path === undefined || path === '' ? undefined : path.slice(0, 1024)
-  } catch {
-    return undefined
-  }
+  const decoded = decodeEditArguments(argumentsText)
+  if (Option.isNone(decoded)) return undefined
+  const path = decoded.value.file_path ?? decoded.value.path
+  return path === undefined || path === '' ? undefined : path.slice(0, 1024)
 }
 
 /** Replace the newest mark (the open Turn's) with `next`, keeping every other entry's identity. */
@@ -86,15 +107,14 @@ const foldEdits = (edits: readonly PendingEdit[]): Pick<TurnMark, 'files' | 'fil
 }
 
 /** One event folded into the marks. Pure: the same log always folds to the same state. */
-const applyEvent = (state: TurnMarksState, event: unknown): TurnMarksState => {
-  const value = record(event)
-  const type = value?.['type']
+const applyEvent = (state: TurnMarksState, event: EventFields): TurnMarksState => {
+  const type = event.type
   if (type !== 'turn/start' && type !== 'tool/call' && type !== 'tool/result' && type !== 'turn/end') return state
-  const data = record(value?.['data'])
+  const data: DataFields | undefined = asFields(event.data)
   if (data === undefined) return state
   if (type === 'turn/start') {
-    const turn = count(data['turn'])
-    const seq = count(value?.['seq'])
+    const turn = asCount(data.turn)
+    const seq = asCount(event.seq)
     if (turn === undefined || seq === undefined) return state
     const last = state.turns.at(-1)
     if (last !== undefined && turn <= last.turn) return state
@@ -108,16 +128,16 @@ const applyEvent = (state: TurnMarksState, event: unknown): TurnMarksState => {
   const open = state.open
   if (open === null) return state
   if (type === 'tool/call') {
-    const callId = text(data['callId'])
-    const name = text(data['name'])
-    if (count(data['turn']) !== open.turn || callId === undefined || name === undefined) return state
+    const callId = asText(data.callId)
+    const name = asText(data.name)
+    if (asCount(data.turn) !== open.turn || callId === undefined || name === undefined) return state
     if (isQuestionTool(name)) {
       return {
         turns: replaceLast(state.turns, open.turn, mark => (mark.question && mark.questionOpen ? mark : { ...mark, question: true, questionOpen: true })),
         open: { ...open, questions: [...open.questions, callId] },
       }
     }
-    const argumentsText = text(data['arguments'])
+    const argumentsText = asText(data.arguments)
     if (!EDIT_TOOLS.has(name) || argumentsText === undefined) return state
     const path = editPath(argumentsText)
     if (path === undefined) return state
@@ -125,8 +145,8 @@ const applyEvent = (state: TurnMarksState, event: unknown): TurnMarksState => {
     return { ...state, open: { ...open, pending: [...open.pending, { callId, path, ...lines }] } }
   }
   if (type === 'tool/result') {
-    const message = record(data['message'])
-    const toolCallId = text(message?.['toolCallId'])
+    const message: MessageFields | undefined = asFields(data.message)
+    const toolCallId = asText(message?.toolCallId)
     if (toolCallId === undefined) return state
     if (open.questions.includes(toolCallId)) {
       const questions = open.questions.filter(id => id !== toolCallId)
@@ -138,10 +158,11 @@ const applyEvent = (state: TurnMarksState, event: unknown): TurnMarksState => {
     const edit = open.pending.find(candidate => candidate.callId === toolCallId)
     if (edit === undefined) return state
     const pending = open.pending.filter(candidate => candidate !== edit)
-    return { ...state, open: { ...open, pending, accepted: message?.['isError'] === true ? open.accepted : [...open.accepted, edit] } }
+    return { ...state, open: { ...open, pending, accepted: message?.isError === true ? open.accepted : [...open.accepted, edit] } }
   }
-  if (count(data['turn']) !== open.turn) return state
-  const failed = text(record(data['reason'])?.['kind']) === 'error'
+  if (asCount(data.turn) !== open.turn) return state
+  const reason: ReasonFields | undefined = asFields(data.reason)
+  const failed = asText(reason?.kind) === 'error'
   const edits = foldEdits(open.accepted)
   const turns = replaceLast(state.turns, open.turn, mark =>
     !failed && edits.fileCount === 0 && !mark.questionOpen ? mark : { ...mark, ...edits, failed, questionOpen: false },

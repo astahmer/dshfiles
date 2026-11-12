@@ -185,6 +185,7 @@ describe('Host saved thread views', () => {
       // Save changes: fromCurrent writes the draft into the preset and clears it.
       const current = yield* stored.get
       yield* stored.update({
+        // SAFETY: the steps above wrote this document's threadViews, so it is the stored view-settings object.
         threadViews: { ...(current.threadViews as object), draft: { groupBy: 'date', statusFilters: ['attention'], sourceFilter: 'main' } },
       })
       expect((yield* views.list).edited).toBe(true)

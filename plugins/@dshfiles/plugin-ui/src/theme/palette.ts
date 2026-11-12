@@ -51,10 +51,10 @@ export interface Palette {
 export const NEUTRAL_STEP_NAMES = ['bg', 'panel', 'raised', 'selected', 'line', 'border', 'border-strong', 'strong', 'faint', 'muted', 'text'] as const
 
 /** Lightness per step at contrast 1. Steps 0–3 are fills, 4–6 borders, 7–8 strong, 9–10 text. */
-const LIGHTNESS: Record<Scheme, readonly number[]> = {
+const LIGHTNESS = {
   dark: [0.165, 0.19, 0.225, 0.25, 0.27, 0.31, 0.37, 0.45, 0.6, 0.72, 0.955],
   light: [0.992, 0.972, 0.945, 0.925, 0.905, 0.87, 0.8, 0.7, 0.6, 0.5, 0.22],
-}
+} as const satisfies Record<Scheme, readonly number[]>
 
 const STATUS_HUES = { success: 150, warning: 80, danger: 25 } as const
 
@@ -64,8 +64,14 @@ export const WARM_STONE = { hue: 65, chroma: 0.007, accentHue: 270, contrast: 1 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 const round = (value: number, digits: number) => Number(value.toFixed(digits))
 
+/** Chroma of fills/borders and of text for one scheme. */
+export interface NeutralChroma {
+  readonly fill: number
+  readonly text: number
+}
+
 /** Chroma of fills/borders and of text for one scheme: light mode is half as warm as dark (D1). */
-export function neutralChroma(chroma: number, scheme: Scheme): { readonly fill: number; readonly text: number } {
+function neutralChroma(chroma: number, scheme: Scheme): NeutralChroma {
   const scale = scheme === 'light' ? 0.5 : 1
   return { fill: chroma * scale, text: ((chroma * 5) / 7) * scale }
 }
@@ -76,9 +82,9 @@ function trio(fg: Oklch): Trio {
   return { fg, bg: withAlpha(fg, 0.12), border: withAlpha(fg, 0.3) }
 }
 
-export function palette(input: PaletteInput): Palette {
+function palette(input: PaletteInput): Palette {
   const { hue, chroma, accentHue, contrast, scheme } = input
-  const lightness = LIGHTNESS[scheme]
+  const lightness: readonly number[] = LIGHTNESS[scheme]
   const base = lightness[0] ?? 0
   const tint = neutralChroma(chroma, scheme)
   const neutral = lightness.map((l, step): Oklch => {
@@ -86,12 +92,14 @@ export function palette(input: PaletteInput): Palette {
     return { l: round(spread, 4), c: round(step >= 7 ? tint.text : tint.fill, 4), h: hue }
   })
   const dark = scheme === 'dark'
-  const accentFg = fitAccent(dark ? { l: 0.72, c: 0.14, h: accentHue } : { l: 0.53, c: 0.19, h: accentHue - 2 }, neutral[2] as Oklch, dark)
+  // SAFETY: `neutral` maps LIGHTNESS, whose ramps have all eleven steps, so steps 0 and 2 exist.
+  const [bg, , raised] = neutral as [Oklch, Oklch, Oklch]
+  const accentFg = fitAccent(dark ? { l: 0.72, c: 0.14, h: accentHue } : { l: 0.53, c: 0.19, h: accentHue - 2 }, raised, dark)
   const status = (h: number): Oklch => (dark ? { l: 0.75, c: 0.14, h } : { l: 0.5, c: 0.15, h })
   return {
     scheme,
     neutral,
-    accent: { ...trio(accentFg), onSolid: dark ? (neutral[0] as Oklch) : { l: 0.99, c: 0, h: accentHue } },
+    accent: { ...trio(accentFg), onSolid: dark ? bg : { l: 0.99, c: 0, h: accentHue } },
     success: trio(status(STATUS_HUES.success)),
     // Amber needs a darker step than green or red to keep AA on a light background.
     warning: trio(dark ? status(STATUS_HUES.warning) : { l: 0.48, c: 0.12, h: STATUS_HUES.warning }),
@@ -135,7 +143,7 @@ const encode = (x: number) => {
 const decode = (x: number) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)
 
 /** sRGB hex (alpha dropped), gamut-clipped. For review tables and tests. */
-export function toHex(color: Oklch): string {
+function toHex(color: Oklch): string {
   return `#${toLinearSrgb(color)
     .map(x =>
       Math.round(encode(x) * 255)
@@ -146,10 +154,11 @@ export function toHex(color: Oklch): string {
 }
 
 /** Parse `#rgb`/`#rrggbb` into oklch. */
-export function hexToOklch(hex: string): Oklch {
+function hexToOklch(hex: string): Oklch {
   const raw = hex.replace('#', '')
   const full = raw.length === 3 ? [...raw].map(ch => ch + ch).join('') : raw.slice(0, 6)
-  const [r, g, b] = [0, 2, 4].map(i => decode(Number.parseInt(full.slice(i, i + 2), 16) / 255)) as [number, number, number]
+  const channel = (start: number): number => decode(Number.parseInt(full.slice(start, start + 2), 16) / 255)
+  const [r, g, b] = [channel(0), channel(2), channel(4)]
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
@@ -161,19 +170,20 @@ export function hexToOklch(hex: string): Oklch {
 }
 
 /** WCAG 2 relative luminance of an opaque colour after gamut clipping. */
-export function luminance(color: Oklch): number {
-  const [r, g, b] = toLinearSrgb(color).map(x => decode(encode(x))) as [number, number, number]
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+function luminance(color: Oklch): number {
+  const clip = (x: number): number => decode(encode(x))
+  const [r, g, b] = toLinearSrgb(color)
+  return 0.2126 * clip(r) + 0.7152 * clip(g) + 0.0722 * clip(b)
 }
 
 /** WCAG 2 contrast ratio between two opaque colours. */
-export function contrastRatio(a: Oklch, b: Oklch): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number]
-  return (hi + 0.05) / (lo + 0.05)
+function contrastRatio(a: Oklch, b: Oklch): number {
+  const [first, second] = [luminance(a), luminance(b)]
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05)
 }
 
 /** CSS `oklch()` text. */
-export function toCss({ l, c, h, alpha }: Oklch): string {
+function toCss({ l, c, h, alpha }: Oklch): string {
   const body = `${round(l, 4)} ${round(c, 4)} ${round(h, 2)}`
   return alpha === undefined ? `oklch(${body})` : `oklch(${body} / ${round(alpha, 3)})`
 }
@@ -199,20 +209,33 @@ export interface StandaloneColours {
  * access, or an exported HTML file opened outside DSH. Generated, so those pages follow the same warm stone and accent
  * as the app instead of restating hand-picked hex (visual refresh T4.2).
  */
-export function standaloneColours(scheme: Scheme): StandaloneColours {
+function standaloneColours(scheme: Scheme): StandaloneColours {
   const generated = palette({ ...WARM_STONE, scheme })
-  const step = (index: number) => toHex(generated.neutral[index] as Oklch)
+  // SAFETY: the generated ramp has all eleven steps, and every index read here is below eleven.
+  const [bg, panel, raised, , line, , , , faint, muted, text] = generated.neutral as [
+    Oklch,
+    Oklch,
+    Oklch,
+    Oklch,
+    Oklch,
+    Oklch,
+    Oklch,
+    Oklch,
+    Oklch,
+    Oklch,
+    Oklch,
+  ]
   return {
-    bg: step(0),
-    panel: step(1),
-    raised: step(2),
-    line: step(4),
-    faint: step(8),
-    muted: step(9),
-    text: step(10),
+    bg: toHex(bg),
+    panel: toHex(panel),
+    raised: toHex(raised),
+    line: toHex(line),
+    faint: toHex(faint),
+    muted: toHex(muted),
+    text: toHex(text),
     accent: toHex(generated.accent.fg),
     // An opaque 12% accent wash over the background, for a highlighted card (hex has no alpha in older engines).
-    accentBg: toHex(mix(generated.neutral[0] as Oklch, generated.accent.fg, 0.12)),
+    accentBg: toHex(mix(bg, generated.accent.fg, 0.12)),
     success: toHex(generated.success.fg),
     warning: toHex(generated.warning.fg),
     danger: toHex(generated.danger.fg),
@@ -224,3 +247,15 @@ const mix = (base: Oklch, over: Oklch, amount: number): Oklch => ({
   c: base.c + (over.c - base.c) * amount,
   h: over.h,
 })
+
+/** Colour arithmetic and the generated neutral and accent ramps. */
+export class PaletteMath {
+  static readonly neutralChroma = neutralChroma
+  static readonly palette = palette
+  static readonly toHex = toHex
+  static readonly hexToOklch = hexToOklch
+  static readonly luminance = luminance
+  static readonly contrastRatio = contrastRatio
+  static readonly toCss = toCss
+  static readonly standaloneColours = standaloneColours
+}

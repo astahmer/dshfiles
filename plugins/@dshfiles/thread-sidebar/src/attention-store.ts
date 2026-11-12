@@ -60,6 +60,19 @@ const finishReasonFromEvent = (event: unknown): AttentionFinishReason | null => 
 }
 
 /** Monotone across Host restarts: a new record always outranks every stored version. */
+/** A hand-made unread mark over the thread's record, keeping its finished turn and its first unread event. */
+const manualUnreadRecord = (sessionId: string, version: number, existing: ThreadAttentionView | undefined): ThreadAttentionView => {
+  const record: ThreadAttentionView = {
+    sessionId,
+    version,
+    finishedAt: existing?.finishedAt ?? null,
+    finishedSeq: existing?.finishedSeq ?? null,
+    finishedReason: existing?.finishedReason ?? null,
+    manuallyUnread: true,
+  }
+  return existing?.firstUnreadSeq === undefined ? record : { ...record, firstUnreadSeq: existing.firstUnreadSeq }
+}
+
 const nextAttentionVersion = (current: number, now: number): number => Math.max(current + 1, now)
 
 const byVersionAscending = (left: ThreadAttentionView, right: ThreadAttentionView): number => left.version - right.version
@@ -269,35 +282,14 @@ export class ThreadAttention extends Context.Service<
           (records, takeVersion) => {
             const existing = records.get(input.sessionId)
             return {
-              put: [
-                {
-                  sessionId: input.sessionId,
-                  version: takeVersion(),
-                  finishedAt: existing?.finishedAt ?? null,
-                  finishedSeq: existing?.finishedSeq ?? null,
-                  finishedReason: existing?.finishedReason ?? null,
-                  manuallyUnread: true,
-                  ...(existing?.firstUnreadSeq === undefined ? {} : { firstUnreadSeq: existing.firstUnreadSeq }),
-                },
-              ],
+              put: [manualUnreadRecord(input.sessionId, takeVersion(), existing)],
               remove: [],
             }
           },
         markUnreadMany:
           (sessionIds: ReadonlyArray<string>): Plan =>
           (records, takeVersion) => ({
-            put: sessionIds.map(sessionId => {
-              const existing = records.get(sessionId)
-              return {
-                sessionId,
-                version: takeVersion(),
-                finishedAt: existing?.finishedAt ?? null,
-                finishedSeq: existing?.finishedSeq ?? null,
-                finishedReason: existing?.finishedReason ?? null,
-                manuallyUnread: true,
-                ...(existing?.firstUnreadSeq === undefined ? {} : { firstUnreadSeq: existing.firstUnreadSeq }),
-              }
-            }),
+            put: sessionIds.map(sessionId => manualUnreadRecord(sessionId, takeVersion(), records.get(sessionId))),
             remove: [],
           }),
         migrate:

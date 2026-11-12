@@ -752,15 +752,10 @@ export default defineClient({
           },
         },
       ] as const
-      for (const row of rows)
-        plugin.add(PaletteActions, {
-          id: `@dshfiles/main-tabs/${row.id}`,
-          group: 'command',
-          label: row.label,
-          aliases: row.aliases,
-          ...(row.shortcutId === undefined ? {} : { shortcutId: row.shortcutId }),
-          run: () => row.run(),
-        })
+      for (const row of rows) {
+        const action = { id: `@dshfiles/main-tabs/${row.id}`, group: 'command' as const, label: row.label, aliases: row.aliases, run: () => row.run() }
+        plugin.add(PaletteActions, row.shortcutId === undefined ? action : { ...action, shortcutId: row.shortcutId })
+      }
     }
   },
 })

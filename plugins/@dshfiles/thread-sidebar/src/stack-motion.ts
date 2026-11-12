@@ -39,7 +39,8 @@ export const StackMotionPolicy = {
 } as const
 
 export const runStackMotion = (motion: StackMotion, update: () => void): void => {
-  const doc = document as ViewTransitionDocument
+  // oxlint-disable-next-line antislop/no-passthrough-variable -- the alias types the optional View Transitions API, checked below.
+  const doc: ViewTransitionDocument = document
   const media = (query: string): boolean => typeof window.matchMedia === 'function' && window.matchMedia(query).matches
   const reducedMotion = media('(prefers-reduced-motion: reduce)')
   const touch = media('(pointer: coarse)')

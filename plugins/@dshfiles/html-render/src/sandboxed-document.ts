@@ -1,4 +1,4 @@
-import { standaloneColours } from '@dshfiles/plugin-ui/theme/palette'
+import { PaletteMath } from '@dshfiles/plugin-ui/theme/palette'
 import type { HtmlPageTheme } from './html-page.js'
 
 /**
@@ -21,8 +21,8 @@ const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 
 const SANS = "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
 
 /** A pinned theme, or a Host token the page cannot read: the generated default palette (DESIGN.md › Colors). */
-const generatedTokens = (scheme: ColorScheme): ThemeTokens => {
-  const colours = standaloneColours(scheme)
+const generatedTokens = (scheme: ColorScheme) => {
+  const colours = PaletteMath.standaloneColours(scheme)
   return {
     bg: colours.bg,
     surface: colours.panel,
@@ -35,7 +35,7 @@ const generatedTokens = (scheme: ColorScheme): ThemeTokens => {
     danger: colours.danger,
     font: SANS,
     'mono-font': MONO,
-  }
+  } satisfies ThemeTokens
 }
 
 const fallbackTokens = {

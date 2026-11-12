@@ -44,6 +44,7 @@ const nextOpen = (queue: readonly string[], open: ReadonlySet<string>, from: num
 
 const EMPTY: TriageContext = { queue: [], open: new Set(), position: 0, handled: 0, skipped: 0, error: null }
 
+// SAFETY: xstate's `types` entries are empty type carriers; nothing reads their values.
 export const triageMachine = setup({
   types: { context: {} as TriageContext, events: {} as TriageEvent },
   actors: {
@@ -138,12 +139,18 @@ export const triageMachine = setup({
   },
 })
 
+/** "2 of 5" in numbers. */
+export interface TriageProgress {
+  readonly index: number
+  readonly total: number
+}
+
 export const TriageModel = {
   nextOpen,
   /** The item on screen, or undefined at Inbox zero or in the list. */
   current: (context: TriageContext): string | undefined => context.queue[context.position],
   /** "2 of 5": items already handled or skipped, plus the open ones still ahead (the one on screen included). */
-  progress: (context: TriageContext): { readonly index: number; readonly total: number } => {
+  progress: (context: TriageContext): TriageProgress => {
     const seen = context.handled + context.skipped
     const ahead = context.queue.slice(context.position).filter(id => context.open.has(id)).length
     return { index: Math.min(seen + 1, seen + ahead), total: seen + ahead }
