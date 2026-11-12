@@ -72,7 +72,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "ai-accounts",
       "description": "Per-account Codex, Claude, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
       "ui": true,
-      "features": 18
+      "features": 20
     },
     {
       "name": "annotations",
@@ -150,7 +150,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "context-compaction",
       "description": "Chunked compaction backend that keeps summary requests within the model context window.",
       "ui": false,
-      "features": 5
+      "features": 6
     },
     {
       "name": "conversation-cleanup",
@@ -306,7 +306,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "mcp-endpoint",
       "description": "An MCP server (streamable HTTP, bearer token) on the DSH Web server, so Claude Code or Codex in a terminal can list, start, message, wait on and stop DSH threads.",
       "ui": true,
-      "features": 2
+      "features": 3
     },
     {
       "name": "mcp-servers",
@@ -3232,6 +3232,95 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "button",
           "name": "Add account",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#stalled-stream-recovery",
+      "plugin": "ai-accounts",
+      "id": "stalled-stream-recovery",
+      "title": "Explain turns stopped by a stalled model stream",
+      "summary": "When a model sends no data until its idle timeout and the retries run out, the failed turn says how long it stayed silent and how to recover: Resume, another model, or the stalled-stream fallback.",
+      "destination": "transcript",
+      "currentSurface": "transcript: failed turn › stalled-stream advice",
+      "reach": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or sessions*\" \"[[fail pi-ai stream idle timeout after 120000ms]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or sessions*",
+          "value": "[[fail pi-ai stream idle timeout after 120000ms]]"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"The model sent no data for 2 min*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "The model sent no data for 2 min*",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#stalled-stream-fallback-setting",
+      "plugin": "ai-accounts",
+      "id": "stalled-stream-fallback-setting",
+      "title": "Turn on the fallback chain for stalled streams",
+      "summary": "A transport Failure recovery switch that lets a stalled stream walk the thread's model fallback chain under any distribution.",
+      "destination": "settings",
+      "currentSurface": "settings: AI Accounts › Failure recovery › Fall back on stalled streams",
+      "reach": [
+        {
+          "text": "click text \"More\"",
+          "action": "click",
+          "by": "text",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click text \"Settings\"",
+          "action": "click",
+          "by": "text",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click text \"AI Accounts\"",
+          "action": "click",
+          "by": "text",
+          "name": "AI Accounts",
+          "value": null
+        },
+        {
+          "text": "hover switch \"Fall back on stalled streams\"",
+          "action": "hover",
+          "by": "switch",
+          "name": "Fall back on stalled streams",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Fall back on stalled streams\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Fall back on stalled streams",
           "value": null
         }
       ],
@@ -10960,6 +11049,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "context-compaction#loaded-skills",
+      "plugin": "context-compaction",
+      "id": "loaded-skills",
+      "title": "Loaded skills kept in compaction checkpoints",
+      "summary": "Opt-in: each checkpoint lists the skills the span it replaces loaded (and, in bodies mode, keeps their instructions), so a long thread does not reload a skill only because a compaction dropped it. Off by default: the kept block adds tokens to every later request.",
+      "destination": "none",
+      "currentSurface": "host: appended to the checkpoint summary, no UI",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "context-compaction#overflow-recognition",
       "plugin": "context-compaction",
       "id": "overflow-recognition",
@@ -16234,6 +16335,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "id": "mcp-endpoint",
       "title": "Drive DSH threads from an outside agent over MCP",
       "summary": "Serve an MCP server (streamable HTTP, stateless, JSON responses) at /mcp on the DSH Web server. Claude Code, Codex or any MCP client with the bearer token can list projects and threads, read a thread's recent messages, create a thread with a first prompt and model, queue or stee…",
+      "destination": "none",
+      "currentSurface": "host: /mcp endpoint",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "mcp-endpoint#mcp-endpoint-plugin-tools",
+      "plugin": "mcp-endpoint",
+      "id": "mcp-endpoint-plugin-tools",
+      "title": "Expose plugin tools to MCP clients",
+      "summary": "Expose existing plugin agent tools through the authenticated MCP endpoint, subject to an off-by-default read-only or read-write setting.",
       "destination": "none",
       "currentSurface": "host: /mcp endpoint",
       "reach": [],
