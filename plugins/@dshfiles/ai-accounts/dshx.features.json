@@ -751,7 +751,7 @@
       "id": "strip-short-names",
       "title": "Short names in the sidebar usage strip",
       "summary": "Show or hide the tag beside each meter in the wide usage strip (Settings switch or the strip's context menu), and set each account's strip short name in AI Accounts settings; an account without one uses its picker tag, then its initials.",
-      "reach": ["click button \"Settings\"", "click text \"AI Accounts\"", "expect switch \"Short names in the strip\""],
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click text \"AI Accounts\"", "expect switch \"Short names in the strip\""],
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",

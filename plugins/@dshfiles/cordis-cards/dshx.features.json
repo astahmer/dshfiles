@@ -9,9 +9,9 @@
       "surfaces": ["client"],
       "surface": "statusItem",
       "destination": "threads",
-      "currentSurface": "sidebar footer: Cordis panel, and Cordis tool cards in the transcript",
+      "currentSurface": "sidebar: Cordis panel in the row under the list (Sidebar settings › Show the row under the list), and Cordis tool cards in the transcript",
       "onboarding": {
-        "firstAction": "Open the Cordis panel in the sidebar footer.",
+        "firstAction": "Turn on Show the row under the list in Sidebar settings, then open the Cordis panel there.",
         "doneWhen": "It lists the dynamic Cordis plugins this Host runs."
       },
       "configuration": [],

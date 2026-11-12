@@ -2044,7 +2044,7 @@
       "surfaces": ["client", "settings"],
       "surface": "command",
       "destination": "none",
-      "currentSurface": "sidebar-footer: More menu",
+      "currentSurface": "sidebar: More in the row under the list (Sidebar settings › Show the row under the list) and the Workbench Navigation view's More menu",
       "configuration": [],
       "states": ["wide", "narrow", "collapsed", "hidden-entry", "entry-yielded-to-another-seat"],
       "failureModes": [
@@ -3725,7 +3725,7 @@
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
-      "currentSurface": "shell: Navigation list (21 entries) and collapsed icon rail",
+      "currentSurface": "rail: the Destinations tabs and the selected destination's list; collapsed, a folder's flyout",
       "configuration": [],
       "states": ["expanded", "collapsed"],
       "failureModes": [

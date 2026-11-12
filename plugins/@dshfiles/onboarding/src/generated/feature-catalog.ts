@@ -2978,10 +2978,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "settings: AI Accounts › strip short names",
       "reach": [
         {
-          "text": "click button \"Settings\"",
+          "text": "click button \"Account menu\"",
           "action": "click",
           "by": "button",
-          "name": "Settings",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
           "value": null
         },
         {
@@ -10764,10 +10771,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "settings: general › view mode",
       "reach": [
         {
-          "text": "click button \"Settings\"",
+          "text": "click button \"Account menu\"",
           "action": "click",
           "by": "button",
-          "name": "Settings",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
           "value": null
         },
         {
@@ -11429,11 +11443,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Cordis panel and cards read the inventory once per connection",
       "summary": "The native Cordis sidebar panel and the cordis_define, cordis_run, cordis_stop and cordis_undefine tool cards from one owned fork of the stock row. Behaviour is the native one; the dynamic-plugin inventory read waits for the page's first connected generation instead of being dis…",
       "destination": "threads",
-      "currentSurface": "sidebar footer: Cordis panel, and Cordis tool cards in the transcript",
+      "currentSurface": "sidebar: Cordis panel in the row under the list (Sidebar settings › Show the row under the list), and Cordis tool cards in the transcript",
       "reach": [],
       "reachNarrow": null,
       "onboarding": {
-        "firstAction": "Open the Cordis panel in the sidebar footer.",
+        "firstAction": "Turn on Show the row under the list in Sidebar settings, then open the Cordis panel there.",
         "doneWhen": "It lists the dynamic Cordis plugins this Host runs."
       }
     },
@@ -19092,8 +19106,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Pair a phone over a self-provisioned HTTPS tunnel",
       "summary": "Opt-in public phone access with agent tools: the persisted setting decides whether DSH exposes the gateway, the tools enable, disable, print a fresh code and revoke devices, and the chosen provider provisions the tunnel (Tailscale first, public tunnel fallback). Redemption issue…",
       "destination": "none",
-      "currentSurface": "host: loopback gateway, terminal QR and the sidebar footer's pairing popover",
+      "currentSurface": "host: loopback gateway, terminal QR and the rail's Pair a phone dialog",
       "reach": [
+        {
+          "text": "click button \"Pair a phone\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pair a phone",
+          "value": null
+        },
         {
           "text": "click button \"Show pairing QR code\"",
           "action": "click",
@@ -22520,10 +22541,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "settings: Tools & MCP › Jev › Key",
       "reach": [
         {
-          "text": "click button \"Settings\"",
+          "text": "click button \"Account menu\"",
           "action": "click",
           "by": "button",
-          "name": "Settings",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
           "value": null
         },
         {
@@ -24662,7 +24690,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Reach Settings, sidebar pages, and hidden footer actions from both More menus",
       "summary": "The wide sidebar foot always seats a More control; it opens Settings, hidden or overflowed footer actions, and every sidebar page in one flat list, so Plugins stays one click away however narrow the sidebar is. The header More menu, and the Workbench Navigation view's, offers th…",
       "destination": "none",
-      "currentSurface": "sidebar-footer: More menu",
+      "currentSurface": "sidebar: More in the row under the list (Sidebar settings › Show the row under the list) and the Workbench Navigation view's More menu",
       "reach": [
         {
           "text": "press ControlOrMeta+Alt+KeyT",
@@ -25605,7 +25633,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Switch destinations from the rail",
       "summary": "In the fixed layout the left column is a labelled rail of eight destinations (Threads, Inbox, Land, Work, Agents, Observe, Knowledge, Settings) beside one list. Threads shows the thread list; every other destination lists its sections, and choosing one opens that page in the sta…",
       "destination": "threads",
-      "currentSurface": "shell: Navigation list (21 entries) and collapsed icon rail",
+      "currentSurface": "rail: the Destinations tabs and the selected destination's list; collapsed, a folder's flyout",
       "reach": [
         {
           "text": "click tab \"Observe\"",

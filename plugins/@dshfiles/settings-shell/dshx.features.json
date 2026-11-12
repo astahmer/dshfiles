@@ -761,7 +761,7 @@
       "id": "shared-jev-key",
       "title": "Set the Jev key once",
       "summary": "Settings › Tools & MCP › Jev leads with one Key: a secret:ALIAS reference (Secret Catalog picker) that Backlog triage and Memory's signal gates both resolve on the Host. Each plugin's earlier key stays stored but hidden as the fallback while the shared key is empty, and is copied into an empty shared key once, never over a set one. Backlog's Jev section and Memory's review link here.",
-      "reach": ["click button \"Settings\"", "fill searchbox \"Search settings\" \"Jev\"", "expect text \"Key\""],
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "fill searchbox \"Search settings\" \"Jev\"", "expect text \"Key\""],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",

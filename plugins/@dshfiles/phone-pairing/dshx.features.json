@@ -9,8 +9,12 @@
       "surfaces": ["host", "tool", "client"],
       "surface": "infrastructure",
       "destination": "none",
-      "currentSurface": "host: loopback gateway, terminal QR and the sidebar footer's pairing popover",
-      "reach": ["click button \"Show pairing QR code\"", "expect text \"Phone access is off. Ask the agent to enable it, then open this again.\""],
+      "currentSurface": "host: loopback gateway, terminal QR and the rail's Pair a phone dialog",
+      "reach": [
+        "click button \"Pair a phone\"",
+        "click button \"Show pairing QR code\"",
+        "expect text \"Phone access is off. Ask the agent to enable it, then open this again.\""
+      ],
       "configuration": [],
       "states": ["disabled", "tunnel-ready", "offer-printed", "qr-popover-open", "port-busy", "paired", "unpaired", "revoked", "no-provider"],
       "failureModes": [

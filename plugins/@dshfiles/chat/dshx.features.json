@@ -374,7 +374,7 @@
       "states": ["device-default", "summary", "normal", "verbose"],
       "failureModes": ["A read-only profile refuses transcript_view_set with SettingsReadOnly; the Settings row keeps the local choice for the session."],
       "externalDependencies": [],
-      "reach": ["click button \"Settings\"", "expect text \"View mode\""],
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect text \"View mode\""],
       "verification": [
         {
           "kind": "unit-test",
