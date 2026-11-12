@@ -76,6 +76,10 @@ describe('pairing gateway', () => {
     try {
       await gateway.listen()
       expect((await get(port, '/')).status).toBe(401)
+      const landing = await get(port, '/pair')
+      expect(landing.status).toBe(200)
+      expect(landing.body).toContain('<label for="code">Pairing code</label>')
+      expect(landing.body).toContain('shown in DSH')
       const refused = await post(port, '/pair/redeem', { code: '000000' })
       expect(refused.status).toBe(403)
       expect(refused.cookie).toBeUndefined()

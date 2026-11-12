@@ -8,9 +8,11 @@ const COOKIE = '__Host-dsh_phone'
 
 const page = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pair phone</title>
-<style>body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:3rem 1.25rem;max-width:26rem;margin-inline:auto}input{font:inherit;letter-spacing:.4em;padding:.75rem;width:100%;box-sizing:border-box;text-align:center}button{font:inherit;margin-top:1rem;padding:.75rem 1.25rem;width:100%}#status{margin-top:1rem}</style>
-</head><body><main><h1>Pair this phone</h1><p id="status" role="status">Enter the 6-digit code shown in the DSH terminal.</p>
-<form id="form"><input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required><button type="submit">Pair</button></form></main>
+<style>
+:root{color-scheme:light dark;font:16px/1.5 system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;min-height:100dvh;padding:1.5rem;display:grid;place-items:center;background:light-dark(#f7f7f8,#18181b);color:light-dark(#18181b,#fafafa)}main{width:min(100%,26rem);padding:1.5rem;border:1px solid light-dark(#e4e4e7,#3f3f46);border-radius:.75rem;background:light-dark(#fff,#27272a)}h1{font-size:1.5rem;line-height:1.25;margin:0 0 .75rem}p{color:light-dark(#52525b,#d4d4d8);margin:0 0 1.5rem}label{display:block;font-size:.875rem;font-weight:600;margin-bottom:.5rem}input,button{font:inherit;width:100%;min-height:3rem;border-radius:.5rem}input{border:1px solid light-dark(#a1a1aa,#71717a);background:transparent;color:inherit;letter-spacing:.3em;padding:.75rem;text-align:center}button{margin-top:1rem;border:0;background:light-dark(#18181b,#fafafa);color:light-dark(#fafafa,#18181b);font-weight:600;cursor:pointer}input:focus-visible,button:focus-visible{outline:2px solid light-dark(#2563eb,#93c5fd);outline-offset:2px}
+</style>
+</head><body><main><h1>Pair this phone</h1><p id="status" role="status">Enter the 6-digit code shown in DSH.</p>
+<form id="form"><label for="code">Pairing code</label><input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required><button type="submit">Pair</button></form></main>
 <script src="/pair/landing.js" defer></script></body></html>`
 
 const script = `(() => {
