@@ -216,7 +216,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "frame-layout",
       "description": "Owned fork of DSH's native layout package: the three-column AppFrame with browser-persisted panel widths.",
       "ui": true,
-      "features": 8
+      "features": 9
     },
     {
       "name": "git-cli",
@@ -12733,6 +12733,118 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "frame-layout#zen-mode",
+      "plugin": "frame-layout",
+      "id": "zen-mode",
+      "title": "Zen mode: only the thread and its composer",
+      "summary": "The Zen mode command (⌘K, or Mod+Shift+. from anywhere) hides the sidebar, the right panel, the status strip and the main tabs, so only the thread and its composer stay; the same command, the chord, Escape outside a text field, menu or dialog, the Leave zen mode button in the to…",
+      "destination": "none",
+      "currentSurface": "palette: Zen mode",
+      "reach": [
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Zen mode\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Zen mode"
+        },
+        {
+          "text": "click option \"Zen mode*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Zen mode*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Leave zen mode\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Leave zen mode",
+          "value": null
+        },
+        {
+          "text": "press ControlOrMeta+Shift+Period",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Shift+Period"
+        },
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "press ControlOrMeta+Shift+Period",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Shift+Period"
+        },
+        {
+          "text": "click button \"Leave zen mode\"",
+          "action": "click",
+          "by": "button",
+          "name": "Leave zen mode",
+          "value": null
+        },
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Zen mode\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Zen mode"
+        },
+        {
+          "text": "click option \"Zen mode*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Zen mode*",
+          "value": null
+        },
+        {
+          "text": "expect button \"More\"",
+          "action": "expect",
+          "by": "button",
+          "name": "More",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {

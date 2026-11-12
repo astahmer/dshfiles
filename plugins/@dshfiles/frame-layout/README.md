@@ -10,6 +10,10 @@
 
 ![Settings › General › Status bar: show, hide and reorder the strip's items](docs/screenshots/status-bar-settings.png)
 
+![Zen mode: only the thread and its composer, with Leave zen mode in the top-left corner](docs/screenshots/zen-mode.png)
+
+![Zen mode on a phone keeps Back and the tab bar and hides only the status pill](docs/screenshots/zen-mode-phone.png)
+
 DSH's three-column AppFrame, forked so the frame's dragged panel widths and collapsed sidebar survive a reload.
 
 ## Use
@@ -26,6 +30,8 @@ DSH's three-column AppFrame, forked so the frame's dragged panel widths and coll
 - **Storage failure degrades to upstream behavior**: a blocked or full store (private mode, quota) leaves the geometry
   in-memory, exactly as the native package.
 - **Phone navigation seat**: below 640px a left occupant that draws its own phone navigation sets `data-shell-phone-nav` on the document; the frame then drops the 56px rail track and the right track, hides the clipped sidebar column and reserves `--dsh-phone-nav-height` for the occupant's bottom bar. A pure CSS rule; without the mark the narrow frame behaves as upstream.
+- **Zen mode**: **Zen mode** in ⌘K, or Mod+Shift+. anywhere, leaves only the thread and its composer. See
+  [zen mode](#zen-mode).
 - **Left-content seat**: the public `shell.left` contract is declared/rendered by the owned thread sidebar, not by AppFrame.
   Its single root occupant receives `{ collapsed: boolean }`; only the flexible middle is delegated. The sidebar retains
   fixed brand/history/customize and account/settings/footer chrome, plus the native navigation/thread fallback. Keep the
@@ -74,6 +80,7 @@ whole delta is:
 | `src/panel-retention.ts`                | new: keeps the active `main` panel selected for `PANEL_REREGISTER_GRACE_MS` after its entry disappears, so a plugin hot reload (which unregisters the entry before the rebuilt bundle registers it again) no longer throws the user back to the thread; `index.ts` routes upstream's `retainMainPanels` through it                                                                                                                                                                                                                                                                                                                                                                              |
 | `src/main-surface.ts`                   | new: adapts the frame store to the observable main-surface seat; delegates frame-authorized keyed-main rendering with a legacy-workbench recursion guard and the installed renderer's native fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `src/right-panel.ts`                    | new: frame-lifetime dock action registration; latest live registration wins, independent disposers preserve other registrations, teardown clears all actions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `src/zen-mode.ts`                       | new: the browser-local zen record (`dshfiles.frame-layout.zen.v1`), the `ctx.zen` seat and the `<html data-dshfiles-zen>` mirror. `AppFrame.tsx` drops the sidebar and right tracks to 0 px while zen is on above the drawer breakpoint, hides their drag handles and the leading seat and draws Leave zen mode in its place; `AppFrame.module.css` hides those columns, the status strip and the `shell.beforeMain` rows; `service.ts` leaves zen on a sidebar toggle instead of toggling                                                                                                                                                                                                      |
 | `src/regions.ts`                        | new: the public `MainSurfaceSeat`, `MainSurfaceOwnerProps`, `BeforeMainOwnerProps`, `RightPanelSeat`, `DockPaneActions`, `DockPaneOwnerProps` and `FrameBottomSeat` contracts, their Context augmentations, and `shell.main`/`shell.beforeMain`/`shell.dock` declarations                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 `src/native/index.ts` stays upstream's no-op Host body; it is also the dshx Host entry, so no extra forwarding module
@@ -196,6 +203,27 @@ Outside Workbench mode the native per-session right sidebar remains the fallback
 A stock frame has no `ctx.rightPanel`; use optional reads rather than injecting it. Historical Workbench `mainSurface`,
 `rightPanel` and `headerToggle` schema fields are hidden decode-only migration inputs; they expose no new public
 configuration and cannot opt the owned stack out of Workbench.
+
+### Zen mode
+
+Plan [calm onboarding](../../../plans/onboarding/calm-onboarding.md) Z1. **Zen mode** (⌘K) or **Mod+Shift+.** hides
+the sidebar, the right panel, the status strip and the main tabs; the thread and its composer stay, and so does
+everything the thread renders, so a question or an approval is never hidden. Leave it with the same command or chord,
+**Escape** outside a text field, menu or dialog (in the composer Escape still stops the turn), the **Leave zen mode**
+button where the sidebar's reopen controls sit, or by asking for the sidebar (Mod+B, or a plugin calling
+`ctx.frameSidebar.show()`).
+
+- **The frame owns it.** The sidebar and right tracks drop to 0 px in the column math (not an overlay), and the frame
+  sets `<html data-dshfiles-zen="on">`. Workbench reads that attribute to hide its main tab rows, so its thread header
+  moves back inline; owners that hide their own chrome read the attribute or `ctx.zen` (`{ on, set, subscribe }`).
+- **Nothing is rewritten.** Zen never writes `showMainTabs`, `hiddenStatusItems` or a panel width, so leaving restores
+  the layout exactly as it was, including a sidebar that was already collapsed.
+- **Per browser.** The choice is stored in this browser under `dshfiles.frame-layout.zen.v1` (`{ "on": true }`) and
+  survives a reload; other tabs of the same browser follow it. Missing or malformed storage reads as off.
+- **Phone and small tablet.** Below 768 px the frame is in its drawer layout: navigation (the phone top bar with Back,
+  the bottom tab bar, the drawer) and the on-demand right sheet stay reachable, and zen only hides the status pill.
+  Leave it from the palette.
+- **No agent tool.** Zen is presentation-only window state (AGENTS.md: presentation state is not a tool).
 
 ### Updating to a new DSH release
 

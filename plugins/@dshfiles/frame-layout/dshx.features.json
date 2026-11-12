@@ -440,6 +440,101 @@
           "reason": "Client-only: opening a page is a layout or sidebar selection."
         }
       ]
+    },
+    {
+      "id": "zen-mode",
+      "title": "Zen mode: only the thread and its composer",
+      "summary": "The Zen mode command (⌘K, or Mod+Shift+. from anywhere) hides the sidebar, the right panel, the status strip and the main tabs, so only the thread and its composer stay; the same command, the chord, Escape outside a text field, menu or dialog, the Leave zen mode button in the top-left corner, or asking for the sidebar (Mod+B) leaves it. The frame drops the sidebar and right tracks in its own column math and sets <html data-dshfiles-zen=\"on\"> so Workbench hides its main tab rows. It never writes another owner's setting (showMainTabs, hiddenStatusItems, the sidebar width), so leaving restores the exact layout. The choice is browser-local (dshfiles.frame-layout.zen.v1) and survives a reload. Below 768 px the frame keeps its drawer, phone tab bar and right sheet, and zen hides only the status pill. Questions and approvals render in the thread, so they stay on screen. Presentation-only state, so there is no agent tool.",
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Zen mode\"",
+        "click option \"Zen mode*\"",
+        "expect button \"Leave zen mode\"",
+        "press ControlOrMeta+Shift+Period",
+        "expect region \"Threads\"",
+        "press ControlOrMeta+Shift+Period",
+        "click button \"Leave zen mode\"",
+        "expect region \"Threads\""
+      ],
+      "reachNarrow": [
+        "click button \"Threads\"",
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Zen mode\"",
+        "click option \"Zen mode*\"",
+        "expect button \"More\""
+      ],
+      "surfaces": ["client", "storage"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "palette: Zen mode",
+      "configuration": [],
+      "states": ["off", "on", "on-drawer", "reloaded"],
+      "failureModes": [
+        "Missing, malformed or blocked browser storage reads as off, so a broken record never traps the window in zen.",
+        "Mod+B or a plugin asking to show the sidebar leaves zen first, so the sidebar returns at the width it had instead of toggling unseen."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.zen-mode-decode",
+          "file": "plugins/@dshfiles/frame-layout/src/zen-mode.test.ts",
+          "testName": "starts off, and reads missing or malformed storage as off"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.zen-mode-persist",
+          "file": "plugins/@dshfiles/frame-layout/src/zen-mode.test.ts",
+          "testName": "keeps the choice in this browser, so a reload comes back in zen and leaving survives the next one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.zen-mode-attribute",
+          "file": "plugins/@dshfiles/frame-layout/src/zen-mode.test.ts",
+          "testName": "mirrors zen onto the root attribute, and removes it on leaving and on teardown"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.zen-mode-sidebar-toggle",
+          "file": "plugins/@dshfiles/frame-layout/src/zen-mode.test.ts",
+          "testName": "leaves zen on the sidebar toggle instead of toggling, so the sidebar comes back as it was"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.zen-mode-wide",
+          "file": "plugins/@dshfiles/frame-layout/src/zen-mode.test.ts",
+          "testName": "leaves only the thread surface on a wide frame"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.zen-mode-drawer",
+          "file": "plugins/@dshfiles/frame-layout/src/zen-mode.test.ts",
+          "testName": "keeps a drawer frame’s navigation and right sheet, hiding only the strip and tabs"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.zen-mode-off",
+          "file": "plugins/@dshfiles/frame-layout/src/zen-mode.test.ts",
+          "testName": "shows everything outside zen"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.zen-mode-workbench-tabs",
+          "file": "plugins/@dshfiles/workbench/src/header-seat.test.ts",
+          "testName": "renders the main header inline in zen mode and seats it again on leaving, with the setting still shown"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "frame-layout.zen-mode-browser",
+          "reason": "Captured at desktop 1440x900 and 390x844 in a scratch DSH (docs/screenshots/zen-mode*.png): the chord and the palette enter zen, a reload keeps it, the chord and Leave zen mode restore the tabs, sidebar and strip; no Gherkin scenario yet."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: zen mode is browser-local presentation and starts no Host work."
+        }
+      ]
     }
   ]
 }

@@ -1293,7 +1293,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: DockPaneOwnerProps, RightPanelSeat, FrameSidebarSeat, FrameBottomSeat"
+        "Also exports: DockPaneOwnerProps, RightPanelSeat, FrameSidebarSeat, FrameBottomSeat, ZenSeat"
       ],
       "source": "plugins/@dshfiles/frame-layout/src/regions.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -3244,7 +3244,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/command-palette › palette-search"
       ],
       "details": [
-        "Used by 24 catalog feature(s)",
+        "Used by 25 catalog feature(s)",
         "Destinations in use: land, none, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
