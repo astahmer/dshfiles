@@ -388,7 +388,10 @@ dshx inspect slots --root sidebar     # read the live composition instead of gue
     user-facing feature: `firstAction` and `doneWhen`, one plain sentence each;
     `open` only for a panel, command or Settings section it really registers.
     `features:check` fails without one unless every client feature is
-    `surface: infrastructure`.
+    `surface: infrastructure`. It also joins the pack in
+    `plugins/@dshfiles/onboarding/src/packs.ts` whose summary fits what it
+    does, or `PACK_EXEMPTIONS` there with a reason when users never choose it;
+    `features:check` fails a UI plugin in neither.
 
 ### Plugin UI and state
 

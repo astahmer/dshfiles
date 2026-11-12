@@ -11,7 +11,7 @@ const run = (...args) => spawnSync(process.execPath, [script, ...args], { encodi
 test('the committed pack pages are up to date', () => {
   const result = run('--check')
   assert.equal(result.status, 0, result.stderr)
-  assert.match(result.stdout, /9 pages up to date/)
+  assert.match(result.stdout, /12 pages up to date/)
 })
 
 test('a hand edit, a missing page and a page no pack generates fail the check', t => {
@@ -23,10 +23,13 @@ test('a hand edit, a missing page and a page no pack generates fail the check', 
     'accounts.md',
     'agents.md',
     'core.md',
+    'develop.md',
+    'files.md',
     'github.md',
     'knowledge.md',
     'observe.md',
     'planning.md',
+    'transcript.md',
     'versioning.md',
   ])
   assert.equal(run('--check', '--out', out).status, 0)

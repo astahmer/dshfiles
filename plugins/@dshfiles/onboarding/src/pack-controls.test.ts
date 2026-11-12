@@ -69,6 +69,7 @@ const manager = (input: {
 const versioningRows = (): Row[] => [
   { entryId: 'include:dshfiles-jj-integration', moduleName: '@dshfiles/jj-integration', enabled: true },
   { entryId: 'include:dshfiles-jujutsu', moduleName: '@dshfiles/jujutsu', enabled: false },
+  { entryId: 'include:dshfiles-project-checks', moduleName: '@dshfiles/project-checks', enabled: true },
 ]
 
 const run = <A>(input: { readonly found: PackManagerSurface<string> }, use: (controls: PackControls['Service']) => Effect.Effect<A>) =>
@@ -133,12 +134,13 @@ describe('pack controls', () => {
     expect(disabled.results.map(result => [result.plugin, result.status])).toEqual([
       ['jj-integration', 'applied'],
       ['jujutsu', 'applied'],
+      ['project-checks', 'applied'],
     ])
     const restored = await run({ found: manager({ rows }) }, controls =>
-      controls.apply({ pack: 'versioning', action: 'enable', prerequisites, plugins: ['jj-integration'] }),
+      controls.apply({ pack: 'versioning', action: 'enable', prerequisites, plugins: ['jj-integration', 'project-checks'] }),
     )
     expect(restored.summary.kind).toBe('applied')
-    expect(rows.map(row => row.enabled)).toEqual([true, false])
+    expect(rows.map(row => row.enabled)).toEqual([true, false, true])
   })
 
   it('degrades to the exact command to copy when the profile is not linked from a checkout, and runs nothing', async () => {
@@ -156,7 +158,7 @@ describe('pack controls', () => {
   })
 
   it('does nothing for an up-to-date pack', async () => {
-    const rows = ['traces', 'activity-timeline', 'preview', 'hmr-gate'].map(name => ({
+    const rows = ['traces', 'activity-timeline', 'preview', 'hmr-gate', 'worktree-memory'].map(name => ({
       entryId: `include:dshfiles-${name}`,
       moduleName: `@dshfiles/${name}`,
       enabled: true,

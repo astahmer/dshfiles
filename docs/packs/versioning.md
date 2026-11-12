@@ -2,7 +2,7 @@
 
 # Versioning workflow
 
-A workspace per thread, landing finished work, the revision graph, changed-file review and undo per turn. Works with jj and git.
+A workspace per thread, landing finished work, the revision graph, changed-file review, project checks and undo per turn. Works with jj and git.
 
 Pack id `versioning`. Back to [all packs](README.md).
 
@@ -12,6 +12,7 @@ Pack id `versioning`. Back to [all packs](README.md).
 2. [`@dshfiles/jujutsu`](../../plugins/@dshfiles/jujutsu/README.md) — Jujutsu revision graph and confirmed Source Control actions for DSH.
 3. [`@dshfiles/diff-viewed`](../../plugins/@dshfiles/diff-viewed/README.md) — Mark changed files as viewed in the DSH change review tab, with per-turn progress.
 4. [`@dshfiles/session-undo`](../../plugins/@dshfiles/session-undo/README.md) — Undo and redo a thread's last turn: the conversation forks back before it and the workspace files return to their snapshot, through the VCS provider (jj operations in a jj workspace).
+5. [`@dshfiles/project-checks`](../../plugins/@dshfiles/project-checks/README.md) — Trusted project actions, completion receipts, and native hook result visibility for DSH.
 
 ## Prerequisites
 
@@ -25,7 +26,7 @@ Pack id `versioning`. Back to [all packs](README.md).
 
 ## Features
 
-From the onboarding feature catalog: 35 features, the 29 curated ones first.
+From the onboarding feature catalog: 38 features, the 29 curated ones first.
 
 ### Curated
 
@@ -67,6 +68,9 @@ From the onboarding feature catalog: 35 features, the 29 curated ones first.
 4. **Undo and redo a turn: conversation and files together** (`session-undo`, composer) — Each turn start snapshots the thread's workspace through the VCS provider (a jj operation in a jj workspace, a snapshot commit in git) before any of its tool calls run. Undo restores that snapshot, continues in a fork of the conversation cut before the turn and archives the orig…
 5. **Rewind to before any recorded turn, files included** (`session-undo`, composer) — The composer's Rewind menu lists every recorded turn. Rewind to here confirms which turns leave the conversation, restores the workspace files to the snapshot taken when that turn started, continues in a fork cut before it and archives the original; redo brings every rewound tur…
 6. **Each turn names the jj revision its edits left, with Restore to here** (`session-undo`, transcript) — When a turn ends in a jj workspace, session-undo snapshots the files again and records the revision holding them (@, or its parent past an empty undescribed change) when it differs from the turn's start. The reply's More actions menu shows it as a muted change name (a jj: refere…
+7. **Run trusted project checks** (`project-checks`, composer) — Run configured fixed-argv actions inside canonical trusted roots, including trusted actions flagged to prepare a new thread workspace (optionally holding its first turn) or to run when a thread settles, retain receipts, and expose an opt-in durable local task lifecycle without e…
+8. **Show native hook invocation records** (`project-checks`, thread-panel) — Display actual hook invoked/result events and avoid inventing skipped-hook records that DSH does not provide.
+9. **Project check receipts appear safely in the Activity Timeline** (`project-checks`) — Persist authoritative verification receipts before emitting a strict v2 safe summary with the verification stage, replay a bounded recent window when Activity Timeline starts, and keep Project Checks useful when Timeline is absent.
 
 ## Enable it
 

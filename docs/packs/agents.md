@@ -2,7 +2,7 @@
 
 # Agents & orchestration
 
-Persistent agents that message each other, questions that wait for you, background jobs and threads on other hosts.
+Persistent agents that message each other, questions that wait for you, background jobs, threads on other hosts, and the tools, skills and MCP servers agents use.
 
 Pack id `agents`. Back to [all packs](README.md).
 
@@ -13,6 +13,10 @@ Pack id `agents`. Back to [all packs](README.md).
 3. [`@dshfiles/agent-questions`](../../plugins/@dshfiles/agent-questions/README.md) — Durable parent-scoped question and answer contract for DSH subagents.
 4. [`@dshfiles/background-jobs`](../../plugins/@dshfiles/background-jobs/README.md) — Every background job of every Session on one page: live jobs from the job registry, finished ones from session logs, classified by what they do.
 5. [`@dshfiles/multi-host`](../../plugins/@dshfiles/multi-host/README.md) — Run new threads on other machines over SSH: host directory, pooled tunnels, host chip and remote thread view.
+6. [`@dshfiles/agent-toolkit`](../../plugins/@dshfiles/agent-toolkit/README.md) — An Agent toolkit page: the tools, plugins, MCP servers, skills and memory the agent can use in the current thread.
+7. [`@dshfiles/capabilities-hub`](../../plugins/@dshfiles/capabilities-hub/README.md) — A Capabilities hub page: one launch point for agent skills, MCP servers and DSH plugins that opens each owner's own manager, with skills.sh link-out guidance and separate trust labels.
+8. [`@dshfiles/mcp-servers`](../../plugins/@dshfiles/mcp-servers/README.md) — Manage profile-wide MCP server configurations and native DSH MCP clients.
+9. [`@dshfiles/mcp-endpoint`](../../plugins/@dshfiles/mcp-endpoint/README.md) — An MCP server (streamable HTTP, bearer token) on the DSH Web server, so Claude Code or Codex in a terminal can list, start, message, wait on and stop DSH threads.
 
 ## Prerequisites
 
@@ -24,7 +28,7 @@ Pack id `agents`. Back to [all packs](README.md).
 
 ## Features
 
-From the onboarding feature catalog: 38 features, the 32 curated ones first.
+From the onboarding feature catalog: 51 features, the 41 curated ones first.
 
 ### Curated
 
@@ -60,6 +64,15 @@ From the onboarding feature catalog: 38 features, the 32 curated ones first.
 30. **Answer a remote agent's questions and approvals in this client** (`multi-host`, composer) — While a mirrored thread is followed, this Host opens the owning runtime's forwarded-event stream as an owner client, holds what the runtime waits on, and shows it in the native question card or an approval panel in the same seat. Answers go back to that runtime, which stays the…
 31. **Work a remote thread's repository from this client** (`multi-host`, threads) — The thread workspace control, the integrate offer, the JJ side panel and the composer's changes bar of a mirrored thread read from the runtime that owns it, and land, queue, undo and prepared jujutsu actions run there. Each call is authorized for that Session and limited to its…
 32. **Open a remote thread's terminal on its host** (`multi-host`, threads) — A terminal tab on a mirrored thread replaces the native body, which has no agent to run against here, with a button that opens that thread in the host's own DSH. Every route into a terminal lands on it: the start page, the shortcut and a restored tab.
+33. **Agent toolkit page** (`agent-toolkit`, thread-panel) — A main panel (sidebar → Agent Toolkit: Capabilities; main-tabs opens it as a tab) showing what the agent can use in one thread: tools with source, owner, read-only marker and preset restrictions; plugin API methods and agent tools; loaded plugins with versions, state and setting…
+34. **See what a thread loads into its context** (`agent-toolkit`, thread-panel) — The thread panel Context tab lists what is loaded for the thread on the stage, each with an estimated token cost at four characters per token: the AGENTS.md-compatible instruction files DSH's own loader finds for its folder, the agent that started it, the memory start block, the…
+35. **Open the manager for skills, MCP servers or plugins from one page** (`capabilities-hub`, settings) — Settings › Capabilities hub lists the three kinds of capability an agent or DSH can gain: skills (agent instructions), MCP servers (tools and credentials) and DSH plugins (executable code), each with its own trust label, a read-only count from its owner (the dshx registry's skil…
+36. **Manage local and remote MCP server definitions** (`mcp-servers`, settings) — Create, edit, enable, connect, disconnect, refresh, and remove bounded stdio or Streamable HTTP server definitions while keeping credentials as references; each environment variable or header is a name → reference row whose reference field offers the Secret Catalog picker and ac…
+37. **Bind server headers and environment to Secret Catalog references** (`mcp-servers`, settings) — Each environment variable or request header of a server is a name → reference row. The reference input carries data-secret-input="reference", so the Secret Catalog's key button lists global aliases and writes secret:ALIAS[@env]; a DSH credential name still works. The Host resolv…
+38. **Reference configured MCP servers and tools in the composer** (`mcp-servers`, composer) — Search enabled MCP server namespaces and the current Session's registered MCP tools from @ autocomplete; selection inserts a structured prompt reference without directly executing tools.
+39. **Search curated providers and the MCP Registry** (`mcp-servers`, settings) — Browse curated provider documentation and search the official Registry while handling unavailable or malformed catalog responses safely.
+40. **Authorize remote OAuth servers** (`mcp-servers`, settings) — Discover OAuth metadata, register a client, run PKCE/state validation, exchange and refresh grants, and clear grant state on sign-out.
+41. **Batch enable, disable and remove MCP servers** (`mcp-servers`, settings) — Registered servers take checkbox selection with ranges and visible-only select-all; enabled or disabled servers change in one pass, and removing a selection always goes through a count-named confirmation that stops its native clients and drops their grants.
 
 ### More
 
@@ -69,6 +82,10 @@ From the onboarding feature catalog: 38 features, the 32 curated ones first.
 4. **Resolve feedback in bounded batches** (`agent-questions`) — Accept at most twenty feedback resolutions atomically and reject oversized batches before writing any receipt.
 5. **Delegate a task to another machine** (`multi-host`) — The multi_host_delegate agent tool runs a task as a thread on a named host, or on the least-loaded visible SSH host through Auto, waits for its turn and returns the final answer, like a subagent on that machine. A pending question on the host, a failed turn and a wait that runs…
 6. **Connect to an SSH-managed runtime** (`multi-host`) — Discover a remote DSH through its launch file over SSH, verify pinned identity/capabilities, keep one pooled tunnel per runtime, and never accept unknown host keys or forward the agent.
+7. **Open the agent toolkit from the command palette** (`agent-toolkit`) — The command palette's “Open the agent toolkit” opens the page about the thread the palette was opened from.
+8. **Drive DSH threads from an outside agent over MCP** (`mcp-endpoint`) — Serve an MCP server (streamable HTTP, stateless, JSON responses) at /mcp on the DSH Web server. Claude Code, Codex or any MCP client with the bearer token can list projects and threads, read a thread's recent messages, create a thread with a first prompt and model, queue or stee…
+9. **Expose plugin tools to MCP clients** (`mcp-endpoint`) — Expose existing plugin agent tools through the authenticated MCP endpoint, subject to an off-by-default read-only or read-write setting.
+10. **Issue an MCP token and connect a client** (`mcp-endpoint`, settings) — Settings › MCP endpoint and the MCP endpoint: connect a client palette command open copyable setup instructions for Claude Code, Codex, Cursor, VS Code and generic JSON. The section generates, rotates and revokes a bearer token and controls LAN access; a freshly issued token app…
 
 ## Enable it
 

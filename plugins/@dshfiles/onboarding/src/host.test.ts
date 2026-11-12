@@ -78,7 +78,19 @@ describe('onboarding Host', () => {
       await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
       const client = createHostApiClient(host.ctx, onboardingApi, '@test/caller')
       const overview = await client.overview({ query: 'backlog' })
-      expect(overview.packs.map(pack => pack.id)).toEqual(['core', 'versioning', 'github', 'planning', 'accounts', 'agents', 'observe', 'knowledge'])
+      expect(overview.packs.map(pack => pack.id)).toEqual([
+        'core',
+        'transcript',
+        'versioning',
+        'github',
+        'planning',
+        'accounts',
+        'agents',
+        'files',
+        'observe',
+        'knowledge',
+        'develop',
+      ])
       expect(overview.features.curatedOnly).toBe(false)
       expect(overview.features.rows.some(row => row.plugin === 'backlog')).toBe(true)
       expect(overview.checklist?.map(item => [item.id, item.state])).toEqual([

@@ -4,11 +4,20 @@
 
 A pack is a named set of owned plugins adopted together; a plugin may sit in several. Getting started (**Knowledge › Getting started**) shows the same packs with each plugin's live state, `onboarding_pack_apply` enables or disables one, and `dshx init` composes a new profile from them. Core is always on.
 
-1. [Core](core.md) (`core`, 6 plugins) — The thread list, tabs, chat, composer, session control and Settings every other pack builds on.
-2. [Versioning workflow](versioning.md) (`versioning`, 4 plugins) — A workspace per thread, landing finished work, the revision graph, changed-file review and undo per turn. Works with jj and git.
-3. [GitHub & review](github.md) (`github`, 3 plugins) — Open and watch pull requests, review a workspace before landing, and run project automations from GitHub events.
-4. [Backlog & planning](planning.md) (`planning`, 6 plugins) — A backlog that starts threads (with Jira and Notion), goals agents keep working on, schedules and a reorderable queue.
-5. [Accounts & cost](accounts.md) (`accounts`, 4 plugins) — Several AI accounts with failover, usage and quota, context compaction, and deferred tools to keep prompts small.
-6. [Agents & orchestration](agents.md) (`agents`, 5 plugins) — Persistent agents that message each other, questions that wait for you, background jobs and threads on other hosts.
-7. [Observe & perf](observe.md) (`observe`, 4 plugins) — Traces of every turn and tool call, an activity log, a browser preview of dev servers, and hot reload that waits for idle.
-8. [Knowledge](knowledge.md) (`knowledge`, 5 plugins) — Memory across threads, reference repositories, search over past threads and prompts, and fast file search.
+1. [Core](core.md) (`core`, 25 plugins) — The thread list, tabs, chat, composer, session control, Settings, AI accounts and Getting started every other pack builds on.
+2. [Composer & transcript](transcript.md) (`transcript`, 11 plugins) — Richer prompts and replies: @ references, model and effort, plan cards, diagrams, HTML and test cards, tool timing, turn summaries and a side chat.
+3. [Versioning workflow](versioning.md) (`versioning`, 5 plugins) — A workspace per thread, landing finished work, the revision graph, changed-file review, project checks and undo per turn. Works with jj and git.
+4. [GitHub & review](github.md) (`github`, 3 plugins) — Open and watch pull requests, review a workspace before landing, and run project automations from GitHub events.
+5. [Backlog & planning](planning.md) (`planning`, 6 plugins) — A backlog that starts threads (with Jira and Notion), goals agents keep working on, schedules and a reorderable queue.
+6. [Accounts & cost](accounts.md) (`accounts`, 5 plugins) — Several AI accounts with failover, secret aliases, usage and quota, context compaction, and deferred tools to keep prompts small.
+7. [Agents & orchestration](agents.md) (`agents`, 9 plugins) — Persistent agents that message each other, questions that wait for you, background jobs, threads on other hosts, and the tools, skills and MCP servers agents use.
+8. [Editor, boards & sharing](files.md) (`files`, 5 plugins) — A file editor, whiteboards per project, and threads you can share by link, move to another machine or clean up.
+9. [Observe & perf](observe.md) (`observe`, 5 plugins) — Traces of every turn and tool call, an activity log, a browser preview of dev servers, process memory, and hot reload that waits for idle.
+10. [Knowledge](knowledge.md) (`knowledge`, 8 plugins) — Memory across threads, reference repositories, search over past threads, prompts and other agents' logs, readable web pages, and fast file search.
+11. [Plugin development](develop.md) (`develop`, 3 plugins) — The plugin guide, a gallery of the shared components, and hot reload that waits for idle.
+
+## In no pack
+
+Every UI plugin joins a pack or this list; `features:check` fails one in neither.
+
+1. [`@dshfiles/loopback-access`](../../plugins/@dshfiles/loopback-access/README.md) — Network plumbing: its one setting only matters once the Web server binds a LAN address, which no pack does.

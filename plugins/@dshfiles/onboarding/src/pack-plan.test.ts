@@ -13,7 +13,7 @@ const entry = (plugin: string, enabled: boolean, readOnlyReason: string | null =
 const input = (overrides: Partial<PreviewInput> = {}): PreviewInput => ({
   pack: 'versioning',
   action: 'enable',
-  entries: [entry('jj-integration', true), entry('jujutsu', false), entry('diff-viewed', true, 'management-required')],
+  entries: [entry('jj-integration', true), entry('jujutsu', false), entry('diff-viewed', true, 'management-required'), entry('project-checks', true)],
   toolchain: { kind: 'automatic' },
   profile: 'scratch',
   homeFromEnv: false,
@@ -33,6 +33,7 @@ describe('pack preview', () => {
       fine: [
         { plugin: 'jj-integration', state: 'enabled' },
         { plugin: 'diff-viewed', state: 'enabled' },
+        { plugin: 'project-checks', state: 'enabled' },
       ],
       prerequisites: [
         { id: 'project', state: 'done' },
@@ -44,7 +45,9 @@ describe('pack preview', () => {
   })
 
   it('is up to date when every plugin already runs, and does nothing', () => {
-    const preview = PackPlan.preview(input({ pack: 'observe', entries: ['traces', 'activity-timeline', 'preview', 'hmr-gate'].map(name => entry(name, true)) }))
+    const preview = PackPlan.preview(
+      input({ pack: 'observe', entries: ['traces', 'activity-timeline', 'preview', 'hmr-gate', 'worktree-memory'].map(name => entry(name, true)) }),
+    )
     expect(preview).toMatchObject({ upToDate: true, restart: 'none', install: [], change: [] })
     expect(PackPlan.stepsOf(preview)).toEqual([])
     expect(PackPlan.summarize({ preview, results: [] })).toMatchObject({ kind: 'up-to-date' })
@@ -61,8 +64,11 @@ describe('pack preview', () => {
       }),
     )
     expect(preview.change.map(step => step.plugin)).toEqual(planning)
-    const partly = PackPlan.preview(input({ pack: 'accounts', action: 'disable', entries: [entry('ai-accounts', true), entry('usage', false)] }))
-    expect(partly.change.map(step => step.plugin)).toEqual(['ai-accounts'])
+    const partly = PackPlan.preview(
+      input({ pack: 'accounts', action: 'disable', entries: [entry('ai-accounts', true), entry('secret-catalog', true), entry('usage', false)] }),
+    )
+    expect(partly.change.map(step => step.plugin)).toEqual(['secret-catalog'])
+    expect(partly.kept).toEqual([{ plugin: 'ai-accounts', neededBy: ['Core'] }])
     expect(partly.fine).toEqual([
       { plugin: 'usage', state: 'disabled' },
       { plugin: 'context-compaction', state: 'not-installed' },

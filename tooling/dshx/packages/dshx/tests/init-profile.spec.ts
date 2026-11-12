@@ -48,7 +48,9 @@ const profileManifest = Schema.Struct({
   dsh: Schema.Struct({ profile: Schema.Struct({ bundles: Schema.Array(Schema.String) }) }),
 })
 
-const CORE = ['thread-sidebar', 'main-tabs', 'chat', 'rich-composer', 'session-controller', 'settings-shell'].map(name => `@dshfiles/${name}`)
+const CORE = ['thread-sidebar', 'main-tabs', 'chat', 'rich-composer', 'session-controller', 'settings-shell', 'onboarding', 'ai-accounts'].map(
+  name => `@dshfiles/${name}`,
+)
 
 describe('dshx init', () => {
   let home: string
@@ -83,7 +85,7 @@ describe('dshx init', () => {
     const result = await init('--packs', 'versioning,nope', '--dry-run')
     expect(result.status).toBe(2)
     expect(result.errors).toContain('Unknown pack: nope.')
-    expect(result.errors).toContain('core, versioning, github, planning, accounts, agents, observe, knowledge')
+    expect(result.errors).toContain('core, transcript, versioning, github, planning, accounts, agents, files, observe, knowledge, develop')
   })
 
   it('always composes Core, even when it is not named', async () => {

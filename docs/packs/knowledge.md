@@ -2,7 +2,7 @@
 
 # Knowledge
 
-Memory across threads, reference repositories, search over past threads and prompts, and fast file search.
+Memory across threads, reference repositories, search over past threads, prompts and other agents' logs, readable web pages, and fast file search.
 
 Pack id `knowledge`. Back to [all packs](README.md).
 
@@ -13,6 +13,9 @@ Pack id `knowledge`. Back to [all packs](README.md).
 3. [`@dshfiles/session-search`](../../plugins/@dshfiles/session-search/README.md) — Owns the sessionQuery search backend: an off-thread FTS5 index fed incrementally from session logs, so a content search is a pure read that never blocks the Host event loop.
 4. [`@dshfiles/prompt-stash`](../../plugins/@dshfiles/prompt-stash/README.md) — Save and reuse shared prompt snippets.
 5. [`@dshfiles/fff-search`](../../plugins/@dshfiles/fff-search/README.md) — Agent grep and glob backed by a resident fff file and content index instead of one ripgrep spawn per call.
+6. [`@dshfiles/agentsview`](../../plugins/@dshfiles/agentsview/README.md) — Browse, search and read the session logs of other local agent CLIs (Claude Code, Codex) inside DSH, read-only, with token totals per agent and model.
+7. [`@dshfiles/web-fetch-readable`](../../plugins/@dshfiles/web-fetch-readable/README.md) — web_fetch provider for ctx.web: follows cross-origin redirects with per-hop public-address revalidation, accepts more text types and extracts the readable article.
+8. [`@dshfiles/resource-packs`](../../plugins/@dshfiles/resource-packs/README.md) — Typed property packs attached to referenced resources, shared by the GUI, plugins and agents.
 
 ## Prerequisites
 
@@ -25,7 +28,7 @@ Pack id `knowledge`. Back to [all packs](README.md).
 
 ## Features
 
-From the onboarding feature catalog: 17 features, the 5 curated ones first.
+From the onboarding feature catalog: 21 features, the 6 curated ones first.
 
 ### Curated
 
@@ -34,6 +37,7 @@ From the onboarding feature catalog: 17 features, the 5 curated ones first.
 3. **Show what memory costs and whether it holds up** (`memory`, knowledge) — Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the use…
 4. **Forget a selection of notes** (`memory`, knowledge) — Valid notes carry a checkbox; Shift/Cmd select ranges and toggles, select-all covers the visible valid notes, and one confirmed action forgets the selection with a shared reason. Superseded and forgotten notes never get a checkbox.
 5. **Attach named outside directories and git repositories to a thread** (`references`, knowledge) — Save a reference (a directory read in place, or a git URL shallow-cloned under $DSH_HOME/references), attach it to a Session with /reference or the reference_* tools, and name every attached reference with its absolute path in that Session's runtime context.
+6. **Agent CLI sessions browser** (`agentsview`, knowledge) — One page lists the sessions other agent CLIs recorded on this machine (Claude Code under ~/.claude/projects, Codex under ~/.codex/sessions), newest first, with title, working directory, branch, prompts, tool calls and token totals; filters them by agent and text, searches their…
 
 ### More
 
@@ -49,6 +53,9 @@ From the onboarding feature catalog: 17 features, the 5 curated ones first.
 10. **Search every prompt sent across threads** (`prompt-stash`, composer) — Search the prompts you sent in every top-level thread from the Prompts menu's All threads tab, Ctrl+R in a focused composer, or the Search prompt history palette entry; Enter inserts one at the cursor without sending and the star saves it to the shared library. The prompt_histor…
 11. **Keep draft attachments across thread navigation** (`prompt-stash`, composer) — While a thread's composer holds draft attachments, keep that thread's session scope retained so leaving the thread and coming back (sidebar Back, another thread) keeps the files and images with the draft text.
 12. **Answer agent grep and glob from a resident fff index** (`fff-search`) — On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a worker thread.
+13. **Answer ctx.web fetches across redirects with the readable article** (`web-fetch-readable`, settings) — A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.
+14. **Source chips under web_search and web_fetch results** (`web-fetch-readable`, transcript) — Each web_search and web_fetch row in the transcript keeps the native view and gains one chip per page it returned, under the card through tool-meta's tool.call.sections seat: the host and the page title (web_search's source titles, web_fetch's article heading), the URL in a tool…
+15. **Typed packs on referenced resources** (`resource-packs`, knowledge) — Register resources and attach reusable typed property packs, without modifying native content or running agents.
 
 ## Enable it
 

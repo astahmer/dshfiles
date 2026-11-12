@@ -1,6 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { DSHX_PRESENTATION_FIELDS, featureCatalogIssues } from '../packages/dshx/src/project/features.ts'
 import { readPackageRelative, telemetryIssues } from './telemetry-coverage.mjs'
 
@@ -127,7 +127,38 @@ const onboardingIssues = catalog => {
   ]
 }
 
+/** Plugins a UI-plugin check accepts: every pack member, plus the explicit exemptions (`onboarding/src/packs.ts`). */
+const readPackMembership = async () => {
+  const packsFile = resolve(pluginsRoot, 'onboarding/src/packs.ts')
+  const module = await import(pathToFileURL(packsFile).href).catch(error => {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND') throw new Error(`${relative(workspaceRoot, packsFile)} is missing: it defines the packs every UI plugin joins.`)
+    throw error
+  })
+  return {
+    packed: new Set(module.PACKS.flatMap(pack => pack.plugins)),
+    exempt: new Map(module.PACK_EXEMPTIONS.map(exemption => [exemption.plugin, exemption.reason])),
+  }
+}
+
+const isUiPlugin = catalog => {
+  const clientFeatures = catalog.features.filter(feature => feature.surfaces.includes('client'))
+  return clientFeatures.some(feature => feature.surface !== 'infrastructure')
+}
+
+/** A UI plugin joins a pack, so `dshx init`, `dshx setup` and Getting started can offer it; or it is exempt with a reason. */
+const packIssues = ({ directory, catalog, membership }) => {
+  const packed = membership.packed.has(directory)
+  const exempt = membership.exempt.has(directory)
+  if (packed && exempt) return [`is in a pack and in PACK_EXEMPTIONS; remove it from PACK_EXEMPTIONS in plugins/@dshfiles/onboarding/src/packs.ts`]
+  if (exempt && !isUiPlugin(catalog)) return [`is not a UI plugin; remove it from PACK_EXEMPTIONS in plugins/@dshfiles/onboarding/src/packs.ts`]
+  if (!isUiPlugin(catalog) || packed || exempt) return []
+  return [
+    `UI plugin joins no pack: add "${directory}" to the pack in plugins/@dshfiles/onboarding/src/packs.ts whose summary describes what it does, or to PACK_EXEMPTIONS with a reason when users never choose it`,
+  ]
+}
+
 const packages = await collectPackages()
+const membership = await readPackMembership()
 const presentationBaseline = await readPresentationBaseline()
 const presentationSeen = new Set()
 const { featureFiles, tags: allScenarioTags, scenarioTags, misplacedTags } = await collectScenarioTags()
@@ -216,6 +247,7 @@ for (const plugin of packages) {
     }
   }
   featureIssues.push(...onboardingIssues(parsed))
+  featureIssues.push(...packIssues({ directory: relative(pluginsRoot, plugin.root), catalog: parsed, membership }))
   if (parsed.kind === 'infrastructure' && !parsed.features.some(feature => feature.verification.some(item => item.kind === 'unit-test'))) {
     featureIssues.push('infrastructure catalogs need at least one package unit-test reference')
   }
@@ -224,6 +256,11 @@ for (const plugin of packages) {
   for (const [kind, count] of Object.entries(telemetry.counts)) telemetryCounts[kind] += count
   for (const issue of featureIssues) errors.push(`${plugin.name}: ${issue}`)
   catalogs.push({ ...plugin, catalog: parsed })
+}
+
+const packageDirectories = new Set(packages.map(plugin => relative(pluginsRoot, plugin.root)))
+for (const plugin of membership.exempt.keys()) {
+  if (!packageDirectories.has(plugin)) errors.push(`PACK_EXEMPTIONS lists ${plugin}, which is not a plugin under plugins/@dshfiles; remove it.`)
 }
 
 for (const key of presentationBaseline) {

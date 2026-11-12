@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util'
 import type { CatalogFeature, Prerequisite } from '../plugins/@dshfiles/onboarding/src/catalog-model.ts'
 import { curationOf } from '../plugins/@dshfiles/onboarding/src/curation.ts'
 import { FEATURE_CATALOG } from '../plugins/@dshfiles/onboarding/src/generated/feature-catalog.ts'
-import { PACKS, type Pack } from '../plugins/@dshfiles/onboarding/src/packs.ts'
+import { PACK_EXEMPTIONS, PACKS, type Pack } from '../plugins/@dshfiles/onboarding/src/packs.ts'
 
 /**
  * Write `docs/packs/<pack>.md` and its index from the one pack definition (`onboarding/src/packs.ts`) and the onboarding
@@ -121,6 +121,15 @@ const renderIndex = (): string =>
     '',
     ...PACKS.map(
       (pack, index) => `${String(index + 1)}. [${pack.title}](${pack.id}.md) (\`${pack.id}\`, ${String(pack.plugins.length)} plugins) — ${pack.summary}`,
+    ),
+    '',
+    '## In no pack',
+    '',
+    'Every UI plugin joins a pack or this list; `features:check` fails one in neither.',
+    '',
+    ...PACK_EXEMPTIONS.map(
+      (exemption, index) =>
+        `${String(index + 1)}. [\`@dshfiles/${exemption.plugin}\`](../../plugins/@dshfiles/${exemption.plugin}/README.md) — ${exemption.reason}`,
     ),
     '',
   ].join('\n')

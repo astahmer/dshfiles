@@ -2,7 +2,7 @@
 
 # Observe & perf
 
-Traces of every turn and tool call, an activity log, a browser preview of dev servers, and hot reload that waits for idle.
+Traces of every turn and tool call, an activity log, a browser preview of dev servers, process memory, and hot reload that waits for idle.
 
 Pack id `observe`. Back to [all packs](README.md).
 
@@ -12,6 +12,7 @@ Pack id `observe`. Back to [all packs](README.md).
 2. [`@dshfiles/activity-timeline`](../../plugins/@dshfiles/activity-timeline/README.md) — Unified chronological activity timeline across agents, sessions, communication, and jj workspaces.
 3. [`@dshfiles/preview`](../../plugins/@dshfiles/preview/README.md) — Agent browser tools over a Host-managed headless Chromium scoped per thread, and the dev servers each thread started.
 4. [`@dshfiles/hmr-gate`](../../plugins/@dshfiles/hmr-gate/README.md) — Web client HMR transport that only announces a rebuilt plugin while its Host half is the code the running Host loaded.
+5. [`@dshfiles/worktree-memory`](../../plugins/@dshfiles/worktree-memory/README.md) — Resident memory of DSH process trees by workspace and deterministic origins for current-user Node processes.
 
 ## Prerequisites
 
@@ -24,7 +25,7 @@ None.
 
 ## Features
 
-From the onboarding feature catalog: 30 features, the 21 curated ones first.
+From the onboarding feature catalog: 32 features, the 21 curated ones first.
 
 ### Curated
 
@@ -61,6 +62,8 @@ From the onboarding feature catalog: 30 features, the 21 curated ones first.
 7. **Plugin updates waiting for a restart in the Inbox** (`hmr-gate`, inbox) — While any rebuilt plugin is held back because its new Host code is not loaded, the Inbox shows one Ready item about this DSH naming the waiting packages and how to apply them (restart when no agent is working). It offers no restart verb: restarting stays the user's decision. A c…
 8. **Held-back bundles join the one restart notice** (`hmr-gate`) — While a rebuilt plugin waits for a Host restart, hmr-gate lists it in thread-sidebar's restart sources, so the status strip's one Restart pending item names it beside the Host files thread-sidebar watches. thread-sidebar owns that item and its Restart DSH / Restart when idle ver…
 9. **Experimental in-process Host reload for opted-in plugins** (`hmr-gate`) — With the hmr-gate row's hostReload config on, a rebuilt Host half of a plugin whose package.json declares dshx.hostReload "safe" is replaced inside the running DSH: its own modules are evicted from the ESM cache and imported again, the Loader contract (name, inject, Config) is c…
+10. **Process memory and Node origins** (`worktree-memory`, observe) — The RAM tab of Observe › Processes (and this thread's share in the thread panel's Jobs facet): One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate par…
+11. **Orphaned scratch DSH Hosts** (`worktree-memory`, observe) — Scratch DSH Hosts (--profile dshx-boot) are listed on the RAM tab by the owner their dshx record names (E2E or dshx dev, workspace, owner pid), with CPU and resident memory. A Host whose owner exited, or a pre-record Host init adopted more than 2 h ago, is flagged Orphan; one St…
 
 ## Enable it
 

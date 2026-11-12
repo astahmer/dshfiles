@@ -80,6 +80,8 @@ blocks the app, makes no model request, and changes the profile only when you co
    prerequisites, key settings, catalog features (curated first), how to enable it and its restart need.
    `node scripts/pack-docs.ts` regenerates them from `src/packs.ts` and `src/generated/feature-catalog.ts`;
    `pnpm check:pack-docs` (part of `check:green`) fails on a stale page, so regenerate after changing either.
+3. **Every UI plugin joins a pack.** `features:check` fails a UI plugin that is in no pack of `src/packs.ts` and not in
+   its `PACK_EXEMPTIONS` (each exemption names a reason); the pack docs list the exemptions.
 
 ## What's new
 

@@ -9,6 +9,12 @@ import test from 'node:test'
 const scriptPath = resolve(dirname(fileURLToPath(import.meta.url)), 'feature-coverage.mjs')
 const temporaryRoots = []
 
+const writePacks = (packsFile, { packed, exempt }) =>
+  writeFile(
+    packsFile,
+    `export const PACKS = [{ id: 'core', plugins: ${JSON.stringify(packed)} }]\nexport const PACK_EXEMPTIONS = ${JSON.stringify(exempt.map(plugin => ({ plugin, reason: 'Fixture.' })))}\n`,
+  )
+
 const withFixture = async callback => {
   const root = await mkdtemp(resolve(tmpdir(), 'dshx-feature-coverage-'))
   temporaryRoots.push(root)
@@ -50,7 +56,10 @@ const withFixture = async callback => {
   await writeFile(resolve(pluginRoot, 'src/api.ts'), "export const demoApi = defineApi({ id: 'demo' })\n")
   const featureFile = resolve(featureRoot, 'demo.feature')
   await writeFile(featureFile, 'Feature: Demo boot\n  @scenario:demo.boot-profile\n  Scenario: Boot the disposable profile\n')
-  return callback({ root, pluginRoot, featureFile, catalogFile: resolve(pluginRoot, 'dshx.features.json') })
+  const packsFile = resolve(root, 'plugins/@dshfiles/onboarding/src/packs.ts')
+  await mkdir(dirname(packsFile), { recursive: true })
+  await writePacks(packsFile, { packed: ['demo'], exempt: [] })
+  return callback({ root, pluginRoot, featureFile, packsFile, catalogFile: resolve(pluginRoot, 'dshx.features.json') })
 }
 
 const runCheck = (root, mode = '--check') => spawnSync(process.execPath, ['--experimental-strip-types', scriptPath, mode, '--root', root], { encoding: 'utf8' })
@@ -277,6 +286,37 @@ test('requires an onboarding block on a UI plugin unless every client feature is
     })
     const withBlock = runCheck(root)
     assert.equal(withBlock.status, 0, withBlock.stderr)
+  })
+})
+
+test('requires a UI plugin to join a pack or the exemption list, and rejects a stale exemption', async () => {
+  await withFixture(async ({ root, catalogFile, packsFile }) => {
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].surfaces = ['client', 'host']
+      catalog.features[0].onboarding = { firstAction: 'Open Observe › Profiles and boot one.', doneWhen: 'A profile shows Ready.' }
+    })
+    assert.equal(runCheck(root).status, 0, runCheck(root).stderr)
+
+    await writePacks(packsFile, { packed: [], exempt: [] })
+    const unpacked = runCheck(root)
+    assert.equal(unpacked.status, 1)
+    assert.match(unpacked.stderr, /@dshfiles\/demo: UI plugin joins no pack: add "demo" to the pack/)
+
+    await writePacks(packsFile, { packed: [], exempt: ['demo'] })
+    const exempt = runCheck(root)
+    assert.equal(exempt.status, 0, exempt.stderr)
+
+    await writePacks(packsFile, { packed: ['demo'], exempt: ['demo'] })
+    assert.match(runCheck(root).stderr, /@dshfiles\/demo: is in a pack and in PACK_EXEMPTIONS/)
+
+    await writePacks(packsFile, { packed: ['demo'], exempt: ['gone'] })
+    assert.match(runCheck(root).stderr, /PACK_EXEMPTIONS lists gone, which is not a plugin under plugins\/@dshfiles/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].surfaces = ['host']
+    })
+    await writePacks(packsFile, { packed: [], exempt: ['demo'] })
+    assert.match(runCheck(root).stderr, /@dshfiles\/demo: is not a UI plugin; remove it from PACK_EXEMPTIONS/)
   })
 })
 
