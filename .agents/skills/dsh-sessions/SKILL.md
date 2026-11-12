@@ -45,7 +45,9 @@ Read it in this order:
 1. `State` and `Attention`: running or idle, idle time, and flags — a tool call
    pending > 2 min, no events for 10 min while running, a failed last turn
    (usage limits show up here), trailing tool failures, the same call repeated,
-   turns with no tool call (goal loop), open todos on an idle session.
+   turns with no tool call (goal loop), open todos on an idle session,
+   compaction thrash (3+ failed compactions, with the latest error) and a skill
+   loaded 3+ times (lost to compaction).
 2. `Cwd … but shell runs in:` — agents often work in another directory through
    per-call `workdir` (a jj thread workspace, a sibling checkout). Inspect that
    directory, not the session cwd.

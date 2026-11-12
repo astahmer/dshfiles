@@ -37,6 +37,8 @@ const retrySchema = Schema.Struct({
   failure: failureSchema,
 })
 const subagentCatalogSchema = Schema.Struct({ childId: Schema.String, label: Schema.optional(Schema.String) })
+const compactionEndSchema = Schema.Struct({ error: Schema.optional(Schema.String) })
+const skillArgumentsSchema = Schema.Struct({ name: Schema.String })
 const modelSelectionSchema = Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) })
 const titleSchema = Schema.Struct({ title: Schema.String })
 const tokenUsageSchema = Schema.Struct({
@@ -112,6 +114,8 @@ export interface SessionDigest {
   readonly turns?: number
   readonly steps?: number
   readonly compactions: number
+  /** Compactions that ended with an error instead of a checkpoint. */
+  readonly compactionFailures: number
   readonly lastTurnEnd?: { readonly seq: number; readonly kind: string; readonly error?: string }
   readonly attention: readonly string[]
   readonly goal?: { readonly objective: string; readonly phase?: string | undefined }
@@ -418,6 +422,9 @@ export const digestSession = (input: {
   let title: string | undefined
   let model: string | undefined
   let compactions = 0
+  let compactionFailures = 0
+  let lastCompactionError: string | undefined
+  const skillLoads = new Map<string, number>()
   let retries = 0
   let failedTurns = 0
   const subagents = new Map<string, string | undefined>()
@@ -446,6 +453,10 @@ export const digestSession = (input: {
         status,
         ...(failure !== undefined && { error: failure }),
       })
+      if (call.success.name === 'skill') {
+        const skill = decodeResult(skillArgumentsSchema, args)
+        if (skill._tag === 'Success') skillLoads.set(skill.success.name, (skillLoads.get(skill.success.name) ?? 0) + 1)
+      }
       const path = stringArgument(args, 'file_path', 'path', 'filePath')
       if (mutatingFileTools.has(call.success.name) && path !== undefined && status !== 'error') {
         const key = display(path)
@@ -504,6 +515,13 @@ export const digestSession = (input: {
     }
     if (event.type === 'llm/retry') retries += 1
     if (event.type === 'compaction/start') compactions += 1
+    if (event.type === 'compaction/end') {
+      const parsed = decodeResult(compactionEndSchema, data)
+      if (parsed._tag === 'Success' && parsed.success.error !== undefined) {
+        compactionFailures += 1
+        lastCompactionError = parsed.success.error
+      }
+    }
     if (event.type === 'session/title') {
       const parsed = decodeResult(titleSchema, data)
       if (parsed._tag === 'Success') title = parsed.success.title
@@ -560,6 +578,10 @@ export const digestSession = (input: {
     attention.push(
       `${turnsWithoutTools} turns since the last tool call (#${lastCallSeq})${lastAssistantText === undefined ? '' : `; latest reply: ${oneLine(lastAssistantText.text, 80)}`}`,
     )
+  // A compaction that keeps failing is retried at every step; each skill reloaded after a compaction re-reads its body.
+  if (compactionFailures >= 3)
+    attention.push(`${compactionFailures} of ${compactions} compactions failed, latest: ${oneLine(lastCompactionError ?? 'unknown error', 160)}`)
+  for (const [skill, loads] of skillLoads) if (loads >= 3) attention.push(`skill ${skill} loaded ${loads} times`)
   const projectedTodos = projections.todos ?? todos
   if (!input.summary.running && lastTurnEnd?.kind !== 'error' && projectedTodos.some(todo => todo.status !== 'completed'))
     attention.push(`idle with ${projectedTodos.filter(todo => todo.status !== 'completed').length} open todos`)
@@ -588,6 +610,7 @@ export const digestSession = (input: {
       steps: projections.sessionStats.steps,
     }),
     compactions,
+    compactionFailures,
     ...(lastTurnEnd !== undefined && { lastTurnEnd }),
     attention,
     ...(projectedGoal !== undefined && { goal: projectedGoal }),
@@ -658,7 +681,7 @@ const renderSessionDigest = (digest: SessionDigest, now: number): string => {
     digest.turns === undefined ? undefined : `${digest.turns} turn${digest.turns === 1 ? '' : 's'}`,
     digest.steps === undefined ? undefined : `${digest.steps} steps`,
     `${digest.toolCallCount} tool calls`,
-    `${digest.compactions} compactions`,
+    `${digest.compactions} compactions${digest.compactionFailures === 0 ? '' : ` (${digest.compactionFailures} failed)`}`,
     digest.tokens === undefined
       ? undefined
       : `tokens in ${formatCount(digest.tokens.input)} (+${formatCount(digest.tokens.cachedInput)} cached) out ${formatCount(digest.tokens.output)}`,

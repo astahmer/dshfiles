@@ -138,6 +138,30 @@ describe('sessions digest', () => {
     expect(digest.attention).toEqual(['idle with 1 open todos'])
   })
 
+  it('flags compaction attempts that keep failing and a skill reloaded across compactions', () => {
+    const fixture = loadFixture('relay-done')
+    const time = lastTime(fixture.records)
+    let seq = recordSeq(fixture.records.at(-1) ?? null)
+    const event = (type: string, data: JsonValue): JsonValue => {
+      seq += 1
+      return { type: 'event', event: { type, seq, time, data } }
+    }
+    const budgetError = 'The system prompt and tools exceed the safe compaction request budget.'
+    const failedCompaction = (compactionId: string) => [
+      event('compaction/start', { compactionId, turn: 9 }),
+      event('compaction/end', { compactionId, turn: 9, error: budgetError }),
+    ]
+    const skill = (callId: string) => event('tool/call', { turn: 9, step: 1, callId, name: 'skill', arguments: JSON.stringify({ name: 'dsh-sessions' }) })
+    const records = [...fixture.records, skill('s1'), ...failedCompaction('k1'), skill('s2'), ...failedCompaction('k2'), ...failedCompaction('k3'), skill('s3')]
+    const digest = SessionDigestModel.digest({ summary: fixture.summary, records, now: time + 1_000 })
+
+    expect(digest.compactions).toBe(4)
+    expect(digest.compactionFailures).toBe(3)
+    expect(digest.attention).toContain(`3 of 4 compactions failed, latest: ${budgetError}`)
+    expect(digest.attention).toContain('skill dsh-sessions loaded 3 times')
+    expect(SessionDigestModel.render(digest, time + 1_000)).toContain('4 compactions (3 failed)')
+  })
+
   it('renders each captured session within a one-screen budget', () => {
     for (const name of ['relay-running', 'goal-loop', 'relay-done']) {
       const fixture = loadFixture(name)
