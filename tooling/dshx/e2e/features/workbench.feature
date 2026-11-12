@@ -435,7 +435,7 @@ Feature: Workbench layouts
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     And each fixed-session conversation receives its own draft
-    Then the view chooser exposes qualified plugin names and AI Accounts search selects its Preview
+    Then the view chooser names views without their plugin and AI Accounts search selects its Preview
     When legacy reusable view titles are saved with their original panel IDs and restored
     Then restored reusable views have qualified titles with the same IDs and one live mount
     And switching conversation tabs preserves distinct messages and drafts

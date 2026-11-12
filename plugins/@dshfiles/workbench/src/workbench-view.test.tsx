@@ -526,7 +526,7 @@ describe('WorkbenchView', () => {
         onOpenPanel={open}
       />,
     )
-    fireEvent.click(screen.getByText('Terminal: Terminal', { selector: 'button span' }))
+    fireEvent.click(screen.getByText('Terminal', { selector: 'button span' }))
     expect(open.mock.calls[0]?.[0]).toBe(terminal.definition)
     fireEvent.click(screen.getByText('New thread', { selector: 'button span' }))
     expect(open.mock.calls[1]?.[0]).toBe(thread.definition)
@@ -880,7 +880,7 @@ describe('WorkbenchView', () => {
     const original = right.activePanel
     if (original === undefined) throw new Error('Missing original panel')
     fireEvent.change(draftOf(original.id), { target: { value: 'preserved' } })
-    fireEvent.click(within(mainChooser).getByText('Backlog: Items', { selector: 'button span' }))
+    fireEvent.click(within(mainChooser).getByText('Items', { selector: 'button span' }))
     expect(right.getPanel(original.id)).toBe(original)
     expect(draftOf(original.id).value).toBe('preserved')
     expect(main.activePanel?.id).not.toBe(original.id)

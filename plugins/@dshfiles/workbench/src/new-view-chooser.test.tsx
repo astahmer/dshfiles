@@ -16,18 +16,27 @@ const source = (id: string, title: string, extra: Partial<WorkbenchPanelDefiniti
 })
 
 describe('NewViewChooser', () => {
-  it('shows and searches producer-qualified names with stable special-view ordering', () => {
+  it('names each view without its plugin, searches the full names, and keeps special-view ordering', () => {
     const definitions = [
       source('backlog', 'Backlog: Items'),
       source('dshfiles-thread-sidebar.workbench-navigation', 'Navigation'),
       source('dshfiles-settings', 'Settings Shell: Settings'),
+      source('plugins', 'Plugin Manager: Plugins'),
       source('current-conversation', 'Rich Composer: Current conversation', { allowMultiple: true }),
     ]
     render(<NewViewChooser definitions={definitions} onSelect={() => undefined} />)
-    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Settings Shell: Settings', 'Navigation', 'Backlog: Items'])
+    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Settings', 'Navigation', 'Items', 'Plugins'])
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search views' }), { target: { value: 'settings shell' } })
+    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Settings'])
     fireEvent.change(screen.getByRole('textbox', { name: 'Search views' }), { target: { value: 'Rich Composer' } })
     expect(screen.queryByRole('button')).toBeNull()
     expect(screen.getByText('No matching views.')).toBeDefined()
+  })
+
+  it('keeps the qualified name when two views would share a short name', () => {
+    const definitions = [source('backlog', 'Backlog: Items'), source('queue', 'Queue: Items'), source('jj', 'Jujutsu')]
+    render(<NewViewChooser definitions={definitions} onSelect={() => undefined} />)
+    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Backlog: Items', 'Jujutsu', 'Queue: Items'])
   })
 
   it('shows and searches the qualified discovery name without changing the tab title', () => {
@@ -76,7 +85,7 @@ describe('NewViewChooser', () => {
     const definitions = [source('backlog', 'Backlog: Items'), source('dshfiles-settings', 'Settings Shell: Settings'), newThread]
     const select = vi.fn()
     render(<NewViewChooser definitions={definitions} onSelect={select} />)
-    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['New thread', 'Settings Shell: Settings', 'Backlog: Items'])
+    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['New thread', 'Settings', 'Items'])
     const input = screen.getByRole('textbox', { name: 'Search views' })
     for (const query of ['new', 'Thread']) {
       fireEvent.change(input, { target: { value: query } })

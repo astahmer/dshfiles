@@ -4,7 +4,7 @@ import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { ArrowUpRightIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { NewThreadSource } from './new-thread-source.js'
-import type { ThreadFacet, ThreadFacetObservable, WorkbenchPanelDefinition } from './registry.js'
+import { withoutPluginPrefix, type ThreadFacet, type ThreadFacetObservable, type WorkbenchPanelDefinition } from './registry.js'
 
 const noThread: ThreadFacetObservable<string | undefined> = { subscribe: () => () => undefined, getSnapshot: () => undefined }
 
@@ -47,16 +47,22 @@ export const NewViewChooser = (props: {
   const facets = facetDefinitions
     .filter(({ facet }) => [facet.title(), facet.description?.() ?? ''].some(text => text.toLocaleLowerCase().includes(query)))
     .toSorted((left, right) => left.facet.order - right.facet.order)
-  const views = available
-    .filter(definition => definition.threadFacet === undefined)
-    .filter(matches)
-    .sort((left, right) => {
-      const priority = (definition: WorkbenchPanelDefinition): number => {
-        const index = [NewThreadSource.id, 'dshfiles-settings', 'dshfiles-thread-sidebar.workbench-navigation'].indexOf(definition.id)
-        return index === -1 ? 3 : index
-      }
-      return priority(left) - priority(right) || (left.discoveryTitle ?? left.title).localeCompare(right.discoveryTitle ?? right.title)
-    })
+  const viewDefinitions = available.filter(definition => definition.threadFacet === undefined)
+  // Rows name the page, never its plugin ("Settings Shell: Settings" reads "Settings"); a short name two views share keeps
+  // its qualified name. Search still matches the full names.
+  const shortName = (definition: WorkbenchPanelDefinition): string => withoutPluginPrefix(definition.discoveryTitle ?? definition.title)
+  const shortNames = viewDefinitions.map(shortName)
+  const label = (definition: WorkbenchPanelDefinition): string => {
+    const short = shortName(definition)
+    return shortNames.indexOf(short) === shortNames.lastIndexOf(short) ? short : (definition.discoveryTitle ?? definition.title)
+  }
+  const views = viewDefinitions.filter(matches).sort((left, right) => {
+    const priority = (definition: WorkbenchPanelDefinition): number => {
+      const index = [NewThreadSource.id, 'dshfiles-settings', 'dshfiles-thread-sidebar.workbench-navigation'].indexOf(definition.id)
+      return index === -1 ? 3 : index
+    }
+    return priority(left) - priority(right) || label(left).localeCompare(label(right))
+  })
   const actions = menuRows
     .filter(row => row.menu === NEW_VIEW_MENU && [row.title, ...(row.keywords ?? [])].some(text => text.toLocaleLowerCase().includes(query)))
     .toSorted((left, right) => (left.order ?? 100) - (right.order ?? 100) || left.title.localeCompare(right.title))
@@ -115,7 +121,7 @@ export const NewViewChooser = (props: {
                 className="dshx:h-auto dshx:min-h-10 dshx:w-full dshx:justify-start dshx:gap-2 dshx:py-2"
                 onClick={() => props.onSelect(definition)}
               >
-                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{definition.discoveryTitle ?? definition.title}</span>
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{label(definition)}</span>
                 <ArrowUpRightIcon aria-hidden className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
               </Button>
             ))}

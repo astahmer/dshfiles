@@ -2339,36 +2339,25 @@ const legacyViewLayoutSchema = withUnknownProperties(legacyViewLayoutFields)
 const PREVIEW_SOURCE_ID = 'dshfiles-thread-sidebar.workbench-status'
 const SCRATCHPAD_SOURCE_ID = 'dshfiles-workbench.scratchpad'
 
-Then('the view chooser exposes qualified plugin names and AI Accounts search selects its Preview', async ({ page }: { page: Page }) => {
+Then('the view chooser names views without their plugin and AI Accounts search selects its Preview', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-plugin-view-names-qualified-chooser-and-search', async () => {
     const chooser = await clickNewTab(mainPane(page))
     const cards = chooser.getByRole('button')
     const names = await cards.evaluateAll(elements => elements.map(element => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''))
     expect(names).toContain('New thread')
-    const reusableNames = names.filter(name => name !== 'New thread')
-    expect(reusableNames.length).toBeGreaterThan(0)
-    expect(reusableNames.every(name => /^[^:]+: \S/u.test(name))).toBe(true)
-    await expect(chooser.getByRole('button', { name: 'Rich Composer: Current conversation', exact: true })).toHaveCount(0)
-    for (const name of [
-      'Threads',
-      'Navigation',
-      'Quota',
-      'Sidebar controls',
-      'AI Accounts: Accounts',
-      'Files',
-      'Workbench: Scratchpad',
-      'Plugin Manager: Plugins',
-      'Schedule: Automation tasks',
-    ])
+    // Rows name the page, never its plugin (DESIGN.md); two views sharing a short name would keep their qualified names.
+    expect(names.filter(name => /^(?:AI Accounts|Workbench|Plugin Manager|Schedule|Settings Shell|Rich Composer): /u.test(name))).toEqual([])
+    await expect(chooser.getByRole('button', { name: 'Current conversation', exact: true })).toHaveCount(0)
+    for (const name of ['Threads', 'Navigation', 'Quota', 'Sidebar controls', 'Accounts', 'Files', 'Scratchpad', 'Plugins', 'Automation tasks'])
       await expect(chooser.getByRole('button', { name, exact: true })).toBeVisible()
     // Native/unlabeled footer actions are present in this composition: never falsely attribute their aggregate to AI Accounts.
-    await expect(chooser.getByRole('button', { name: 'AI Accounts: Controls', exact: true })).toHaveCount(0)
+    await expect(chooser.getByRole('button', { name: 'Controls', exact: true })).toHaveCount(0)
     await page.screenshot({ path: test.info().outputPath('plugin-view-names-qualified-chooser.png'), animations: 'disabled' })
+    // Search still matches the full, plugin-qualified names.
     await chooser.getByRole('textbox', { name: 'Search views', exact: true }).fill('AI Accounts')
     const matchingNames = await cards.evaluateAll(elements => elements.map(element => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''))
-    expect(matchingNames).toEqual(expect.arrayContaining(['Quota', 'AI Accounts: Accounts', 'AI Accounts: Usage history', 'AI Accounts: Quota forecast']))
+    expect(matchingNames).toEqual(expect.arrayContaining(['Quota', 'Accounts', 'Usage history', 'Quota forecast']))
     await expect(chooser.getByRole('button', { name: 'Sidebar controls', exact: true })).toHaveCount(0)
-    expect(matchingNames.every(name => name.startsWith('AI Accounts: '))).toBe(true)
     await chooser.getByRole('button', { name: 'Quota', exact: true }).click()
     await expect(chooser).toBeHidden()
     const tab = mainPane(page).getByRole('tab', { name: 'Quota', exact: true })

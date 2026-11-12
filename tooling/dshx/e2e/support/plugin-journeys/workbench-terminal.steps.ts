@@ -130,7 +130,7 @@ When('the {string} pane opens a genuine terminal from its view picker', async ({
   await (region === 'left' ? leftThreads.getByRole('button', { name: 'New tab', exact: true }) : plus.first()).click()
   const chooser = target.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })
   await expect(chooser).toHaveCount(1)
-  await chooser.getByRole('button', { name: 'Terminal: Terminal', exact: true }).click()
+  await chooser.getByRole('button', { name: 'Terminal', exact: true }).click()
   await expect(chooser).toBeHidden()
   const body = visibleTerminals(target)
   await expect(body).toHaveCount(1)

@@ -381,7 +381,7 @@
     {
       "id": "main-panel-sources",
       "title": "Choose plugin views and one Settings hub",
-      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use qualified destination names when available, such as Agents › Directory, and producer-declared names otherwise (Quota, Files); their tab captions stay short. Conversations open only from the thread list or New thread, never as a separate Rich Composer/current-conversation choice. Search matches full qualified names; special ordering uses stable IDs. Restored reusable panels refresh their captions without changing IDs or remounting, while user conversation, scoped and resource titles remain untouched. Empty right/bottom panes and semantic Start use the same chooser; Settings leaves and runtime occurrences are not primary suggestions.",
+      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use qualified destination names when available, such as Agents › Directory, and producer-declared names otherwise (Quota, Files); a \"Plugin: View\" name shows without its plugin (Settings Shell: Settings reads Settings) unless two views would share the short name, and tab captions stay short. Conversations open only from the thread list or New thread, never as a separate Rich Composer/current-conversation choice. Search matches full qualified names; special ordering uses stable IDs. Restored reusable panels refresh their captions without changing IDs or remounting, while user conversation, scoped and resource titles remain untouched. Empty right/bottom panes and semantic Start use the same chooser; Settings leaves and runtime occurrences are not primary suggestions.",
       "reach": ["press ControlOrMeta+Alt+KeyT", "expect region \"Choose a view\""],
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
@@ -418,7 +418,13 @@
           "kind": "unit-test",
           "id": "workbench.qualified-chooser-names",
           "file": "plugins/@dshfiles/workbench/src/new-view-chooser.test.tsx",
-          "testName": "shows and searches producer-qualified names with stable special-view ordering"
+          "testName": "names each view without its plugin, searches the full names, and keeps special-view ordering"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.chooser-short-name-collision",
+          "file": "plugins/@dshfiles/workbench/src/new-view-chooser.test.tsx",
+          "testName": "keeps the qualified name when two views would share a short name"
         },
         {
           "kind": "unit-test",
@@ -586,18 +592,18 @@
     {
       "id": "terminal-pages",
       "title": "Open native terminals from any pane's view chooser",
-      "summary": "Terminal: Terminal explicitly creates an independently owned native terminal in the selected tab group without opening the right pane. Moving and restoring the real occurrence preserves its native PTY and Session ownership.",
+      "summary": "Terminal in the view chooser explicitly creates an independently owned native terminal in the selected tab group without opening the right pane. Moving and restoring the real occurrence preserves its native PTY and Session ownership.",
       "reach": [
         "seed tool-call-thread",
         "press ControlOrMeta+Alt+KeyT",
         "fill textbox \"Search views\" \"Terminal\"",
-        "click button \"Terminal: Terminal\"",
+        "click button \"Terminal\"",
         "expect tab \"Terminal*\""
       ],
       "surfaces": ["client", "integration", "storage"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "main-tabs: New tab › Terminal: Terminal",
+      "currentSurface": "main-tabs: New tab › Terminal",
       "configuration": [],
       "states": ["available", "opened", "moved", "hidden", "restored", "closed", "session-unavailable"],
       "failureModes": [

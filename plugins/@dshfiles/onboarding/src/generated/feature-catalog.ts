@@ -23388,7 +23388,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "workbench-sidebar-assemblies",
       "title": "Dock the actual sidebar content assemblies",
-      "summary": "The owned stack always uses Workbench tabs with no native-layout opt-out. The actual New tab chooser tab offers Threads, Navigation, Quota and AI Accounts: Controls alongside the Settings Shell: Settings hub, without a separate Rich Composer/current-conversation entry. Mixed or…",
+      "summary": "The owned stack always uses Workbench tabs with no native-layout opt-out. The actual New tab chooser tab offers Threads, Navigation, Quota and Controls alongside the Settings hub (names without their plugin; a short name two views share keeps its qualified name), without a separ…",
       "destination": "none",
       "currentSurface": "main-tabs: New tab › Thread Sidebar views",
       "reach": [
@@ -28643,7 +28643,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "main-panel-sources",
       "title": "Choose plugin views and one Settings hub",
-      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use qualified destination names when available, such as Agents › Directory, and producer-declared names otherwise (Quota, Files); their tab captions stay short. Conversations open only from the…",
+      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use qualified destination names when available, such as Agents › Directory, and producer-declared names otherwise (Quota, Files); a \"Plugin: View\" name shows without its plugin (Settings Shell:…",
       "destination": "none",
       "currentSurface": "main-tabs: New tab chooser",
       "reach": [
@@ -28773,9 +28773,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "terminal-pages",
       "title": "Open native terminals from any pane's view chooser",
-      "summary": "Terminal: Terminal explicitly creates an independently owned native terminal in the selected tab group without opening the right pane. Moving and restoring the real occurrence preserves its native PTY and Session ownership.",
+      "summary": "Terminal in the view chooser explicitly creates an independently owned native terminal in the selected tab group without opening the right pane. Moving and restoring the real occurrence preserves its native PTY and Session ownership.",
       "destination": "thread-panel",
-      "currentSurface": "main-tabs: New tab › Terminal: Terminal",
+      "currentSurface": "main-tabs: New tab › Terminal",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -28799,10 +28799,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Terminal"
         },
         {
-          "text": "click button \"Terminal: Terminal\"",
+          "text": "click button \"Terminal\"",
           "action": "click",
           "by": "button",
-          "name": "Terminal: Terminal",
+          "name": "Terminal",
           "value": null
         },
         {
