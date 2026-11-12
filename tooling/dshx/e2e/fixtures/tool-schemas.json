@@ -10323,7 +10323,7 @@
     },
     {
       "name": "scheduled_send_list",
-      "description": "List the messages scheduled to be sent later, soonest first: one thread when sessionId is given (agents default to their own thread), else every thread. Read-only.",
+      "description": "List the messages scheduled to be sent later, soonest first: one thread when sessionId is given, else every thread. Agents default to, and only reach, their own thread and its subagents. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
