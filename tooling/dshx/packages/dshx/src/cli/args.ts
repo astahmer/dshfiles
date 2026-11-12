@@ -1019,7 +1019,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(follow ? { follow } : undefined),
     ...(parsed.owner !== undefined && { owner: parsed.owner }),
     ...(parsed.input !== undefined && { input: parsed.input }),
-    ...(parsed.write ? { write: true } : {}),
+    ...(parsed.write ? { write: true } : undefined),
   }
 }
 

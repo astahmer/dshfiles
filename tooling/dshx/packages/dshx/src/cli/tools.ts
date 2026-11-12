@@ -1,7 +1,6 @@
-import * as Schema from 'effect/Schema'
 import { dshxRegistryApi } from '../api/index.js'
 import { pluginToolCatalog } from '../api/tool-catalog.js'
-import { jsonValueSchema } from '../json.js'
+import { decodeJson, jsonObjectSchema, type JsonObject } from '../json.js'
 import { DshPlatformError } from '../platform/client.js'
 import { connectDshxApi, createDshxApiCaller } from '../platform/dshx-api.js'
 import { connectDshxApiClient } from '../platform/dshx-api-client.js'
@@ -69,21 +68,18 @@ export const runToolsCli = async ({
       io.stderr.write('error: This tool takes no input; remove --input.\n')
       return 2
     }
-    let input
+    let input: JsonObject | undefined
     if (args.input !== undefined) {
       let text = args.input
       if (text === '-') {
         text = ''
         for await (const chunk of io.stdin) text += String(chunk)
       }
-      let value: unknown
       try {
-        value = JSON.parse(text)
+        input = decodeJson(jsonObjectSchema, text)
       } catch {
         throw new TypeError('--input must be a JSON object.')
       }
-      if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('--input must be a JSON object.')
-      input = Schema.decodeUnknownSync(jsonValueSchema)(value)
     }
     const target = { packageId: entry.owner, apiId: entry.apiId, version: entry.version, ...(request !== undefined && { fetch: request }) }
     const call =

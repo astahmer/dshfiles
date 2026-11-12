@@ -281,5 +281,8 @@ it('builds client setup instructions with and without an issued token', () => {
   const link = cursor && 'installUrl' in cursor ? cursor.installUrl : undefined
   expect(link).toBeDefined()
   const encoded = new URL(link ?? '').searchParams.get('config')
-  expect(JSON.parse(atob(encoded ?? ''))).toEqual({ url, headers: { Authorization: `Bearer ${token}` } })
+  const config = Schema.decodeUnknownSync(
+    Schema.fromJsonString(Schema.Struct({ url: Schema.String, headers: Schema.Struct({ Authorization: Schema.String }) })),
+  )(atob(encoded ?? ''))
+  expect(config).toEqual({ url, headers: { Authorization: `Bearer ${token}` } })
 })
