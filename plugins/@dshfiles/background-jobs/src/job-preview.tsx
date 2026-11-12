@@ -163,9 +163,7 @@ const JobPreviewCard = (
         meta={
           <>
             <span className="dshx:shrink-0 dshx:@max-pane-narrow:sr-only">{t('previewKind')}</span>
-            {view.progress === undefined ? null : (
-              <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:hidden">{view.progress}</span>
-            )}
+            {view.progress === undefined ? null : <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:hidden">{view.progress}</span>}
             <span role="status" className="dshx:shrink-0">
               <Badge variant={statusVariant(view.status)}>{t(STATUS_KEY[view.status])}</Badge>
             </span>

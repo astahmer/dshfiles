@@ -270,9 +270,7 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
           <>
             <span>·</span>
             {fileCount === 0 ? (
-              <span className="dshx:min-w-0 dshx:truncate">
-                {context.base.kind === 'parent' ? 'no working copy changes' : 'no net file changes'}
-              </span>
+              <span className="dshx:min-w-0 dshx:truncate">{context.base.kind === 'parent' ? 'no working copy changes' : 'no net file changes'}</span>
             ) : (
               <>
                 <span className="dshx:shrink-0">

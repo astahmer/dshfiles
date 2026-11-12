@@ -325,11 +325,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
               ? props.renderFactorySlot('conversation.user.text', { text, facts: QUEUE_TEXT_FACTS, interactive: false, ellipsis: true })
               : preview || (showAttachments && previews.length > 0 ? '' : (files ?? '—'))
           }
-          meta={
-            <>
-              {showAttachments ? <QueuedAttachments sessionId={props.sessionId} previews={previews} readImage={props.readImage} /> : null}
-            </>
-          }
+          meta={<>{showAttachments ? <QueuedAttachments sessionId={props.sessionId} previews={previews} readImage={props.readImage} /> : null}</>}
           actions={
             queueMutable ? (
               <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-60 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">

@@ -41,11 +41,11 @@
   "dependencies": {
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
+    "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/session-controller": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
-    "effect": "catalog:",
-    "@dshfiles/plugin-ui": "workspace:*"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

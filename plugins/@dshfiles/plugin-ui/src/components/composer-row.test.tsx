@@ -6,14 +6,7 @@ import { ComposerRow } from './composer-row.js'
 afterEach(cleanup)
 
 test('draws one leading icon, label, meta and action cluster', () => {
-  render(
-    <ComposerRow
-      icon={<svg data-testid="glyph" />}
-      label="2 queued"
-      meta="top runs first"
-      actions={<button type="button">Remove</button>}
-    />,
-  )
+  render(<ComposerRow icon={<svg data-testid="glyph" />} label="2 queued" meta="top runs first" actions={<button type="button">Remove</button>} />)
   expect(screen.getByTestId('glyph').parentElement?.getAttribute('data-slot')).toBe('composer-row-icon')
   expect(screen.getByText('2 queued').getAttribute('data-slot')).toBe('composer-row-label')
   expect(screen.getByText('top runs first').getAttribute('data-slot')).toBe('composer-row-meta')
@@ -22,9 +15,7 @@ test('draws one leading icon, label, meta and action cluster', () => {
 
 test('makes the body a disclosure button and leaves the actions separate', () => {
   const onSelect = vi.fn()
-  render(
-    <ComposerRow label="Changes since branching from main" expanded actions={<button type="button">Compare</button>} onSelect={onSelect} />,
-  )
+  render(<ComposerRow label="Changes since branching from main" expanded actions={<button type="button">Compare</button>} onSelect={onSelect} />)
   const disclosure = screen.getByRole('button', { name: 'Changes since branching from main' })
   expect(disclosure.getAttribute('aria-expanded')).toBe('true')
   fireEvent.click(disclosure)

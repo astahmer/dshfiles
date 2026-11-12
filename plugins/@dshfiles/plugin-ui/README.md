@@ -142,23 +142,23 @@ more plugins repeat the same behavior; otherwise compose the existing kit.
 The [component gallery](../component-gallery/README.md) demos every composite below. Each one replaced local markup on
 the screen named; when a screen needs a prop the component lacks, add it here rather than forking the component.
 
-| Component                                          | Used by                                                                         |
-| -------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `TraceWaterfall`, `AgentTimeline`, `CallStackTree` | traces: span tree, session traces, span exception frames                        |
-| `StackTrace`, `CodeBlock`                          | test-runs: failing test frames and code frames, Stack trace card under bash     |
-| `MergeChecks`                                      | diffs-review Land card                                                          |
-| `MergeConflictGraph`                               | jj-integration workspace menu conflict notice                                   |
-| `FallbackChain`                                    | model-effort-picker fallbacks, with a "Serving now" rung                        |
-| `CreditsUsage`                                     | ai-accounts quota windows                                                       |
-| `SpendMap`                                         | usage › Cost                                                                    |
-| `ActivityFeed`                                     | activity-timeline rows                                                          |
-| `RoutineList`                                      | project-automations rows                                                        |
-| `BulkSelectList`                                   | jujutsu workspace cleanup selection                                             |
-| `AgentRoster`                                      | agent-communication live agent list                                             |
-| `StepTrail`, `AgentRunSteps`                       | agent-plan activity strip and plan steps                                        |
-| `PipelineRun`                                      | project-checks receipts                                                         |
-| `CheckpointGraph`, `CostWaterfall`, `PresenceList` | session-undo rewind preview, usage thread Cost facet, agent-plan activity strip |
-| `Page`, `PageSection`, `EmptyState`, `EntityList`  | most owned pages                                                                |
+| Component                                          | Used by                                                                                   |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `TraceWaterfall`, `AgentTimeline`, `CallStackTree` | traces: span tree, session traces, span exception frames                                  |
+| `StackTrace`, `CodeBlock`                          | test-runs: failing test frames and code frames, Stack trace card under bash               |
+| `MergeChecks`                                      | diffs-review Land card                                                                    |
+| `MergeConflictGraph`                               | jj-integration workspace menu conflict notice                                             |
+| `FallbackChain`                                    | model-effort-picker fallbacks, with a "Serving now" rung                                  |
+| `CreditsUsage`                                     | ai-accounts quota windows                                                                 |
+| `SpendMap`                                         | usage › Cost                                                                              |
+| `ActivityFeed`                                     | activity-timeline rows                                                                    |
+| `RoutineList`                                      | project-automations rows                                                                  |
+| `BulkSelectList`                                   | jujutsu workspace cleanup selection                                                       |
+| `AgentRoster`                                      | agent-communication live agent list                                                       |
+| `StepTrail`, `AgentRunSteps`                       | agent-plan activity strip and plan steps                                                  |
+| `PipelineRun`                                      | project-checks receipts                                                                   |
+| `CheckpointGraph`, `CostWaterfall`, `PresenceList` | session-undo rewind preview, usage thread Cost facet, agent-plan activity strip           |
+| `Page`, `PageSection`, `EmptyState`, `EntityList`  | most owned pages                                                                          |
 | `ComposerRow`                                      | background-jobs, jujutsu, queue-reorder, rich-composer: the state rows above the composer |
 
 Deleted rather than adopted: `MergeChecklist` (overlapped `MergeChecks`), `TestRunResults` (a streaming view, while
