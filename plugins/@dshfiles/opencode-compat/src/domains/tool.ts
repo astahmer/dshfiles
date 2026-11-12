@@ -106,7 +106,7 @@ export const createToolDomain =
                 signal: exec.signal,
                 progress: async () => undefined,
               })
-              content.set(exec.token, textContent(result.content))
+              if (result.content !== undefined) content.set(exec.token, textContent(result.content))
               return result.output ?? null
             },
             projectContent: exec => {

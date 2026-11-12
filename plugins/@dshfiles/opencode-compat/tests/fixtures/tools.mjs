@@ -14,6 +14,12 @@ export default {
         input: Schema.Struct({ text: Schema.String }),
         execute: async input => ({ content: input.text, output: input.text }),
       })
+      editor.add({
+        name: 'count',
+        description: 'Count characters.',
+        input: Schema.Struct({ text: Schema.String }),
+        execute: async input => ({ output: { count: input.text.length } }),
+      })
     })
     await ctx.tool.hook('execute.before', input => {
       if (input.input?.text === 'deny-me') throw new Error('Denied by OpenCode plugin')
