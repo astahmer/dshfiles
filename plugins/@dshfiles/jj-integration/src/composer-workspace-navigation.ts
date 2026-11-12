@@ -9,6 +9,9 @@ const ARRIVAL_TIMEOUT_MS = 120_000
 export const arrivalTimeoutMessage = (workspaceId: string): string =>
   `DSH did not open the new thread in ${workspaceId} within ${String(Math.round(ARRIVAL_TIMEOUT_MS / 1000))} seconds. Pick that workspace again, or reload the page if it stays unreachable.`
 
+const referencesTimeoutMessage = (workspaceId: string): string =>
+  `The new thread opened in ${workspaceId}, but its draft's references did not come back within ${String(Math.round(ARRIVAL_TIMEOUT_MS / 1000))} seconds. Add them again in the composer.`
+
 export const createComposerWorkspaceNavigation = (input: {
   readonly selectedWorkspace: () => string | undefined
   readonly subscribe: (listener: () => void) => () => void
@@ -75,7 +78,14 @@ export const createComposerWorkspaceNavigation = (input: {
           return
         }
         try {
-          void input.restoreReferences({ workspaceId, handoff, signal: lifetime }).then(resolve, reject)
+          // The restore rejects with its signal's reason; a timeout's own reason reads only "signal timed out".
+          void input
+            .restoreReferences({ workspaceId, handoff, signal: lifetime })
+            .then(resolve, (error: unknown) =>
+              reject(
+                !signal.aborted && error instanceof DOMException && error.name === 'TimeoutError' ? new Error(referencesTimeoutMessage(workspaceId)) : error,
+              ),
+            )
         } catch (error) {
           reject(error)
         }

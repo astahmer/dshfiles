@@ -61,6 +61,17 @@ describe('composer-owned workspace navigation', () => {
     expect(arrivalTimeoutMessage('thread-ab')).toMatch(/pick that workspace again|reload the page/iu)
   })
 
+  it('names a recovery step when the draft references never come back, instead of the raw timeout reason', async () => {
+    const fixture = navigationFixture({
+      captureReferences: () => ({ draft: '@Mention target', occurrences: [] }),
+      // The real restore rejects with its signal's reason, which is this DOMException once the arrival budget runs out.
+      restoreReferences: () => Promise.reject(new DOMException('signal timed out', 'TimeoutError')),
+    })
+    fixture.navigation.bind(fixture.arrive)
+    const opened = fixture.navigation.open('thread-ab', new AbortController().signal)
+    await expect(opened).rejects.toThrow(/thread-ab.*Add them again in the composer/u)
+  })
+
   it('picks immediately through the native composer without waiting for a Session route', () => {
     const fixture = navigationFixture()
     const picked: string[] = []
