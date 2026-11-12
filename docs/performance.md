@@ -111,6 +111,57 @@ new Host code):
 | `session-turn-admission/snapshot`   |     16 |     1 |
 | all `/api/` requests, same workload |     66 |    51 |
 
+## Jujutsu drag preview (2026-11-12; same probe before and after, starved machine)
+
+Dropping a revision, bookmark or workspace on the revision graph waited for `jujutsu/prepare` ("Preparing a state-bound
+preview…"): 466–770 ms on a scratch Host and 934 ms in one live sample ([graph prefetch](#jujutsu-revision-graph-prefetch-2026-10-30-baseline-2026-10-31-integrated-live-after-probe)).
+No stored trace covered a prepare, so the probe is a test that runs the real `Mutations.prepare` over real jj on the
+`dshfiles` store (106 workspaces): a rebase of `@` onto `@--` and a move of that workspace to `@-`, never confirmed.
+The first round is cold (empty view-read cache); the rest are warm (same operation head). Before: the previous Host
+files restored in a throwaway revision on top, alternated with after.
+
+```sh
+PREPARE_PROBE_REPO=<thread workspace> pnpm --dir plugins/@dshfiles/jujutsu exec vitest run src/mutation-prepare.probe.test.ts --testTimeout 600000
+```
+
+Attribution: jj subprocesses, all of it. Prepare took a full repository snapshot first: `root` → `status` →
+{`log --limit 501 all()`, `diff @`, `git remote list`, `op log --limit 1000`} → `evolog` over ~460 commit ids →
+(workspace actions) `workspace list` twice, each snapshotting the working copy → the target-state `log`. Host CPU
+(parsing) and payload (the preview is at most 8 KB) were negligible; the panel already renders at the drop. The
+500-row log never hit the graph's cached reads, which use other limits. After: one parallel round of
+`--ignore-working-copy` view reads for only the named revisions, the target digest and, when the action needs them,
+paths, remotes or workspaces; confirm still snapshots `@` and refuses a changed target.
+
+Load average was 55–85 on 10 cores for every run (other agents' builds and E2E runs); one jj spawn cost 0.6–1.8 s
+against 80–340 ms on an idle machine, so compare spawns and rows, not absolute seconds.
+
+| Prepare                  | Before (2 passes)                  | After (3 passes)                                |
+| ------------------------ | ---------------------------------- | ----------------------------------------------- |
+| Rebase, cold             | 11.8 s, 11.6 s; 8 spawns, 5 serial | 6.8 s, 2.2 s, 7.8 s; 3 spawns, 1 parallel round |
+| Rebase, warm p50         | 3.8 s, 4.0 s; 3–4 spawns           | 13 ms, 15 ms, 12 ms; 0 spawns                   |
+| Workspace move, cold     | 13.5 s, 8.2 s; 6–10 spawns         | 3.7 s, 2.0 s, 4.6 s; 3 spawns, 1 parallel round |
+| Workspace move, warm p50 | 7.9 s, 4.9 s; 5–6 spawns           | 198 ms, 8.8 s\*, 9 ms; 0 spawns                 |
+
+\* A warm round that spawns nothing and still takes seconds (also one 16.5 s rebase round) is the probe process
+descheduled on the starved machine, not jj.
+
+The same drag in a browser: a fresh scratch DSH per variant (`dshx dev up` with Jujutsu, JjIntegration, MultiHost and
+UiStyles; the sample project with three more revisions and the `shared-workspaces` seed; 1280×800), and a Playwright
+probe over the scratch Chromium's CDP port that drags `feat: second change on first` onto `fix: sibling change` and the
+`review-01` chip onto `feat: first change`, times drop → preview summary, then cancels. Both variants carry the new
+client; only the Host files differ. Pass 1 ran right after boot in both variants and took 18–30 s, so it is left out.
+
+| Drop → preview ready, passes 2 and 3 | Before           | After         |
+| ------------------------------------ | ---------------- | ------------- |
+| Rebase                               | 842 ms, 2361 ms  | 335 ms, 26 ms |
+| Workspace move                       | 2885 ms, 6447 ms | 55 ms, 49 ms  |
+| Hint on the hovered row              | 19–68 ms         | 29–122 ms     |
+| Preview panel after the drop         | 11–95 ms         | 16–220 ms     |
+
+The hint and panel times include Playwright's own pointer steps and the starved machine (load 50–65); neither waits on
+the Host. At idle spawn costs, a cold prepare is one jj round (≈ 80–340 ms) and a warm one ≈ 10 ms; neither was
+measured on an idle machine, and the live Host keeps the old path until a Host restart loads the new bundle.
+
 ## Pull-request watcher GitHub budget (2026-11-11)
 
 `@dshfiles/pull-requests` read each watched pull request with its own `gh pr view`: one process and one GraphQL query
