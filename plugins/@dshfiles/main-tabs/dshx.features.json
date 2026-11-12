@@ -638,7 +638,7 @@
     {
       "id": "tab-keyboard",
       "title": "Jump between tabs from the keyboard",
-      "summary": "Close active tab closes the active tab without archiving its thread; it ships without a default because DSH's own page.close owns Mod+W, and is bound in Settings \u203a Shortcuts. Mod+1\u20268 jump to a tab and Mod+9 to the last one, Ctrl+Tab and Ctrl+Shift+Tab cycle (Desktop); the browser keeps those keys, so the Web defaults are Mod+Alt+1\u20269 and Mod+Alt+] / [. All are rebindable in Settings \u203a Shortcuts. Arrow keys, Enter and Delete work inside the focused strip. Mod+T (Web: Mod+Alt+T) opens a new tab.",
+      "summary": "Close active tab closes the active tab without archiving its thread; it ships without a default because DSH's own page.close owns Mod+W, and is bound in Settings \u203a Shortcuts. Mod+1\u20268 jump to a tab and Mod+9 to the last one, Ctrl+Tab and Ctrl+Shift+Tab cycle (Desktop); the browser keeps those keys, so the Web defaults are Mod+Alt+1\u20269 and Mod+Alt+] / [. All are rebindable in Settings \u203a Shortcuts. Arrow keys, Enter and Delete work inside the focused strip. Mod+T (Web: Mod+Alt+T) opens a new tab. In an installed app (standalone display mode) Mod+T, Mod+Shift+T and Mod+W act directly instead of reaching the browser's own chords.",
       "surfaces": ["client", "integration"],
       "surface": "command",
       "destination": "none",
@@ -648,11 +648,16 @@
       "failureModes": ["A default another command already owns leaves that tab command listed but unbound."],
       "externalDependencies": [],
       "verification": [
-        {
-          "kind": "gherkin",
-          "id": "main-tabs.keyboard",
-          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
-        },
+            {
+      "kind": "gherkin",
+      "id": "main-tabs.keyboard",
+      "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+    },
+    {
+      "kind": "gherkin",
+      "id": "main-tabs.pwa-shortcuts",
+      "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+    },
         {
           "kind": "unit-test",
           "id": "main-tabs.machine-unit-jump-and-cycle",

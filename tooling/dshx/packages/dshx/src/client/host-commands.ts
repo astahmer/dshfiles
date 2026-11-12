@@ -7,6 +7,25 @@
  * Host without it simply reports "cannot run".
  */
 
+export const observeStandaloneDisplay = (window: Window): { readonly matches: () => boolean; readonly dispose: () => void } => {
+  if (typeof window.matchMedia !== 'function') return { matches: () => false, dispose: () => undefined }
+  const standalone = window.matchMedia('(display-mode: standalone)')
+  const overlay = window.matchMedia('(display-mode: window-controls-overlay)')
+  let matches = standalone.matches || overlay.matches
+  const update = (): void => {
+    matches = standalone.matches || overlay.matches
+  }
+  standalone.addEventListener('change', update)
+  overlay.addEventListener('change', update)
+  return {
+    matches: () => matches,
+    dispose: () => {
+      standalone.removeEventListener('change', update)
+      overlay.removeEventListener('change', update)
+    },
+  }
+}
+
 export interface HostShortcutRegistry {
   readonly invoke: (commandId: string, scope: { readonly region: 'page'; readonly modal: null; readonly target: Element | null }) => void
 }

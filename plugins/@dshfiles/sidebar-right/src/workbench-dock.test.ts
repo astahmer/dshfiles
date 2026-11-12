@@ -53,8 +53,9 @@ function sidebar(host: Pick<SidebarRightHost, 'workbench' | 'dock' | 'mint'> = {
 
 function toggleCommand(controller: ReturnType<typeof sidebar>['controller']): ShortcutCommand {
   const commands: ShortcutCommand[] = []
-  const shortcuts: Pick<Shortcuts, 'register' | 'runtime'> = {
+  const shortcuts: Pick<Shortcuts, 'register' | 'runtime' | 'platform'> = {
     runtime: 'web',
+    platform: 'macos',
     register: command => {
       commands.push(command)
       return () => {

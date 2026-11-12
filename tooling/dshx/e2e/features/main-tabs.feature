@@ -47,6 +47,12 @@ Feature: Main view tabs
     And the Plugins and Jujutsu are opened and kept as tabs
     Then the tab shortcuts jump to the first and last tab and cycle between them
 
+  @scenario:main-tabs.pwa-shortcuts
+  Scenario: Installed-mode shortcuts open, close and reopen a tab
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/main-tabs, @dshfiles/jujutsu, @dshfiles/workspace-folder-picker" is booted
+    When standalone display mode is emulated for the tab strip
+    Then the PWA tab shortcuts open, close and reopen a tab
+
   @scenario:main-tabs.persistence
   Scenario: Tabs, pins and the active tab survive a reload
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/main-tabs, @dshfiles/jujutsu, @dshfiles/workspace-folder-picker" is booted

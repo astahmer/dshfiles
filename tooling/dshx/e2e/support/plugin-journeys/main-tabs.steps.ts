@@ -81,6 +81,32 @@ const newThreadButton = (page: Page) =>
     .or(page.getByRole('button', { name: 'New session', exact: true }))
     .first()
 
+When('standalone display mode is emulated for the tab strip', async ({ page }: { page: Page }) => {
+  await page.addInitScript(() => {
+    const matchMedia = window.matchMedia.bind(window)
+    window.matchMedia = query => {
+      const result = matchMedia(query)
+      if (query === '(display-mode: standalone)') Object.defineProperty(result, 'matches', { value: true })
+      return result
+    }
+  })
+  await page.reload()
+  await expect(strip(page)).toBeAttached()
+})
+
+Then('the PWA tab shortcuts open, close and reopen a tab', async ({ page }: { page: Page }) => {
+  await openKept(page, 'Plugins')
+  await page.keyboard.press('Meta+t')
+  await expect(tab(page, 'Start')).toBeVisible()
+  await page.keyboard.press('Meta+w')
+  await expect(tab(page, 'Start')).toHaveCount(0)
+  await tab(page, 'Plugins').click()
+  await page.keyboard.press('Meta+w')
+  await expect(tab(page, 'Plugins')).toHaveCount(0)
+  await page.keyboard.press('Meta+Shift+t')
+  await expect(tab(page, 'Plugins')).toBeVisible()
+})
+
 When('the standalone native tab strip is ready', async ({ page }: { page: Page }) => {
   await expect(page.locator('[data-main-surface="native"]')).toBeVisible()
   await expect(page.locator('[data-slot="shell.main"]')).toHaveCount(0)
@@ -112,7 +138,10 @@ When('a disposable native-tabs workspace is selected', async ({ page }: { page: 
     // Registering now opens the folder-inspection dialog; keep the scratch folder plain so this journey only cares
     // about the strip's tabs.
     const setup = page.getByRole('dialog', { name: `Add ${basename(root)}`, exact: true })
-    const asked = await setup.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)
+    const asked = await setup
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false)
     if (asked) {
       await setup.getByRole('button', { name: 'Add without a repository', exact: true }).click()
       await expect(setup).toBeHidden()

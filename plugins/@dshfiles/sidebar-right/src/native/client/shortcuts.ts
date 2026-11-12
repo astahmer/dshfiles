@@ -1,7 +1,9 @@
 /** Sidebar-owned commands resolved against the currently mounted page. */
 import type { Shortcuts, ShortcutBinding, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { closeTopModal, modalSelector } from '@deepseek-ai/dsh-client-ui-primitives'
+import { observeStandaloneDisplay } from '@dshfiles/dshx/client'
+import { handlePwaCloseShortcut } from './pwa-close-shortcut.js'
 import type { SidebarRightController } from './service.ts'
 import type { SidebarRightTarget } from './focus.ts'
 import type {} from './locales.ts'
@@ -15,7 +17,7 @@ import type {} from './locales.ts'
  * @returns release callback for the commands.
  */
 export function registerSidebarShortcuts(
-  shortcuts: Pick<Shortcuts, 'register' | 'runtime'>,
+  shortcuts: Pick<Shortcuts, 'register' | 'runtime' | 'platform'>,
   sidebar: SidebarRightController,
   t: TranslateNS<'sidebarRight'>,
   closeWindow: () => void,
@@ -90,6 +92,30 @@ export function registerSidebarShortcuts(
       }),
     )
   }
+  const resolveClose = (element: Element | null, modal: string | null) => {
+    if (modal !== null) return { status: 'handled' as const, run: () => { closeTopModal(document) } }
+    const target = sidebar.focusedTarget(element)
+    if (target === undefined || !sidebar.canCloseTarget(target)) return { status: 'pass' as const }
+    return { status: 'handled' as const, run: () => { sidebar.closeTarget(target) } }
+  }
+  if (shortcuts.runtime === 'web') {
+    const display = observeStandaloneDisplay(window)
+    const onKeyDown = (event: KeyboardEvent): void => handlePwaCloseShortcut({
+      event,
+      standalone: display.matches(),
+      mac: shortcuts.platform === 'macos',
+      close: () => {
+        const element = event.composedPath().find(value => value instanceof Element) ?? document.activeElement
+        const modal = document.querySelector(modalSelector) === null ? null : 'other'
+        const result = resolveClose(element, modal)
+        if (result.status !== 'handled') return false
+        result.run()
+        return true
+      },
+    })
+    window.addEventListener('keydown', onKeyDown, true)
+    disposers.push(() => { window.removeEventListener('keydown', onKeyDown, true); display.dispose() })
+  }
   for (const kind of ['close', 'refresh'] as const) {
     const desktop: ShortcutBinding = { code: kind === 'close' ? 'KeyW' : 'KeyR', modifiers: ['primary'] }
     const web: ShortcutBinding = { ...desktop, modifiers: ['primary', 'alt'] }
@@ -108,14 +134,7 @@ export function registerSidebarShortcuts(
         regions: ['page', 'editable', 'terminal'],
         modals: kind === 'close' ? ['settings', 'shortcuts', 'other'] : [],
         resolve: ({ target: element, source, modal }) => {
-          if (kind === 'close' && modal !== null) {
-            return {
-              status: 'handled',
-              run: () => {
-                closeTopModal(document)
-              },
-            }
-          }
+          if (kind === 'close' && modal !== null) return resolveClose(element, modal)
           const target = sidebar.focusedTarget(element)
           if (target === undefined && (source === 'iframe' || element?.closest('[data-sidebar-right-session]'))) {
             return { status: 'blocked', reason: t('command.stale') }

@@ -6,7 +6,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { createApiClient, defineClient, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient, observeStandaloneDisplay, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { modalSelector } from '@deepseek-ai/dsh-client-ui-primitives'
+import { handlePwaTabShortcut } from './pwa-tab-shortcuts.js'
 import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
 import type { BeforeMainOwnerProps } from '@dshfiles/frame-layout/regions'
 import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
@@ -597,6 +599,43 @@ export default defineClient({
         }),
       ),
     )
+
+    if (ctx.shortcuts.runtime === 'web')
+      ctx.effect(() => {
+        const display = observeStandaloneDisplay(window)
+        const onKeyDown = (event: KeyboardEvent): void =>
+          handlePwaTabShortcut({
+            event,
+            standalone: display.matches(),
+            mac: ctx.shortcuts.platform === 'macos',
+            run: action => {
+              if (document.querySelector(modalSelector) !== null) return false
+              if (
+                action === 'close' &&
+                event
+                  .composedPath()
+                  .some(value => value instanceof Element && value.closest('[data-sidebar-right-session], [data-sidebar-resource-panel]') !== null)
+              )
+                return false
+              const snapshot = actor.getSnapshot()
+              const command =
+                action === 'new'
+                  ? { type: 'tab.new' as const }
+                  : action === 'reopen'
+                    ? { type: 'tab.reopenClosed' as const }
+                    : { type: 'tab.closeActive' as const }
+              if (!snapshot.matches('on') || !snapshot.can(command)) return false
+              if (action === 'new') ctx.layout.beginNavigation()
+              actor.send(command)
+              return true
+            },
+          })
+        window.addEventListener('keydown', onKeyDown, true)
+        return () => {
+          window.removeEventListener('keydown', onKeyDown, true)
+          display.dispose()
+        }
+      }, 'main-tabs: PWA shortcuts')
 
     interface TabCommand {
       readonly id: string

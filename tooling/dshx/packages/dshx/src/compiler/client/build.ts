@@ -251,6 +251,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const defineLocale = LocaleNamespaceModel.define',
           'export const plural = LocaleNamespaceModel.plural',
           `import { HostCommandsModel } from ${JSON.stringify(CLIENT_HOST_COMMANDS_PATH)}`,
+          `export { observeStandaloneDisplay } from ${JSON.stringify(CLIENT_HOST_COMMANDS_PATH)}`,
           'export const hasHostCommandRegistry = HostCommandsModel.hasRegistry',
           'export const runHostCommand = HostCommandsModel.run',
           `export { useApi, useApiEvent, useApiQuery, useResource } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
