@@ -10,7 +10,8 @@ export type ItemSource<T> = T | ((track: Track) => T | undefined)
 /** Ends registrations made through it, and its children, at once. */
 export interface PluginScope {
   readonly signal: AbortSignal
-  onDispose(cleanup: () => void): void
+  /** Returns a function that drops the cleanup unrun, for work withdrawn before the scope ends. */
+  onDispose(cleanup: () => void): () => void
   child(): PluginScope
   dispose(): void
 }
@@ -93,7 +94,9 @@ export interface PluginContext extends PluginServices {
 const createScope = (): PluginScope => {
   let controller: AbortController | undefined
   let disposed = false
-  const cleanups: (() => void)[] = []
+  // A plugin's root scope lives as long as the page: a keyed run, child scope or registration withdrawn early must leave
+  // it when it ends, or the page keeps one closure per run for good.
+  const cleanups = new Set<{ readonly run: () => void }>()
   const scope: PluginScope = {
     // Created on first read: a scope that nobody asks a signal of needs no AbortController.
     get signal() {
@@ -104,20 +107,26 @@ const createScope = (): PluginScope => {
     onDispose: cleanup => {
       if (disposed) {
         cleanup()
-        return
+        return () => {}
       }
-      cleanups.push(cleanup)
+      const entry = { run: cleanup }
+      cleanups.add(entry)
+      return () => {
+        cleanups.delete(entry)
+      }
     },
     child: () => {
       const child = createScope()
-      scope.onDispose(() => child.dispose())
+      child.onDispose(scope.onDispose(() => child.dispose()))
       return child
     },
     dispose: () => {
       if (disposed) return
       disposed = true
       controller?.abort()
-      for (const cleanup of cleanups.splice(0).reverse()) {
+      const pending = [...cleanups].reverse()
+      cleanups.clear()
+      for (const { run: cleanup } of pending) {
         try {
           cleanup()
         } catch (error) {
@@ -223,13 +232,15 @@ const createPluginContext = (options: PluginContextOptions): PluginContext => {
       return () => {}
     }
     let removed = false
+    let unregister = (): void => {}
     const remove = (): void => {
       if (removed) return
       removed = true
+      unregister()
       unmount()
       entry.remove()
     }
-    options.scope.onDispose(remove)
+    unregister = options.scope.onDispose(remove)
     return remove
   }
 
@@ -253,13 +264,15 @@ const createPluginContext = (options: PluginContextOptions): PluginContext => {
       },
     })
     let stopped = false
+    let unregister = (): void => {}
     const remove = (): void => {
       if (stopped) return
       stopped = true
+      unregister()
       stop()
       withdraw()
     }
-    options.scope.onDispose(remove)
+    unregister = options.scope.onDispose(remove)
     return remove
   }
 
@@ -285,8 +298,11 @@ const createPluginContext = (options: PluginContextOptions): PluginContext => {
     },
     provide: (contract, value) => {
       const withdraw = BrowserBroker.provide(contract, value, options.owner)
-      options.scope.onDispose(withdraw)
-      return withdraw
+      const unregister = options.scope.onDispose(withdraw)
+      return () => {
+        unregister()
+        withdraw()
+      }
     },
     use: contract => {
       const cached = liveCache.get(contract.id)
@@ -329,12 +345,14 @@ const createPluginContext = (options: PluginContextOptions): PluginContext => {
         if (run !== undefined && equals(run.key as Parameters<typeof fn>[0], next)) return
         start(next)
       })
+      let unregister = (): void => {}
       const stop = (): void => {
+        unregister()
         unsubscribe()
         run?.scope.dispose()
         run = undefined
       }
-      options.scope.onDispose(stop)
+      unregister = options.scope.onDispose(stop)
       return stop
     },
     bind: component => options.decorate(component),

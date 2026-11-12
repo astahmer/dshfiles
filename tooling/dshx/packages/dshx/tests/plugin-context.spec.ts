@@ -1,4 +1,6 @@
 import { createRequire } from 'node:module'
+import { setFlagsFromString } from 'node:v8'
+import { runInNewContext } from 'node:vm'
 import * as Schema from 'effect/Schema'
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { createElement, type ComponentType, type ReactNode } from 'react'
@@ -389,6 +391,50 @@ describe('keyed', () => {
     provider.dispose()
     scope.dispose()
     expect(setups).toEqual(['active'])
+  })
+})
+
+describe('a long-lived scope', () => {
+  setFlagsFromString('--expose-gc')
+  const gc: () => void = runInNewContext('gc')
+  const collected = async (ref: WeakRef<object>): Promise<boolean> => {
+    for (let attempt = 0; attempt < 10 && ref.deref() !== undefined; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 0))
+      gc()
+    }
+    return ref.deref() === undefined
+  }
+
+  it('lets go of a mounted item withdrawn early, while the plugin lives on', async () => {
+    const Mounted = BrowserBroker.defineRegistry<{ readonly id: string }>('test.mounted')
+    PluginContextModel.registerNativeMount(Mounted, input => {
+      const unmount = input.slots.register({ name: input.item.id }, input.item)
+      return () => {
+        if (typeof unmount === 'function') unmount()
+      }
+    })
+    const { plugin, host } = createPlugin('@test/owner')
+    const added = (() => {
+      const item = { id: 'one-shot' }
+      plugin.add(Mounted, item)()
+      return new WeakRef(item)
+    })()
+    host.registered.length = 0
+    expect(plugin.list(Mounted).get()).toEqual([])
+    expect(await collected(added)).toBe(true)
+  })
+
+  it('lets go of every finished keyed run, while the plugin lives on', async () => {
+    const { plugin } = createPlugin('@test/owner')
+    const source = PluginContextModel.signal(0)
+    const runs: WeakRef<AbortSignal>[] = []
+    plugin.keyed(source, (_key, run) => {
+      runs.push(new WeakRef(run.signal))
+    })
+    for (let key = 1; key <= 50; key++) source.set(key)
+    const finished = runs.slice(0, -1)
+    expect(finished.every(run => run.deref()?.aborted !== false)).toBe(true)
+    for (const run of finished) expect(await collected(run)).toBe(true)
   })
 })
 
