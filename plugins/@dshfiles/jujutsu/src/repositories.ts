@@ -111,7 +111,7 @@ export class Repositories extends Context.Service<
       })
 
       const workspaces = Effect.fn('jujutsu workspaces list')(function* (repo: RegisteredRepo) {
-        const listing = yield* run(repo)(['workspace', 'list', '-T', 'name ++ "\\t" ++ root ++ "\\n"'], { outputLimit: 64_000 })
+        const listing = yield* run(repo)(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\t" ++ root ++ "\\n"'], { outputLimit: 64_000 })
         return listing.stdout
           .split('\n')
           .map(line => line.split('\t'))

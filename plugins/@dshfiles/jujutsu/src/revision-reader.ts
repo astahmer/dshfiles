@@ -47,7 +47,7 @@ const remoteNamePattern = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/
 const ignoreWorkingCopy = RevisionReads.ignoreWorkingCopy
 
 /** The panel's view of a repository and the identity it was read under. */
-export interface Snapshot {
+interface Snapshot {
   readonly state: JujutsuState
   readonly identity: string
 }
@@ -278,12 +278,20 @@ const make = Effect.gen(function* () {
     return state
   })
 
-  /** `revisions` plus the evolution flags of the ones looked up by id, for revisions an action names off the first page. */
-  const withRevisions = Effect.fnUntraced(function* (repo: RegisteredRepo, revisions: readonly Revision[], commitIds: readonly string[]) {
-    if (commitIds.length === 0) return revisions
-    const loaded = yield* revisionsByIds(repo, commitIds)
-    const evolution = yield* evolvedCommitIds(repo, loaded)
-    return [...revisions, ...withEvolved(loaded, evolution.commitIds)]
+  /**
+   * The revisions one action names and, for a bookmark action, the one its bookmark points at: one view read, answered
+   * again at the same operation head. Evolution flags are not read; no preview shows them.
+   */
+  const named = Effect.fnUntraced(function* (repo: RegisteredRepo, target: { readonly commitIds: readonly string[]; readonly bookmark: string | undefined }) {
+    const revsets = [
+      ...(target.commitIds.length === 0 ? [] : [GraphPage.commitIdsRevset(target.commitIds)]),
+      ...(target.bookmark === undefined ? [] : [`bookmarks(exact:"${target.bookmark}")`]),
+    ]
+    if (revsets.length === 0) return []
+    const result = yield* repositories.run(repo)([ignoreWorkingCopy, 'log', '--no-graph', '--revisions', revsets.join(' | '), '--template', REVISION_TEMPLATE])
+    if (result.truncated) return yield* new OutputLimitExceeded({ subject: 'revision-lookup' })
+    const revisions: readonly Revision[] = yield* Effect.fromResult(JujutsuOutputModel.parseJsonLines(result.stdout, revisionSchema))
+    return revisions
   })
 
   const graphPage = Effect.fn('jujutsu graph page')(function* (input: {
@@ -440,9 +448,9 @@ const make = Effect.gen(function* () {
   })
 
   return {
-    snapshot,
     targetState,
-    withRevisions,
+    named,
+    remoteNames: (repo: RegisteredRepo) => Effect.map(readRemotes(repo), remotes => remotes.names),
     paths: (repo: RegisteredRepo, revision: string) => RevisionReads.paths(repositories.run(repo), revision),
     load,
     graphPage,

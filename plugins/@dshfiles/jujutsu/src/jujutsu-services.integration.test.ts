@@ -223,6 +223,33 @@ describe.skipIf(!jjAvailable)('jujutsu services', () => {
     }).pipe(Effect.scoped),
   )
 
+  it.effect('a rebase preview reads only what it names, and a working-copy edit made since refuses it', () =>
+    Effect.gen(function* () {
+      const spawned: string[] = []
+      const repo = yield* temporaryRepository
+      const fileSystem = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const commitOf = (revision: string) => jj(repo, 'log', '--no-graph', '-r', revision, '-T', 'commit_id').trim()
+      yield* Effect.gen(function* () {
+        const { id: repoId } = yield* Repositories.use(repositories => repositories.register(repo))
+        const action = { kind: 'rebase', sourceId: commitOf('@'), destinationId: commitOf('root()') } as const
+        const mark = spawned.length
+        const preview = yield* Mutations.use(mutations => mutations.prepare({ repoId, action }))
+        expect(preview.summary).toMatch(/^Rebase \w+ onto \w+$/)
+        const reads = spawned.slice(mark)
+        expect(reads.filter(args => !args.includes('--ignore-working-copy'))).toEqual([])
+        expect(reads.filter(args => args.includes('all()') || args.includes(' evolog ') || args.includes(' op log '))).toEqual([])
+
+        yield* fileSystem.writeFileString(path.join(repo, 'shared.txt'), 'edited after the preview\n')
+        const error = yield* Effect.flip(Mutations.use(mutations => mutations.confirm({ repoId, previewId: preview.id })))
+        expect({ tag: error._tag, message: error.message }).toEqual({
+          tag: 'PreviewExpired',
+          message: 'A revision or bookmark this action names changed after the preview. Refresh and prepare the action again.',
+        })
+      }).pipe(Effect.provide(servicesWith(countingSpawner(spawned))))
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
   it.effect('refuses a preview once it is five minutes old', () =>
     Effect.gen(function* () {
       const repo = yield* temporaryRepository

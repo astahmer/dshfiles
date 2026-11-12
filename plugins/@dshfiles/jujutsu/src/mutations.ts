@@ -4,15 +4,14 @@ import type { Mutation, Revision } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, type PreparedMutation } from './core.js'
 import { MutationRefused, PreviewExpired, WorkspaceChanged } from './errors.js'
 import { JujutsuCommands } from './jujutsu-commands.js'
-import { missingMutationRevisionIds, revisionIdsFor } from './mutation-revisions.js'
+import { revisionIdsFor } from './mutation-revisions.js'
 import { Repositories } from './repositories.js'
 import { RepositoryIdentity, type RegisteredRepo } from './repository-identity.js'
-import { RevisionReader, type MutationTarget, type Snapshot } from './revision-reader.js'
+import { RevisionReader, type MutationTarget } from './revision-reader.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
 
 const PREVIEW_TTL = Duration.minutes(5)
 const MAX_PREVIEWS = 32
-const MAX_REVISIONS = 500
 const NETWORK_TIMEOUT = Duration.seconds(120)
 const COMMAND_TIMEOUT = Duration.seconds(30)
 const MAX_DETAIL = 7_800
@@ -289,29 +288,40 @@ const make = Effect.gen(function* () {
     return { workspaces, target: workspaces.find(workspace => workspace.name === name) }
   })
 
-  const prepareMutation = Effect.fnUntraced(function* (repo: RegisteredRepo, current: Snapshot, action: Mutation) {
+  /**
+   * Reads only what the action names, in one round of view reads: no `status`, no repository page. `take` snapshots
+   * `@` and compares the same targets before anything runs, so a working copy edited since then refuses the preview.
+   */
+  const prepareMutation = Effect.fnUntraced(function* (repo: RegisteredRepo, action: Mutation) {
     const destination =
       action.kind === 'workspace-add'
         ? yield* resolveWorkspaceDestination({ repositoryPath: repo.root, selectedParentPath: action.parentPath, name: action.name })
         : undefined
     const preparedAction: Mutation = action.kind === 'workspace-add' && destination !== undefined ? { ...action, parentPath: destination.parentPath } : action
-    const forgetOrEdit = action.kind === 'workspace-forget' || action.kind === 'workspace-edit' ? yield* findWorkspace(repo, action.name) : undefined
+    const target = targetOf(preparedAction)
+    const commitIds = [...new Set(target.commitIds)]
+    if (!commitIds.every(JujutsuMutationModel.isCommitId)) return yield* refuse('invalid-revision')
+    const pathsRevision = pathsRevisionOf(preparedAction)
+    const remote = preparedAction.kind === 'fetch' || preparedAction.kind === 'push'
+    const [forgetOrEdit, revisions, selectedPaths, remoteNames, targets] = yield* Effect.all(
+      [
+        action.kind === 'workspace-forget' || action.kind === 'workspace-edit' ? findWorkspace(repo, action.name) : Effect.succeed(undefined),
+        reader.named(repo, { commitIds, bookmark: target.bookmark }),
+        pathsRevision === undefined ? Effect.succeed<readonly string[]>([]) : reader.paths(repo, pathsRevision),
+        remote ? reader.remoteNames(repo) : Effect.succeed<readonly string[]>([]),
+        reader.targetState(repo, target),
+      ],
+      { concurrency: 'unbounded' },
+    )
     if (forgetOrEdit !== undefined && forgetOrEdit.target === undefined) return yield* refuse('workspace-gone')
     if (action.kind === 'workspace-forget' && forgetOrEdit !== undefined && forgetOrEdit.workspaces.length <= 1) return yield* refuse('only-workspace')
     const workspaceRoot = forgetOrEdit?.target?.path
-    const missingIds = missingMutationRevisionIds(preparedAction, current.state.revisions)
-    if (!missingIds.every(JujutsuMutationModel.isCommitId)) return yield* refuse('invalid-revision')
-    const revisions = yield* reader.withRevisions(repo, current.state.revisions, missingIds)
-    yield* Effect.forEach(missingIds, commitId => findRevision(revisions, commitId))
-    const pathsRevision = pathsRevisionOf(preparedAction)
-    const selectedPaths = pathsRevision === undefined ? current.state.changedPaths : yield* reader.paths(repo, pathsRevision)
+    yield* Effect.forEach(commitIds, commitId => findRevision(revisions, commitId))
     const preview: Preview = yield* mutationPreview({ action: preparedAction, revisions, selectedPaths, workspacePath: destination?.path ?? workspaceRoot })
     const argv = yield* Effect.fromResult(JujutsuMutationModel.buildMutationArgv(preparedAction))
-    if ((preparedAction.kind === 'fetch' || preparedAction.kind === 'push') && !current.state.remoteNames.includes(preparedAction.remote)) {
-      return yield* refuse('remote-gone')
-    }
+    if (remote && !remoteNames.includes(preparedAction.remote)) return yield* refuse('remote-gone')
     const pushBookmark = preparedAction.kind === 'push' ? preparedAction : undefined
-    if (pushBookmark !== undefined && !current.state.revisions.some(row => row.localBookmarks.includes(pushBookmark.bookmark))) {
+    if (pushBookmark !== undefined && !revisions.some(row => row.localBookmarks.includes(pushBookmark.bookmark))) {
       return yield* refuse('bookmark-unlisted')
     }
     const dryRun =
@@ -332,8 +342,8 @@ const make = Effect.gen(function* () {
     const detail = fullDetail.length > MAX_DETAIL ? fullDetail.slice(0, 7_760) + '\n[preview detail truncated]' : fullDetail
     const prepared: PreparedMutation = {
       root: repo.root,
-      identity: current.identity,
-      targets: yield* reader.targetState(repo, targetOf(preparedAction)),
+      identity: repo.identity,
+      targets,
       action: preparedAction,
       argv,
       title: preview.title,
@@ -373,8 +383,7 @@ const make = Effect.gen(function* () {
 
   const prepare = Effect.fn('jujutsu mutation prepare')(function* (input: { readonly repoId: string; readonly action: Mutation }) {
     const repo = yield* repositories.resolve(input.repoId)
-    const current = yield* reader.snapshot(repo, MAX_REVISIONS)
-    const prepared = yield* prepareMutation(repo, current, input.action)
+    const prepared = yield* prepareMutation(repo, input.action)
     const id = randomUUID()
     yield* Cache.set(previews, id, prepared)
     return { id, kind: input.action.kind, title: prepared.title, summary: prepared.summary, detail: prepared.detail, expiresAt: prepared.expiresAt }
