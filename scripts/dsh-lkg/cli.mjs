@@ -397,7 +397,8 @@ const healthCheck = async (root, { keepState = false, turn } = {}) => {
   // the Host cannot maintain its own profile and the state cannot be removed.
   thawed(join(home, 'profiles', 'web'))
   const port = await freePort()
-  const child = spawn(nodePath, [entry, 'web', '--port', String(port), '--no-open'], {
+  // The profile may bind a LAN address and then print only localhost/LAN URLs; the probe needs loopback.
+  const child = spawn(nodePath, [entry, 'web', '--host', '127.0.0.1', '--port', String(port), '--no-open'], {
     env: { ...process.env, DSH_HOME: home, DSH_LKG_RECOVER: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
