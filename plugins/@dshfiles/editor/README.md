@@ -10,6 +10,10 @@ Depends on `@dshfiles/workbench` for its dockable panel and `@dshfiles/plugin-ui
 
 The Workbench chooser exposes the reusable **Editor: Files** view; its open-file tabs retain their filenames.
 
+A Markdown tab's **Preview** renders through Chat's code-fence registry (`@dshfiles/chat/fenced-markdown`): a
+` ```mermaid ` fence is a diagram card with its source one click away wherever `@dshfiles/mermaid-diagrams` is
+active, and the native code card otherwise.
+
 ## Thread artifacts
 
 The Workbench chooser and the command palette expose **Editor: Artifacts**: the Markdown and HTML documents that belong to the thread on screen. Artifacts live on the Host in the versioned `@dshfiles/editor-artifacts` plugin-storage namespace, so they survive a DSH restart and are listed per thread. Each document carries a revision; a save sends the revision it started from, and a concurrent edit (from the user or the agent) is refused with the current revision instead of silently overwriting work. Reload replaces the draft after an explicit confirmation; Delete asks first.

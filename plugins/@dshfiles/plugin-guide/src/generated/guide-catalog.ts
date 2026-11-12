@@ -373,7 +373,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "attentionApi",
       "importFrom": "@dshfiles/activity-timeline/attention-api",
       "owner": "@dshfiles/activity-timeline",
-      "source": "plugins/@dshfiles/activity-timeline/src/attention-api.ts:169",
+      "source": "plugins/@dshfiles/activity-timeline/src/attention-api.ts:172",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/activity-timeline:attention",
@@ -3216,7 +3216,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 59 catalog feature(s)",
+        "Used by 60 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3328,7 +3328,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 126 catalog feature(s)",
+        "Used by 128 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

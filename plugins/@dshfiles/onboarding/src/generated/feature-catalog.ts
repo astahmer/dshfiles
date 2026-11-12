@@ -357,6 +357,12 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "features": 8
     },
     {
+      "name": "opencode-compat",
+      "description": "Load OpenCode v2 server plugins in the DSH Host.",
+      "ui": false,
+      "features": 3
+    },
+    {
       "name": "optmem-core",
       "description": "Shared, DSH-independent memory primitives used by @dshfiles/memory.",
       "ui": false,
@@ -12046,7 +12052,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "editor",
       "id": "workspace-editor",
       "title": "Browse and edit workspace files",
-      "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview, and save through Host file APIs.",
+      "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview whose code fences go through Chat's registry (a ```mermaid block is a diagram with @dshfiles/mermaid-diagrams), and save through Host fil…",
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Editor: Files",
       "reach": [
@@ -17211,7 +17217,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mermaid-diagrams",
       "id": "chat-diagram",
       "title": "Mermaid diagrams in the conversation",
-      "summary": "A ```mermaid fence renders as a themed diagram card wherever Chat's code-fence registry applies: assistant answers, reasoning, compaction summaries, ask_user_question text and backlog item text. A fence becomes a diagram once it is complete (another block follows it, or the mess…",
+      "summary": "A ```mermaid fence renders as a themed diagram card wherever Chat's code-fence registry applies: assistant answers, reasoning, compaction summaries, ask_user_question text, backlog item text and the editor's Markdown preview. A fence becomes a diagram once it is complete (anothe…",
       "destination": "transcript",
       "currentSurface": "transcript: mermaid code fence",
       "reach": [],
@@ -18671,6 +18677,42 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           }
         }
       }
+    },
+    {
+      "key": "opencode-compat#plugin-loader",
+      "plugin": "opencode-compat",
+      "id": "plugin-loader",
+      "title": "Load OpenCode server plugins",
+      "summary": "Loads configured OpenCode v2 server plugins in the Host and records unsupported APIs.",
+      "destination": "settings",
+      "currentSurface": "settings: dshfiles-opencode-compat",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "opencode-compat#plugin-tools",
+      "plugin": "opencode-compat",
+      "id": "plugin-tools",
+      "title": "Run OpenCode plugin tools and tool hooks",
+      "summary": "Tools an OpenCode plugin adds through ctx.tool.transform become DSH agent tools; its execute.before and execute.after hooks run on every DSH tool call, denying calls or replacing result content.",
+      "destination": "none",
+      "currentSurface": "agent tools contributed by configured plugins",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "opencode-compat#skills-context-storage",
+      "plugin": "opencode-compat",
+      "id": "skills-context-storage",
+      "title": "OpenCode skills, context hooks and storage",
+      "summary": "Maps plugin-owned skills, prompt assembly hooks and durable JSON storage into DSH.",
+      "destination": "none",
+      "currentSurface": "settings: dshfiles-opencode-compat",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
     },
     {
       "key": "optmem-core#credential-redaction",

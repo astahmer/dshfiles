@@ -43,7 +43,7 @@
     {
       "id": "workspace-editor",
       "title": "Browse and edit workspace files",
-      "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview, and save through Host file APIs.",
+      "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview whose code fences go through Chat's registry (a ```mermaid block is a diagram with @dshfiles/mermaid-diagrams), and save through Host file APIs.",
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -163,6 +163,12 @@
           "id": "editor.workspace-editor-unit-symlink-prefix-root",
           "file": "plugins/@dshfiles/editor/src/workspace-write.test.ts",
           "testName": "accepts a root reached through a symlinked prefix"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-editor-unit-markdown-preview-fences",
+          "file": "plugins/@dshfiles/editor/src/markdown-preview.test.tsx",
+          "testName": "renders through Chat fence renderers, so a Mermaid block becomes a diagram"
         }
       ],
       "telemetry": [

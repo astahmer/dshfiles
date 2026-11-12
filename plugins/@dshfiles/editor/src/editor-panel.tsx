@@ -358,7 +358,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         {active?.status === 'ready' && <FilePreview document={active} remote={props.remote} />}
         {viewing && (
           <div className="dshx:absolute dshx:inset-0 dshx:overflow-auto dshx:bg-background dshx:p-4" data-file-viewer={viewer.id}>
-            <viewer.component sessionId={sessionId} path={active.path} text={handleRef.current?.snapshot(active.id)?.text ?? ''} />
+            <viewer.component sessionId={sessionId} path={active.path} text={handleRef.current?.snapshot(active.id)?.text ?? active.text} />
           </div>
         )}
         {active === undefined && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Pick a file in the tree, or open one from another panel.</p>}

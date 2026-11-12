@@ -67,6 +67,18 @@ const fenceProps = (code: string, streaming = false) => ({
 
 const settle = () => act(async () => {})
 
+/** The b:581 flowchart: a `subgraph`, `<br/>` in its labels and a labeled two-way edge. */
+const B581_FLOWCHART = [
+  'flowchart LR',
+  '  subgraph Host A',
+  '    OL[(op-log + item cache<br/>sqlite)] --> Engine',
+  '    Engine --> P1[linear adapter]',
+  '    Engine --> P2[github adapter]',
+  '    Engine --> P3[notion / jira / files / sqlite]',
+  '  end',
+  '  OL <-- "ops since cursor<br/>multi-host channel" --> OLB[(Host B op-log)]',
+].join('\n')
+
 describe('mermaid fence', () => {
   it('keeps the native card while the fence is incomplete and loads nothing', () => {
     const { services } = createServices()
@@ -89,6 +101,17 @@ describe('mermaid fence', () => {
     expect(source).toBe('flowchart LR\n  A --> B')
     expect(options).toMatchObject({ links: false, images: false, zoom: false, sanitize: services.sanitizers.plain })
     expect(services.loader.math).not.toHaveBeenCalled()
+  })
+
+  it('renders the b:581 labeled two-way flowchart as a diagram with its source one click away', async () => {
+    const { services, renderer } = createServices()
+    const MermaidFence = createMermaidFence(services)
+    const { container } = render(<MermaidFence {...fenceProps(B581_FLOWCHART)} />)
+    await settle()
+    expect(container.querySelector('[data-mermaid-diagram="ready"] svg')).not.toBeNull()
+    expect(renderer.mountAsync.mock.calls[0]?.[1]).toBe(B581_FLOWCHART)
+    fireEvent.click(screen.getByRole('button', { name: 'Show code' }))
+    expect(screen.getByTestId('native-source').textContent).toBe(B581_FLOWCHART)
   })
 
   it('typesets $$ labels through the math loader and the math sanitizer', async () => {

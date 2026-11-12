@@ -5,7 +5,7 @@
     {
       "id": "chat-diagram",
       "title": "Mermaid diagrams in the conversation",
-      "summary": "A ```mermaid fence renders as a themed diagram card wherever Chat's code-fence registry applies: assistant answers, reasoning, compaction summaries, ask_user_question text and backlog item text. A fence becomes a diagram once it is complete (another block follows it, or the message settles); until then the native code card stays. The card keeps the code's height while pele loads and fades the diagram in; its header toggles between the diagram and its highlighted source and copies the source; clicking the diagram expands it full size. pele (Obsidian's Mermaid renderer, MIT) draws the SVG through DOMPurify with links, images, styles and foreignObject removed; $$…$$ labels are typeset with KaTeX MathML, loaded only for such a diagram, under a profile that admits only KaTeX's MathML inside foreignObject. Colors come from the DSH theme, so light and dark switch without re-rendering. Neither renderer is in client.js: the Host serves pele's ES module build and katex.mjs from /dshfiles-mermaid-diagrams/renderer/ through dshx StaticAssets, and the Client imports them on first use.",
+      "summary": "A ```mermaid fence renders as a themed diagram card wherever Chat's code-fence registry applies: assistant answers, reasoning, compaction summaries, ask_user_question text, backlog item text and the editor's Markdown preview. A fence becomes a diagram once it is complete (another block follows it, or the message settles); until then the native code card stays. The card keeps the code's height while pele loads and fades the diagram in; its header toggles between the diagram and its highlighted source and copies the source; clicking the diagram expands it full size. pele (Obsidian's Mermaid renderer, MIT) draws the SVG through DOMPurify with links, images, styles and foreignObject removed; $$…$$ labels are typeset with KaTeX MathML, loaded only for such a diagram, under a profile that admits only KaTeX's MathML inside foreignObject. Colors come from the DSH theme, so light and dark switch without re-rendering. Neither renderer is in client.js: the Host serves pele's ES module build and katex.mjs from /dshfiles-mermaid-diagrams/renderer/ through dshx StaticAssets, and the Client imports them on first use.",
       "surfaces": ["host", "client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -79,6 +79,18 @@
           "id": "mermaid-diagrams.route-confinement",
           "file": "plugins/@dshfiles/mermaid-diagrams/tests/renderer-assets.test.ts",
           "testName": "refuses traversal, symbolic links, non-scripts and writes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mermaid-diagrams.b581-flowchart-parse",
+          "file": "plugins/@dshfiles/mermaid-diagrams/tests/flowchart-parse.test.ts",
+          "testName": "parses with the installed renderer, its subgraph and labeled two-way edge intact"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mermaid-diagrams.b581-flowchart-card",
+          "file": "plugins/@dshfiles/mermaid-diagrams/tests/mermaid-fence.test.tsx",
+          "testName": "renders the b:581 labeled two-way flowchart as a diagram with its source one click away"
         }
       ],
       "telemetry": [

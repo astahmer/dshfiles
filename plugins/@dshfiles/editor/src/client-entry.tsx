@@ -6,7 +6,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { Command, defineClient, FileViewer, Files, type FilesService, SessionScreen, SettingsSection, type SettingsSectionItem } from '@dshfiles/dshx/client'
-import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -34,6 +33,7 @@ import { openFileLinksPreference } from './open-file-links-preference.js'
 import { EDITOR_SETTINGS_NAMESPACE } from './settings-namespace.js'
 import { editorSettings } from './settings.js'
 import { createFollowedSession } from './followed-session.js'
+import { MarkdownPreview } from './markdown-preview.js'
 import { createSessionScreen } from './session-screen.js'
 import { createWorkspaceFileIndex } from './workspace-files.js'
 
@@ -78,7 +78,7 @@ export default defineClient({
       id: 'dshfiles-editor.markdown-preview',
       title: 'Preview',
       matches: path => /\.(?:md|markdown|mdx)$/iu.test(path),
-      component: props => <Markdown text={props.text} variant="body" />,
+      component: MarkdownPreview,
     })
     // The form's value is the Host's schema-resolved section, so its fields arrive with their defaults applied.
     const settingsForm = ctx.configForms.get<SettingsValue<typeof editorSettings.schema>>(EDITOR_SETTINGS_NAMESPACE)
