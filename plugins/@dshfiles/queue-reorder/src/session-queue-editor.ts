@@ -120,14 +120,30 @@ const storedEdits = createStoredValue({ key: 'dshfiles.queue-reorder.edits.v1', 
 
 /** The Host API client, set by the dock: dshx hands it out only inside a Client Slot component. */
 let queueClient: QueueApiClient | undefined
+const queueClientWaiters = new Set<(client: QueueApiClient) => void>()
+
+const QUEUE_CLIENT_TIMEOUT_MS = 15_000
 
 export const useQueueClientForEditing = (client: QueueApiClient): void => {
   queueClient = client
+  for (const resolve of queueClientWaiters) resolve(client)
+  queueClientWaiters.clear()
 }
 
-const requireQueueClient = (): QueueApiClient => {
-  if (queueClient === undefined) throw new Error('queue dock is not mounted')
-  return queueClient
+/** A reloaded edit resumes when its editor is created, before the dock first renders and hands out the client. */
+const requireQueueClient = (): Promise<QueueApiClient> => {
+  if (queueClient !== undefined) return Promise.resolve(queueClient)
+  return new Promise((resolve, reject) => {
+    const waiter = (client: QueueApiClient): void => {
+      clearTimeout(timer)
+      resolve(client)
+    }
+    const timer = setTimeout(() => {
+      queueClientWaiters.delete(waiter)
+      reject(new Error('queue dock is not mounted'))
+    }, QUEUE_CLIENT_TIMEOUT_MS)
+    queueClientWaiters.add(waiter)
+  })
 }
 
 const waitForUploads = (drafts: DraftAttachmentApi, ids: readonly DraftAttachmentId[]): Promise<void> => {
@@ -168,13 +184,18 @@ const toPromptPart = (part: { readonly type: 'text'; readonly text: string } | S
 const sessionQueueIo = (input: { readonly sessionId: SessionFace['sessionId']; readonly session: SessionFace }) => ({
   readImage: async (attachment: QueuedImageAttachment): Promise<File> => {
     if (!isAttachmentId(attachment.attachmentId)) throw new Error('image has no id')
+    // Native reads stop resolving once an edit takes the message out of the queue; the Host keeps it readable.
+    const hosted = await requireQueueClient()
+      .then(client => client.readImage({ sessionId: input.sessionId, attachmentId: attachment.attachmentId }))
+      .catch(() => undefined)
+    if (hosted !== undefined) return new File([bytesFromBase64(hosted.data)], attachment.name ?? hosted.name, { type: hosted.mediaType })
     const result = await input.session.readAttachment(imageReference(attachment, attachment.attachmentId))
     if (!result.ok) throw new Error(result.error.message)
     const name = attachment.name ?? result.value.attachment.name ?? 'image'
     return new File([new Uint8Array(result.value.data)], name, { type: result.value.attachment.mediaType })
   },
   readFile: async (attachment: QueuedFileAttachment): Promise<File> => {
-    const file = await requireQueueClient().readFile({ sessionId: input.sessionId, attachment })
+    const file = await (await requireQueueClient()).readFile({ sessionId: input.sessionId, attachment })
     return new File([bytesFromBase64(file.data)], file.name)
   },
   remove: async (itemId: string): Promise<void> => {
@@ -271,7 +292,7 @@ const createEditor = (input: {
       readFile: io.readFile,
       remove: io.remove,
       enqueue: io.enqueue,
-      move: async (itemId, direction) => (await requireQueueClient().move({ sessionId: input.sessionId, itemId, direction })).index,
+      move: async (itemId, direction) => (await (await requireQueueClient()).move({ sessionId: input.sessionId, itemId, direction })).index,
     },
     records,
   })

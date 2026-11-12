@@ -66,5 +66,18 @@ export const queueApi = defineApi({
         data: Schema.String.check(Schema.isMaxLength(Math.ceil(MAX_QUEUE_FILE_BYTES / 3) * 4)),
       }),
     }),
+    // Native `session.attachment` stops resolving an image once its message leaves the queue, so an edit reloaded
+    // mid-flight reads it here instead. A Host started before this method answers with an unknown-endpoint error.
+    readImage: method({
+      input: Schema.Struct({
+        sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+        attachmentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+      }),
+      output: Schema.Struct({
+        name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+        mediaType: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+        data: Schema.String.check(Schema.isMaxLength(Math.ceil(MAX_QUEUE_FILE_BYTES / 3) * 4)),
+      }),
+    }),
   },
 })

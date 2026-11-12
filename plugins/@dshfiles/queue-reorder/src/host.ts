@@ -4,7 +4,8 @@ import type { ApiCaller } from '@dshfiles/dshx/api'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Effect, Layer, Schema } from 'effect'
 import { moveDirectionSchema, queueApi, queuePositionSchema } from './api.js'
-import { QueuedFiles, QueueOrder } from './queue-order-service.js'
+import { QueueOrder } from './queue-order-service.js'
+import { QueuedFiles } from './queued-files-promise.js'
 import { scheduledSendApi } from './scheduled-send-api.js'
 import { ScheduledSendDeliveryLive } from './scheduled-send-delivery.js'
 import { ScheduledSendStore } from './scheduled-send-store.js'
@@ -115,6 +116,7 @@ export default DshxPlugin.make({
       move: input => QueueOrder.use(queue => queue.move(input)),
       describe: input => QueueOrder.use(queue => queue.describe(input.sessionId)),
       readFile: input => QueueOrder.use(queue => queue.readFile({ sessionId: input.sessionId, attachmentId: input.attachment.attachmentId })),
+      readImage: input => QueueOrder.use(queue => queue.readImage(input)),
     }),
   ],
   tools: [moveTool],

@@ -1,12 +1,13 @@
-import type { FileBlock } from '@deepseek-ai/dsh-llm'
-import { HostContext, hostService } from '@dshfiles/dshx/effect'
+import type { FileBlock, ImageBlock } from '@deepseek-ai/dsh-llm'
+import { hostService } from '@dshfiles/dshx/effect'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { Context, Effect, Layer, Ref, Schema, Stream } from 'effect'
 import { MAX_QUEUE_FILE_BYTES } from './api.js'
+import { QueuedFiles, type QueuedFileUnreadable } from './queued-files-promise.js'
 import { QueueOrderModel, type QueueMoveRequest, type QueuePosition } from './queue-order.js'
 import '@deepseek-ai/dsh-agent'
 
-type FileAttachmentRef = FileBlock['attachment']
+type AttachmentBlock = FileBlock | ImageBlock
 
 export class QueueSessionNotLive extends Schema.TaggedError<QueueSessionNotLive>()(
   'QueueSessionNotLive',
@@ -48,45 +49,6 @@ export class QueuedFileTooLarge extends Schema.TaggedError<QueuedFileTooLarge>()
   }
 }
 
-export class QueuedFileUnreadable extends Schema.TaggedError<QueuedFileUnreadable>()(
-  'QueuedFileUnreadable',
-  { attachmentId: Schema.String, cause: Schema.optional(Schema.Defect()) },
-  { dshxWireCode: 'queued-file-unreadable' },
-) {
-  override get message(): string {
-    return 'That queued file could not be read. Remove it from the message or queue it again.'
-  }
-}
-
-interface FileReader {
-  readFileStream(ref: FileAttachmentRef): AsyncIterable<Uint8Array>
-}
-
-const isFileReader = (value: unknown): value is FileReader =>
-  typeof value === 'object' && value !== null && 'readFileStream' in value && typeof value.readFileStream === 'function'
-
-/** The Host attachment store, read lazily: it is not injected, and an older Host may lack it. */
-export class QueuedFiles extends Context.Service<QueuedFiles, { readonly read: (ref: FileAttachmentRef) => Stream.Stream<Uint8Array, QueuedFileUnreadable> }>()(
-  '@dshfiles/queue-reorder/QueuedFiles',
-) {
-  static readonly layer = Layer.effect(
-    QueuedFiles,
-    Effect.gen(function* () {
-      const host = yield* HostContext
-      return QueuedFiles.of({
-        read: ref =>
-          Stream.unwrap(
-            Effect.gen(function* () {
-              const store: unknown = host.ctx.get('attachments')
-              if (!isFileReader(store)) return yield* new QueuedFileUnreadable({ attachmentId: ref.attachmentId })
-              return Stream.fromAsyncIterable(store.readFileStream(ref), cause => new QueuedFileUnreadable({ attachmentId: ref.attachmentId, cause }))
-            }),
-          ),
-      })
-    }),
-  )
-}
-
 /**
  * Queue reordering on a live Agent inbox. `updateQueue` cannot express a reorder, so a move is a durable inbox
  * splice: the message keeps its identity and replay, fork and resume reconstruct the order the user saw.
@@ -100,6 +62,13 @@ export class QueueOrder extends Context.Service<
       readonly sessionId: string
       readonly attachmentId: string
     }) => Effect.Effect<{ readonly name: string; readonly data: string }, QueuedFileMissing | QueuedFileTooLarge | QueuedFileUnreadable>
+    readonly readImage: (request: {
+      readonly sessionId: string
+      readonly attachmentId: string
+    }) => Effect.Effect<
+      { readonly name: string; readonly mediaType: string; readonly data: string },
+      QueuedFileMissing | QueuedFileTooLarge | QueuedFileUnreadable
+    >
   }
 >()('@dshfiles/queue-reorder/QueueOrder') {
   static readonly layer = Layer.effect(
@@ -107,8 +76,9 @@ export class QueueOrder extends Context.Service<
     Effect.gen(function* () {
       const agents = yield* hostService('agents')
       const files = yield* QueuedFiles
-      // Editing removes a message from the queue while Cancel still needs its files, so a seen reference stays readable.
-      const confirmedFiles = yield* Ref.make(new Map<string, ReadonlyMap<string, FileAttachmentRef>>())
+      // Editing removes a message from the queue while Cancel and a reloaded edit still need its attachments, so a
+      // reference read while queued stays readable for that session.
+      const confirmedBlocks = yield* Ref.make(new Map<string, ReadonlyMap<string, AttachmentBlock>>())
 
       const liveInbox = (sessionId: string) => agents.get(SessionId(sessionId))?.inbox
 
@@ -126,22 +96,23 @@ export class QueueOrder extends Context.Service<
           return inbox === undefined ? [] : QueueOrderModel.describeInbox(inbox)
         }).pipe(Effect.withSpan('queue describe'))
 
-      const queuedFileRef = Effect.fnUntraced(function* (sessionId: string, attachmentId: string) {
-        const confirmed = (yield* Ref.get(confirmedFiles)).get(sessionId)?.get(attachmentId)
+      const queuedBlock = Effect.fnUntraced(function* (sessionId: string, attachmentId: string) {
+        const confirmed = (yield* Ref.get(confirmedBlocks)).get(sessionId)?.get(attachmentId)
         if (confirmed !== undefined) return confirmed
         const inbox = liveInbox(sessionId)
         if (inbox === undefined) return undefined
         const found = [...inbox.nextTurn, ...inbox.nextStep]
           .flatMap(message => message.content)
-          .find((block): block is FileBlock => block.type === 'file' && block.attachment.attachmentId === attachmentId)
+          .find((block): block is AttachmentBlock => (block.type === 'file' || block.type === 'image') && block.attachment.attachmentId === attachmentId)
         if (found === undefined) return undefined
-        yield* Ref.update(confirmedFiles, current => new Map(current).set(sessionId, new Map(current.get(sessionId)).set(attachmentId, found.attachment)))
-        return found.attachment
+        yield* Ref.update(confirmedBlocks, current => new Map(current).set(sessionId, new Map(current.get(sessionId)).set(attachmentId, found)))
+        return found
       })
 
       const readFile = Effect.fn('queue read file')(function* (request: { readonly sessionId: string; readonly attachmentId: string }) {
-        const ref = yield* queuedFileRef(request.sessionId, request.attachmentId)
-        if (ref === undefined) return yield* new QueuedFileMissing({ attachmentId: request.attachmentId })
+        const block = yield* queuedBlock(request.sessionId, request.attachmentId)
+        if (block?.type !== 'file') return yield* new QueuedFileMissing({ attachmentId: request.attachmentId })
+        const ref = block.attachment
         const tooLarge = new QueuedFileTooLarge({ attachmentId: request.attachmentId, limitBytes: MAX_QUEUE_FILE_BYTES })
         if (ref.bytes > MAX_QUEUE_FILE_BYTES) return yield* tooLarge
         const read = yield* files.read(ref).pipe(
@@ -158,7 +129,18 @@ export class QueueOrder extends Context.Service<
         return { name: ref.name, data: Buffer.concat(read.chunks).toString('base64') }
       })
 
-      return QueueOrder.of({ move, describe, readFile })
+      const readImage = Effect.fn('queue read image')(function* (request: { readonly sessionId: string; readonly attachmentId: string }) {
+        const block = yield* queuedBlock(request.sessionId, request.attachmentId)
+        if (block?.type !== 'image') return yield* new QueuedFileMissing({ attachmentId: request.attachmentId })
+        const ref = block.attachment
+        const tooLarge = new QueuedFileTooLarge({ attachmentId: request.attachmentId, limitBytes: MAX_QUEUE_FILE_BYTES })
+        if (ref.bytes > MAX_QUEUE_FILE_BYTES) return yield* tooLarge
+        const data = yield* files.readImage(ref)
+        if (data.byteLength > MAX_QUEUE_FILE_BYTES) return yield* tooLarge
+        return { name: ref.name ?? 'image', mediaType: ref.mediaType, data: Buffer.from(data).toString('base64') }
+      })
+
+      return QueueOrder.of({ move, describe, readFile, readImage })
     }),
   )
 }

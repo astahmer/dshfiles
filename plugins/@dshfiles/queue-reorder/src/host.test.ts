@@ -22,6 +22,11 @@ const fileBlock = (attachmentId: string, bytes: number) => ({
   attachment: { attachmentId, name: `${attachmentId}.txt`, bytes, mediaType: 'text/plain' },
 })
 
+const imageBlock = (attachmentId: string) => ({
+  type: 'image',
+  attachment: { attachmentId, mediaType: 'image/png', bytes: 4, width: 1, height: 1, name: `${attachmentId}.png` },
+})
+
 /** One live session's Agent inbox with standard splice semantics; the Host reaches it through the `agents` registry. */
 const liveSession = () => {
   const lists = {
@@ -80,6 +85,7 @@ const mountedQueue = Effect.gen(function* () {
         readFileStream: async function* (ref: { readonly attachmentId: string }) {
           yield* fileContents.get(ref.attachmentId) ?? []
         },
+        readImage: async (ref: { readonly attachmentId: string }) => ({ ref, data: new Uint8Array([137, 80, 78, 71]) }),
       })
       await created.mount(queueReorderHost, { packageId: '@dshfiles/queue-reorder' })
       return created
@@ -172,6 +178,23 @@ describe('queue-reorder Host', () => {
           ok: false,
           error: { code: 'queued-file-missing', message: 'That file is not attached to a message queued in this session.' },
         })
+      }),
+    ),
+  )
+
+  it.effect('reads a queued image and keeps it readable after the message leaves the queue, for its own session only', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const queue = yield* mountedQueue
+        queue.inbox.nextTurn.push({ id: 'd', content: [{ type: 'text', text: 'look' }, imageBlock('shot')] })
+        const image = { ok: true, value: { output: { name: 'shot.png', mediaType: 'image/png', data: Buffer.from([137, 80, 78, 71]).toString('base64') } } }
+        expect(yield* queue.call('readImage', { sessionId: 'live', attachmentId: 'shot' })).toEqual(image)
+
+        queue.inbox.splice('next-turn', 3, 1, [])
+        expect(yield* queue.call('readImage', { sessionId: 'live', attachmentId: 'shot' })).toEqual(image)
+        const missing = { ok: false, error: { code: 'queued-file-missing', message: 'That file is not attached to a message queued in this session.' } }
+        expect(yield* queue.call('readImage', { sessionId: 'child', attachmentId: 'shot' })).toEqual(missing)
+        expect(yield* queue.call('readImage', { sessionId: 'live', attachmentId: 'notes' })).toEqual(missing)
       }),
     ),
   )
