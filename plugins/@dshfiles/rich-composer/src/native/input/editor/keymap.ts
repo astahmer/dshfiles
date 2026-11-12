@@ -43,6 +43,11 @@ export interface ComposerKeymapHandlers {
   /** Primary+Alt+Enter: send, then open a fresh draft; absent leaves the chord unbound. */
   submitAndNewDraft?(): void
   /**
+   * Whether a bare Enter breaks the line instead of sending, as on a touch keyboard whose return key has no Shift
+   * companion; the Send button sends there. Absent means Enter sends.
+   */
+  enterBreaksLine?(): boolean
+  /**
    * Pasted files with directory metadata supplied by the clipboard entry API.
    * @param files - browser files in clipboard order.
    * @param directories - known directory members; absent when no entry identifies a directory.
@@ -322,6 +327,8 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
         event?.preventDefault()
         return true
       }
+      // A bare touch-keyboard return is the user's newline key: Lexical's own line break handles it.
+      if (!(event?.ctrlKey === true || event?.metaKey === true) && handlers.enterBreaksLine?.() === true) return false
       event?.preventDefault()
       if (event?.repeat === true) return true // held-down Enter must not machine-gun sends
       if (!handlers.canSubmit()) return true

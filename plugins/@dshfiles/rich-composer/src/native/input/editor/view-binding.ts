@@ -206,6 +206,7 @@ export function installDraftKeymap(
       keyboard.submit(resolveSubmitMode(g.busyEnter, g.running, 'enter', g.steeringAvailable), 'enter')
       g.requestFreshDraft()
     },
+    enterBreaksLine: () => typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches,
     intakeFiles: (files, directories) => { gate.current.intakeFiles(files, directories) },
     pasteText: (text) => {
       if (gate.current.machineBusy || gate.current.locked) return

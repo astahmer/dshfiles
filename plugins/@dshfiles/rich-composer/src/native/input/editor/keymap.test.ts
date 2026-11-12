@@ -144,3 +144,46 @@ describe('composer prompt recall keys', () => {
     expect(ended).toBe(1)
   })
 })
+
+describe('composer Enter on a touch keyboard', () => {
+  const enterEditor = (enterBreaksLine: boolean) => {
+    const sent: boolean[] = []
+    const editor = createEditor({ namespace: 'composer-keymap-touch-enter-test' })
+    disposers.push(
+      registerComposerKeymap(editor, {
+        arbitrate: () => 'pass',
+        space: () => false,
+        dismissPopup: () => undefined,
+        canSubmit: () => true,
+        submit: accelerated => { sent.push(accelerated) },
+        enterBreaksLine: () => enterBreaksLine,
+        intakeFiles: () => undefined,
+        pasteText: () => undefined,
+      }),
+    )
+    const press = (init: KeyboardEventInit): { handled: boolean; event: KeyboardEvent } => {
+      const event = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, ...init })
+      let handled = false
+      editor.update(() => { handled = editor.dispatchCommand(KEY_ENTER_COMMAND, event) }, { discrete: true })
+      return { handled, event }
+    }
+    return { sent, press }
+  }
+
+  it('leaves a bare return to the line break and never sends', () => {
+    const touch = enterEditor(true)
+    const bare = touch.press({})
+    expect(bare.handled).toBe(false)
+    expect(bare.event.defaultPrevented).toBe(false)
+    expect(touch.sent).toEqual([])
+  })
+
+  it('still sends on a bare Enter with a physical keyboard, and on Ctrl+Enter everywhere', () => {
+    const desktop = enterEditor(false)
+    expect(desktop.press({}).handled).toBe(true)
+    const touch = enterEditor(true)
+    expect(touch.press({ ctrlKey: true }).handled).toBe(true)
+    expect(desktop.sent).toEqual([false])
+    expect(touch.sent).toEqual([true])
+  })
+})

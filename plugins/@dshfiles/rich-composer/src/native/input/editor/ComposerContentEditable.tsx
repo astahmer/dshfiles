@@ -72,6 +72,8 @@ export function ComposerContentEditable({ editor, editable, elementRef, ...rest 
       suppressContentEditableWarning
       role="textbox"
       aria-multiline="true"
+      // A touch keyboard's return key breaks the line there (keymap `enterBreaksLine`): label it so.
+      enterKeyHint="enter"
       data-composer-input
       {...rest}
     />
