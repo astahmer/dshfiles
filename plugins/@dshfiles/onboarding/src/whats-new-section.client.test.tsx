@@ -79,9 +79,9 @@ describe('WhatsNewSection', () => {
     expect(within(onboarding).getByText('Getting started.')).toBeTruthy()
     expect(within(onboarding).getByText('show what is new')).toBeTruthy()
     expect(within(section).queryAllByText('New')).toEqual([])
-    fireEvent.click(within(section).getByRole('button', { name: 'Features of onboarding' }))
+    fireEvent.click(within(section).getByRole('button', { name: 'Features of Onboarding' }))
     expect(page.showFeatures).toHaveBeenCalledWith('onboarding')
-    expect(within(section).queryByRole('button', { name: 'Features of backlog' })).toBeNull()
+    expect(within(section).queryByRole('button', { name: 'Features of Backlog' })).toBeNull()
   })
 
   it('marks what landed since the last visit as New until the user marks it seen, never on its own', async () => {

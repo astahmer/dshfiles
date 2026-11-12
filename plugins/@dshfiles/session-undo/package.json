@@ -27,6 +27,7 @@
   "dependencies": {
     "@dshfiles/chat": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/rich-composer": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/vcs-provider-port": "workspace:*",
     "effect": "catalog:"

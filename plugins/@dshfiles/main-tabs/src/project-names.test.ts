@@ -12,3 +12,17 @@ test('names each project workspace after its folder', () => {
     ['b', 'site'],
   ])
 })
+
+test('names a thread workspace after the project it was cut from', () => {
+  const names = ProjectNames.byWorkspaceId(
+    [
+      { workspaceId: 'thread', path: '/Users/me/dev/dshfiles-threads/thread-1ceffc' },
+      { workspaceId: 'custom', path: '/Users/me/threads/site/thread-ab12' },
+    ],
+    new Map([['/Users/me/threads/site', '/Users/me/code/site']]),
+  )
+  expect([...names]).toEqual([
+    ['thread', 'dshfiles'],
+    ['custom', 'site'],
+  ])
+})

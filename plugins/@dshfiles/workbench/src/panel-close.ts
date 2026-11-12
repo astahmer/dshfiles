@@ -19,7 +19,12 @@ export interface WorkbenchPanelIdentity {
  * the tab actor back.
  */
 export const closeWorkbenchPanel = (input: { api: DockviewApi; registry: WorkbenchPanelRegistry; panel: WorkbenchPanelIdentity }): void => {
-  input.registry.get(NewViewTabs.sourceId(input.panel.params, input.panel.id))?.beforeClose?.()
+  // A definition rejects the close by throwing (the sidebar pane, b:952m): the occurrence stays.
+  try {
+    input.registry.get(NewViewTabs.sourceId(input.panel.params, input.panel.id))?.beforeClose?.()
+  } catch {
+    return
+  }
   const panel = input.api.getPanel(input.panel.id)
   if (panel !== undefined) input.api.removePanel(panel)
 }

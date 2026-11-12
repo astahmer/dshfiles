@@ -114,7 +114,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
       <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:px-3 dshx:py-2">
         <div className="dshx:flex dshx:items-center dshx:gap-1">
-          <span className="dshx:text-[11px] dshx:font-semibold dshx:text-muted-foreground">Changes</span>
+          <span className="dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground">Changes</span>
           <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
             <FileViewToggle onChange={props.onFileViewChange} value={props.fileView} />
             {workingCopy !== undefined && (
@@ -132,7 +132,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
             <Select onValueChange={value => props.onAncestorCountChange(Number(value))} value={String(props.ancestorCount)}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <SelectTrigger aria-label="Ancestor groups" className="dshx:h-6 dshx:gap-1 dshx:px-1.5 dshx:text-[11px]" size="sm">
+                  <SelectTrigger aria-label="Ancestor groups" className="dshx:h-6 dshx:gap-1 dshx:px-1.5 dshx:text-2xs" size="sm">
                     <span className="dshx:text-muted-foreground">@-</span>
                     <SelectValue />
                   </SelectTrigger>
@@ -173,7 +173,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                   <Button className="dshx:flex-1" disabled={props.busy || commitMessage.length === 0} onClick={commit} size="xs" type="button">
                     <CheckIcon />
                     Commit
-                    <Kbd className="dshx:ml-1 dshx:h-4 dshx:bg-primary-foreground/20 dshx:text-[10px] dshx:text-primary-foreground">⌘↵</Kbd>
+                    <Kbd className="dshx:ml-1 dshx:h-4 dshx:bg-primary-foreground/20 dshx:text-2xs dshx:text-primary-foreground">⌘↵</Kbd>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="dshx-root" side="bottom">
@@ -236,7 +236,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                         {firstLine(revision.description)}
                       </span>
                       {revision.immutable && (
-                        <Badge className="dshx:h-4 dshx:rounded-sm dshx:px-1 dshx:py-0 dshx:text-[10px]" variant="outline">
+                        <Badge className="dshx:h-4 dshx:rounded-sm dshx:px-1 dshx:py-0 dshx:text-2xs" variant="outline">
                           immutable
                         </Badge>
                       )}
@@ -283,7 +283,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                     </IconAction>
                   )}
                 </span>
-                <span className="dshx:min-w-5 dshx:flex-none dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-center dshx:font-mono dshx:text-[10px]">
+                <span className="dshx:min-w-5 dshx:flex-none dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-center dshx:font-mono dshx:text-2xs">
                   {files?.length ?? '…'}
                 </span>
               </div>

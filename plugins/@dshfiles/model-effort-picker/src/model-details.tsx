@@ -9,8 +9,8 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountColor } from './account-color.js'
 import { FallbacksSection } from './fallbacks-section.js'
 import { FastModeSection } from './fast-mode-section.js'
-import { ModelPickerModel } from './model-picker-model.js'
-import { BrandMark, InfoHint, ProviderLabel } from './picker-atoms.js'
+import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
+import { BrandMark, InfoHint, ProviderLabel, QuotaPercent } from './picker-atoms.js'
 
 type CatalogGroup = ModelDirectoryState['groups'][number]
 
@@ -35,6 +35,8 @@ export const ModelDetails = (props: {
   readonly error: string | null
   readonly accountAccents: ReadonlyMap<string, string>
   readonly providerLabels: ReadonlyMap<string, string>
+  /** What is left on each account (b:16yr): the list shows one row per model, so the account is chosen here. */
+  readonly quotas: ReadonlyMap<string, ModelQuota>
   readonly onBack: () => void
   readonly onClose: () => void
   readonly onRetry: () => void
@@ -79,12 +81,12 @@ export const ModelDetails = (props: {
           <>
             <BrandMark brand={ModelPickerModel.brandFor({ model })} className="dshx:size-[18px]" name={name} />
             <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1 dshx:overflow-hidden">
-              <h2 className="dshx:min-w-0 dshx:truncate dshx:text-[13px] dshx:font-semibold dshx:leading-none" data-model-picker-current>
+              <h2 className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold dshx:leading-none" data-model-picker-current>
                 {name}
               </h2>
               {providerLabel === undefined ? null : (
                 <>
-                  <span aria-hidden="true" className="dshx:shrink-0 dshx:text-[10px] dshx:text-muted-foreground/50">
+                  <span aria-hidden="true" className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground/50">
                     ·
                   </span>
                   <ProviderLabel className="dshx:max-w-[6.5rem]" label={providerLabel} />
@@ -114,37 +116,45 @@ export const ModelDetails = (props: {
       </header>
 
       <div className="dshx:mt-2 dshx:flex dshx:items-start dshx:gap-2">
-        <p className="dshx:shrink-0 dshx:pt-1 dshx:text-[10px] dshx:font-medium dshx:text-muted-foreground">Account</p>
+        <p className="dshx:shrink-0 dshx:pt-1 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">Account</p>
         <div aria-label="Available accounts" className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:gap-1" data-model-account-chips>
-          {accounts.map(account => (
-            <Tooltip key={account.id}>
-              <TooltipTrigger asChild>
-                <button
-                  aria-pressed={group?.id === account.id}
-                  className={cn(
-                    'dshx:flex dshx:h-6 dshx:max-w-[10rem] dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:px-2 dshx:text-[10.5px] dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-                    group?.id === account.id && 'dshx:border-info/60 dshx:bg-info/10 dshx:text-foreground',
-                  )}
-                  disabled={props.busy}
-                  onClick={() => {
-                    const target = account.models.find(entry => entry.id === model?.id)
-                    if (target === undefined || model === undefined) return
-                    props.onInspect({ model: model.id, provider: account.id })
-                    props.onSelect(ModelPickerModel.selectionForModel(account, target, props.current))
-                  }}
-                  type="button"
-                >
-                  <i
-                    aria-hidden="true"
-                    className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full"
-                    style={{ backgroundColor: props.accountAccents.get(account.id) ?? accountColor({ instanceId: account.id }) }}
-                  />
-                  <span className="dshx:min-w-0 dshx:truncate">{account.name}</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">{account.name}</TooltipContent>
-            </Tooltip>
-          ))}
+          {accounts.map(account => {
+            const quota = props.quotas.get(account.id)
+            return (
+              <Tooltip key={account.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    aria-label={account.name}
+                    aria-pressed={group?.id === account.id}
+                    className={cn(
+                      'dshx:flex dshx:h-6 dshx:max-w-[10rem] dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:px-2 dshx:text-2xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+                      group?.id === account.id && 'dshx:border-info/60 dshx:bg-info/10 dshx:text-foreground',
+                    )}
+                    disabled={props.busy}
+                    onClick={() => {
+                      const target = account.models.find(entry => entry.id === model?.id)
+                      if (target === undefined || model === undefined) return
+                      props.onInspect({ model: model.id, provider: account.id })
+                      props.onSelect(ModelPickerModel.selectionForModel(account, target, props.current))
+                    }}
+                    type="button"
+                  >
+                    <i
+                      aria-hidden="true"
+                      className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full"
+                      style={{ backgroundColor: props.accountAccents.get(account.id) ?? accountColor({ instanceId: account.id }) }}
+                    />
+                    <span className="dshx:min-w-0 dshx:truncate">{account.name}</span>
+                    {quota === undefined ? null : <QuotaPercent onReserve={quota.onReserve} percent={quota.percent} />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {account.name}
+                  {quota === undefined ? '' : ` · ${quota.label}: ${String(Math.round(quota.percent))}% left`}
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
         </div>
       </div>
 
@@ -153,7 +163,7 @@ export const ModelDetails = (props: {
           className="dshx:mt-2 dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:border dshx:border-destructive/30 dshx:bg-destructive/10 dshx:px-2 dshx:py-1.5"
           role="alert"
         >
-          <p className="dshx:min-w-0 dshx:text-[11px] dshx:text-destructive">{props.error}</p>
+          <p className="dshx:min-w-0 dshx:text-2xs dshx:text-destructive">{props.error}</p>
           <Button onClick={props.onRetry} size="xs" variant="outline">
             Retry
           </Button>
@@ -164,14 +174,14 @@ export const ModelDetails = (props: {
         <section aria-label="Reasoning effort" className="dshx:mt-2.5 dshx:flex dshx:flex-col dshx:gap-1">
           <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
             <span className="dshx:flex dshx:items-center dshx:gap-1">
-              <p className="dshx:text-[11px] dshx:font-medium">Reasoning effort</p>
+              <p className="dshx:text-2xs dshx:font-medium">Reasoning effort</p>
               <InfoHint description="Higher effort lets the model think for longer before it answers." />
             </span>
             {
               <button
                 aria-pressed={selection.reasoningEffort === undefined}
                 className={cn(
-                  'dshx:flex dshx:items-center dshx:gap-1 dshx:rounded dshx:px-1 dshx:py-0.5 dshx:text-[10px] dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+                  'dshx:flex dshx:items-center dshx:gap-1 dshx:rounded dshx:px-1 dshx:py-0.5 dshx:text-2xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
                   selection.reasoningEffort === undefined && 'dshx:text-foreground',
                 )}
                 disabled={props.busy}
@@ -184,7 +194,7 @@ export const ModelDetails = (props: {
             }
           </div>
           {efforts.length === 0 ? (
-            <p className="dshx:text-[11px] dshx:text-muted-foreground">This model has no reasoning levels.</p>
+            <p className="dshx:text-2xs dshx:text-muted-foreground">This model has no reasoning levels.</p>
           ) : (
             <div className="dshx:flex dshx:flex-col dshx:gap-0.5">
               <div className="dshx:relative dshx:py-0.5">
@@ -220,7 +230,7 @@ export const ModelDetails = (props: {
                   <button
                     aria-pressed={index === effortIndex}
                     className={cn(
-                      'dshx:absolute dshx:top-0 dshx:min-w-0 dshx:whitespace-nowrap dshx:rounded-sm dshx:px-0.5 dshx:text-[10px] dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+                      'dshx:absolute dshx:top-0 dshx:min-w-0 dshx:whitespace-nowrap dshx:rounded-sm dshx:px-0.5 dshx:text-2xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
                       index === 0 ? 'dshx:translate-x-0' : index === efforts.length - 1 ? 'dshx:-translate-x-full' : 'dshx:-translate-x-1/2',
                       index === effortIndex && 'dshx:font-semibold dshx:text-foreground',
                     )}

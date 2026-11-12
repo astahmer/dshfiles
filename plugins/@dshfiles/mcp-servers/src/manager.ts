@@ -26,6 +26,10 @@ import { PendingAuthorizations } from './pending-authorizations.js'
 import { makeClientReconciler, type ClientTarget } from './reconcile.js'
 import { RegistrySearch } from './registry-search.js'
 import { McpServerStateModel } from './server-state.js'
+import { standaloneColours } from '@dshfiles/plugin-ui/theme/palette'
+
+/** The OAuth callback tab cannot read the Host theme; it uses the generated dark palette. */
+const SIGN_IN_PAGE = standaloneColours('dark')
 
 export const OAUTH_CALLBACK_PATH = '/api/dshfiles-mcp-servers/oauth/callback'
 const CREDENTIAL_SCOPE = 'mcp-servers'
@@ -122,7 +126,7 @@ const callbackPage = (response: ServerResponse, status: number, message: string)
     'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'",
   })
   response.end(
-    `<!doctype html><meta charset="utf-8"><title>MCP sign-in</title><body style="font:14px system-ui;padding:32px;color:#ddd;background:#1b1b1b"><p>${message}</p><p>You can close this tab and return to DSH.</p>${status === 200 ? '<script>window.setTimeout(()=>window.close(),800)</script>' : ''}</body>`,
+    `<!doctype html><meta charset="utf-8"><title>MCP sign-in</title><body style="font:14px system-ui;padding:32px;color:${SIGN_IN_PAGE.text};background:${SIGN_IN_PAGE.bg}"><p>${message}</p><p>You can close this tab and return to DSH.</p>${status === 200 ? '<script>window.setTimeout(()=>window.close(),800)</script>' : ''}</body>`,
   )
 }
 

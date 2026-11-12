@@ -74,3 +74,19 @@ Feature: Prompt stash
     When the prompt history is opened from the command palette at phone width
     And the sent prompt "Review the release notes" is inserted
     Then the composer holds "Review the release notes" without sending it
+
+  # b:2cep: a panel opened from a More menu row closed itself a moment later.
+  @scenario:prompt-stash.more-menu-panels-stay-open
+  Scenario: Saved prompts and Prompt history opened from the More menu stay open
+    Given the isolated plugin composition of "@dshfiles/prompt-stash, @dshfiles/session-search, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread is started with the prompt "Summarize the open incidents"
+    When "Saved prompts" is chosen in the composer More menu
+    Then the "Saved prompts" panel is still open 3 seconds later
+    When a saved prompt "Morning check" with text "Check the overnight alerts." is created
+    And the saved prompt "Morning check" is inserted
+    Then the thread composer holds "Check the overnight alerts."
+    When "Prompt history" is chosen in the composer More menu
+    Then the "Prompt history" panel is still open 3 seconds later
+    When the sent prompt "Summarize the open incidents" is inserted
+    Then the composer holds "Summarize the open incidents" without sending it

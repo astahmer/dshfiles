@@ -3,7 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
-import { Api, DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostContext, hostService, WebRoutes } from '@dshfiles/dshx/effect'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
 import { Effect, Layer } from 'effect'
@@ -56,10 +56,7 @@ const WebhookRouteLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const server = yield* hostService('webServer')
     const handler = yield* DshxPlugin.callback((request: IncomingMessage, response: ServerResponse) => handleWebhook({ request, response }))
-    yield* Effect.acquireRelease(
-      Effect.sync(() => server.register({ kind: 'prefix', path: WEBHOOK_PATH, handler })),
-      unregister => Effect.sync(unregister),
-    )
+    yield* WebRoutes.register(server, { kind: 'prefix', path: WEBHOOK_PATH, handler })
   }),
 )
 

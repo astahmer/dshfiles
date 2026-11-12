@@ -27,6 +27,23 @@ const answerableQuestion = (item: NativeQuestionInboxItem) => {
 }
 
 /**
+ * Why a form is answered in its thread, with its options when it has some, so the Inbox still shows what is asked. A
+ * form still open in its thread (`ask_user_question` with `timeout: -1`, or before its timeout) is held by the native
+ * answerer in the browser that shows its card; the Host's answer API takes only continued forms, so the Inbox cannot
+ * answer it in place (productivity pass Q6 carried item). Several questions, multi-select and free text need the form.
+ */
+const inThreadDetail = (item: NativeQuestionInboxItem): string => {
+  const [question, ...rest] = item.questions
+  const options =
+    question === undefined || rest.length > 0 ? [] : question.options.slice(0, 8).map(option => option.label.replace(/\s*\(Recommended\)\s*$/iu, ''))
+  if (options.length === 0 || question === undefined) return 'Open the thread to answer it there.'
+  const listed = `Options: ${options.join(' · ')}.`
+  if (question.multiSelect) return `${listed} Open the thread to pick one or more there.`
+  if (!item.canAnswer) return `${listed} Open the thread to choose: its form is still open there, and while it is, only that form takes the answer.`
+  return `${listed} Open the thread to answer it there.`
+}
+
+/**
  * One pending form in a live thread as a blocking item about it. A continued, single-question, single-select form is
  * answerable in place with its options; any other form (still open on the native waterfall, several questions, multi
  * select or free text) is answered in its thread.
@@ -36,7 +53,7 @@ const draftOf = (item: NativeQuestionInboxItem): AttentionDraft | undefined => {
   if (first === undefined) return undefined
   const more = item.questions.length > 1 ? ` (+${String(item.questions.length - 1)} more)` : ''
   const answerable = answerableQuestion(item)
-  const detail = answerable === undefined ? 'Open the thread to answer it there.' : 'Choose an answer here, or open the thread to write your own.'
+  const detail = answerable === undefined ? inThreadDetail(item) : 'Choose an answer here, or open the thread to write your own.'
   return {
     dedupeKey: `${item.sessionId}:${item.callId}`,
     subject: { kind: 'session', id: item.sessionId },

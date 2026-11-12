@@ -7,6 +7,7 @@ import type { ThreadDelay } from './thread-delays.js'
 import type { ThreadMutes } from './thread-mute.js'
 import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, type ThreadNotificationCategories, type ThreadNotificationPlacement } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-view-preferences.js'
+import type { ThreadBoardViewSettings } from './thread-board-view.js'
 import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
 import { SchemaHelpers } from './schema-helpers.js'
 
@@ -107,13 +108,25 @@ export interface SidebarPreferences {
   idleSectionOverrides: Record<string, IdleSectionOverride>
   workspaceFilter: string | null
   /**
-   * Fixed (default): the rail of destinations and one list (docs/ade-ux §4.1). Free docking: the older left column of
-   * movable Workbench panes, whose saved layout is kept untouched while fixed is on.
+   * Retired by the one sidebar layout (b:952m), kept decodable for one release: the layout used before the merge, Fixed
+   * (the rail of destinations and one list) or Free docking (the movable Workbench panes).
    */
   layoutMode: 'fixed' | 'docking'
+  /** The merge marker: which layout the merge found (null until one page migrated this Host). */
+  layoutMerge: 'fixed' | 'docking' | null
   headerMode: 'compact' | 'expanded'
   /** Drop the Host brand mark and name from the header; the collapse button stays. */
   hideBrandLogo: boolean
+  /**
+   * The foot row under the list (b:4v6p). Fixed layout hides it by default: its Settings, page links and More are the
+   * rail's and ⌘K's, Restart and Copy URL are ⌘K commands, and a pending restart or page reload still shows it.
+   */
+  showFooter: boolean
+  /**
+   * Restart DSH, Copy DSH URL for agents and Pair a phone (and a pending page reload) as a group directly above Settings
+   * on the rail, and under More › DSH on a phone (b:kgcc). Off: they go back to the row under the list.
+   */
+  showRailActions: boolean
   headerRegionHeight: number | null
   headerOrder: string[]
   hiddenHeaderIds: string[]
@@ -173,6 +186,13 @@ export interface SidebarPreferences {
   finishedSubagents: FinishedSubagentsMode
   /** Saved thread views and the controls around them; Host-synced so every browser reads the same set. */
   threadViews: ThreadViewSettings
+  /** The Board page's group, filters and folded columns; Host-synced like the list views (productivity pass E9). */
+  boardView: ThreadBoardViewSettings
+  /**
+   * The rail's folders (b:952m), written only through the Host's sidebar tree verbs and decoded where it is read
+   * (sidebar-tree.ts), so a tree this client cannot read never costs the rest of the preferences.
+   */
+  sidebarTree: unknown
 }
 
 export type ThreadRowDensity = 'compact' | 'comfortable'
@@ -202,8 +222,11 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   idleSectionOverrides: {},
   workspaceFilter: null,
   layoutMode: 'fixed',
+  layoutMerge: null,
   headerMode: 'compact',
   hideBrandLogo: false,
+  showFooter: false,
+  showRailActions: true,
   headerRegionHeight: null,
   headerOrder: [],
   hiddenHeaderIds: [],
@@ -220,10 +243,12 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   paletteRecentLimit: 20,
   threadRowDensity: 'compact',
   threadRowProject: true,
-  threadRowProjectColor: true,
+  // Colour is a signal (visual refresh T1.3): project names are muted text unless the user turns colour on.
+  threadRowProjectColor: false,
   projectColorPalette: 'balanced',
   threadRowTitle: true,
-  threadRowMachine: true,
+  // The local Host name repeats on every row; it is opt-in (T1.3), the second line reads project · branch.
+  threadRowMachine: false,
   threadRowPath: false,
   threadRowTime: true,
   threadRowStatusDot: true,
@@ -233,7 +258,8 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   approvalNeededDisplay: 'group',
   inputNeededDisplay: 'group',
   turnFinishedDisplay: 'label',
-  attentionColors: { approvalNeeded: 'warning', inputNeeded: 'warning', turnFinished: 'success' },
+  // Colour is a signal (visual refresh P1): waiting on you is the indigo Needs you hue, a finished turn is ink.
+  attentionColors: { approvalNeeded: 'info', inputNeeded: 'info', turnFinished: 'muted' },
   includeSubagentAttention: false,
   desktopNotificationsEnabled: false,
   notificationCategories: DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
@@ -243,13 +269,16 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   resumeAfterRestart: false,
   resumeAfterRestartMaxThreads: 5,
   resumeAfterRestartDelaySeconds: 10,
-  autoRestartWhenIdle: true,
+  autoRestartWhenIdle: false,
   autoRestartQuietSeconds: 60,
   subscriptionNoticeLevel: 'all',
   subscriptionDelivery: 'steer',
   maxChildren: 3,
   finishedSubagents: 'collapse',
   threadViews: DEFAULT_THREAD_VIEW_SETTINGS,
+  // Equal to DEFAULT_THREAD_BOARD_VIEW (a test holds them together); spelled out so this module needs no runtime import.
+  boardView: { groupBy: 'status', statusFilters: [], sourceFilter: 'all', projectFilter: null, collapsedGroups: [], collapsedSections: [] },
+  sidebarTree: { revision: 0, folders: [], removed: [], tombstones: [] },
 }
 
 export interface OrderedSidebarEntry {

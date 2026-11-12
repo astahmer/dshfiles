@@ -1,6 +1,12 @@
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { useApi } from '@dshfiles/dshx/client'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { ChevronLeftIcon, EllipsisIcon, FileCodeIcon, FileTextIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +30,8 @@ const ArtifactEditor = (props: {
   readonly occurrence: string
   readonly loadEngine: () => Promise<CodeEditorEngine>
   readonly onClose: () => void
+  /** Below the narrow-pane width the list and the editor stack; Back returns to the list. */
+  readonly onBack?: () => void
 }): JSX.Element => {
   const api = useApi(editorArtifactsApi)
   const queryClient = useQueryClient()
@@ -117,13 +125,19 @@ const ArtifactEditor = (props: {
   })
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
-      <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:p-2">
-        <input
-          aria-label="Artifact title"
-          className="dshx:min-w-0 dshx:flex-1 dshx:rounded dshx:border dshx:px-2 dshx:py-1"
-          value={title}
-          onChange={event => setTitle(event.target.value)}
-        />
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:p-2">
+        {props.onBack === undefined ? null : (
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Back to artifacts"
+            className="dshx:hidden dshx:@max-pane-narrow:inline-flex dshx:pointer-coarse:size-11"
+            onClick={props.onBack}
+          >
+            <ChevronLeftIcon aria-hidden />
+          </Button>
+        )}
+        <Input aria-label="Artifact title" className="dshx:h-8 dshx:min-w-0 dshx:flex-1" value={title} onChange={event => setTitle(event.target.value)} />
         <Button
           size="sm"
           disabled={save.isPending || reload.isPending || remove.isPending || title.trim() === '' || (!dirty && title === artifact.title)}
@@ -131,12 +145,23 @@ const ArtifactEditor = (props: {
         >
           Save
         </Button>
-        <Button size="sm" variant="outline" disabled={save.isPending || reload.isPending || remove.isPending} onClick={() => setConfirmReload(true)}>
-          Reload
-        </Button>
-        <Button size="sm" variant="outline" disabled={save.isPending || reload.isPending || remove.isPending} onClick={() => setConfirmDelete(true)}>
-          Delete
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon-sm" variant="ghost" aria-label="More artifact actions" disabled={save.isPending || reload.isPending || remove.isPending}>
+              <EllipsisIcon aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="dshx-root">
+            <DropdownMenuItem onSelect={() => setConfirmReload(true)}>
+              <RefreshCwIcon aria-hidden />
+              Reload
+            </DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
+              <Trash2Icon aria-hidden />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {(save.isError || reload.isError || remove.isError || engineError) && (
         <p role="alert" className="dshx:p-2 dshx:text-xs dshx:text-destructive">
@@ -210,61 +235,103 @@ const ThreadArtifacts = (props: {
       void queryClient.invalidateQueries({ queryKey: listKey })
     },
   })
+  const failure = list.error ?? read.error ?? create.error
+  const artifacts = list.data?.artifacts ?? []
+  const editing = opened.some(item => item.id === selected)
   return (
-    <div className="dshx:flex dshx:h-full dshx:min-h-0">
-      <aside className="dshx:w-48 dshx:shrink-0 dshx:overflow-auto dshx:border-r dshx:p-2">
-        <Button size="sm" onClick={() => create.mutate('markdown')} disabled={create.isPending}>
-          New artifact
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => create.mutate('html')} disabled={create.isPending}>
-          New HTML
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => void list.refetch()}>
-          Refresh
-        </Button>
-        {list.data?.artifacts.map(item => (
-          <Button
-            className="dshx:mt-1 dshx:w-full dshx:justify-start dshx:truncate"
-            key={item.id}
-            size="sm"
-            variant={selected === item.id ? 'secondary' : 'ghost'}
-            onClick={() => {
-              if (opened.some(open => open.id === item.id)) setSelected(item.id)
-              else read.mutate(item.id)
-            }}
-          >
-            {item.title}
-          </Button>
-        ))}
-        {(list.isError || read.isError || create.isError) && (
-          <p role="alert" className="dshx:text-xs dshx:text-destructive">
-            {errorMessage(list.error ?? read.error ?? create.error, 'Could not load artifacts. Try again.')}
-          </p>
-        )}
-        {list.isError && (
-          <Button size="sm" onClick={() => void list.refetch()}>
-            Retry
-          </Button>
-        )}
-      </aside>
-      {opened
-        .filter(item => props.active && selected === item.id)
-        .map(item => (
-          <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1" key={item.id}>
-            <ArtifactEditor
-              artifact={item}
-              drafts={drafts}
-              sessionId={props.sessionId}
-              occurrence={props.occurrence}
-              loadEngine={props.loadEngine}
-              onClose={() => {
-                setOpened(current => current.filter(open => open.id !== item.id))
-                setSelected(null)
+    <Page
+      fill
+      heading="Artifacts"
+      {...(list.data === undefined ? {} : { count: artifacts.length })}
+      bodyClassName="dshx:gap-0"
+      // One primary (b:ysaj): the kinds are a menu, not three stacked buttons.
+      primaryAction={{
+        id: 'new',
+        label: 'New',
+        icon: <PlusIcon aria-hidden />,
+        pending: create.isPending,
+        onSelect: () => undefined,
+        items: [
+          { id: 'new-markdown', label: 'Markdown', icon: <FileTextIcon aria-hidden />, onSelect: () => create.mutate('markdown') },
+          { id: 'new-html', label: 'HTML', icon: <FileCodeIcon aria-hidden />, onSelect: () => create.mutate('html') },
+        ],
+      }}
+      actions={[
+        {
+          id: 'refresh',
+          label: 'Refresh',
+          icon: <RefreshCwIcon aria-hidden />,
+          pending: list.isFetching,
+          placement: 'overflow',
+          onSelect: () => void list.refetch(),
+        },
+      ]}
+    >
+      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border">
+        <nav
+          aria-label="Artifacts"
+          className={cn(
+            'dshx:flex dshx:w-56 dshx:shrink-0 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:border-r dshx:border-border dshx:p-1.5 dshx:@max-pane-narrow:w-full dshx:@max-pane-narrow:border-r-0',
+            editing && 'dshx:@max-pane-narrow:hidden',
+          )}
+        >
+          {list.isPending ? (
+            <div className="dshx:flex dshx:justify-center dshx:py-6">
+              <Spinner />
+            </div>
+          ) : null}
+          {list.data !== undefined && artifacts.length === 0 ? <EmptyState>No artifacts in this thread yet. New makes one.</EmptyState> : null}
+          {artifacts.map(item => (
+            <Button
+              className="dshx:w-full dshx:min-w-0 dshx:shrink dshx:justify-start dshx:pointer-coarse:h-11"
+              key={item.id}
+              size="sm"
+              variant={selected === item.id ? 'secondary' : 'ghost'}
+              aria-current={selected === item.id ? 'true' : undefined}
+              onClick={() => {
+                if (opened.some(open => open.id === item.id)) setSelected(item.id)
+                else read.mutate(item.id)
               }}
-            />
-          </div>
-        ))}
-    </div>
+            >
+              <span className="dshx:min-w-0 dshx:truncate">{item.title}</span>
+            </Button>
+          ))}
+          {failure === null ? null : (
+            <div role="alert" className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-2 dshx:p-2 dshx:text-xs dshx:text-destructive">
+              {errorMessage(failure, 'Could not load artifacts. Try again.')}
+              {list.isError ? (
+                <Button size="sm" variant="outline" onClick={() => void list.refetch()}>
+                  Retry
+                </Button>
+              ) : null}
+            </div>
+          )}
+        </nav>
+        <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1', !editing && 'dshx:@max-pane-narrow:hidden')}>
+          {editing ? null : (
+            <p className="dshx:m-auto dshx:max-w-[40ch] dshx:p-4 dshx:text-center dshx:text-sm dshx:text-muted-foreground">Choose an artifact to edit it.</p>
+          )}
+          {opened
+            .filter(item => props.active && selected === item.id)
+            .map(item => (
+              <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1" key={item.id}>
+                <ArtifactEditor
+                  artifact={item}
+                  drafts={drafts}
+                  sessionId={props.sessionId}
+                  occurrence={props.occurrence}
+                  loadEngine={props.loadEngine}
+                  onBack={() => setSelected(null)}
+                  onClose={() => {
+                    setOpened(current => current.filter(open => open.id !== item.id))
+                    setSelected(null)
+                  }}
+                />
+              </div>
+            ))}
+        </div>
+      </div>
+    </Page>
   )
 }
 
@@ -276,7 +343,11 @@ export const ArtifactsPanel = (props: { readonly sessionId: string | undefined; 
   }, [props.sessionId])
   return (
     <div className="dshx-root dshx:h-full dshx:min-h-0 dshx:bg-background dshx:text-foreground">
-      {props.sessionId === undefined && <p className="dshx:p-3 dshx:text-xs">Open a thread to view its artifacts.</p>}
+      {props.sessionId === undefined && (
+        <Page heading="Artifacts">
+          <EmptyState>Open a thread to see its artifacts.</EmptyState>
+        </Page>
+      )}
       {sessions.map(sessionId => (
         <div key={sessionId} className="dshx:h-full" style={{ display: sessionId === props.sessionId ? 'block' : 'none' }}>
           <ThreadArtifacts sessionId={sessionId} occurrence={occurrence} active={sessionId === props.sessionId} loadEngine={props.loadEngine} />

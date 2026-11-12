@@ -158,6 +158,138 @@
           "reason": "Client-only: key bindings and the Host shortcut registry live in the browser and start no Host work."
         }
       ]
+    },
+    {
+      "id": "scoped-key-layers",
+      "title": "Single keys, sequences and scoped keys",
+      "summary": "Binds every dshx Command key by scope (global, not-typing, list, triage, changes, composer): chords, single keys (J, Shift+J, ?), ⌥ letters and two-step sequences (G then I within 1.2 s), matched by physical key. A list, triage or changes key fires only inside its region (or the region last used when nothing has focus); single keys and ⌥ letters never fire in a text field, an IME composition or an open menu, and one setting turns character keys off.",
+      "surfaces": ["client", "integration"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "keyboard: J / K / E / ? / G then I",
+      "configuration": [
+        {
+          "key": "singleKeys",
+          "defaultValue": "true",
+          "constraints": "Boolean; false turns every character-key shortcut off (J, E, ?, G then I). Chords with ⌘ or Ctrl and ⌥ letters stay on.",
+          "choices": ["true", "false"],
+          "coveredBy": ["shortcuts.scoped-keys-setting-off"]
+        }
+      ],
+      "states": ["matched", "typing", "composing", "overlay", "single-keys-off", "sequence-pending", "sequence-expired", "region-matched", "ambient-region"],
+      "failureModes": [
+        "An unparsable key spec stays unbound with one console warning naming the command and spec.",
+        "An old Host without the dshfiles-shortcuts namespace reads as single keys on, the default."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.scoped-keys-editable-guard",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "keeps single keys, Shift keys and ⌥ letters out of text fields, and lets the characters through"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.scoped-keys-ime-guard",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "never fires a single key during an IME composition"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.scoped-keys-setting-off",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "turns every character key off with the setting, and keeps chords and ⌥ letters on"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.scoped-keys-sequence",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "runs a sequence when the second key comes within 1.2 s, and drops it after"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.scoped-keys-list-region",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "fires list keys only inside a list region, and lets the innermost owner win"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.scoped-keys-ambient",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "sends keys from the page to the region last used, else to an ambient one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.scoped-keys-composer",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "fires composer chords only from inside the composer, and passes the trigger"
+        },
+        {
+          "kind": "gherkin",
+          "id": "shortcuts.scoped-keys",
+          "featureFile": "tooling/dshx/e2e/features/shortcuts.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: key matching runs in the browser; the Host half only registers the settings namespace."
+        }
+      ]
+    },
+    {
+      "id": "shortcut-cheat-sheet",
+      "title": "Keyboard shortcut sheet",
+      "summary": "? or ⌘/ opens a sheet of every bound key grouped by where it works (Global, Go to, Lists, Triage, Changes, Composer, App), generated from the dshx Command registry and the Host shortcut catalog, with the Single-key shortcuts switch beside the keys it turns off.",
+      "surfaces": ["client"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "keyboard: ? / Mod+/",
+      "configuration": [
+        {
+          "key": "singleKeys",
+          "defaultValue": "true",
+          "constraints": "Boolean; false turns every character-key shortcut off (J, E, ?, G then I). Chords with ⌘ or Ctrl and ⌥ letters stay on.",
+          "choices": ["true", "false"],
+          "coveredBy": ["shortcuts.cheat-sheet"]
+        }
+      ],
+      "states": ["closed", "open", "single-keys-off"],
+      "failureModes": ["Without a writable settings namespace the switch shows disabled and keys stay on."],
+      "externalDependencies": [],
+      "reach": ["press Escape", "press Shift+Slash", "expect dialog \"Keyboard shortcuts\""],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.cheat-sheet-sections",
+          "file": "plugins/@dshfiles/shortcuts/src/cheat-sheet-model.test.ts",
+          "testName": "groups bound keys by scope or section, in reading order, and collapses duplicates"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.cheat-sheet-single-keys-off",
+          "file": "plugins/@dshfiles/shortcuts/src/cheat-sheet-model.test.ts",
+          "testName": "drops character keys while single-key shortcuts are off"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.cheat-sheet-host-rows",
+          "file": "plugins/@dshfiles/shortcuts/src/cheat-sheet-model.test.ts",
+          "testName": "lists Host chords under App unless a command already names them, and follows user rebindings"
+        },
+        {
+          "kind": "gherkin",
+          "id": "shortcuts.cheat-sheet",
+          "featureFile": "tooling/dshx/e2e/features/shortcuts.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the sheet renders browser registries and starts no Host work."
+        }
+      ]
     }
   ],
   "kind": "bundle"

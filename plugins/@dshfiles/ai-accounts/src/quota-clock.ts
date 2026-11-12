@@ -24,14 +24,21 @@ export const nextQuotaTickDelayMs = (input: {
  * hidden tab and catches up on visibility or focus, so a closed compact strip stops ticking every second while a
  * reset crossing is still shown on time.
  */
-export const useQuotaClock = (input: { readonly resetsAt: readonly (number | null)[]; readonly precision?: 'minute' | 'second' | undefined }): number => {
+export const useQuotaClock = (input: {
+  readonly resetsAt: readonly (number | null)[]
+  readonly precision?: 'minute' | 'second' | undefined
+  /** Pause while this element is off screen (b:jaz6: the status strip's reset times); omitted, only a hidden tab pauses. */
+  readonly element?: Element | null | undefined
+}): number => {
   const [now, setNow] = useState(Date.now)
   const resets = useRef(input.resetsAt)
   resets.current = input.resetsAt
   const scheduleKey = input.resetsAt.map(reset => (reset === null ? '' : String(reset))).join(',')
+  const element = input.element ?? null
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
+    let onScreen = true
     const schedule = (): void => {
       clearTimeout(timer)
       const at = Date.now()
@@ -44,18 +51,29 @@ export const useQuotaClock = (input: { readonly resetsAt: readonly (number | nul
     const sync = (): void => {
       clearTimeout(timer)
       timer = undefined
-      if (document.hidden) return
+      if (document.hidden || !onScreen) return
       schedule()
     }
     sync()
     document.addEventListener('visibilitychange', sync)
     window.addEventListener('focus', sync)
+    const visibility =
+      element === null || typeof IntersectionObserver !== 'function'
+        ? null
+        : new IntersectionObserver(entries => {
+            const visible = entries.at(-1)?.isIntersecting ?? true
+            if (visible === onScreen) return
+            onScreen = visible
+            sync()
+          })
+    if (element !== null) visibility?.observe(element)
     return () => {
       clearTimeout(timer)
+      visibility?.disconnect()
       document.removeEventListener('visibilitychange', sync)
       window.removeEventListener('focus', sync)
     }
-  }, [input.precision, scheduleKey])
+  }, [input.precision, scheduleKey, element])
 
   return now
 }

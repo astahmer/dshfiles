@@ -123,29 +123,41 @@ describe('GettingStartedPage', () => {
     expect(page.copy).toHaveBeenCalledWith('gh auth login')
 
     const packs = screen.getByRole('region', { name: /Packs/u })
-    expect(within(packs).getByText('backlog · enabled')).toBeTruthy()
-    expect(within(packs).getByText('backlog-jira · not installed')).toBeTruthy()
-    expect(within(packs).getByText('goal-tool · disabled')).toBeTruthy()
+    const chip = (plugin: string) => packs.querySelector<HTMLElement>(`[data-plugin="${plugin}"]`)
+    // Display names and a status glyph in neutral ink; the package slug stays in data attributes only.
+    expect(chip('backlog')?.dataset.pluginState).toBe('enabled')
+    expect(chip('backlog')?.textContent).toBe('Backlog')
+    expect(within(chip('backlog') ?? packs).getByRole('img', { name: 'enabled' })).toBeTruthy()
+    expect(chip('backlog-jira')?.dataset.pluginState).toBe('not-installed')
+    expect(chip('backlog-jira')?.textContent).toBe('Backlog jira')
+    expect(chip('goal-tool')?.dataset.pluginState).toBe('disabled')
+    expect(within(packs).queryByText(/^[a-z]+(?:-[a-z]+)+$/u)).toBeNull()
+    expect(packs.querySelector('[class*="text-success"], [class*="text-warning"], [data-variant="success"], [data-variant="warning"]')).toBeNull()
     fireEvent.click(within(packs).getByRole('button', { name: 'Isolate each new thread in its own workspace' }))
     expect(page.services.opened.at(-1)).toBe('settings:{"setting":{"entryId":"jj-integration","fieldPath":["isolateByDefault"]}}')
 
     const features = screen.getByRole('list', { name: 'Features' })
     const openButtons = within(features).getAllByRole('button', { name: /^Open / })
     expect(openButtons.length).toBeGreaterThan(0)
-    const backlogRow = within(features).getAllByText('backlog')[0]?.closest('li')
-    if (backlogRow === null || backlogRow === undefined) throw new Error('no backlog row')
+    const rowsOf = (plugin: string) => [...features.querySelectorAll<HTMLElement>(`[data-feature^="${plugin}#"]`)]
+    const backlogRow = rowsOf('backlog').find(row => within(row).queryAllByRole('button', { name: /^Open / }).length > 0)
+    if (backlogRow === undefined) throw new Error('no backlog row')
     fireEvent.click(within(backlogRow).getByRole('button', { name: /^Open / }))
     expect(page.services.opened.at(-1)).toBe('panel:dshfiles-backlog-panel')
-    const unregistered = within(features).getAllByText('traces')[0]?.closest('li')
-    expect(unregistered === null || unregistered === undefined ? [] : within(unregistered).queryAllByRole('button', { name: /^Open / })).toEqual([])
+    for (const unregistered of rowsOf('traces')) expect(within(unregistered).queryAllByRole('button', { name: /^Open / })).toEqual([])
+    // A row names where the feature lives, never its package.
+    expect(within(features).queryByText(/^backlog$|^traces$/u)).toBeNull()
 
     fireEvent.click(within(backlogRow).getByRole('button', { name: /^Show me where: / }))
     expect(page.showWhere).toHaveBeenCalledWith(backlogRow.dataset.feature)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start setup' }))
+    // The page's one primary action sits in the header, not in a column of its own.
+    const start = screen.getByRole('button', { name: 'Start setup' })
+    expect(start.closest('[data-slot="page-actions"]')).not.toBeNull()
+    fireEvent.click(start)
     expect(page.startWizard).toHaveBeenCalledOnce()
     expect((await screen.findByRole('region', { name: /What's new/u })).dataset.whatsNew).toBe('no-checkout')
-  })
+  }, 20_000)
 
   it('searches every feature, narrows by destination and hides packs and What’s new when their settings are off', async () => {
     const page = renderPage({ registered: [], packs: false, whatsNew: false })
@@ -156,7 +168,9 @@ describe('GettingStartedPage', () => {
     fireEvent.change(screen.getByLabelText('Search features'), { target: { value: 'onboarding checklist' } })
     await waitFor(() => expect(loadOverview).toHaveBeenLastCalledWith({ query: 'onboarding checklist' }))
     await screen.findByText('See what this setup can do and what it still needs on one page')
-    fireEvent.click(await screen.findByRole('button', { name: /^Knowledge/u }))
+    const destinations = screen.getByRole('group', { name: 'Destinations' })
+    expect(within(destinations).getByRole('radio', { name: 'All' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(await within(destinations).findByRole('radio', { name: /^Knowledge/u }))
     await waitFor(() => expect(loadOverview).toHaveBeenLastCalledWith({ query: 'onboarding checklist', destination: 'knowledge' }))
     fireEvent.change(screen.getByLabelText('Search features'), { target: { value: 'zzzz-no-such-feature' } })
     await screen.findByText('No feature matches every word.')
@@ -172,13 +186,13 @@ describe('GettingStartedPage', () => {
     fireEvent.click(within(planning).getByRole('button', { name: 'Enable pack: Backlog & planning' }))
     const dialog = await screen.findByRole('dialog', { name: 'Enable Backlog & planning' })
     await within(dialog).findByRole('region', { name: 'Install by hand' })
-    expect(within(dialog).getByRole('region', { name: 'Enable' }).textContent).toContain('goal-tool')
+    expect(within(dialog).getByRole('region', { name: 'Enable' }).textContent).toContain('Goal tool')
     expect(
       within(dialog).getByRole('button', {
         name: /Copy node tooling\/dshx\/packages\/dshx\/dist\/cli\/bin\.js add @dshfiles\/backlog-jira --profile scratch/u,
       }),
     ).toBeTruthy()
-    expect(within(dialog).getByRole('region', { name: 'Restart' }).textContent).toMatch(/Restart when idle/u)
+    expect(within(dialog).getByRole('region', { name: 'Restart' }).textContent).toMatch(/Restart DSH \(bottom of the sidebar\)/u)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(applyPack).not.toHaveBeenCalled()

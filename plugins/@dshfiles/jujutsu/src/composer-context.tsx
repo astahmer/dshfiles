@@ -1,32 +1,22 @@
-import { usePhoneThreadTool } from '@dshfiles/rich-composer/phone-thread-menu'
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import { useSettings } from '@dshfiles/dshx/client'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { useProjectBookmark } from '@dshfiles/jj-integration/project-bookmark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, FileCodeIcon, FileDiffIcon } from '@dshfiles/plugin-ui/icons'
+import { FileDiffIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from 'react'
 import * as Schema from 'effect/Schema'
 import { useAutoRefresh } from './auto-refresh.js'
-import { useOpenInEditor } from './open-in-editor.js'
-import { type ComposerBase, type ComposerRepository } from './composer-context-api.js'
-import type { FileStatus } from './api.js'
-import { ComposerContextModel, composerBaseSetting, PROJECT_BASE_SETTING } from './composer-context-core.js'
+import type { ComposerBase } from './composer-context-api.js'
+import { ComposerContextModel, composerBaseSetting } from './composer-context-core.js'
 import { composerSessionCwd } from './composer-context-session.js'
 import { ChatReferenceLinks } from './chat-reference-links.js'
-import { FullDiffDialog } from './full-diff-dialog.js'
 import { decodePreferences } from './preferences.js'
 import { jujutsuSettings } from './settings.js'
 import { useComposerContextApi } from './use-jujutsu-api.js'
@@ -37,7 +27,8 @@ export interface ComposerJujutsuServices {
   readonly workspaces: IWorkspaces
   /** Open the right panel on the repository holding `path`, or collapse it when it already shows that repository. */
   readonly toggleJujutsu: (path: string) => void
-  readonly openWorkspaceReview: (workspacePath: string, sessionId: string) => void
+  /** Open the Changes facet on this workspace; false when no Changes owner is active. */
+  readonly openWorkspaceReview: (workspacePath: string, sessionId: string) => boolean
   readonly openJujutsuReference: (
     path: string,
     reference: { readonly value: string; readonly kind: 'revision' | 'bookmark'; readonly behavior: 'focus' | 'path' },
@@ -47,17 +38,6 @@ export interface ComposerJujutsuServices {
 export interface ComposerSlotProps {
   readonly sessionId: SessionSummary['id']
   readonly jujutsu: ComposerJujutsuServices
-}
-
-// Inline instead of client.css so the plugin sheet stays byte-identical to the shared plugin-ui sheet; same
-// geometry as the shipped queue dock so the bar lines up with the composer card.
-const ABOVE_STYLE: CSSProperties = {
-  boxSizing: 'border-box',
-  width:
-    'calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset))',
-  maxWidth: 'calc(var(--dsh-composer-card-max-width) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset))',
-  margin: '0 auto',
-  flex: 'none',
 }
 
 const noStoredBases: Readonly<Record<string, string>> = {}
@@ -91,7 +71,6 @@ const useSessionCwd = (sessions: ISessions, workspaces: WorkspaceItems, sessionI
 
 const composerKeys = {
   context: (cwd: string, base: string) => ['jujutsu', 'composer', cwd, base, 'context'] as const,
-  diff: (cwd: string, base: string) => ['jujutsu', 'composer', cwd, base, 'diff'] as const,
 }
 
 /** Settings, the Session cwd and the chosen base, then the shared context query both composer slots read. */
@@ -106,8 +85,8 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
   const projectBookmark = useProjectBookmark(cwd, 'main')
   const setting = (cwd === null ? undefined : bases[cwd]) ?? preferences.composerBarBase
   const base: ComposerBase = ComposerContextModel.composerBaseForProject(setting, projectBookmark)
-  const choice = ComposerContextModel.composerBaseChoice(setting)
   const baseKey = composerBaseSetting(base)
+  // A remote thread's repository is read from its owner (multi-host); a local one from this Host.
   const api = useComposerContextApi(props.sessionId)
   // Chat reference links read the repository's bookmarks to decide which inline code is a link, so the
   // shared context query stays on for them even when this surface's own toggle is off.
@@ -121,20 +100,14 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
     retry: false,
     ...refresh.queryOptions,
   })
-  // The composer bar, chips and header toggle all become visible on the same switch; they join one read.
+  // The Changes pill, location chip and header toggle all become visible on the same switch; they join one read.
   refetch.current = () => void query.refetch({ cancelRefetch: false })
-  const chooseBase = (next: string): void => {
-    if (cwd !== null) storedBases.set({ ...bases, [cwd]: next })
-  }
   const repository = query.isSuccess ? query.data.repository : null
   return {
     ref: refresh.ref,
     cwd,
     base,
     baseKey,
-    choice,
-    projectBookmark,
-    chooseBase,
     repository: preferences[surface] ? repository : null,
     bookmarks: repository?.localBookmarks ?? [],
   }
@@ -146,81 +119,6 @@ const basename = (path: string): string =>
     .split(/[\\/]/u)
     .at(-1) ?? path
 
-const STATUS_CLASS = {
-  A: 'dshx:text-success',
-  D: 'dshx:text-destructive',
-  R: 'dshx:text-warning',
-  C: 'dshx:text-warning',
-  M: 'dshx:text-muted-foreground',
-} satisfies Record<FileStatus, string>
-
-const BasePicker = (props: {
-  readonly repository: ComposerRepository
-  /** The stored choice: `project`, `parent`, `trunk`, a bookmark or an encoded remote bookmark. */
-  readonly choice: string
-  /** The project's main branch the `project` choice compares against. */
-  readonly projectBookmark: string
-  readonly onChoose: (setting: string) => void
-}) => {
-  const [filter, setFilter] = useState('')
-  const bookmarks = props.repository.localBookmarks.filter(name => name.toLowerCase().includes(filter.toLowerCase())).slice(0, 40)
-  const availableRemoteBookmarks = props.repository.remoteBookmarks ?? []
-  const remoteBookmarks = availableRemoteBookmarks
-    .filter(bookmark => (bookmark.name + '@' + bookmark.remote).toLowerCase().includes(filter.toLowerCase()))
-    .slice(0, 40)
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button className="dshx:ml-auto dshx:max-w-[45%] dshx:text-muted-foreground" size="xs" type="button" variant="ghost">
-          <span>Compare with</span>
-          <span className={cn('dshx:truncate dshx:font-mono! dshx:text-foreground', !props.repository.base.found && 'dshx:text-warning')}>
-            {props.repository.base.label}
-          </span>
-          <ChevronDownIcon />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="dshx:max-h-80 dshx:w-64 dshx:overflow-y-auto">
-        <DropdownMenuLabel className="dshx:text-xs">Diff and revision comparison base</DropdownMenuLabel>
-        <DropdownMenuRadioGroup onValueChange={props.onChoose} value={props.choice}>
-          <DropdownMenuRadioItem value={PROJECT_BASE_SETTING}>
-            Main branch (<span className="dshx:font-mono!">{props.projectBookmark}</span>)
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="parent">Parent (@-)</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="trunk">Trunk (trunk())</DropdownMenuRadioItem>
-          {(props.repository.localBookmarks.length > 0 || availableRemoteBookmarks.length > 0) && <DropdownMenuSeparator />}
-          {(props.repository.localBookmarks.length > 8 || availableRemoteBookmarks.length > 8) && (
-            <input
-              aria-label="Filter bookmarks"
-              className="dshx:mx-1 dshx:mb-1 dshx:w-[calc(100%-0.5rem)] dshx:rounded-sm dshx:border dshx:bg-background dshx:px-2 dshx:py-1 dshx:font-mono! dshx:text-xs"
-              onChange={event => setFilter(event.target.value)}
-              onKeyDown={event => event.stopPropagation()}
-              placeholder="Filter bookmarks"
-              value={filter}
-            />
-          )}
-          {bookmarks.length > 0 && <DropdownMenuLabel className="dshx:text-xs">Local bookmarks</DropdownMenuLabel>}
-          {bookmarks.map(name => (
-            <DropdownMenuRadioItem className="dshx:font-mono! dshx:text-xs" key={name} value={name}>
-              {name}
-            </DropdownMenuRadioItem>
-          ))}
-          {remoteBookmarks.length > 0 && <DropdownMenuLabel className="dshx:text-xs">Remote bookmarks</DropdownMenuLabel>}
-          {remoteBookmarks.map(bookmark => (
-            <DropdownMenuRadioItem
-              className="dshx:font-mono! dshx:text-xs"
-              key={bookmark.name + '@' + bookmark.remote}
-              value={composerBaseSetting({ kind: 'remoteBookmark', name: bookmark.name, remote: bookmark.remote })}
-            >
-              {bookmark.name}@{bookmark.remote}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-/** "Uncommitted · 5 files, +116 −3 ▾" above the composer, with the changed files and a base picker. */
 /** Whether this Session has not sent its first message: its run row already says where it will work. */
 const useBlankSession = (props: ComposerSlotProps): boolean => {
   const sessions = props.jujutsu.sessions
@@ -229,34 +127,17 @@ const useBlankSession = (props: ComposerSlotProps): boolean => {
   return useSyncExternalStore(subscribe, read, read)
 }
 
-export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null =>
-  // A new thread's run row (rich-composer) carries project, workspace and starting bookmark; this bar only explains
-  // changes once the thread has some.
-  useBlankSession(props) ? null : <ComposerChangesBarContent {...props} />
+/**
+ * The Changes pill (visual refresh T3.2): one compact `+N −M` reading in the thread header and the phone top bar that
+ * opens the Changes facet on this workspace. It replaces the bar that sat above the composer; the facet carries the
+ * file list, the diff and the comparison base. A new thread has nothing to compare yet, so it shows no pill.
+ */
+export const ChangesPill = (props: ComposerSlotProps): JSX.Element | null => (useBlankSession(props) ? null : <ChangesPillContent {...props} />)
 
-const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null => {
+const ChangesPillContent = (props: ComposerSlotProps): JSX.Element | null => {
   const context = useComposerContext(props, 'composerBar')
-  const [expanded, setExpanded] = useState(false)
-  const [fullDiffPath, setFullDiffPath] = useState<string | null | undefined>(undefined)
-  const api = useComposerContextApi(props.sessionId)
-  const openInEditor = useOpenInEditor()
   const repository = context.repository
-  const diffQuery = useQuery({
-    queryKey: composerKeys.diff(context.cwd ?? '', context.baseKey),
-    queryFn: ({ signal }) => api.diff({ cwd: context.cwd ?? '', base: context.base }, { signal }),
-    enabled: repository !== null && (expanded || fullDiffPath !== undefined),
-    retry: false,
-  })
-  const countsByPath = useMemo(() => new Map(diffQuery.data?.files.map(file => [file.path, file]) ?? []), [diffQuery.data])
-  const phoneTool = usePhoneThreadTool({
-    id: '@dshfiles/jujutsu/changes',
-    label: 'Workspace changes',
-    open: () => setExpanded(true),
-    active: expanded,
-    available: repository !== null,
-  })
   if (repository === null) return null
-
   const fileCount = repository.totals?.files ?? repository.files.length
   const heading = context.base.kind === 'parent' ? 'Working copy' : 'Changes since branching from ' + repository.base.label
   const revisionSummary = ComposerContextModel.revisionSummary({
@@ -264,136 +145,49 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
     baseFound: repository.base.found,
     counts: repository.revisionCounts,
   })
-  const openFile = (path: string): void => {
-    openInEditor({ path, cwd: repository.root })
+  const files = fileCount === 0 ? 'no file changes' : fileCount + (fileCount === 1 ? ' file' : ' files')
+  const totals = repository.totals === null ? '' : ', +' + repository.totals.additions + ' −' + repository.totals.deletions
+  // The accessible name is the one the replaced bar's review button had, so journeys and agents keep finding it; the
+  // file counts live in the tooltip and the visible text.
+  const label = 'Review workspace changes: ' + revisionSummary
+  const open = (): void => {
+    if (!props.jujutsu.openWorkspaceReview(repository.root, String(props.sessionId))) props.jujutsu.toggleJujutsu(repository.root)
   }
-
+  // b:ark0: one line, never shrunk. The header's utilities group floors its width at its occupants' min-content and
+  // clips its start edge past that; a label free to wrap ("No changes") counted only as its longest word there, so the
+  // group came out narrower than the pill and cut its first letters off ("o changes").
   return (
     <TooltipProvider delayDuration={500}>
-      <div
-        className="dshx-root dshx:mb-1.5 dshx:rounded-lg dshx:border dshx:bg-background/90 dshx:text-xs"
-        {...phoneTool.triggerProps}
-        ref={context.ref}
-        style={ABOVE_STYLE}
-      >
-        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-1 dshx:py-0.5">
-          <Button
-            aria-expanded={expanded}
-            className="dshx:min-w-0 dshx:shrink dshx:justify-start dshx:overflow-hidden dshx:text-muted-foreground"
-            disabled={fileCount === 0}
-            onClick={() => setExpanded(open => !open)}
-            size="xs"
-            type="button"
-            variant="ghost"
-          >
-            <span className="dshx:font-medium dshx:text-foreground">{heading}</span>
-            <span>·</span>
-            {fileCount === 0 ? (
-              <span>{context.base.kind === 'parent' ? 'no working copy changes' : 'no net file changes'}</span>
-            ) : (
-              <>
-                <span>
-                  {fileCount} {fileCount === 1 ? 'file' : 'files'}
-                  {repository.totals !== null && ','}
-                </span>
-                {repository.totals !== null && (
-                  <span className="dshx:font-mono! dshx:tabular-nums">
-                    <span className="dshx:text-success">+{repository.totals.additions}</span>{' '}
-                    <span className="dshx:text-destructive">−{repository.totals.deletions}</span>
-                  </span>
-                )}
-                <ChevronDownIcon className={cn('dshx:transition-transform', expanded && 'dshx:rotate-180')} />
-              </>
-            )}
-          </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
           <button
-            aria-label={'Review workspace changes: ' + revisionSummary}
-            className="dshx:min-w-0 dshx:truncate dshx:cursor-pointer dshx:text-muted-foreground dshx:underline-offset-2 dshx:hover:text-foreground dshx:hover:underline"
-            onClick={() => props.jujutsu.openWorkspaceReview(repository.root, String(props.sessionId))}
+            aria-label={label}
+            className={cn(
+              'dshx-root dshx:inline-flex dshx:h-6 dshx:shrink-0 dshx:cursor-pointer dshx:whitespace-nowrap dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-transparent dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums dshx:hover:bg-accent dshx:hover:text-foreground dshx:[&_svg]:size-3.5 dshx:[&_svg]:flex-none',
+              'dshx:pointer-coarse:h-8 dshx:pointer-coarse:px-2.5 dshx:pointer-coarse:text-sm dshx:pointer-coarse:relative dshx:pointer-coarse:after:absolute dshx:pointer-coarse:after:-inset-y-1.5 dshx:pointer-coarse:after:inset-x-0 dshx:pointer-coarse:after:content-[""]',
+            )}
+            data-changes-pill=""
+            onClick={open}
+            ref={context.ref}
             type="button"
           >
-            {revisionSummary}
+            <FileDiffIcon />
+            {/* b:czs9: in a header row under 26rem the pill keeps its icon; the counts stay in its name and tooltip. */}
+            {fileCount === 0 || repository.totals === null ? (
+              <span className="dshx:@max-[26rem]:hidden">{fileCount === 0 ? 'No changes' : files}</span>
+            ) : (
+              <span className="dshx:font-mono! dshx:flex dshx:gap-1 dshx:@max-[26rem]:hidden">
+                <span>+{repository.totals.additions}</span>
+                <span>−{repository.totals.deletions}</span>
+              </span>
+            )}
+            {repository.conflict && <span className="dshx:text-destructive">conflict</span>}
           </button>
-          <BasePicker
-            choice={context.choice}
-            projectBookmark={context.projectBookmark}
-            onChoose={next => {
-              context.chooseBase(next)
-              setExpanded(false)
-            }}
-            repository={repository}
-          />
-        </div>
-        {expanded && fileCount > 0 && (
-          <ul className="dshx:max-h-56 dshx:overflow-y-auto dshx:border-t dshx:py-1">
-            {repository.files.map(file => {
-              const counts = countsByPath.get(file.path)
-              const slash = file.path.lastIndexOf('/')
-              return (
-                <li className="dshx:group dshx:flex dshx:items-center dshx:gap-2 dshx:px-2 dshx:py-0.5 dshx:hover:bg-accent" key={file.path}>
-                  <span className={cn('dshx:w-3 dshx:flex-none dshx:font-mono! dshx:font-semibold', STATUS_CLASS[file.status])}>{file.status}</span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:cursor-pointer dshx:items-baseline dshx:gap-1.5 dshx:text-left"
-                        onClick={() => setFullDiffPath(file.path)}
-                        type="button"
-                      >
-                        <span className="dshx:truncate dshx:text-foreground">{file.path.slice(slash + 1)}</span>
-                        {slash > 0 && <span className="dshx:truncate dshx:text-muted-foreground">{file.path.slice(0, slash)}</span>}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">{file.path}</TooltipContent>
-                  </Tooltip>
-                  {counts !== undefined && (
-                    <span className="dshx:flex-none dshx:font-mono! dshx:tabular-nums">
-                      <span className="dshx:text-success">+{counts.additions}</span> <span className="dshx:text-destructive">−{counts.deletions}</span>
-                    </span>
-                  )}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button aria-label={'Open diff of ' + file.path} onClick={() => setFullDiffPath(file.path)} size="icon-xs" type="button" variant="ghost">
-                        <FileDiffIcon />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">Open diff</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        aria-label={'Open ' + file.path}
-                        disabled={file.status === 'D'}
-                        onClick={() => openFile(file.path)}
-                        size="icon-xs"
-                        type="button"
-                        variant="ghost"
-                      >
-                        <FileCodeIcon />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">Open file</TooltipContent>
-                  </Tooltip>
-                </li>
-              )
-            })}
-            {repository.filesTruncated && <li className="dshx:px-2 dshx:py-0.5 dshx:text-muted-foreground">More files are not listed.</li>}
-          </ul>
-        )}
-        {fullDiffPath !== undefined && (
-          <FullDiffDialog
-            error={diffQuery.isError ? 'Could not load the diff.' : null}
-            focusPath={fullDiffPath}
-            heading={heading + ' · ' + basename(repository.root)}
-            layout="unified"
-            onClose={() => setFullDiffPath(undefined)}
-            onOpenInEditor={path => {
-              if (openInEditor({ path, cwd: repository.root })) setFullDiffPath(undefined)
-            }}
-            patch={diffQuery.data?.patch}
-            truncated={diffQuery.data?.truncated ?? false}
-          />
-        )}
-      </div>
+        </TooltipTrigger>
+        <TooltipContent className="dshx:whitespace-pre-line" side="bottom">
+          {heading + ' · ' + files + totals + '\n' + revisionSummary}
+        </TooltipContent>
+      </Tooltip>
     </TooltipProvider>
   )
 }
@@ -418,26 +212,55 @@ const Chip = (props: { readonly tooltip: string; readonly onClick: () => void; r
   </Tooltip>
 )
 
-/** The jj workspace and bookmark inside the composer's run summary chip; it opens the Jujutsu panel for this repository. */
-export const ComposerLocation = (props: ComposerSlotProps): JSX.Element | null => {
+/** One contextual chip below the composer; it opens the Jujutsu panel for this repository. */
+export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   const context = useComposerContext(props, 'composerChips')
   const repository = context.repository
   const workspaces = useWorkspaceItems(props.jujutsu.workspaces)
   const currentWorkspace = workspaces.find(workspace => workspace.sessionIds.includes(props.sessionId))
+  const workspaceId = currentWorkspace?.workspaceId
+  const api = useApi(jjIntegrationApi)
+  const destination = useQuery({
+    queryKey: ['jujutsu', 'composer-project', workspaceId ?? ''],
+    enabled: repository !== null && workspaceId !== undefined,
+    retry: false,
+    queryFn: ({ signal }) =>
+      runHostRequest({
+        signal,
+        timeoutMs: 15_000,
+        request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }),
+      }).catch(error => {
+        if (isApiOwnerMissing(error)) return null
+        throw error
+      }),
+  })
   if (repository === null) return null
   const toggle = (): void => props.jujutsu.toggleJujutsu(repository.root)
 
   const ownBookmark = repository.bookmarks[0]
   const nearestBookmark = repository.nearestBookmarks[0]
   const bookmark = ownBookmark ?? nearestBookmark
-  // The run summary chip already shows this thread workspace's title ("project · name"), so its name is not repeated.
-  const workspace = repository.workspace === null || currentWorkspace?.title.split(' · ').includes(repository.workspace) ? undefined : repository.workspace
-  const location = [workspace, bookmark === undefined ? undefined : bookmark + (ownBookmark === undefined ? '+' : '')]
+  const project =
+    workspaces.find(workspace => workspace.workspaceId === destination.data?.projectWorkspaceId)?.title ?? currentWorkspace?.title ?? basename(repository.root)
+  // Plain words (productivity pass Q5, T5.4; b:212a): "Own workspace · 1 ahead of main", "In the project · on main" rather
+  // than the raw "sample (thread-842240 / main+)"; the workspace slug, bookmark and change id stay in the tooltip.
+  const ownWorkspace = repository.workspace !== null && repository.workspace !== 'default' && repository.workspace !== project
+  // Composer follow-up b:gyk7: the composer's run summary already names the project, so the chip says only where the
+  // working copy stands, with the count when the base is that bookmark ("2 ahead of main", "2 behind").
+  const counts = bookmark !== undefined && repository.base.label === bookmark ? repository.revisionCounts : undefined
+  const ahead = counts === undefined || counts === null || counts.ahead === 0 ? '' : `${String(counts.ahead)} `
+  // b:212a: the same two words the workspace picker uses, "Own workspace" or "In the project", never the folder name.
+  const location = [
+    ownWorkspace ? 'Own workspace' : 'In the project',
+    bookmark === undefined ? undefined : ownBookmark === undefined ? `${ahead}ahead of ${bookmark}` : `on ${bookmark}`,
+    counts === undefined || counts === null || counts.behind === 0 ? undefined : `${String(counts.behind)} behind`,
+  ]
     .filter((value): value is string => value !== undefined)
-    .join(' / ')
+    .join(' · ')
   const label = location.length === 0 ? `@ ${repository.changeId}` : location
   const title = [
     'Toggle Jujutsu on ' + repository.root,
+    'Project: ' + project,
     repository.workspace === null ? undefined : 'Workspace: ' + repository.workspace,
     bookmark === undefined ? undefined : 'Bookmark: ' + bookmark + (ownBookmark === undefined ? ' (nearest ancestor)' : ''),
     'Working copy: @ ' + repository.changeId + ' (' + repository.commitId + ')',
@@ -445,20 +268,14 @@ export const ComposerLocation = (props: ComposerSlotProps): JSX.Element | null =
   ]
     .filter((value): value is string => value !== undefined)
     .join('\n')
-  // Rich Composer's run summary chip already names the project and host: this continues it with the location.
   return (
     <TooltipProvider delayDuration={500}>
-      <span
-        className="dshx-root dshx:flex dshx:min-w-0 dshx:shrink dshx:items-center dshx:gap-1 dshx:overflow-hidden"
-        ref={context.ref}
-        data-jujutsu-location=""
-      >
-        <span aria-hidden="true">·</span>
-        <Chip className="dshx:max-w-full dshx:shrink dshx:px-1 dshx:py-0" onClick={toggle} tooltip={title}>
-          <span className="dshx:min-w-0 dshx:truncate">{label}</span>
+      <div className="dshx-root dshx:flex dshx:items-center dshx:text-xs dshx:text-muted-foreground" data-composer-meta="location" ref={context.ref}>
+        <Chip onClick={toggle} tooltip={title}>
+          <span>{label}</span>
           {repository.conflict && <span className="dshx:shrink-0 dshx:text-destructive">conflict</span>}
         </Chip>
-      </span>
+      </div>
     </TooltipProvider>
   )
 }

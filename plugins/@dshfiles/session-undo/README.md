@@ -1,13 +1,16 @@
 # @dshfiles/session-undo
 
-![Undo and redo a turn: conversation and files together](docs/screenshots/turn-undo-redo.png)
+![Undo, rewind and redo are rows of the composer's More (⋯) menu](docs/screenshots/turn-undo-redo.png)
 
 ![Rewind to before any recorded turn, files included](docs/screenshots/turn-rewind.png)
 
 Undo a thread's last turn, or rewind to before any earlier one, and get both the conversation and the files back to
-where they were; redo reverses it. The controls sit in the composer's right toolbar: **Undo last turn** once the
-thread has a recorded turn (its tooltip names the turn's prompt), **Rewind to an earlier turn** once it has two, and
-**Redo** while the undo or rewind is fresh.
+where they were; redo reverses it. The verbs are rows of the composer bar's More (⋯) menu (rich-composer's
+`ComposerMoreItems`), and palette commands for the composer on screen: **Undo last turn** once the thread has a
+recorded turn, **Rewind to an earlier turn…** once it has two, and **Redo** while the undo or rewind is fresh; a row
+the thread cannot use is disabled. The setting **Show undo, history and saved prompts in the composer bar**
+(`dshfiles-rich-composer.showComposerExtras`) puts the buttons back in the bar, the undo tooltip naming the turn's
+prompt.
 
 - **Snapshot at every turn start.** When a turn starts, its workspace files are recorded through the
   [VCS provider](../vcs-provider-port/README.md) that claims the folder: the jj operation that snapshotted the
@@ -27,7 +30,7 @@ thread has a recorded turn (its tooltip names the turn's prompt), **Rewind to an
   threads, the restore is refused the same way rather than guessed. A turn with no file snapshot rewinds only the
   conversation and is never refused. A prompt is kept for every recorded turn, so a turn whose checkpoint is still being
   taken when the next prompt arrives still names it.
-- **Every finished turn names its revision.** When a turn ends in a jj workspace, the files are snapshotted again and, when the revision moved, the turn's action row shows it as `jj:<commit>`: the reference opens the Jujutsu panel on that revision, and **Restore to after this turn** rewinds to the start of the next recorded turn, so the files and the conversation come back as this turn left them. The latest turn offers no Restore (nothing later to drop), a turn that changed no file names no revision, and a git workspace names none: a snapshot commit is not a revision a reader would open. `turnRevisions` off skips the turn-end snapshot and hides both. The row requires the `@dshfiles/chat` fork's assistant-actions seat.
+- **Every finished turn names its revision.** When a turn ends in a jj workspace, the files are snapshotted again and, when the revision moved, the reply's **More actions** (⋯) menu shows it as a muted change name (`jj:<change>`, b:ysaj: no raw commit id under every reply): the reference opens the Jujutsu panel on that revision, and **Restore to here** (named "Restore to after this turn") rewinds to the start of the next recorded turn, so the files and the conversation come back as this turn left them. The latest turn offers no Restore (nothing later to drop), a turn that changed no file names no revision, and a git workspace names none: a snapshot commit is not a revision a reader would open. `turnRevisions` off skips the turn-end snapshot and hides both. The row requires the `@dshfiles/chat` fork's assistant-actions seat.
 - **Redo** puts the files back as they were before the undo or rewind, brings the original thread back and archives the fork.
   A new turn in the fork drops its redo, as in an editor.
 - All three are refused while the thread runs, and a fork that fails after the files were restored puts them back.

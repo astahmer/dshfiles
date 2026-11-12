@@ -21,6 +21,13 @@
 @theme inline {
   --font-sans: var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
   --font-mono: var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
+  /*
+   * The smallest step (`dshx:text-2xs`): dense meta such as counters, kbd hints and graph labels. It follows the
+   * density minimum, 11px compact and 12px comfortable (phone width or a narrow pane), so nothing reads below 11px
+   * and nothing below 12px on a phone (DESIGN.md › Typography).
+   */
+  --text-2xs: var(--dshx-density-text-min, 11px);
+  --text-2xs--line-height: 1.35;
   --text-xs: 0.75rem;
   --text-xs--line-height: 1.35;
   --text-sm: 0.8125rem;
@@ -65,10 +72,41 @@
   --color-graph-5: var(--dshx-kit-graph-5);
   --color-graph-6: var(--dshx-kit-graph-6);
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  /*
+   * One radius scale for kit and native surfaces: the kit reads the Host `--dsw-radius-*`, which ui-styles remaps
+   * (visual refresh T0.2). 4 chips/badges · 6 controls and rows · 8 cards and code · 12 composer, menus,
+   * dialogs · 16 phone sheets. Fallbacks keep the same values when the remap is absent (an isolated test).
+   */
+  --radius-sm: var(--dsw-radius-xs, 4px);
+  --radius-md: var(--dsw-radius-sm, 6px);
+  --radius-lg: var(--dsw-radius-md, 8px);
+  --radius-xl: var(--dsw-radius-lg, 12px);
+  --radius-2xl: var(--dsw-radius-panel, 16px);
+
+  /* Control heights (`dshx:h-control`, …): 24 compact · 28 default · 32 list rows · 36 composer bar · 44 touch. */
+  --spacing-control-compact: var(--dshx-size-control-compact);
+  --spacing-control: var(--dshx-size-control);
+  --spacing-row: var(--dshx-size-row);
+  --spacing-bar: var(--dshx-size-bar);
+  --spacing-touch: var(--dshx-size-touch);
+
+  /* Elevation: s0 resting (none) · s1 composer and sticky · s2 menus and popovers · s3 modals and sheets. */
+  --shadow-s0: none;
+  --shadow-s1: var(--dshx-elevation-1);
+  --shadow-s2: var(--dshx-elevation-2);
+  --shadow-s3: var(--dshx-elevation-3);
+
+  /* One enter curve and one exit curve for every animated surface. */
+  --ease-enter: var(--dshx-motion-ease-enter);
+  --ease-exit: var(--dshx-motion-ease-exit);
+
+  /* Headings (weight 600, tight tracking): 20/28 section title, 26/32 page or hero title. */
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.4;
+  --text-title--letter-spacing: -0.01em;
+  --text-display: 1.625rem;
+  --text-display--line-height: 1.2308;
+  --text-display--letter-spacing: -0.02em;
 }
 
 /*
@@ -103,6 +141,49 @@
     --dshx-kit-graph-4: oklch(0.58 0.19 350);
     --dshx-kit-graph-5: oklch(0.6 0.15 145);
     --dshx-kit-graph-6: oklch(0.68 0.14 90);
+
+    /* Geometry (visual refresh token spec). */
+    --dshx-size-control-compact: 24px;
+    --dshx-size-control: 28px;
+    --dshx-size-row: 32px;
+    --dshx-size-bar: 36px;
+    --dshx-size-touch: 44px;
+
+    /* Elevation, light: soft ambient shadows; only s2/s3 layers may add a backdrop blur. */
+    --dshx-elevation-1: 0 1px 2px oklch(0.2 0.01 65 / 0.05), 0 4px 12px -6px oklch(0.2 0.01 65 / 0.1);
+    --dshx-elevation-2: 0 2px 6px -2px oklch(0.2 0.01 65 / 0.08), 0 10px 28px -8px oklch(0.2 0.01 65 / 0.16);
+    --dshx-elevation-3: 0 4px 12px -4px oklch(0.2 0.01 65 / 0.1), 0 24px 56px -16px oklch(0.2 0.01 65 / 0.26);
+
+    /*
+     * Motion: 80 hover · 120 collapse/fade · 160 menus · 220 panels · 280 sheets; exits are 100ms. Shimmer loops at
+     * 2.2s and must pause off-screen. Under reduced motion consumers animate opacity only (P5 applies it).
+     */
+    --dshx-duration-hover: 80ms;
+    --dshx-duration-fade: 120ms;
+    --dshx-duration-menu: 160ms;
+    --dshx-duration-panel: 220ms;
+    --dshx-duration-sheet: 280ms;
+    --dshx-duration-exit: 100ms;
+    --dshx-duration-shimmer: 2.2s;
+    --dshx-motion-ease-enter: cubic-bezier(0.2, 0, 0, 1);
+    --dshx-motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+    /*
+     * Density. Compact (desktop): UI 13px, meta 12px, minimum 11px, inputs 13px. Comfortable values switch in below
+     * on a coarse pointer. P0 only defines them; surfaces adopt them phase by phase, so nothing moves yet.
+     */
+    --dshx-density-text-ui: 13px;
+    --dshx-density-text-prose: 14px;
+    --dshx-density-text-meta: 12px;
+    --dshx-density-text-min: 11px;
+    --dshx-density-text-input: 13px;
+    --dshx-density-target: 28px;
+
+    /* Safe areas for the phone top bar, tab bar, composer and sheets (0 outside a notched display). */
+    --dshx-safe-top: env(safe-area-inset-top, 0px);
+    --dshx-safe-right: env(safe-area-inset-right, 0px);
+    --dshx-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --dshx-safe-left: env(safe-area-inset-left, 0px);
   }
   .project-tone-balanced-0 {
     color: var(--dshx-project-balanced-0);
@@ -161,6 +242,43 @@
     --dshx-kit-graph-4: oklch(0.74 0.15 350);
     --dshx-kit-graph-5: oklch(0.77 0.15 145);
     --dshx-kit-graph-6: oklch(0.82 0.13 92);
+
+    /* Elevation, dark: deeper shadows plus a 1px inner top highlight, so raised layers read against near-black. */
+    --dshx-elevation-1: 0 1px 2px oklch(0 0 0 / 0.4), 0 6px 16px -8px oklch(0 0 0 / 0.6), inset 0 1px 0 oklch(1 0 0 / 0.05);
+    --dshx-elevation-2: 0 4px 10px -2px oklch(0 0 0 / 0.45), 0 14px 32px -10px oklch(0 0 0 / 0.7), inset 0 1px 0 oklch(1 0 0 / 0.06);
+    --dshx-elevation-3: 0 8px 20px -6px oklch(0 0 0 / 0.5), 0 28px 64px -16px oklch(0 0 0 / 0.8), inset 0 1px 0 oklch(1 0 0 / 0.06);
+  }
+
+  /*
+   * Comfortable density on touch (visual refresh phone rules), by pointer and width, never by user agent:
+   * every coarse pointer gets 44px targets and 16px inputs (no Safari zoom on focus); phone-width viewports and
+   * narrow panes (`@max-pane-narrow`) also get the 15/13/12px text steps.
+   */
+  @media (pointer: coarse) {
+    :root {
+      --dshx-density-text-input: 16px;
+      --dshx-density-target: 44px;
+    }
+  }
+
+  @media (pointer: coarse) and (max-width: 28rem) {
+    :root {
+      --dshx-density-text-ui: 15px;
+      --dshx-density-text-prose: 15px;
+      --dshx-density-text-meta: 13px;
+      --dshx-density-text-min: 12px;
+    }
+  }
+
+  @media (pointer: coarse) {
+    @container (max-width: 28rem) {
+      :where(.dshx-root) {
+        --dshx-density-text-ui: 15px;
+        --dshx-density-text-prose: 15px;
+        --dshx-density-text-meta: 13px;
+        --dshx-density-text-min: 12px;
+      }
+    }
   }
 }
 
@@ -411,10 +529,24 @@
  */
 @layer base {
   @media (pointer: coarse) {
+    /* A row with a long press (hooks/row-gestures) keeps text selection out of the gesture. */
+    :where([data-row-gestures]) {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    /*
+     * A kit Button wrapped as a Tooltip, Popover or menu trigger (`asChild`) carries the trigger's `data-slot`
+     * instead of `button`, so triggers, switches, checkboxes and radio items join the list (T5.4). Raw buttons inside
+     * kit roots join too (upstream pynxkvvu), except those that draw their own `after:` and conversation content.
+     */
     :where(
       [data-slot='button'],
       [data-slot='toggle'],
       [data-slot='toggle-group-item'],
+      button[data-slot$='-trigger']:not([data-slot='tabs-trigger'], [data-slot='accordion-trigger']),
+      [data-slot='switch'],
+      [data-slot='checkbox'],
+      [data-slot='radio-group-item'],
       .dshx-root button:not([data-slot]):not([class*='after:']):not([data-slot^='conversation.'] *)
     ) {
       position: relative;
@@ -424,6 +556,10 @@
       [data-slot='button'],
       [data-slot='toggle'],
       [data-slot='toggle-group-item'],
+      button[data-slot$='-trigger']:not([data-slot='tabs-trigger'], [data-slot='accordion-trigger']),
+      [data-slot='switch'],
+      [data-slot='checkbox'],
+      [data-slot='radio-group-item'],
       .dshx-root button:not([data-slot]):not([class*='after:']):not([data-slot^='conversation.'] *)
     )::after {
       content: '';
@@ -456,6 +592,392 @@
       [data-slot='command-item']
     ) {
       min-height: 44px;
+    }
+  }
+
+  /* Phone-width text fields are 44pt tall too (comfortable density): a field cannot widen its hit area with ::after. */
+  @media (pointer: coarse) and (max-width: 639.98px) {
+    :where(input[data-slot='input']:not([type='checkbox'], [type='radio'], [type='range'], [type='hidden'])) {
+      min-height: 44px;
+    }
+
+    /* A search field drawn as an input group (icon + field) grows as one box (min-height beats its `h-8`). */
+    :where([data-slot='input-group']:not(:has(> textarea))) {
+      min-height: 44px;
+    }
+  }
+}
+
+/*
+ * Motion (visual refresh T5.1, DESIGN.md Motion). Every kit layer that animates takes the P0 tokens instead of
+ * tw-animate's 150ms `ease`: menus, popovers, selects, tooltips and hover cards enter in 160ms, dialogs in 220ms,
+ * sheets in 280ms, all on the enter curve; every exit is 100ms on the exit curve. Unlayered, so it beats the
+ * per-component `duration-*` utilities without editing each one; a consumer's own inline animation still wins.
+ */
+:where(
+  [data-slot='dropdown-menu-content'],
+  [data-slot='dropdown-menu-sub-content'],
+  [data-slot='context-menu-content'],
+  [data-slot='context-menu-sub-content'],
+  [data-slot='select-content'],
+  [data-slot='popover-content'],
+  [data-slot='hover-card-content'],
+  [data-slot='tooltip-content']
+):not([data-state='closed']) {
+  --tw-duration: var(--dshx-duration-menu);
+  --tw-ease: var(--dshx-motion-ease-enter);
+}
+
+:where([data-slot='dialog-content'], [data-slot='alert-dialog-content'], [data-slot='dialog-overlay'], [data-slot='alert-dialog-overlay'])[data-state='open'] {
+  --tw-duration: var(--dshx-duration-panel);
+  --tw-ease: var(--dshx-motion-ease-enter);
+}
+
+:where([data-slot='sheet-content'], [data-slot='sheet-overlay'])[data-state='open'] {
+  --tw-duration: var(--dshx-duration-sheet);
+  --tw-ease: var(--dshx-motion-ease-enter);
+}
+
+:where([data-slot='accordion-content'])[data-state='open'] {
+  --tw-duration: var(--dshx-duration-fade);
+  --tw-ease: var(--dshx-motion-ease-enter);
+}
+
+:where(
+  [data-slot='dropdown-menu-content'],
+  [data-slot='dropdown-menu-sub-content'],
+  [data-slot='context-menu-content'],
+  [data-slot='context-menu-sub-content'],
+  [data-slot='select-content'],
+  [data-slot='popover-content'],
+  [data-slot='hover-card-content'],
+  [data-slot='tooltip-content'],
+  [data-slot='dialog-content'],
+  [data-slot='alert-dialog-content'],
+  [data-slot='dialog-overlay'],
+  [data-slot='alert-dialog-overlay'],
+  [data-slot='sheet-content'],
+  [data-slot='sheet-overlay'],
+  [data-slot='accordion-content']
+)[data-state='closed'] {
+  --tw-duration: var(--dshx-duration-exit);
+  --tw-ease: var(--dshx-motion-ease-exit);
+}
+
+/* Collapses fade their content in (120ms); height stays instant so nothing inside is clipped while it opens. */
+:where([data-slot='collapsible-content'])[data-state='open'] {
+  animation: dshx-fade-in var(--dshx-duration-fade) var(--dshx-motion-ease-enter);
+}
+
+@keyframes dshx-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dshx-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+ * The working shimmer (DESIGN.md Motion: a 2.2s sweep, not a spinner, paused off screen) as one CSS class, so a list of
+ * working rows animates without a script per row. Owners phase-lock rows with a negative `animation-delay` and pause an
+ * off-screen one with `data-live-paused`. Reduced motion keeps the plain secondary text.
+ */
+@keyframes dshx-live-shimmer {
+  from {
+    background-position-x: 100%;
+  }
+  to {
+    background-position-x: 0%;
+  }
+}
+
+.dshx-live-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--dsw-alias-label-secondary) 0%,
+    var(--dsw-alias-label-secondary) 40%,
+    var(--dsw-alias-label-primary) 50%,
+    var(--dsw-alias-label-secondary) 60%,
+    var(--dsw-alias-label-secondary) 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: dshx-live-shimmer var(--dshx-duration-shimmer, 2.2s) linear infinite;
+}
+
+.dshx-live-shimmer[data-live-paused] {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dshx-live-shimmer {
+    animation: none;
+    background-image: none;
+    color: var(--dsw-alias-label-secondary);
+  }
+}
+
+/*
+ * Phone: every menu and picker is a bottom sheet (visual refresh T5.2, plan phone rules "Sheets, not popovers").
+ * Under the phone shell (`html[data-shell-phone-nav]`, thread-sidebar, < 640px) a kit dropdown or context menu,
+ * select, popover or combobox (through its positioning wrapper, the content's parent), and the Host's native menu,
+ * leave their anchor and present as a 16px-radius sheet on
+ * the bottom edge with a grabber over a dim scrim. Owners keep their contents, keyboard handling and dismissal (a tap
+ * on the scrim is outside the content, so it closes); only the geometry and the motion change. Tooltips and hover
+ * cards stay anchored. While the software keyboard is open the anchored layer stays (a sheet would cover the field the
+ * user types in). The composer's own pickers already did this (rich-composer, T3.5); this is the same rule for all.
+ */
+@media (max-width: 639.98px) {
+  html[data-shell-phone-nav]:not([data-phone-keyboard])
+    :where(div):has(
+      > [data-slot='dropdown-menu-content'],
+      > [data-slot='dropdown-menu-sub-content'],
+      > [data-slot='context-menu-content'],
+      > [data-slot='context-menu-sub-content'],
+      > [data-slot='select-content'],
+      > [data-slot='popover-content']
+    ),
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'] {
+    position: fixed !important;
+    top: auto !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  html[data-shell-phone-nav]:not([data-phone-keyboard])
+    :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content']
+    ),
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'] {
+    position: relative;
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    max-height: 72dvh !important;
+    /* A sheet spans the screen: the viewport clamp's sideways shift (hooks/viewport-clamp) would push it off the edge. */
+    translate: none !important;
+    padding-top: 20px !important;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-left: max(8px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(8px, env(safe-area-inset-right, 0px)) !important;
+    border-width: 1px 0 0 !important;
+    border-radius: var(--dsw-radius-panel, 16px) var(--dsw-radius-panel, 16px) 0 0 !important;
+    background: var(--dshx-tone-raised, var(--dsw-alias-bg-layer-2)) !important;
+    backdrop-filter: none !important;
+    box-shadow:
+      var(--dshx-elevation-3),
+      0 0 0 100vmax color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 30%, transparent) !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    transform-origin: 50% 100% !important;
+    animation: dshx-sheet-in var(--dshx-duration-sheet) var(--dshx-motion-ease-enter) both !important;
+  }
+
+  html[data-shell-phone-nav]:not([data-phone-keyboard])
+    :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content']
+    )[data-state='closed'] {
+    animation: dshx-sheet-out var(--dshx-duration-exit) var(--dshx-motion-ease-exit) both !important;
+  }
+
+  /* The grabber says it is a sheet. */
+  html[data-shell-phone-nav]:not([data-phone-keyboard])
+    :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content']
+    )::before,
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu']::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 999px;
+    background: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
+  }
+
+  /* Rows in a sheet read at the comfortable size (15px) with 44pt rows (the touch rule above sets the height). */
+  html[data-shell-phone-nav]:not([data-phone-keyboard])
+    :is(
+      [data-slot='dropdown-menu-item'],
+      [data-slot='dropdown-menu-checkbox-item'],
+      [data-slot='dropdown-menu-radio-item'],
+      [data-slot='dropdown-menu-sub-trigger'],
+      [data-slot='context-menu-item'],
+      [data-slot='context-menu-checkbox-item'],
+      [data-slot='context-menu-radio-item'],
+      [data-slot='context-menu-sub-trigger'],
+      [data-slot='select-item']
+    ) {
+    font-size: var(--dshx-density-text-ui, 15px);
+  }
+}
+
+@keyframes dshx-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+}
+
+@keyframes dshx-sheet-out {
+  to {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+/*
+ * Phone stack push (T5.2): thread-sidebar sets `html[data-phone-stack-motion]` around a same-document View Transition
+ * when a pick pushes a thread or page over the list (`push`) or Back pops it (`pop`). The page slides like an iOS
+ * navigation stack; the top bar and the tab bar cross-fade in place. Without View Transitions nothing animates.
+ */
+html[data-phone-stack-motion] [data-phone-top-bar] {
+  view-transition-name: dshx-phone-top-bar;
+}
+
+html[data-phone-stack-motion] [data-phone-tab-bar] {
+  view-transition-name: dshx-phone-tab-bar;
+}
+
+html[data-phone-stack-motion]::view-transition-group(*) {
+  animation-duration: var(--dshx-duration-sheet);
+  animation-timing-function: var(--dshx-motion-ease-enter);
+}
+
+html[data-phone-stack-motion='push']::view-transition-old(root) {
+  animation: dshx-stack-out-left var(--dshx-duration-sheet) var(--dshx-motion-ease-enter) both;
+}
+
+html[data-phone-stack-motion='push']::view-transition-new(root) {
+  animation: dshx-stack-in-right var(--dshx-duration-sheet) var(--dshx-motion-ease-enter) both;
+}
+
+html[data-phone-stack-motion='pop']::view-transition-old(root) {
+  z-index: 1;
+  animation: dshx-stack-out-right var(--dshx-duration-panel) var(--dshx-motion-ease-enter) both;
+}
+
+html[data-phone-stack-motion='pop']::view-transition-new(root) {
+  animation: dshx-stack-in-left var(--dshx-duration-panel) var(--dshx-motion-ease-enter) both;
+}
+
+@keyframes dshx-stack-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes dshx-stack-out-left {
+  to {
+    transform: translateX(-30%);
+    opacity: 0.6;
+  }
+}
+
+@keyframes dshx-stack-out-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes dshx-stack-in-left {
+  from {
+    transform: translateX(-30%);
+    opacity: 0.6;
+  }
+}
+
+/*
+ * Reduced motion: opacity only. tw-animate's slide and zoom distances collapse to zero (its fades stay), the sheet
+ * and stack keyframes become fades, collapses and accordions open without a height animation, and the kit's looping
+ * spinners and pulses stop (their `motion-reduce:animate-none`).
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  * {
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-exit-scale: 1 !important;
+    --tw-enter-rotate: 0 !important;
+    --tw-exit-rotate: 0 !important;
+  }
+
+  :where([data-slot='accordion-content'])[data-state] {
+    animation-name: dshx-fade-in !important;
+  }
+
+  :where([data-slot='accordion-content'])[data-state='closed'] {
+    animation-name: dshx-fade-out !important;
+  }
+
+  @keyframes dshx-sheet-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes dshx-sheet-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes dshx-stack-in-right {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes dshx-stack-out-left {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes dshx-stack-out-right {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes dshx-stack-in-left {
+    from {
+      opacity: 0;
     }
   }
 }

@@ -46,6 +46,7 @@ import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { useSessionThreadApi } from './use-session-thread-api.js'
 import { useToast } from './toast.js'
 import { DraftAttachmentCarry } from './draft-attachment-carry.js'
+import { sessionWorkspaceId } from './session-workspace.js'
 import { deferWorkspaceSubmit, deliverFirstSend } from './workspace-submit.js'
 import { defersIsolationToSend, ownsIsolatedThreadWorkspace, WorkspaceToggle, type DeferredMove, type ToggleRequest } from './workspace-toggle-machine.js'
 import { defaultJjIntegrationSettings, IntegratedNoticeActions, jjIntegrationSettings } from './settings.js'
@@ -625,10 +626,17 @@ export default defineClient({
       const currentId = mainViewSessionId(sessions)
       if (currentId === undefined || (sessionId !== undefined && currentId !== sessionId)) return undefined
       const session = sessions.byId[currentId]
-      const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.sessionIds.includes(currentId))
+      // dshfiles: session-controller keeps a blank New thread as a draft whose workspace only its draft list names (as
+      // `selectedWorkspace` reads above), so the send guard must find it there too; otherwise a send made while a switch
+      // runs is not held and goes through in the checkout the user is leaving.
+      const workspaceId = sessionWorkspaceId({
+        sessionId: currentId,
+        workspaces: ctx.workspaces.list.getSnapshot().items,
+        drafts: sessionDrafts()?.list.getSnapshot(),
+      })
       const scoped = ctx.sessions.scope(currentId)
-      if (session === undefined || workspace === undefined || scoped === undefined) return undefined
-      return { sessionId: currentId, workspaceId: workspace.workspaceId, blank: session.blank, input: ctx.conversation.input.for(scoped) }
+      if (session === undefined || workspaceId === undefined || scoped === undefined) return undefined
+      return { sessionId: currentId, workspaceId, blank: session.blank, input: ctx.conversation.input.for(scoped) }
     }
     const captureComposerReferences = (): ComposerReferenceHandoff | undefined => {
       const composer = workspaceComposerFor()
@@ -1040,7 +1048,7 @@ export default defineClient({
             if (!requestReplaceThreadTab(sessionId, targetSessionId)) ctx.uiWorkspace.openSession(targetSessionId)
           },
           blocks: ctx.conversation.blocks,
-          reason: translate('preparingWorkspace', { name: move.name }),
+          reason: translate('preparingWorkspace'),
           failureMessage: translate('workspaceSendFailed'),
           changedMessage: translate('workspaceSendChanged'),
           signal: controller.signal,
@@ -1051,7 +1059,7 @@ export default defineClient({
               warmups.consume(sessionId)
               // The view did not follow, so the thread is only offered: the send happened where the user was not.
               if (!followed && deliveredSessionId !== undefined) {
-                ThreadNotices.show({ text: translate('threadStartedElsewhere', { name: move.name }), sessionId: deliveredSessionId })
+                ThreadNotices.show({ text: translate('threadStartedElsewhere'), sessionId: deliveredSessionId })
               }
               return
             }
@@ -1066,7 +1074,7 @@ export default defineClient({
         return
       }
       const name = workspaceToggle.getSnapshot().context.pending?.name ?? null
-      const reason = name === null ? translate('switchingDestination') : translate('preparingWorkspace', { name })
+      const reason = name === null ? translate('switchingDestination') : translate('preparingWorkspace')
       void deferWorkspaceSubmit({
         actor: workspaceToggle,
         source,

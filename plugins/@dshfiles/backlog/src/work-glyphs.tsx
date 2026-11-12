@@ -32,8 +32,8 @@ const PriorityIcon = (props: { readonly priority: BacklogPriority; readonly clas
     return (
       <svg aria-hidden viewBox="0 0 14 14" width="14" height="14" className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-warning', props.className)}>
         <rect x="1" y="1" width="12" height="12" rx="3" fill="currentColor" />
-        <path d="M7 3.8v4" stroke="var(--color-background, #fff)" strokeWidth="1.6" strokeLinecap="round" />
-        <circle cx="7" cy="10.2" r="0.9" fill="var(--color-background, #fff)" />
+        <path d="M7 3.8v4" style={{ stroke: 'var(--dsw-alias-bg-base)' }} strokeWidth="1.6" strokeLinecap="round" />
+        <circle cx="7" cy="10.2" r="0.9" style={{ fill: 'var(--dsw-alias-bg-base)' }} />
       </svg>
     )
   if (props.priority === 'none')
@@ -54,7 +54,7 @@ const PriorityIcon = (props: { readonly priority: BacklogPriority; readonly clas
 }
 
 const chip =
-  'dshx:inline-flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:font-medium dshx:tabular-nums'
+  'dshx:inline-flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-2xs dshx:font-medium dshx:tabular-nums'
 
 const WithTooltip = (props: { readonly tip: string; readonly children: ReactNode }): JSX.Element => (
   <Tooltip>

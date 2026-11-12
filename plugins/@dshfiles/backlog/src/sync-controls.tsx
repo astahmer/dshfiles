@@ -510,7 +510,7 @@ const SyncMenuItems = (props: {
       {linked.map(entry => (
         <Fragment key={`${entry.bindingId ?? entry.backend}-${entry.remoteKey}`}>
           <ContextMenuItem
-            className="dshx:gap-2 dshx:text-[13px]"
+            className="dshx:gap-2 dshx:text-sm"
             disabled={actions.syncNow.isPending}
             onSelect={() => actions.syncNow.mutate({ id: props.itemId, ...(entry.bindingId !== undefined && { binding: entry.bindingId }) })}
           >
@@ -518,7 +518,7 @@ const SyncMenuItems = (props: {
             Sync now with {entry.remoteKey}
           </ContextMenuItem>
           <ContextMenuItem
-            className="dshx:gap-2 dshx:text-[13px]"
+            className="dshx:gap-2 dshx:text-sm"
             onSelect={() =>
               actions.linkRemote.mutate({ id: props.itemId, ...refTarget(entry), remove: true }, { onError: failed('The item could not be unlinked. Retry.') })
             }
@@ -530,12 +530,12 @@ const SyncMenuItems = (props: {
       ))}
       {available.map(view => (
         <Fragment key={view.binding.id}>
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.onLink(view.binding.id)}>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-sm" onSelect={() => props.onLink(view.binding.id)}>
             <LinkIcon aria-hidden className="dshx:size-3.5" />
             Link to {bindingLabel(view)}…
           </ContextMenuItem>
           <ContextMenuItem
-            className="dshx:gap-2 dshx:text-[13px]"
+            className="dshx:gap-2 dshx:text-sm"
             disabled={actions.linkRemote.isPending}
             onSelect={() => createThrough(actions, { itemId: props.itemId, view })}
           >
@@ -579,7 +579,7 @@ const BatchMenuItems = (props: { readonly items: readonly SyncBatchItem[] }): JS
     <>
       <ContextMenuSeparator />
       <ContextMenuSub>
-        <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+        <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-sm">
           <CloudIcon aria-hidden className="dshx:size-3.5" />
           Create in…
         </ContextMenuSubTrigger>
@@ -587,7 +587,7 @@ const BatchMenuItems = (props: { readonly items: readonly SyncBatchItem[] }): JS
           {targets.map(target => (
             <ContextMenuItem
               key={target.view.binding.id}
-              className="dshx:gap-2 dshx:text-[13px]"
+              className="dshx:gap-2 dshx:text-sm"
               disabled={create.isPending}
               onSelect={() => create.mutate({ bindingId: target.view.binding.id, label: bindingLabel(target.view), ids: target.itemIds })}
             >

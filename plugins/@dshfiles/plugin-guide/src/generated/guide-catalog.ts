@@ -48,7 +48,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:95",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:98",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -68,7 +68,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:94",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:97",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -415,6 +415,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "InboxQuickReplies",
+      "importFrom": "@dshfiles/activity-timeline/quick-replies",
+      "owner": "@dshfiles/activity-timeline",
+      "source": "plugins/@dshfiles/activity-timeline/src/quick-replies.ts:22",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/activity-timeline.quick-replies",
+      "kind": "registry",
+      "title": "InboxQuickReplies",
+      "summary": "Contribution registry owned by @dshfiles/activity-timeline.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(InboxQuickReplies, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/activity-timeline renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/activity-timeline.quick-replies"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/agents/contract",
       "kind": "module",
       "title": "@dshfiles/agents/contract",
@@ -542,7 +564,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: SHORT_NAME_MAX_LENGTH, UsageOverviewModel"
+        "Also exports: SHORT_NAME_MAX_LENGTH, LOW_QUOTA_PERCENT, UsageOverviewModel"
       ],
       "source": "plugins/@dshfiles/ai-accounts/src/usage-overview-model.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -891,6 +913,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "TranscriptRunFolds",
+      "importFrom": "@dshfiles/chat/run-folds",
+      "owner": "@dshfiles/chat",
+      "source": "plugins/@dshfiles/chat/src/run-folds.ts:78",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/chat.transcript-run-fold",
+      "kind": "registry",
+      "title": "TranscriptRunFolds",
+      "summary": "Contribution registry owned by @dshfiles/chat.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(TranscriptRunFolds, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/chat renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/chat.transcript-run-fold"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/chat/message-images",
       "kind": "module",
       "title": "@dshfiles/chat/message-images",
@@ -995,10 +1039,52 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/chat/turn-marks",
+      "kind": "module",
+      "title": "@dshfiles/chat/turn-marks",
+      "summary": "What the turn map and the \"Since you left\" recap know about every Turn of a thread, including Turns the transcript has not paged in: whether the agent asked a question, whether the Turn failed, which files it wrote. Published as the `@dshfiles/chat/turn-marks` dshx module. Chat owns the screen, so it declares the cont…",
+      "publicSymbol": "TURN_MARKS_PROJECTION_KEY, TURN_MARKS_FILE_LIMIT, turnMarkFileSchema, TurnMarkFile, turnMarkSchema, TurnMark",
+      "importFrom": "@dshfiles/chat/turn-marks",
+      "owner": "@dshfiles/chat",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [
+        "Also exports: turnMarksViewSchema, TurnMarksView, TurnMarkKind, TurnMarkFilter, TURN_MARK_FILTERS, TurnMarksModel"
+      ],
+      "source": "plugins/@dshfiles/chat/src/turn-marks.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/chat/thread-tools",
+      "kind": "module",
+      "title": "@dshfiles/chat/thread-tools",
+      "summary": "How another plugin reaches the long-thread tools of the owned Chat fork, published as the `@dshfiles/chat/thread-tools` dshx module. Importing it loads none of Chat's runtime. - {@link ThreadToolsModel.request} opens the find bar or the Turns sheet of one thread's Chat view; a thread `⋯` menu (thread-sidebar) calls it…",
+      "publicSymbol": "ThreadTool, SinceYouLeftNote, ThreadToolsModel, SinceYouLeftModel",
+      "importFrom": "@dshfiles/chat/thread-tools",
+      "owner": "@dshfiles/chat",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/chat/src/thread-tools.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "PaletteActions",
       "importFrom": "@dshfiles/command-palette/palette-contract",
       "owner": "@dshfiles/command-palette",
-      "source": "plugins/@dshfiles/command-palette/src/palette-contract.ts:64",
+      "source": "plugins/@dshfiles/command-palette/src/palette-contract.ts:73",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/command-palette.action",
@@ -1020,7 +1106,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "CommandPalette",
       "importFrom": "@dshfiles/command-palette/palette-contract",
       "owner": "@dshfiles/command-palette",
-      "source": "plugins/@dshfiles/command-palette/src/palette-contract.ts:66",
+      "source": "plugins/@dshfiles/command-palette/src/palette-contract.ts:75",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "contract:@dshfiles/command-palette.palette",
@@ -1101,6 +1187,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/diffs-review/src/review-page-context.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "LandCardActions",
+      "importFrom": "@dshfiles/diffs-review/land-card-actions",
+      "owner": "@dshfiles/diffs-review",
+      "source": "plugins/@dshfiles/diffs-review/src/land-card-actions.ts:33",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/diffs-review.land-card-action",
+      "kind": "registry",
+      "title": "LandCardActions",
+      "summary": "Providers contribute with `plugin.add(LandCardActions, { id, component: plugin.bind(View) })`.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(LandCardActions, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/diffs-review renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/diffs-review.land-card-action"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1195,7 +1303,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "StatusItems",
       "importFrom": "@dshfiles/frame-layout/status-strip",
       "owner": "@dshfiles/frame-layout",
-      "source": "plugins/@dshfiles/frame-layout/src/status-strip.ts:43",
+      "source": "plugins/@dshfiles/frame-layout/src/status-strip.ts:48",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/frame-layout.status-item",
@@ -1321,7 +1429,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/api.ts:253",
+      "source": "plugins/@dshfiles/jj-integration/src/api.ts:255",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/jj-integration:jj-threads",
@@ -1334,8 +1442,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/jj-integration owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: ownWorkspaceFor, provision, destination, classifyWorkspaces, projects, noFolder, projectBookmark, setProjectBookmark, repositories, refreshRepositories, threadAt, revisionGraph, isolate, land, queueLand, cancelQueuedLand, integrationProgress, reviewHistory, threadStatus, landThread, workspaceSetup, cancelWorkspaceSetup, workspaceSync, discard, discardMany, cleanupWorkspaces, startCleanup, cleanupJobs",
-        "Agent tools: jj_thread_destination (read-only), jj_thread_projects (read-only), jj_project_bookmark (read-only), jj_set_project_bookmark, jj_thread_repositories (read-only), jj_thread_refresh_repositories (read-only), jj_thread_isolate, jj_thread_review_history (read-only), jj_thread_status (read-only), jj_thread_rebase, jj_workspace_setup, jj_cancel_workspace_setup, jj_thread_workspace_sync (read-only), jj_thread_discard, jj_thread_discard_many, jj_thread_cleanup, jj_thread_cleanup_jobs (read-only)"
+        "Methods: ownWorkspaceFor, provision, destination, classifyWorkspaces, projects, noFolder, projectBookmark, setProjectBookmark, repositories, refreshRepositories, threadAt, revisionGraph, isolate, land, queueLand, cancelQueuedLand, integrationProgress, reviewHistory, threadStatus, landThread, landImpact, workspaceSetup, cancelWorkspaceSetup, workspaceSync, updateCheck, updateApply, discard, discardMany, cleanupWorkspaces, startCleanup, cleanupJobs",
+        "Agent tools: jj_thread_destination (read-only), jj_thread_projects (read-only), jj_project_bookmark (read-only), jj_set_project_bookmark, jj_thread_repositories (read-only), jj_thread_refresh_repositories (read-only), jj_thread_isolate, jj_thread_review_history (read-only), jj_thread_status (read-only), jj_thread_rebase, jj_thread_land_impact (read-only), jj_workspace_setup, jj_cancel_workspace_setup, jj_thread_workspace_sync (read-only), dsh_update_check (read-only), dsh_update_apply, jj_thread_discard, jj_thread_discard_many, jj_thread_cleanup, jj_thread_cleanup_jobs (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -1461,6 +1569,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/jj-integration/src/revision-graph.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/jj-integration/repository-change",
+      "kind": "module",
+      "title": "@dshfiles/jj-integration/repository-change",
+      "summary": "The one \"the repository moved\" signal: a land, rebase or queue change rewrote jj history, so every view that reads the thread inventory (the thread list's \"N to land\", the jj panel, the changes chips) refetches now instead of on its next poll. A dshx module, so another plugin that lands through jj-integration (diffs-r…",
+      "publicSymbol": "REPOSITORY_CHANGED_EVENT, announceRepositoryChange",
+      "importFrom": "@dshfiles/jj-integration/repository-change",
+      "owner": "@dshfiles/jj-integration",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/jj-integration/src/repository-change.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1790,7 +1918,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "pullRequestApi",
       "importFrom": "@dshfiles/pull-requests/api",
       "owner": "@dshfiles/pull-requests",
-      "source": "plugins/@dshfiles/pull-requests/src/api.ts:56",
+      "source": "plugins/@dshfiles/pull-requests/src/api.ts:57",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/pull-requests:pull-requests",
@@ -1894,6 +2022,70 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/rich-composer/src/conversation-contract.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/rich-composer/thread-views",
+      "kind": "module",
+      "title": "@dshfiles/rich-composer/thread-views",
+      "summary": "The thread's secondary views (Trajectory, Traces, Requests…) as thread-panel facets, published as the `@dshfiles/rich-composer/thread-views` dshx module. Importing it loads none of the composer's runtime. Productivity pass Q5 (E5): the stage always shows Chat; every other `conversation.view` opens as a facet of the th…",
+      "publicSymbol": "ThreadView, ThreadViewOpenRequest, ThreadViewsModel",
+      "importFrom": "@dshfiles/rich-composer/thread-views",
+      "owner": "@dshfiles/rich-composer",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/rich-composer/src/thread-views.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "ComposerMoreItems",
+      "importFrom": "@dshfiles/rich-composer/composer-more",
+      "owner": "@dshfiles/rich-composer",
+      "source": "plugins/@dshfiles/rich-composer/src/composer-more.ts:39",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/rich-composer.composer-more-item",
+      "kind": "registry",
+      "title": "ComposerMoreItems",
+      "summary": "Contribution registry owned by @dshfiles/rich-composer.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(ComposerMoreItems, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/rich-composer renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/rich-composer.composer-more-item"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "ComposerBar",
+      "importFrom": "@dshfiles/rich-composer/composer-more",
+      "owner": "@dshfiles/rich-composer",
+      "source": "plugins/@dshfiles/rich-composer/src/composer-more.ts:47",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/rich-composer.composer-bar",
+      "kind": "contract",
+      "title": "ComposerBar",
+      "summary": "Client service contract provided by @dshfiles/rich-composer.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(ComposerBar) to consume; only @dshfiles/rich-composer provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/rich-composer's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/rich-composer.composer-bar"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2130,7 +2322,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Calling is additive; @dshfiles/session-search owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
         "Methods: health, findInThread, promptHistory",
-        "Agent tools: session_search_health (read-only), thread_find (read-only)"
+        "Agent tools: session_search_health (read-only), session_find_in_thread (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2199,7 +2391,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadSidebarAttentionApi",
       "importFrom": "@dshfiles/thread-sidebar/attention-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/attention-api.ts:112",
+      "source": "plugins/@dshfiles/thread-sidebar/src/attention-api.ts:117",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-sidebar-attention",
@@ -2288,7 +2480,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadViewsApi",
       "importFrom": "@dshfiles/thread-sidebar/thread-views-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/thread-views-api.ts:50",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-views-api.ts:75",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-sidebar-views",
@@ -2353,7 +2545,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "DestinationSections",
       "importFrom": "@dshfiles/thread-sidebar/destinations",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:261",
+      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:50",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/thread-sidebar.destination-section",
@@ -2389,6 +2581,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Additive: each contribution adds an entry; @dshfiles/thread-sidebar renders nothing for it when absent.",
       "details": [
         "Registry id: @dshfiles/thread-sidebar.row-action"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "ThreadMenuSections",
+      "importFrom": "@dshfiles/thread-sidebar/thread-menu-sections",
+      "owner": "@dshfiles/thread-sidebar",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-menu-sections.ts:30",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/thread-sidebar.thread-menu-section",
+      "kind": "registry",
+      "title": "ThreadMenuSections",
+      "summary": "Contribution registry owned by @dshfiles/thread-sidebar.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(ThreadMenuSections, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/thread-sidebar renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/thread-sidebar.thread-menu-section"
       ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
@@ -2776,6 +2990,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/workbench/shell-merge",
+      "kind": "module",
+      "title": "@dshfiles/workbench/shell-merge",
+      "summary": "One sidebar layout (b:952m): the Fixed and Free docking left columns merged into one docking region whose default arrangement is the old Fixed rail and list, as one pane (`SIDEBAR_PANE_ID`) whose tab row is hidden. The sidebar owns which layout a person used before the merge (its Host-synced `layoutMode`); the Workben…",
+      "publicSymbol": "SIDEBAR_PANE_ID, SHELL_MERGE_BACKUP_NAME, FormerShellLayout, ShellMergeRequest, ShellMergePort, workbenchShellMerge",
+      "importFrom": "@dshfiles/workbench/shell-merge",
+      "owner": "@dshfiles/workbench",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [
+        "Also exports: ShellMergePlan, ShellMerge, LeftKeepRequest, LeftKeepPort, workbenchLeftKeep, SidebarFolderTarget, SidebarFoldersProvider, SidebarFolderTargets, LayoutResetPort, workbenchLayoutReset"
+      ],
+      "source": "plugins/@dshfiles/workbench/src/shell-merge.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "workspaceFolderBrowserApi",
       "importFrom": "@dshfiles/workspace-folder-picker/directory-browser-api",
       "owner": "@dshfiles/workspace-folder-picker",
@@ -2946,6 +3182,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/workspace-folder-picker/project-add-flow",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-add-flow",
+      "summary": "Productivity pass Q5 (T5.5): \"New project\" and \"Add folder\" were reachable only through the composer's project menu, then a dialog whose \"New ▾\" button hid New project and Clone repository; users asked agents to do it instead (7 threads). This module, published as `@dshfiles/workspace-folder-picker/project-add-flow`,…",
+      "publicSymbol": "ProjectAddView, ProjectAddFlow",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-add-flow",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-add-flow.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "surface:command",
       "kind": "surface",
       "title": "command",
@@ -2966,7 +3222,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/command-palette › palette-search"
       ],
       "details": [
-        "Used by 21 catalog feature(s)",
+        "Used by 24 catalog feature(s)",
         "Destinations in use: land, none, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2991,10 +3247,10 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/activity-timeline › activity-feed",
         "@dshfiles/activity-timeline › verification-receipts",
         "@dshfiles/activity-timeline › inbox-panel",
-        "@dshfiles/agent-communication › agent-directory"
+        "@dshfiles/activity-timeline › inbox-push"
       ],
       "details": [
-        "Used by 80 catalog feature(s)",
+        "Used by 83 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3132,7 +3388,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 36 catalog feature(s)",
+        "Used by 40 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3160,7 +3416,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-preset › draft-preset-selection"
       ],
       "details": [
-        "Used by 68 catalog feature(s)",
+        "Used by 69 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3216,7 +3472,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 58 catalog feature(s)",
+        "Used by 60 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3328,7 +3584,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 124 catalog feature(s)",
+        "Used by 126 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

@@ -6,29 +6,32 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { useLayoutEffect, useRef, useSyncExternalStore, type ComponentProps } from 'react'
+import { useLayoutEffect, useRef, useSyncExternalStore, type ComponentProps, type ReactNode } from 'react'
 import { NavigationIconRow } from './navigation-icon-row.js'
 import { SidebarSettingsButton } from './sidebar-customization.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { SidebarOrganization } from './organization.js'
+import { SidebarDockHost } from './sidebar-dock-host.js'
+import { SIDEBAR_PANE_ID } from '@dshfiles/workbench/shell-merge'
 import type { sidebarChildren } from './sidebar-contract.js'
 
 type SidebarRenderSlot = PropsRenderSlots<keyof typeof sidebarChildren>['renderSlot']
 type FooterSlot = 'sidebar.footer.above' | 'sidebar.footer.action'
 
-/** Group only explicitly qualified display labels; a prefix is not framework ownership provenance. */
+/** A legacy "Plugin: View" label shows as its view name: pane titles never carry plugin names (DESIGN.md). */
+const withoutPluginPrefix = (label: string): string => {
+  const separator = label.indexOf(': ')
+  return separator > 0 && label.slice(separator + 2).trim() !== '' ? label.slice(separator + 2).trim() : label.trim()
+}
+
+/**
+ * A footer aggregate takes its sole contributor's own label; several contributors, or an unlabeled one, read as the
+ * generic seat name rather than a guessed owner.
+ */
 const footerTitle = (slot: FooterSlot, labels: readonly string[]): string => {
-  const noun = slot === 'sidebar.footer.above' ? 'Previews' : 'Controls'
-  const fallback = `Thread Sidebar: Plugin ${noun.toLowerCase()}`
-  if (labels.length === 0) return fallback
-  const prefixes = labels.map(label => {
-    const separator = label.indexOf(':')
-    const prefix = label.slice(0, separator).trim()
-    return separator > 0 && prefix !== '' && label.slice(separator + 1).trim() !== '' ? prefix : undefined
-  })
-  const prefix = prefixes[0]
-  if (prefix === undefined || prefixes.some(candidate => candidate !== prefix)) return fallback
-  return slot === 'sidebar.footer.above' && labels.length === 1 ? (labels[0] ?? fallback) : `${prefix}: ${noun}`
+  const fallback = slot === 'sidebar.footer.above' ? 'Sidebar previews' : 'Sidebar controls'
+  const only = labels.length === 1 ? withoutPluginPrefix(labels[0] ?? '') : ''
+  return only === '' || only.endsWith(':') ? fallback : only
 }
 
 /** Supplied only by the sidebar root declaring these seats; never a second slot registration. */
@@ -137,8 +140,34 @@ export const registerSidebarWorkbenchPanels = (
       </div>
     )
   }
-  const definitions = [
-    { id: 'dshfiles-thread-sidebar.workbench-threads', title: () => 'Thread Sidebar: Threads', component: Threads, padding: 'dshx:p-3' },
+  /** The rail and its list (b:952m): the root portals them into the element the visible occurrence lends. */
+  const Sidebar = ({ visible = true }: WorkbenchPanelProps): JSX.Element => {
+    const host = useRef<HTMLDivElement>(null)
+    useLayoutEffect(() => {
+      if (!visible || host.current === null) return
+      return SidebarDockHost.attach(host.current)
+    }, [visible])
+    return <div ref={host} data-sidebar-dock-host="" className="dshx:flex dshx:h-full dshx:min-h-0 dshx:min-w-0 dshx:flex-1" />
+  }
+  const definitions: readonly {
+    readonly id: string
+    readonly title: () => string
+    readonly component: (props: WorkbenchPanelProps) => ReactNode
+    readonly padding: string
+    readonly beforeClose?: () => void
+  }[] = [
+    // Registered first, so a Workbench that sees Navigation and Threads also sees the pane its left default is made of.
+    {
+      id: SIDEBAR_PANE_ID,
+      title: () => 'Sidebar',
+      component: Sidebar,
+      padding: '',
+      // The rail is how every page is reached: it moves, splits and floats, but Reset layout is its only way out.
+      beforeClose: () => {
+        throw new Error('The sidebar pane stays open. Move it elsewhere, or use Reset layout to put it back.')
+      },
+    },
+    { id: 'dshfiles-thread-sidebar.workbench-threads', title: () => 'Threads', component: Threads, padding: 'dshx:p-3' },
     {
       id: 'dshfiles-thread-sidebar.workbench-status',
       title: () => footerTitle('sidebar.footer.above', sources.footerTitles('sidebar.footer.above')),
@@ -151,7 +180,7 @@ export const registerSidebarWorkbenchPanels = (
       component: () => sources.renderSlot('sidebar.footer.action', { wide: true }),
       padding: 'dshx:p-3',
     },
-    { id: 'dshfiles-thread-sidebar.workbench-navigation', title: () => 'Thread Sidebar: Navigation', component: Navigation, padding: 'dshx:px-1' },
+    { id: 'dshfiles-thread-sidebar.workbench-navigation', title: () => 'Navigation', component: Navigation, padding: 'dshx:px-1' },
   ]
   const registrations = definitions.map(definition => {
     const Content = definition.component
@@ -163,7 +192,11 @@ export const registerSidebarWorkbenchPanels = (
             <section
               aria-label={definition.id === 'dshfiles-thread-sidebar.workbench-threads' ? undefined : title}
               data-sidebar-workbench-source={definition.id}
-              className={cn('dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto', definition.padding)}
+              className={cn(
+                'dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col',
+                definition.id === SIDEBAR_PANE_ID ? 'dshx:overflow-hidden' : 'dshx:overflow-y-auto',
+                definition.padding,
+              )}
             >
               <Content {...props} />
             </section>
@@ -179,7 +212,8 @@ export const registerSidebarWorkbenchPanels = (
         if (registeredTitle === title) return
         // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot the old disposer before publishing its replacement; only the old registration may be released below.
         const previous = dispose
-        dispose = registry.register({ id: definition.id, title, component: Panel })
+        const registration: WorkbenchPanelDefinition = { id: definition.id, title, component: Panel }
+        dispose = registry.register(definition.beforeClose === undefined ? registration : { ...registration, beforeClose: definition.beforeClose })
         registeredTitle = title
         previous()
       },

@@ -6,12 +6,16 @@ type ComposerState = {
   readonly draft: string
   readonly attachmentIds: readonly string[]
   readonly phase: 'plain' | 'adjudicating' | 'claimed' | 'submitting'
+  /** Reference chips in the draft; a draft holding any is not moved as plain text. */
+  readonly occurrences?: readonly unknown[]
 }
 
 type ComposerInput = {
   readonly state: { getSnapshot(): ComposerState }
   submit(mode: 'queue', source: 'click' | 'enter'): void
   notify(level: 'info' | 'error', text: string): void
+  /** Replaces the draft text; absent where the composer cannot take a moved draft. */
+  setDraft?(draft: string): void
 }
 
 export interface WorkspaceComposer {
@@ -25,6 +29,25 @@ const sameDraft = (left: ComposerState, right: ComposerState): boolean =>
   left.draft === right.draft &&
   left.attachmentIds.length === right.attachmentIds.length &&
   left.attachmentIds.every((id, index) => right.attachmentIds[index] === id)
+
+/**
+ * dshfiles: a switch can make its destination the main view while the composer on screen is still the one it left (the
+ * fork opens the destination in its own tab), so a send typed meanwhile comes from the left Session. Its plain-text
+ * draft moves into the destination's empty composer and is sent there, never in the checkout the user moved away from.
+ */
+const moveDraftInto = (input: { readonly source: WorkspaceComposer; readonly target: WorkspaceComposer; readonly requested: ComposerState }): boolean => {
+  const { source, target, requested } = input
+  const sourceState = source.input.state.getSnapshot()
+  const targetState = target.input.state.getSnapshot()
+  if (target.input.setDraft === undefined || source.input.setDraft === undefined) return false
+  if (requested.attachmentIds.length > 0 || (requested.occurrences?.length ?? 0) > 0) return false
+  if (sourceState.phase !== 'plain' || !sameDraft(requested, sourceState)) return false
+  if (targetState.phase !== 'plain' || targetState.draft !== '' || targetState.attachmentIds.length > 0) return false
+  target.input.setDraft(requested.draft)
+  if (target.input.state.getSnapshot().draft !== requested.draft) return false
+  source.input.setDraft('')
+  return true
+}
 
 /** The Host's own words when it refused the destination: sending again cannot help, and they say what will. */
 const destinationRefusal = (error: unknown): string | undefined =>
@@ -65,6 +88,12 @@ export const deferWorkspaceSubmit = async (input: {
     if (current === undefined || !current.blank || current.workspaceId !== (outcome.workspaceId ?? input.source.workspaceId)) {
       input.source.input.notify('error', input.failureMessage)
       return 'failed'
+    }
+
+    if (current.sessionId !== input.source.sessionId && moveDraftInto({ source: input.source, target: current, requested })) {
+      release()
+      current.input.submit('queue', input.submitSource)
+      return 'sent'
     }
 
     const currentState = current.input.state.getSnapshot()

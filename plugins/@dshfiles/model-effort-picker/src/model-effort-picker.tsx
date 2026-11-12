@@ -10,17 +10,24 @@ import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { ScrollArea } from '@dshfiles/plugin-ui/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArrowLeftRightIcon, ChevronDownIcon, LoaderCircleIcon, SearchIcon, SparklesIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, SearchIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountColor } from './account-color.js'
 import { ModelDetails, type InspectedRoute } from './model-details.js'
 import { ModelPickerModel } from './model-picker-model.js'
 import { ModelRow } from './model-row.js'
 import { PROVIDER_LABEL } from './provider-labels.js'
+import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { requestFanOut } from '@dshfiles/thread-sidebar/fan-out-request'
+import { englishModelPicker, type ModelPickerTranslate } from './locales.js'
 import { modelEffortPickerSettings } from './settings.js'
 
-type Props = ModelSelectInjected & { readonly locked: boolean; readonly sessionId: string }
+type Props = ModelSelectInjected & {
+  readonly locked: boolean
+  readonly sessionId: string
+  /** The picker's locale seat (`dshfiles.modelPicker`); English when absent. */
+  readonly t?: (key: string, params?: Readonly<Record<string, string | number>>) => string
+}
 type FastModeRoute = { readonly sessionId: string; readonly provider: string; readonly model: string }
 
 const fastModeRouteKey = ({ sessionId, provider, model }: FastModeRoute): string => JSON.stringify([sessionId, provider, model])
@@ -54,12 +61,14 @@ const FastModeIndicator = ({ sessionId, provider, model, enabledOverride }: Fast
   // Every picker showing this Session mounts its indicator within the same landing; the page-wide resource reads the
   // route once for all of them (5 s covers the later mounts, a toggle shows through `enabledOverride` meanwhile).
   const state = useResource(aiAccountsFastModeApi, 'status', { sessionId, provider, model }, { staleTime: 5_000 })
+  // Composer redesign (b:v9yh): the chip is plain text; only a live state (Fast mode on) earns a glyph.
   if (enabledOverride ?? state.data?.enabled ?? false)
     return <ZapIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-warning" data-model-fast-mode-enabled />
-  return <SparklesIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+  return null
 }
 
-export const ModelEffortPicker = ({ locked, available, directory, load, select, sessionId }: Props) => {
+export const ModelEffortPicker = ({ locked, available, directory, load, select, sessionId, t: seat }: Props) => {
+  const t: ModelPickerTranslate = seat === undefined ? englishModelPicker : (key, params) => seat(key, params)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectionError, setSelectionError] = useState<string | null>(null)
@@ -68,6 +77,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const [narrowDetails, setNarrowDetails] = useState(false)
   const [popoverWidth, setPopoverWidth] = useState<number | null>(null)
   const [fanOut, setFanOut] = useState<readonly ModelSelection[]>([])
+  // b:ysaj: Select several makes a click collect routes, so fan-out is not a shift-click secret (and works on touch).
+  const [several, setSeveral] = useState(false)
   const modelListRef = useRef<HTMLDivElement | null>(null)
   // The popover's Portal mounts its content one render after `open`, so the fit below waits for the list node itself.
   const [listNode, setListNode] = useState<HTMLDivElement | null>(null)
@@ -82,20 +93,27 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     () => directory.getSnapshot(),
   )
   const filteredGroups = useMemo(() => ModelPickerModel.filterGroups(state.groups, query), [state.groups, query])
-  const rows = useMemo(() => {
-    const flattened = filteredGroups.flatMap(group => group.models.map(model => ({ group, model })))
-    return [...flattened].sort(
-      (left, right) =>
-        Number(right.group.id === state.current?.provider && right.model.id === state.current.model) -
-        Number(left.group.id === state.current?.provider && left.model.id === state.current.model),
-    )
-  }, [filteredGroups, state.current])
   // Only the open menu shows account labels and quotas; reading them on mount cost two requests per thread switch.
   const usage = useApiQuery(aiAccountsApi, 'usage', { enabled: open })
   const profiles = useApiQuery(aiAccountsApi, 'read', { enabled: open })
   const providerLabels = useMemo(
     () => new Map((profiles.data?.accounts ?? []).map(profile => [profile.instanceId, PROVIDER_LABEL[profile.kind]])),
     [profiles.data],
+  )
+  // b:16yr: one row per model; the detail panel chooses the account.
+  const rows = useMemo(
+    () => ModelPickerModel.modelRows({ groups: filteredGroups, current: state.current, providerOf: id => providerLabels.get(id) }),
+    [filteredGroups, state.current, providerLabels],
+  )
+  const quotas = useMemo(
+    () =>
+      new Map(
+        (usage.data?.cards ?? []).flatMap(card => {
+          const quota = ModelPickerModel.quota(card)
+          return quota === undefined ? [] : [[card.instanceId, quota] as const]
+        }),
+      ),
+    [usage.data],
   )
   const accountAccents = useMemo(
     () =>
@@ -113,9 +131,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const selectedModel = selectedGroup?.models.find(model => model.id === current?.model)
   const inspectedRoute: InspectedRoute | null = inspected ?? (current === null ? null : { model: current.model, provider: current.provider })
   const busy = locked || state.status === 'selecting'
-  const effortLabel = selectedModel === undefined ? (state.retainedEffort ?? 'Default') : ModelPickerModel.effortName(selectedModel, current)
+  const effortLabel = selectedModel === undefined ? state.retainedEffort : ModelPickerModel.effortName(selectedModel, current)
   const settings = useSettings(modelEffortPickerSettings)
-  const accountSwapEnabled = settings.value?.accountSwap ?? true
+  const accountSwapEnabled = settings.value?.accountSwap ?? false
   const accountSwapRoutes = settings.value?.accountSwapRoutes
   const nextAccount = useMemo(
     () => (accountSwapEnabled ? ModelPickerModel.nextAccountSelection({ current, groups: state.groups, routes: accountSwapRoutes ?? [] }) : undefined),
@@ -149,9 +167,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     setPopoverWidth(width => (width !== null && Math.abs(width - next) < 1 ? width : next))
   }, [open, query, rows, listNode])
 
+  // The chip's name, its account tag (b:4qjm) and its accessible name all come from the catalog: read it as soon as the
+  // picker is available, not only once its menu opens.
   useEffect(() => {
-    if (accountSwapEnabled && available) load()
-  }, [accountSwapEnabled, available, load])
+    if (available) load()
+  }, [available, load])
 
   useEffect(() => {
     if (!open) return
@@ -190,6 +210,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
       }),
     )
     setFanOut([])
+    setSeveral(false)
     setOpen(false)
   }
 
@@ -207,17 +228,16 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
         <Popover onOpenChange={setOpen} open={open}>
           <PopoverTrigger asChild>
             <Button
-              aria-label={`${shortLabel?.title ?? triggerLabel}, reasoning ${effortLabel}`}
-              className="dshx-root dshx:h-8 dshx:max-w-72 dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-left dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:has-[>svg]:px-1.5"
+              aria-label={`${shortLabel?.title ?? triggerLabel}, reasoning ${effortLabel ?? 'provider default'}`}
+              className="dshx-root dshx:h-8 dshx:max-w-72 dshx:min-w-0 dshx:shrink dshx:justify-start dshx:gap-1 dshx:px-2 dshx:text-left dshx:@max-pane-narrow:px-1.5 dshx:in-data-model-icon:px-1"
+              data-model-trigger=""
               disabled={locked}
               size="sm"
               variant="ghost"
             >
               {busy ? (
                 <LoaderCircleIcon aria-hidden="true" className="dshx:size-4 dshx:animate-spin dshx:text-muted-foreground" />
-              ) : current === null ? (
-                <SparklesIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-              ) : (
+              ) : current === null ? null : (
                 <FastModeIndicator
                   enabledOverride={fastModeOverride?.routeKey === currentFastModeRouteKey ? fastModeOverride.enabled : undefined}
                   model={current.model}
@@ -225,11 +245,23 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   sessionId={sessionId}
                 />
               )}
-              <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:leading-none">
+              {/* A bar too narrow for even the name (the composer row's data-model-icon, b:gyk7) shows the model as an icon;
+                  its name stays in the tooltip and the accessible name. */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <CpuIcon
+                    aria-hidden="true"
+                    className="dshx:hidden dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground dshx:in-data-model-icon:block"
+                    data-model-picker-icon
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{shortLabel === undefined ? triggerLabel : `${triggerLabel} · ${shortLabel.title}`}</TooltipContent>
+              </Tooltip>
+              <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:leading-none dshx:in-data-model-icon:hidden">
                 {shortLabel?.providerTag === undefined ? null : (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="dshx:shrink-0 dshx:text-[10px] dshx:font-semibold dshx:text-muted-foreground" data-model-picker-provider>
+                      <span className="dshx:shrink-0 dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground" data-model-picker-provider>
                         {shortLabel.providerTag}
                       </span>
                     </TooltipTrigger>
@@ -240,7 +272,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   effort instead of the name, so the trigger always says which model answers. */}
                 {shortLabel === undefined ? (
                   <span
-                    className="dshx:max-w-[clamp(3rem,calc(100cqw-21rem),12rem)] dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
+                    className="dshx:max-w-[clamp(4rem,calc(100cqw-15rem),14rem)] dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
                     data-model-picker-text
                   >
                     {triggerLabel}
@@ -249,7 +281,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span
-                        className="dshx:max-w-[clamp(3rem,calc(100cqw-21rem),12rem)] dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
+                        className="dshx:max-w-[clamp(4rem,calc(100cqw-15rem),14rem)] dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
                         data-model-picker-text
                       >
                         {triggerLabel}
@@ -258,17 +290,24 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     <TooltipContent>{shortLabel.title}</TooltipContent>
                   </Tooltip>
                 )}
-                <span aria-hidden="true" className="dshx:text-[10px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden dshx:in-data-model-compact:hidden">
-                  ·
-                </span>
-                <span
-                  className="dshx:shrink-0 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:text-muted-foreground dshx:in-data-model-compact:hidden"
-                  data-model-picker-effort
-                >
-                  {effortLabel}
-                </span>
+                {effortLabel === undefined ? null : (
+                  <>
+                    <span aria-hidden="true" className="dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden dshx:in-data-model-compact:hidden">
+                      ·
+                    </span>
+                    <span
+                      className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden dshx:in-data-model-compact:hidden"
+                      data-model-picker-effort
+                    >
+                      {effortLabel}
+                    </span>
+                  </>
+                )}
               </span>
-              <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
+              <ChevronDownIcon
+                aria-hidden="true"
+                className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground dshx:opacity-60 dshx:in-data-model-icon:hidden"
+              />
             </Button>
           </PopoverTrigger>
           <PopoverContent
@@ -313,7 +352,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   <Input
                     aria-label="Search models and accounts"
                     autoComplete="off"
-                    className="dshx:h-7 dshx:rounded-lg dshx:border-border dshx:bg-muted/40 dshx:pl-7 dshx:pr-11 dshx:text-[11px] dshx:focus-visible:ring-1 dshx:focus-visible:ring-info/60"
+                    className="dshx:h-7 dshx:rounded-lg dshx:border-border dshx:bg-muted/40 dshx:pl-7 dshx:pr-11 dshx:text-2xs dshx:focus-visible:ring-1 dshx:focus-visible:ring-info/60"
                     onChange={event => setQuery(event.currentTarget.value)}
                     onKeyDown={event => {
                       if (event.key === 'Enter') {
@@ -331,7 +370,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     ref={searchInputRef}
                     value={query}
                   />
-                  <Kbd className="dshx:pointer-events-none dshx:absolute dshx:right-1.5 dshx:top-1/2 dshx:h-4 dshx:-translate-y-1/2 dshx:px-1 dshx:text-[9px]">
+                  <Kbd className="dshx:pointer-events-none dshx:absolute dshx:right-1.5 dshx:top-1/2 dshx:h-4 dshx:-translate-y-1/2 dshx:px-1 dshx:text-2xs">
                     {MOD_KEY} K
                   </Kbd>
                 </label>
@@ -352,29 +391,24 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     ref={attachModelList}
                     role="list"
                   >
-                    {rows.map(({ group, model }) => {
-                      const active = current?.provider === group.id && current.model === model.id
-                      const quota = ModelPickerModel.quota(usage.data?.cards.find(card => card.instanceId === group.id))
-                      return (
-                        <ModelRow
-                          accountAccent={accountAccents.get(group.id)}
-                          active={active}
-                          busy={busy}
-                          current={current}
-                          fanOutSelected={ModelPickerModel.isFanOutRoute(fanOut, { provider: group.id, model: model.id })}
-                          group={group}
-                          key={`${group.id}:${model.id}`}
-                          model={model}
-                          onEffort={choose}
-                          onFanOut={toggleFanOut}
-                          onInspect={() => showDetails({ model: model.id, provider: group.id })}
-                          onSelect={choose}
-                          providerLabel={providerLabels.get(group.id)}
-                          quota={quota}
-                          sessionId={sessionId}
-                        />
-                      )
-                    })}
+                    {rows.map(({ key, group, model, active }) => (
+                      <ModelRow
+                        active={active}
+                        busy={busy}
+                        current={current}
+                        fanOutSelected={ModelPickerModel.isFanOutRoute(fanOut, { provider: group.id, model: model.id })}
+                        group={group}
+                        key={key}
+                        model={model}
+                        onFanOut={toggleFanOut}
+                        selectSeveral={several}
+                        onInspect={() => showDetails({ model: model.id, provider: group.id })}
+                        onSelect={choose}
+                        providerLabel={providerLabels.get(group.id)}
+                        quota={quotas.get(group.id)}
+                        sessionId={sessionId}
+                      />
+                    ))}
                     {rows.length === 0 && (
                       <p className="dshx:px-3 dshx:py-5 dshx:text-center dshx:text-xs dshx:text-muted-foreground">
                         {state.status === 'loading' ? 'Loading model catalog…' : 'No matching models.'}
@@ -382,23 +416,40 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     )}
                   </div>
                 </ScrollArea>
-                {fanOut.length > 0 ? (
-                  <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-2 dshx:py-1.5">
-                    <span className="dshx:min-w-0 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
-                      {fanOut.length} model{fanOut.length === 1 ? '' : 's'} selected
-                    </span>
-                    <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-                      <Button onClick={() => setFanOut([])} size="sm" type="button" variant="ghost">
-                        Clear
-                      </Button>
-                      <Button disabled={fanOut.length < 2} onClick={startFanOut} size="sm" type="button">
-                        Fan out…
-                      </Button>
-                    </span>
+                <div
+                  className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-2 dshx:py-1.5"
+                  data-model-picker-fan-out=""
+                >
+                  <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
+                    <label className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs dshx:pointer-coarse:min-h-11">
+                      <Switch
+                        aria-label={t('selectSeveral')}
+                        checked={several || fanOut.length > 0}
+                        onCheckedChange={checked => {
+                          setSeveral(checked)
+                          if (!checked) setFanOut([])
+                        }}
+                        size="sm"
+                      />
+                      <span className="dshx:truncate">{fanOut.length > 0 ? t('selected', { count: fanOut.length }) : t('selectSeveral')}</span>
+                    </label>
+                    {fanOut.length > 0 ? (
+                      <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
+                        <Button onClick={() => setFanOut([])} size="sm" type="button" variant="ghost">
+                          {t('clear')}
+                        </Button>
+                        <Button disabled={fanOut.length < 2} onClick={startFanOut} size="sm" type="button">
+                          {t('fanOut')}
+                        </Button>
+                      </span>
+                    ) : null}
                   </div>
-                ) : null}
+                  {several || fanOut.length > 0 ? (
+                    <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{fanOut.length === 1 ? t('fanOutNeedsTwo') : t('selectSeveralHint')}</p>
+                  ) : null}
+                </div>
                 {state.failures.length > 0 && (
-                  <p className="dshx:px-1 dshx:text-[10px] dshx:text-muted-foreground">
+                  <p className="dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">
                     {state.failures.length} provider{state.failures.length === 1 ? '' : 's'} could not load:{' '}
                     {state.failures.map(failure => failure.name).join(', ')}
                   </p>
@@ -416,7 +467,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
               >
                 <span
                   aria-hidden="true"
-                  className="dshx:absolute dshx:-left-1 dshx:top-7 dshx:size-2 dshx:rotate-45 dshx:rounded-[1px] dshx:border-b dshx:border-l dshx:border-border dshx:bg-popover"
+                  className="dshx:absolute dshx:-left-1 dshx:top-7 dshx:size-2 dshx:rotate-45 dshx:rounded-xs dshx:border-b dshx:border-l dshx:border-border dshx:bg-popover"
                 />
                 <div className="dshx:min-h-0 dshx:overflow-y-auto">
                   <ModelDetails
@@ -442,6 +493,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     onRetry={load}
                     onSelect={choose}
                     providerLabels={providerLabels}
+                    quotas={quotas}
                     sessionId={sessionId}
                   />
                 </div>

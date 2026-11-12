@@ -29,6 +29,17 @@ describe('pluginSettingsPages', () => {
     ])
     expect(pages[1]?.description).toBe('Group threads.')
   })
+
+  it("describes a page by its schema's own description before the manifest's", () => {
+    const [page] = SettingsPluginPages.pluginSettingsPages({
+      namespaces: [
+        { ns: 'dshfiles-ui-styles', schema: wire(Schema.object({ preset: Schema.string() }).description('Colours and fonts.')), autoGenerate: true },
+      ],
+      labels: new Map([['dshfiles-ui-styles', { title: '', description: 'The one bundle that compiles the stylesheet.' }]]),
+      text,
+    })
+    expect(page?.description).toBe('Colours and fonts.')
+  })
 })
 
 describe('localizedTextReader', () => {

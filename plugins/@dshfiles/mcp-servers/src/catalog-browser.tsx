@@ -76,7 +76,7 @@ const CatalogCard = (props: {
     <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
       <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
         <h3 className="dshx:truncate dshx:text-sm dshx:font-medium">{props.title}</h3>
-        <Badge className="dshx:shrink-0 dshx:text-[10px]" variant="muted">
+        <Badge className="dshx:shrink-0 dshx:text-2xs" variant="muted">
           {props.badge}
         </Badge>
       </div>
@@ -207,7 +207,7 @@ export const CatalogBrowser = (props: {
                 description={provider.description}
                 footer={
                   <a
-                    className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground dshx:underline dshx:underline-offset-4 dshx:hover:text-foreground"
+                    className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground dshx:underline dshx:underline-offset-4 dshx:hover:text-foreground"
                     href={provider.docsUrl}
                     rel="noopener noreferrer"
                     target="_blank"
@@ -226,7 +226,7 @@ export const CatalogBrowser = (props: {
                 badge={t('registryBadge')}
                 description={entry.description || entry.version}
                 footer={
-                  <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground" title={entry.name}>
+                  <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground" title={entry.name}>
                     {new URL(entry.endpoint).host}
                   </span>
                 }
@@ -258,7 +258,7 @@ export const CatalogBrowser = (props: {
               <p className="dshx:col-span-full dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">{t('registryNoMatch')}</p>
             ) : null}
           </div>
-          <footer className="dshx:mt-3 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-t dshx:pt-3 dshx:text-[11px] dshx:text-muted-foreground">
+          <footer className="dshx:mt-3 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-t dshx:pt-3 dshx:text-2xs dshx:text-muted-foreground">
             <p>{t('registryDisclaimer')}</p>
             <a className="dshx:underline dshx:underline-offset-4 dshx:hover:text-foreground" href={REGISTRY_URL} rel="noopener noreferrer" target="_blank">
               {t('exploreRegistry')}

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Conversation cleanup",
-    "description": "Preview and permanently delete cold settled or archived local conversation logs, with explicit confirmation and writer protection."
+    "title": "Thread cleanup",
+    "description": "Preview and permanently delete the local logs of cold threads that are done or archived, with explicit confirmation and writer protection."
   }
 }

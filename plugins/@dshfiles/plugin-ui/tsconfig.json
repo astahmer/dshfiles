@@ -6,10 +6,11 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "types": ["node", "react", "@dshfiles/dshx/client/env"],
     "paths": {
       "@dshfiles/plugin-ui/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "testing/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx", "vitest.config.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "src/**/*.tsx", "testing/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx", "vitest.config.ts"]
 }

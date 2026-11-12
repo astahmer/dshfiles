@@ -11,6 +11,7 @@ import { SidebarPreferencesModel, storedPreferences } from './preferences.js'
 import { SidebarPreferencesMachine, type SidebarPreferencesMachineClient } from './preferences-machine.js'
 import { threadSidebarSettings } from './settings.js'
 import { doneViewFilterMigration, shippedViewFiltersMigration, threadViewPreferences } from './thread-view-preferences.js'
+import { storedThreadBoardView } from './thread-board-view.js'
 
 interface PreferencesSnapshot {
   readonly preferences: SidebarPreferences
@@ -41,6 +42,9 @@ const useOptionalSettings = (): ThreadSidebarSettingsState | null => {
  */
 export const usePreferences = (): PreferencesSnapshot & {
   hostBacked: boolean
+  boardViewOnHost: boolean
+  layoutMergeOnHost: boolean
+  settingsSettled: boolean
   threadViewWritePending: boolean
   updatePreferences: (patch: Partial<SidebarPreferences>) => void
 } => {
@@ -48,6 +52,14 @@ export const usePreferences = (): PreferencesSnapshot & {
   const localPreferences = storedPreferences.useValue() ?? DEFAULT_PREFERENCES
   const hostPreferences = useMemo(() => (settings?.value === undefined ? null : SidebarPreferencesModel.decode(settings.value)), [settings?.value])
   const hostBacked = settings !== null && settings.status === 'ready' && settings.writable && hostPreferences !== null
+  // A Host whose settings schema predates the Board view field returns no `boardView`: the browser copy stays live.
+  const boardViewOnHost = hostBacked && typeof settings.value === 'object' && settings.value !== null && 'boardView' in settings.value
+  // The one sidebar layout's merge marker (b:952m) is Host state only once the restarted Host declares it.
+  const layoutMergeOnHost = hostBacked && typeof settings.value === 'object' && settings.value !== null && 'layoutMerge' in settings.value
+  // Whether the Host answered (or will not): a fallback read before that is not yet the person's settings.
+  const settingsSettled = settings === null || settings.status !== 'loading'
+  const boardViewOnHostRef = useRef(boardViewOnHost)
+  boardViewOnHostRef.current = boardViewOnHost
   const settingsRef = useRef(settings)
   settingsRef.current = settings
   const client = useMemo<SidebarPreferencesMachineClient>(
@@ -73,12 +85,14 @@ export const usePreferences = (): PreferencesSnapshot & {
             shippedFiltersMigrated: shippedViewFiltersMigration.get(),
           },
           collapsedGroups: storedCollapsedGroups.get(),
+          boardView: boardViewOnHostRef.current ? storedThreadBoardView.get() : null,
         }),
         clear: () => {
           threadViewPreferences.remove()
           doneViewFilterMigration.set(true)
           shippedViewFiltersMigration.set(true)
           storedCollapsedGroups.remove()
+          if (boardViewOnHostRef.current) storedThreadBoardView.remove()
         },
       },
     }),
@@ -114,6 +128,9 @@ export const usePreferences = (): PreferencesSnapshot & {
     preferences,
     storageWarning: hostBacked ? snapshot.context.hostWriteFailed : snapshot.context.localWriteFailed,
     hostBacked,
+    boardViewOnHost,
+    layoutMergeOnHost,
+    settingsSettled,
     threadViewWritePending,
     updatePreferences,
   }
@@ -126,6 +143,12 @@ interface SidebarState {
   threadViewWritePending: boolean
   /** True while DSH Settings serves the sidebar namespace and accepts writes. */
   hostBacked: boolean
+  /** True when that namespace also holds the Board view (E9); an older Host keeps it in this browser. */
+  boardViewOnHost: boolean
+  /** True when that namespace declares the one sidebar layout's merge marker (b:952m). */
+  layoutMergeOnHost: boolean
+  /** False while the Host settings are still loading: preferences are then only the browser's fallback. */
+  settingsSettled: boolean
   openPalette: (mode: PaletteMode) => void
   closePalette: () => void
   /** The thread shown in the main view, reported by the thread list for navigation history. */
@@ -144,7 +167,8 @@ export const useSidebarState = (): SidebarState => {
 }
 
 export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX.Element => {
-  const { preferences, storageWarning, hostBacked, threadViewWritePending, updatePreferences } = usePreferences()
+  const { preferences, storageWarning, hostBacked, boardViewOnHost, layoutMergeOnHost, settingsSettled, threadViewWritePending, updatePreferences } =
+    usePreferences()
   const [selectedThreadId, setSelectedThreadId] = useState<SessionSummary['id'] | null>(null)
   const threadTitle = useRef<(sessionId: SessionSummary['id']) => string | undefined>(() => undefined)
 
@@ -154,6 +178,9 @@ export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX
       updatePreferences,
       storageWarning,
       hostBacked,
+      boardViewOnHost,
+      layoutMergeOnHost,
+      settingsSettled,
       threadViewWritePending,
       openPalette: PaletteBridge.open,
       closePalette: PaletteBridge.close,
@@ -161,7 +188,7 @@ export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX
       setSelectedThreadId,
       threadTitle,
     }),
-    [preferences, updatePreferences, storageWarning, hostBacked, threadViewWritePending, selectedThreadId],
+    [preferences, updatePreferences, storageWarning, hostBacked, boardViewOnHost, layoutMergeOnHost, settingsSettled, threadViewWritePending, selectedThreadId],
   )
 
   return <SidebarStateContext.Provider value={state}>{children}</SidebarStateContext.Provider>

@@ -17,7 +17,7 @@ const find = (id: string) => {
 const base = { listOpen: false, moreOpen: false, destination: find('threads'), destinations, activePanelId: null, selectedThreadId: null } as const
 
 describe('PhoneTopBarModel', () => {
-  it('names a thread stage and goes back to Threads', () => {
+  it('names a thread on the stage and goes back to Threads, offering its panels', () => {
     expect(PhoneTopBarModel.resolve({ ...base, selectedThreadId: 'session-1', stageTitle: 'Fix the login race' })).toEqual({
       title: 'Fix the login race',
       back: { to: 'threads', label: 'Threads' },
@@ -38,8 +38,8 @@ describe('PhoneTopBarModel', () => {
     })
   })
 
-  it('calls a draft New thread without mistaking it for a destination list', () => {
-    expect(PhoneTopBarModel.resolve(base)).toEqual({ title: 'New thread', back: { to: 'threads', label: 'Threads' }, thread: true })
+  it('calls a draft New thread and offers no panels until it is a thread', () => {
+    expect(PhoneTopBarModel.resolve(base)).toEqual({ title: 'New thread', back: { to: 'threads', label: 'Threads' }, thread: false })
     expect(PhoneTopBarModel.resolve({ ...base, selectedThreadId: 'session-1', stageTitle: '  ' }).title).toBe('Thread')
   })
 

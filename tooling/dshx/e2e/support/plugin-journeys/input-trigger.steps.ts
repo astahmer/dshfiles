@@ -5,7 +5,7 @@ import type { ComposerService } from '../../../packages/dshx/src/client/app-serv
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { materializeNonblankThread } from '../thread-composer.js'
 
-const composerInput = (page: Page) => page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+const composerInput = (page: Page) => page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
 
 When('{string} is typed in the composer', async ({ page }: { page: Page }, text: string) => {
   const composer = composerInput(page)
@@ -39,7 +39,9 @@ When('the composer sends {string}', async ({ page, $testInfo }: { page: Page; $t
   // A plain first message materializes the thread; the second one carries the references, which render as links and
   // chips rather than as the raw text the shared helper waits for.
   await materializeNonblankThread(page, 'Reference card thread', $testInfo)
-  await page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/u }).fill(text)
+  await page
+    .getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/u })
+    .fill(text)
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
   await expect(page.getByRole('button', { name: /^Preview backlog item b:[0-9a-z]+$/u }).last()).toBeVisible({ timeout: 60_000 })
 })
@@ -49,11 +51,7 @@ const sharedCard = (page: Page, kind: string) => page.locator(`[data-dshfiles-en
 When('the agent mention {string} is previewed', async ({ page }: { page: Page }, handle: string) => {
   // A picked agent submits `@{handle}` and renders the agent chip; a typed legacy `@handle` stays the native file
   // chip titled `@handle`, which agents decorates with the same card.
-  await page
-    .locator('[data-conversation-session]')
-    .locator(`[data-ref-chip="agent"], [data-ref-chip="file"][title="@${handle}"]`)
-    .last()
-    .click()
+  await page.locator('[data-conversation-session]').locator(`[data-ref-chip="agent"], [data-ref-chip="file"][title="@${handle}"]`).last().click()
 })
 
 When('the backlog reference {string} is previewed', async ({ page }: { page: Page }, label: string) => {

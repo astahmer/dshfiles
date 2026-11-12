@@ -112,7 +112,7 @@ const AttentionBadge = (props: { readonly attention: BacklogAttention; readonly 
       <TooltipTrigger asChild>
         <span
           className={cn(
-            'dshx:inline-flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:font-medium',
+            'dshx:inline-flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-2xs dshx:font-medium',
             attentionTone[props.attention],
           )}
         >
@@ -173,7 +173,7 @@ const ActorAvatar = (props: { readonly actorId: string | undefined; readonly cla
       <TooltipTrigger asChild>
         <span
           className={cn(
-            'dshx:inline-flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-[9px] dshx:font-semibold dshx:ring-2 dshx:ring-background',
+            'dshx:inline-flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-2xs dshx:font-semibold dshx:ring-2 dshx:ring-background',
             agent ? 'dshx:bg-violet/20 dshx:text-violet' : system ? 'dshx:bg-muted dshx:text-muted-foreground' : 'dshx:bg-info/20 dshx:text-info',
             props.className,
           )}
@@ -194,7 +194,7 @@ const ActorStack = (props: { readonly actorIds: readonly string[]; readonly max?
         <ActorAvatar key={id} actorId={id} />
       ))}
       {props.actorIds.length > max ? (
-        <span className="dshx:z-10 dshx:inline-flex dshx:h-[18px] dshx:items-center dshx:rounded-full dshx:bg-muted dshx:px-1 dshx:text-[9px] dshx:text-muted-foreground dshx:ring-2 dshx:ring-background">
+        <span className="dshx:z-10 dshx:inline-flex dshx:h-[18px] dshx:items-center dshx:rounded-full dshx:bg-muted dshx:px-1 dshx:text-2xs dshx:text-muted-foreground dshx:ring-2 dshx:ring-background">
           +{props.actorIds.length - max}
         </span>
       ) : null}

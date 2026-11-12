@@ -60,6 +60,7 @@
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/session-controller": "workspace:*",
+    "@dshfiles/workspace-folder-picker": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "clsx": "catalog:",

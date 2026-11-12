@@ -97,9 +97,7 @@ export function ActivityFeed<F extends string>({
     for (const group of order) {
       result.push({
         key: `group:${group}`,
-        node: (
-          <h3 className="dshx:pt-3 dshx:pb-1.5 dshx:text-[11px] dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">{group}</h3>
-        ),
+        node: <h3 className="dshx:pt-3 dshx:pb-1.5 dshx:text-2xs dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">{group}</h3>,
       })
       for (const event of byGroup.get(group) ?? []) {
         result.push({ key: event.id, node: <FeedRow event={event} quiet={quietGroups.includes(group)} onSelect={onSelectEvent} /> })
@@ -159,7 +157,7 @@ function FeedRow({
       <span
         aria-hidden
         className={cn(
-          'dshx:grid dshx:size-5 dshx:shrink-0 dshx:place-items-center dshx:rounded-full dshx:text-[8px] dshx:font-semibold dshx:tracking-tight',
+          'dshx:grid dshx:size-5 dshx:shrink-0 dshx:place-items-center dshx:rounded-full dshx:text-2xs dshx:font-semibold dshx:tracking-tight',
           toneClass[event.actor.tone ?? 'muted'],
         )}
       >
@@ -187,7 +185,7 @@ function FeedRow({
     </>
   )
   const rowClass = cn(
-    'dshx:flex dshx:w-full dshx:items-center dshx:gap-2.5 dshx:rounded-md dshx:px-1.5 dshx:py-1.5 dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/60',
+    'dshx:flex dshx:w-full dshx:items-center dshx:gap-2.5 dshx:rounded-md dshx:px-1.5 dshx:py-1.5 dshx:text-sm dshx:transition-colors dshx:hover:bg-accent/60',
     event.selected === true && 'dshx:bg-accent',
   )
   return onSelect ? (

@@ -1,5 +1,5 @@
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { DshxPlugin, hostServiceChanges } from '@dshfiles/dshx/effect'
+import { DshxPlugin, hostServiceChanges, WebRoutes } from '@dshfiles/dshx/effect'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
 import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
 import { Effect, type FileSystem, Layer, Option, type Path, Ref, Stream } from 'effect'
@@ -31,7 +31,7 @@ const rendererAssetRoute = (directory: string) =>
           yield* unregister
           if (Option.isNone(availability)) return
           const server = availability.value
-          yield* Ref.set(registered, Option.some(server.register({ kind: 'prefix', path: RENDERER_ROUTE, handler })))
+          yield* Ref.set(registered, Option.some(WebRoutes.holdRoute(server, { kind: 'prefix', path: RENDERER_ROUTE, handler })))
         }),
       ).pipe(Effect.forkScoped)
       yield* Effect.addFinalizer(() => unregister)

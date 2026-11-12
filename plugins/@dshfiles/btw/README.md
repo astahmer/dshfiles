@@ -1,6 +1,6 @@
 # @dshfiles/btw
 
-![Open a side question from the palette, a shortcut or the composer](docs/screenshots/btw-side-question-entry-points.png)
+![Open a side question from the palette, a shortcut or the composer's More (⋯) menu](docs/screenshots/btw-side-question-entry-points.png)
 
 `/btw <question>` asks about the current thread without touching it. The
 answer opens in a right-sidebar tab, where follow-ups continue.

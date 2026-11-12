@@ -4,7 +4,7 @@ import { confirmFolderSetupStep } from './threads.js'
 
 /** M0 materializes a Host Session only after a real first submit. No step registration or profile side effects. */
 export const materializeNonblankThread = async (page: Page, prompt: string, testInfo: TestInfo): Promise<string> => {
-  const composer = page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/ })
+  const composer = page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/ })
   if (!(await composer.isVisible())) {
     await page
       .getByRole('button', { name: 'New thread', exact: true })
@@ -12,8 +12,8 @@ export const materializeNonblankThread = async (page: Page, prompt: string, test
       .first()
       .click()
   }
-  const chooseWorkspace = page.getByRole('button', { name: 'Choose workspace', exact: true })
-  if ((await chooseWorkspace.isVisible()) && (await chooseWorkspace.textContent())?.trim() === 'Choose workspace') {
+  const chooseWorkspace = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
+  if ((await chooseWorkspace.isVisible()) && /^Choose (?:project|workspace)$/u.test((await chooseWorkspace.textContent())?.trim() ?? '')) {
     await chooseWorkspace.click()
     const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
     await expect(picker).toBeVisible()

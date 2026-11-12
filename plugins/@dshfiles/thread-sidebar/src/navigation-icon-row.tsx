@@ -1,9 +1,9 @@
-import { IconSettingsOutlineRegular, rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
+import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { EllipsisVerticalIcon, SlidersHorizontalIcon } from '@dshfiles/plugin-ui/icons'
+import { EllipsisVerticalIcon, SettingsIcon, SlidersHorizontalIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { SidebarOrganization, type NavigationOverflow } from './organization.js'
@@ -272,7 +272,7 @@ export const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element =>
                       settings.open()
                     }}
                   >
-                    <IconSettingsOutlineRegular size={16} />
+                    <SettingsIcon strokeWidth={1.5} size={16} />
                     <span>{settings.label}</span>
                   </CommandItem>
                 )}

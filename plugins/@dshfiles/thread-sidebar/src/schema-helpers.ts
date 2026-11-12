@@ -25,6 +25,14 @@ export class SchemaHelpers {
       }),
     )
 
+  /**
+   * The input of a method an agent tool exposes. It stays a plain Struct so it publishes a JSON Schema: `strictStruct`
+   * publishes none, and then the tool layer drops every argument and calls the method with `undefined`
+   * (`shell_navigation_counts` failed with "Expected object | array", `thread_subscribe` never saw its `sessionId`).
+   * Unknown keys are still refused: the API boundary validates every call with `onExcessProperty: 'error'`.
+   */
+  static readonly toolInput = <const Fields extends Schema.Struct.Fields>(fields: Fields) => Schema.Struct(fields)
+
   static readonly withDecodedDefault = <S extends Schema.ConstraintDecoder<unknown>, const Default extends S['Type']>(
     schema: S,
     getDefault: () => Default,

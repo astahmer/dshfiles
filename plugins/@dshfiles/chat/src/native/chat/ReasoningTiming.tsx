@@ -30,7 +30,7 @@ const clock = (() => {
 
 const subscribeNever = (): (() => void) => () => {}
 const clockFormat = new Intl.DateTimeFormat(undefined, {
-  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 })
 const dayFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 

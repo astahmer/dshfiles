@@ -101,6 +101,19 @@ thread header chip ─► previewApi.devServers ─► lsof/ss + ps + cwd probe 
   gets `image: null` while the page is still. `mirrorInput` replays one click, wheel, key or text gesture in page
   viewport pixels. Both are Client methods; agents keep `preview_screenshot`, `preview_click` and `preview_type`.
 
+## Opening a dev server from another device
+
+The Host lists a port as `http://localhost:<port>/`. On a GUI reached from another device (a phone over Tailscale, a
+laptop on the LAN) that name is the device itself, so **Open** rewrites it: a server listening on every interface
+(`0.0.0.0`, `::`) opens on the DSH Host's own name, the one the browser already reached DSH on
+(`http://laptop.<tailnet>.ts.net:5173/`), in a new tab when the GUI is HTTPS and the server is HTTP (a pane would
+refuse that frame as mixed content). A server that listens on loopback only cannot be reached from another device,
+so Open shows why and the fix instead of a dead page: restart it on every interface (`vite --host 0.0.0.0`,
+`next dev -H 0.0.0.0`, `HOST=0.0.0.0`), or, over Tailscale, publish it with
+`tailscale serve --bg --https=<port> http://127.0.0.1:<port>`. Nothing changes on the Host or in its network
+settings; **Watch** on a preview page still shows the agent's own browser. The rule is
+[`remote-reach.ts`](src/remote-reach.ts); on a loopback GUI every URL is left alone.
+
 ## Proposed Agent browser hand-off
 
 This is a design, not a shipped capability. A highlight request should name the thread, page and a ref from that page's latest `preview_snapshot`. Preview resolves the ref in the Host browser, obtains its viewport rectangle, and publishes a short-lived overlay event scoped to that thread and page. The Agent browser draws the rectangle over the mirrored image, scaling viewport coordinates to the displayed image as it already does for input. A stale or ambiguous ref, a closed page, or an element outside the viewport must return a useful failure rather than highlight a guessed target. Navigation, a new snapshot or expiry clears the highlight.

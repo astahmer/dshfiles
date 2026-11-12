@@ -543,7 +543,7 @@ When('Auto creates a thread through the remote folder picker', async ({ page }: 
   if (remoteSessionId === undefined) throw new Error('The manager did not list the new remote Session.')
   const conversation = page.locator('[data-conversation-content]')
   await expect.poll(() => conversation.getAttribute('data-conversation-session')).toBe(remoteSessionId)
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await expect(composer).toBeVisible({ timeout: 30_000 })
   await expect(composer).toBeEnabled()
 
@@ -609,7 +609,7 @@ When('the native composer sends a prompt to the remote Session', async ({ page }
   const observation = autoDestinationObservations.get(page)
   if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
   const prompt = `remote-composer-${randomUUID()}`
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill(prompt)
   const send = page.getByRole('button', { name: 'Send message', exact: true })
   await expect(send).toBeEnabled()
@@ -1170,7 +1170,11 @@ When('a checkout on the host has unpushed work and origin moved', async ({ page 
 When('the checkout is checked from the Sync checkout dialog', async ({ page }: { readonly page: Page }) => {
   const repositories = checkoutSyncRepositories.get(page)
   if (repositories === undefined) throw new Error('The checkout sync journey created no repositories.')
-  await page.getByTestId(/^host-row-/u).filter({ hasText: scratchRemoteName }).getByRole('button', { name: 'Sync checkout', exact: true }).click()
+  await page
+    .getByTestId(/^host-row-/u)
+    .filter({ hasText: scratchRemoteName })
+    .getByRole('button', { name: 'Sync checkout', exact: true })
+    .click()
   const dialog = syncDialog(page)
   await expect(dialog).toBeVisible()
   await dialog.getByLabel(`Checkout on ${scratchRemoteName}`).fill(repositories.checkout)
@@ -1219,7 +1223,7 @@ When('the manager composer selects the recorded remote thread mention', async ({
   if (created === undefined || created.mention === undefined) throw new Error('The manager did not expose a canonical mention for the remote thread.')
 
   await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await expect(composer).toBeVisible({ timeout: 30_000 })
   const option = page.getByRole('listbox').getByRole('option').filter({ hasText: observation.sessionId }).first()
   const chip = page.locator('[data-composer-card] [data-composer-chip="reference"]')

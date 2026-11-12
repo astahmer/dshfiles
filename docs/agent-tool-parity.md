@@ -34,6 +34,15 @@ The sidebar **Use this account for this thread** action shares its Host implemen
 
 The Session-controller fork publishes the reusable `thread-model` contract and corresponding `thread_local_model_state` / `thread_select_local_model` tools. Selection is serialized and revision-checked at commit; it preserves the in-flight request and applies to future requests. Native model-picker behavior remains separate. Optional compaction guidance is presentation/advice only; native `/compact` remains an explicit user decision, not a new automatic tool action. See the [AI Accounts behavior](../plugins/@dshfiles/ai-accounts/README.md#use-an-account-for-the-current-thread) and [native contract](../plugins/@dshfiles/session-controller/README.md#thread-local-model-selection). The historical survey counts below are not recalculated by this scoped addition.
 
+## Appearance theme (visual refresh P6)
+
+Settings › General › Appearance (preset, grey hue and tint, accent hue, contrast, interface and code font) is served by
+`@dshfiles/ui-styles`, whose `ui-theme-appearance` API binds `theme_get` (read-only: preset, values in effect, overrides,
+fonts, the light/dark preference and the presets) and `theme_set` (call only when the user asked; a preset, overrides,
+fonts, or `reset: true` back to the defaults). Both read and write the same settings namespace as the form, so a change
+is visible with `theme_get` and reversed with `reset: true` or a later `theme_set`. Light, dark or system stays the
+native `ui-theme` setting (`settings_set`). The historical survey counts below are not recalculated by this addition.
+
 ## Onboarding (DSH 0.2.1-rc.2)
 
 `@dshfiles/onboarding` binds every user-facing capability of Getting started to its Host API. `onboarding_overview` (read-only) returns the checklist, packs and feature rows the page shows, and with `preview: { pack, action }` the exact pack change the dialog previews. `onboarding_pack_apply` (write, run only when the user asked) applies one pack change and requires `confirm: true`; a call without it changes nothing, and the other action reverses it. `onboarding_reach` (read-only) returns the steps **Show me where** walks. `onboarding_whats_new` (read-only) returns What's new. `onboarding_suggestions` (read-only) returns the usage suggestions the page shows and refuses, reading nothing, while the `suggestions` setting is off (the default); dismissing a suggestion is per-browser presentation and has no tool. `onboarding_try_it` (write, run only when the user asked) starts the same demo thread **Try it** starts, through thread-sidebar's Thread actions create path; it requires `confirm: true`, refuses while the `tryIt` setting is off (the default), and returns the thread id so the user can open, stop or archive it (the tokens spent are not reversible). Opening a page, replaying the wizard and walking a feature are presentation and have no tool: the Agent gives the user the steps and the user walks them. See the [plugin README](../plugins/@dshfiles/onboarding/README.md#agent-tools). The historical survey counts below are not recalculated by this scoped addition.
@@ -185,6 +194,13 @@ so the agent can follow the same asynchronous pass the user watches.
 Settings › Projects › **Main branch** pairs `jj_project_bookmark` (read-only:
 the branch and the layer that chose it) with `jj_set_project_bookmark` (write;
 `bookmark: null` reverses it to Automatic).
+
+Productivity pass Q3 adds three, bound to the same methods the UI calls: `dsh_update_check` (read-only; Settings ›
+About › Update DSH's Check: fetch, What's new, what it would rebuild and whether a restart follows, plus the update
+job's progress), `dsh_update_apply` (the section's Update; `confirm: true` with no default, never restarts or pushes)
+and `jj_thread_land_impact` (read-only; the Land card's Try live). The restart that may follow stays the user's
+**Restart when idle**; Land & next, Open PR and keyboard review reuse `jj_thread_rebase`, `pull_request_create_preview`
+/ `pull_request_create` and the diff-viewed marks.
 
 Deliberately not bound, because an existing tool already covers the decision or
 there is no model decision to make: `land` and `threadAt` (both accept an
@@ -578,6 +594,12 @@ effective value and source, the model the Settings rows draw. `plugin_inventory`
 `setPluginEnabled`, the verbs of the native Plugins page; the write relays the
 manager's verdict (applied, restart-required with its reason, overridden) and is
 reversed with the opposite value.
+
+Chat owns its view mode (visual refresh T2.5: Summary / Normal / Verbose) and binds it on its own `chat-view` API:
+`transcript_view_get` (read-only; the saved mode, or null for the device default) and `transcript_view_set`
+(compact, detailed, verbose, or `device-default` to clear the choice again; user-requested only). Chat's Host entry
+keeps its native schemastery `Config` (the `dshfiles-chat` namespace) through `defineHost`, so the tools write the
+same field the Settings row does, at the revision they read.
 
 Secret Catalog binds `secret_reference_status` (read-only) to the
 `secret-catalog-setup.referenceStatus` verb its reference repair card uses: why

@@ -1,0 +1,38 @@
+/*
+ * Geist and Geist Mono for the visual refresh (visual refresh D2, T0.4). Variable latin faces only (~52 KB);
+ * other scripts and italics fall back to the system stack the Host already uses. dshx inlines client assets, so the
+ * files ship as data URIs inside this one injected sheet. Provenance and the OFL licences: ./fonts/README.md.
+ */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('./fonts/geist-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('./fonts/geist-mono-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+/*
+ * The Host builds `--dsw-font-family` as `var(--dsh-font-family-text, <default>), <default>` on body, where
+ * `--dsh-font-family-text` is the family typed in Settings. Replacing only the `-default` stacks (declared on `:root`)
+ * keeps that setting winning and leaves every font size alone. The tails are the Host's own 0.2.1-rc.2 stacks.
+ */
+:root:root {
+  --dsh-font-family-text-default:
+    'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --dsh-font-family-code-default:
+    'Geist Mono', 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei', monospace;
+}

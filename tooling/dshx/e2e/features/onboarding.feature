@@ -2,8 +2,9 @@ Feature: Onboarding
 
   Getting started shows a setup checklist read from the Host, the plugin packs
   and every catalogued feature, and opens only routes that exist. A three-step
-  setup wizard shows while no thread is open, never blocks the app, and ends by
-  inserting a prompt it never sends.
+  setup wizard (a dialog, a bottom sheet on a phone) opens while setup is
+  missing, puts itself away for now on Escape, and ends by inserting a prompt
+  it never sends.
 
   @scenario:onboarding.getting-started
   Scenario: Getting started lists the checklist, packs and features and opens a registered page

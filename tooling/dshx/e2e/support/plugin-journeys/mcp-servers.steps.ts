@@ -7,7 +7,7 @@ import { fakeOAuthMcpFor, startFakeOAuthMcp, stopFakeOAuthMcp } from '../fake-oa
 import { allowLoopbackBrowserOrigin, finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 const fakeServer = join(dirname(fileURLToPath(import.meta.url)), '..', 'fake-mcp-server.mjs')
-const newThreadComposerName = 'Describe what you want to build, / commands, @ files or sessions'
+const newThreadComposerName = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
 const addForm = (page: Page) => page.getByRole('form', { name: 'Add MCP server', exact: true })
 const servers = (page: Page) => page.getByRole('region', { name: 'Registered servers', exact: true })
 const serverRow = (page: Page, name: string) => servers(page).getByRole('listitem').filter({ hasText: name })
@@ -40,14 +40,14 @@ When('the composer searches MCP @ autocomplete for {string}', async ({ page }: {
   await expect(sendButton).toBeEnabled()
   await sendButton.click()
   await expect(page.getByText(/This turn failed/)).toBeVisible()
-  await page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true }).fill(`@${query}`)
+  await page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u }).fill(`@${query}`)
 })
 
 Then('the Echo server and its tool appear as @ suggestions', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'mcp-servers-autocomplete-shows-server', async () => {
     await expect(page.getByRole('option').filter({ hasText: 'Echo server' })).toBeVisible()
   })
-  await page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true }).fill('@e2e')
+  await page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u }).fill('@e2e')
   await recordAssertion(page, 'mcp-servers-autocomplete-shows-tool', async () => {
     await expect(page.getByRole('option').filter({ hasText: 'e2e_echo' })).toBeVisible()
   })

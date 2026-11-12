@@ -4,7 +4,7 @@
 
 ![Describe and review the working copy in Source Control](docs/screenshots/source-control.png)
 
-![Show exact revision counts against the selected base](docs/screenshots/composer-context.png)
+![The Changes pill in the thread header opens the Changes view](docs/screenshots/composer-context.png)
 
 ![Remove a workspace from the graph](docs/screenshots/workspace-removal.png)
 
@@ -74,10 +74,17 @@ Two panels in navigation, the main view and the Workbench chooser: **Revision gr
   commits @, then Working Copy and `@-1 … @-N` groups with per-file open diff,
   discard (`jj restore`), move to parent/child (`jj squash` with literal
   filesets), split by selected files, and group describe/new/edit/squash.
+- A **Changes pill** in the thread header (desktop) and the phone top bar
+  (setting `composerBar`): the thread workspace's net file diff since branching
+  from the base (`composerBarBase`, `main` by default) as `+N −M`, the revisions
+  only on `@` or only on that base in its tooltip, and one click into the Changes
+  view (or this panel when no Changes owner is loaded). A new thread shows no
+  pill. It replaced the changed-files bar that sat above the composer (visual
+  refresh T3.2); the Changes view carries the file list, diffs and scopes.
 - One-click toggle of the right-panel Jujutsu page on the current thread's
-  repository: the workspace and bookmark reading that continues Rich
-  Composer's `project · host` run summary chip (slot
-  `conversation.composer.location`; without Rich Composer, or on a thread with no workspace title such as a bare JJ folder, it is not shown), a conversation-header button (setting
+  repository: the workspace and bookmark reading after Rich Composer's
+  `project · host` run summary chip on the meter line (a
+  `conversation.composer.dock` entry; without Rich Composer, or on a thread with no workspace title such as a bare JJ folder, it is not shown), a conversation-header button (setting
   `headerToggle`, **off by default** so the header keeps thread state; the page
   also opens from its own rail), and the `jujutsu.toggleSessionRepository`
   command, unbound by default under Settings › Shortcuts. It opens the page on

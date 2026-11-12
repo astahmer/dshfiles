@@ -451,7 +451,7 @@ const tools: readonly WalkthroughTool[] = [
 function MiniStat({ label, value, accent }: { readonly label: string; readonly value: string; readonly accent?: boolean }) {
   return (
     <div className="dshx:flex dshx:w-48 dshx:flex-col dshx:gap-2 dshx:p-3">
-      <span className="dshx:text-[10px] dshx:text-muted-foreground">{label}</span>
+      <span className="dshx:text-2xs dshx:text-muted-foreground">{label}</span>
       <span className="dshx:text-lg dshx:font-medium dshx:tabular-nums">{value}</span>
       <div className="dshx:flex dshx:h-2 dshx:gap-0.5 dshx:overflow-hidden dshx:rounded-full">
         <div className="dshx:flex-[4] dshx:bg-muted-foreground/50" />

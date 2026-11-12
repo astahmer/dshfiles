@@ -163,7 +163,7 @@ describe('owned conversation view panel sources', () => {
       f.held[0]?.reject(new Error('Session unavailable'))
       await Promise.resolve()
     })
-    expect(f.element.querySelector('[role="alert"]')?.textContent).toContain('Conversation unavailable')
+    expect(f.element.querySelector('[role="alert"]')?.textContent).toContain('Thread unavailable')
     expect(f.element.textContent).not.toContain(`${b}:trajectory`)
     act(() => f.root.render(null))
     expect(f.held[0]?.release).toHaveBeenCalledTimes(1)

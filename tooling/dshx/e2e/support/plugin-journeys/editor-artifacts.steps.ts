@@ -16,13 +16,13 @@ Before({ tags: '@scenario:editor.thread-artifacts' }, () => test.setTimeout(330_
 
 const openArtifacts = async (page: Page): Promise<void> => {
   const pane = page.locator('[data-workbench-region="main"]').first()
-  const existing = pane.getByRole('tab', { name: 'Editor: Artifacts', exact: true })
+  const existing = pane.getByRole('tab', { name: 'Artifacts', exact: true })
   if ((await existing.count()) === 0) {
     await pane.getByRole('button', { name: 'New tab', exact: true }).first().click()
     const chooser = pane.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })
-    await chooser.getByRole('button', { name: 'Editor: Artifacts', exact: true }).click()
+    await chooser.getByRole('button', { name: 'Artifacts', exact: true }).click()
   }
-  await pane.getByRole('tab', { name: 'Editor: Artifacts', exact: true }).first().click()
+  await pane.getByRole('tab', { name: 'Artifacts', exact: true }).first().click()
 }
 
 When('the fake model creates a thread artifact', async ({ page }: { page: Page }) => {
@@ -49,7 +49,9 @@ Then('the artifact can be opened and edited in the workbench', async ({ page }: 
   await save.click()
   await expect(save).toBeDisabled({ timeout: 15_000 })
   // Read the stored document back through Reload so a Host restart is not what proves the save landed.
-  await page.getByRole('button', { name: 'Reload', exact: true }).click()
+  // b:ysaj: Reload and Delete are in the editor's ⋯.
+  await page.getByRole('button', { name: 'More artifact actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Reload', exact: true }).click()
   const confirmReload = page.getByRole('alertdialog', { name: 'Reload artifact?', exact: true })
   await confirmReload.getByRole('button', { name: 'Reload', exact: true }).click()
   await expect(content.locator('.view-lines')).toContainText(editedContent)
@@ -71,7 +73,8 @@ Then('the saved artifact can be reopened after a Host restart', async ({ page }:
 })
 
 Then('the artifact can be deleted from the thread', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await page.getByRole('button', { name: 'More artifact actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
   await page.getByRole('alertdialog', { name: 'Delete artifact?', exact: true }).getByRole('button', { name: 'Delete', exact: true }).click()
   await recordAssertion(page, 'artifact-deletion-survives-reload', async () => {
     await expect(page.getByRole('button', { name: title, exact: true })).toHaveCount(0)
@@ -82,7 +85,9 @@ Then('the artifact can be deleted from the thread', async ({ page }: { page: Pag
 })
 
 Then('a new Markdown artifact can be created and saved in the workbench', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'New artifact', exact: true }).click()
+  // b:ysaj: one New ▾ with the kinds in a menu.
+  await page.getByRole('button', { name: 'New', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Markdown', exact: true }).click()
   await page.getByRole('textbox', { name: 'Artifact title', exact: true }).fill('Created in workbench.md')
   await page.getByLabel('Artifact content', { exact: true }).locator('.view-lines').click()
   await page.keyboard.type('Created in the UI')

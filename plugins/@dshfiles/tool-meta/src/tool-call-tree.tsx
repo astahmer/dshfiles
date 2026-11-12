@@ -35,14 +35,16 @@ const wrapToolCallTree = (input: ToolCallFrameParts & { readonly tree: Component
         dispatched.current = true
         const isWaitCall = owner.toolName === 'job_output' || owner.toolName === 'background_jobs_wait'
         return (
-          <div className="dshx:relative" data-dshfiles-tool-meta-frame="">
+          // The frame is a size container: in a narrow pane (a phone, a split) the timing would sit over the card's own
+          // status chip, so it gives way below the narrow tier (visual refresh P2).
+          <div className="dshx:@container dshx:relative" data-dshfiles-tool-meta-frame="">
             {nativeRenderSlot(key, owner, options)}
             {isWaitCall ? (
               <div className="dshx-root dshx:flex dshx:justify-end dshx:pr-2 dshx:pb-2">
                 <Meta owner={owner} />
               </div>
             ) : (
-              <span className="dshx-root dshx:pointer-events-none dshx:absolute dshx:top-0 dshx:right-0 dshx:flex dshx:h-7 dshx:items-center dshx:pr-2">
+              <span className="dshx-root dshx:pointer-events-none dshx:absolute dshx:top-0 dshx:right-0 dshx:flex dshx:h-7 dshx:items-center dshx:pr-2 dshx:@max-pane-narrow:hidden">
                 <Meta owner={owner} />
               </span>
             )}

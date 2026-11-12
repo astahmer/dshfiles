@@ -8,11 +8,11 @@ Monaco-based workspace file editor for DSH. Provides a workspace tree, editor ta
 
 Depends on `@dshfiles/workbench` for its dockable panel and `@dshfiles/plugin-ui` for shared UI. Build, test, and typecheck with `pnpm build`, `pnpm test`, and `pnpm typecheck` from this package.
 
-The Workbench chooser exposes the reusable **Editor: Files** view; its open-file tabs retain their filenames.
+The Workbench chooser exposes the reusable **Files** view; its open-file tabs retain their filenames.
 
 ## Thread artifacts
 
-The Workbench chooser and the command palette expose **Editor: Artifacts**: the Markdown and HTML documents that belong to the thread on screen. Artifacts live on the Host in the versioned `@dshfiles/editor-artifacts` plugin-storage namespace, so they survive a DSH restart and are listed per thread. Each document carries a revision; a save sends the revision it started from, and a concurrent edit (from the user or the agent) is refused with the current revision instead of silently overwriting work. Reload replaces the draft after an explicit confirmation; Delete asks first.
+The Workbench chooser and the command palette expose **Artifacts**: the Markdown and HTML documents that belong to the thread on screen. The page has one primary **New ▾** (Markdown, HTML), the thread's artifacts beside the editor, and Reload and Delete in the editor's ⋯; below the narrow-pane width the list and the editor stack, with Back to return to the list. Artifacts live on the Host in the versioned `@dshfiles/editor-artifacts` plugin-storage namespace, so they survive a DSH restart and are listed per thread. Each document carries a revision; a save sends the revision it started from, and a concurrent edit (from the user or the agent) is refused with the current revision instead of silently overwriting work. Reload replaces the draft after an explicit confirmation; Delete asks first.
 
 The agent drives the same API through the `artifact_list`, `artifact_read`, `artifact_create`, `artifact_update` and `artifact_delete` tools. The read tools set `readOnly`; create, update and delete say they run only when the user asked, and `artifact_delete` requires `confirm: true` with the expected revision.
 

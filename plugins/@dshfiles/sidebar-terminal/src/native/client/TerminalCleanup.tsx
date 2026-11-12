@@ -5,6 +5,7 @@ import type { WebTerminalId } from '@deepseek-ai/dsh-api-terminal-controller/typ
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from './locales.ts'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import css from './TerminalCleanup.module.css'
 
 /** The model owns cleanup; this seat only shows failures and requests retries. */
@@ -22,8 +23,8 @@ export interface TerminalCleanupInjected {
 export function TerminalCleanup({ useCloseFailures, retryClose, t }: PropsRuntime<'shell.overlay'> & PropsLocale<'sidebarTerminal'> & InjectFace<TerminalCleanupInjected>): ReactNode {
   const failures = useCloseFailures(value => value)
   if (failures.length === 0) return null
-  return <div className={css.stack}>{failures.map(failure => <div key={failure.id} className={css.notice} role="alert">
+  return <div className={`dshx-root ${css.stack}`}>{failures.map(failure => <div key={failure.id} className={css.notice} role="alert">
     <span>{t('cleanupFailed', { title: failure.title, message: failure.message })}</span>
-    <button type="button" onClick={() => { retryClose(failure.id) }}>{t('retry')}</button>
+    <Button type="button" size="sm" variant="outline" className="dshx:shrink-0" onClick={() => { retryClose(failure.id) }}>{t('retry')}</Button>
   </div>)}</div>
 }

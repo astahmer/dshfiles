@@ -54,7 +54,7 @@ export const AccountsToolbar = (props: {
             type="search"
             value={props.search}
           />
-          <kbd className="dshx:pointer-events-none dshx:absolute dshx:top-2.5 dshx:right-3 dshx:rounded dshx:bg-muted dshx:px-1 dshx:text-[11px] dshx:text-muted-foreground">
+          <kbd className="dshx:pointer-events-none dshx:absolute dshx:top-2.5 dshx:right-3 dshx:rounded dshx:bg-muted dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">
             ⌘K
           </kbd>
         </div>

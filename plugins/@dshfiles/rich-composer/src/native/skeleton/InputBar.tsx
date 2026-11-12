@@ -14,7 +14,7 @@
  */
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
+import type { ChangeEvent, CSSProperties, KeyboardEvent, MouseEvent } from 'react'
 import clsx from 'clsx'
 import {
   IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip,
@@ -42,7 +42,6 @@ import { isImageMediaType } from '../service.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { AnnotationsPill } from './AnnotationsPill.tsx'
 import { observeControlRow } from './control-row-layout.ts'
-import { observeRunRowPlacement } from './run-row-placement.ts'
 import css from './InputBar.module.css'
 
 const noSubscription = (): (() => void) => () => {}
@@ -51,6 +50,56 @@ const noSubscription = (): (() => void) => () => {}
 const THREAD_VIEW_SHOWN_EVENT = 'dshfiles:thread-view-shown'
 
 export type InputBarProps = ComposerBarProps
+
+/**
+ * Window event the composer sends to ask for a fresh new-thread draft (Primary+Alt+Enter anywhere, Primary+Enter on the
+ * new-thread page); @dshfiles/command-palette, which owns New thread, answers it. Nothing listens without it.
+ */
+export const START_NEW_THREAD_EVENT = 'dshfiles:start-new-thread'
+/** A send slower than this to leave the draft no longer opens a fresh draft. */
+const FRESH_DRAFT_WAIT_MS = 15_000
+/** The platform's primary modifier as the send tooltip spells it (composer redesign b:v9yh). */
+const MOD = typeof navigator !== 'undefined' && /mac|iphone|ipad/iu.test(navigator.userAgent) ? '⌘' : 'Ctrl+'
+
+/**
+ * The send button's glyph for what a click does now (visual refresh T3.3). Keyed by mode at the call site, so a
+ * change remounts it and the CSS entry animation plays once.
+ * @param props.mode - stop, steer into the running turn, queue behind it, or send.
+ * @returns a 16px decorative svg.
+ */
+function SendGlyph({ mode }: { readonly mode: 'stop' | 'steer' | 'queue' | 'send' }) {
+  if (mode === 'stop') {
+    return (
+      <svg className={css.sendGlyph} viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+        <rect x="3.5" y="3.5" width="9" height="9" rx="2" fill="currentColor" />
+      </svg>
+    )
+  }
+  if (mode === 'steer') {
+    // A turn into the running line: the message joins the current turn.
+    return (
+      <svg className={css.sendGlyph} viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M3.5 2.5v5a3 3 0 0 0 3 3h6" />
+        <path d="M9.5 7.5l3 3-3 3" />
+      </svg>
+    )
+  }
+  if (mode === 'queue') {
+    // A line added under the queue: the message waits for the running turn.
+    return (
+      <svg className={css.sendGlyph} viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
+        <path d="M2.5 4h8M2.5 8h8M2.5 12h4.5" />
+        <path d="M12 10v5M9.5 12.5h5" />
+      </svg>
+    )
+  }
+  return (
+    <svg className={css.sendGlyph} viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M8 13V3" />
+      <path d="M3.5 7.5L8 3l4.5 4.5" />
+    </svg>
+  )
+}
 
 export const InputBar = memo(function InputBar({
   useSession, useInput, inputActions, keyboard, addFiles, removeAttachment, resolveDraftAttachments,
@@ -76,6 +125,8 @@ export const InputBar = memo(function InputBar({
   // Plan mode swaps the composer placeholder (the projection is the folded
   // host value; owner-prop placeholders — hero, session-unavailable — win).
   const planActive = useProjection('plan', plan => plan !== undefined && (plan.pending ? !plan.active : plan.active))
+  // The narrow meter line's ⋯: its readings on a second line (b:gyk7).
+  const [metaExpanded, setMetaExpanded] = useState(false)
   // Absent (undefined: no frame yet) and cleared (null) both mean no goal.
   const hasGoal = useProjection('goal', goal => goal != null)
   // Session-maybe: the machine faces are absent together while no session is
@@ -137,15 +188,10 @@ export const InputBar = memo(function InputBar({
   useLayoutEffect(() => {
     const row = rowRef.current
     if (row === null) return
-    return observeControlRow(row)
+    return observeControlRow(row, { iconStep: () => !row.classList.contains(css.rowHero ?? '') })
   }, [])
   const cardRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  // The hero run row carries the model seat only while it fits beside its own
-  // segments; the same seat rides the tool row otherwise (see observeRunRowPlacement).
-  const runRowRef = useRef<HTMLDivElement | null>(null)
-  const modelSeatRef = useRef<HTMLElement | null>(null)
-  const [modelInRow, setModelInRow] = useState(true)
 
   // A continuable child without its live parent cannot accept human input,
   // but its independent Stop below stays available while it runs.
@@ -331,15 +377,34 @@ export const InputBar = memo(function InputBar({
     if (picked.length > 0) intakeFiles(picked)
   }
 
+  // Send in the background / send and start another (dshfiles plan Q2 T2.5): once the send went out (the draft
+  // emptied and the machine settled), ask for a fresh new-thread draft. A send that never goes out drops the request.
+  const freshDraftRequested = useRef<number | null>(null)
+  const requestFreshDraft = useCallback((): void => {
+    freshDraftRequested.current = Date.now()
+  }, [])
+  useEffect(() => {
+    const requestedAt = freshDraftRequested.current
+    if (requestedAt === null) return
+    if (Date.now() - requestedAt > FRESH_DRAFT_WAIT_MS) {
+      freshDraftRequested.current = null
+      return
+    }
+    if (machineBusy || draft !== '') return
+    freshDraftRequested.current = null
+    window.dispatchEvent(new CustomEvent(START_NEW_THREAD_EVENT))
+  }, [draft, machineBusy])
+  const draftPage = variant === 'hero'
+
   // The keymap handlers read live bar state through this ref so the editor
   // registration survives re-renders without re-arming per keystroke.
   const gate = useRef({
     locked, machineBusy, canSteerQueue, running, steeringAvailable, busyEnter,
-    intakeFiles, pasteText, uploadsPending, showToast, t, canAcceptDrop, promptHistory, replaceDraft,
+    intakeFiles, pasteText, uploadsPending, showToast, t, canAcceptDrop, promptHistory, replaceDraft, draftPage, requestFreshDraft,
   })
   gate.current = {
     locked, machineBusy, canSteerQueue, running, steeringAvailable, busyEnter,
-    intakeFiles, pasteText, uploadsPending, showToast, t, canAcceptDrop, promptHistory, replaceDraft,
+    intakeFiles, pasteText, uploadsPending, showToast, t, canAcceptDrop, promptHistory, replaceDraft, draftPage, requestFreshDraft,
   }
 
   useEffect(() => {
@@ -409,11 +474,26 @@ export const InputBar = memo(function InputBar({
   const interruptible = running && continuable
   const primarySubmitMode = resolveSubmitMode(busyEnter, running, 'enter', steeringAvailable)
   const plainMessageDraft = !empty && input?.phase === 'plain' && !draft.trimStart().startsWith('/')
-  const primaryLabel = primaryStops
-    ? t('input.stop')
+  // Visual refresh T3.3: one round button whose glyph says what a click does now — send, queue behind the running
+  // turn, steer into it, or stop. The semantics are unchanged; only the label already chose between them.
+  const sendMode: 'stop' | 'steer' | 'queue' | 'send' = primaryStops
+    ? 'stop'
     : running && steeringAvailable && !disabled && !uploadsPending && plainMessageDraft
-      ? t(primarySubmitMode === 'steer' ? 'input.send.steer' : 'input.send.queue')
-      : t('input.send')
+      ? primarySubmitMode === 'steer' ? 'steer' : 'queue'
+      : 'send'
+  const primaryLabel = sendMode === 'stop'
+    ? t('input.stop')
+    : sendMode === 'steer'
+      ? t('input.send.steer')
+      : sendMode === 'queue' ? t('input.send.queue') : t('input.send')
+  // The tooltip lists the three send keys (composer redesign b:v9yh): Enter, Primary+Enter (a fresh draft on the
+  // new-thread page, the other delivery while a turn runs) and Primary+Alt+Enter (send and start a new thread).
+  const acceleratedLabel = variant === 'hero'
+    ? t('input.send.keepDraft')
+    : running && steeringAvailable
+      ? primarySubmitMode === 'steer' ? t('input.send.queue') : t('input.send.steer')
+      : t('input.send.whileRunning')
+  const sendTooltip = `${primaryLabel} ↵ · ${acceleratedLabel} ${MOD}↵ · ${t('input.send.newThread')} ${MOD}⌥↵`
   const onPrimary = (): void => {
     if (primaryStops) {
       stop?.()
@@ -453,43 +533,28 @@ export const InputBar = memo(function InputBar({
       : canSteerQueue
         ? t('placeholder.steerQueue')
         : planActive ? t('placeholder.plan') : t('placeholder.default'))
+  // Visual refresh T3.1: the visible placeholder teaches the sigils this composer really has (`@` files, skills and
+  // threads through input-trigger; `/` commands). The accessible name keeps the long-standing default and hero
+  // sentences, which journeys, the scratch seeder and assistive tech already address the box by.
+  const sigilPlaceholder = placeholderText === t('placeholder.default') || placeholderText === t('placeholder.hero')
+  const visiblePlaceholder = sigilPlaceholder ? t('placeholder.sigils') : placeholderText
+  // Composer redesign b:v9yh: "Ask anything" plus a muted "@ mention · / commands" while the draft is empty; the
+  // CSS drops the hint in narrow bars and on touch, where only "Ask anything" fits.
+  const placeholderHint = sigilPlaceholder ? JSON.stringify(t('placeholder.hint')) : undefined
 
-  // Hero: one run row above the card holds the pre-send choices (§4.5 of docs/ade-ux). File access moves up from
-  // the toolbar there; the model seat follows it only while the row can hold it, because a seat that does not fit
-  // wraps alone onto a second line and its trailing auto margin strands it at the right edge. Once the thread has
-  // started the row collapses to the summary chip on the meter line and both seats return to the toolbar.
+  // Hero: the pre-send choices (§4.5 of docs/ade-ux) ride inside the card's bottom bar as quiet ghost pickers
+  // (visual refresh T3.2): project · host · workspace · agent mode · options · file access after the + control, the
+  // model seat beside Send exactly where a started thread keeps it. Nothing sits above the input any more. Once the
+  // thread has started the row collapses to the summary chip on the meter line and file access returns to the modes.
   const heroRunRow = variant === 'hero' && runRow !== undefined
-  const modelSeatInRow = heroRunRow && modelInRow
-  useLayoutEffect(() => {
-    const row = runRowRef.current
-    if (row === null || modelSeatRef.current === null) return
-    return observeRunRowPlacement({
-      row,
-      model: () => modelSeatRef.current,
-      onChange: setModelInRow,
-    })
-  }, [heroRunRow, modelInRow, sessionId])
   const queued = input?.queue.length ?? 0
 
   return (
-    <div className={clsx(css.root, variant === 'hero' && css.hero)}>
-      {heroRunRow && (
-        <div className={css.runRowFrame}>
-        <div ref={runRowRef} className={css.runRow} role="group" aria-label={t('runRow.label')} data-run-row="">
-          {runRow}
-          {sessionId === undefined ? null : (
-            <span className={css.runSegment} data-run-segment="file-access">
-              {renderSlot('conversation.input.permission', { locked })}
-            </span>
-          )}
-          {sessionId === undefined || !modelSeatInRow ? null : (
-            <span ref={modelSeatRef} className={clsx(css.runSegment, css.runModel)} data-run-segment="model" data-model-seat="">
-              {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
-            </span>
-          )}
-        </div>
-        </div>
-      )}
+    <div
+      className={clsx(css.root, variant === 'hero' && css.hero)}
+      data-shortcut-scope="composer"
+      style={placeholderHint === undefined ? undefined : { '--dsh-composer-placeholder-hint': placeholderHint } as CSSProperties}
+    >
       {toast !== null && (
         <Toast
           key={toast.seq}
@@ -554,7 +619,7 @@ export const InputBar = memo(function InputBar({
           editable={editable}
           editorDisabled={editorDisabled}
           phase={input?.phase ?? 'inert'}
-          placeholderText={placeholderText}
+          placeholderText={visiblePlaceholder}
           ariaLabel={workspaceTrigger ? t('hero.chooseWorkspace') : placeholderText}
           workspaceTrigger={workspaceTrigger}
           workspacePickerOpen={workspacePickerOpen}
@@ -562,7 +627,7 @@ export const InputBar = memo(function InputBar({
           hint={hint}
           showPlaceholder={draft === '' && attachments.length === 0 && !claimActive}
         />
-        <div ref={rowRef} className={css.row}>
+        <div ref={rowRef} className={clsx(css.row, heroRunRow && css.rowHero)}>
           <div className={css.tools} hidden={activity}>
             <Tooltip label={t('input.commands')} side="top" delayMs={500}>
               <button
@@ -586,7 +651,17 @@ export const InputBar = memo(function InputBar({
               hidden
               onChange={onPickFiles}
             />
-            <div className={css.modes}>
+            {heroRunRow && (
+              <div className={css.runRow} role="group" aria-label={t('runRow.label')} data-run-row="">
+                {runRow}
+                {sessionId === undefined ? null : (
+                  <span className={css.runSegment} data-run-segment="file-access">
+                    {renderSlot('conversation.input.permission', { locked })}
+                  </span>
+                )}
+              </div>
+            )}
+            <div className={css.modes} data-mode-group="">
               {sessionId === undefined || heroRunRow ? null : renderSlot('conversation.input.permission', { locked })}
               {sessionId === undefined ? null : renderSlot('conversation.input.plan', { locked })}
             </div>
@@ -599,8 +674,8 @@ export const InputBar = memo(function InputBar({
               {input === undefined || sessionId === undefined
                 ? null
                 : renderSlot('conversation.input.right', {})}
-              {sessionId === undefined || modelSeatInRow ? null : (
-                <span ref={modelSeatRef} className={css.modelSeat} data-model-seat="">
+              {sessionId === undefined ? null : (
+                <span className={css.modelSeat} data-model-seat="" data-run-segment={heroRunRow ? 'model' : undefined}>
                   {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
                 </span>
               )}
@@ -608,6 +683,15 @@ export const InputBar = memo(function InputBar({
             {input === undefined || sessionId === undefined ? null : <div className={activity ? css.activityExpanded : css.activity}>
               {renderSlot('conversation.input.activity', { locked, onActiveChange: setActivity })}
             </div>}
+            {/* The context meter rides beside Send (T3.3): a ring and percentage, its breakdown on click. */}
+            {activity ? null : (
+              <ContextMeter
+                useProjection={useProjection}
+                t={t}
+                detail={input === undefined || sessionId === undefined ? null : renderSlot('conversation.composer.context', {})}
+              />
+            )}
+            <div className={css.send}>
             {interruptible && (
               <Tooltip label={t('input.stop')} shortcutKeys={stopKeys} side="top" delayMs={500} disabled={stop === undefined}>
                 <button
@@ -624,38 +708,47 @@ export const InputBar = memo(function InputBar({
                 </button>
               </Tooltip>
             )}
-            <Tooltip label={primaryStops ? t('input.stop') : primaryLabel} shortcutKeys={primaryStops ? stopKeys : undefined} side="top" delayMs={500} disabled={primaryDisabled}>
+            <Tooltip label={primaryStops ? t('input.stop') : sendTooltip} shortcutKeys={primaryStops ? stopKeys : undefined} side="top" delayMs={500} disabled={primaryDisabled} maxWidth={280}>
               <button
                 type="button"
                 className={css.primary}
                 aria-label={primaryLabel}
                 disabled={primaryDisabled}
+                data-send-mode={sendMode}
                 onMouseDown={keepFocus}
                 onClick={onPrimary}
               >
-                {primaryStops ? (
-                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
-                    <rect x="3" y="3" width="10" height="10" rx="3" fill="currentColor" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
-                    <path d="M8.3125 0.980183C8.66767 1.0531 8.97902 1.20418 9.2627 1.43233C9.48724 1.61297 9.73029 1.85793 9.97949 2.10714L14.707 6.83468L13.293 8.24874L9 3.95577V15.0417H7V3.95577L2.70703 8.24874L1.29297 6.83468L6.02051 2.10714C6.26971 1.85793 6.51277 1.61297 6.7373 1.43233C6.97662 1.23986 7.28445 1.04402 7.6875 0.980183C7.8973 0.947006 8.1031 0.95516 8.3125 0.980183Z" fill="currentColor" />
-                  </svg>
-                )}
+                <SendGlyph key={sendMode} mode={sendMode} />
               </button>
             </Tooltip>
+            </div>
           </div>
         </div>
       </div>
-      {/* The meter line: run summary · context % · dock readings (cost, activity, plugin chips) · N queued. */}
-      <div className={css.dock} data-composer-dock data-meter-line="">
+      {/* The meter line (composer follow-up b:gyk7): where the thread runs on the left (run summary, then the plugins'
+          location entries such as "ahead of main by 2", then N queued), its readings on the right (activity, tokens,
+          cost). The context reading is the ring in the bar, not repeated here. In a narrow bar only the left group
+          shows; ⋯ lays the readings out on a second line. */}
+      <div className={css.dock} data-composer-dock data-meter-line="" data-meter-expanded={metaExpanded ? '' : undefined}>
         {variant === 'composer' && runSummary !== undefined ? runSummary : null}
-        {activity ? null : <ContextMeter useProjection={useProjection} t={t} />}
         {variant === 'composer' && input !== undefined && sessionId !== undefined
           ? renderSlot('conversation.composer.dock', {})
           : null}
         {variant === 'composer' && queued > 0 ? (
           <span className={css.queued} data-meter="queued">{t('runRow.queued', { count: String(queued) })}</span>
+        ) : null}
+        {variant === 'composer' ? <span className={css.meterSpacer} aria-hidden /> : null}
+        {variant === 'composer' ? (
+          <button
+            type="button"
+            className={css.meterMore}
+            aria-expanded={metaExpanded}
+            aria-label={metaExpanded ? t('runRow.lessDetails') : t('runRow.moreDetails')}
+            data-meter-more=""
+            onClick={() => { setMetaExpanded(open => !open) }}
+          >
+            ⋯
+          </button>
         ) : null}
       </div>
     </div>

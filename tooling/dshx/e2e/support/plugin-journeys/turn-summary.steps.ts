@@ -5,7 +5,7 @@ import { When, Then } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const WRITE_FILE = `[[call write ${JSON.stringify({ file_path: 'notes/walkthrough.md', content: 'one two' })}]]`
 const FAILING_COMMAND = `[[call bash ${JSON.stringify({ command: 'printf "turn-summary-e2e"; exit 7', description: 'Run the failing summary fixture' })}]]`
 
@@ -48,7 +48,7 @@ Then('the finished turn opens a walkthrough naming the written file', async ({ p
 })
 
 Then('the finished turn names the failed command and its outcome', async ({ page }: { page: Page }) => {
-  await expect(page.getByRole('status').filter({ hasText: /^(Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
   const summary = page.locator('[data-dshfiles-turn-summary]')
   await recordAssertion(page, 'turn-summary-shows-tool-count-and-failure', async () => {
     await expect(summary).toBeVisible()

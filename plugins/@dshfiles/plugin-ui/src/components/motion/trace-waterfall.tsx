@@ -226,7 +226,7 @@ export function TraceWaterfall({
         </div>
         <div
           aria-hidden
-          className="dshx:relative dshx:flex dshx:h-8 dshx:items-center dshx:border-b dshx:border-border dshx:text-[10px] dshx:font-medium dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase"
+          className="dshx:relative dshx:flex dshx:h-8 dshx:items-center dshx:border-b dshx:border-border dshx:text-2xs dshx:font-medium dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase"
         >
           <span className="dshx:w-[220px] dshx:shrink-0 dshx:border-r dshx:border-border dshx:px-4 dshx:leading-8 dshx:@max-pane-compact:w-[184px] dshx:@max-pane-narrow:w-[46%]">
             {labels.span}
@@ -347,7 +347,7 @@ function WaterfallBar({
         aria-hidden
         data-slot="trace-waterfall-bar"
         className={cn(
-          'dshx:relative dshx:h-4 dshx:shrink-0 dshx:origin-left dshx:overflow-hidden dshx:rounded-[5px] dshx:border',
+          'dshx:relative dshx:h-4 dshx:shrink-0 dshx:origin-left dshx:overflow-hidden dshx:rounded-md dshx:border',
           toneTint[tone],
           span.kind === 'agent' && !running && 'dshx:bg-transparent dshx:border-muted-foreground/40',
         )}
@@ -366,7 +366,7 @@ function WaterfallBar({
       {slowest ? (
         <span
           ref={chipRef}
-          className="dshx:shrink-0 dshx:rounded-sm dshx:bg-warning/15 dshx:px-1 dshx:text-[10px] dshx:font-semibold dshx:tracking-wider dshx:text-warning dshx:uppercase dshx:@max-pane-narrow:hidden"
+          className="dshx:shrink-0 dshx:rounded-sm dshx:bg-warning/15 dshx:px-1 dshx:text-2xs dshx:font-semibold dshx:tracking-wider dshx:text-warning dshx:uppercase dshx:@max-pane-narrow:hidden"
         >
           {slowestLabel}
         </span>

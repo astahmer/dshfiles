@@ -10,7 +10,7 @@ import { Then, When } from '../bdd.js'
 import { confirmFolderSetupStep } from '../threads.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
-const folderPickerDialog = (page: Page) => page.getByRole('dialog', { name: 'Add workspace' })
+const folderPickerDialog = (page: Page) => page.getByRole('dialog', { name: 'Add a project' })
 const absolutePathPattern = /^(?:\/|[a-z]:[\\/]|\\\\)/i
 const capabilityEndpoint = `${ApiChannelModel.apiChannel('@dshfiles/workspace-folder-picker', 'workspace-folder-picker.browser').slice(1)}/capabilities`
 const rpcIdentity = Schema.Struct({ rpcId: Schema.String, method: Schema.String })
@@ -28,10 +28,10 @@ const dismissGetStarted = async (page: Page): Promise<void> => {
 
 When('the header workspace Add workspace action is opened', async ({ page }: { page: Page }) => {
   await dismissGetStarted(page)
-  const choose = page.getByRole('button', { name: 'Choose workspace', exact: true })
+  const choose = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
   await expect(choose).toBeVisible({ timeout: 60_000 })
   await choose.click()
-  await page.getByRole('menuitem', { name: /Add workspace/ }).click()
+  await page.getByRole('menuitem', { name: /^Add (?:folder|workspace)/ }).click()
 })
 
 When('the sidebar Add workspace action is opened', async ({ page }: { page: Page }) => {
@@ -302,8 +302,8 @@ Then('a typed absolute folder path can be registered without browsing', async ({
     await recordAssertion(page, 'direct-path-is-registered-as-workspace', () =>
       expect(page.getByRole('treeitem').filter({ hasText: workspaceName })).toBeVisible(),
     )
-    await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
-    await page.getByRole('menuitem', { name: /Add workspace/ }).click()
+    await page.getByRole('button', { name: /^Choose (?:project|workspace)$/u }).click()
+    await page.getByRole('menuitem', { name: /^Add (?:folder|workspace)/ }).click()
     await recordAssertion(page, 'add-workspace-flow-can-reopen', () => expect(dialog).toBeVisible())
     await finishJourneyAssertions(page)
   } finally {
@@ -321,8 +321,8 @@ Then('a local repository can be cloned and registered as a workspace', async ({ 
     await writeFile(join(origin, 'README.md'), '# origin\n')
     execFileSync('git', ['-C', origin, 'add', 'README.md'])
     execFileSync('git', ['-C', origin, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '--quiet', '-m', 'first'])
-    await dialog.getByRole('button', { name: 'New', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Clone repository…' }).click()
+    // Productivity pass Q5 (T5.5): New project and Clone are direct buttons of the Add a project dialog.
+    await dialog.getByRole('button', { name: 'Clone repository…', exact: true }).click()
     const cloneDialog = page.getByRole('dialog', { name: 'Clone repository' })
     await recordAssertion(page, 'clone-dialog-opens', () => expect(cloneDialog).toBeVisible())
     await cloneDialog.getByRole('textbox', { name: 'Repository URL' }).fill(`file://${origin}`)
@@ -344,8 +344,7 @@ Then('a new project can be created and registered as a workspace', async ({ page
   const scratchRoot = await realpath(await mkdtemp(join(tmpdir(), 'dsh-folder-picker-new-')))
   const dialog = folderPickerDialog(page)
   try {
-    await dialog.getByRole('button', { name: 'New', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'New project…' }).click()
+    await dialog.getByRole('button', { name: 'New project…', exact: true }).click()
     const createDialog = page.getByRole('dialog', { name: 'New project' })
     await recordAssertion(page, 'new-project-dialog-opens', () => expect(createDialog).toBeVisible())
     await createDialog.getByRole('textbox', { name: 'Parent folder' }).fill(scratchRoot)

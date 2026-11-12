@@ -90,7 +90,7 @@ const DemoCard = React.memo(function DemoCard({ demo }: { readonly demo: Gallery
             {demo.title}
           </h2>
           <p className="dshx:text-xs dshx:text-muted-foreground">{demo.description}</p>
-          <code className="dshx:mt-1 dshx:block dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">{demo.source}</code>
+          <code className="dshx:mt-1 dshx:block dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{demo.source}</code>
         </div>
         {demo.static ? null : (
           <Button variant="ghost" size="xs" aria-label={`Replay ${demo.title}`} onClick={() => setRun(n => n + 1)}>

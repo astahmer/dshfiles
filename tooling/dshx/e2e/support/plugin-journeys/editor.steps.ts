@@ -60,7 +60,7 @@ When('a disposable workspace with source, dependency and version-control files h
   await writeFile(join(workspace, '.git', 'HEAD'), headSource)
 
   await registerWorkspaceFolder(page, workspace)
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   // The New thread composer resets a draft typed while it switches to the just-registered project, so type until it sticks.
   await expect(async () => {
     await composer.fill('editor e2e thread')
@@ -166,11 +166,11 @@ Then('Go to file lists workspace sources but not dependency or version-control f
 
 Then('{string} opens in the {string} editor with its disk content', async ({ page }: { page: Page }, fileName: string, placement: string) => {
   await recordAssertion(page, `editor-opens-in-the-${placement.replaceAll(' ', '-')}`, async () => {
-    const workbenchEditor = page.getByRole('region', { name: 'Editor: Files', exact: true })
+    const workbenchEditor = page.getByRole('region', { name: 'Files', exact: true })
     if (placement === 'workbench') {
       const pane = page.locator('[data-workbench-region="main"]').first()
       await expect(pane).toBeVisible()
-      await expect(workbenchEditor.getByRole('tab', { name: 'Editor: Files', exact: true })).toHaveAttribute('aria-selected', 'true')
+      await expect(workbenchEditor.getByRole('tab', { name: 'Files', exact: true })).toHaveAttribute('aria-selected', 'true')
       // File browsing belongs to Editor; the shared chooser offers no duplicate Explorer.
       await pane.getByRole('button', { name: 'New tab', exact: true }).first().click()
       const chooser = pane.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })

@@ -239,6 +239,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       scope: 'session'
       owner: ConversationHeaderActionOwnerProps
     }
+    // 'conversation.session.header.changes' is declared in ../../conversation-contract.ts, the published module its
+    // providers import (visual refresh T3.2).
     /** Global navigation before the Session title, available without a Session. */
     'conversation.header.leading': {
       kind: 'single'
@@ -274,6 +276,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.input.overlay': { kind: 'list'; scope: 'session' }
     /** Ambient entries below the composer card. */
     'conversation.composer.dock': { kind: 'list'; scope: 'session' }
+    /**
+     * dshfiles (b:ysaj): readings inside the context meter's panel, under the occupancy breakdown (how far the thread
+     * is from automatic compaction), so the meter line carries no second context item.
+     */
+    'conversation.composer.context': { kind: 'list'; scope: 'session' }
     /** Compact controls at the left of the composer tool row. */
     'conversation.input.left': { kind: 'list'; scope: 'session' }
     /** Compact controls before the composer submit action. */
@@ -314,7 +321,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
         'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe' }
         'conversation.hero.options': { kind: 'list'; scope: 'session' }
-        'conversation.composer.location': { kind: 'list'; scope: 'session' }
+        // Declared in ../../conversation-contract.ts (visual refresh T3.4).
+        'conversation.hero.suggestions': { kind: 'list'; scope: 'root' }
       }
       inject: ConversationInjected
       locale: 'conversation'
@@ -526,7 +534,7 @@ export type ComposerBarProps =
     | 'conversation.input.permission'
     | 'conversation.input.left' | 'conversation.input.plan'
     | 'conversation.input.right' | 'conversation.input.model' | 'conversation.input.activity'
-    | 'conversation.composer.dock'
+    | 'conversation.composer.dock' | 'conversation.composer.context'
   >
   & InjectFace<ComposerBarInjected>
   & PropsLocale<'conversation'>
@@ -601,6 +609,7 @@ export type ConversationSessionHeaderSlotProps =
     'conversation.session.header.lineage'
     | 'conversation.session.header.actions'
     | 'conversation.session.header.utilities'
+    | 'conversation.session.header.changes'
     | 'conversation.session.header.corner'
   >
   & PropsStore<ConversationStore>

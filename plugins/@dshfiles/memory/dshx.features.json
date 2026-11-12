@@ -488,7 +488,7 @@
       ],
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"memory: n:1\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"memory: n:1\"",
         "press Enter",
         "expect button \"Preview memory n:1\"",
         "click button \"Preview memory n:1\"",

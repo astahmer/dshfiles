@@ -3,7 +3,7 @@ import { usePhoneThreadTool } from '@dshfiles/rich-composer/phone-thread-menu'
 import { BookmarkIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
@@ -16,6 +16,7 @@ import { PromptEditorForm, type PromptEditorSubmission } from './prompt-editor-f
 import { promptLibraryMachine, type PromptLibraryWorkflowClient } from './prompt-library-machine.js'
 import { promptSearchFilter } from './prompt-search.js'
 import { useDraftAttachmentRetention, type DraftAttachmentKeeper } from './draft-attachment-retention.js'
+import { promptLibraryRequests } from './composer-rows.js'
 import { PromptHistoryTab } from './prompt-history-tab.js'
 import { PromptHistoryTargets } from './prompt-history-targets.js'
 
@@ -24,11 +25,20 @@ type PromptSource = 'saved' | 'recent' | 'history'
 const sourceTitle = { saved: 'Saved prompts', recent: 'Recent messages', history: 'Prompt history' } satisfies Record<PromptSource, string>
 const sourceNote = {
   saved: 'Saved text is shared through the Host. Files and attachments are not included.',
-  recent: 'Recent text from this conversation only. Attachments are not included.',
+  recent: 'Recent text from this thread only. Attachments are not included.',
   history: 'Every prompt you sent, across threads. Star one to keep it in Saved.',
 } satisfies Record<PromptSource, string>
 
-const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeeper: DraftAttachmentKeeper<PromptActionProps['sessionId']> }): JSX.Element => {
+const PromptStashAction = (
+  props: PromptActionProps & {
+    readonly attachmentKeeper: DraftAttachmentKeeper<PromptActionProps['sessionId']>
+    /**
+     * True while the user keeps saved prompts in the composer bar (rich-composer's `showComposerExtras`). False: the
+     * button leaves the bar, the composer's More menu and `/prompts` open the same popover from an anchor in its place.
+     */
+    readonly pinned: boolean
+  },
+): JSX.Element => {
   const input = props.useInput(state => state)
   useDraftAttachmentRetention({ keeper: props.attachmentKeeper, sessionId: props.sessionId, count: input.attachmentIds.length })
   const [activeSource, setActiveSource] = useState<PromptSource>('saved')
@@ -88,8 +98,16 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
     setActiveSource(source)
     send({ type: 'open', span: props.inputActions.captureInsertion() })
   }
+  const openLibraryRef = useRef(openLibrary)
+  openLibraryRef.current = openLibrary
+  useEffect(() => promptLibraryRequests.on(props.sessionId, source => openLibraryRef.current(source)), [props.sessionId])
 
-  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  // The button, or the invisible anchor that stands in for it while the library lives in the composer's More menu: either
+  // way it sits in the composer card, which Ctrl+R and the palette's prompt history find through it.
+  const triggerRef = useRef<HTMLElement | null>(null)
+  const setTrigger = (element: HTMLElement | null): void => {
+    triggerRef.current = element
+  }
   const openHistoryRef = useRef(() => openLibrary('history'))
   openHistoryRef.current = () => openLibrary('history')
   useEffect(() => {
@@ -146,21 +164,29 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
 
   return (
     <Popover open={isOpen} onOpenChange={next => (next ? openLibrary() : closeLibrary())}>
-      <PopoverTrigger asChild>
-        <Button
-          {...phoneTool.triggerProps}
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent dshx:data-[state=open]:text-foreground"
-          id={triggerId}
-          ref={triggerRef}
-          onMouseDown={event => event.preventDefault()}
-        >
-          <BookmarkIcon />
-          <span className="dshx:@max-pane-compact:sr-only dshx:in-data-model-compact:sr-only">Prompts</span>
-        </Button>
-      </PopoverTrigger>
+      {props.pinned ? null : (
+        // Opened from the More menu or /prompts: an invisible anchor where the button was keeps the popover above the bar.
+        <PopoverAnchor asChild>
+          <span ref={setTrigger} aria-label="Saved prompts" className="dshx:inline-block dshx:h-6 dshx:w-0" data-prompt-stash-anchor="" id={triggerId} />
+        </PopoverAnchor>
+      )}
+      {props.pinned ? (
+        <PopoverTrigger asChild>
+          <Button
+            {...phoneTool.triggerProps}
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent dshx:data-[state=open]:text-foreground"
+            id={triggerId}
+            ref={setTrigger}
+            onMouseDown={event => event.preventDefault()}
+          >
+            <BookmarkIcon />
+            <span className="dshx:@max-pane-compact:sr-only dshx:in-data-model-compact:sr-only">Prompts</span>
+          </Button>
+        </PopoverTrigger>
+      ) : null}
       <PopoverContent
         onCloseAutoFocus={phoneTool.onCloseAutoFocus}
         align="end"
@@ -232,7 +258,7 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
 
           <TabsContent value="recent" className="dshx:mt-0">
             {recentPrompts.length === 0 ? (
-              emptyLine('No sent text prompts are loaded from this conversation.')
+              emptyLine('No sent text prompts are loaded from this thread.')
             ) : (
               <Command className="dshx:rounded-none dshx:bg-transparent" filter={promptSearchFilter}>
                 <CommandInput placeholder="Search recent messages" />

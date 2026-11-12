@@ -1,5 +1,5 @@
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { DshxPlugin, hostService } from '@dshfiles/dshx/effect'
+import { DshxPlugin, hostService, WebRoutes } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer, Option } from 'effect'
 import { enrichDrafts } from './enrich.js'
 import { extensionOrigins } from './extension.js'
@@ -32,13 +32,10 @@ export class ExtensionRoutes extends Context.Service<
       const webServer = yield* hostService('webServer').pipe(Effect.option)
       if (Option.isSome(webServer)) {
         const server = webServer.value
-        yield* Effect.acquireRelease(
-          Effect.sync(() => [
-            server.register({ kind: 'exact', path: INGEST_PATH, handler: createIngestHandler({ token, allowedOrigins, ingest }) }),
-            server.register({ kind: 'exact', path: PAIR_PATH, handler: createPairHandler({ pairing, token, allowedOrigins }) }),
-          ]),
-          unregister => Effect.sync(() => unregister.forEach(remove => remove())),
-        )
+        // Held through WebRoutes: a Host bundle reload activates the rebuilt plugin before this Scope closes, and a
+        // plain second registration of the same path was a fatal "duplicate exact route" (b:gyk7).
+        yield* WebRoutes.register(server, { kind: 'exact', path: INGEST_PATH, handler: createIngestHandler({ token, allowedOrigins, ingest }) })
+        yield* WebRoutes.register(server, { kind: 'exact', path: PAIR_PATH, handler: createPairHandler({ pairing, token, allowedOrigins }) })
       }
       return ExtensionRoutes.of({ arm: Effect.sync(() => pairing.arm()), status: Effect.sync(() => pairing.status()) })
     }),

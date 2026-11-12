@@ -63,7 +63,7 @@ const ResourceUsage = (props: { readonly hostName: string; readonly resource: Re
 
   const metric = (label: string, value: string, ratio: number | undefined) => (
     <div className="dshx:min-w-0 dshx:flex-1">
-      <div className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-[11px]">
+      <div className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-2xs">
         <span className="dshx:text-muted-foreground">{label}</span>
         <span className="dshx:truncate dshx:font-mono">{value}</span>
       </div>
@@ -205,7 +205,7 @@ const HostRow = (props: {
     remoteView.mutate({ action: 'open', tab })
   }
   const target = (
-    <Badge variant="outline" className="dshx:shrink-0 dshx:font-mono dshx:text-[11px]">
+    <Badge variant="outline" className="dshx:shrink-0 dshx:font-mono dshx:text-2xs">
       {host.connector.kind === 'ssh' ? host.connector.sshTarget : 'this machine'}
     </Badge>
   )
@@ -262,12 +262,12 @@ const HostRow = (props: {
             </Tooltip>
           )}
           {host.hidden ? (
-            <Badge variant="secondary" className="dshx:shrink-0 dshx:text-[10px]">
+            <Badge variant="secondary" className="dshx:shrink-0 dshx:text-2xs">
               Hidden
             </Badge>
           ) : null}
           {props.resource?.stale ? (
-            <Badge variant="outline" className="dshx:shrink-0 dshx:text-[10px]">
+            <Badge variant="outline" className="dshx:shrink-0 dshx:text-2xs">
               Stale
             </Badge>
           ) : null}
@@ -523,7 +523,7 @@ export const HostsPage = () => {
         heading="Hosts"
         description="Machines threads can run on. Hidden hosts keep their records but leave the destination picker."
         meta={
-          <Badge variant="secondary" className="dshx:text-[11px] dshx:font-normal">
+          <Badge variant="secondary" className="dshx:text-2xs dshx:font-normal">
             {hosts.length === 0 ? 'none' : `${hosts.length} registered`}
             {hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}
           </Badge>

@@ -71,3 +71,16 @@
     margin-left: 0;
   }
 }
+
+/* dshfiles (b:ysaj): inside the reply's ⋯ menu the usage pill is a full row and keeps its words on a phone too. */
+@media (max-width: 480px) {
+  :global([data-message-actions-menu]) .trigger {
+    justify-content: flex-start;
+    width: 100%;
+    padding: 0 8px;
+  }
+
+  :global([data-message-actions-menu]) .trigger .label {
+    display: inline;
+  }
+}

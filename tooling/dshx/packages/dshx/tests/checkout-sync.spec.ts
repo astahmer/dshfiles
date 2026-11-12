@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { CheckoutRebuild } from '../src/checkout/rebuild.js'
-import { syncCheckout } from '../src/checkout/sync.js'
+import { planCheckout, syncCheckout } from '../src/checkout/sync.js'
 import { runCli } from '../src/cli/run.js'
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
@@ -264,6 +264,21 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
     for (let attempt = 0; attempt < 3; attempt++) expect(await sync(true)).toMatchObject({ status: 'would-sync' })
     expect(await sync()).toMatchObject({ status: 'synced', kept: [{ description: '' }] })
     expect(readFileSync(join(checkout, 'local.txt'), 'utf8')).toBe('local\n')
+  })
+
+  it('plans a move to a revision off the bookmark without touching the repository', async () => {
+    jj(lander, 'new', 'main')
+    writeFile(join(lander, 'thread.txt'), 'thread work\n')
+    jj(lander, 'commit', '-m', 'feat: thread work')
+    const head = commitOf(lander, '@-')
+    const operation = jj(checkout, '--ignore-working-copy', 'op', 'log', '-n', '1', '--no-graph', '-T', 'id').trim()
+
+    const result = await planCheckout({ cwd: lander, workspace: 'default', revision: head })
+
+    expect(result).toMatchObject({ workspace: 'default', to: head, changedFiles: ['thread.txt'], restart: { needed: false } })
+    expect(jj(checkout, '--ignore-working-copy', 'op', 'log', '-n', '1', '--no-graph', '-T', 'id').trim()).toBe(operation)
+    expect(commitOf(checkout, 'main')).not.toBe(head)
+    await expect(planCheckout({ cwd: lander, workspace: 'default', revision: 'main' })).rejects.toThrow('full lowercase hexadecimal')
   })
 
   it('reports a dry run without touching the repository or the files', async () => {

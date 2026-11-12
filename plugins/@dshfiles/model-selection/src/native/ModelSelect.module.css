@@ -78,7 +78,8 @@
 .chevron {
   flex: 0 0 auto;
   color: var(--dsw-alias-label-caption);
-  transition: transform 120ms ease;
+  /* dshfiles (visual refresh T5.1): the picker chevron turns on the collapse token. */
+  transition: transform var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease);
 }
 
 .chevronOpen {
@@ -328,4 +329,11 @@
   width: 12px;
   height: 12px;
   color: var(--dsw-alias-menu-icon);
+}
+
+/* dshfiles (visual refresh T5.1): reduced motion turns the chevron without the rotation animation. */
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
 }

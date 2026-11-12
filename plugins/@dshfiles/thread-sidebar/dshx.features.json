@@ -55,7 +55,7 @@
       "summary": "A thread started in No folder runs in its own dated scratch folder. Its row menu offers Turn into project, which registers that folder as a project with a title no other project holds and moves the thread under its own project group; the folder and its revisions stay where they were. A thread that is already a project is never offered the row action.",
       "reach": [
         "click button \"New session\"",
-        "click button \"Choose workspace\"",
+        "click button \"Choose project\"",
         "click option \"No folder*\"",
         "click button \"Send message\"",
         "click button \"Thread actions\"",
@@ -147,7 +147,7 @@
     {
       "id": "workbench-sidebar-assemblies",
       "title": "Dock the actual sidebar content assemblies",
-      "summary": "The owned stack always uses Workbench tabs with no native-layout opt-out. The actual New tab chooser tab offers Thread Sidebar: Threads, Thread Sidebar: Navigation, AI Accounts: Preview and AI Accounts: Controls alongside the Settings Shell: Settings hub, without a separate Rich Composer/current-conversation entry. Mixed or unlabeled footer assemblies use Thread Sidebar: Plugin previews or Thread Sidebar: Plugin controls instead of claiming one plugin owns them. Each group has far-right Pane options, without a persistent Workbench toolbar. The sidebar root delegates authorized slots with real owner props, contexts and live navigation selection; shell.left supplies the flexible tabbed area, including the existing account Preview assembly seated as an ordinary group. The fixed Preview is absent while that actual supported slot is overridden; standalone Sidebar keeps its fallback. Brand/history/palette, native account/settings toolbar and update notices stay fixed. The Threads panel owns its Sidebar settings wheel and the original customization editor's portal seat. Its original middle is absent-occupant compatibility only. The fullheight right pane retains tabs and real Session resources while collapsed, independently of the left/centre bottom row.",
+      "summary": "The owned stack always uses Workbench tabs with no native-layout opt-out. The actual New tab chooser tab offers Threads, Navigation, Quota and AI Accounts: Controls alongside the Settings Shell: Settings hub, without a separate Rich Composer/current-conversation entry. Mixed or unlabeled footer assemblies use Sidebar previews or Sidebar controls instead of claiming one plugin owns them. Each group has far-right Pane options, without a persistent Workbench toolbar. The sidebar root delegates authorized slots with real owner props, contexts and live navigation selection; shell.left supplies the flexible tabbed area, including the existing account Preview assembly seated as an ordinary group. The fixed Preview is absent while that actual supported slot is overridden; standalone Sidebar keeps its fallback. Brand/history/palette, native account/settings toolbar and update notices stay fixed. The Threads panel owns its Sidebar settings wheel and the original customization editor's portal seat. Its original middle is absent-occupant compatibility only. The fullheight right pane retains tabs and real Session resources while collapsed, independently of the left/centre bottom row.",
       "reach": [
         "expect region \"Threads\"",
         "expect button \"Collapse sidebar\"",
@@ -211,7 +211,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.workbench-assemblies-registration",
           "file": "plugins/@dshfiles/thread-sidebar/src/workbench-panels.test.tsx",
-          "testName": "registers the four real sidebar assemblies and disposes exactly its own entries"
+          "testName": "registers the five real sidebar assemblies, the one sidebar pane first, and disposes exactly its own entries"
         },
         {
           "kind": "unit-test",
@@ -250,12 +250,13 @@
       "summary": "Browse threads in the sidebar list, or open the thread board as a page that shows only columns (recovery, attention and remote threads sit in their column; drafts stay in the sidebar) and keeps its own grouping, status/source filters and project scope; park and settle through sidebar preferences and pin/archive through Host APIs.",
       "reach": [
         "expect region \"Threads\"",
-        "expect button \"Group: Status\"",
         "click tab \"Threads\"",
-        "click button \"Board\"",
+        "click button \"Filter: *\"",
+        "expect menuitem \"Group: Status\"",
+        "click menuitem \"Board\"",
         "expect region \"Thread board\"",
         "expect region \"Active column\"",
-        "expect button \"Group: Status\""
+        "expect button \"Group: *\""
       ],
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "surface": "destinationSection",
@@ -456,18 +457,11 @@
       "summary": "All threads is grouped by the ADE status vocabulary: Pinned on top, then Needs you, Working, Ready, Idle and Done (Done folded; a thread idle for 72 hours folds into Done unless pinned). Within a group the newest return comes first. Needs you and Failed are a projection of the inbox (open items about the thread) plus the questions, approvals, usage limits and interrupted turns the sidebar already sees, and a parent rolls up its subagents so it never looks finished while a child waits or failed. Each row shows a status glyph, the title, the agent preset, muted project and host chips, the elapsed time and one inline verb when it needs you (Answer and Approve open the thread; Retry, Resume and Land run the inbox item's verb); the hover action strip opens to the left of that verb, so neither covers the other. A Needs you group header offers Resume all for every row whose verb is Resume, so quota stops and interrupted turns leave together. Group › Arrange manually brings back the drag-to-arrange sections; saved views keep their own grouping.",
       "reach": [
         "expect region \"Threads\"",
-        "click button \"Group: Status\"",
+        "click button \"Filter: *\"",
+        "click menuitem \"Group: *\"",
         "expect text \"Arrange manually\"",
         "press Escape",
-        "expect button \"Group: Status\""
-      ],
-      "reachNarrow": [
-        "click button \"Threads\"",
-        "expect region \"Threads\"",
-        "click button \"Group: Status\"",
-        "expect text \"Arrange manually\"",
-        "press Escape",
-        "expect button \"Group: Status\""
+        "expect button \"Filter: *\""
       ],
       "surfaces": ["client", "integration"],
       "surface": "destinationSection",
@@ -582,28 +576,84 @@
       ]
     },
     {
+      "id": "live-working-activity",
+      "title": "See what a working thread is doing right now",
+      "summary": "A working thread's row trades its static meta line for a live one: its current step (\"Running pnpm test\", \"Editing 3 files\", \"Thinking\", or the subagent rollup) in the working shimmer, then the elapsed time (\"· 1m 12s\"); without a known step it reads \"Working · 1m 12s\". The thread header shows the same line beside the synced spinner, and the browser tab title gains a \"⟳ N ·\" prefix while N top-level threads work. The Host folds turn starts and tool calls it already observes into an in-memory map (thread-sidebar-live-turns list), read once every 3 s for every working row and only while one runs; one page-wide 1 s ticker writes each visible clock's text, and the shimmer is one CSS animation phase-locked across rows that pauses off screen and under reduced motion.",
+      "reach": ["expect region \"Threads\""],
+      "surfaces": ["client", "host"],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "thread-list: working row second line; session header utilities; document title",
+      "configuration": [],
+      "states": ["working-with-step", "working-without-step", "idle-hidden"],
+      "failureModes": [
+        "A Host older than the live-turns read answers that the API owner is missing: the row shows Working with the time since this tab saw the thread start, or no time for a thread already running when the page loaded.",
+        "A Host restart forgets the map; turns that start after it are tracked again."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.live-turns-fold",
+          "file": "plugins/@dshfiles/thread-sidebar/src/live-turns.test.ts",
+          "testName": "records a turn from its start and says its current step in words"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.live-turns-edits",
+          "file": "plugins/@dshfiles/thread-sidebar/src/live-turns.test.ts",
+          "testName": "counts the files a turn edits and thinks between calls"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.live-activity-ticker",
+          "file": "plugins/@dshfiles/thread-sidebar/src/live-activity.client.test.tsx",
+          "testName": "ticks every visible clock from one shared timer and pauses an off-screen one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.working-tab-title",
+          "file": "plugins/@dshfiles/thread-sidebar/src/live-activity.client.test.tsx",
+          "testName": "prefixes the count while threads work and restores the title after"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.live-working-activity-browser",
+          "reason": "Captured in a scratch DSH at desktop and 390x844 WebKit with two held fake-provider turns (productivity pass polish); a Gherkin scenario would need a turn held open past the journey's settle step."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
       "id": "project-header-chat",
       "title": "Start a chat from a project group header",
       "summary": "Open a fresh local New chat from a project header. All threads shows the selected blank immediately; typing saves a distinct unsent draft before sending. Reopen any of several project drafts from their rows, without creating saved empty conversations.",
       "reach": [
         "click button \"New thread\"",
-        "click button \"Choose workspace\"",
+        "click button \"Choose project\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
         "press Enter",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Project header example\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Project header example\"",
         "press Enter",
         "expect text \"Project header example\"",
-        "click button \"All threads\"",
-        "click button \"Group: Status\"",
+        "click button \"Filter: *\"",
+        "click menuitemradio \"All threads*\"",
+        "click button \"Filter: *\"",
+        "click menuitem \"Group: *\"",
         "click menuitemradio \"Project\"",
         "expect button \"New chat in sample\"",
         "click button \"New chat in sample\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unsent project prompt\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Unsent project prompt\"",
         "expect text \"Draft: Unsent project prompt\"",
-        "click text \"Project header example\" at 16,8",
-        "click text \"Draft: Unsent project prompt\" at 16,8",
+        "click button \"Project header example*\" at 8,8",
+        "click button \"Draft: Unsent project prompt*\" at 8,8",
         "expect text \"Unsent project prompt\""
       ],
       "surfaces": ["client", "integration"],
@@ -653,11 +703,11 @@
       "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, and open an archived thread by restoring it: DSH drops an archived Session from the main view, so one click restores and opens it instead of retrying a view that keeps closing.",
       "reach": [
         "click button \"New thread\"",
-        "click button \"Choose workspace\"",
+        "click button \"Choose project\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
         "press Enter",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Archive me later\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Archive me later\"",
         "press Enter",
         "expect text \"Archive me later\"",
         "click button \"More thread actions\"",
@@ -731,11 +781,11 @@
       "title": "Configure saved thread views",
       "summary": "Group thread rows by activity and filter by any combination of status, source, or attention; include durable Inactive and explicitly selected interrupted child rows in saved views, allow views to overlap, show attention dots only for matching statuses, and independently show or hide each tab's count. Grouping by project keys on the repository identity the Host resolves (origin, else repository root, else the folder), so two checkouts of one repository are one row marked with its checkout count.",
       "reach": [
-        "expect group \"Thread list view\"",
-        "click button \"All threads\"",
-        "expect button \"All threads\"",
-        "expect button \"Done\"",
-        "click button \"Thread list settings\"",
+        "click button \"Filter: *\"",
+        "expect menuitemradio \"Done*\"",
+        "click menuitemradio \"All threads*\"",
+        "click button \"Filter: *\"",
+        "click menuitem \"Thread list settings\"",
         "click button \"Manage views\"",
         "click button \"Add view\"",
         "expect checkbox \"Working\"",
@@ -1062,21 +1112,135 @@
       ]
     },
     {
+      "id": "filter-presets",
+      "title": "Save and switch thread list filter presets",
+      "summary": "The thread list's Filter menu opens on a Presets section: the saved views (All threads, Working, Done and the user's own) as one-click radios, Save current filters as preset…, Save changes and Discard changes once a filter was changed after applying one, and Preset options (Rename…, Update with current filters, Delete… with an Undo notice, Mark all read/unread, Manage presets…). A preset stores the grouping, status and source filters and, when saved with one, the project scope. The Filter button names the active preset (\"Filter: Needs you (edited)\" with a dot while edited). ⌘K lists a \"Filter: ‹preset›\" row per preset, [ and ] step through them in the thread list, and an optional chips row under the header applies one in one tap. Presets live in the thread-sidebar Host settings (threadViews), so every browser and device sees the same ones; the agent reads and changes them with the thread_view_* tools.",
+      "reach": [
+        "expect region \"Threads\"",
+        "click button \"Filter: *\"",
+        "expect group \"Presets\"",
+        "expect menuitemradio \"All threads*\"",
+        "click menuitem \"Save current filters as preset…\"",
+        "expect dialog \"Save filters as a preset\"",
+        "expect textbox \"Preset name\""
+      ],
+      "reachNarrow": [
+        "click button \"Back to Threads\"",
+        "click button \"Filter: *\"",
+        "expect group \"Presets\"",
+        "click menuitem \"Save current filters as preset…\"",
+        "expect dialog \"Save filters as a preset\""
+      ],
+      "surfaces": ["client", "host", "tool", "command", "settings", "storage"],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "thread-list: Filter menu › Presets",
+      "configuration": [
+        {
+          "key": "threadViews.showPresets",
+          "defaultValue": "true",
+          "constraints": "Boolean, Host-synced; Thread list settings › Use filter presets. Off: the Filter menu has no Presets section, the button shows the filters themselves, and the keys and ⌘K rows go.",
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.filter-presets-unit-round-trip"]
+        },
+        {
+          "key": "threadViews.showPresetChips",
+          "defaultValue": "false",
+          "constraints": "Boolean, Host-synced; Thread list settings › Show filter presets as chips: a chips row under the list header.",
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.filter-presets-unit-round-trip"]
+        },
+        {
+          "key": "threadViews.draft",
+          "defaultValue": "absent",
+          "constraints": "Host-synced unsaved filters (groupBy, statusFilters, sourceFilter) of the active preset; applying a preset or Save changes drops it.",
+          "coveredBy": ["thread-sidebar.filter-presets-unit-draft"]
+        },
+        {
+          "key": "threadViews.views[].projectFilter",
+          "defaultValue": "absent",
+          "constraints": "A project id, '' for Unassigned or null for All projects; absent (built-ins) leaves the project picker alone.",
+          "coveredBy": ["thread-sidebar.filter-presets-unit-project-scope"]
+        }
+      ],
+      "states": ["applied", "edited", "saved", "renamed", "deleted", "restored", "chips", "off"],
+      "failureModes": [
+        "A filter change after applying a preset never rewrites the preset: it is a draft until Save changes; changing back to the preset's own filters drops the draft.",
+        "Applying a preset, the active one included, drops the draft; a preset saved with a project scope sets the project picker, a built-in leaves it alone.",
+        "Delete asks for confirmation, refuses the last enabled preset, and its Undo notice puts the preset back at its position (active again if it was); the agent's thread_view_delete needs confirm: true and returns the preset and position thread_view_create restores.",
+        "At 12 presets Save current filters as preset… explains the limit instead of failing."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.filter-presets-unit-draft",
+          "file": "plugins/@dshfiles/thread-sidebar/src/filter-presets.test.ts",
+          "testName": "keeps a filter change as a draft beside the preset instead of rewriting it, and marks the list edited"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.filter-presets-unit-project-scope",
+          "file": "plugins/@dshfiles/thread-sidebar/src/filter-presets.test.ts",
+          "testName": "a project scope that differs from the one the preset names counts as edited; a neutral preset ignores it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.filter-presets-unit-save-changes",
+          "file": "plugins/@dshfiles/thread-sidebar/src/filter-presets.test.ts",
+          "testName": "Save changes writes the draft into the active preset; a neutral preset stays neutral on All projects"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.filter-presets-unit-round-trip",
+          "file": "plugins/@dshfiles/thread-sidebar/src/filter-presets.test.ts",
+          "testName": "round-trips a document with a draft, a project scope and the preset switches through the stored schema"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-sidebar.filter-presets-host-tools",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-views-host.test.ts",
+          "testName": "filter presets: saves the current filters, applies with its project scope, saves changes, deletes and restores in place"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.filter-presets",
+          "featureFile": "tooling/dshx/e2e/features/thread-view-presets.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Set the thread list's filters, then choose Filter › Save current filters as preset… and name it.",
+        "doneWhen": "The Filter button shows your preset's name and one click in its Presets section brings the filters back."
+      }
+    },
+    {
       "id": "idle-archive-policy",
       "title": "Automatically settle eligible idle threads",
       "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, settled, and explicitly excluded sessions and workspaces. Subagent threads idle for `subagentSettleHours` (24 by default) settle on their own and their running background jobs are stopped. The Host scans on the configured interval, so threads settle with no browser open; other plugins ask it to settle a thread for their own trigger through the auto-settle-api contract, and thread_auto_settle_status reads the last and next scan and the newest automatic settles. Settling is the plugin's own status: the thread stays listed and openable, the native archive verb is never called, and the Host pre-step gate stops its model steps until it is unsettled.",
       "reach": [
-        "click button \"All threads\"",
+        "click button \"Filter: *\"",
+        "click menuitemradio \"All threads*\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Idle policy target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Idle policy target\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
-        "rightclick text \"Idle policy target\" at 8,8",
+        "rightclick button \"Idle policy target*\" at 8,8",
         "click menuitem \"Auto-settle behavior\"",
         "expect menuitemradio \"Settle after idle threshold\"",
         "press Escape",
         "press Escape",
-        "click button \"Thread list settings\"",
+        "click button \"Filter: *\"",
+        "click menuitem \"Thread list settings\"",
         "expect checkbox \"Settle inactive threads\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
@@ -1262,20 +1426,22 @@
       "title": "Group remote threads with each view",
       "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
       "reach": [
-        "click button \"All threads\"",
-        "expect button \"All threads\"",
-        "click button \"All threads\"",
+        "click button \"Filter: *\"",
+        "click menuitemradio \"All threads*\"",
+        "expect button \"Filter: *\"",
         "expect region \"Threads\"",
-        "click button \"Thread list settings\"",
+        "click button \"Filter: *\"",
+        "click menuitem \"Thread list settings\"",
         "expect region \"Thread list settings\""
       ],
       "reachNarrow": [
-        "click button \"Threads\"",
-        "click button \"All threads\"",
-        "expect button \"All threads\"",
-        "click button \"All threads\"",
+        "click button \"Back to Threads\"",
+        "click button \"Filter: *\"",
+        "click menuitemradio \"All threads*\"",
+        "expect button \"Filter: *\"",
         "expect region \"Threads\"",
-        "click button \"Thread list settings\"",
+        "click button \"Filter: *\"",
+        "click menuitem \"Thread list settings\"",
         "expect region \"Thread list settings\""
       ],
       "surfaces": ["client"],
@@ -1345,15 +1511,17 @@
       "title": "Archive a settled thread once its delay passes",
       "summary": "Archive a settled thread after a configurable delay counted from the instant it was settled. The settled composer banner withholds its settle age while that age is only \"now\", titles the thread with it once the age says more, shows when the delay will archive it, and offers Archive and the primary Unsettle action that lifts the block; archived, pinned, running, waiting or newly changed threads, and threads settled before the timestamps existed, are never archived by the policy.",
       "reach": [
-        "click button \"All threads\"",
+        "click button \"Filter: *\"",
+        "click menuitemradio \"All threads*\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Settled archive target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Settled archive target\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
         "click button \"More thread actions\"",
         "click menuitem \"Settle\"",
         "expect status \"This thread is settled.\"",
-        "click button \"Thread list settings\"",
+        "click button \"Filter: *\"",
+        "click menuitem \"Thread list settings\"",
         "expect group \"Archive settled threads\""
       ],
       "surfaces": ["client", "settings"],
@@ -1414,12 +1582,13 @@
       "title": "Mute or snooze a thread",
       "summary": "Mute a thread for 1 h, 8 h, 24 h, until tomorrow morning (09:00), a week, or until unmuted, from its row, its context menu or the session header. A muted thread raises no desktop alert, attention group, label or unread dot and keeps its place instead of rising on new activity; a bell-off marker's tooltip gives the time left, and it wakes on its own. Mutes are Host-synced sidebar settings; the Muted filter lists them.",
       "reach": [
-        "click button \"All threads\"",
+        "click button \"Filter: *\"",
+        "click menuitemradio \"All threads*\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mute target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Mute target\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
-        "rightclick text \"Mute target\" at 8,8",
+        "rightclick button \"Mute target*\" at 8,8",
         "click menuitem \"Mute thread\"",
         "click menuitem \"Until tomorrow morning\"",
         "expect img \"Muted\""
@@ -1486,16 +1655,17 @@
       "title": "Keep selected threads manually unread",
       "summary": "Mark a thread unread from the sidebar and clear that marker in every browser when the thread is opened. The row dot and its Inbox item are one record: Done in the Inbox clears the dot at once (the attention API publishes a changed event every page re-reads on), and reading the thread resolves the item.",
       "reach": [
-        "click button \"All threads\"",
+        "click button \"Filter: *\"",
+        "click menuitemradio \"All threads*\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Unread target\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread neighbour\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Unread neighbour\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
-        "rightclick text \"Unread target\" at 8,8",
+        "rightclick button \"Unread target*\" at 8,8",
         "click menuitem \"Mark unread\"",
         "expect img \"Unread\""
       ],
@@ -1542,7 +1712,7 @@
       "summary": "The Host records every finished turn as an unacknowledged thread; the sidebar, other plugins and CLIs read that one record, and opening the thread acknowledges it everywhere.",
       "reach": [
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"thread sidebar finished turn e2e target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"thread sidebar finished turn e2e target\"",
         "click button \"Send message\"",
         "expect text \"Turn finished\""
       ],
@@ -1599,23 +1769,6 @@
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
         "click button \"Thread notifications\"",
-        "expect group \"Thread notifications\"",
-        "expect button \"Approval needed: Off\"",
-        "expect button \"Turn stopped: Off\"",
-        "expect button \"Agent messages: In-app and system\"",
-        "expect button \"Snooze notifications\"",
-        "click button \"Snooze notifications\"",
-        "expect button \"Resume notifications\"",
-        "click button \"Resume notifications\"",
-        "expect button \"Snooze notifications\"",
-        "expect button \"In-app notification position\"",
-        "expect button \"In-app notification timeout\""
-      ],
-      "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Settings Accounts, tools, secrets and plugins.\"",
-        "click combobox \"Sections\"",
-        "click option \"Thread notifications\"",
         "expect group \"Thread notifications\"",
         "expect button \"Approval needed: Off\"",
         "expect button \"Turn stopped: Off\"",
@@ -1742,7 +1895,13 @@
       "id": "navigation-layout",
       "title": "Customize sidebar navigation and sections",
       "summary": "The Threads panel toolbar owns a Sidebar settings gear, not fixed app chrome. It opens the original Root-owned Customize sidebar editor inside that panel through an owned React portal seat, so gear and editor follow moves and remain usable with a hidden tab row or collapsed left column. Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior using the same preferences authority. Standalone/global recovery remains available. The separate list-only sliders control is named Thread list settings; no duplicate preference model or native DOM reparenting is involved.",
-      "reach": ["click button \"Sidebar settings\"", "expect heading \"Customize sidebar\"", "click button \"Move up: Settle\"", "expect checkbox \"Settle\""],
+      "reach": [
+        "click button \"Filter: *\"",
+        "click menuitem \"Sidebar settings\"",
+        "expect heading \"Customize sidebar\"",
+        "click button \"Move up: Settle\"",
+        "expect checkbox \"Settle\""
+      ],
       "surfaces": ["client", "settings", "storage"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -1881,12 +2040,7 @@
       "id": "footer-more-menu",
       "title": "Reach Settings, sidebar pages, and hidden footer actions from both More menus",
       "summary": "The wide sidebar foot always seats a More control; it opens Settings, hidden or overflowed footer actions, and every sidebar page in one flat list, so Plugins stays one click away however narrow the sidebar is. The header More menu, and the Workbench Navigation view's, offers the same Settings action beside Customize sidebar in both the scroll-and-menu and menu-only overflow modes, even when every destination fits the row. A seat whose card yielded to another surface takes no room and can never leave the footer menu empty.",
-      "reach": [
-        "click button \"New tab\"",
-        "click button \"Thread Sidebar: Navigation\"",
-        "click button \"More sidebar destinations\"",
-        "expect option \"Settings\""
-      ],
+      "reach": ["press ControlOrMeta+Alt+KeyT", "click button \"Navigation\"", "click button \"More sidebar destinations\"", "expect option \"Settings\""],
       "surfaces": ["client", "settings"],
       "surface": "command",
       "destination": "none",
@@ -1944,6 +2098,81 @@
       ]
     },
     {
+      "id": "rail-actions",
+      "title": "Restart DSH, Copy DSH URL and Pair a phone on the rail above Settings",
+      "summary": "The DSH actions sit in a small group at the bottom of the rail, directly above Settings and below the folders and + New folder, expanded and collapsed alike: Restart DSH (only while the supervisor offers a restart; amber with a slow pulse while updates or a restart wait), a pending page reload (amber, opens the list of updated plugins), Copy DSH URL for agents (shows Copied) and Pair a phone (only with phone-pairing). Each has a tooltip and an accessible name; they are actions, not folders. On a phone they are rows of a DSH section at the end of the More tab. They are no longer drawn in the row under the list, and the command palette keeps them. Show DSH actions on the rail (on by default) puts them back in that row, which a pending restart or page reload then shows.",
+      "reach": ["expect tab \"Settings\"", "expect button \"Copy DSH URL for agents\""],
+      "surfaces": ["client", "settings"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "rail: DSH actions above Settings; phone: More › DSH",
+      "configuration": [
+        {
+          "key": "showRailActions",
+          "defaultValue": "true",
+          "constraints": "Boolean; off moves the DSH actions back to the row under the list.",
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.rail-actions"]
+        }
+      ],
+      "states": ["expanded", "collapsed", "phone", "restart-pending", "reload-pending", "copied", "setting-off"],
+      "failureModes": [
+        "An action whose owner is absent (no restart supervisor, no launch URL, no phone-pairing) is not drawn.",
+        "No action is drawn twice: with the rail actions on, the row under the list never carries them.",
+        "Only a pending restart or page reload is coloured; every other action stays muted."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.rail-actions",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.rail-actions-above-settings",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "puts the group directly above Settings, below the folders, and runs each action"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.rail-actions-collapsed",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "keeps the same group in the same place on the collapsed rail"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.rail-actions-pending-and-copied",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "marks a pending restart in amber with a pulse, and shows Copied after a copy"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.rail-actions-reload-pending",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "shows a pending page reload in amber that opens its plugin list"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.rail-actions-phone-more",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "lists the same actions under More › DSH on a phone, after the destinations"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.rail-actions-setting-default",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "a Host namespace from before the rail actions setting shows the DSH actions on the rail (b:kgcc)"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the rail draws actions whose Host verbs (restart, launch URL) already carry their own api-dispatch spans in pending-host-restart."
+        }
+      ]
+    },
+    {
       "id": "client-reload-banner",
       "title": "Offer a page reload when the running client bundles are behind",
       "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Restart the page to apply updates banner at the sidebar foot, naming the plugins a reload would load, with the button that does it.",
@@ -1985,7 +2214,7 @@
       "summary": "Search threads and files with frecency and keyboard chords, retain bounded recent results, and navigate backward or forward through history.",
       "reach": [
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Palette search target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Palette search target\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
         "click button \"Search threads\"",
@@ -2087,10 +2316,16 @@
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
       "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a “parent thread unavailable” header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
-      "reach": ["click button \"Thread list settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
+      "reach": [
+        "click button \"Filter: *\"",
+        "click menuitem \"Thread list settings\"",
+        "click button \"Finished subagents: Fold into “N finished”\"",
+        "expect menuitemradio \"Hide them\""
+      ],
       "reachNarrow": [
-        "click button \"Threads\"",
-        "click button \"Thread list settings\"",
+        "click button \"Back to Threads\"",
+        "click button \"Filter: *\"",
+        "click menuitem \"Thread list settings\"",
         "click button \"Finished subagents: Fold into “N finished”\"",
         "expect menuitemradio \"Hide them\""
       ],
@@ -2247,11 +2482,11 @@
       "summary": "Keep Pin as an icon button in the conversation header and put park, settle or unsettle, mute or snooze, archive, and restore in a More menu; Pin folds into the menu when the header is too narrow. Child-thread action preferences apply.",
       "reach": [
         "click button \"New thread\"",
-        "click button \"Choose workspace\"",
+        "click button \"Choose project\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
         "press Enter",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Header actions target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Header actions target\"",
         "press Enter",
         "expect group \"Thread actions\"",
         "click button \"More thread actions\"",
@@ -2466,7 +2701,7 @@
     {
       "id": "auto-restart-when-idle",
       "title": "Restart by itself to apply updates when idle",
-      "summary": "With autoRestartWhenIdle (on by default), a pending Host update (a plugin whose Host files changed since boot, which is what hmr-gate holds back, or a changed profile manifest after a profile sync) restarts DSH through the supervisor once no turn, subagent, background job or open user question ran for the quiet period; the last 30 s show Restarting to apply updates in N s with Postpone in the status strip, a check right before restarting cancels it when work started, a turn cut anyway is recorded for the bounded resume, and the page reloads onto the new Host. Without a supervisor nothing restarts and the item shows the launcher command.",
+      "summary": "With autoRestartWhenIdle (off by default in this fork; it acts on its own), a pending Host update (a plugin whose Host files changed since boot, which is what hmr-gate holds back, or a changed profile manifest after a profile sync) restarts DSH through the supervisor once no turn, subagent, background job or open user question ran for the quiet period; the last 30 s show Restarting to apply updates in N s on the rail's Restart (its dialog offers Postpone, then Resume automatic restart; the status strip item instead while the rail actions are off), a check right before restarting cancels it when work started, a turn cut anyway is recorded for the bounded resume, and the page reloads onto the new Host. Without a supervisor nothing restarts and the status strip item shows the launcher command with Copy command and Turn off automatic restart.",
       "surfaces": ["client", "host", "api", "tool"],
       "surface": "statusItem",
       "destination": "none",
@@ -2474,7 +2709,7 @@
       "configuration": [
         {
           "key": "autoRestartWhenIdle",
-          "defaultValue": "true",
+          "defaultValue": "false",
           "constraints": "Boolean; restart by itself to apply pending Host updates when idle.",
           "choices": ["true", "false"],
           "coveredBy": ["thread-sidebar.auto-restart-unit-idle-restart"]
@@ -2717,19 +2952,20 @@
       "title": "Mention another thread from its row, its tab, or a drag into the composer",
       "summary": "Resolve a target Host session and insert its native reference chip at the active composer's caret, from the sidebar row menu, from a main-view tab's menu, or by dragging a thread row or thread tab and dropping it on a composer. A drag carries only the plugin's own thread-mention type, so a rich editor never receives stray plain text; the composer under the pointer outlines and shows a drop hint, and only that composer inserts. Resolving, unavailable, and draft-changed outcomes surface as notices instead of changing the draft.",
       "reach": [
-        "click button \"All threads\"",
+        "click button \"Filter: *\"",
+        "click menuitemradio \"All threads*\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Mention target\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention source\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Mention source\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
-        "rightclick text \"Mention target\" at 8,8",
+        "rightclick button \"Mention target*\" at 8,8",
         "click menuitem \"@Mention thread\"",
         "expect title \"Mention target\"",
-        "rightclick text \"Mention source\" at 8,8",
+        "rightclick button \"Mention source*\" at 8,8",
         "click menuitem \"Follow-up in a new thread\"",
         "expect text \"Follow-up after @session:*\""
       ],
@@ -2813,11 +3049,12 @@
       "title": "Find human-invocable skills from @ autocomplete",
       "summary": "List the current Session's user-invocable skills in the @ menu and route selection through the existing /skill invocation.",
       "reach": [
-        "click button \"All threads\"",
+        "click button \"Filter: *\"",
+        "click menuitemradio \"All threads*\"",
         "click button \"New thread\"",
         "press Escape",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@e2e-skill-mentions\"",
-        "click textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@e2e-skill-mentions\"",
+        "click textbox \"Describe what you want to build, / commands, @ files or threads\"",
         "press End",
         "press x",
         "press Backspace",
@@ -2868,7 +3105,8 @@
         "seed quota-blocked-thread",
         "expect region \"Needs you\"",
         "expect button \"Resume all\"",
-        "click button \"Group: Status\"",
+        "click button \"Filter: *\"",
+        "click menuitem \"Group: *\"",
         "click menuitemradio \"Arrange manually\"",
         "expect region \"Usage limit\"",
         "expect button \"Resume this thread\""
@@ -2934,7 +3172,7 @@
       "summary": "A thread's row context menu, its hover action, the Open in side panel command palette action and a `@dshfiles/main-tabs` thread tab's own context menu open that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right controller, which opens a threadaside resource tab, and the tab menu asks for the same aside over the cancelable `dshfiles:open-thread-aside` window event this plugin answers. Dragging a main thread tab onto the open side panel moves it here the same way, and the aside tab's own menu row Move to main area hands it back: it dispatches `dshfiles:open-thread` and closes the aside only once `@dshfiles/main-tabs` took the thread, so the thread lives in one place. The tab retains the Session and hosts the same embedded Conversation a subagent chat does, so the thread streams and its composer works beside the thread the user is reading; closing the tab only releases the reference, and an already-open aside is focused instead of duplicated. The rebindable command threadSidebar.openInSidePanel ships unbound, and Customize sidebar > Hover actions stores hiddenRowActions and rowActionOrder so every row button is per-user in both visibility and left-to-right order.",
       "reach": [
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Hover actions target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Hover actions target\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
         "hover text \"Hover actions target\" at 8,8",
@@ -3386,7 +3624,7 @@
     {
       "id": "finished-turn-inbox",
       "title": "Finished turns in the Inbox",
-      "summary": "Each unacknowledged finished turn becomes an Inbox item: Ready for a completed, stopped or blocked turn, Failed for an error or the output token limit, plus one Ready item for a thread marked unread by hand. Opening the thread acknowledges it and resolves the item. Done on the item in the Inbox acknowledges the same turn here, so the row loses its unread dot too; Done on an older turn leaves a newer finish unread.",
+      "summary": "Each unacknowledged finished turn becomes an Inbox item: Ready for a completed, stopped or blocked turn, Failed for an error or the output token limit, plus one Ready item for a thread marked unread by hand. Opening the thread acknowledges it and resolves the item. Done on the item in the Inbox acknowledges the same turn here, so the row loses its unread dot too; Done on an older turn leaves a newer finish unread. A subagent Session publishes no item of its own: its finished turns roll up into the parent thread's item as one line (\"3 subagent turns finished; 1 failed.\"), read from the stored Session header only, and reading the parent clears them.",
       "reach": [
         "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\":\\\"echo inbox\\\",\\\"description\\\":\\\"Inbox check\\\"}]]\"",
         "press Enter",
@@ -3402,10 +3640,11 @@
       "currentSurface": "left-nav: Inbox › Turn finished",
       "surfaces": ["host", "integration"],
       "configuration": [],
-      "states": ["ready", "failed", "manually-unread", "acknowledged", "inbox-absent", "done-in-inbox"],
+      "states": ["ready", "failed", "manually-unread", "acknowledged", "inbox-absent", "done-in-inbox", "subagent-rolled-up"],
       "failureModes": [
         "Each finished turn is its own occurrence, so a later turn shows again after an earlier one was marked done.",
-        "Without the inbox loaded, thread attention works exactly as before."
+        "Without the inbox loaded, thread attention works exactly as before.",
+        "Subagent items published before the roll-up are not listed again, so the first reconcile resolves them into Closed once; a subagent header that cannot be read keeps that Session as its own thread."
       ],
       "externalDependencies": [
         {
@@ -3426,6 +3665,24 @@
           "id": "thread-sidebar.finished-turn-inbox-done",
           "file": "plugins/@dshfiles/thread-sidebar/src/inbox-provider.test.ts",
           "testName": "matches Done in the inbox to the thread record only while the item is its current turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.finished-turn-inbox-subagent-rollup",
+          "file": "plugins/@dshfiles/thread-sidebar/src/inbox-provider.test.ts",
+          "testName": "publishes no item for a subagent and rolls its finished turns into the parent item as a count (E1)"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.finished-turn-inbox-subagent-migration",
+          "file": "plugins/@dshfiles/thread-sidebar/src/inbox-provider.test.ts",
+          "testName": "drops the child items published before the roll-up, so reconcile resolves them once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.finished-turn-inbox-subagent-clear",
+          "file": "plugins/@dshfiles/thread-sidebar/src/inbox-provider.test.ts",
+          "testName": "clears subagent records once their parent thread is read, and keeps those of a parent still running"
         },
         {
           "kind": "not-applicable",
@@ -3450,16 +3707,8 @@
         "click button \"Traces\"",
         "expect heading \"Traces\"",
         "click tab \"Threads\"",
-        "expect button \"Board\""
-      ],
-      "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
-        "expect navigation \"Observe pages\"",
-        "click button \"Traces\"",
-        "expect heading \"Traces\"",
-        "click button \"Threads\"",
-        "expect button \"Board\""
+        "click button \"Filter: *\"",
+        "expect menuitem \"Board\""
       ],
       "surfaces": ["client"],
       "surface": "destinationSection",
@@ -3501,7 +3750,7 @@
     {
       "id": "phone-stack-navigation",
       "title": "Navigate the phone as a stack",
-      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers a Thread menu button: it calls the typed Rich Composer menu contract, only while the stage has its own mounted reader, to show the thread's view tabs, header controls and thread-panel opener (the bottom sheet) under the bar; it closes when the stage stops showing a thread. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
+      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers Thread panels, which opens the thread panel as a bottom sheet. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3518,7 +3767,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.phone-stack-thread",
           "file": "plugins/@dshfiles/thread-sidebar/src/phone-shell.test.ts",
-          "testName": "names a thread stage and goes back to Threads"
+          "testName": "names a thread on the stage and goes back to Threads, offering its panels"
         },
         {
           "kind": "unit-test",
@@ -3573,52 +3822,138 @@
     },
     {
       "id": "layout-mode",
-      "title": "Choose a fixed or free-docking left column",
-      "summary": "Settings › Layout (and the palette's Layout commands) switch the left column between the fixed rail-and-list layout, the default, and free docking, which mounts the movable Workbench panes again. The Workbench's saved left layout and named layouts are not touched while fixed is on, so switching back to free docking restores them; Move tab to stops offering the left region while it is absent.",
-      "reach": ["click tab \"Settings\"", "click radio \"Free docking\"", "expect tab \"Thread Sidebar: Threads\""],
+      "title": "One sidebar layout: the rail and list as a movable pane",
+      "summary": "The Fixed and Free docking left columns are one docking region (b:952m). Its default is the rail of destinations and the selected destination's list, as one Sidebar pane whose tab row is hidden; that pane moves, splits and floats like any Workbench pane, and Reset layout (⌘K) brings the default back. Collapsed, on a phone and without the Workbench the rail and list stay inline. A one-time merge keeps each person's arrangement: a former Fixed user's dormant docking layout becomes the named layout \"Free docking (before merge)\"; a former Free docking user keeps their left layout, the row under the list and the main tab rows. The retired layoutMode setting is decoded for one release and no longer shown.",
+      "reach": ["expect tab \"Threads\"", "click tab \"Observe\"", "expect navigation \"Observe pages\""],
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: Thread sidebar › Layout",
+      "currentSurface": "sidebar: the rail and list (Workbench Sidebar pane)",
       "configuration": [
         {
-          "key": "layoutMode",
-          "defaultValue": "fixed",
-          "constraints": "One of fixed or docking; docking restores the Workbench left panes and their saved layout.",
-          "choices": ["fixed", "docking"],
-          "coveredBy": ["thread-sidebar.layout-mode-default"]
+          "key": "layoutMerge",
+          "defaultValue": "null",
+          "constraints": "Hidden merge marker: null until one page migrated this Host, then the layout it found (fixed or docking).",
+          "choices": ["null", "fixed", "docking"],
+          "coveredBy": ["thread-sidebar.layout-merge-decide"]
         }
       ],
-      "states": ["fixed", "docking"],
-      "failureModes": ["Without the Workbench the docking choice falls back to the standalone navigation list and thread list."],
+      "states": ["default", "rearranged", "collapsed", "phone"],
+      "failureModes": [
+        "Without the Workbench the rail and list render inline, as the former Fixed layout did.",
+        "A left layout without the Sidebar pane (a former Free docking user's) shows its own Navigation and Threads panes; Reset layout restores the default."
+      ],
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
-          "id": "thread-sidebar.layout-mode-browser",
-          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (docs/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+          "kind": "unit-test",
+          "id": "thread-sidebar.layout-merge-decide",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-dock-host.test.ts",
+          "testName": "migrates a former Free docking user: marker plus the row under the list, which Free docking always showed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.layout-sidebar-pane",
+          "file": "plugins/@dshfiles/thread-sidebar/src/workbench-panels.test.tsx",
+          "testName": "lends the visible Sidebar pane’s element to the root and refuses an ordinary close (b:952m)"
         },
         {
           "kind": "unit-test",
           "id": "thread-sidebar.layout-mode-default",
           "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
-          "testName": "starts fixed and switches to free docking from Settings"
+          "testName": "lists the Settings pages without a layout switch: one sidebar layout (b:952m)"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.layout-mode-browser",
+          "reason": "The browser journey is the catalog reach plus the scratch-DSH desktop and WebKit phone evidence in sidebar folders (b:952m); the Workbench journeys seed the former Free docking arrangement and assert Reset layout restores the Sidebar pane."
         }
       ],
       "telemetry": [
         {
           "kind": "not-applicable",
-          "reason": "A Host-synced settings write through the dshx settings service; no plugin Host work of its own."
+          "reason": "Client-only presentation plus a Host-synced settings write through the dshx settings service; no plugin Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "sidebar-folders",
+      "title": "Folders of plugin panels on the rail",
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "sidebar: the rail's folders (agent tools sidebar_*)",
+      "summary": "The rail is a list of folders (b:952m): the eight destinations are built-in folders (hidden, never deleted) and a person adds folders of their own and files any addable panel (a page, a thread facet, a plugin view) in any folder. Only their changes are stored (sidebarTree in the Host settings); an empty tree is the default, so a page a plugin adds later lands in its mapped folder. Every verb has its inverse and an agent tool: sidebar_tree_get, sidebar_panels_available, sidebar_folder_create, sidebar_folder_rename, sidebar_folder_move, sidebar_folder_delete (confirm, restorable for 30 days), sidebar_folder_restore, sidebar_panel_add, sidebar_panel_move, sidebar_panel_remove, sidebar_tree_reset (confirm).",
+      "reach": [
+        "click button \"New sidebar folder\"",
+        "fill textbox \"Folder name\" \"Review\"",
+        "click radio \"eye\"",
+        "click button \"Create folder\"",
+        "click tab \"Review\"",
+        "click button \"Add panel\"",
+        "click option \"Changes\"",
+        "click button \"Add panel\"",
+        "click option \"Backlog\"",
+        "expect navigation \"Review pages\""
+      ],
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["derived", "customized", "folder-deleted", "folder-restored"],
+      "failureModes": [
+        "A write that lost a race with another writer is recomputed on a fresh read; a failed settings write reports a recovery path.",
+        "A filed panel whose plugin is not loaded is skipped in this browser and kept in the tree.",
+        "sidebar_panels_available says so when no browser reported its panels since DSH started."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.sidebar-tree-create-delete-restore",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-tree-host.test.ts",
+          "testName": "starts derived and round-trips create ↔ delete ↔ restore, keeping the folder’s panels"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.sidebar-tree-inverses",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-tree-host.test.ts",
+          "testName": "round-trips rename and hide ↔ show, move ↔ move back, add ↔ remove and panel move ↔ move back"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.sidebar-tree-confirm",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-tree-host.test.ts",
+          "testName": "requires explicit confirmation for destructive verbs and a change for an update"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.sidebar-tree-resolve",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-tree.test.ts",
+          "testName": "shows a filed panel only in its folder, skips a removed page, and keeps a page a plugin adds later"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.sidebar-folders-browser",
+          "reason": "The browser journey is the catalog reach plus the scratch-DSH desktop and WebKit phone evidence in sidebar folders (b:952m); the Workbench journeys seed the former Free docking arrangement and assert Reset layout restores the Sidebar pane."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },
     {
       "id": "moved-to-map",
       "title": "Find where a former sidebar page went",
-      "summary": "Where did a page go? (palette, or the link under every destination list) lists each former left-nav entry with the destination and section that holds it now and an Open button. The list is generated from the catalogs' migration map, and a test fails when an entry has no section. The palette also finds every page by its old name.",
+      "summary": "Where did a page go? (a palette command; the sidebar keeps no link to it since b:hbtt) lists each former left-nav entry with the destination and section that holds it now and an Open button. The list is generated from the catalogs' migration map, and a test fails when an entry has no section. The palette also finds every page by its old name.",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"Where did a page go?\"",
+        "press Meta+Shift+P",
+        "fill combobox \"Search the command palette\" \"Where did a page go\"",
+        "click option \"Where did a page go?*\"",
         "expect heading \"Where did a page go?\"",
         "click button \"Open Observe › Usage\"",
         "expect tab \"Observe\""
@@ -3704,7 +4039,7 @@
     {
       "id": "phone-tab-bar",
       "title": "Navigate from a bottom tab bar on a phone",
-      "summary": "Below 640px the rail becomes a bottom tab bar (Threads, Inbox, New, More). Threads and Inbox open their list full screen; opening a thread or page closes it, so the stage is pushed; a second tap on the open tab goes back. More lists the other destinations and the moved-to help. The frame then gives the stage the full width and leaves room for the bar instead of keeping the 56px rail.",
+      "summary": "Below 640px the rail becomes a bottom tab bar (Threads, Inbox, New, More). Threads and Inbox open their list full screen; opening a thread or page closes it, so the stage is pushed; a second tap on the open tab goes back. More lists the other destinations. The frame then gives the stage the full width and leaves room for the bar instead of keeping the 56px rail.",
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3740,7 +4075,6 @@
       "title": "See the threads waiting on you in one page",
       "summary": "Inbox › Waiting threads lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
       "reach": ["click tab \"Inbox\"", "click button \"Waiting threads\"", "expect heading \"Waiting threads\""],
-      "reachNarrow": ["click button \"Inbox\"", "click button \"Waiting threads\"", "expect heading \"Waiting threads\""],
       "surfaces": ["client", "integration"],
       "surface": "destinationSection",
       "destination": "inbox",
@@ -3796,10 +4130,10 @@
     {
       "id": "subagent-live-preview",
       "title": "Live subagent preview in the transcript and above the composer",
-      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working children above the composer share a \"Working subagents\" header with their count that collapses them all, and stays collapsed while children start and finish.",
+      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working children above the composer fold into one \"N subagents working\" row, closed by default like the background-jobs dock; opening it lists them, and the choice holds while children start and finish.",
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+        "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
         "press Enter",
         "expect region \"Working subagents\"",
         "click button \"Show or hide the progress of *\"",
@@ -3856,7 +4190,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.subagent-dock-group-collapse",
           "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
-          "testName": "collapses every working child under one header and keeps it collapsed as children come and go"
+          "testName": "folds two or more working children into one closed row and keeps the reader's choice as children come and go"
         }
       ],
       "telemetry": [
@@ -3869,10 +4203,10 @@
     {
       "id": "thread-subscriptions",
       "title": "Opt-in completion notices between threads",
-      "summary": "A thread can subscribe to another thread's turn completions. While subscribed, that thread's turn end sends ONE compact notice into the subscriber (status: finished, landed, failed, blocked, stopped, truncated or waiting-on-question, plus a 320-character preview of the turn that ended, never the transcript); compaction-only turns send nothing. An idle subscriber is woken; a running one gets the notice steered into its live turn at its next step (or queued behind it), and notices that arrive together merge into one, latest status per thread. Each subscription has a level (all, outcomes, stuck, never) with a default setting. Nothing is delivered without a subscription, so a thread started with thread_create/thread_fork stays silent by default. The state is durable Host storage, visible and reversible from a thread's context menu (Notify “…” when this thread finishes, also for several selected threads) and the N-notified row badge, and it ends when either thread is archived.",
+      "summary": "A thread can subscribe to another thread's turn completions. While subscribed, that thread's turn end sends ONE compact notice into the subscriber (status: finished, landed, failed, blocked, stopped, truncated or waiting-on-question, plus a 320-character preview of the turn that ended, never the transcript); compaction-only turns send nothing. An idle subscriber is woken; a running one gets the notice steered into its live turn at its next step (or queued behind it), and notices that arrive together merge into one, latest status per thread. Each subscription has a level (all, outcomes, stuck, never) with a default setting. Nothing is delivered without a subscription, so a thread started with thread_create/thread_fork stays silent by default. The state is durable Host storage, visible and reversible from a thread's context menu (Notify…, also for several selected threads; Never shows as Off there) and the N-notified row badge, and it ends when either thread is archived.",
       "surface": "rowDecorator",
       "destination": "threads",
-      "currentSurface": "threads: row context menu → Notify “…” when this thread finishes",
+      "currentSurface": "threads: row context menu → Notify…",
       "surfaces": ["client", "host", "tool", "storage"],
       "configuration": [
         {
@@ -4010,20 +4344,20 @@
       "reach": [
         "click button \"All threads\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify spare\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Notify spare\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify target\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Notify target\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify supervisor\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Notify supervisor\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
         "hover tab \"Threads\"",
         "rightclick button \"Notify target*\" at 8,8",
-        "click menuitem \"Notify “Notify supervisor” when this thread finishes\"",
+        "click menuitem \"Notify…\"",
         "expect menuitemradio \"Only when stuck\""
       ]
     },
@@ -4101,6 +4435,42 @@
           "span": "thread-sidebar user notification send",
           "file": "plugins/@dshfiles/thread-sidebar/src/user-notification-host.test.ts",
           "testName": "links the calling thread by default, none with null, and records a span"
+        }
+      ]
+    },
+    {
+      "id": "hero-suggestions",
+      "title": "Resume, Review and Inbox cards on the new-thread screen",
+      "summary": "The new-thread screen offers up to three flat cards under the composer (above it on a phone): Resume the most recent quiet thread (or one stopped and waiting to be resumed), Review a thread whose work is ready to land (it opens the thread and its Changes view), and the Inbox count of threads that need you. They read the Session list and the Inbox’s thread signals, so they appear without the thread list mounted; a card with no real data is not shown.",
+      "reach": ["seed tool-call-thread", "click button \"New session\"", "expect button \"Resume*\""],
+      "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "new-thread screen: suggestion cards",
+      "configuration": [],
+      "states": ["no-threads", "resume", "review", "inbox"],
+      "failureModes": [
+        "Without the Inbox owner the Review and Inbox cards stay hidden; Resume still reads the Session list.",
+        "Without a Changes owner Review only opens the thread."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.hero-suggestions-pick",
+          "file": "plugins/@dshfiles/thread-sidebar/src/hero-suggestions.test.ts",
+          "testName": "reviews a thread ready to land and does not repeat it as Resume"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.hero-suggestions-browser",
+          "reason": "The cards only draw real data (a quiet thread, a workspace ready to land, Inbox items), which an isolated journey profile does not hold; the pick is unit-tested and the reach steps walk the Resume card on a seeded scratch DSH (dshx dev open thread-sidebar/hero-suggestions)."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the cards read existing Session and Inbox data and navigate; they start no Host work."
         }
       ]
     }

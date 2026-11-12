@@ -8,17 +8,33 @@
     "path": "packages/client/ui-agent-preset"
   },
   "files": [
-    { "upstream": "src/client", "local": "src/native" },
-    { "upstream": "src/index.ts", "local": "src/host.ts" },
-    { "upstream": "src/css-modules.d.ts", "local": "src/css-modules.d.ts" },
-    { "upstream": "locale", "local": "locale" }
+    {
+      "upstream": "src/client",
+      "local": "src/native"
+    },
+    {
+      "upstream": "src/index.ts",
+      "local": "src/host.ts"
+    },
+    {
+      "upstream": "src/css-modules.d.ts",
+      "local": "src/css-modules.d.ts"
+    },
+    {
+      "upstream": "locale",
+      "local": "locale"
+    }
   ],
   "delta": [
+    "src/native/AgentPresetLabel.module.css",
+    "src/native/AgentPresetLabel.tsx",
+    "src/native/AgentPresetSeat.tsx",
     "src/native/AgentPresetSection.tsx",
     "src/native/index.ts",
     "src/native/locales.ts",
     "src/native/seat-store.ts",
-    "src/native/settings-store.ts",
-    "src/native/section-store.ts"
-  ]
+    "src/native/section-store.ts",
+    "src/native/settings-store.ts"
+  ],
+  "added": ["src/native/menu-requests.ts", "src/native/label-visibility.ts"]
 }

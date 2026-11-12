@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-workspace'
-import { Api, DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostContext, hostService, WebRoutes } from '@dshfiles/dshx/effect'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
 import { Context, Effect, Layer } from 'effect'
@@ -64,10 +64,7 @@ const McpRouteLive = Layer.effectDiscard(
     const handler = yield* DshxPlugin.callback((request: IncomingMessage, response: ServerResponse) =>
       handleMcpRequest({ request, response, version: VERSION }),
     )
-    yield* Effect.acquireRelease(
-      Effect.sync(() => web.server.register({ kind: 'exact', path: MCP_PATH, handler })),
-      unregister => Effect.sync(unregister),
-    )
+    yield* WebRoutes.register(web.server, { kind: 'exact', path: MCP_PATH, handler })
   }),
 )
 

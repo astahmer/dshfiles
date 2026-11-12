@@ -12,6 +12,9 @@ export const workbenchSettings = defineSettings({
     bottomPanel: Schema.union([Schema.const('hidden').description('Hidden'), Schema.const('shown').description('Shown below the centre')])
       .default('hidden')
       .description('Show the tabbed bottom pane below the left and centre columns. The right pane remains full height.'),
+    showMainTabs: Schema.boolean()
+      .default(true)
+      .description('Show the tabs above the thread (b:4v6p). Off: the thread header takes that row and threads switch from the list, ⌘K and the keys.'),
     demoPanels: Schema.boolean()
       .default(false)
       .description('Developer fixtures: offer the Scratchpad and Ticker panels, which count mounts and renders to prove docking never remounts a panel.'),

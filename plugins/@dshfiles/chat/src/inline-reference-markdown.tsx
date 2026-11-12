@@ -7,6 +7,7 @@ import { CodeBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import { memo, type ComponentProps, type ReactNode } from 'react'
 import { CodeFenceModel } from './code-fence-transform.js'
 import { InlineReferenceModel } from './inline-references.js'
+import { MarkdownProse } from './markdown-prose.js'
 
 type MarkdownTextProps = ComponentProps<typeof MarkdownText>
 /** The native renderer's own function: calling it keeps its streaming cache, whose frozen blocks reach the block cache. */
@@ -21,6 +22,7 @@ const renderMarkdownText = MarkdownText.type
 export const InlineReferenceMarkdown = memo(function InlineReferenceMarkdown(props: MarkdownTextProps): ReactNode {
   const references = InlineReferenceModel.useState()
   const fences = CodeFenceModel.useState(CodeBlock)
+  const prose = MarkdownProse.useState(CodeBlock)
   const output = renderMarkdownText(props)
-  return CodeFenceModel.transform(InlineReferenceModel.transform(output, references), fences)
+  return MarkdownProse.transform(CodeFenceModel.transform(InlineReferenceModel.transform(output, references), fences), prose, 'answer')
 })

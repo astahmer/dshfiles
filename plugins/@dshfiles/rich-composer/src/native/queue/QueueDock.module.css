@@ -95,7 +95,7 @@
 .count {
   flex: 1 1 auto;
   min-width: 0;
-  font-family: Inter, var(--dsw-font-family);
+  font-family: var(--dsw-font-family);
   font-size: 13px;
   font-weight: 500;
   line-height: 24px;
@@ -198,7 +198,7 @@
   flex: 1 1 auto;
   min-width: 0;
   font: var(--dsw-font-xs-13);
-  font-family: Inter, var(--dsw-font-family);
+  font-family: var(--dsw-font-family);
   color: var(--dsw-alias-label-primary-dimmed);
 }
 

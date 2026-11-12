@@ -4,14 +4,11 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { CopyIcon, ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
+import { PREREQUISITE_LABELS, pluginLabel } from './labels.js'
 import { PackChangeFlow } from './pack-change-flow.js'
 import { RESTART_GUIDANCE, type PackAction, type PackOutcome, type PackPreview, type PackSummary, type StepResult } from './pack-plan.js'
-
-/** 44 px on phones and touch screens, the kit's own height elsewhere. */
-const TOUCH = 'dshx:max-sm:min-h-[44px] dshx:pointer-coarse:min-h-[44px]'
 
 export interface PackTarget {
   readonly pack: string
@@ -67,7 +64,7 @@ const CopyCommand = (props: { readonly command: string; readonly copy: (text: st
   return (
     <Button
       aria-label={`Copy ${props.command}`}
-      className={cn('dshx:h-auto dshx:max-w-full dshx:shrink dshx:justify-start dshx:py-1.5 dshx:text-left dshx:whitespace-normal', TOUCH)}
+      className="dshx:h-auto dshx:max-w-full dshx:shrink dshx:justify-start dshx:py-1.5 dshx:text-left dshx:whitespace-normal"
       onClick={() => void props.copy(props.command).then(setCopied)}
       size="sm"
       variant="outline"
@@ -115,42 +112,50 @@ const PreviewBody = (props: { readonly preview: PackPreview; readonly copy: (tex
                   <CopyCommand command={step.command} copy={props.copy} key={step.plugin} />
                 ))}
               </div>
-              <Button asChild className={cn('dshx:self-start', TOUCH)} size="sm" variant="ghost">
+              <Button asChild className="dshx:self-start" size="sm" variant="ghost">
                 <a href={preview.docsUrl} rel="noopener noreferrer" target="_blank">
                   <ExternalLinkIcon /> Installing into a profile
                 </a>
               </Button>
             </>
           ) : (
-            <Names items={preview.install.map(step => ({ key: step.plugin, text: step.plugin }))} />
+            <Names items={preview.install.map(step => ({ key: step.plugin, text: pluginLabel(step.plugin) }))} />
           )}
         </Section>
       )}
       {preview.change.length === 0 ? null : (
         <Section heading={VERB[preview.action]} id="change">
-          <Names items={preview.change.map(step => ({ key: step.plugin, text: step.plugin }))} />
+          <Names items={preview.change.map(step => ({ key: step.plugin, text: pluginLabel(step.plugin) }))} />
         </Section>
       )}
       {preview.fine.length === 0 ? null : (
         <Section heading="Already fine" id="fine">
           <Names
-            items={preview.fine.map(step => ({ key: step.plugin, text: `${step.plugin} · ${step.state === 'not-installed' ? 'not installed' : step.state}` }))}
+            items={preview.fine.map(step => ({
+              key: step.plugin,
+              text: `${pluginLabel(step.plugin)} · ${step.state === 'not-installed' ? 'not installed' : step.state}`,
+            }))}
           />
         </Section>
       )}
       {preview.kept.length === 0 ? null : (
         <Section heading="Kept on" id="kept">
-          <Names items={preview.kept.map(step => ({ key: step.plugin, text: `${step.plugin} · needed by ${step.neededBy.join(', ')}` }))} />
+          <Names items={preview.kept.map(step => ({ key: step.plugin, text: `${pluginLabel(step.plugin)} · needed by ${step.neededBy.join(', ')}` }))} />
         </Section>
       )}
       {preview.blocked.length === 0 ? null : (
         <Section heading="Cannot change here" id="blocked">
-          <Names items={preview.blocked.map(step => ({ key: step.plugin, text: `${step.plugin} · ${step.reason}` }))} />
+          <Names items={preview.blocked.map(step => ({ key: step.plugin, text: `${pluginLabel(step.plugin)} · ${step.reason}` }))} />
         </Section>
       )}
       {preview.prerequisites.length === 0 ? null : (
         <Section heading="Needs" id="prerequisites">
-          <Names items={preview.prerequisites.map(item => ({ key: item.id, text: `${item.id} · ${item.state}` }))} />
+          <Names
+            items={preview.prerequisites.map(item => ({
+              key: item.id,
+              text: `${PREREQUISITE_LABELS[item.id]} · ${item.state === 'todo' ? 'to do' : item.state}`,
+            }))}
+          />
         </Section>
       )}
       {preview.restart === 'none' ? null : (
@@ -174,7 +179,7 @@ const Results = (props: { readonly results: readonly StepResult[]; readonly queu
         data-step-status={result.status}
         key={`${result.plugin}.${result.step}`}
       >
-        <span className="dshx:text-sm dshx:font-medium">{result.plugin}</span>
+        <span className="dshx:text-sm dshx:font-medium">{pluginLabel(result.plugin)}</span>
         <span className="dshx:text-xs dshx:text-muted-foreground">
           {result.step} · {STATUS_LABEL[result.status]}
           {result.restartReason === null ? '' : ` (${result.restartReason})`}
@@ -185,7 +190,7 @@ const Results = (props: { readonly results: readonly StepResult[]; readonly queu
     {props.queue.map((plugin, index) => (
       <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:py-1.5" data-step-status={index === 0 ? 'running' : 'waiting'} key={plugin}>
         {index === 0 ? <Spinner className="dshx:size-3.5" /> : null}
-        <span className="dshx:text-sm dshx:font-medium">{plugin}</span>
+        <span className="dshx:text-sm dshx:font-medium">{pluginLabel(plugin)}</span>
         <span className="dshx:text-xs dshx:text-muted-foreground">{index === 0 ? 'working' : 'waiting'}</span>
       </li>
     ))}
@@ -215,7 +220,7 @@ const ChangeBody = (props: Omit<PackChangeDialogProps, 'target'> & { readonly ta
         send({
           type: 'step-failed',
           plugin: current,
-          reason: `${errorMessage(error, 'The Host did not answer.')} Getting started rereads the Host to show what is on now.`,
+          reason: `${errorMessage(error, 'No answer came back.')} Getting started reloads the packs to show what is on now.`,
         }),
     )
   }, [stepKey, current, applyPack, target.pack, target.action])
@@ -281,23 +286,17 @@ const ChangeBody = (props: Omit<PackChangeDialogProps, 'target'> & { readonly ta
       <DialogFooter>
         {state.phase === 'reviewing' ? (
           <>
-            <Button className={TOUCH} onClick={props.onClose} variant="outline">
+            <Button onClick={props.onClose} variant="outline">
               {actionable ? 'Cancel' : 'Close'}
             </Button>
-            {actionable ? (
-              <Button className={TOUCH} onClick={() => send({ type: 'confirm', preview: data })}>
-                {verb} pack
-              </Button>
-            ) : null}
+            {actionable ? <Button onClick={() => send({ type: 'confirm', preview: data })}>{verb} pack</Button> : null}
           </>
         ) : state.phase === 'applying' ? (
-          <Button className={TOUCH} disabled={state.cancelRequested} onClick={() => send({ type: 'cancel' })} variant="outline">
+          <Button disabled={state.cancelRequested} onClick={() => send({ type: 'cancel' })} variant="outline">
             {state.cancelRequested ? 'Stopping after this plugin…' : 'Stop after this plugin'}
           </Button>
         ) : (
-          <Button className={TOUCH} onClick={props.onClose}>
-            Close
-          </Button>
+          <Button onClick={props.onClose}>Close</Button>
         )}
       </DialogFooter>
     </>

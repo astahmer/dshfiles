@@ -1,6 +1,5 @@
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsSectionSearchProps } from '@dshfiles/dshx/client'
-import { IconCloseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
@@ -27,11 +26,11 @@ export interface SectionRow {
 }
 
 const headerButton =
-  'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-[var(--dsw-radius-sm)] dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-[var(--dsw-alias-label-primary)] dshx:hover:bg-[var(--dsw-alias-interactive-bg-hover)] dshx:[&_svg]:size-3.5'
+  'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-md dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-foreground dshx:hover:bg-[var(--dsw-alias-interactive-bg-hover)] dshx:[&_svg]:size-3.5'
 const navCell =
-  'dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-[var(--dsw-radius-md)] dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-[13px] dshx:leading-5 dshx:font-normal dshx:text-[var(--dsw-alias-label-primary)] dshx:hover:bg-[var(--dsw-specific-sidebar-nav-item-hover)]'
+  'dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-sm dshx:leading-5 dshx:font-normal dshx:text-foreground dshx:hover:bg-[var(--dsw-specific-sidebar-nav-item-hover)]'
 const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)] dshx:font-medium'
-const navGroup = 'dshx:mt-3 dshx:px-3 dshx:pb-1 dshx:text-[12px] dshx:font-medium dshx:text-[var(--dsw-alias-label-secondary)] dshx:first:mt-0'
+const navGroup = 'dshx:mt-3 dshx:px-3 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:first:mt-0'
 
 export interface SettingsViewProps {
   /** Every Settings entry, by task group (plan §4.6). */
@@ -79,7 +78,7 @@ const NavCell = (props: {
   >
     <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.entry.label}</span>
     {props.count !== undefined && props.count > 0 && (
-      <span className="dshx:rounded-full dshx:bg-secondary dshx:px-1.5 dshx:text-[11px] dshx:leading-4 dshx:text-muted-foreground dshx:tabular-nums">
+      <span className="dshx:rounded-full dshx:bg-secondary dshx:px-1.5 dshx:text-2xs dshx:leading-4 dshx:text-muted-foreground dshx:tabular-nums">
         {props.count}
       </span>
     )}
@@ -104,7 +103,7 @@ const sectionOwnerWithTarget = (props: SettingsViewProps): SettingsSectionOwnerP
   props.sectionTarget === undefined ? props.sectionOwner : { ...props.sectionOwner, target: props.sectionTarget }
 
 const Kbd = (props: { readonly children: ReactNode }): JSX.Element => (
-  <kbd className="dshx:rounded dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:py-px dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">
+  <kbd className="dshx:rounded dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:py-px dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">
     {props.children}
   </kbd>
 )
@@ -117,12 +116,12 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
     <div className="dshx-root dshx:flex dshx:max-w-[760px] dshx:flex-col dshx:gap-6" data-settings-results="">
       {result.sections.length > 0 && (
         <section aria-label={t('search.sections')} className="dshx:flex dshx:flex-col dshx:gap-1">
-          <h3 className="dshx:m-0 dshx:text-[13px] dshx:font-semibold dshx:text-muted-foreground">{t('search.sections')}</h3>
+          <h3 className="dshx:m-0 dshx:text-sm dshx:font-semibold dshx:text-muted-foreground">{t('search.sections')}</h3>
           <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
             {result.sections.map(section => (
               <button
                 aria-label={t('search.openSection', { section: section.label })}
-                className="dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-transparent dshx:px-2.5 dshx:py-1 dshx:text-[13px] dshx:hover:bg-accent"
+                className="dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-transparent dshx:px-2.5 dshx:py-1 dshx:text-sm dshx:hover:bg-accent"
                 key={section.id}
                 onClick={() => props.onSelect(section.id)}
                 type="button"
@@ -145,7 +144,7 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
             onClick={() => props.onSelect(group.sectionId)}
             type="button"
           >
-            <h3 className="dshx:m-0 dshx:text-[15px] dshx:font-semibold dshx:text-foreground dshx:hover:underline">
+            <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">
               <Highlight query={props.query} text={group.label} />
             </h3>
             <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.matches', { count: group.entries.length })}</span>
@@ -158,11 +157,11 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
               onClick={() => props.onReveal({ sectionId: entry.sectionId, target: entry.id })}
               type="button"
             >
-              <span className="dshx:text-[14px] dshx:text-foreground">
+              <span className="dshx:text-base dshx:text-foreground">
                 <Highlight query={props.query} text={entry.title} />
               </span>
               {entry.description !== undefined && (
-                <span className="dshx:text-[12px] dshx:text-muted-foreground">
+                <span className="dshx:text-xs dshx:text-muted-foreground">
                   <Highlight query={props.query} text={entry.description} />
                 </span>
               )}
@@ -177,13 +176,13 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
             onClick={() => props.onSelect('general')}
             type="button"
           >
-            <h3 className="dshx:m-0 dshx:text-[15px] dshx:font-semibold dshx:text-foreground dshx:hover:underline">{t('search.shortcuts')}</h3>
+            <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">{t('search.shortcuts')}</h3>
             <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.editShortcuts')}</span>
           </button>
           <ul className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:p-0">
             {result.shortcuts.map(shortcut => (
               <li
-                className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:px-2 dshx:py-1.5 dshx:text-[14px]"
+                className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:px-2 dshx:py-1.5 dshx:text-base"
                 data-settings-shortcut={shortcut.id}
                 key={shortcut.id}
               >
@@ -207,7 +206,7 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
             onClick={() => props.onSelect(hit.page.pageId)}
             type="button"
           >
-            <h3 className="dshx:m-0 dshx:text-[15px] dshx:font-semibold dshx:text-foreground dshx:hover:underline">
+            <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">
               <Highlight query={props.query} text={hit.page.title} />
             </h3>
             <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.matches', { count: hit.fields.length })}</span>
@@ -232,18 +231,18 @@ const EntryView = (
     <div className="dshx:flex dshx:flex-col dshx:gap-5" data-settings-entry={entry.id}>
       {ownHeading && (
         <header className="dshx:flex dshx:flex-col dshx:gap-0.5">
-          {props.groupLabel !== entry.label && <p className="dshx:m-0 dshx:text-[12px] dshx:text-muted-foreground">{props.groupLabel}</p>}
-          <h2 className="dshx:m-0 dshx:text-[18px] dshx:font-semibold dshx:text-foreground">{entry.label}</h2>
+          {props.groupLabel !== entry.label && <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{props.groupLabel}</p>}
+          <h2 className="dshx:m-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{entry.label}</h2>
         </header>
       )}
       {link !== undefined && (
         <div
-          className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:px-4 dshx:py-3"
+          className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-b dshx:border-border dshx:pb-4"
           data-settings-link={link.panelId}
         >
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
-            <span className="dshx:text-[14px] dshx:text-foreground">{link.description}</span>
-            <span className="dshx:text-[12px] dshx:text-muted-foreground">{t('entry.opensPage')}</span>
+            <span className="dshx:text-base dshx:text-foreground">{link.description}</span>
+            <span className="dshx:text-xs dshx:text-muted-foreground">{t('entry.opensPage')}</span>
           </div>
           <Button onClick={() => props.openPanel(link.panelId)} size="sm" variant="outline">
             {t('entry.open', { page: link.label })}
@@ -256,7 +255,7 @@ const EntryView = (
         <Fragment key={page.pageId}>{props.renderPluginPage(page, ownHeading)}</Fragment>
       ))}
       {jevHere.length > 0 && (
-        <p className="dshx:m-0 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-[13px] dshx:text-muted-foreground" role="note">
+        <p className="dshx:m-0 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="note">
           {t('entry.jevMoved', { page: entry.label })}
           <Button onClick={() => props.onSelect(JEV_ENTRY_ID)} size="xs" variant="link">
             {t('entry.openJev')}
@@ -307,7 +306,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
       <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
         <div className="dshx:box-border dshx:flex dshx:h-[58px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-4 dshx:@max-pane-compact:gap-2 dshx:@max-pane-compact:px-3">
           <div
-            className="dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-[16px] dshx:leading-6 dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)] dshx:@max-pane-compact:sr-only"
+            className="dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-base dshx:leading-6 dshx:font-medium dshx:text-foreground dshx:@max-pane-compact:sr-only"
             id={props.titleId}
           >
             {props.renderSlot('settings.header', {})}
@@ -357,7 +356,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             {t('search.modified')}
           </Toggle>
           {searching && (
-            <span aria-live="polite" className="dshx:shrink-0 dshx:text-[12px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" role="status">
+            <span aria-live="polite" className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" role="status">
               {foundText}
             </span>
           )}
@@ -365,7 +364,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             {props.renderSlot('settings.action', {})}
             {props.onClose !== undefined && (
               <button className={headerButton} onClick={props.onClose} type="button">
-                <IconCloseOutlineRegular size={14} />
+                <XIcon strokeWidth={1.5} size={14} />
                 <span className="dshx:sr-only">{props.renderSlot('settings.close', {})}</span>
               </button>
             )}

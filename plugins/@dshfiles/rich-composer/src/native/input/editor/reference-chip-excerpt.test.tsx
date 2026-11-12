@@ -38,10 +38,15 @@ it('reveals the captured output the draft will send', () => {
   const button = container.querySelector('button')
   act(() => button?.click())
   expect(button?.getAttribute('aria-expanded')).toBe('true')
-  expect(container.textContent).toContain('first\nsecond')
+  // The kit popover portals to the body, on the floating layer with the s2 shadow and 12px radius.
+  const content = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+  expect(content?.querySelector('[data-terminal-excerpt]')?.textContent).toBe('first\nsecond')
+  expect(content?.className).toContain('dshx:shadow-s2')
+  expect(content?.className).toContain('dshx:rounded-xl')
+  expect(content?.className).not.toMatch(/80vw|z-index/u)
   act(() => button?.click())
   expect(button?.getAttribute('aria-expanded')).toBe('false')
-  expect(container.textContent).not.toContain('first')
+  expect(document.body.textContent).not.toContain('first')
 })
 
 it('collapses on Escape so the editor keeps its keyboard path', () => {

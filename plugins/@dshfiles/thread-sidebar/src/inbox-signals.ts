@@ -26,7 +26,15 @@ const signalsOf = (items: readonly AttentionItem[]): ReadonlyMap<string, InboxTh
     if (item.resolvedAt !== null || item.doneAt !== null) continue
     const severity = item.severity
     const verb = INLINE_VERBS.find((candidate: InlineVerb) => item.verbs.includes(candidate))
-    const next: InboxThreadSignal = { itemId: item.id, severity, reason: item.reason, verb, openedAt: item.openedAt }
+    const next: InboxThreadSignal = {
+      itemId: item.id,
+      severity,
+      reason: item.reason,
+      verb,
+      openedAt: item.openedAt,
+      ...(item.detail !== null && { detail: item.detail }),
+      ...(item.verbs.includes('Answer') && item.choices.length > 0 && { choices: item.choices }),
+    }
     const current = signals.get(item.subject.id)
     if (
       current === undefined ||
@@ -45,8 +53,8 @@ export interface InboxThreadSignals {
   readonly signals: ReadonlyMap<string, InboxThreadSignal>
   /** False until both views answered once, so an empty list can say it is empty instead of still loading. */
   readonly loaded: boolean
-  /** Run a provider verb on one item; resolves to the provider's outcome. */
-  readonly act: (itemId: string, verb: AttentionProviderVerb) => Promise<{ readonly ok: boolean; readonly message: string }>
+  /** Run a provider verb on one item (an Answer names its choice); resolves to the provider's outcome. */
+  readonly act: (itemId: string, verb: AttentionProviderVerb, choiceId?: string) => Promise<{ readonly ok: boolean; readonly message: string }>
   /** Mark one item done, the way the Inbox page's Done does; a provider may clear its own record too. */
   readonly done: (itemId: string) => Promise<void>
 }
@@ -74,8 +82,8 @@ export const useInboxThreadSignals = (options: { readonly enabled: boolean }): I
     return items.length === 0 ? EMPTY : signalsOf(items)
   }, [needsYou.data, other.data])
   const act = useCallback(
-    async (itemId: string, verb: AttentionProviderVerb) => {
-      const outcome = await api.act({ id: itemId, verb })
+    async (itemId: string, verb: AttentionProviderVerb, choiceId?: string) => {
+      const outcome = await api.act({ id: itemId, verb, ...(choiceId !== undefined && { choiceId }) })
       void queryClient.invalidateQueries({ queryKey: inboxKeys.all })
       return outcome
     },

@@ -190,12 +190,12 @@ export const MentionMenu = (props: {
           }}
           onMouseEnter={() => props.onHover(index)}
           className={cn(
-            'dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-[13px]',
+            'dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-sm',
             index === props.highlight && 'dshx:bg-accent',
           )}
         >
           {suggestion.label}
-          <span className="dshx:ml-auto dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{suggestion.hint}</span>
+          <span className="dshx:ml-auto dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">{suggestion.hint}</span>
         </li>
       ))}
     </ul>

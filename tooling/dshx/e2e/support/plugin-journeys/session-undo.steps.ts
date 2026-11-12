@@ -4,6 +4,7 @@ import { access, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { chooseComposerMore, expectComposerMoreEnabled } from '../composer-more.js'
 import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
 
 const projects = new WeakMap<Page, string>()
@@ -102,25 +103,25 @@ Then('redo restored {string} and {string} in the project', async ({ page }: { pa
 })
 
 When('the last turn is undone from the composer', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Undo last turn', exact: true }).click()
+  await chooseComposerMore(page, 'Undo last turn')
 })
 
 Then('{string} is gone and the undone prompt waits in the queue', async ({ page }: { page: Page }, file: string) => {
   await recordAssertion(page, 'session-undo-files-and-conversation', async () => {
     await expect.poll(() => exists(join(projectFor(page), file)), { timeout: 30_000 }).toBe(false)
     await expect(page.getByText(/Undo journey write/).first()).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByRole('button', { name: 'Redo the undone turn and its files', exact: true })).toBeVisible()
+    await expectComposerMoreEnabled(page, 'Redo the undone turn', 'Redo the undone turn and its files', { timeout: 30_000 })
   })
 })
 
 When('the undone turn is redone from the composer', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Redo the undone turn and its files', exact: true }).click()
+  await chooseComposerMore(page, 'Redo the undone turn', 'Redo the undone turn and its files')
 })
 
 When('the thread is rewound to before the turn that left {string}', async ({ page }: { page: Page }, file: string) => {
   // Wait until the third turn's checkpoint is listed, so the menu holds every turn.
-  await expect(page.getByRole('button', { name: 'Rewind to an earlier turn', exact: true })).toBeVisible({ timeout: 30_000 })
-  await page.getByRole('button', { name: 'Rewind to an earlier turn', exact: true }).click()
+  await expectComposerMoreEnabled(page, 'Rewind to an earlier turn', 'Rewind to an earlier turn', { timeout: 30_000 })
+  await chooseComposerMore(page, 'Rewind to an earlier turn')
   await expect(page.getByRole('menuitem')).toHaveCount(3, { timeout: 30_000 })
   await page.getByRole('menuitem').filter({ hasText: file }).click()
   const dialog = page.getByRole('alertdialog')
@@ -136,14 +137,15 @@ Then('only {string} of the three files remains', async ({ page }: { page: Page }
     await expect.poll(() => exists(join(projectFor(page), 'rewind-3.txt')), { timeout: 30_000 }).toBe(false)
     await expect.poll(() => exists(join(projectFor(page), 'rewind-2.txt'))).toBe(false)
     await expect.poll(() => exists(join(projectFor(page), kept))).toBe(true)
-    await expect(page.getByRole('button', { name: 'Redo the undone turn and its files', exact: true })).toBeVisible()
+    await expectComposerMoreEnabled(page, 'Redo the undone turn', 'Redo the undone turn and its files', { timeout: 30_000 })
   })
 })
 
 Then('the original thread shows its turns again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'session-undo-redo-returns-to-rewound-thread', async () => {
     await expect(page.getByText('Rewind journey turn for rewind-3.txt').first()).toBeVisible({ timeout: 30_000 })
-    await page.getByRole('button', { name: 'Rewind to an earlier turn', exact: true }).click()
+    await expectComposerMoreEnabled(page, 'Rewind to an earlier turn', 'Rewind to an earlier turn', { timeout: 30_000 })
+    await chooseComposerMore(page, 'Rewind to an earlier turn')
     await expect(page.getByRole('menuitem')).toHaveCount(3)
     await page.keyboard.press('Escape')
   })
@@ -152,32 +154,44 @@ Then('the original thread shows its turns again', async ({ page }: { page: Page 
 
 Then('the original thread shows its turn again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'session-undo-redo-returns-to-thread', async () => {
-    await expect(page.getByRole('status').filter({ hasText: /^Completed$/ })).toHaveCount(1, { timeout: 30_000 })
-    await expect(page.getByRole('button', { name: 'Undo last turn', exact: true })).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed)$/ })).toHaveCount(1, { timeout: 30_000 })
+    await expectComposerMoreEnabled(page, 'Undo last turn')
   })
   await finishJourneyAssertions(page)
 })
 
+/** b:ysaj: a turn's checkpoint is a row of its reply's More actions menu; open that menu and return the row. */
+const openCheckpoint = async (page: Page, turn: 'first' | 'last') => {
+  const tails = page.locator('[data-turn-tail]').filter({ has: page.getByRole('button', { name: 'More actions', exact: true }) })
+  const tail = turn === 'first' ? tails.first() : tails.last()
+  await page.keyboard.press('Escape')
+  await tail.hover()
+  await tail.getByRole('button', { name: 'More actions', exact: true }).click()
+  return page.locator('[data-message-actions-menu] [data-session-undo-checkpoint]')
+}
+
 Then('each turn names the jj revision its edits left', async ({ page }: { page: Page }) => {
-  const checkpoints = page.locator('[data-session-undo-checkpoint]')
   await recordAssertion(page, 'session-undo-turn-checkpoint-revisions', async () => {
     await expect.poll(() => exists(join(projectFor(page), 'checkpoint-2.txt')), { timeout: 30_000 }).toBe(true)
-    await expect(checkpoints).toHaveCount(2, { timeout: 30_000 })
-    for (const checkpoint of await checkpoints.all())
-      await expect(checkpoint.locator('[data-session-undo-revision]').getByRole('link', { name: /^Jujutsu revision:/ })).toBeVisible()
-    await expect(checkpoints.first().getByRole('button', { name: 'Restore to after this turn', exact: true })).toHaveCount(1)
-    await expect(checkpoints.last().getByRole('button', { name: 'Restore to after this turn', exact: true })).toHaveCount(0)
+    await expect(page.locator('[data-turn-tail]').filter({ has: page.getByRole('button', { name: 'More actions', exact: true }) })).toHaveCount(2, { timeout: 30_000 })
+    // No raw commit id under the replies: the checkpoint lives only inside the menu.
+    await expect(page.locator('[data-session-undo-checkpoint]')).toHaveCount(0)
+    const first = await openCheckpoint(page, 'first')
+    await expect(first).toHaveCount(1, { timeout: 30_000 })
+    await expect(first.locator('[data-session-undo-revision]').getByRole('link', { name: /^Jujutsu revision:/ })).toBeVisible()
+    await expect(first.getByRole('button', { name: 'Restore to after this turn', exact: true })).toHaveCount(1)
+    const shots = process.env.DSHX_E2E_SHOT_DIR
+    if (shots !== undefined) await page.screenshot({ path: `${shots}/turn-checkpoint.png` })
+    const last = await openCheckpoint(page, 'last')
+    await expect(last).toHaveCount(1, { timeout: 30_000 })
+    await expect(last.locator('[data-session-undo-revision]').getByRole('link', { name: /^Jujutsu revision:/ })).toBeVisible()
+    await expect(last.getByRole('button', { name: 'Restore to after this turn', exact: true })).toHaveCount(0)
+    await page.keyboard.press('Escape')
   })
-  const shots = process.env.DSHX_E2E_SHOT_DIR
-  if (shots !== undefined) {
-    await checkpoints.first().hover()
-    await page.screenshot({ path: `${shots}/turn-checkpoint.png` })
-  }
 })
 
 When('the first turn is restored from its checkpoint', async ({ page }: { page: Page }) => {
-  const checkpoint = page.locator('[data-session-undo-checkpoint]').first()
-  await checkpoint.hover()
+  const checkpoint = await openCheckpoint(page, 'first')
   await checkpoint.getByRole('button', { name: 'Restore to after this turn', exact: true }).click()
   const dialog = page.getByRole('alertdialog')
   await recordAssertion(page, 'session-undo-turn-checkpoint-confirms', () => expect(dialog.locator('[data-session-undo="lost-turns"] li')).toHaveCount(1))

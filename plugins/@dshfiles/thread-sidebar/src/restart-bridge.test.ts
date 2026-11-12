@@ -11,10 +11,15 @@ describe('RestartBridge', () => {
   it('notifies the item only when what it shows changes', () => {
     const listener = vi.fn()
     const stop = RestartBridge.subscribe(listener)
-    RestartBridge.publish({ hostPlugins: ['@dshfiles/a'], available: true, waitingLabel: null })
-    RestartBridge.publish({ hostPlugins: ['@dshfiles/a'], available: true, waitingLabel: null })
+    RestartBridge.publish({ hostPlugins: ['@dshfiles/a'], available: true, waitingLabel: null, onRail: false })
+    RestartBridge.publish({ hostPlugins: ['@dshfiles/a'], available: true, waitingLabel: null, onRail: false })
     expect(listener).toHaveBeenCalledTimes(1)
-    RestartBridge.publish({ hostPlugins: ['@dshfiles/a'], available: true, waitingLabel: 'Restart pending: waiting for running turns to finish' })
+    RestartBridge.publish({
+      hostPlugins: ['@dshfiles/a'],
+      available: true,
+      waitingLabel: 'Restart pending: waiting for running turns to finish',
+      onRail: false,
+    })
     expect(listener).toHaveBeenCalledTimes(2)
     expect(RestartBridge.read().waitingLabel).toBe('Restart pending: waiting for running turns to finish')
     stop()

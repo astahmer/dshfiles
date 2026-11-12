@@ -8,7 +8,7 @@
 
 ![Metric list with one chart per metric](docs/screenshots/metric-charts.png)
 
-![Per-thread Requests tab scoped to the selected thread](docs/screenshots/thread-traces-tab.png)
+![Per-thread Traces facet in the thread panel, opened from the thread header](docs/screenshots/thread-traces-tab.png)
 
 ![Alert rules over stored telemetry](docs/screenshots/alert-rules.png)
 
@@ -57,12 +57,15 @@ through the Host, not from the page: dshx forwards them to this receiver like it
 interaction made as client spans and the Host spans those calls caused nested under them (catalog feature
 `browser-interaction-traces`; [observability](../../../docs/observability.md#browser-interactions-dshfiles-web)).
 
-## Per-thread Traces tab
+## Per-thread Traces facet
 
-Every thread gets a **Traces** tab in its conversation view, right after **Trajectory** (a `conversation.view`
-entry, `order: 11`; Trajectory is 10 and only shows with developer tools on). It shows that thread's telemetry only:
+Every thread gets a **Traces** facet in its thread panel (productivity pass Q5: the thread header has no view tabs; the
+stage is always Chat). Open it from the header's **More thread actions › Open Traces**, a turn's **Trace** button or any
+pane's **Choose a view**, as a movable pane. It is still registered as a `conversation.view` entry
+(`order: 11`, after Trajectory at 10, which only shows with developer tools on); Rich Composer turns every non-Chat view
+into a facet (`@dshfiles/rich-composer/thread-views`). It shows that thread's telemetry only:
 every trace in which any span carries `dsh.session.id` = the thread's Session id, so plugin spans nested under an agent
-turn count even without the attribute. A **Requests** tab follows at `order: 12`; it reuses the Usage request log and
+turn count even without the attribute. A **Requests** facet follows at `order: 12`; it reuses the Usage request log and
 filters it by the current Session id, with the same status, search and sorting controls.
 
 - **Summary**: traces, spans, error spans, total trace time, model calls (`gen_ai.operation.name = chat`, one per

@@ -541,7 +541,7 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
           </div>
 
           {selection.ids.length === 0 ? null : (
-            <div className="dshx:sticky dshx:bottom-2 dshx:z-30 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg">
+            <div className="dshx:sticky dshx:bottom-2 dshx:z-30 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:pl-3 dshx:text-sm dshx:shadow-lg">
               <span className="dshx:mr-2 dshx:tabular-nums">{t('selectedCount', { count: selection.ids.length })}</span>
               <Button size="sm" variant="destructive" onClick={() => sendStop({ type: 'ask' })}>
                 {t('stopSelected')}

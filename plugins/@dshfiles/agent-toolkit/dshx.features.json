@@ -141,7 +141,7 @@
       "summary": "The command palette's “Open the agent toolkit” opens the page about the thread the palette was opened from.",
       "reach": [
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Toolkit thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Toolkit thread\"",
         "press Enter",
         "click button \"Open command palette\"",
         "click option \"Open the agent toolkit*\"",
@@ -176,7 +176,7 @@
       "summary": "The thread panel Context tab lists what is loaded for the thread on the stage, each with an estimated token cost at four characters per token: the AGENTS.md-compatible instruction files DSH's own loader finds for its folder, the agent that started it, the memory start block, the skill catalog lines, enabled MCP servers costed by their tools, and attached references. Read-only; a source whose plugin is not loaded is left out.",
       "reach": [
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"context check\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"context check\"",
         "press Enter",
         "expect text \"context check\"",
         "click button \"Open right sidebar\"",

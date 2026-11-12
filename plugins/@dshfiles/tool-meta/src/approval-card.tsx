@@ -6,7 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ShieldAlertIcon, ShieldCheckIcon, ShieldIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { Option, Schema } from 'effect'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { ApprovalRisk, type ApprovalRiskLevel } from './approval-risk.js'
@@ -24,11 +24,20 @@ const decodeShellCall = Schema.decodeUnknownOption(
   }),
 )
 
+/**
+ * An approval is Needs you whatever its risk (b:ysaj): the card keeps a neutral frame and leads with the indigo
+ * diamond, and the risk is a small badge on the status trio, red only for a destructive command.
+ */
 const RISK = {
-  high: { badge: 'destructive', label: 'riskHigh', Icon: ShieldAlertIcon, frame: 'dshx:border-destructive' },
-  review: { badge: 'warning', label: 'riskReview', Icon: ShieldIcon, frame: 'dshx:border-warning' },
-  low: { badge: 'muted', label: 'riskLow', Icon: ShieldCheckIcon, frame: 'dshx:border-border' },
-} as const satisfies Record<ApprovalRiskLevel, { readonly badge: string; readonly label: string; readonly Icon: unknown; readonly frame: string }>
+  high: {
+    badge: 'outline',
+    label: 'riskHigh',
+    Icon: ShieldAlertIcon,
+    tone: 'dshx:border-(--dshx-tone-danger-border) dshx:bg-(--dshx-tone-danger-bg) dshx:text-destructive',
+  },
+  review: { badge: 'outline', label: 'riskReview', Icon: ShieldIcon, tone: 'dshx:text-muted-foreground' },
+  low: { badge: 'muted', label: 'riskLow', Icon: ShieldCheckIcon, tone: '' },
+} as const satisfies Record<ApprovalRiskLevel, { readonly badge: string; readonly label: string; readonly Icon: unknown; readonly tone: string }>
 
 /**
  * The native approval request, restyled: the risk the request carries, the tool and its command, and the native keys
@@ -109,7 +118,7 @@ const AnsweringCard = (
       data-approval-card={approval.key}
       aria-busy={sending}
     >
-      <div className={cn('dshx:w-full dshx:max-w-3xl dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:bg-background dshx:shadow-md', risk.frame)}>
+      <div className="dshx:w-full dshx:max-w-3xl dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-background dshx:shadow-s1">
         <div
           aria-label={props.t('approvalDetails')}
           className="dshx:flex dshx:max-h-72 dshx:flex-col dshx:gap-2 dshx:overflow-y-auto dshx:px-4 dshx:pt-3 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
@@ -118,7 +127,9 @@ const AnsweringCard = (
           tabIndex={0}
         >
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-            <Badge data-approval-risk={risk.label} variant={risk.badge}>
+            <StatusGlyph status="needs-you" label={props.t('approvalNeedsYou')} />
+            <span className="dshx:shrink-0 dshx:text-xs dshx:font-medium dshx:text-foreground">{props.t('approvalNeedsYou')}</span>
+            <Badge className={risk.tone} data-approval-risk={risk.label} variant={risk.badge}>
               <risk.Icon aria-hidden />
               {props.t(risk.label)}
             </Badge>
@@ -133,14 +144,27 @@ const AnsweringCard = (
               {command}
             </pre>
           )}
-          {failure === undefined ? null : <div className="dshx:text-xs dshx:text-destructive">{failure}</div>}
+          {failure === undefined ? null : (
+            <div className="dshx:text-xs dshx:text-destructive" role="alert">
+              {failure}
+            </div>
+          )}
         </div>
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-2 dshx:px-4 dshx:py-3">
-          <Button disabled={sending} onClick={() => answer('rejected')} size="sm" type="button" variant="outline">
+        {/* ≥48pt on a phone, side by side across the card (b:ysaj). */}
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-2 dshx:px-4 dshx:py-3 dshx:@max-pane-narrow:flex-nowrap">
+          <Button
+            className="dshx:pointer-coarse:h-12 dshx:@max-pane-narrow:flex-1"
+            disabled={sending}
+            onClick={() => answer('rejected')}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
             {props.t('approvalReject')}
             <Kbd className="dshx:bg-transparent dshx:text-current dshx:opacity-70 dshx:@max-pane-narrow:hidden">Esc</Kbd>
           </Button>
           <Button
+            className="dshx:pointer-coarse:h-12 dshx:@max-pane-narrow:flex-1"
             disabled={sending}
             onClick={() => answer('allowed-once')}
             size="sm"

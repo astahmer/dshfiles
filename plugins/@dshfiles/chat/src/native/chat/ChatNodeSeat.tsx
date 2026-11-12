@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { JsonBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ConversationLocationDataStore, ConversationTurnDataMap } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -9,6 +9,8 @@ import { isAtOrOutside } from '../contract/group-tree.ts'
 import { turnProcessAlwaysOpen } from '../contract/turn-process.ts'
 import { turnProcessOpen } from '../stores.ts'
 import { hiddenOrCollapsing } from './flow-motion.ts'
+import { revealRun, RunFoldSummary, useRunFoldHidden, type RunFoldPlacement } from './RunFold.tsx'
+import { SinceYouLeftContext } from './SinceYouLeftCard.tsx'
 import css from './ChatView.module.css'
 
 interface ChatNodeSeatProps extends ChatNodeOwnerProps {
@@ -25,6 +27,8 @@ interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly useChatNodeBottom: ChatFlowSlotProps['useChatNodeBottom']
   readonly deferCollapse: boolean
   readonly useGroupAction: ChatFlowSlotProps['useGroupAction']
+  /** dshfiles (b:7rv2): this row's place in a folded run of background jobs or subagents. */
+  readonly runFold?: RunFoldPlacement | undefined
 }
 
 type RoutedChatNodeOwner = {
@@ -55,6 +59,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   nodeKey, groupPart, useChatNode, useChatNodeProcess, usePresentation,
   cwd, openFile, inspectCall, forkAt,
   loadImage, useProjection, fileMentions, useStore, actions, renderSlot, t, useChatNodeBottom, deferCollapse, useGroupAction,
+  nodeStore, runFold,
 }: ChatNodeSeatProps) {
   const bottom = useChatNodeBottom(nodeKey)
   const node = useChatNode(nodeKey)
@@ -98,6 +103,9 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
     && processPresentation?.turnClosed === true
     && processSpec !== undefined
     && routedNode.data.step === processSpec.answerStep
+  // dshfiles: an unread thread opens at this answer, so "Since you left" (divider and recap) rides at its top.
+  const sinceYouLeft = useContext(SinceYouLeftContext)
+  const sinceHere = finalAnswer && sinceYouLeft?.answerTurn !== undefined && sinceYouLeft.answerTurn === turn ? sinceYouLeft.element : null
   const ownsDisclosure = routedNode?.kind === 'turn-process' || processAnswer
   const foldable = processWindowReady
     && (liveProcess || processMember || ownsDisclosure)
@@ -119,10 +127,15 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
     && processPresentation.compactAnswer
     && !processOpen
   const processHidden = controllerInactive || (foldable && processMember && !processOpen)
+  // dshfiles (b:7rv2): a collapsed run hides its members; the head keeps the summary and hides only its own card.
+  const runHidden = useRunFoldHidden(runFold, nodeKey)
+  const runHead = runFold?.head
+  const memberRunHidden = runHidden && runHead === undefined
   const revealProcess = useCallback(() => {
+    if (memberRunHidden) revealRun(runFold)
     if (processMember) setOpen(true)
-  }, [processMember, setOpen])
-  const wrapperRef = useGroupAction(processHidden, revealProcess)
+  }, [memberRunHidden, runFold, processMember, setOpen])
+  const wrapperRef = useGroupAction(processHidden || memberRunHidden, revealProcess)
   const [disclosureReset] = useState(() => createSnapshotStore(0))
   const turnData = turnDataOf(routedNode)
   const hookContext = useMemo<ChatNodeHookContext>(
@@ -155,6 +168,17 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   // distribute an object containing a union into a union of objects itself.
   const routedOwner = { ...owner, node: routedNode } as RoutedChatNodeOwner
   const flowKey = groupPart === undefined || groupPart === 'response' ? routedNode.key : JSON.stringify([routedNode.key, groupPart])
+  const content = renderSlot('conversation.chat.node', routedOwner, {
+    entryKey: routedNode.kind,
+    hookContext,
+    fallback: (
+      <JsonBlock
+        label={t('message.unknownSurface', { type: routedNode.kind })}
+        payload={routedNode.data}
+        truncatedLabel={total => t('json.truncated', { total })}
+      />
+    ),
+  })
   return (
     <div
       ref={wrapperRef}
@@ -170,19 +194,16 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       data-turn-process-member={processMember || undefined}
       data-turn-process-hidden={processHidden || undefined}
       data-turn-process-answer={compactAnswer || undefined}
+      data-run-fold-member={runFold === undefined ? undefined : runHead === undefined ? 'member' : 'head'}
       data-chat-final-answer={finalAnswer || undefined}
     >
-      {renderSlot('conversation.chat.node', routedOwner, {
-        entryKey: routedNode.kind,
-        hookContext,
-        fallback: (
-          <JsonBlock
-            label={t('message.unknownSurface', { type: routedNode.kind })}
-            payload={routedNode.data}
-            truncatedLabel={total => t('json.truncated', { total })}
-          />
-        ),
-      })}
+      {sinceHere}
+      {runFold === undefined || runHead === undefined ? content : (
+        <>
+          <RunFoldSummary runKey={runFold.runKey} memberKeys={runHead.memberKeys} nodeStore={nodeStore} t={t} />
+          <div hidden={runHidden || undefined} data-run-fold-card="">{content}</div>
+        </>
+      )}
     </div>
   )
 })

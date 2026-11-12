@@ -55,18 +55,18 @@ const StateLine = (props: { readonly item: BacklogSummaryView }): JSX.Element =>
   if (item.attention !== 'none') return <ItemGlyphs.AttentionBadge attention={item.attention} />
   if (item.status === 'doing')
     return (
-      <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+      <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
         <LoaderCircleIcon aria-hidden className="dshx:size-3 dshx:animate-spin dshx:text-info dshx:[animation-duration:2.4s]" />
         {ItemGlyphs.ago(item.lastActivityAt)}
       </span>
     )
   if (item.status === 'done')
     return (
-      <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+      <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
         <StatusDot size="sm" tone="success" /> Done {ItemGlyphs.ago(item.lastActivityAt)}
       </span>
     )
-  return <span className="dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
+  return <span className="dshx:text-2xs dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
 }
 
 const CardFace = (props: {
@@ -95,12 +95,12 @@ const CardFace = (props: {
             id={item.id}
             value={item.title}
             cancel={props.onRenameDone}
-            className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-[13px] dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
+            className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-sm dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
           />
         ) : (
           <BacklogText
             text={item.title}
-            className="dshx:line-clamp-2 dshx:min-w-0 dshx:flex-1 dshx:text-[13px] dshx:leading-snug dshx:font-medium dshx:text-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-snug! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0"
+            className="dshx:line-clamp-2 dshx:min-w-0 dshx:flex-1 dshx:text-sm dshx:leading-snug dshx:font-medium dshx:text-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-sm! dshx:[&>div]:leading-snug! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0"
           />
         )}
         {props.onPickStatus === undefined ? null : (
@@ -127,7 +127,7 @@ const CardFace = (props: {
         <WorkGlyphs.BlockedBadge blockedBy={item.blockedBy} />
         <WorkGlyphs.ClaimChip lease={item.lease} compact />
         <WorkGlyphs.RunStateChip run={run} compact />
-        <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
+        <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
           {item.project === null ? null : <ItemGlyphs.ProjectLabel project={item.project} className="dshx:max-w-24" />}
           {item.links.length === 0 ? null : (
             <span className="dshx:flex dshx:items-center dshx:gap-0.5">
@@ -447,10 +447,7 @@ export const BoardView = (props: {
               <header className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-2">
                 <ItemGlyphs.StatusIcon status={status} />
                 <h3 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{ItemGlyphs.statusLabels[status]}</h3>
-                <RollingNumber
-                  value={column.length}
-                  className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground"
-                />
+                <RollingNumber value={column.length} className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground" />
                 <button
                   type="button"
                   aria-label={`Add to ${ItemGlyphs.statusLabels[status]}`}

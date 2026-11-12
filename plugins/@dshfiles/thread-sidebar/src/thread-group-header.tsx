@@ -42,20 +42,21 @@ export const ThreadGroupHeader = ({
       <button
         type="button"
         data-thread-section-header=""
-        className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+        // Recessive (T1.3): a quiet 12px label and count, no rule; spacing separates the groups.
+        className="dshx:group/header dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
         aria-expanded={!collapsed}
         onClick={onToggle}
       >
         {icon}
         <span className="dshx:min-w-0 dshx:truncate">{label}</span>
         {checkoutCount === undefined || checkoutCount < 2 ? null : (
-          <span className="dshx:shrink-0 dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:text-[10px] dshx:font-medium dshx:text-muted-foreground">
+          <span className="dshx:shrink-0 dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">
             {checkoutCount} checkouts
           </span>
         )}
-        <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums">({count})</span>
-        <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-        <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
+        <span className="dshx:shrink-0 dshx:font-normal dshx:tabular-nums dshx:text-(--dsw-alias-label-tertiary)">({count})</span>
+        <span className="dshx:flex-1" aria-hidden="true" />
+        <span className="dshx:inline-flex dshx:shrink-0 dshx:opacity-60 dshx:group-hover/header:opacity-100" aria-hidden="true">
           {collapsed ? <ChevronDownIcon size={12} /> : <ChevronUpIcon size={12} />}
         </span>
       </button>

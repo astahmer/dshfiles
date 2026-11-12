@@ -78,7 +78,7 @@ export const AccountGroup = (props: {
                   <ProviderGlyph kind={profile.kind} />
                   <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
                     <strong className="dshx:truncate dshx:text-sm dshx:font-semibold">{profile.displayName}</strong>
-                    <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
+                    <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">
                       {[profile.plan, profile.identity].filter(Boolean).join(' · ') || (profile.signedIn ? 'Credentials available' : 'Not signed in')}
                     </span>
                   </span>
@@ -98,7 +98,7 @@ export const AccountGroup = (props: {
                 <ActionHint label={status.detail ?? status.label}>
                   <span
                     className={cn(
-                      'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-[11px]',
+                      'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs',
                       status.tone === 'success' ? 'dshx:text-success' : status.tone === 'warning' ? 'dshx:text-warning' : 'dshx:text-muted-foreground',
                     )}
                   >
@@ -190,7 +190,7 @@ export const AccountGroup = (props: {
                     >
                       <item.Icon className="dshx:size-4 dshx:text-muted-foreground" />
                       <span>{item.label}</span>
-                      <span className="dshx:ml-auto dshx:truncate dshx:text-[10px] dshx:text-muted-foreground">{item.detail}</span>
+                      <span className="dshx:ml-auto dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{item.detail}</span>
                       <ChevronRightIcon className="dshx:size-3 dshx:text-muted-foreground" />
                     </button>
                   ))}

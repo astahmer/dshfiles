@@ -84,7 +84,7 @@ Given('the pull-requests composition with a jj repository and a stub gh is boote
 })
 
 Given('a thread is started in the pull-request project', async ({ page }: { page: Page }) => {
-  await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText('pr-project')
+  await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toHaveText('pr-project')
   // No model provider is configured: the turn fails at once, which still creates the thread in the project.
   await sendMessage(page, 'Add sprockets to the widget')
 })

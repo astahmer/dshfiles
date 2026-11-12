@@ -6,7 +6,7 @@
 
 ![The status strip along the bottom of the frame, here with the Quota item](docs/screenshots/status-strip.png)
 
-![On a phone the strip is one Status chip that opens its items](docs/screenshots/status-strip-phone.png)
+![On a phone the strip is one pill that names its first items and opens the list](docs/screenshots/status-strip-phone.png)
 
 ![Settings › General › Status bar: show, hide and reorder the strip's items](docs/screenshots/status-bar-settings.png)
 
@@ -110,8 +110,9 @@ plugin.add(StatusItems, { id: '@dshfiles/my-plugin', side: 'global', label: 'Wor
 `side: 'global'` items sit on the left, `'thread'` items (about the thread on the stage) on the right; `order` sorts
 within a side and the first registration per `id` wins, so one plugin cannot fill the strip. A component receives
 `compact` (phone width) and the frame's `useSessions`, and returns null while it has nothing to say; one that throws
-hides only itself. The row is zero-height until an item is added. Below 640 px it collapses to one **Status** chip that
-opens the items as a list above it. frame-layout owns this registry because it depends on no plugin, so any provider
+hides only itself. The row is zero-height until an item is added. Below 640 px it collapses to one pill that
+names its first two items in their own words ("1 working · Quota CC1 56%", never a bare "Status"; the frame reads each
+item's rendered text) and opens the items as a list above it; it hides while the software keyboard is up. frame-layout owns this registry because it depends on no plugin, so any provider
 (ai-accounts, thread-sidebar, hmr-gate) can depend on it without closing a cycle.
 
 An item may declare `open`: the strip renders it as a button that opens its full page (Working: the thread list on its

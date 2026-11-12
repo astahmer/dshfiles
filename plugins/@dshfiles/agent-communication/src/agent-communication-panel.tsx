@@ -366,14 +366,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
       const cwd = member === undefined ? null : sessionCwd(member.id)
       if (cwd === null) return `${props.t('workspace')} · ${topic.slice('workspace/'.length, 'workspace/'.length + 8)}`
       const project = projectLabel({ path: cwd })
-      return EntityLabels.isThreadWorkspace(cwd)
-        ? `${project} · ${
-            cwd
-              .replace(/[\\/]+$/u, '')
-              .split(/[\\/]/u)
-              .at(-1) ?? ''
-          }`
-        : project
+      // A thread workspace is named by its thread, never its folder (b:212a).
+      return EntityLabels.isThreadWorkspace(cwd) ? `${project} · ${sessionLabel(member?.id ?? '')}` : project
     },
   }
   const navigationQuery = useQuery({

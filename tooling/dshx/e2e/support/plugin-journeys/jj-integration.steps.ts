@@ -1,3 +1,4 @@
+import { ThreadListFilter } from '../thread-list-filter.js'
 import { expect, type Page, type Request } from '@playwright/test'
 import { openGlobalPanel } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
@@ -45,8 +46,8 @@ const heldDestinationLookupFor = (page: Page): HeldDestinationLookup => {
   if (lookup === undefined) throw new Error('No held New thread destination lookup exists for this page.')
   return lookup
 }
-const newThreadComposerName = 'Describe what you want to build, / commands, @ files or sessions'
-const threadComposerName = 'Message or run a task, / commands, @ files or sessions'
+const newThreadComposerName = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
+const threadComposerName = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 const threadComposer = (page: Page) => page.getByRole('textbox', { name: threadComposerName, exact: true })
 const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const newThreadComposer = (page: Page) => page.getByRole('textbox', { name: newThreadComposerName, exact: true })
@@ -145,8 +146,11 @@ const provisionedThreadName = (page: Page): string => {
   return threadName
 }
 
-const threadRow = (page: Page) =>
-  page.getByRole('listitem').filter({ has: page.getByRole('button', { name: `More actions for ${provisionedThreadName(page)}`, exact: true }) })
+/** A Land row is titled by its thread (b:212a); its workspace folder rides on a data attribute. */
+/** The title the rebase journeys give their thread; Land rows and dialogs name the thread by it (b:212a). */
+const REBASE_THREAD_TITLE = 'jj integration rebase e2e thread'
+
+const threadRow = (page: Page) => page.getByRole('listitem').filter({ has: page.locator(`[data-workspace-name="${provisionedThreadName(page)}"]`) })
 
 const createRepository = async (page: Page, temporaryParent = tmpdir()): Promise<ThreadRepository> => {
   const temporaryRoot = await realpath(await mkdtemp(join(temporaryParent, 'dshx-jj-integration-e2e-')))
@@ -196,20 +200,41 @@ export const threadWorkspacePathFor = (page: Page): string => {
   return threadName === undefined ? repository.repositoryPath : join(repository.threadsPath, threadName)
 }
 
-const projectButton = (page: Page) => page.getByRole('button', { name: 'Choose workspace', exact: true })
+const projectButton = (page: Page) => page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
+/**
+ * The thread workspace a New thread draft runs in. rich-composer's project chip names the project only (b:212a) and
+ * carries the folder on `data-thread-workspace`; the stock composer, which isolated compositions boot, still reads
+ * "repo · thread-xxxxxx". Undefined while the draft stays in the project.
+ */
+const draftThreadWorkspace = async (page: Page): Promise<string | undefined> => {
+  const segment = page.locator('[data-run-segment="project"][data-thread-workspace]').filter({ visible: true }).first()
+  if ((await segment.count()) > 0) {
+    await expect(projectButton(page), 'The project chip names the project, not its thread workspace').toHaveText('repo')
+    return (await segment.getAttribute('data-thread-workspace')) ?? undefined
+  }
+  return /^repo · (thread-[\w-]+)$/.exec(((await projectButton(page).textContent()) ?? '').trim())?.[1]
+}
+const expectDraftThreadWorkspace = async (page: Page, expected: RegExp | string | undefined): Promise<void> => {
+  await expect
+    .poll(() => draftThreadWorkspace(page), { timeout: 15_000 })
+    .toEqual(expected instanceof RegExp ? expect.stringMatching(expected) : expected)
+}
+/** The thread header's workspace control: "Own workspace", its folder on `data-workspace-name`. */
+const ownWorkspaceControl = (page: Page, threadName?: string) =>
+  page.locator(threadName === undefined ? '[data-workspace-place="own"][data-workspace-name]' : `[data-workspace-place="own"][data-workspace-name="${threadName}"]`)
 const dismissGetStartedDialog = async (page: Page): Promise<void> => {
   const dialog = page.getByRole('dialog', { name: 'Get started', exact: true })
   if (!(await dialog.isVisible())) return
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(dialog).toBeHidden()
 }
-/** The composer run row's Workspace segment: "Workspace: Own workspace from main" or "Workspace: In place". */
+/** The composer run row's Workspace segment: "Workspace: Own workspace from main" or "Workspace: In the project". */
 const workspaceToggle = (page: Page) => page.getByRole('button', { name: /^Workspace: / })
 const expectOwnWorkspace = (page: Page, own: boolean, bookmark?: string) =>
   expect(workspaceToggle(page)).toHaveAccessibleName(
-    own ? (bookmark === undefined ? /^Workspace: Own workspace/ : `Workspace: Own workspace from ${bookmark}`) : 'Workspace: In place',
+    own ? (bookmark === undefined ? /^Workspace: Own workspace/ : `Workspace: Own workspace from ${bookmark}`) : 'Workspace: In the project',
   )
-const chooseWorkspace = async (page: Page, choice: 'Own workspace' | 'In place'): Promise<void> => {
+const chooseWorkspace = async (page: Page, choice: 'Own workspace' | 'In the project'): Promise<void> => {
   // The destination bar can remount while a new thread settles on its project, which closes an open menu: reopen it.
   await expect(async () => {
     if ((await page.getByRole('option', { name: new RegExp(`^${choice}`) }).count()) === 0) await workspaceToggle(page).click()
@@ -258,7 +283,7 @@ const rebaseButton = (page: Page) => page.getByRole('button', { name: 'Land this
 /** The same land action, one click from the answer: the row the newest completed turn renders. */
 const turnEndIntegrateOffer = (page: Page) => page.getByTestId('jj-inline-integrate-offer')
 /** The one header control: it names a thread workspace, or the shared checkout the thread runs in. */
-const workspaceControl = (page: Page) => page.getByRole('button', { name: /^(?:Current thread workspace: |Workspace actions for )/ })
+const workspaceControl = (page: Page) => page.getByRole('button', { name: /^(?:Own workspace actions$|Workspace actions for )/ })
 const workspaceMenu = (page: Page) => page.locator('[data-slot="popover-content"]')
 
 /** The menu closes on every action, so a step that asserts inside it opens it first. */
@@ -269,15 +294,15 @@ const openWorkspaceMenu = async (page: Page): Promise<void> => {
 }
 
 /**
- * The Host names a thread workspace `<repository> · <thread>`; the thread name is its directory under `repo-threads`.
- * Under load the picker re-renders through its empty "Choose workspace" label while the provisioned workspace
- * registers, so the label is read once it settles on a thread workspace.
+ * The thread name is the workspace's directory under `repo-threads`; the project segment carries it on
+ * `data-thread-workspace` while its chip reads `repo` (b:212a). Under load the picker re-renders through its empty
+ * "Choose project" label while the provisioned workspace registers, so it is read once it settles on a thread workspace.
  */
 const currentThreadName = async (page: Page): Promise<string> => {
   let threadName: string | undefined
   await expect(async () => {
     const label = ((await projectButton(page).textContent()) ?? '').trim()
-    threadName = /^repo · (thread-[\w-]+)$/.exec(label)?.[1]
+    threadName = /^thread-[\w-]+$/.exec((await draftThreadWorkspace(page)) ?? '')?.[0]
     expect(threadName, `The New thread project is not a thread workspace: ${label}`).toBeDefined()
   }).toPass({ timeout: 15_000 })
   if (threadName === undefined) throw new Error('The New thread project never settled on a thread workspace.')
@@ -286,10 +311,11 @@ const currentThreadName = async (page: Page): Promise<string> => {
 
 /** A started thread names its workspace in the conversation header, once the New thread composer is gone. */
 const currentHeaderThreadName = async (page: Page): Promise<string> => {
-  const header = page.getByRole('button', { name: /^Current thread workspace: thread-/ })
+  const header = ownWorkspaceControl(page).filter({ visible: true }).first()
   await expect(header).toBeVisible({ timeout: 30_000 })
-  const label = await header.getAttribute('aria-label')
-  const threadName = /^Current thread workspace: (thread-[\w-]+)$/.exec(label ?? '')?.[1]
+  await expect(header).toHaveAccessibleName('Own workspace actions')
+  const label = await header.getAttribute('data-workspace-name')
+  const threadName = /^thread-[\w-]+$/.exec(label ?? '')?.[0]
   if (threadName === undefined) throw new Error(`The thread header does not name a thread workspace: ${label ?? ''}`)
   return threadName
 }
@@ -662,20 +688,21 @@ When('the New thread composer draft is cleared', async ({ page }: { page: Page }
 
 When('the New thread workspace toggle is turned on', async ({ page }: { page: Page }) => {
   await chooseWorkspace(page, 'Own workspace')
-  await expect(projectButton(page)).toHaveText(/^repo · thread-/)
+  await expectDraftThreadWorkspace(page, /^thread-/)
   provisionedThreads.set(page, await currentThreadName(page))
   // The switch makes DSH open a fresh blank Session in the new workspace; the thread must keep it instead of moving
   // back to the project checkout, so hold the state for a moment before trusting it.
   await expect(async () => {
     await page.waitForTimeout(2_000)
-    await expect(projectButton(page)).toHaveText(new RegExp(`^repo · ${provisionedThreadName(page)}$`))
+    await expectDraftThreadWorkspace(page, provisionedThreadName(page))
     await expectOwnWorkspace(page, true)
   }).toPass({ timeout: 10_000 })
 })
 
 When('the New thread workspace toggle is turned off', async ({ page }: { page: Page }) => {
-  await chooseWorkspace(page, 'In place')
+  await chooseWorkspace(page, 'In the project')
   await expect(projectButton(page)).toHaveText('repo')
+  await expectDraftThreadWorkspace(page, undefined)
 })
 
 When('the local Command Code model is selected for the New thread', async ({ page }: { page: Page }) => {
@@ -684,7 +711,7 @@ When('the local Command Code model is selected for the New thread', async ({ pag
 
 When('the New thread workspace is kept in the shared checkout', async ({ page }: { page: Page }) => {
   const toggle = workspaceToggle(page)
-  if ((await toggle.getAttribute('aria-label'))?.startsWith('Workspace: Own') === true) await chooseWorkspace(page, 'In place')
+  if ((await toggle.getAttribute('aria-label'))?.startsWith('Workspace: Own') === true) await chooseWorkspace(page, 'In the project')
   await expectOwnWorkspace(page, false)
 })
 
@@ -693,7 +720,7 @@ When('the {string} bookmark is picked in the destination bar', async ({ page }: 
   await page.getByPlaceholder('Search workspaces and bookmarks').fill(bookmark)
   await page.getByRole('option', { name: bookmark, exact: true }).click()
   await expectOwnWorkspace(page, true, bookmark)
-  await expect(projectButton(page)).toHaveText(/^repo · thread-/)
+  await expectDraftThreadWorkspace(page, /^thread-/)
 })
 
 When('No folder is chosen as the New thread project', async ({ page }: { page: Page }) => {
@@ -720,8 +747,10 @@ When('a message is sent in the thread workspace', async ({ page }: { page: Page 
 
 Then('the current thread header identifies its jj workspace', async ({ page }: { page: Page }) => {
   const threadName = provisionedThreadName(page)
-  const indicator = page.getByRole('button', { name: `Current thread workspace: ${threadName}`, exact: true })
+  const indicator = ownWorkspaceControl(page, threadName)
   await expect(indicator).toBeVisible()
+  await expect(indicator).toHaveAccessibleName('Own workspace actions')
+  await expect(indicator).toHaveText(/^Own workspace/)
   await indicator.click()
   await expect(rebaseButton(page)).toBeVisible()
   await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
@@ -743,7 +772,7 @@ When('the current thread workspace chip is hovered', async ({ page }: { page: Pa
     if (await workspaceMenu(page).isVisible()) await page.keyboard.press('Escape')
     await expect(workspaceMenu(page)).toBeHidden({ timeout: 1_000 })
   }).toPass({ timeout: 10_000 })
-  await page.getByRole('button', { name: `Current thread workspace: ${provisionedThreadName(page)}`, exact: true }).hover()
+  await ownWorkspaceControl(page, provisionedThreadName(page)).hover()
   await expect(page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true })).toBeHidden()
 })
 
@@ -1039,7 +1068,7 @@ Then('a failed destination lookup leaves the first send retryable', async ({ pag
   await expect(composer).toHaveText('first message from the inherited workspace')
   await expect(page.getByText('The workspace could not be prepared; the message was not sent. Send again to retry.', { exact: true })).toBeVisible()
   const previousThread = provisionedThreadName(page)
-  await expect(projectButton(page)).toHaveText(`repo · ${previousThread}`)
+  await expectDraftThreadWorkspace(page, previousThread)
   expect(workspaceNames(repositoryFor(page), [previousThread])).toEqual(['default', previousThread].sort())
   await destination.getByRole('button', { name: 'Retry', exact: true }).click()
   await expect(destination.getByRole('alert')).toHaveCount(0)
@@ -1054,9 +1083,9 @@ Then('the blank new thread keeps the previous workspace until it sends', async (
   await recordAssertion(page, 'jj-integration-empty-new-thread-defers-its-workspace', async () => {
     await expect(newThreadComposer(page)).toBeVisible()
     await expect(newThreadComposer(page)).toHaveText('')
-    await expect(projectButton(page)).toHaveText(`repo · ${previousThread}`)
+    await expectDraftThreadWorkspace(page, previousThread)
     await expectOwnWorkspace(page, true)
-    await expect(page.getByRole('status', { name: /^thread-/ })).toHaveCount(0)
+    await expect(page.getByRole('status', { name: 'Preparing own workspace…', exact: true })).toHaveCount(0)
     expect(workspaceNames(repository, [previousThread])).toEqual(['default', previousThread])
   })
   await finishJourneyAssertions(page)
@@ -1134,12 +1163,7 @@ When('a disposable jj repository with an asset icon is chosen as the New thread 
 
 Then('the project row shows the icon the repository ships', async ({ page }: { page: Page }) => {
   // Project rows only exist while the thread list groups by project.
-  await page.getByRole('button', { name: /^Group: /u }).click()
-  await page
-    .getByRole('menuitemradio', { name: /^Project$/u })
-    .or(page.getByRole('option', { name: /^Project$/u }))
-    .first()
-    .click()
+  await ThreadListFilter.selectGroup(page, page.getByRole('region', { name: 'Threads', exact: true }), 'Project')
   await recordAssertion(page, 'jj-integration-project-icon-comes-from-the-repository', async () => {
     await expect(page.locator('[data-project-icon-source="assets/icon.svg"]')).toBeVisible({ timeout: 30_000 })
   })
@@ -1382,7 +1406,7 @@ When('the thread is settled from the rebase notice', async ({ page }: { page: Pa
 })
 
 Then('the thread appears in the Settled sidebar section', async ({ page }: { page: Page }) => {
-  await (await threadList(page)).getByRole('button', { name: 'All threads', exact: true }).click()
+  await ThreadListFilter.selectView(page, await threadList(page), 'All threads')
   await ThreadSidebarJourney.arrangeManually(page)
   const settledSection = (await threadList(page)).getByRole('button', { name: 'Settled (1)', exact: true })
   await recordAssertion(page, 'jj-integration-rebased-thread-can-be-settled-from-notice', () => expect(settledSection).toBeVisible())
@@ -1432,10 +1456,10 @@ Then('the New thread picker lists Projects but not the thread workspaces of a di
   const repository = await createRepository(page)
   await chooseProjectPath(page, repository.repositoryPath)
   await chooseWorkspace(page, 'Own workspace')
-  await expect(projectButton(page)).toHaveText(/^repo · thread-/)
+  await expectDraftThreadWorkspace(page, /^thread-/)
   provisionedThreads.set(page, await currentThreadName(page))
   await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
-  const settled = page.getByRole('status').filter({ hasText: /^(Completed|Failed|Stopped|Cancelled)$/ })
+  const settled = page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })
   const settledCount = await settled.count()
   await newThreadComposer(page).fill('jj picker workspace seed')
   await newThreadComposer(page).press('Enter')
@@ -1505,7 +1529,7 @@ When('the integration is queued from the workspace menu', async ({ page }: { pag
 
 Then('the thread shows the queued integration notice with Undo', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  await (await threadList(page)).getByRole('button', { name: 'All threads', exact: true }).click()
+  await ThreadListFilter.selectView(page, await threadList(page), 'All threads')
   await recordAssertion(page, 'jj-integration-queued-integration-shows-undo', async () => {
     const notice = page.getByTestId('jj-thread-integration-queued-notice')
     await expect(notice).toContainText('Landing on main queued')
@@ -1556,7 +1580,8 @@ Then('the thread row offers Integrate for its 1 revision', async ({ page }: { pa
 
 When('a ready workspace is selected for batch integration', async ({ page }: { page: Page }) => {
   await threadRow(page)
-    .getByRole('checkbox', { name: /^Select workspace /u })
+    // The batch checkbox names the thread, not its workspace folder (b:212a).
+    .getByRole('checkbox', { name: `Select “${REBASE_THREAD_TITLE}” to land in a batch`, exact: true })
     .check()
 })
 
@@ -1632,7 +1657,7 @@ Then('its Preview shows the latest message', async ({ page }: { page: Page }) =>
 
 When("{string} is chosen from the thread row's More menu", async ({ page }: { page: Page }, item: string) => {
   await threadRow(page)
-    .getByRole('button', { name: `More actions for ${provisionedThreadName(page)}`, exact: true })
+    .getByRole('button', { name: `More actions for ${REBASE_THREAD_TITLE}`, exact: true })
     .click()
   await page.getByRole('menuitem', { name: item, exact: true }).click()
 })
@@ -1640,7 +1665,7 @@ When("{string} is chosen from the thread row's More menu", async ({ page }: { pa
 Then('the confirmation names the thread and its 1 revision to rebase', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'jj-integration-removal-confirmation', async () => {
     const dialog = page.getByRole('alertdialog')
-    await expect(dialog.getByRole('heading')).toHaveText(`Remove ${provisionedThreadName(page)} and abandon 1 unlanded revision(s)?`)
+    await expect(dialog.getByRole('heading')).toHaveText(`Remove the workspace of “${REBASE_THREAD_TITLE}” and abandon 1 unlanded revision(s)?`)
     await expect(dialog).toContainText('deletes its folder')
     await expect(dialog).toContainText('threads stay in DSH and are not archived')
   })

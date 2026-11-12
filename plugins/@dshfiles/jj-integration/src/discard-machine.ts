@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react'
 interface DiscardTarget {
   readonly path: string
   readonly name: string
+  /** The thread the workspace belongs to, which the dialog names instead of its folder (b:212a). */
+  readonly label?: string | undefined
   readonly unlandedCount: number
 }
 

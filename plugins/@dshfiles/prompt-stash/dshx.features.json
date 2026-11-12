@@ -33,6 +33,11 @@
           "featureFile": "tooling/dshx/e2e/features/prompt-stash.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "prompt-stash.more-menu-panels-stay-open",
+          "featureFile": "tooling/dshx/e2e/features/prompt-stash.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "prompt-stash.prompt-library-unit-cross-tab-edit",
           "file": "plugins/@dshfiles/prompt-stash/src/library.test.ts",
@@ -158,7 +163,7 @@
       "summary": "Search the prompts you sent in every top-level thread from the Prompts menu's All threads tab, Ctrl+R in a focused composer, or the Search prompt history palette entry; Enter inserts one at the cursor without sending and the star saves it to the shared library. The prompt_history_search agent tool reads the same Host method.",
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Deploy the quartz service to staging\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Deploy the quartz service to staging\"",
         "press Enter",
         "click button \"Prompts\"",
         "click tab \"All threads\"",
@@ -246,16 +251,16 @@
       "reach": [
         "seed tool-call-thread",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Attachment draft thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Attachment draft thread\"",
         "press Enter",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Draft with attachments\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Draft with attachments\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
         "expect button \"Remove file note.txt\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Other thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Other thread\"",
         "press Enter",
-        "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
+        "expect textbox \"Message or run a task, / commands, @ files or threads\"",
         "click button \"Back\"",
         "expect button \"Remove image red.png\"",
         "expect button \"Remove file note.txt\""

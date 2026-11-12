@@ -3,8 +3,9 @@
  * notice for the whole app, so leaving the Chat panel does not drop it. A
  * `shell.quota-notice` entry may replace the generic Toast for codes it claims.
  */
+import { TriangleAlertIcon } from '@dshfiles/plugin-ui/icons'
 import { Fragment } from 'react'
-import { IconWarningOutlineRegular, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { QuotaNoticeHostProps, QuotaNoticeOwnerProps } from '../contract/slots.ts'
 
 /**
@@ -20,7 +21,7 @@ export function QuotaNoticeHost({ useNotice, dismissNotice, keepNoticeOpen, rend
   return (
     <Fragment key={`quota-notice-${String(notice.seq)}`}>
       {renderSlotChain('shell.quota-notice', owner, {
-        fallback: <Toast text={owner.message} icon={<IconWarningOutlineRegular size={18} />} onDone={dismissNotice} />,
+        fallback: <Toast text={owner.message} icon={<TriangleAlertIcon strokeWidth={1.5} size={18} />} onDone={dismissNotice} />,
       })}
     </Fragment>
   )

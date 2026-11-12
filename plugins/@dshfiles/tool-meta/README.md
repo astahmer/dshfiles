@@ -27,7 +27,9 @@ A native approval request renders in the composer as one card instead of the nat
 request's reason, the command the call runs, and Reject / Allow once with their Esc and Enter keys. Risk is a label for
 attention, never a policy: **Destructive** for a command that deletes, overwrites or publishes (`rm -rf`,
 `git push --force`, `jj abandon`, `sudo`, `curl … | sh`), **Read-only** for a tool that only reads, **Review**
-otherwise.
+otherwise. An approval is always Needs you: the card leads with the indigo diamond and keeps a neutral frame, and the
+risk badge uses the status trio, red only for Destructive (b:ysaj). On a phone Reject and Allow once share the row at
+48pt.
 
 The card is a `conversation.composer` chain entry ahead of the native panel (priority 0.5 against 1): it renders the
 request and asks the native approval package to answer, so its waterfall, hand-on (`delegate`), withdrawal and

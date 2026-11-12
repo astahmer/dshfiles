@@ -50,6 +50,18 @@
       "default": "./src/icons.ts"
     },
     "./styles.css": "./src/styles.css",
+    "./theme/palette": {
+      "types": "./src/theme/palette.ts",
+      "default": "./src/theme/palette.ts"
+    },
+    "./theme/css": {
+      "types": "./src/theme/theme-css.ts",
+      "default": "./src/theme/theme-css.ts"
+    },
+    "./theme/appearance": {
+      "types": "./src/theme/appearance.ts",
+      "default": "./src/theme/appearance.ts"
+    },
     "./vite": {
       "types": "./src/vite.ts",
       "default": "./src/vite.ts"
@@ -90,6 +102,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "theme:emit": "node scripts/emit-theme-css.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

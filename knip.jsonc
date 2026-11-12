@@ -13,6 +13,12 @@
     "plugins/@dshfiles/rich-composer/src/native/skeleton/safari.ts",
     "plugins/@dshfiles/chat/src/native/model/steering-history.ts",
     "plugins/@dshfiles/chat/src/native/model/tool-call-tree.ts",
+    // Vendored and unreferenced since the running row draws the kit Working glyph (visual refresh T4.3); the fork
+    // checker has no removal record, so the upstream file stays.
+    "plugins/@dshfiles/chat/src/native/chat/RunningWhaleTail.tsx",
+    // Vendored and unreferenced since message rows leave their time to the transcript's time dividers; kept
+    // byte-identical for native-fork-diff like RunningWhaleTail.
+    "plugins/@dshfiles/chat/src/native/chat/use-calendar-day.ts",
     // The vendored no-op Host body of ui-sidebar-right, kept byte-identical; the fork's Host entry is src/host.ts.
     "plugins/@dshfiles/sidebar-right/src/native/index.ts",
     // The same for ui-sidebar-terminal, plus the recovery header action and cleanup overlay its fork delta unregisters

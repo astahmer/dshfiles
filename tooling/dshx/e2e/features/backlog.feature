@@ -498,7 +498,7 @@ Feature: Backlog
 
   @scenario:backlog.thread-backlinks
   Scenario: A thread's header lists the backlog items that link to it
-    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a Command Code account backed by a local fake provider is added
     And the Backlog panel is opened
     And "Follow up on the deployment" is captured

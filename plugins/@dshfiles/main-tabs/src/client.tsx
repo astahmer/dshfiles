@@ -7,6 +7,7 @@ import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deeps
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { createApiClient, defineClient, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
 import type { BeforeMainOwnerProps } from '@dshfiles/frame-layout/regions'
 import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
@@ -16,6 +17,7 @@ import { threadSidebarThreadDirectoriesApi, useThreadDirectories, WorkspacePaths
 import { PanelTitles } from '@dshfiles/workbench/panel-titles'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
 import { Effect, Fiber, Schema } from 'effect'
 import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
@@ -413,7 +415,10 @@ export default defineClient({
             [byId, threadDirectories, workspaceItems],
           )
           const showProjectName = settings.value?.showProjectName ?? false
-          const projectNames = useMemo(() => (showProjectName ? ProjectNames.byWorkspaceId(workspaceItems) : undefined), [showProjectName, workspaceItems])
+          const projectNames = useMemo(
+            () => (showProjectName ? ProjectNames.byWorkspaceId(workspaceItems, threadDirectories) : undefined),
+            [showProjectName, threadDirectories, workspaceItems],
+          )
           const statuses = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
           // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges,
           // and both read the one page-wide poll instead of each holding their own interval.
@@ -512,7 +517,8 @@ export default defineClient({
                 column: 'threads',
                 label: translate('recentThreads'),
                 suggestions: threads.map(session => {
-                  const project = session.cwd?.split('/').filter(Boolean).at(-1)
+                  // A thread workspace reads as the project it was cut from, never its `thread-xxxxxx` folder (b:212a).
+                  const project = session.cwd === undefined ? undefined : EntityLabels.repositoryPath(session.cwd).split('/').filter(Boolean).at(-1)
                   const running = statuses.get(session.id)?.running ?? session.running
                   return {
                     id: `thread:${session.id}`,
@@ -707,6 +713,54 @@ export default defineClient({
           }
         }
       }, `main-tabs: ${commandId} shortcut`)
+    }
+    // Productivity pass Q5 (E6): the Fixed layout hides the tab strip, so the verbs that only lived on it stay
+    // reachable from ⌘K (and the keys above). Free docking keeps the strip, its + and its tab menu as before.
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) {
+      const activeTabId = (): string | undefined => {
+        const snapshot = actor.getSnapshot()
+        if (!snapshot.matches('on')) return undefined
+        return snapshot.context.sets[snapshot.context.scopeKey]?.activeTabId ?? undefined
+      }
+      const rows = [
+        {
+          id: 'new-tab',
+          label: () => translate('newTab'),
+          aliases: ['Choose a view', 'Start tab'],
+          shortcutId: 'mainTabs.newTab',
+          run: () => {
+            ctx.layout.beginNavigation()
+            actor.send({ type: 'tab.new' })
+          },
+        },
+        {
+          id: 'reopen-closed-tab',
+          label: () => translate('reopenClosedTab'),
+          aliases: ['Undo close tab'],
+          shortcutId: 'mainTabs.reopenClosed',
+          run: () => actor.send({ type: 'tab.reopenClosed' }),
+        },
+        {
+          id: 'close-other-tabs',
+          label: () => translate('closeOthers'),
+          aliases: ['Close other threads in tabs'],
+          shortcutId: undefined,
+          run: () => {
+            const tabId = activeTabId()
+            if (tabId !== undefined) actor.send({ type: 'tab.closeOthers', tabId })
+          },
+        },
+      ] as const
+      for (const row of rows)
+        plugin.add(PaletteActions, {
+          id: `@dshfiles/main-tabs/${row.id}`,
+          group: 'command',
+          label: row.label,
+          aliases: row.aliases,
+          ...(row.shortcutId === undefined ? {} : { shortcutId: row.shortcutId }),
+          run: () => row.run(),
+        })
     }
   },
 })

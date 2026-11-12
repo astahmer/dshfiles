@@ -6,10 +6,10 @@ const defaultColors = DEFAULT_PREFERENCES.attentionColors
 
 describe('thread attention presentation', () => {
   it.each([
-    ['threadSidebarApprovalNeeded', 'dshx:text-warning/80', 'dshx:bg-warning'],
-    ['threadSidebarInputNeeded', 'dshx:text-warning/80', 'dshx:bg-warning'],
-    ['threadSidebarTurnFinished', 'dshx:text-success/80', 'dshx:bg-success'],
-    ['threadSidebarNeedsResume', 'dshx:text-warning/80', 'dshx:bg-warning'],
+    ['threadSidebarApprovalNeeded', 'dshx:text-info/80', 'dshx:bg-info'],
+    ['threadSidebarInputNeeded', 'dshx:text-info/80', 'dshx:bg-info'],
+    ['threadSidebarTurnFinished', 'dshx:text-muted-foreground/80', 'dshx:bg-muted-foreground/45'],
+    ['threadSidebarNeedsResume', 'dshx:text-info/80', 'dshx:bg-info'],
   ] as const)('uses configured semantic colors for %s', (label, textClass, dotClass) => {
     expect(ThreadAttentionPresentationModel.attentionLabelClass(label, defaultColors)).toBe(textClass)
     expect(ThreadAttentionPresentationModel.attentionDotClass({ attentionLabel: label, attentionColors: defaultColors, unread: false, running: false })).toBe(
@@ -40,10 +40,10 @@ describe('thread attention presentation', () => {
         unread: false,
         running: false,
       }),
-    ).toBe('dshx:bg-warning')
+    ).toBe('dshx:bg-info')
     expect(
       ThreadAttentionPresentationModel.attentionDotClass({ attentionLabel: undefined, attentionColors: defaultColors, unread: false, running: true }),
-    ).toBe('dshx:animate-pulse dshx:bg-info')
+    ).toBe('dshx:animate-pulse dshx:bg-muted-foreground')
   })
 
   it('keeps generic unread, running, and idle indicators distinct', () => {
@@ -52,7 +52,7 @@ describe('thread attention presentation', () => {
     ).toBe('dshx:bg-primary')
     expect(
       ThreadAttentionPresentationModel.attentionDotClass({ attentionLabel: undefined, attentionColors: defaultColors, unread: false, running: true }),
-    ).toBe('dshx:animate-pulse dshx:bg-info')
+    ).toBe('dshx:animate-pulse dshx:bg-muted-foreground')
     expect(
       ThreadAttentionPresentationModel.attentionDotClass({ attentionLabel: undefined, attentionColors: defaultColors, unread: false, running: false }),
     ).toBe('dshx:bg-muted-foreground/45')
@@ -66,6 +66,6 @@ describe('thread attention presentation', () => {
         unread: true,
         running: true,
       }),
-    ).toBe('dshx:bg-success')
+    ).toBe('dshx:bg-muted-foreground/45')
   })
 })

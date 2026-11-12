@@ -17,7 +17,7 @@ const reasoningEffort = (page: Page) => page.getByRole('region', { name: 'Reason
 const pickerSelectionByPage = new WeakMap<Page, { readonly model: string; readonly effort: string }>()
 
 When('a submitted prompt opens a scratch Session', async ({ page }: { page: Page }) => {
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await expect(composer).toBeVisible()
   await composer.fill('Open a scratch Session for the model picker')
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
@@ -29,13 +29,17 @@ When('the composer model picker is searched for an unavailable model', async ({ 
   const trigger = page.locator('[data-model-picker-text]')
   const selectedModel = (await trigger.innerText()).trim()
   const effortLabel = page.locator('[data-model-picker-effort]')
-  const selectedEffort = (await effortLabel.innerText()).trim()
   await expect(trigger).toBeVisible()
-  await expect(effortLabel).toBeVisible()
-  const modelBounds = await trigger.boundingBox()
-  const effortBounds = await effortLabel.boundingBox()
-  if (modelBounds === null || effortBounds === null) throw new Error('The composer model and reasoning labels have no visible bounds.')
-  expect(Math.abs(modelBounds.y - effortBounds.y)).toBeLessThan(2)
+  // The chip names an effort only when one is chosen or the model defines a default (composer redesign b:v9yh): a
+  // provider-decided effort shows the model alone.
+  const selectedEffort = (await effortLabel.count()) === 0 ? '' : (await effortLabel.innerText()).trim()
+  if (selectedEffort !== '') {
+    await expect(effortLabel).toBeVisible()
+    const modelBounds = await trigger.boundingBox()
+    const effortBounds = await effortLabel.boundingBox()
+    if (modelBounds === null || effortBounds === null) throw new Error('The composer model and reasoning labels have no visible bounds.')
+    expect(Math.abs(modelBounds.y - effortBounds.y)).toBeLessThan(2)
+  }
   pickerSelectionByPage.set(page, { model: selectedModel, effort: selectedEffort })
   await trigger.click()
 
@@ -64,7 +68,8 @@ Then('the empty search keeps the composer selection', async ({ page }: { page: P
     const model = page.locator('[data-model-picker-text]')
     const effortLabel = page.locator('[data-model-picker-effort]')
     await expect(model).toHaveText(selection.model)
-    await expect(effortLabel).toHaveText(selection.effort)
+    if (selection.effort === '') await expect(effortLabel).toHaveCount(0)
+    else await expect(effortLabel).toHaveText(selection.effort)
     await expect(page.getByRole('list', { name: 'Models and accounts', exact: true }).getByText('No matching models.', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: /Details for/u })).toHaveCount(0)
     await expect(page.getByRole('dialog')).toBeVisible()
@@ -326,17 +331,43 @@ Then('swapping accounts keeps the model and selects the next account', async ({ 
   await recordAssertion(page, 'model-effort-picker-account-swap-preserves-selection', async () => {
     const model = page.locator('[data-model-picker-text]')
     const effort = page.locator('[data-model-picker-effort]')
-    const initialEffort = await effort.innerText()
+    // No effort label when the provider decides it (composer redesign b:v9yh); the swap must keep that too.
+    const initialEffort = (await effort.count()) === 0 ? '' : await effort.innerText()
     await expect(model).toHaveText('gpt-6-luna')
     await model.hover()
     await expect(page.getByRole('tooltip')).toContainText('Command Code 1')
-    await expect(page.getByRole('button', { name: 'Switch to Command Code 2', exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Switch to Command Code 2', exact: true }).click()
+    // b:4qjm/b:16yr: no swap button beside the chip; the detail panel's Account chips switch the thread's account.
+    await expect(page.locator('[data-model-account-swap]')).toHaveCount(0)
+    const accounts = page.getByRole('group', { name: 'Available accounts' }).or(page.getByLabel('Available accounts')).first()
+    // The isolated composition can close the menu's first open at once (as it drops the trigger tooltip on main), so an
+    // open that closed itself is opened again.
+    const openMenu = async (): Promise<void> => {
+      if (await accounts.isVisible().catch(() => false)) return
+      await page.locator('[data-model-trigger]').filter({ visible: true }).first().click()
+      await expect(accounts).toBeVisible()
+    }
+    await openMenu()
+    await expect(accounts.getByRole('button', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(async () => {
+      await openMenu()
+      await accounts.getByRole('button', { name: 'Command Code 2', exact: true }).click({ timeout: 2_000 })
+      await expect(accounts.getByRole('button', { name: 'Command Code 2', exact: true })).toHaveAttribute('aria-pressed', 'true', { timeout: 2_000 })
+    }).toPass({ timeout: 20_000 })
+    // One row per model however many accounts offer it.
+    await expect(
+      page.getByRole('list', { name: 'Models and accounts', exact: true }).locator('[data-model-picker-option]').filter({ hasText: 'gpt-6-luna' }),
+    ).toHaveCount(1)
+    await page.keyboard.press('Escape')
     await expect(model).toHaveText('gpt-6-luna')
+    // Off the default account, the chip names it.
+    await expect(page.locator('[data-model-picker-provider]').filter({ visible: true })).toHaveText('CC2')
     await model.hover()
     await expect(page.getByRole('tooltip')).toContainText('Command Code 2')
-    await expect(effort).toHaveText(initialEffort)
-    await expect(page.getByRole('button', { name: 'Switch to Command Code 1', exact: true })).toBeVisible()
+    if (initialEffort === '') await expect(effort).toHaveCount(0)
+    else await expect(effort).toHaveText(initialEffort)
+    await openMenu()
+    await expect(accounts.getByRole('button', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-pressed', 'false')
+    await page.keyboard.press('Escape')
   })
   await finishJourneyAssertions(page)
 })

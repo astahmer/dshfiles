@@ -1,5 +1,5 @@
 {
-  "hostBundles": 86,
+  "hostBundles": 88,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -64,6 +64,7 @@
     "@dshfiles/settings-subagent",
     "@dshfiles/settings-web-search",
     "@dshfiles/shared-streams",
+    "@dshfiles/shortcuts",
     "@dshfiles/sidebar-terminal",
     "@dshfiles/storage-domain",
     "@dshfiles/storage-json",
@@ -80,6 +81,7 @@
     "@dshfiles/traces",
     "@dshfiles/turn-summary",
     "@dshfiles/tweet-context",
+    "@dshfiles/ui-styles",
     "@dshfiles/usage",
     "@dshfiles/web-fetch-readable",
     "@dshfiles/web-search-brave",
@@ -88,12 +90,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 652,
-  "apiToolBindings": 455,
-  "apiToolNameCount": 455,
-  "apiToolSchemas": 454,
+  "apiMethods": 675,
+  "apiToolBindings": 474,
+  "apiToolNameCount": 474,
+  "apiToolSchemas": 473,
   "definedTools": 24,
-  "tools": 478,
+  "tools": 497,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -4704,6 +4706,39 @@
       }
     },
     {
+      "name": "dsh_update_apply",
+      "description": "Update DSH, apply: in the background, fetch, fast-forward the bookmark to its remote copy (only when it is a strict ancestor; diverged history is refused with the exact commands), then bring the checkout DSH runs from onto it with `dshx checkout sync` (keeps its undescribed local edits, refuses described local work, reinstalls and rebuilds what changed). Never pushes and never restarts DSH: when a Host bundle changed it reports a restart is needed, which the user applies with Restart when idle. Requires confirm: true. Call only when the user asked to update DSH; dsh_update_check shows the job's progress.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "dsh_update_check",
+      "description": "Update DSH, check: fetch the bookmark's remote copy (main@origin) for the jj checkout DSH runs from and list What's new (revisions it lacks), what moving onto them would install, rebuild and hot-reload, whether DSH would need a restart, and the last update job. Fetching moves no files and never fast-forwards the bookmark. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "fetch": {
+            "description": "Fetch the remote first (network). Default true; false reads what is already fetched.",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "dshx_capabilities",
       "description": "List the typed APIs DSH plugins serve in this process: owner package, methods, what each does, and which are callable by you as tools. Use it to find a plugin capability before asking the user for data a plugin already has. Read-only.",
       "parameters": {
@@ -5046,6 +5081,52 @@
           "width": {
             "description": "Viewport width in pixels, 320–1920; defaults to 800, about the card's width.",
             "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "inbox_push_devices",
+      "description": "Which devices receive push for blocking Inbox items (Needs you and Failed): label, push service, last push and last error. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "inbox_push_remove",
+      "description": "Stop pushing to one device by id (from inbox_push_devices). Call only when the user asked to remove that device; it can turn push on again from its Inbox.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "confirm": {
+            "description": "Must be true: the device stops receiving push until it turns push on again.",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "inbox_push_test",
+      "description": "Send one test notification to every subscribed device, or to one by id. Call only when the user asked for a test push.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -6020,6 +6101,22 @@
       "parameters": {
         "type": "object",
         "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jj_thread_land_impact",
+      "description": "Try this change live: what landing the thread workspace at a path would change in the running DSH, read only. Plans moving the checkout DSH runs from to the thread’s newest landable commit with `dshx checkout plan`: files, reinstalls, which plugins hot-reload (client bundle only) and which need Restart when idle (Host bundle or manifest changed). It never lands, syncs or restarts.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
         "additionalProperties": false
       }
     },
@@ -10358,6 +10455,32 @@
       }
     },
     {
+      "name": "session_find_in_thread",
+      "description": "Find every event of one DSH thread (Session) whose text contains all words of `text` (the last word may be a prefix), in transcript order: the whole stored transcript, older turns and tool calls and results included (model thinking is not indexed). Each match has its event seq, type, time and a short snippet. `limit` defaults to 200; with `newest: true` the newest `limit` matches are returned (still in transcript order), which is what a find bar starting from the tail reads. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "newest": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sessionId",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "session_redo",
       "description": "Reverse the undo or rewind that created this thread: put the files back as they were before it, bring the original thread back with every rewound turn, and archive this one. Refused once this thread ran a new turn, and when another live thread works in the same folder unless allowSharedDirectory: true. Call only when the user asked to redo.",
       "parameters": {
@@ -10608,7 +10731,8 @@
       "description": "Read how often each rail destination and section was opened in the DSH GUI, and from which surface (rail, phone tab bar, list index, palette, moved-to help, phone Back). Ids and counts only. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -10616,7 +10740,225 @@
       "description": "Clear the navigation counts and start counting again. Call only when the user asked to reset them; confirm must be true.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_folder_create",
+      "description": "Create a sidebar folder with a title and an optional lucide icon name, before another folder or above Settings. Undo with sidebar_folder_delete. Call only when the user asked for that folder.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "beforeId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_folder_delete",
+      "description": "Delete a user folder; its panels move to Settings › Other pages and the folder can be restored for 30 days with sidebar_folder_restore. Built-in folders cannot be deleted (hide them with sidebar_folder_rename). Requires confirm: true. Call only when the user asked to delete that folder.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_folder_move",
+      "description": "Move a sidebar folder before another folder, or above Settings at the end. Undo by moving it back. Call only when the user asked to reorder folders.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "beforeId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_folder_rename",
+      "description": "Rename or re-icon a user folder, or hide or show a built-in folder. Undo with the previous title, icon or visibility. Call only when the user asked for that change.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_folder_restore",
+      "description": "Restore a deleted sidebar folder at its old place with its panels (within 30 days of the delete). Call only when the user asked to bring it back.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_panel_add",
+      "description": "File a panel (an id from sidebar_panels_available) in a sidebar folder, optionally kept docked in the sidebar; it leaves any other folder. Undo with sidebar_panel_remove. Call only when the user asked to add that panel.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "viewId": {
+            "type": "string"
+          },
+          "folderId": {
+            "type": "string"
+          },
+          "keep": {
+            "type": "boolean"
+          },
+          "beforeViewId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "viewId",
+          "folderId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_panel_move",
+      "description": "Move a panel already in the sidebar to another folder or place. Undo by moving it back. Call only when the user asked to move that panel.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "viewId": {
+            "type": "string"
+          },
+          "folderId": {
+            "type": "string"
+          },
+          "beforeViewId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "viewId",
+          "folderId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_panel_remove",
+      "description": "Take a panel out of the sidebar (a page removed from its default folder stays reachable from the palette). Undo with sidebar_panel_add. Call only when the user asked to remove that panel.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "viewId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "viewId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_panels_available",
+      "description": "List the panels a browser reported it can show (pages, thread facets, plugin views), the ids sidebar_panel_add takes. Empty, with a note, when no browser has reported since the Host started: ask the user to open the DSH page. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_tree_get",
+      "description": "Read the sidebar folders: each folder (built-in destinations and user folders) with its filed panels, the panels removed from their default folder and the deleted folders that can still be restored. derived: true means nothing was changed yet and every page sits in its default folder. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sidebar_tree_reset",
+      "description": "Reset the sidebar folders to the default (every page in its default folder); user folders become restorable deleted folders for 30 days. Requires confirm: true. Call only when the user asked to reset the sidebar folders.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -10651,6 +10993,83 @@
           "selectedText",
           "comment"
         ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "theme_get",
+      "description": "The Appearance theme: colour preset, the grey hue, grey tint, accent hue and contrast in effect and their overrides, UI, code and reading font, the light/dark preference and the available presets. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "theme_set",
+      "description": "Change the Appearance theme for every surface: a preset, per-value overrides or the fonts; reset: true restores the defaults. Call only when the user asked to change the theme. Reversible: theme_get shows the previous state and reset: true returns to the defaults. Light or dark is the separate Theme setting (ui-theme preference).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reset": {
+            "description": "true restores every default (warm stone, Geist, Geist Mono); other fields are ignored.",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "preset": {
+            "description": "Colour preset. Choosing one clears the grey hue, grey tint, accent hue and contrast overrides not given in the same call.",
+            "type": "string",
+            "enum": [
+              "warm-stone",
+              "neutral",
+              "high-contrast",
+              "slate-blue",
+              "moss"
+            ]
+          },
+          "greyHue": {
+            "type": "number",
+            "description": "Hue of the greys, 0–360. null clears the override."
+          },
+          "greyTint": {
+            "type": "number",
+            "description": "Tint of the greys, 0–0.03. null clears the override."
+          },
+          "accentHue": {
+            "type": "number",
+            "description": "Hue of the accent, 0–360. null clears the override."
+          },
+          "contrast": {
+            "type": "number",
+            "description": "Spread of borders and text, 1–1.5. null clears the override."
+          },
+          "interfaceFont": {
+            "description": "Interface font.",
+            "type": "string",
+            "enum": [
+              "geist",
+              "system"
+            ]
+          },
+          "codeFont": {
+            "description": "Code font.",
+            "type": "string",
+            "enum": [
+              "geist-mono",
+              "system"
+            ]
+          },
+          "readingFont": {
+            "description": "Reply prose font in threads: sans (default) or serif (a system serif, nothing downloaded).",
+            "type": "string",
+            "enum": [
+              "sans",
+              "serif"
+            ]
+          }
+        },
         "additionalProperties": false
       }
     },
@@ -10691,7 +11110,8 @@
       "description": "Read the Host auto-settle state: whether idle or rebased auto-settle is on, the scan interval, the last and next scan, and the newest automatic settles with the trigger and reason behind each. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -10864,29 +11284,6 @@
         "required": [
           "text",
           "models"
-        ],
-        "additionalProperties": false
-      }
-    },
-    {
-      "name": "thread_find",
-      "description": "Find every event of one DSH thread (Session) whose text contains all words of `text` (the last word may be a prefix), in transcript order: the whole stored transcript, older turns and tool calls and results included (model thinking is not indexed). Each match has its event seq, type, time and a short snippet. `limit` defaults to 200. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string"
-          },
-          "text": {
-            "type": "string"
-          },
-          "limit": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "sessionId",
-          "text"
         ],
         "additionalProperties": false
       }
@@ -11421,7 +11818,7 @@
     },
     {
       "name": "thread_view_create",
-      "description": "Create a saved thread sidebar view. Call only when the user asked to create that view.",
+      "description": "Create a thread list filter preset. Omitted groupBy/statusFilters/sourceFilter are the list's current filters, so { id, name, projectFilter } saves the current filters as a preset; projectFilter null = All projects, omitted = the preset leaves the project picker alone. `select: true` applies it; `position` inserts it there (restores a deleted preset in place). Call only when the user asked to create that preset.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -11472,22 +11869,27 @@
               "main",
               "subagents"
             ]
+          },
+          "projectFilter": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer"
+          },
+          "select": {
+            "type": "boolean"
           }
         },
         "required": [
           "id",
-          "name",
-          "enabled",
-          "groupBy",
-          "statusFilters",
-          "sourceFilter"
+          "name"
         ],
         "additionalProperties": false
       }
     },
     {
       "name": "thread_view_delete",
-      "description": "Delete a saved thread sidebar view. Requires explicit confirm: true. Call only when the user asked to delete that view.",
+      "description": "Delete a thread list filter preset. Requires explicit confirm: true. The result names the removed preset and its position; thread_view_create with them restores it. Call only when the user asked to delete that preset.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -11550,7 +11952,7 @@
     },
     {
       "name": "thread_view_select",
-      "description": "Select an enabled saved thread sidebar view or change grouping/filter control visibility. Call only when the user asked for that selection or visibility change.",
+      "description": "Apply an enabled thread list filter preset (drops unsaved filter changes; a preset with a project scope sets the project picker), or change the visibility of the Group/Filter controls, the Presets section (showPresets) and the preset chips row (showPresetChips). Call only when the user asked for that selection or visibility change.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -11562,6 +11964,12 @@
           },
           "showFilterControl": {
             "type": "boolean"
+          },
+          "showPresets": {
+            "type": "boolean"
+          },
+          "showPresetChips": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -11569,7 +11977,7 @@
     },
     {
       "name": "thread_view_update",
-      "description": "Change a saved thread sidebar view name, enabled state, grouping or filters. Call only when the user asked for that change.",
+      "description": "Rename a thread list filter preset, hide or show it (enabled), or change its grouping, filters or project scope. `fromCurrent: true` writes the list's current filters into it (Save changes / Update with current filters). Call only when the user asked for that change.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -11620,6 +12028,15 @@
               "main",
               "subagents"
             ]
+          },
+          "projectFilter": {
+            "type": "string"
+          },
+          "fromCurrent": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
           }
         },
         "required": [
@@ -11630,7 +12047,7 @@
     },
     {
       "name": "thread_views_list",
-      "description": "Read saved thread sidebar views, their order, active view and control visibility. Read-only.",
+      "description": "Read the thread list filter presets (saved views): their filters, order, the active preset, whether the list was edited since it was applied (`edited`, unsaved filters in `settings.draft`), the current project scope and control visibility. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {},

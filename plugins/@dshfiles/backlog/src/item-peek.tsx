@@ -246,7 +246,7 @@ const TitleField = (props: { readonly id: number; readonly title: string }): JSX
           className="dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:bg-transparent dshx:text-xl dshx:font-semibold dshx:leading-snug dshx:tracking-tight dshx:text-foreground dshx:outline-none"
         />
         {autosave.error === null ? null : (
-          <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
+          <p role="alert" className="dshx:text-2xs dshx:text-destructive">
             {errorMessage(autosave.error, 'The title could not be saved. Edit it and press Enter to retry, or Escape to keep the old title.')}
           </p>
         )}
@@ -306,7 +306,7 @@ const BodyField = (props: {
           type="button"
           aria-label="Edit description"
           onClick={begin}
-          className="dshx:-mx-2 dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent/40"
+          className="dshx:-mx-2 dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-sm dshx:leading-relaxed dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent/40"
         >
           Add a description…
         </button>
@@ -316,7 +316,7 @@ const BodyField = (props: {
         <BacklogText
           text={props.body}
           onActivate={begin}
-          className="dshx:-mx-2 dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:transition-colors dshx:hover:bg-accent/40"
+          className="dshx:-mx-2 dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-sm dshx:leading-relaxed dshx:transition-colors dshx:hover:bg-accent/40"
         />
         <Button aria-label="Edit description" className="dshx:mt-1 dshx:shrink-0" onClick={begin} size="icon-xs" type="button" variant="ghost">
           <PencilIcon aria-hidden />
@@ -342,7 +342,7 @@ const BodyField = (props: {
         onSubmit={save}
       />
       {autosave.error === null ? null : (
-        <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
+        <p role="alert" className="dshx:text-2xs dshx:text-destructive">
           {errorMessage(autosave.error, 'That attachment could not be saved.')}
         </p>
       )}
@@ -607,7 +607,7 @@ const TimelineRuns = (props: {
                 <p className="dshx:text-xs dshx:text-muted-foreground">
                   <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(run.event.actor)}</span> · {ItemGlyphs.ago(run.event.at)}
                 </p>
-                <div className="dshx:group dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-2.5 dshx:py-1.5 dshx:text-[13px]">
+                <div className="dshx:group dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-2.5 dshx:py-1.5 dshx:text-sm">
                   {isEditing ? (
                     <ReplyEditor
                       key={commentId}
@@ -715,7 +715,7 @@ const TimelineRuns = (props: {
                             {openDiffs.has(`${String(index)}:${String(position)}`) ? 'Hide changes' : 'Show changes'}
                           </button>
                           {openDiffs.has(`${String(index)}:${String(position)}`) ? (
-                            <div className="dshx:mt-1 dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:p-2 dshx:text-[11px]">
+                            <div className="dshx:mt-1 dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:p-2 dshx:text-2xs">
                               {event.fieldChanges.map(change => (
                                 <div key={change.field} className="dshx:grid dshx:grid-cols-[4rem_minmax(0,1fr)_auto] dshx:items-start dshx:gap-2">
                                   <span className="dshx:font-medium dshx:text-foreground">{change.field}</span>
@@ -967,7 +967,7 @@ const CommentBox = (props: {
               >
                 <MessageSquareIcon aria-hidden />
                 <span className="dshx:min-w-0 dshx:truncate">{thread.title}</span>
-                <span className="dshx:ml-auto dshx:shrink-0 dshx:font-mono! dshx:text-[10px] dshx:text-muted-foreground">{thread.sessionId.slice(-6)}</span>
+                <span className="dshx:ml-auto dshx:shrink-0 dshx:font-mono! dshx:text-2xs dshx:text-muted-foreground">{thread.sessionId.slice(-6)}</span>
               </CommandItem>
             ))}
           </CommandGroup>
@@ -980,7 +980,7 @@ const CommentBox = (props: {
         </CommandList>
       </CommandDialog>
       {failure === null ? null : (
-        <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
+        <p role="alert" className="dshx:text-2xs dshx:text-destructive">
           {failure}
         </p>
       )}
@@ -1048,14 +1048,14 @@ const LinkRow = (props: {
       {link.type === 'url' && (
         <Popover open={urlOpen} onOpenChange={setUrlOpen}>
           <PopoverTrigger asChild>
-            <button type="button" className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
+            <button type="button" className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-sm dshx:hover:underline">
               {linkLabel(link)}
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="dshx-root dshx:w-48 dshx:p-1">
             <button
               type="button"
-              className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:hover:bg-accent"
+              className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-sm dshx:hover:bg-accent"
               onClick={() => {
                 void window.open(link.target, '_blank', 'noopener,noreferrer')
                 setUrlOpen(false)
@@ -1066,7 +1066,7 @@ const LinkRow = (props: {
             </button>
             <button
               type="button"
-              className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:hover:bg-accent"
+              className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-sm dshx:hover:bg-accent"
               onClick={() => {
                 void writeClipboard(link.target)
                 setUrlOpen(false)
@@ -1083,14 +1083,14 @@ const LinkRow = (props: {
       )}
       {link.type === 'secret' && <SecretLinkRevealSlot reference={linkLabel(link)} cwd={props.project} />}
       {link.type !== 'item' && link.type !== 'url' && open !== undefined && (
-        <button type="button" onClick={open} className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
+        <button type="button" onClick={open} className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-sm dshx:hover:underline">
           {link.type === 'thread' ? props.threadLabel : linkLabel(link)}
         </button>
       )}
       {props.thread === undefined ? null : (
         <span
           className={cn(
-            'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-[10px]',
+            'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-2xs',
             props.thread.running ? 'dshx:text-info' : 'dshx:text-muted-foreground',
           )}
         >
@@ -1101,7 +1101,7 @@ const LinkRow = (props: {
       {link.provenance === undefined ? null : (
         <span
           className={cn(
-            'dshx:shrink-0 dshx:rounded dshx:px-1 dshx:text-[10px]',
+            'dshx:shrink-0 dshx:rounded dshx:px-1 dshx:text-2xs',
             link.provenance === 'inferred' ? 'dshx:border dshx:border-dashed dshx:border-violet/50 dshx:text-violet' : 'dshx:text-muted-foreground',
           )}
         >
@@ -1234,7 +1234,7 @@ const PeekBody = (props: {
             </>
           )}
           <BacklogMentionHandle item={item} className="dshx:text-foreground" />
-          {item.freshness === 'fresh' ? null : <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[11px]">{item.freshness}</span>}
+          {item.freshness === 'fresh' ? null : <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-2xs">{item.freshness}</span>}
         </nav>
         <TooltipProvider>
           <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
@@ -1386,7 +1386,7 @@ const PeekBody = (props: {
             {props.loading ? (
               <BacklogText
                 text={item.body}
-                className="dshx:line-clamp-3 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-3"
+                className="dshx:line-clamp-3 dshx:text-sm dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-3"
               />
             ) : (
               <BodyField id={item.id} body={item.body} threads={props.threads} projects={props.projectPaths} />
@@ -1397,7 +1397,7 @@ const PeekBody = (props: {
                   <QuoteIcon aria-hidden className="dshx:size-3" /> Original capture
                   <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-open/capture:rotate-90" />
                 </summary>
-                <p className="dshx:mt-1.5 dshx:whitespace-pre-wrap dshx:rounded-r-lg dshx:border-l-2 dshx:border-border dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-[13px] dshx:text-muted-foreground">
+                <p className="dshx:mt-1.5 dshx:whitespace-pre-wrap dshx:rounded-r-lg dshx:border-l-2 dshx:border-border dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground">
                   {captured}
                 </p>
               </details>
@@ -1413,7 +1413,7 @@ const PeekBody = (props: {
             ) : null}
             {groups.map(group => (
               <div key={group.relation} className="dshx:flex dshx:flex-col dshx:gap-0.5">
-                <span className="dshx:text-[11px] dshx:text-muted-foreground">{relationLabels[group.relation]}</span>
+                <span className="dshx:text-2xs dshx:text-muted-foreground">{relationLabels[group.relation]}</span>
                 <ul aria-label={relationLabels[group.relation]} className="dshx:flex dshx:flex-col">
                   {group.links.map(link => (
                     <LinkRow
@@ -1431,7 +1431,7 @@ const PeekBody = (props: {
             ))}
             {props.detail.backlinks.length === 0 ? null : (
               <div className="dshx:flex dshx:flex-col dshx:gap-0.5">
-                <span className="dshx:text-[11px] dshx:text-muted-foreground">Referenced by</span>
+                <span className="dshx:text-2xs dshx:text-muted-foreground">Referenced by</span>
                 <ul aria-label="Referenced by" className="dshx:flex dshx:flex-col">
                   {props.detail.backlinks.map(backlink => (
                     <BacklogItemMenu
@@ -1448,7 +1448,7 @@ const PeekBody = (props: {
                         <button
                           type="button"
                           onClick={() => props.select(backlink.id)}
-                          className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
+                          className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-sm dshx:transition-colors dshx:hover:bg-accent/50"
                         >
                           <ItemGlyphs.StatusIcon status={backlink.status} />
                           <span className="dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">{BacklogReference.labelOf(backlink)}</span>

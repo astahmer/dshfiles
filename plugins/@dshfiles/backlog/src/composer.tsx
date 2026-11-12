@@ -72,13 +72,13 @@ const captureProject = createStoredValue({
 })
 
 const chipClass =
-  'dshx:inline-flex dshx:h-5 dshx:max-w-56 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:truncate dshx:rounded-full dshx:border dshx:border-border dshx:px-2 dshx:text-[11px] dshx:text-muted-foreground'
+  'dshx:inline-flex dshx:h-5 dshx:max-w-56 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:truncate dshx:rounded-full dshx:border dshx:border-border dshx:px-2 dshx:text-2xs dshx:text-muted-foreground'
 
 const iconButtonClass =
   'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:disabled:opacity-40'
 
 const propertyClass =
-  'dshx:inline-flex dshx:h-6 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground'
+  'dshx:inline-flex dshx:h-6 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground'
 
 const ChoiceChip = <Value extends string>(props: {
   readonly label: string
@@ -94,7 +94,7 @@ const ChoiceChip = <Value extends string>(props: {
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" side="top" className="dshx-root dshx:min-w-40">
       {props.values.map(value => (
-        <DropdownMenuItem key={value} onSelect={() => props.onPick(value)} className="dshx:gap-2 dshx:text-[13px]">
+        <DropdownMenuItem key={value} onSelect={() => props.onPick(value)} className="dshx:gap-2 dshx:text-sm">
           {props.render(value)}
           {value === props.value ? <CheckIcon aria-hidden className="dshx:ml-auto dshx:size-3.5" /> : null}
         </DropdownMenuItem>
@@ -147,7 +147,7 @@ const ReferenceDialog = (props: {
                 <CommandItem key={thread.id} value={`${thread.title} ${thread.id}`} onSelect={() => props.onPickThread(thread)}>
                   <MessageSquareIcon aria-hidden />
                   <span className="dshx:truncate">{thread.title}</span>
-                  {thread.running ? <span className="dshx:ml-auto dshx:text-[11px] dshx:text-info">running</span> : null}
+                  {thread.running ? <span className="dshx:ml-auto dshx:text-2xs dshx:text-info">running</span> : null}
                 </CommandItem>
               ))}
           </CommandGroup>
@@ -158,7 +158,7 @@ const ReferenceDialog = (props: {
               <CommandItem key={item.id} value={`${item.title} ${BacklogReference.labelOf(item)}`} onSelect={() => props.onPickItem(item)}>
                 <ItemGlyphs.StatusIcon status={item.status} />
                 <span className="dshx:truncate">{item.title}</span>
-                <span className="dshx:ml-auto dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.labelOf(item)}</span>
+                <span className="dshx:ml-auto dshx:font-mono! dshx:text-2xs dshx:text-muted-foreground">{BacklogReference.labelOf(item)}</span>
               </CommandItem>
             ))}
           </CommandGroup>
@@ -256,7 +256,7 @@ export const Composer = (props: {
           <>
             <ItemGlyphs.ProjectDot project={path} />
             <span className="dshx:truncate">{ItemGlyphs.projectName(path)}</span>
-            <span className="dshx:ml-auto dshx:max-w-40 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{path}</span>
+            <span className="dshx:ml-auto dshx:max-w-40 dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{path}</span>
           </>
         ),
         hint: 'project',
@@ -412,7 +412,7 @@ export const Composer = (props: {
   const voiceAvailable = speech.data?.available === true
   const inputClass = cn(
     'dshx:w-full dshx:overflow-y-auto dshx:whitespace-pre-wrap dshx:break-words dshx:rounded-md dshx:bg-transparent dshx:leading-relaxed dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
-    chat ? 'dshx:min-h-20 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-[13px]',
+    chat ? 'dshx:min-h-20 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-sm',
   )
   const voiceTitle = (() => {
     if (transcribing) return 'Transcribing…'
@@ -459,7 +459,7 @@ export const Composer = (props: {
       <BacklogImageEditor
         ref={input}
         ariaLabel="Capture"
-        className={cn(inputClass, chat ? 'dshx:min-h-20 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-[13px]')}
+        className={cn(inputClass, chat ? 'dshx:min-h-20 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-sm')}
         value={text}
         files={attachments.files}
         placeholder={props.placeholder}
@@ -528,17 +528,17 @@ export const Composer = (props: {
             <PlusIcon className="dshx:size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="top" className="dshx-root dshx:w-52">
-            <DropdownMenuItem onSelect={() => void addFromPicker()} className="dshx:gap-2 dshx:text-[13px]">
+            <DropdownMenuItem onSelect={() => void addFromPicker()} className="dshx:gap-2 dshx:text-sm">
               <PaperclipIcon aria-hidden /> Add image or file
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setReferenceMode('item')} className="dshx:gap-2 dshx:text-[13px]">
+            <DropdownMenuItem onSelect={() => setReferenceMode('item')} className="dshx:gap-2 dshx:text-sm">
               <ListIcon aria-hidden /> Link a backlog item
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setReferenceMode('thread')} className="dshx:gap-2 dshx:text-[13px]">
+            <DropdownMenuItem onSelect={() => setReferenceMode('thread')} className="dshx:gap-2 dshx:text-sm">
               <MessageSquareIcon aria-hidden /> Link a thread
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setProjectPickerOpen(true)} className="dshx:gap-2 dshx:text-[13px]">
+            <DropdownMenuItem onSelect={() => setProjectPickerOpen(true)} className="dshx:gap-2 dshx:text-sm">
               <FolderIcon aria-hidden /> Set a project
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -642,8 +642,8 @@ export const Composer = (props: {
         )}
 
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
-          {recording ? <span className="dshx:text-[11px] dshx:text-destructive">Recording…</span> : null}
-          {transcribing ? <span className="dshx:text-[11px] dshx:text-muted-foreground">Transcribing…</span> : null}
+          {recording ? <span className="dshx:text-2xs dshx:text-destructive">Recording…</span> : null}
+          {transcribing ? <span className="dshx:text-2xs dshx:text-muted-foreground">Transcribing…</span> : null}
           <ComposerTools
             {...BacklogComposerScope.capture(props.draftKey)}
             insertText={value => {
@@ -688,7 +688,7 @@ export const Composer = (props: {
       </div>
 
       {chat ? (
-        <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:text-[11px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
+        <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
           <span>
             <Kbd>↵</Kbd> add · <Kbd>⇧↵</Kbd> new line · <Kbd>Tab</Kbd> complete
           </span>

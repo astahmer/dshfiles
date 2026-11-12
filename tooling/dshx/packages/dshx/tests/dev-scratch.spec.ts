@@ -194,7 +194,7 @@ describe('dshx dev scratch commands', () => {
         <nav aria-label="Global panels"><button aria-label="AI Accounts: Accounts" onclick="document.querySelector('#accounts').hidden = false">AI Accounts: Accounts</button></nav>
         <aside id="accounts" role="complementary" aria-label="Provider accounts" hidden>Provider accounts</aside>
         <button aria-label="New session" onclick="const row = document.createElement('div'); row.setAttribute('role', 'treeitem'); row.textContent = 'New Session'; row.onclick = () => { document.querySelector('#composer').hidden = false }; document.body.append(row)"></button>
-        <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or sessions" contenteditable="true" hidden></div>
+        <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or threads" contenteditable="true" hidden></div>
         <button aria-label="Select model" onclick="document.querySelector('#models').hidden = false">Select model</button>
         <div id="models" role="menu" aria-label="Model" hidden><div role="menuitemradio" aria-label="${modelId}" aria-checked="false" onclick="this.setAttribute('aria-checked', 'true')">${modelId}</div></div>
       `)
@@ -244,7 +244,7 @@ describe('dshx dev scratch commands', () => {
       expect(await page.locator('#models').evaluate(element => element.hasAttribute('open'))).toBe(false)
       await page.setContent(`
         <button aria-label="New thread" onclick="setTimeout(() => { document.querySelector('#composer').hidden = false }, 50)">New thread</button>
-        <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or sessions" contenteditable="true" hidden></div>
+        <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or threads" contenteditable="true" hidden></div>
       `)
       const delayedComposer = await ScratchSeedRuntime.openSeedThreadComposer(page, 1_000)
       expect(await delayedComposer.isVisible()).toBe(true)
@@ -312,13 +312,13 @@ describe('dshx dev scratch commands', () => {
       const page = await browser.newPage()
       await page.setContent(`
         <button aria-label="New thread" onclick="document.querySelector('#project').hidden = false">New thread</button>
-        <button id="project" aria-label="Choose workspace" onclick="document.querySelector('#composer').hidden = false" hidden>Choose workspace</button>
-        <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or sessions" contenteditable="true" hidden></div>
+        <button id="project" aria-label="Choose project" onclick="document.querySelector('#composer').hidden = false" hidden>Choose project</button>
+        <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or threads" contenteditable="true" hidden></div>
       `)
       const composer = await ScratchSeedRuntime.openSeedThreadComposer(page, 1_000)
-      expect(await page.getByRole('button', { name: 'Choose workspace', exact: true }).isVisible()).toBe(true)
+      expect(await page.getByRole('button', { name: 'Choose project', exact: true }).isVisible()).toBe(true)
       expect(await composer.isVisible()).toBe(false)
-      await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+      await page.getByRole('button', { name: 'Choose project', exact: true }).click()
       expect(await composer.isVisible()).toBe(true)
     } finally {
       await browser.close()
@@ -332,7 +332,7 @@ describe('dshx dev scratch commands', () => {
       await page.setContent(`
         <button aria-label="New thread" onclick="requestAnimationFrame(() => { document.querySelector('#session').hidden = false })">New thread</button>
         <div id="session" data-conversation-session="prewarmed-session" hidden>
-          <div role="textbox" aria-label="Message or run a task, / commands, @ files or sessions" contenteditable="true"></div>
+          <div role="textbox" aria-label="Message or run a task, / commands, @ files or threads" contenteditable="true"></div>
           <span>sample</span>
           <button aria-label="Select model">Select model</button>
         </div>
@@ -340,7 +340,7 @@ describe('dshx dev scratch commands', () => {
       const composer = await ScratchSeedRuntime.openSeedThreadComposer(page, 1_000)
       expect(await composer.isVisible()).toBe(true)
       expect(await page.getByRole('treeitem').count()).toBe(0)
-      expect(await page.getByRole('button', { name: 'Choose workspace', exact: true }).count()).toBe(0)
+      expect(await page.getByRole('button', { name: 'Choose project', exact: true }).count()).toBe(0)
       await ScratchSeedRuntime.prepareFakeProviderComposer(page, 'sample', 1_000)
       expect(await page.getByRole('button', { name: 'Select model', exact: true }).isVisible()).toBe(true)
     } finally {
@@ -353,9 +353,9 @@ describe('dshx dev scratch commands', () => {
     try {
       const page = await browser.newPage()
       await page.setContent(`
-        <div role="textbox" aria-label="Describe what you want to build, / commands, @ files or sessions" contenteditable="true" hidden>untouched</div>
-        <div role="textbox" aria-label="Message or run a task, / commands, @ files or sessions" contenteditable="true" hidden>untouched</div>
-        <div id="active" role="textbox" aria-label="${label}, / commands, @ files or sessions" contenteditable="true" onkeydown="if (event.key === 'Enter') { event.preventDefault(); this.dataset.submitted = this.textContent }"></div>
+        <div role="textbox" aria-label="Describe what you want to build, / commands, @ files or threads" contenteditable="true" hidden>untouched</div>
+        <div role="textbox" aria-label="Message or run a task, / commands, @ files or threads" contenteditable="true" hidden>untouched</div>
+        <div id="active" role="textbox" aria-label="${label}, / commands, @ files or threads" contenteditable="true" onkeydown="if (event.key === 'Enter') { event.preventDefault(); this.dataset.submitted = this.textContent }"></div>
       `)
       await ScratchSeedRuntime.sendFakeProviderTurn(page, 'Deterministic seed prompt', 1_000)
       expect(await page.locator('#active').getAttribute('data-submitted')).toBe('Deterministic seed prompt')

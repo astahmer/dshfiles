@@ -20,7 +20,7 @@ import { ChangedImages } from './changed-images.js'
 import { ReviewImageModel } from './review-image-query.js'
 
 const METRICS = GRAPH_DENSITY.compact
-const CHIP = 'dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:font-mono! dshx:text-[10px] dshx:leading-none'
+const CHIP = 'dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:font-mono! dshx:text-2xs dshx:leading-none'
 
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
 const STAT = 'dshx:font-mono dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground'
@@ -234,14 +234,14 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
               )}
               {entry.hiddenBelow === 0 ? null : (
                 <LaneFiller lanes={entry.layout.bottomLanes} width={graphWidth}>
-                  <p className="dshx:py-0.5 dshx:text-[11px] dshx:text-muted-foreground dshx:italic" data-testid="combined-gap">
+                  <p className="dshx:py-0.5 dshx:text-2xs dshx:text-muted-foreground dshx:italic" data-testid="combined-gap">
                     {entry.hiddenBelow === 1 ? '1 revision' : `${String(entry.hiddenBelow)} revisions`} not in this review
                   </p>
                 </LaneFiller>
               )}
               {entry.uncountedBelow ? (
                 <LaneFiller lanes={entry.layout.bottomLanes} width={graphWidth}>
-                  <p className="dshx:py-0.5 dshx:text-[11px] dshx:text-muted-foreground dshx:italic" data-testid="combined-uncounted">
+                  <p className="dshx:py-0.5 dshx:text-2xs dshx:text-muted-foreground dshx:italic" data-testid="combined-uncounted">
                     Earlier history not counted; select fewer or closer revisions to see it
                   </p>
                 </LaneFiller>
@@ -293,7 +293,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
               return (
                 <Button
                   aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${path}`}
-                  className="dshx:gap-1 dshx:text-[11px]"
+                  className="dshx:gap-1 dshx:text-2xs"
                   disabled={!marks.ready}
                   onClick={() => marks.set([target], !viewed)}
                   size="sm"
@@ -321,7 +321,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
                   return (
                     <Button
                       aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.name}`}
-                      className="dshx:gap-1 dshx:text-[11px]"
+                      className="dshx:gap-1 dshx:text-2xs"
                       disabled={!marks.ready}
                       onClick={() => marks.set([target], !viewed)}
                       size="sm"
@@ -376,7 +376,7 @@ const RevisionRow = (props: {
       type="button"
     >
       <RevisionGraphCell height={METRICS.rowHeight} layout={layout} metrics={METRICS} revision={node} width={props.width} />
-      <code className="dshx:shrink-0 dshx:font-mono! dshx:text-[11px]">
+      <code className="dshx:shrink-0 dshx:font-mono! dshx:text-2xs">
         <span className="dshx:font-semibold">{id.prefix}</span>
         <span className="dshx:text-muted-foreground">{id.rest}</span>
       </code>
@@ -389,7 +389,7 @@ const RevisionRow = (props: {
           {bookmark}
         </span>
       ))}
-      {bookmarks.length > 2 ? <span className="dshx:shrink-0 dshx:text-[10px] dshx:text-muted-foreground">+{bookmarks.length - 2}</span> : null}
+      {bookmarks.length > 2 ? <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">+{bookmarks.length - 2}</span> : null}
       <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', revision.description.length === 0 && 'dshx:text-muted-foreground dshx:italic')}>
         {subject(revision)}
       </span>
@@ -415,7 +415,7 @@ const BaseRow = (props: { readonly entry: Extract<ReviewGraphEntry, { kind: 'bas
       style={{ height: METRICS.rowHeight }}
     >
       <RevisionGraphCell height={METRICS.rowHeight} layout={layout} metrics={METRICS} revision={node} width={props.width} />
-      <code className="dshx:shrink-0 dshx:font-mono! dshx:text-[11px]">{label}</code>
+      <code className="dshx:shrink-0 dshx:font-mono! dshx:text-2xs">{label}</code>
       {base.bookmarks.slice(0, 2).map(bookmark => (
         <span className={cn(CHIP, 'dshx:max-w-24 dshx:truncate dshx:bg-muted dshx:text-muted-foreground')} key={bookmark}>
           {bookmark}

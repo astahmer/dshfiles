@@ -12,7 +12,7 @@ import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.j
 const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const newThreadComposer = (page: Page) =>
   page.getByRole('textbox', {
-    name: 'Describe what you want to build, / commands, @ files or sessions',
+    name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u,
     exact: true,
   })
 
@@ -126,7 +126,7 @@ Then('the composer shows the draft with the quote, note and file chips', async (
 })
 
 const threadComposer = (page: Page) =>
-  page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/ })
+  page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/ })
 const composerText = async (page: Page): Promise<string> => (await threadComposer(page).innerText()).replaceAll('\u200b', '').replace(/\s+/gu, ' ').trim()
 const expectDraft = async (page: Page, text: string): Promise<void> => {
   await expect.poll(() => composerText(page)).toBe(text)
@@ -244,15 +244,13 @@ Then('the run row holds project, host, workspace and model, and sending with the
     await expect(row.locator('[data-run-segment="project"]')).toBeVisible()
     await expect(row.getByRole('button', { name: 'Run on Local', exact: true })).toBeVisible()
     await expect(row.locator('[data-run-segment="workspace"]')).toBeVisible()
-    // The model seat rides the run row while the row can hold it and the tool row
-    // otherwise (a wrapped seat strands itself at the right edge); either way the
-    // composer shows exactly one of it.
+    // Visual refresh T3.2: the pickers ride inside the card's bottom bar (nothing above the input), and the one model
+    // seat sits beside Send.
+    await expect(page.locator('[data-composer-card] [data-run-row]')).toHaveCount(1)
     const modelSeats = page.locator('[data-slot="conversation.input.model"]')
     await expect(modelSeats).toHaveCount(1)
     await expect(modelSeats).toBeVisible()
-    const modelInRow = await row.locator('[data-slot="conversation.input.model"]').count()
-    const modelInCard = await page.locator('[data-composer-card] [data-slot="conversation.input.model"]').count()
-    expect(modelInRow + modelInCard).toBe(1)
+    await expect(page.locator('[data-composer-card] [data-model-seat] [data-slot="conversation.input.model"]')).toHaveCount(1)
   })
   await recordAssertion(page, 'rich-composer-run-row-sends-with-defaults', async () => {
     // Zero chip changes: type and send with the row's defaults.

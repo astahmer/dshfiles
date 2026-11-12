@@ -4,9 +4,9 @@
 // token totals, and click-open dialogs. Settled-node identity prevents
 // stream-delta updates from rerendering the pills.
 
+import { DatabaseIcon, GaugeIcon } from '@dshfiles/plugin-ui/icons'
 import { memo, useMemo, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { IconDatabaseOutlineRegular, IconGaugeOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { InjectFace, PropsRenderSlots, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: merges the sessionStats key into SessionProjectionMap for useProjection.
@@ -15,6 +15,7 @@ import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 import type { ChatViewSlotProps, PerformanceUsageInjected } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { formatTokensPerSecond } from './message-chrome.ts'
+import { countsText } from './stats-counts.ts'
 import { assistantStepReading } from '../contract/turn-metrics.ts'
 import { formatCacheHitPercent, formatExactTokens, formatTokens } from './token-format.ts'
 import { MEASURE_STYLE, useStatDialog } from './stat-dialog.ts'
@@ -238,15 +239,18 @@ function DialogPill({ stat, icon, label, ariaLabel, title, titleValue, children 
 export const ActivityPill = memo(function ActivityPill({ useChat, useProjection, usePerformanceUsage, t }: StatPillProps) {
   const mode = usePerformanceUsage(value => value)
   const stats = useSessionStats(useChat, useProjection)
-  const speed = stats.decodeMs > 0 ? decodeSpeed(stats, t) : null
-  const icon = <IconGaugeOutlineRegular />
+  // Composer follow-up b:gyk7: the speed is a live reading, shown only while an answer streams; the dialog keeps it.
+  const streaming = useChat(s => s.legacy.partial !== null)
+  const sessionSpeed = stats.decodeMs > 0 ? decodeSpeed(stats, t) : null
+  const speed = streaming ? sessionSpeed : null
+  const icon = <GaugeIcon size={14} strokeWidth={1.5} />
   if (mode === 'compact') return speed === null ? null : <PlainPill stat="activity" icon={icon} label={speed} />
   if (stats.steps === 0) return null
-  const counts = t('stats.counts', { turns: stats.turns, steps: stats.steps })
+  const counts = countsText(stats, t)
   const content: PillContent = { stat: 'activity', icon, label: joined(counts, speed) }
   // A window without one timed figure has no dialog rows to show, so the pill
   // stays a plain reading instead of a button opening an empty dialog.
-  if (stats.llmMs <= 0 && stats.toolMs <= 0 && stats.ttftSteps <= 0 && speed === null) return <PlainPill {...content} />
+  if (stats.llmMs <= 0 && stats.toolMs <= 0 && stats.ttftSteps <= 0 && sessionSpeed === null) return <PlainPill {...content} />
   return (
     <DialogPill {...content} ariaLabel={speed === null ? counts : `${counts} · ${speed}`} title={t('stats.dialog.title')}>
       <dl className={dialogCss.details} data-session-stats-details>
@@ -268,10 +272,10 @@ export const ActivityPill = memo(function ActivityPill({ useChat, useProjection,
             <dd>{formatDuration(stats.ttftMs / stats.ttftSteps, t)}</dd>
           </>
         )}
-        {speed !== null && (
+        {sessionSpeed !== null && (
           <>
             <dt>{t('stats.dialog.speed')}</dt>
-            <dd>{speed}</dd>
+            <dd>{sessionSpeed}</dd>
           </>
         )}
       </dl>
@@ -294,8 +298,9 @@ export const UsagePill = memo(function UsagePill({ useProjection, usePerformance
   // billing (e.g. every request failed) shows no usage pill.
   if (usage === undefined || (billedInputTokens(usage) === 0 && usage.outputTokens === 0)) return null
   const cacheHit = cacheHitPercent(usage)
-  const cacheHitText = cacheHit !== null ? t('stats.cacheHit', { percent: cacheHit }) : null
-  const icon = <IconDatabaseOutlineRegular />
+  // A zero cache hit says nothing worth a place on the meter line (b:gyk7); the dialog still lists it.
+  const cacheHitText = cacheHit !== null && cacheHit !== '0' ? t('stats.cacheHit', { percent: cacheHit }) : null
+  const icon = <DatabaseIcon size={14} strokeWidth={1.5} />
   if (mode === 'compact') {
     return cacheHitText === null ? null : <PlainPill stat="usage" icon={icon} label={cacheHitText} />
   }

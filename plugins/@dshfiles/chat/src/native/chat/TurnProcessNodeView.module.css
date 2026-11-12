@@ -4,10 +4,10 @@
   align-items: center;
   width: 100%;
   min-width: 0;
-  height: calc(33px + var(--dsh-content-font-delta, 0px));
-  padding: 0 0 8px;
+  /* dshfiles (visual refresh T2.1): no rule under the row; turns separate by spacing. */
+  height: calc(24px + var(--dsh-content-font-delta, 0px));
+  padding: 0;
   border: none;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
   background: none;
   color: var(--dsw-alias-label-tertiary);
   font: inherit;
@@ -31,7 +31,8 @@
   height: 14px;
   margin-left: 4px;
   color: inherit;
-  transition: transform 100ms ease;
+  /* dshfiles (visual refresh T5.1): disclosure chevrons turn on the collapse token. */
+  transition: transform var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease);
 }
 
 .root[data-open] .chevron {

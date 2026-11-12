@@ -6,9 +6,8 @@
  * the Host call (fronting the Session in its saved orders, the failure
  * notice) lives in the injected callbacks, not here.
  */
-import {
-  IconPinFillRegular, IconPinOutlineRegular, MenuItemButton, Tooltip,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { PinIcon } from '@dshfiles/plugin-ui/icons'
+import { IconPinFillRegular, MenuItemButton, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PinSessionInjected, SessionMenuItemProps, SessionRowActionProps } from '../contract/slots.ts'
 import css from '../rows/Rows.module.css'
 
@@ -34,7 +33,7 @@ export function PinSessionMenuItem(props: SessionMenuItemProps<PinSessionInjecte
   if (archived) return null
   return (
     <MenuItemButton
-      icon={pinned ? <IconPinFillRegular /> : <IconPinOutlineRegular />}
+      icon={pinned ? <IconPinFillRegular /> : <PinIcon size={14} strokeWidth={1.5} />}
       onSelect={() => {
         setMenuOpen(false)
         ;(pinned ? unpinSession : pinSession)(sessionId)
@@ -62,7 +61,7 @@ export function PinSessionRowButton(props: SessionRowActionProps<PinSessionInjec
         aria-label={t(pinned ? 'menu.unpinSession' : 'menu.pinSession')}
         onClick={() => { (pinned ? unpinSession : pinSession)(sessionId) }}
       >
-        {pinned ? <IconPinFillRegular size={14} /> : <IconPinOutlineRegular size={14} />}
+        {pinned ? <IconPinFillRegular size={14} /> : <PinIcon strokeWidth={1.5} size={14} />}
       </button>
     </Tooltip>
   )

@@ -12,14 +12,20 @@ import { DraftThreadsModel } from './draft-threads.js'
 import type { SessionDraft, SessionDrafts } from '@dshfiles/session-controller/draft-client'
 import { isListedUnsentThread, presentUnsentRows } from './unsent-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
-import { DEFAULT_THREAD_BOARD_VIEW, storedThreadBoardView, ThreadBoardViewModel } from './thread-board-view.js'
+import { DEFAULT_THREAD_BOARD_VIEW, storedThreadBoardView, ThreadBoardViewModel, type ThreadBoardViewSettings } from './thread-board-view.js'
 import { toggleCollapsedGroup } from './collapsed-groups.js'
 import { threadDragMachine, type ThreadDragCommands } from './thread-drag-machine.js'
 import { ThreadRouteModel } from './thread-route.js'
 import { useNearViewport } from './use-near-viewport.js'
+import { RowSwipeModel, useRowSwipe } from './row-swipe.js'
+import { HeldGroupsModel, type HeldGroups } from './held-groups.js'
+import { PeekCard, RowPeek } from '@dshfiles/plugin-ui/components/peek'
+import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
+import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
 import { VirtualThreadRows } from './virtual-thread-rows.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
+import { LiveActivityLine, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
@@ -30,8 +36,8 @@ import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-ch
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
-import { useApi, useApiEvent, useApiQuery, usePlugin, useRegistry } from '@dshfiles/dshx/client'
-import { THREAD_NOTIFY_CHOICES, useThreadSubscriptions, type ThreadNotifyChoice } from './subscriptions-client.js'
+import { useApi, useApiEvent, useApiQuery, usePlugin, useRegistry, type CommandTrigger } from '@dshfiles/dshx/client'
+import { useThreadSubscriptions, type ThreadNotifyChoice } from './subscriptions-client.js'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ThreadRowActions, type ThreadRowActionTarget } from './thread-row-actions.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -40,18 +46,7 @@ import { startInteraction } from '@dshfiles/dshx/tracing/client'
 import { createInventoryPoll } from './inventory-poll.js'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { activeQuestionSessionIds } from './pending-questions.js'
-import {
-  IconArchiveOutlineRegular,
-  IconCheckCircleOutlineRegular,
-  IconChevronDownOutlineRegular,
-  IconChevronUpOutlineRegular,
-  IconPauseOutlineRegular,
-  IconPinFillRegular,
-  IconPinOutlineRegular,
-  IconPlayOutlineRegular,
-  IconUnarchiveOutlineRegular,
-  writeClipboard,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconPinFillRegular, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
@@ -76,13 +71,20 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { ListHeaderExtras } from './list-header-extras.js'
+import { PresetChips, PresetDeleteDialog, PresetNameDialog, type PresetNamePrompt } from './filter-presets.js'
+import { ProjectAddFlow } from '@dshfiles/workspace-folder-picker/project-add-flow'
 import { Empty, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
@@ -90,19 +92,35 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
-  EllipsisIcon,
   ActivityIcon,
+  ArchiveIcon,
+  ArchiveRestoreIcon,
   BellIcon,
   BellOffIcon,
+  BookmarkPlusIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  CircleCheckIcon,
   CirclePauseIcon,
+  EllipsisIcon,
   GripVerticalIcon,
+  FolderIcon,
+  GitBranchIcon,
+  LayersIcon,
   LinkIcon,
+  ListFilterIcon,
   MonitorIcon,
   PanelRightOpenIcon,
+  PauseIcon,
+  PencilIcon,
+  PinIcon,
+  PlayIcon,
   RefreshCwIcon,
+  RotateCcwIcon,
+  SaveIcon,
   Settings2Icon,
+  SlidersHorizontalIcon,
+  UsersIcon,
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -144,12 +162,12 @@ import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
 import { useSidebarState } from './sidebar-state.js'
+import { useStageCovered } from './stage-cover.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
 import { projectTextTone } from './project-tone.js'
 import { useThreadDirectories } from './use-thread-directories.js'
-import { workspaceName, workspaceNameLabel } from './workspace-paths.js'
 import {
   failedResumeNotice,
   INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
@@ -183,6 +201,7 @@ import {
 import { createThreadMultiSelectionStore, useThreadMultiSelected, useThreadMultiSelectedIds, type ThreadMultiSelectionStore } from './thread-multi-selection.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
+import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
 import { SettledThreadsModel, type SettledSessionState } from './settled-threads.js'
 import { answerSettleRequests } from './settle-request.js'
@@ -199,7 +218,7 @@ import {
   type ThreadSourceFilter,
   type ThreadViewPreferences,
 } from './thread-view.js'
-import { ThreadViewPreferencesModel, type ThreadViewSettings, WORKING_VIEW_ID } from './thread-view-preferences.js'
+import { ALL_THREADS_VIEW_ID, MAX_THREAD_VIEWS, ThreadViewPreferencesModel, type ThreadViewSettings, WORKING_VIEW_ID } from './thread-view-preferences.js'
 import { SHOW_WORKING_THREADS_EVENT } from './working-status-item.js'
 import {
   ThreadViewManager,
@@ -227,6 +246,7 @@ import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAc
 import { useThreadAttention } from './attention-client.js'
 import { useRowAgentHandles } from './use-row-agent-handles.js'
 import type { ThreadAttentionView } from './attention-api.js'
+import { SinceYouLeftModel } from '@dshfiles/chat/thread-tools'
 import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
 import {
   effectiveActivityAt,
@@ -244,6 +264,15 @@ import {
   type ThreadMuteOption,
 } from './thread-mute.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+
+/**
+ * Hand Chat the unseen range of a thread being opened (productivity pass T4.3), before this surface clears the record.
+ * Only a finished-turn record carries one; a manual unread mark has no turn to start from.
+ */
+const noteSinceYouLeft = (record: ThreadAttentionView): void => {
+  if (record.finishedAt === null || record.finishedSeq === null) return
+  SinceYouLeftModel.note({ sessionId: record.sessionId, firstUnreadSeq: record.firstUnreadSeq ?? null, finishedSeq: record.finishedSeq })
+}
 
 const sessionActivityAt = (options: {
   readonly session: Pick<SessionSummary, 'id' | 'updatedAt'>
@@ -293,6 +322,8 @@ type ThreadSidebarProps = ThreadSidebarStandardProps &
   InjectedActions & {
     tSidebar: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
     onNavigationLookahead?: (sessionIds: readonly SessionSummary['id'][]) => void
+    /** Retain a thread's history for a Space peek of its last reply; absent mounts show no reply. */
+    retainPeek?: RetainThread
     /** The sidebar shell hides the thread region with CSS when it is collapsed; absent means a mount with no shell. */
     wide?: boolean
     /** Absent means `sidebar`. The board page mounts beside it, so only the primary mount runs side effects. */
@@ -341,11 +372,11 @@ const threadDelayLabelKeys = {
 
 type ThreadSidebarLabelKey = Parameters<ThreadSidebarTranslate>[0]
 
-/** One notice tone per category: failures read as errors, work that needs review as warnings. */
+/** One notice tone per category: failures read as errors, work that needs review as warnings, an agent's message as a plain card. */
 const notificationNoticeTones = {
   'approval-needed': 'warning',
   'input-needed': 'warning',
-  'agent-message': 'warning',
+  'agent-message': 'neutral',
   'turn-finished': 'success',
   stopped: 'warning',
   failed: 'danger',
@@ -392,6 +423,9 @@ const threadSourceFilterLabelKeys = {
 } satisfies Record<ThreadSourceFilter, Parameters<ThreadSidebarTranslate>[0]>
 
 const ALL_PROJECTS = '__all__'
+/** Picker entries that open the project add flow (productivity pass Q5, T5.5), never a filter value. */
+const ADD_FOLDER = '__add-folder__'
+const NEW_PROJECT = '__new-project__'
 /**
  * How often the sidebar re-reads the JJ inventory while the page is visible. The Host keeps a repository view for sixty
  * seconds, so a shorter schedule spent a full jj scan on every other tick.
@@ -419,15 +453,16 @@ const threadTabFocusEventSchema = Schema.StructWithRest(Schema.Struct({ sessionI
 ])
 
 const noticeClass = 'dshx:w-auto dshx:px-3 dshx:py-2 dshx:text-xs'
-const stickyHeaderClass = 'dshx:sticky dshx:top-0 dshx:z-10 dshx:bg-background'
+// The list sits on the sidebar fill, so its sticky headers do too (no lighter band over a recessive surface).
+const stickyHeaderClass = 'dshx:sticky dshx:top-0 dshx:z-10 dshx:bg-(--dsw-specific-sidebar-fill)'
 
 const sectionIcons = {
-  pinned: <IconPinOutlineRegular size={14} />,
+  pinned: <PinIcon strokeWidth={1.5} size={14} />,
   active: <ActivityIcon className="dshx:size-3.5" />,
-  parked: <IconPauseOutlineRegular size={14} />,
-  settled: <IconCheckCircleOutlineRegular size={14} />,
+  parked: <PauseIcon strokeWidth={1.5} size={14} />,
+  settled: <CircleCheckIcon strokeWidth={1.5} size={14} />,
   inactive: <CirclePauseIcon className="dshx:size-3.5" />,
-  archived: <IconArchiveOutlineRegular size={14} />,
+  archived: <ArchiveIcon strokeWidth={1.5} size={14} />,
 } satisfies Record<SidebarSection, ReactNode>
 
 const setIncludes = (values: readonly string[]): ReadonlySet<string> => new Set(values)
@@ -526,8 +561,11 @@ interface RowActions {
   /** The open thread a batch notice level applies to, or undefined when none can subscribe. */
   readonly batchNotifySubscriber: () => { readonly title: string } | undefined
   readonly batchNotify: (choice: ThreadNotifyChoice) => void
+  readonly notifyDefaultLevel: () => Exclude<ThreadNotifyChoice, 'off' | 'default'>
   /** The row's one inline verb (plan §4.3): an inbox item's provider verb, a sidebar Resume, or open the thread. */
   readonly actOnStatus: (sessionId: SessionSummary['id'], status: ThreadStatus) => void
+  /** Open the row's peek (Space on a keyboard; a long press on a phone shows it as a sheet). */
+  readonly peek: (sessionId: SessionSummary['id']) => void
   readonly translate: ThreadSidebarTranslate
 }
 
@@ -572,13 +610,21 @@ interface ThreadRowProps {
   readonly workspaceTitle: string | undefined
   /** The project folder behind the workspace id, for a thread whose Session summary carries no cwd. */
   readonly workspacePath: string | undefined
-  readonly workspaceName: string | undefined
+  /**
+   * Set when the thread runs in its own jj workspace rather than in the project checkout (b:212a): the row shows a quiet
+   * branch indicator and at most one state word, never the workspace's folder name, which only its tooltip carries.
+   * Primitives, so the memoized row keeps its props equal across list renders.
+   */
+  readonly ownWorkspaceName: string | undefined
+  readonly ownWorkspacePath: string | undefined
+  readonly ownWorkspaceState: OwnWorkspaceStateKind | undefined
+  readonly ownWorkspaceStateText: string | undefined
+  readonly ownWorkspaceStateAt: number | undefined
   readonly machine: string | undefined
   readonly age: string
   /** Set only while the thread is muted or snoozed. */
   readonly mute: ThreadMute | undefined
   readonly attentionLabel: ThreadAttentionLabel | undefined
-  readonly rebasedAt: number | undefined
   readonly integrationQueuedAt: number | undefined
   readonly needsResume: boolean
   readonly resumeBusy: boolean
@@ -600,6 +646,13 @@ interface ThreadRowProps {
    * keeps the older dot-and-label row for the other groupings.
    */
   readonly workStatus?: ThreadStatus | undefined
+  /**
+   * Lead the row with its project's 16px mark (polish pass b:r4et): which project a thread belongs to reads at a glance.
+   * Off under a project section, whose header carries the mark already.
+   */
+  readonly projectMark?: boolean | undefined
+  /** A running turn's start and current step, for the live activity line; undefined while the thread does not run. */
+  readonly liveTurn?: LiveTurnView | undefined
   /** Each child's own status, for the nested subagent rows under a status-grouped parent. */
   readonly childStatuses?: ReadonlyMap<SessionSummary['id'], ThreadStatus> | undefined
   /** The `@handle` of the agent that started the thread, else the agent preset it runs, shown as a muted chip. */
@@ -782,12 +835,12 @@ const ChildThreadList = (props: {
             {child.displayTitle}
           </span>
           {childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed') ? null : (
-            <span className="dshx:shrink-0 dshx:text-[10px] dshx:font-medium dshx:text-muted-foreground">{t(workStatusLabelKeys[childStatus.status])}</span>
+            <span className="dshx:shrink-0 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{t(workStatusLabelKeys[childStatus.status])}</span>
           )}
           {attentionLabel === undefined ? null : (
             <span
               className={cn(
-                'dshx:shrink-0 dshx:text-[10px] dshx:font-medium',
+                'dshx:shrink-0 dshx:text-2xs dshx:font-medium',
                 ThreadAttentionPresentationModel.attentionLabelClass(attentionLabel, props.rowStyle.attentionColors),
               )}
             >
@@ -861,23 +914,41 @@ const notifyChoiceLabelKeys = {
   never: 'threadSidebarNotifyChoiceNever',
 } as const satisfies Record<ThreadNotifyChoice, string>
 
+/**
+ * The submenu's rows, in reading order (fork fit of upstream qsypsxlt): follow the default level (named), a fixed level,
+ * or Off. Upstream's Never (subscribed at the never level) notifies exactly as little as Off, so the menu offers Off
+ * only and shows a pair stored at never as Off.
+ */
+const NOTIFY_MENU_CHOICES = ['default', 'all', 'outcomes', 'stuck', 'off'] as const satisfies readonly ThreadNotifyChoice[]
+const notifyLevelLabelKeys = {
+  all: 'threadSidebarNotifyChoiceAll',
+  outcomes: 'threadSidebarNotifyChoiceOutcomes',
+  stuck: 'threadSidebarNotifyChoiceStuck',
+  never: 'threadSidebarNotifyChoiceOff',
+} as const satisfies Record<Exclude<ThreadNotifyChoice, 'off' | 'default'>, string>
+
 /** Off, follow the default level, or a fixed level for one pair; a batch shows no current choice. */
 const NotifyChoiceMenu = (props: {
   /** The subscriber thread's title, named in the submenu label. */
   readonly subscriberTitle: string
   readonly choice: ThreadNotifyChoice | undefined
+  /** The level a pair that follows the default gets (`subscriptionNoticeLevel`), named in that row. */
+  readonly defaultLevel: Exclude<ThreadNotifyChoice, 'off' | 'default'>
   readonly onChoose: (choice: ThreadNotifyChoice) => void
   readonly t: ThreadSidebarTranslate
 }): JSX.Element => (
   <ContextMenuSub>
-    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">
-      {props.t('threadSidebarNotifyOnFinish', { title: props.subscriberTitle })}
-    </ContextMenuSubTrigger>
-    <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-      <ContextMenuRadioGroup value={props.choice ?? ''}>
-        {THREAD_NOTIFY_CHOICES.map(choice => (
+    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">{props.t('threadSidebarNotifyOnFinish')}</ContextMenuSubTrigger>
+    <ContextMenuSubContent className="dshx-root dshx:min-w-44 dshx:max-w-72">
+      <ContextMenuLabel className="dshx:font-normal dshx:text-muted-foreground">
+        {props.t('threadSidebarNotifyOnFinishFor', { title: props.subscriberTitle })}
+      </ContextMenuLabel>
+      <ContextMenuRadioGroup value={props.choice === 'never' ? 'off' : (props.choice ?? '')}>
+        {NOTIFY_MENU_CHOICES.map(choice => (
           <ContextMenuRadioItem key={choice} value={choice} data-notify-choice={choice} onSelect={() => props.onChoose(choice)}>
-            {props.t(notifyChoiceLabelKeys[choice])}
+            {choice === 'default'
+              ? props.t('threadSidebarNotifyChoiceDefault', { level: props.t(notifyLevelLabelKeys[props.defaultLevel]) })
+              : props.t(notifyChoiceLabelKeys[choice])}
           </ContextMenuRadioItem>
         ))}
       </ContextMenuRadioGroup>
@@ -896,13 +967,23 @@ const BatchThreadMenuItems = (props: {
     <>
       <ContextMenuLabel>{props.t('threadSidebarSelectedCount', { count: snapshot.ids.length })}</ContextMenuLabel>
       <ContextMenuSeparator />
-      {snapshot.anyUnpinned ? <ContextMenuItem onSelect={() => props.actions.batchMutate('pin')}>{props.t('threadSidebarPin')}</ContextMenuItem> : null}
+      {snapshot.anyUnpinned ? (
+        <ContextMenuItem keys="P" onSelect={() => props.actions.batchMutate('pin')}>
+          {props.t('threadSidebarPin')}
+        </ContextMenuItem>
+      ) : null}
       {snapshot.anyPinned ? <ContextMenuItem onSelect={() => props.actions.batchMutate('unpin')}>{props.t('threadSidebarUnpin')}</ContextMenuItem> : null}
       {snapshot.anyUnparked ? <ContextMenuItem onSelect={() => props.actions.batchSetParked(true)}>{props.t('threadSidebarPark')}</ContextMenuItem> : null}
       {snapshot.anyParked ? <ContextMenuItem onSelect={() => props.actions.batchSetParked(false)}>{props.t('threadSidebarUnpark')}</ContextMenuItem> : null}
-      {snapshot.anyUnsettled ? <ContextMenuItem onSelect={() => props.actions.batchSetSettled(true)}>{props.t('threadSidebarSettle')}</ContextMenuItem> : null}
+      {snapshot.anyUnsettled ? (
+        <ContextMenuItem keys="E" onSelect={() => props.actions.batchSetSettled(true)}>
+          {props.t('threadSidebarSettle')}
+        </ContextMenuItem>
+      ) : null}
       {snapshot.anySettled ? <ContextMenuItem onSelect={() => props.actions.batchSetSettled(false)}>{props.t('threadSidebarUnsettle')}</ContextMenuItem> : null}
-      <ContextMenuItem onSelect={() => props.actions.batchMarkUnread()}>{props.t('threadSidebarMarkUnread')}</ContextMenuItem>
+      <ContextMenuItem keys="U" onSelect={() => props.actions.batchMarkUnread()}>
+        {props.t('threadSidebarMarkUnread')}
+      </ContextMenuItem>
       <ContextMenuSub>
         <ContextMenuSubTrigger>{props.t('threadSidebarMute')}</ContextMenuSubTrigger>
         <ContextMenuSubContent className="dshx-root dshx:min-w-44">
@@ -919,7 +1000,13 @@ const BatchThreadMenuItems = (props: {
       </ContextMenuSub>
       <ContextMenuItem onSelect={() => props.actions.batchCopyLinks()}>{props.t('threadSidebarCopyLinks')}</ContextMenuItem>
       {notifySubscriber === undefined ? null : (
-        <NotifyChoiceMenu subscriberTitle={notifySubscriber.title} choice={undefined} onChoose={choice => props.actions.batchNotify(choice)} t={props.t} />
+        <NotifyChoiceMenu
+          subscriberTitle={notifySubscriber.title}
+          choice={undefined}
+          defaultLevel={props.actions.notifyDefaultLevel()}
+          onChoose={choice => props.actions.batchNotify(choice)}
+          t={props.t}
+        />
       )}
       <ContextMenuSeparator />
       {snapshot.anyLive ? <ContextMenuItem onSelect={() => props.actions.batchMutate('archive')}>{props.t('threadSidebarArchive')}</ContextMenuItem> : null}
@@ -970,8 +1057,43 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   if (selection.sessionIds.length > 1 && selection.sessionIds.includes(session.id)) {
     return <BatchThreadMenuItems snapshot={props.actions.batch()} actions={props.actions} t={t} />
   }
+  // Lifecycle verbs lead (productivity pass E8): on a phone this menu is the row's action sheet, and Pin, Settle (the
+  // swipe's Done), Park, Archive and Mute are what a supervisor reaches for; the thread's other verbs follow.
   return (
     <>
+      {archived ? (
+        <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, 'unarchive')}>{t('threadSidebarRestore')}</ContextMenuItem>
+      ) : (
+        <>
+          <ContextMenuItem keys="P" onSelect={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}>
+            {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+          </ContextMenuItem>
+          <ContextMenuItem disabled={session.running} keys="E" onSelect={() => props.actions.toggleSettled(session.id)}>
+            {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
+          </ContextMenuItem>
+          <ContextMenuItem disabled={session.running} keys="H" onSelect={() => props.actions.toggleParked(session.id)}>
+            {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+          </ContextMenuItem>
+          <ContextMenuItem disabled={session.running} onSelect={() => void props.actions.mutate(session.id, 'archive')}>
+            {t('threadSidebarArchive')}
+          </ContextMenuItem>
+        </>
+      )}
+      <ContextMenuSub>
+        <ContextMenuSubTrigger>{t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}</ContextMenuSubTrigger>
+        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+          {THREAD_MUTE_OPTIONS.map(option => (
+            <ContextMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
+              {t(muteOptionLabelKeys[option])}
+            </ContextMenuItem>
+          ))}
+          <ContextMenuSeparator />
+          <ContextMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
+            {t('threadSidebarUnmute')}
+          </ContextMenuItem>
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+      <ContextMenuSeparator />
       <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
       <ContextMenuItem disabled={props.workspaceId === undefined} onSelect={() => props.actions.followUp(session.id, props.workspaceId)}>
         {t('threadSidebarFollowUp')}
@@ -1025,11 +1147,12 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
         <NotifyChoiceMenu
           subscriberTitle={notifyTarget.subscriberTitle}
           choice={notifyTarget.choice}
+          defaultLevel={props.actions.notifyDefaultLevel()}
           onChoose={choice => props.actions.setNotify(notifyTarget, choice)}
           t={t}
         />
       )}
-      <ContextMenuItem disabled={unread} onSelect={() => props.actions.markUnread(session.id)}>
+      <ContextMenuItem disabled={unread} keys="U" onSelect={() => props.actions.markUnread(session.id)}>
         {t('threadSidebarMarkUnread')}
       </ContextMenuItem>
       <ContextMenuSeparator />
@@ -1069,21 +1192,6 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
       </ContextMenuSub>
       <ContextMenuSeparator />
       <ContextMenuSub>
-        <ContextMenuSubTrigger>{t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-          {THREAD_MUTE_OPTIONS.map(option => (
-            <ContextMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
-              {t(muteOptionLabelKeys[option])}
-            </ContextMenuItem>
-          ))}
-          <ContextMenuSeparator />
-          <ContextMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
-            {t('threadSidebarUnmute')}
-          </ContextMenuItem>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
         <ContextMenuSubTrigger>{t('threadSidebarMoveToSection')}</ContextMenuSubTrigger>
         <ContextMenuSubContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMoveToSection')}>
           {SIDEBAR_SECTIONS.map(section => (
@@ -1093,33 +1201,6 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           ))}
         </ContextMenuSubContent>
       </ContextMenuSub>
-      <ContextMenuSeparator />
-      {archived ? (
-        <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, 'unarchive')}>{t('threadSidebarRestore')}</ContextMenuItem>
-      ) : (
-        <>
-          <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}>
-            {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-          </ContextMenuItem>
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>{t('threadSidebarChangeStatus')}</ContextMenuSubTrigger>
-            <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-              <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}>
-                {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-              </ContextMenuItem>
-              <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleParked(session.id)}>
-                {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-              </ContextMenuItem>
-              <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleSettled(session.id)}>
-                {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
-              </ContextMenuItem>
-              <ContextMenuItem disabled={session.running} onSelect={() => void props.actions.mutate(session.id, 'archive')}>
-                {t('threadSidebarArchive')}
-              </ContextMenuItem>
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-        </>
-      )}
     </>
   )
 }
@@ -1128,7 +1209,16 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
 const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => (
   <ContextMenu>
     <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
-    <ContextMenuContent className="dshx-root dshx:min-w-44" aria-label={props.actions.translate('threadSidebarContextMenu')}>
+    <ContextMenuContent
+      className="dshx-root dshx:min-w-44"
+      aria-label={props.actions.translate('threadSidebarContextMenu')}
+      // The right-button release that ends the opening click lands on whatever item the menu placed under the pointer
+      // (a long menu shifts up to fit the window), and Radix selects an item on a pointer-up it did not see go down.
+      // Only a primary click, a tap or a key chooses an item; marking the event handled stops the item's handler.
+      onPointerUpCapture={event => {
+        if (event.button === 2) event.preventDefault()
+      }}
+    >
       <ThreadMenuBody {...props} />
     </ContextMenuContent>
   </ContextMenu>
@@ -1143,22 +1233,114 @@ const ThreadRowMenu = {
   },
 } as const
 
+/** A touch-first device (the phone rules apply under `pointer: coarse`); read once, it does not change mid-session. */
+let coarsePointerMatch: boolean | undefined
+const coarsePointer = (): boolean => {
+  coarsePointerMatch ??= typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+  return coarsePointerMatch
+}
+
+/**
+ * The 16px project mark that leads a thread row: the project's own icon (favicon, `dsh.project.json` icon) or its
+ * neutral monogram, from the Host's cached project-icon resolver. A thread outside any project keeps an empty box of the
+ * same size so every title starts on one line. Never a status colour: the status glyph beside it is the only signal.
+ */
+/** The project's 14px mark on a row's second line (b:212a): where the thread runs, beside the project name. */
+const RowProjectMark = memo((props: { readonly path: string | undefined; readonly title: string | undefined }): JSX.Element =>
+  props.path === undefined ? (
+    <span aria-hidden="true" className="dshx:inline-flex dshx:size-3.5 dshx:shrink-0" data-thread-project-mark="none" />
+  ) : (
+    <span aria-hidden="true" className="dshx:inline-flex dshx:size-3.5 dshx:shrink-0" data-thread-project-mark={props.title ?? ''}>
+      <ProjectIcon path={props.path} label={props.title} className="dshx:size-3.5" />
+    </span>
+  ),
+)
+
+/**
+ * The quiet sign that a thread runs in its own workspace: a branch icon, at most one state word, and the folder name and
+ * path in its tooltip only. A thread workspace is a detail of its thread, never a name of its own (b:212a).
+ */
+const OwnWorkspaceIndicator = (props: {
+  readonly workspace: OwnWorkspaceView
+  readonly showState: boolean
+  readonly t: ThreadSidebarTranslate
+}): JSX.Element => {
+  const { workspace, t } = props
+  const hint = t('threadSidebarOwnWorkspaceHint', { name: workspace.name, path: workspace.path ?? workspace.name })
+  const state = props.showState ? workspace.state : undefined
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="dshx:inline-flex dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-1"
+          data-thread-workspace-indicator=""
+          data-workspace-name={workspace.name}
+          data-workspace-state={state?.kind}
+        >
+          <GitBranchIcon aria-hidden="true" className="dshx:size-3 dshx:shrink-0" />
+          <span className="dshx:sr-only">{t('threadSidebarOwnWorkspace')}</span>
+          {state === undefined ? null : (
+            <span
+              className="dshx:whitespace-nowrap"
+              {...(state.kind === 'landed'
+                ? { 'data-testid': 'thread-sidebar-rebased-tag', ...(state.at === undefined ? {} : { 'data-landed-at': String(state.at) }) }
+                : {})}
+            >
+              {state.text}
+            </span>
+          )}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="dshx:max-w-96 dshx:break-all">
+        {hint}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 /** Memoized so a session update re-renders only its own row, not the whole list. */
 const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, settled, rowStyle } = props
   const rowRef = useRef<HTMLElement | null>(null)
   const multiSelected = useThreadMultiSelected(props.actions.multiSelection, session.id)
+  // Phone: swipe left for Done (settle), right for Pin (T1.3). Touch pointers only; desktop keeps drag-and-drop.
+  // A long press shows the row's peek as a sheet (T6.1): the glance a keyboard gets from Space, with the row's menu
+  // one tap further (its action sheet). It replaces the context menu trigger's own touch timer.
+  const swipe = useRowSwipe(
+    coarsePointer() && !props.renaming && !session.running,
+    action => {
+      if (action === 'done') props.actions.toggleSettled(session.id)
+      else void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')
+    },
+    coarsePointer() && !props.renaming ? () => props.actions.peek(session.id) : undefined,
+  )
+  const swipeReveal = RowSwipeModel.revealed(swipe.offset)
   // Offscreen rows keep their content and layout box; only their menus and hover actions wait for the viewport.
   const nearViewport = useNearViewport(rowRef)
   const t = props.actions.translate
   const unread = props.unread
   const compact = rowStyle.density === 'compact'
   const childCount = props.childThreads.length + props.finishedChildThreads.length
-  const showProject = rowStyle.project || props.parentTitle !== undefined
+  // Line 2 says where the thread runs (b:212a): the project's mark and name, then a quiet own-workspace indicator. Under
+  // a project section the header names the project, so the row keeps only the indicator.
+  const showMark = props.projectMark === true
+  const showProject = rowStyle.project && props.projectMark === true
+  const ownWorkspace: OwnWorkspaceView | undefined =
+    props.ownWorkspaceName === undefined
+      ? undefined
+      : {
+          name: props.ownWorkspaceName,
+          path: props.ownWorkspacePath,
+          state:
+            props.ownWorkspaceState === undefined || props.ownWorkspaceStateText === undefined
+              ? undefined
+              : { kind: props.ownWorkspaceState, text: props.ownWorkspaceStateText, at: props.ownWorkspaceStateAt },
+        }
   const showMachine = rowStyle.machine && props.machine !== undefined
   const showPath = rowStyle.path && session.cwd !== undefined && session.cwd.length > 0
-  const workspaceLabel = workspaceNameLabel(props.workspaceName, props.workspaceTitle)
   const workStatus = props.workStatus
+  // The status glyph keeps its own 16px seat on line 1; line 2's seat holds the project mark under it.
+  const leadSeat = workStatus !== undefined || rowStyle.statusDot
   const inlineVerb = workStatus?.verb
   const showAgent = workStatus !== undefined && props.agent !== undefined
   // Why it needs you leads the second line, so the title keeps the first line to itself.
@@ -1166,14 +1348,22 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     workStatus === undefined || (workStatus.status !== 'needs-you' && workStatus.status !== 'failed' && workStatus.detail === undefined)
       ? undefined
       : (workStatus.detail ?? t(workStatusLabelKeys[workStatus.status]))
-  const metaLine = showProject || showMachine || showPath || childCount > 0 || showAgent || statusDetail !== undefined
-  const headLine =
-    rowStyle.title ||
-    rowStyle.time ||
-    rowStyle.statusDot ||
-    props.rebasedAt !== undefined ||
-    props.integrationQueuedAt !== undefined ||
-    (props.subscriberCount ?? 0) > 0
+  // A working thread trades its static meta for what it is doing now (polish pass b:r4et): its step or the subagent
+  // rollup, with the working shimmer, then the elapsed time. Done, idle and attention rows keep the meta line.
+  const live = session.running && (workStatus === undefined || workStatus.status === 'working')
+  const liveStep = live ? (workStatus?.detail ?? props.liveTurn?.step ?? t('threadSidebarWorking')) : undefined
+  const metaLine =
+    live ||
+    (showMark && props.workspacePath !== undefined) ||
+    showProject ||
+    ownWorkspace !== undefined ||
+    props.parentTitle !== undefined ||
+    showMachine ||
+    showPath ||
+    childCount > 0 ||
+    showAgent ||
+    statusDetail !== undefined
+  const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.integrationQueuedAt !== undefined || (props.subscriberCount ?? 0) > 0
   const openAside = useAsideOpen()
   /**
    * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
@@ -1204,7 +1394,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       return withTooltip(
         t('threadSidebarRestore'),
         <Button variant="ghost" size="icon-xs" aria-label={t('threadSidebarRestore')} onClick={() => void props.actions.mutate(session.id, 'unarchive')}>
-          <IconUnarchiveOutlineRegular size={14} />
+          <ArchiveRestoreIcon strokeWidth={1.5} size={14} />
         </Button>,
       )
     }
@@ -1227,7 +1417,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           aria-label={t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
           onClick={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}
         >
-          {pinned ? <IconPinFillRegular size={14} /> : <IconPinOutlineRegular size={14} />}
+          {pinned ? <IconPinFillRegular size={14} /> : <PinIcon strokeWidth={1.5} size={14} />}
         </Button>,
       )
     }
@@ -1241,7 +1431,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           aria-label={t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
           onClick={() => props.actions.toggleParked(session.id)}
         >
-          {parked ? <IconPlayOutlineRegular size={14} /> : <IconPauseOutlineRegular size={14} />}
+          {parked ? <PlayIcon strokeWidth={1.5} size={14} /> : <PauseIcon strokeWidth={1.5} size={14} />}
         </Button>,
       )
     }
@@ -1255,7 +1445,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           aria-label={t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
           onClick={() => props.actions.toggleSettled(session.id)}
         >
-          {settled ? <IconPlayOutlineRegular size={14} /> : <IconCheckCircleOutlineRegular size={14} />}
+          {settled ? <PlayIcon strokeWidth={1.5} size={14} /> : <CircleCheckIcon strokeWidth={1.5} size={14} />}
         </Button>,
       )
     }
@@ -1286,7 +1476,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     return withTooltip(
       t('threadSidebarArchive'),
       <Button variant="ghost" size="icon-xs" aria-label={t('threadSidebarArchive')} onClick={() => void props.actions.mutate(session.id, 'archive')}>
-        <IconArchiveOutlineRegular size={14} />
+        <ArchiveIcon strokeWidth={1.5} size={14} />
       </Button>,
     )
   }
@@ -1314,10 +1504,31 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         data-thread-id={session.id}
         data-selected={props.selected}
         data-unread={unread ? '' : undefined}
+        data-settled={props.settled ? '' : undefined}
         data-thread-section-row={props.section === undefined ? undefined : ''}
         onContextMenu={captureThreadMentionInsertion}
+        data-row-gestures=""
+        {...swipe.handlers}
       >
-        <div className="dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-accent">
+        {swipeReveal === undefined ? null : (
+          <div
+            aria-hidden="true"
+            data-row-swipe-reveal={swipeReveal}
+            className={cn(
+              'dshx:absolute dshx:inset-0 dshx:flex dshx:items-center dshx:rounded-md dshx:bg-muted dshx:px-4 dshx:text-sm dshx:font-medium dshx:text-foreground',
+              swipeReveal === 'done' ? 'dshx:justify-end' : 'dshx:justify-start',
+            )}
+          >
+            {swipeReveal === 'done' ? t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSwipeDone') : t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+          </div>
+        )}
+        <div
+          className={cn(
+            'dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-accent dshx:pointer-coarse:touch-pan-y',
+            swipe.offset === 0 ? 'dshx:transition-transform dshx:duration-150' : 'dshx:bg-(--dsw-specific-sidebar-fill)',
+          )}
+          style={swipe.offset === 0 ? undefined : { transform: `translateX(${String(swipe.offset)}px)` }}
+        >
           {props.renaming ? (
             <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center', compact ? 'dshx:px-2 dshx:py-1.5' : 'dshx:px-2.5 dshx:py-2.5')}>
               <InlineTitleEditor
@@ -1334,8 +1545,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               draggable
               data-work-status={workStatus?.status}
               className={cn(
-                'dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
+                'dshx:@container/row dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
+                // Phone rows are 60pt two-line targets (T1.3), whatever the density preference.
+                'dshx:pointer-coarse:min-h-15 dshx:pointer-coarse:justify-center',
                 // Touch: the row's actions menu button takes the top-right corner, so the inline verb moves left of it.
                 inlineVerb !== undefined ? 'dshx:pr-20 dshx:pointer-coarse:pr-30' : 'dshx:pointer-coarse:pr-11',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
@@ -1350,21 +1563,31 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             >
               {headLine ? (
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                  {workStatus !== undefined ? (
-                    <StatusGlyph
-                      status={workStatus.status}
-                      // An unread Ready row keeps the accessible name the dot had, so "Unread" still finds it.
-                      label={workStatus.status === 'ready' && unread ? t('threadSidebarUnread') : t(workStatusLabelKeys[workStatus.status])}
-                    />
-                  ) : rowStyle.statusDot ? (
-                    <SessionStatusDot
-                      session={session}
-                      unread={unread}
-                      unreadLabel={t('threadSidebarUnread')}
-                      attentionLabel={props.attentionLabel}
-                      attentionColors={rowStyle.attentionColors}
-                    />
-                  ) : null}
+                  {(() => {
+                    const status =
+                      workStatus !== undefined ? (
+                        <StatusGlyph
+                          status={workStatus.status}
+                          // An unread Ready row keeps the accessible name the dot had, so "Unread" still finds it.
+                          label={workStatus.status === 'ready' && unread ? t('threadSidebarUnread') : t(workStatusLabelKeys[workStatus.status])}
+                        />
+                      ) : rowStyle.statusDot ? (
+                        <SessionStatusDot
+                          session={session}
+                          unread={unread}
+                          unreadLabel={t('threadSidebarUnread')}
+                          attentionLabel={props.attentionLabel}
+                          attentionColors={rowStyle.attentionColors}
+                        />
+                      ) : null
+                    // The glyph has its own 16px seat (b:212a), where the project mark used to carry it as a corner badge:
+                    // the mark moved to line 2, so line 1 keeps main's widths and the mute marker its place by the strip.
+                    return status === null ? null : (
+                      <span className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" data-thread-lead="">
+                        {status}
+                      </span>
+                    )
+                  })()}
                   {props.mute === undefined ? null : <MutedMarker mute={props.mute} t={t} />}
                   <span
                     className={cn(
@@ -1395,11 +1618,6 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                           {t('threadSidebarIntegrationQueued')}
                         </Badge>,
                       )}
-                  {props.rebasedAt === undefined ? null : (
-                    <Badge variant="success" title={new Date(props.rebasedAt).toLocaleString()} data-testid="thread-sidebar-rebased-tag">
-                      {t('threadSidebarRebased')}
-                    </Badge>
-                  )}
                   {props.subscriberCount === undefined || props.subscriberCount === 0
                     ? null
                     : withTooltip(
@@ -1416,11 +1634,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <span
                       className={cn(
                         'dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
-                        // The status list's spinner already says Working; the time stays colourless there.
-                        workStatus === undefined && session.running && 'dshx:font-medium dshx:text-info',
+                        // The spinner and the live activity line say Working; the time stays colourless (DESIGN.md).
                       )}
                     >
-                      {`${workStatus === undefined && session.running ? `${t('threadSidebarWorking')} · ` : ''}${props.age}`}
+                      {props.age}
                     </span>
                   ) : null}
                 </span>
@@ -1429,11 +1646,21 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 <span
                   className={cn(
                     'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
-                    rowStyle.statusDot && 'dshx:pl-4',
                     childCount > 0 && 'dshx:pr-16',
                   )}
+                  data-thread-where=""
                 >
-                  {statusDetail === undefined ? null : (
+                  {/* Line 2 is where the thread runs (b:212a): the project mark sits in the seat under the status glyph,
+                      so the project name lines up with the title. Its 8px gap matches line 1's. */}
+                  {leadSeat || showMark ? (
+                    <span className="dshx:mr-0.5 dshx:inline-flex dshx:w-4 dshx:shrink-0 dshx:justify-center">
+                      {showMark ? <RowProjectMark path={props.workspacePath} title={props.workspaceTitle} /> : null}
+                    </span>
+                  ) : null}
+                  {liveStep === undefined ? null : (
+                    <LiveActivityLine active={nearViewport} startedAt={props.liveTurn?.startedAt} step={liveStep} className="dshx:min-w-0 dshx:flex-1" />
+                  )}
+                  {liveStep !== undefined || statusDetail === undefined ? null : (
                     <span
                       className={cn(
                         'dshx:min-w-0 dshx:max-w-[60%] dshx:shrink dshx:truncate',
@@ -1444,39 +1671,36 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {statusDetail}
                     </span>
                   )}
+                  {showProject && liveStep === undefined ? (
+                    <span
+                      className={cn(
+                        // The first text to give way on a short row: it truncates, then hides, before the mark does.
+                        'dshx:min-w-0 dshx:shrink dshx:truncate dshx:@max-[11rem]/row:hidden',
+                        rowStyle.projectColor && props.workspaceTitle !== undefined && projectTextTone(props.workspaceTitle, props.rowStyle.projectPalette),
+                      )}
+                      data-testid="thread-row-project"
+                    >
+                      {props.workspaceTitle ?? t('threadSidebarUnassigned')}
+                    </span>
+                  ) : null}
+                  {ownWorkspace === undefined ? null : <OwnWorkspaceIndicator workspace={ownWorkspace} showState={liveStep === undefined} t={t} />}
                   {showAgent ? (
                     <span className="dshx:shrink-0 dshx:truncate dshx:max-w-[35%]" data-testid="thread-row-agent">
                       @{props.agent}
                     </span>
                   ) : null}
-                  {showProject ? (
-                    <span
-                      className={cn(
-                        'dshx:truncate dshx:font-medium',
-                        rowStyle.projectColor && props.workspaceTitle !== undefined && projectTextTone(props.workspaceTitle, props.rowStyle.projectPalette),
-                        (showMachine || showPath || props.parentTitle !== undefined) && 'dshx:max-w-[55%] dshx:shrink-0',
-                      )}
-                    >
-                      {props.workspaceTitle ?? t('threadSidebarUnassigned')}
-                    </span>
-                  ) : null}
-                  {workspaceLabel === undefined ? null : (
-                    <span className="dshx:shrink-0 dshx:truncate" data-testid="thread-workspace-name">
-                      · {workspaceLabel}
-                    </span>
-                  )}
-                  {props.parentTitle === undefined ? null : (
+                  {props.parentTitle === undefined || liveStep !== undefined ? null : (
                     <span className="dshx:min-w-0 dshx:truncate">
                       {t('threadSidebarChildOf')} {props.parentTitle}
                     </span>
                   )}
-                  {showMachine ? (
+                  {showMachine && liveStep === undefined ? (
                     <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
                       <MonitorIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />
                       <span className="dshx:truncate">{props.machine}</span>
                     </span>
                   ) : null}
-                  {showPath ? (
+                  {showPath && liveStep === undefined ? (
                     <span className="dshx:min-w-0 dshx:truncate" title={session.cwd}>
                       {session.cwd}
                     </span>
@@ -1631,6 +1855,16 @@ const ABSENT_CURRENT_SESSION_ID: ObservableSnapshot<string | undefined> = {
   subscribe: () => () => undefined,
 }
 
+/** How long after a press in the list (or a menu) a list change counts as the user's own and skips the hold. */
+const USER_CHANGE_WINDOW_MS = 3_000
+
+/** The id a grouped row holds its place by: a local thread's Session, or a remote thread's runtime and Session. */
+const heldGroupedThreadId = (
+  thread:
+    | { readonly kind: 'local'; readonly session: SessionSummary }
+    | { readonly kind: 'remote'; readonly remote: { readonly runtimeId: string; readonly sessionId: string } },
+): string => (thread.kind === 'local' ? thread.session.id : `${thread.remote.runtimeId}:${thread.remote.sessionId}`)
+
 const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const surface = props.surface ?? 'sidebar'
   const isBoard = surface === 'board'
@@ -1661,7 +1895,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const threadDirectories = useThreadDirectories(workspaceItems)
   const archivedIdList = useStableValue(workspaceState.archivedSessionIds, HostSnapshotsModel.sameIds)
   const pinnedIdList = useStableValue(workspaceState.pinnedSessionIds, HostSnapshotsModel.sameIds)
-  const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
+  const { preferences, updatePreferences, storageWarning, boardViewOnHost, setSelectedThreadId, threadTitle } = useSidebarState()
+  // Read by a preset delete's Undo, which may run after other preset writes.
+  const preferencesRef = useRef(preferences)
+  preferencesRef.current = preferences
+  const stageShowsPage = useStageCovered()
   const attention = useThreadAttention({ enabled: sessionState.phase === 'ready' })
   const agentHandleOf = useRowAgentHandles()
   const recoveryApi = useApi(threadSidebarRecoveryApi)
@@ -1774,11 +2012,21 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
+  const [presetPrompt, setPresetPrompt] = useState<PresetNamePrompt | null>(null)
+  const [presetToDelete, setPresetToDelete] = useState<{ readonly id: string; readonly label: string } | null>(null)
   const [threadToScrollTo, setThreadToScrollTo] = useState<string | null>(null)
   const threadViewSettings = preferences.threadViews
   const listThreadView = ThreadViewPreferencesModel.activeThreadView(threadViewSettings)
-  const boardViewSettings = storedThreadBoardView.useValue() ?? DEFAULT_THREAD_BOARD_VIEW
-  const threadView = isBoard ? boardViewSettings : listThreadView
+  // The Board view follows the user across devices (E9) once the Host's settings hold it; an older Host keeps it here.
+  const localBoardViewSettings = storedThreadBoardView.useValue() ?? DEFAULT_THREAD_BOARD_VIEW
+  const boardViewSettings = boardViewOnHost ? preferences.boardView : localBoardViewSettings
+  const setBoardView = (next: ThreadBoardViewSettings): void => {
+    if (boardViewOnHost) updatePreferences({ boardView: next })
+    else storedThreadBoardView.set(next)
+  }
+  // Filter presets (b:xpvk): the list shows the active preset's filters, or the draft once the user changed one.
+  const listThreadFilters = useMemo(() => ThreadViewPreferencesModel.currentThreadViewFilters(threadViewSettings), [threadViewSettings])
+  const threadView = isBoard ? boardViewSettings : listThreadFilters
   const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
   const localProjectsForRemoteThreads = useMemo(
     () =>
@@ -1934,10 +2182,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [projectIdentities.data, workspaceItems])
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
-  const workspaceNameById = useMemo(
-    () => new Map<string, string | undefined>(workspaceItems.map(workspace => [workspace.workspaceId, workspaceName(workspace.path)])),
-    [workspaceItems],
-  )
+  /** The jj thread workspace each Session works in, for the row's one state word (b:212a). */
+  const jjThreadBySession = useMemo(() => {
+    const map = new Map<string, OwnWorkspaceThread>()
+    for (const repository of jjRepositories.data?.repositories ?? [])
+      for (const thread of repository.threads) for (const id of thread.sessionIds) map.set(id, thread)
+    return map
+  }, [jjRepositories.data])
   const integrationQueuedAtBySessionId = useMemo(
     () => indexQueuedIntegrationSessions((jjRepositories.data?.repositories ?? []).flatMap(repository => repository.threads)),
     [jjRepositories.data],
@@ -2325,6 +2576,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // The shared attention store owns the page-wide poll and its focus/visibility catch-up, so this
   // mount only refreshes when the running set changes (the one fact that makes attention stale fast).
   const selectedAttention = selectedSessionId === undefined ? undefined : attention.records.get(selectedSessionId)
+  const attentionAvailable = attention.available
+  const sinceYouLeftPending = useRef<string | null>(null)
+  const sinceYouLeftSelected = useRef<string | undefined>(undefined)
   const acknowledgeAttention = attention.acknowledge
   const acknowledgeManualUnread = attention.clearUnread
   useEffect(() => {
@@ -2336,15 +2590,33 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const justSelected = previousSelectedId.current !== selectedSessionId
     previousSelectedId.current = selectedSessionId
     if (selectedAttention === undefined) return
-    // Watching a thread finish acknowledges that turn; it never clears a mark the user made on purpose just now.
-    if (selectedAttention.finishedAt !== null) acknowledgeAttention(selectedSessionId, selectedAttention.version)
-    else if (justSelected) acknowledgeManualUnread(selectedSessionId, selectedAttention.version)
-  }, [acknowledgeAttention, acknowledgeManualUnread, isPrimarySurface, selectedAttention, selectedSessionId])
+    // Watching a thread finish acknowledges that turn; it never clears a mark the user made on purpose just now. A
+    // destination page over the stage (the Inbox, on a phone the whole screen) means the thread is not being watched.
+    if (selectedAttention.finishedAt !== null) {
+      if (!stageShowsPage) acknowledgeAttention(selectedSessionId, selectedAttention.version)
+    } else if (justSelected) acknowledgeManualUnread(selectedSessionId, selectedAttention.version)
+  }, [acknowledgeAttention, acknowledgeManualUnread, isPrimarySurface, selectedAttention, selectedSessionId, stageShowsPage])
+  // Opening a thread clears its record (above, or never on a phone, whose Threads tab is not the primary surface): hand
+  // Chat the unseen range on the open itself, on every surface, so it can draw "Since you left". A turn the user then
+  // watches finish is acknowledged, never handed over. A thread opened before the first attention snapshot arrived (a
+  // page load on its URL) is handed over when the snapshot arrives. Handing the same record over twice is harmless.
+  useEffect(() => {
+    const justSelected = sinceYouLeftSelected.current !== selectedSessionId
+    sinceYouLeftSelected.current = selectedSessionId
+    if (selectedSessionId === undefined) return
+    if (justSelected && !attentionAvailable) sinceYouLeftPending.current = selectedSessionId
+    const firstSnapshot = attentionAvailable && sinceYouLeftPending.current === selectedSessionId
+    if (attentionAvailable) sinceYouLeftPending.current = null
+    if (selectedAttention !== undefined && (justSelected || firstSnapshot) && !stageShowsPage) noteSinceYouLeft(selectedAttention)
+  }, [attentionAvailable, selectedAttention, selectedSessionId, stageShowsPage])
   threadTitle.current = sessionId => sessionState.byId[sessionId]?.displayTitle
 
   const selectThread = (sessionId: SessionSummary['id'], options: { readonly linked?: boolean } = {}): void => {
     if (sessionId !== selectedSessionId) startInteraction('thread switch', { attributes: { 'dshx.thread.source': 'sidebar' } })
     const opened = attention.records.get(sessionId)
+    // A phone's Threads list unmounts as the thread opens, so the selection effect never sees it: hand the unseen range
+    // to Chat here, on the tap itself (the effect hands the same record over again on a desktop; that is harmless).
+    if (opened !== undefined) noteSinceYouLeft(opened)
     if (opened !== undefined && shouldClearUnreadOnReselect({ requestedSessionId: sessionId, selectedSessionId }))
       attention.clearUnread(sessionId, opened.version)
     if (isPrimarySurface) pageLoadThreadRoute.settle()
@@ -2929,7 +3201,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       ...(plan.settle ? SettledThreadsModel.settle(status, targets, readNow()) : plan.unsettle ? SettledThreadsModel.unsettle(status, targets) : {}),
       idleSectionOverrides,
     }
-    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
+    if (isBoard) setBoardView(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
     changePreferences(isBoard ? nextPreferences : { ...nextPreferences, collapsedSections: [...nextCollapsedSections] })
     if (failed) setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
     else if (!plan.archive) setNotice(null)
@@ -2960,7 +3232,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       ...(plan.settle ? SettledThreadsModel.settle(status, [sessionId], readNow()) : plan.unsettle ? SettledThreadsModel.unsettle(status, [sessionId]) : {}),
       idleSectionOverrides,
     }
-    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
+    if (isBoard) setBoardView(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
     changePreferences(isBoard ? nextPreferences : { ...nextPreferences, collapsedSections: [...nextCollapsedSections] })
     setNotice(null)
   }
@@ -2985,13 +3257,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const nextCollapsedGroups = key.startsWith(STATUS_GROUP_KEY_PREFIX)
       ? [...ThreadStatusModel.toggle(key, collapsedGroups)]
       : toggleCollapsedGroup(collapsedGroups, key)
-    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedGroups: nextCollapsedGroups }))
+    if (isBoard) setBoardView(ThreadBoardViewModel.update(boardViewSettings, { collapsedGroups: nextCollapsedGroups }))
     else changePreferences({ collapsedGroups: nextCollapsedGroups })
   }
 
   const toggleSection = (section: SidebarSection): void => {
     const nextCollapsedSections = SidebarPreferencesModel.toggleCollapsedSection(collapsedSections, section)
-    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
+    if (isBoard) setBoardView(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
     else changePreferences({ collapsedSections: nextCollapsedSections })
   }
 
@@ -3431,7 +3703,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // The ADE status grouping (plan §4.3, §4.7): each row's status is a projection of the inbox plus the attention this
   // sidebar already classifies, with subagents rolled up into their parent.
   const stateGrouping = threadView.groupBy === 'state'
-  const inbox = useInboxThreadSignals({ enabled: stateGrouping && sessionState.phase === 'ready' })
+  // Rows keep the status glyphs (and their detail line) when grouped by project, so a project section still says what
+  // needs you; only the status grouping sorts and sections by them.
+  const statusGlyphs = stateGrouping || threadView.groupBy === 'project'
+  const inbox = useInboxThreadSignals({ enabled: statusGlyphs && sessionState.phase === 'ready' })
   /**
    * Resume one row however it stopped: its inbox verb (quota, another provider), its stored quota continuation when the
    * inbox is absent, or the turn a previous Host process left open.
@@ -3455,7 +3730,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   const childStatusById = useMemo(() => {
     const statuses = new Map<SessionSummary['id'], ThreadStatus>()
-    if (!stateGrouping) return statuses
+    if (!statusGlyphs) return statuses
     for (const entry of [...childThreadEntries, ...detachedThreadEntries]) {
       statuses.set(
         entry.session.id,
@@ -3484,11 +3759,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     now,
     preferences.settledAt,
     settledSessionIds,
-    stateGrouping,
+    statusGlyphs,
   ])
   const threadStatusById = useMemo(() => {
     const statuses = new Map<SessionSummary['id'], ThreadStatus>()
-    if (!stateGrouping) return statuses
+    if (!statusGlyphs) return statuses
     for (const entry of sectionEntries) {
       const children = (threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN).flatMap(child => {
         const status = childStatusById.get(child.id)
@@ -3525,9 +3800,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     preferences.settledAt,
     sectionEntries,
     settledSessionIds,
-    stateGrouping,
+    statusGlyphs,
     threadTree,
   ])
+  // One Host read every 3 s for every working row's step and start, only while one runs (polish pass b:r4et).
+  const runningRowIds = useMemo(() => sectionEntries.filter(entry => entry.session.running).map(entry => entry.session.id), [sectionEntries])
+  const liveTurns = useLiveTurns(runningRowIds, sessionState.phase === 'ready')
   const transitionClock = useRef(ThreadStatusModel.createTransitionClock())
   const threadViewAttentionEntries = useMemo(() => {
     // A tab's dot follows the dots its rows draw, and a row's dot shows only its own state: a child's label lights
@@ -4069,7 +4347,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       window.removeEventListener('dragend', onDragEnd, true)
     }
   }, [dragActor, sendDrag, surface])
-  const groupedThreadEntries = useMemo(() => {
+  const liveGroupedThreadEntries = useMemo(() => {
     if (threadView.groupBy === 'status') return []
     const entries: SidebarGroupedViewEntry[] = [
       ...visibleThreadEntries
@@ -4150,6 +4428,58 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     visibleThreadEntries,
     pinnedIdList,
   ])
+  // While the pointer is over the list or focus is in it, rows hold their places (plan Q2 T2.2); see held-groups.ts.
+  const [heldGroups, setHeldGroups] = useState<HeldGroups | null>(null)
+  const holding = useRef({ hover: false, focus: false })
+  const latestGroups = useRef(liveGroupedThreadEntries)
+  latestGroups.current = liveGroupedThreadEntries
+  // A hold taken before the list loaded, or of no rows at all, has nothing to keep in place: the first rows are not
+  // "updates".
+  const listLoaded = sessionState.phase === 'ready' && workspaceState.phase === 'ready'
+  const effectiveHold = listLoaded && heldGroups !== null && heldGroups.groups.some(group => group.ids.length > 0) ? heldGroups : null
+  const groupedThreadEntries = useMemo(
+    () => HeldGroupsModel.apply(liveGroupedThreadEntries, effectiveHold, heldGroupedThreadId),
+    [effectiveHold, liveGroupedThreadEntries],
+  )
+  const heldUpdates = HeldGroupsModel.pending(liveGroupedThreadEntries, effectiveHold, heldGroupedThreadId)
+  const holdOrder = (reason: 'hover' | 'focus', on: boolean): void => {
+    if (isBoard) return
+    holding.current = { ...holding.current, [reason]: on }
+    if (on)
+      setHeldGroups(current =>
+        current !== null && current.groups.some(group => group.ids.length > 0) ? current : HeldGroupsModel.capture(latestGroups.current, heldGroupedThreadId),
+      )
+    else if (!holding.current.hover && !holding.current.focus) setHeldGroups(null)
+  }
+  // The hold is for changes that arrive on their own (a thread finishing). A change the user just made (a menu verb, a
+  // key, a new chat from a project header) applies at once: for a moment after a press in the list or a menu, a live
+  // change re-captures the hold instead of waiting behind the pill.
+  const userActedAt = useRef(0)
+  useEffect(() => {
+    const onAct = (event: Event): void => {
+      const target = event.target instanceof Element ? event.target : null
+      if (target === null) return
+      if (scrollAreaRef.current?.contains(target) === true || target.closest('[role="menu"], [role="dialog"], [role="alertdialog"], [role="listbox"]') !== null)
+        userActedAt.current = Date.now()
+    }
+    window.addEventListener('pointerdown', onAct, true)
+    window.addEventListener('keydown', onAct, true)
+    return () => {
+      window.removeEventListener('pointerdown', onAct, true)
+      window.removeEventListener('keydown', onAct, true)
+    }
+  }, [])
+  useEffect(() => {
+    if (Date.now() - userActedAt.current > USER_CHANGE_WINDOW_MS) return
+    setHeldGroups(current => (current === null ? null : HeldGroupsModel.capture(liveGroupedThreadEntries, heldGroupedThreadId)))
+  }, [liveGroupedThreadEntries])
+  // A different grouping, view or filter has different groups: the hold never carries across it.
+  const viewSignature = JSON.stringify(threadView)
+  useEffect(() => {
+    setHeldGroups(current => (current === null ? null : HeldGroupsModel.capture(latestGroups.current, heldGroupedThreadId)))
+  }, [viewSignature, activeWorkspaceFilter])
+  const showHeldUpdates = (): void =>
+    setHeldGroups(holding.current.hover || holding.current.focus ? HeldGroupsModel.capture(latestGroups.current, heldGroupedThreadId) : null)
   /** Rows of a status group whose inline verb is Resume, so the group header can offer one bulk verb. */
   const statusGroupResumableSessions = useMemo(() => {
     const byGroupKey = new Map<string, readonly SessionSummary[]>()
@@ -4202,16 +4532,39 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const projectFilterValue = activeWorkspaceFilter === null ? ALL_PROJECTS : activeWorkspaceFilter.length === 0 ? UNASSIGNED_PROJECT : activeWorkspaceFilter
 
   const selectProject = (value: string): void => {
+    // Productivity pass Q5 (T5.5): the picker's last entries add a project instead of filtering.
+    if (value === ADD_FOLDER || value === NEW_PROJECT) {
+      ProjectAddFlow.open(value === NEW_PROJECT ? 'create' : 'browse')
+      return
+    }
     setSettingsOpen(false)
     const projectFilter = value === ALL_PROJECTS ? null : value === UNASSIGNED_PROJECT ? '' : value
-    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { projectFilter }))
+    if (isBoard) setBoardView(ThreadBoardViewModel.update(boardViewSettings, { projectFilter }))
     else changePreferences({ workspaceFilter: projectFilter })
   }
 
+  // Offered only where the flow's owner (workspace-folder-picker's dialog) is mounted; it answers ProjectAddFlow.open.
+  const projectAddAvailable = ProjectAddFlow.available()
   const projectOptions: readonly ComboboxOption[] = [
     { value: ALL_PROJECTS, label: props.tSidebar('threadSidebarAllProjects') },
     { value: UNASSIGNED_PROJECT, label: props.tSidebar('threadSidebarUnassigned') },
     ...displayWorkspaces.map(workspace => ({ value: workspace.id, label: workspace.title })),
+    ...(projectAddAvailable
+      ? [
+          {
+            value: ADD_FOLDER,
+            label: props.tSidebar('threadSidebarAddFolder'),
+            group: props.tSidebar('threadSidebarAddProject'),
+            keywords: ['open folder', 'register', 'add workspace'],
+          },
+          {
+            value: NEW_PROJECT,
+            label: props.tSidebar('threadSidebarNewProject'),
+            group: props.tSidebar('threadSidebarAddProject'),
+            keywords: ['create project', 'init', 'new repository'],
+          },
+        ]
+      : []),
   ]
 
   const projectFilterLabel = projectOptions.find(option => option.value === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
@@ -4220,10 +4573,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const updateThreadView = (patch: Partial<ThreadViewPreferences>): void => {
     if (isBoard) {
-      storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, patch))
+      setBoardView(ThreadBoardViewModel.update(boardViewSettings, patch))
       return
     }
-    changePreferences({ threadViews: ThreadViewPreferencesModel.updateThreadViewPreferences(threadViewSettings, patch) })
+    // A filter change leaves the preset as saved and keeps a draft beside it: the trigger reads "(edited)" until the
+    // user saves the changes or applies a preset again (b:xpvk).
+    changePreferences({ threadViews: ThreadViewPreferencesModel.editThreadViewFilters(threadViewSettings, patch) })
   }
   // The Settings write is asynchronous; a failure surfaces through the shared storage warning.
   const saveThreadViewSettings = (settings: ThreadViewSettings): boolean => {
@@ -4233,9 +4588,68 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const updateThreadViewControls = (patch: Partial<Pick<ThreadViewSettings, 'showGroupControl' | 'showFilterControl'>>): void => {
     saveThreadViewSettings({ ...threadViewSettings, ...patch })
   }
+  const presetsOn = threadViewSettings.showPresets
+  const presetEdited = presetsOn && ThreadViewPreferencesModel.isThreadViewEdited(threadViewSettings, preferences.workspaceFilter)
+  /** Apply a preset: its filters, and its project scope when it names one. Applying the active one again drops edits. */
   const selectThreadViewPreset = (viewId: string): void => {
-    if (viewId === threadViewSettings.activeViewId) return
-    saveThreadViewSettings(ThreadViewPreferencesModel.selectThreadView(threadViewSettings, viewId))
+    if (viewId === threadViewSettings.activeViewId && !ThreadViewPreferencesModel.isThreadViewEdited(threadViewSettings, preferences.workspaceFilter)) return
+    const applied = ThreadViewPreferencesModel.applyThreadViewPreset(threadViewSettings, viewId)
+    const threadViews = ThreadViewPreferencesModel.updateThreadViewSettings(applied.settings)
+    changePreferences(applied.workspaceFilter === undefined ? { threadViews } : { threadViews, workspaceFilter: applied.workspaceFilter })
+  }
+  const savePresetChanges = (viewId: string = listThreadView.id): void => {
+    saveThreadViewSettings(ThreadViewPreferencesModel.saveCurrentFiltersToPreset(threadViewSettings, viewId, preferences.workspaceFilter))
+  }
+  const submitPresetName = (prompt: PresetNamePrompt, name: string): void => {
+    setPresetPrompt(null)
+    if (prompt.mode === 'rename') {
+      saveThreadViewSettings(ThreadViewPreferencesModel.renameThreadView(threadViewSettings, prompt.viewId, name))
+      return
+    }
+    if (threadViewSettings.views.length >= MAX_THREAD_VIEWS) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarPresetFull', { count: MAX_THREAD_VIEWS }) })
+      return
+    }
+    saveThreadViewSettings(
+      ThreadViewPreferencesModel.createPresetFromCurrent(threadViewSettings, {
+        id: ThreadViewPreferencesModel.newThreadViewId(),
+        name,
+        workspaceFilter: preferences.workspaceFilter,
+      }),
+    )
+    setNotice({ tone: 'success', message: props.tSidebar('threadSidebarPresetSaved', { name }), durationMs: 3_000 })
+  }
+  // Delete keeps the removed preset for Undo, which puts it back where it was (and makes it active again if it was).
+  const deletePreset = (viewId: string): void => {
+    setPresetToDelete(null)
+    const position = threadViewSettings.views.findIndex(view => view.id === viewId)
+    const view = threadViewSettings.views[position]
+    if (view === undefined) return
+    const wasActive = view.id === listThreadView.id
+    const removed = ThreadViewPreferencesModel.removeThreadView(threadViewSettings, viewId)
+    if (removed === threadViewSettings) return
+    saveThreadViewSettings(removed)
+    const label = threadViewPresetLabel(view, props.tSidebar)
+    setNotice({
+      tone: 'success',
+      message: props.tSidebar('threadSidebarPresetDeleted', { name: label }),
+      actionLabel: props.tSidebar('threadSidebarUndo'),
+      durationMs: preferences.archiveUndoDurationSeconds * 1_000,
+      onAction: () => {
+        setNotice(null)
+        const current = preferencesRef.current.threadViews
+        if (current.views.some(candidate => candidate.id === view.id) || current.views.length >= MAX_THREAD_VIEWS) return
+        const restored = ThreadViewPreferencesModel.insertThreadView(current, view, position)
+        saveThreadViewSettings(wasActive ? { ...restored, activeViewId: view.id } : restored)
+      },
+    })
+  }
+  const cyclePreset = (direction: -1 | 1): false | undefined => {
+    if (!presetsOn) return false
+    const next = ThreadViewPreferencesModel.adjacentThreadViewId(threadViewSettings, direction)
+    if (next === undefined || next === listThreadView.id) return false
+    selectThreadViewPreset(next)
+    return undefined
   }
   // The status strip's Working item opens the list on its Working view.
   useEffect(() => {
@@ -4447,7 +4861,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         id: '@dshfiles/thread-sidebar/thread/pin',
         label: () => latestRowActions.current.props.tSidebar('threadSidebarPin'),
         aliases: ['pin thread'],
-        icon: <IconPinOutlineRegular size={16} />,
+        icon: <PinIcon strokeWidth={1.5} size={16} />,
         group: 'action',
         isAvailable: context => context.thread !== null && !context.thread.pinned,
         run: async context => {
@@ -4474,6 +4888,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     ]
     return PaletteBridge.addActions(actions)
   }, [asideOpener, isPrimarySurface])
+  // The peek's state is declared below the row actions; rows reach it through this ref.
+  const openPeek = useRef<(sessionId: string) => void>(() => undefined)
   // One stable object for every row; it reads the latest closures so memoized rows never go stale.
   const rowActions = useMemo<RowActions>(() => {
     return {
@@ -4538,9 +4954,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         })
       },
       actOnStatus: (sessionId, status) => latestRowActions.current.actOnStatus(sessionId, status),
+      peek: sessionId => openPeek.current(sessionId),
       setNotify: (target, choice) => latestRowActions.current.setNotify(target, choice),
       batchNotifySubscriber: () => latestRowActions.current.batchNotifySubscriber(),
       batchNotify: choice => latestRowActions.current.batchNotify(choice),
+      notifyDefaultLevel: () => latestRowActions.current.preferences.subscriptionNoticeLevel,
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
     }
   }, [multiSelection])
@@ -4551,6 +4969,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const childRowCache = childRowCacheRef.current
 
   const orderedVisibleThreadIds = (list: HTMLElement): string[] => ThreadListNavigationModel.visibleRows(list).map(row => row.id)
+
+  const lookahead = (sessionIds: readonly string[]): void => {
+    if (props.onNavigationLookahead === undefined) return
+    const lookaheadSessions = sessionIds.flatMap(sessionId => {
+      const session = sessionState.byId[SessionId(sessionId)]
+      return session === undefined ? [] : [session.id]
+    })
+    props.onNavigationLookahead(lookaheadSessions)
+  }
 
   const navigateThreadList = (event: KeyboardEvent): void => {
     const list = scrollAreaRef.current
@@ -4565,16 +4992,459 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         const session = sessionState.byId[SessionId(sessionId)]
         if (session !== undefined) openThread(session.id)
       },
-      onLookahead: sessionIds => {
-        if (props.onNavigationLookahead === undefined) return
-        const lookaheadSessions = sessionIds.flatMap(sessionId => {
-          const session = sessionState.byId[SessionId(sessionId)]
-          return session === undefined ? [] : [session.id]
-        })
-        props.onNavigationLookahead(lookaheadSessions)
-      },
+      onLookahead: lookahead,
     })
   }
+
+  // Keyboard triage of the list (plan Q2 T2.2): the shortcut layer's list keys act on the focused row, or on every
+  // selected row, through the same batch verbs as the row menu; Z takes the last one back.
+  const listUndo = useRef<(() => void) | null>(null)
+  const latestAttention = useRef(attention)
+  latestAttention.current = attention
+  const [peekId, setPeekId] = useState<string | null>(null)
+  openPeek.current = sessionId => setPeekId(sessionId)
+  const listTargets = (): readonly string[] => {
+    const selected = selectionRef.current.sessionIds.filter(sessionId => sessionState.byId[SessionId(sessionId)] !== undefined)
+    if (selected.length > 0) return selected
+    const list = scrollAreaRef.current
+    const focused = list === null ? undefined : ThreadListNavigationModel.focusedRowId(list)
+    return focused === undefined ? [] : [focused]
+  }
+  const withTargets = (sessionIds: readonly string[], run: () => void): void => {
+    selectionRef.current = { sessionIds: [...sessionIds], anchorId: sessionIds[0] }
+    run()
+  }
+  // Undo runs renders later, when these closures' own state is stale; it calls the newest batch verbs instead.
+  const latestBatch = useRef({ batchSetSettled, batchSetParked, batchMutate, batchMute, batchUnmute })
+  latestBatch.current = { batchSetSettled, batchSetParked, batchMutate, batchMute, batchUnmute }
+  /** Each list verb on explicit threads, returning its undo; keys, the palette's thread rows and Z share them. */
+  const threadVerbs = {
+    done: (sessionIds: readonly string[]): (() => void) => {
+      const settled = sessionIds.every(sessionId => settledSessionIds.has(SessionId(sessionId)))
+      withTargets(sessionIds, () => batchSetSettled(!settled))
+      return () => withTargets(sessionIds, () => latestBatch.current.batchSetSettled(settled))
+    },
+    park: (sessionIds: readonly string[]): (() => void) => {
+      const parked = sessionIds.every(sessionId => parkedSessionIds.has(sessionId))
+      withTargets(sessionIds, () => batchSetParked(!parked))
+      return () => withTargets(sessionIds, () => latestBatch.current.batchSetParked(parked))
+    },
+    pin: (sessionIds: readonly string[]): (() => void) => {
+      const pin = sessionIds.some(sessionId => !pinnedSessionIds.has(SessionId(sessionId)))
+      withTargets(sessionIds, () => batchMutate(pin ? 'pin' : 'unpin'))
+      return () => withTargets(sessionIds, () => latestBatch.current.batchMutate(pin ? 'unpin' : 'pin'))
+    },
+    mute: (sessionIds: readonly string[]): (() => void) => {
+      const muted = sessionIds.some(sessionId => mutedSessionIds.has(SessionId(sessionId)))
+      withTargets(sessionIds, () => (muted ? batchUnmute() : batchMute('forever')))
+      return () => withTargets(sessionIds, () => (muted ? latestBatch.current.batchMute('forever') : latestBatch.current.batchUnmute()))
+    },
+    unread: (sessionIds: readonly string[]): (() => void) => {
+      withTargets(sessionIds, batchMarkUnread)
+      return () => {
+        const entries = sessionIds.flatMap(sessionId => {
+          const record = latestAttention.current.records.get(sessionId)
+          return record === undefined ? [] : [{ sessionId, version: record.version }]
+        })
+        if (entries.length > 0) latestAttention.current.clearUnreadMany(entries)
+      }
+    },
+  }
+  const listVerb = (apply: (sessionIds: readonly string[]) => () => void): false | undefined => {
+    const sessionIds = listTargets()
+    if (sessionIds.length === 0) return false
+    listUndo.current = apply(sessionIds)
+    return undefined
+  }
+  const moveListFocus = (direction: 1 | -1, extend: boolean): false | undefined => {
+    const list = scrollAreaRef.current
+    if (list === null) return false
+    setPeekId(null)
+    return ThreadListNavigationModel.move({
+      list,
+      direction,
+      extend,
+      selection: selectionRef.current,
+      onSelectionChange: setThreadSelection,
+      onLookahead: lookahead,
+    })
+      ? undefined
+      : false
+  }
+  const onRowButton = (trigger: CommandTrigger | undefined): boolean => {
+    const target = trigger?.event?.target
+    return target instanceof Element && target.closest(THREAD_MAIN_BUTTON_SELECTOR) !== null
+  }
+  const peekSignal = peekId === null ? undefined : inbox.signals.get(peekId)
+  const listRegion = (): HTMLDivElement | null => scrollAreaRef.current
+  useCommands(isBoard ? undefined : plugin, [
+    {
+      id: '@dshfiles/thread-sidebar.list-next',
+      title: tSidebar('threadSidebarKeyNext'),
+      keys: ['J'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => moveListFocus(1, false),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-previous',
+      title: tSidebar('threadSidebarKeyPrevious'),
+      keys: ['K'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => moveListFocus(-1, false),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-extend-down',
+      title: tSidebar('threadSidebarKeyExtendDown'),
+      keys: ['Shift+J'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => moveListFocus(1, true),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-extend-up',
+      title: tSidebar('threadSidebarKeyExtendUp'),
+      keys: ['Shift+K'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => moveListFocus(-1, true),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-select',
+      title: tSidebar('threadSidebarKeySelect'),
+      keys: ['X'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => {
+        const list = scrollAreaRef.current
+        const focused = list === null ? undefined : ThreadListNavigationModel.focusedRowId(list)
+        if (focused === undefined) return false
+        setThreadSelection(ThreadSelectionModel.toggle(selectionRef.current, focused))
+        return undefined
+      },
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-open',
+      title: tSidebar('threadSidebarKeyOpen'),
+      keys: ['Enter'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: trigger => {
+        const list = scrollAreaRef.current
+        const focused = list === null ? undefined : ThreadListNavigationModel.focusedRowId(list)
+        const session = focused === undefined ? undefined : sessionState.byId[SessionId(focused)]
+        if (session === undefined || !onRowButton(trigger)) return false
+        openThread(session.id)
+        return undefined
+      },
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-done',
+      title: tSidebar('threadSidebarKeyDone'),
+      keys: ['E'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => listVerb(threadVerbs.done),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-park',
+      title: tSidebar('threadSidebarKeyPark'),
+      keys: ['H'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => listVerb(threadVerbs.park),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-pin',
+      title: tSidebar('threadSidebarKeyPin'),
+      keys: ['P'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => listVerb(threadVerbs.pin),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-mute',
+      title: tSidebar('threadSidebarKeyMute'),
+      keys: ['M'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => listVerb(threadVerbs.mute),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-unread',
+      title: tSidebar('threadSidebarKeyUnread'),
+      keys: ['U'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => listVerb(threadVerbs.unread),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-undo',
+      title: tSidebar('threadSidebarKeyUndo'),
+      keys: ['Z'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: () => {
+        const undo = listUndo.current
+        listUndo.current = null
+        if (undo === null) setNotice({ tone: 'success', message: tSidebar('threadSidebarNothingToUndo') })
+        else {
+          undo()
+          setNotice({ tone: 'success', message: tSidebar('threadSidebarUndone') })
+        }
+      },
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-peek',
+      title: tSidebar('threadSidebarKeyPeek'),
+      keys: ['Space'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      run: trigger => {
+        const list = scrollAreaRef.current
+        const focused = list === null ? undefined : ThreadListNavigationModel.focusedRowId(list)
+        if (focused === undefined || !onRowButton(trigger)) return false
+        setPeekId(current => (current === focused ? null : focused))
+        return undefined
+      },
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-new-thread',
+      title: tSidebar('threadSidebarKeyNewThread'),
+      keys: ['C'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: listRegion,
+      // New thread belongs to the palette (it owns the web chord too); the list only asks for it.
+      run: () => (plugin.commands.run('@dshfiles/command-palette.new-thread') ? undefined : false),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-peek-choice',
+      title: tSidebar('threadSidebarKeyPeek'),
+      keys: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      enabled: peekSignal?.choices !== undefined,
+      region: listRegion,
+      run: trigger => {
+        const choice = peekSignal?.choices?.[Number(trigger?.keys) - 1]
+        if (peekSignal === undefined || choice === undefined) return false
+        void inbox.act(peekSignal.itemId, 'Answer', choice.id)
+        setPeekId(null)
+        return undefined
+      },
+    },
+    // Filter presets (b:xpvk): `[` and `]` step through the enabled presets, wrapping. 1–9 already answer in the peek
+    // and G is the destination chord, so the bracket pair is the free list key (Q2 keymap).
+    {
+      id: '@dshfiles/thread-sidebar.list-preset-previous',
+      title: tSidebar('threadSidebarPresetPrevious'),
+      keys: ['['],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      enabled: presetsOn,
+      region: listRegion,
+      run: () => cyclePreset(-1),
+    },
+    {
+      id: '@dshfiles/thread-sidebar.list-preset-next',
+      title: tSidebar('threadSidebarPresetNext'),
+      keys: [']'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      enabled: presetsOn,
+      region: listRegion,
+      run: () => cyclePreset(1),
+    },
+  ])
+  const peekSession = peekId === null ? undefined : sessionState.byId[SessionId(peekId)]
+  const peekReply = useLastReply(peekSession === undefined ? undefined : props.retainPeek, peekSession?.id)
+  const peekStatus = peekSession === undefined ? undefined : (threadStatusById.get(peekSession.id) ?? childStatusById.get(peekSession.id))
+  const peekWorkspace =
+    peekSession === undefined
+      ? undefined
+      : (jjRepositories.data?.repositories ?? []).flatMap(repository => repository.threads).find(thread => thread.sessionIds.includes(peekSession.id))
+  const peekFacts =
+    peekSession === undefined
+      ? []
+      : [
+          ...(peekSession.running ? [tSidebar('threadSidebarPeekWorking')] : []),
+          ...(peekWorkspace === undefined || peekWorkspace.unlanded.length === 0
+            ? []
+            : [tSidebar('threadSidebarPeekPending', { count: peekWorkspace.unlanded.length })]),
+          ...((peekWorkspace?.behindCount ?? 0) > 0 ? [tSidebar('threadSidebarPeekBehind', { count: peekWorkspace?.behindCount ?? 0 })] : []),
+          ...(peekWorkspace === undefined || peekWorkspace.unlanded.length === 0
+            ? []
+            : peekWorkspace.canRebase === true
+              ? [tSidebar('threadSidebarPeekCanLand')]
+              : peekWorkspace.canRebase === false
+                ? [tSidebar('threadSidebarPeekBlocked')]
+                : []),
+        ]
+  // ⌘K on a focused or selected row lists that thread's verbs first (plan Q2 T2.4). The palette takes focus when it
+  // opens, so the row the user was on is remembered until focus lands somewhere that is neither the list nor a dialog.
+  const lastListRow = useRef<string | null>(null)
+  useEffect(() => {
+    if (!isPrimarySurface) return
+    const onFocusIn = (event: FocusEvent): void => {
+      const target = event.target instanceof Element ? event.target : null
+      const list = scrollAreaRef.current
+      if (target === null || list === null) return
+      if (list.contains(target)) lastListRow.current = ThreadListNavigationModel.focusedRowId(list) ?? lastListRow.current
+      else if (target.closest('[role="dialog"]') === null) lastListRow.current = null
+    }
+    window.addEventListener('focusin', onFocusIn, true)
+    return () => window.removeEventListener('focusin', onFocusIn, true)
+  }, [isPrimarySurface])
+  const paletteTargets = (): readonly string[] => {
+    const selected = selectionRef.current.sessionIds.filter(sessionId => sessionState.byId[SessionId(sessionId)] !== undefined)
+    if (selected.length > 0) return selected
+    const row = lastListRow.current
+    if (row !== null && sessionState.byId[SessionId(row)] !== undefined) return [row]
+    return selectedSessionId === undefined || sessionState.byId[selectedSessionId]?.blank === true ? [] : [selectedSessionId]
+  }
+  const paletteState = useRef({
+    targets: paletteTargets,
+    verbs: threadVerbs,
+    open: openThread,
+    byId: sessionState.byId,
+    settledSessionIds,
+    pinnedSessionIds,
+    parkedSessionIds,
+    mutedSessionIds,
+    tSidebar,
+  })
+  paletteState.current = {
+    targets: paletteTargets,
+    verbs: threadVerbs,
+    open: openThread,
+    byId: sessionState.byId,
+    settledSessionIds,
+    pinnedSessionIds,
+    parkedSessionIds,
+    mutedSessionIds,
+    tSidebar,
+  }
+  useEffect(() => {
+    if (!isPrimarySurface) return
+    const live = () => paletteState.current
+    const heading = (): string => {
+      const state = live()
+      const targets = state.targets()
+      const first = targets[0] === undefined ? undefined : state.byId[SessionId(targets[0])]
+      return targets.length > 1
+        ? state.tSidebar('threadSidebarPaletteActionsForMany', { count: targets.length })
+        : state.tSidebar('threadSidebarPaletteActionsFor', { title: first?.displayTitle ?? '' })
+    }
+    const every = (has: (sessionId: string) => boolean): boolean => live().targets().every(has)
+    const run = (verb: keyof typeof threadVerbs) => () => {
+      const state = live()
+      const targets = state.targets()
+      if (targets.length > 0) listUndo.current = state.verbs[verb](targets)
+    }
+    const available = () => live().targets().length > 0
+    const action = (id: string, label: () => string, keys: readonly string[], verb: keyof typeof threadVerbs) => ({
+      id: `@dshfiles/thread-sidebar/thread-action/${id}`,
+      group: 'thread' as const,
+      heading,
+      label,
+      keys,
+      isAvailable: available,
+      run: run(verb),
+    })
+    return PaletteBridge.addActions([
+      {
+        id: '@dshfiles/thread-sidebar/thread-action/open',
+        group: 'thread',
+        heading,
+        label: () => live().tSidebar('threadSidebarKeyOpen'),
+        keys: ['Enter'],
+        isAvailable: () => live().targets().length === 1,
+        run: () => {
+          const target = live().targets()[0]
+          if (target !== undefined) live().open(SessionId(target))
+        },
+      },
+      action(
+        'done',
+        () => live().tSidebar(every(id => live().settledSessionIds.has(SessionId(id))) ? 'threadSidebarUnsettle' : 'threadSidebarSettle'),
+        ['E'],
+        'done',
+      ),
+      action('pin', () => live().tSidebar(every(id => live().pinnedSessionIds.has(SessionId(id))) ? 'threadSidebarUnpin' : 'threadSidebarPin'), ['P'], 'pin'),
+      action('park', () => live().tSidebar(every(id => live().parkedSessionIds.has(id)) ? 'threadSidebarUnpark' : 'threadSidebarPark'), ['H'], 'park'),
+      action(
+        'mute',
+        () =>
+          live().tSidebar(
+            live()
+              .targets()
+              .some(id => live().mutedSessionIds.has(SessionId(id)))
+              ? 'threadSidebarUnmute'
+              : 'threadSidebarMute',
+          ),
+        ['M'],
+        'mute',
+      ),
+      action('unread', () => live().tSidebar('threadSidebarMarkUnread'), ['U'], 'unread'),
+    ])
+  }, [isPrimarySurface])
+  // ⌘K "Filter: ‹preset›" rows (b:xpvk): one per enabled preset, re-registered only when the presets' ids or names change.
+  const presetPaletteState = useRef({ apply: selectThreadViewPreset, activeId: listThreadView.id, edited: presetEdited })
+  presetPaletteState.current = { apply: selectThreadViewPreset, activeId: listThreadView.id, edited: presetEdited }
+  const presetPaletteKey = presetsOn
+    ? JSON.stringify(threadViewSettings.views.filter(view => view.enabled).map(view => [view.id, threadViewPresetLabel(view, tSidebar)]))
+    : ''
+  useEffect(() => {
+    if (!isPrimarySurface || presetPaletteKey === '') return
+    // SAFETY: the key is this effect's own JSON.stringify of [id, label] pairs above.
+    const presets = JSON.parse(presetPaletteKey) as readonly (readonly [string, string])[]
+    return PaletteBridge.addActions(
+      presets.map(([id, label]) => ({
+        id: `@dshfiles/thread-sidebar/filter-preset/${id}`,
+        group: 'command' as const,
+        label: tSidebar('threadSidebarPresetPalette', { name: label }),
+        aliases: ['filter', 'preset', 'view', label],
+        isSelected: () => presetPaletteState.current.activeId === id && !presetPaletteState.current.edited,
+        run: () => presetPaletteState.current.apply(id),
+      })),
+    )
+  }, [isPrimarySurface, presetPaletteKey, tSidebar])
+  const peekAnchor =
+    peekId === null
+      ? null
+      : (scrollAreaRef.current?.querySelector<HTMLElement>(`${THREAD_MAIN_BUTTON_SELECTOR}[data-thread-id="${CSS.escape(peekId)}"]`) ?? null)
 
   const handleSelectionClickCapture = (event: ReactMouseEvent<HTMLDivElement>): void => {
     // The click a pointer drag produces on release belongs to the drag, not to the row it started on.
@@ -4696,6 +5566,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     })
     const rowAttentionLabel = attentionLabel ?? inlineAttentionLabels.get(session.id)
     const realWorkspaceId = realWorkspaceBySession.get(session.id)
+    const ownWorkspace = OwnWorkspaceModel.of({
+      registered: realWorkspaceId === undefined || realWorkspaceId === workspaceId ? undefined : workspacePathById.get(realWorkspaceId),
+      cwd: session.cwd,
+      thread: jjThreadBySession.get(session.id),
+      rebasedAt: rebasedIndex.rebasedAtBySessionId.get(session.id),
+      t: tSidebar,
+      threadDirectories,
+    })
     return (
       <ThreadRow
         key={session.id}
@@ -4714,12 +5592,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         workspaceId={workspaceId}
         workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
         workspacePath={workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)}
-        workspaceName={realWorkspaceId === undefined || realWorkspaceId === workspaceId ? undefined : workspaceNameById.get(realWorkspaceId)}
+        ownWorkspaceName={ownWorkspace?.name}
+        ownWorkspacePath={ownWorkspace?.path}
+        ownWorkspaceState={ownWorkspace?.state?.kind}
+        ownWorkspaceStateText={ownWorkspace?.state?.text}
+        ownWorkspaceStateAt={ownWorkspace?.state?.at}
         machine={machine}
         age={formatAge(session.updatedAt)}
         mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
         attentionLabel={rowAttentionLabel}
-        rebasedAt={rebasedIndex.rebasedAtBySessionId.get(session.id)}
         integrationQueuedAt={integrationQueuedAtBySessionId.get(session.id)}
         needsResume={recoverySessionIds.has(session.id)}
         resumeBusy={resumeBusySessionIds.has(session.id)}
@@ -4733,9 +5614,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         allChildrenShown={expandedParents.has(session.id)}
         selectedChildId={childRow.selectedChildId}
         actions={rowActions}
-        workStatus={stateGrouping ? (threadStatusById.get(session.id) ?? childStatusById.get(session.id)) : undefined}
-        childStatuses={stateGrouping ? childStatusById : undefined}
-        agent={stateGrouping ? (agentHandleOf(session.id) ?? agentPresetOf(session)) : undefined}
+        workStatus={statusGlyphs ? (threadStatusById.get(session.id) ?? childStatusById.get(session.id)) : undefined}
+        childStatuses={statusGlyphs ? childStatusById : undefined}
+        agent={statusGlyphs ? (agentHandleOf(session.id) ?? agentPresetOf(session)) : undefined}
+        // A project section's header already carries the mark; elsewhere every row leads with its project's mark.
+        projectMark={threadView.groupBy !== 'project'}
+        liveTurn={session.running ? liveTurns.get(session.id) : undefined}
         notifyTarget={
           !subscriptions.available || selectedSession === undefined || selectedSession.id === session.id
             ? undefined
@@ -4863,6 +5747,49 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
   }, [attention.records, isPrimarySurface, selectedSession?.id, sessionStatus, sessions, tSidebar])
 
+  // The Filter menu's View section (productivity pass Q5, T5.3): the active view, its short label for the trigger, and
+  // the threads it matches for Mark view read / unread.
+  const headerExtras = useSyncExternalStore(ListHeaderExtras.subscribe, ListHeaderExtras.get, () => ListHeaderExtras.empty)
+  const activeViewTab = viewTabs.find(tab => tab.view.id === listThreadView.id)
+  const activeViewShortLabel =
+    activeViewTab === undefined
+      ? props.tSidebar('threadSidebarAllShort')
+      : activeViewTab.view.id === ALL_THREADS_VIEW_ID && activeViewTab.label === props.tSidebar('threadSidebarAllThreads')
+        ? props.tSidebar('threadSidebarAllShort')
+        : activeViewTab.label
+  // The trigger's accessible name after "Filter: ": the active preset ("Needs you (edited)"), or with presets off the
+  // filters themselves, as before b:xpvk.
+  const activePresetLabel = activeViewTab?.label ?? props.tSidebar('threadSidebarAllThreads')
+  const filterTriggerName = !presetsOn
+    ? activeFilterSummary
+    : presetEdited
+      ? props.tSidebar('threadSidebarPresetEdited', { name: activePresetLabel })
+      : activePresetLabel
+  const activeViewThreadIds =
+    activeViewTab === undefined
+      ? []
+      : threadViewAttentionEntries
+          .filter(entry =>
+            ThreadViewModel.matchesAttentionView(entry, { filters: activeViewTab.view.statusFilters, sourceFilter: activeViewTab.view.sourceFilter }),
+          )
+          .map(entry => entry.thread.id)
+  const clearActiveViewUnread = (): void => {
+    const entries = activeViewThreadIds.flatMap(sessionId => {
+      const record = attention.records.get(sessionId)
+      return record === undefined ? [] : [{ sessionId, version: record.version }]
+    })
+    if (entries.length > 0) attention.clearUnreadMany(entries)
+  }
+  const markActiveViewUnread = (): void => {
+    const sessionIds = activeViewThreadIds.filter(sessionId => !attention.records.has(sessionId))
+    if (sessionIds.length > 0) attention.markUnreadMany(sessionIds)
+  }
+  const listFiltered = listThreadView.id !== ALL_THREADS_VIEW_ID || activeFilterLabels.length > 0 || presetEdited
+  const statusFilterSummary =
+    threadView.statusFilters.length === 0
+      ? props.tSidebar('threadSidebarFilterNone')
+      : threadView.statusFilters.map(filter => props.tSidebar(threadStatusFilterLabelKeys[filter])).join(' · ')
+
   // `notify_user`: the agent's own message, routed through its own “Agent messages” category.
   const userNotifications = useApi(userNotificationApi)
   useApiEvent(userNotificationApi, 'sent', notification => {
@@ -4898,255 +5825,599 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   return (
     <TooltipProvider delayDuration={500}>
       <section
-        className={cn('dshx-root dshx:relative dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col', shiftPressed && 'dshx:select-none')}
+        // The list is sidebar furniture wherever it docks (rail column, Workbench pane, phone list): the same recessive
+        // fill everywhere, which its sticky group headers match (T1.3).
+        className={cn(
+          'dshx-root dshx:relative dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill)',
+          shiftPressed && 'dshx:select-none',
+        )}
         aria-label={props.tSidebar(isBoard ? 'threadSidebarBoardTitle' : 'threadSidebarTitle')}
         data-thread-surface={surface}
         onClickCapture={handleSelectionClickCapture}
         onContextMenuCapture={handleSelectionContextMenuCapture}
       >
-        <header className={cn('dshx:px-2 dshx:py-1', isBoard && 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-4 dshx:py-2.5')}>
-          {isBoard ? <h1 className="dshx:text-base dshx:font-semibold">{props.tSidebar('threadSidebarBoardTitle')}</h1> : null}
-          <div className={cn('dshx:flex dshx:items-center dshx:gap-1', isBoard && 'dshx:shrink-0')}>
-            <Combobox
-              contentClassName="dshx:w-(--radix-popover-trigger-width) dshx:min-w-56"
-              emptyLabel={props.tSidebar('threadSidebarProjectSearchEmpty')}
-              label={props.tSidebar('threadSidebarProjectFilter')}
-              onValueChange={selectProject}
-              options={projectOptions}
-              searchAbove={0}
-              searchLabel={props.tSidebar('threadSidebarProjectSearch')}
-              searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
-              triggerClassName={cn(
-                'dshx:h-8 dshx:min-w-0 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:font-medium dshx:hover:bg-accent',
-                isBoard ? 'dshx:w-56 dshx:text-sm' : 'dshx:flex-1 dshx:text-base',
-              )}
-              triggerContent={
-                <>
-                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{projectFilterLabel}</span>
-                  <span className="dshx:inline-flex dshx:text-muted-foreground" aria-hidden="true">
-                    <IconChevronDownOutlineRegular size={14} />
-                  </span>
-                </>
-              }
-              value={projectFilterValue}
-            />
-            {isBoard ? null : (
-              <Button
-                type="button"
-                size="icon"
-                variant={settingsOpen ? 'secondary' : 'ghost'}
-                aria-label={props.tSidebar('threadSidebarThreadListSettings')}
-                aria-expanded={settingsOpen}
-                onClick={() => setSettingsOpen(current => !current)}
-              >
-                <Settings2Icon />
-              </Button>
-            )}
-          </div>
-          <div
-            ref={setViewTabRow}
-            role="group"
-            className={cn('dshx:flex dshx:gap-1', compactViewTabs ? 'dshx:overflow-x-hidden' : 'dshx:overflow-x-auto', !isBoard && 'dshx:pt-1')}
-            aria-label={props.tSidebar('threadSidebarListView')}
-            data-compact-view-tabs={compactViewTabs ? '' : undefined}
-            onKeyDown={event => navigateThreadList(event.nativeEvent)}
-            hidden={isBoard}
-          >
-            {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => {
-              const compactLabel = threadViewPresetCompactLabel(view)
-              // Read only by this tab's context menu: matching every listed row per tab on each render was the
-              // sidebar's hottest loop while a turn streams.
-              const matchingThreadIds =
-                viewMenuOpenId === view.id
-                  ? threadViewAttentionEntries
-                      .filter(entry => ThreadViewModel.matchesAttentionView(entry, { filters: view.statusFilters, sourceFilter: view.sourceFilter }))
-                      .map(entry => entry.thread.id)
-                  : NO_VIEW_MENU_THREAD_IDS
-              const clearViewUnread = (): void => {
-                const entries = matchingThreadIds.flatMap(sessionId => {
-                  const record = attention.records.get(sessionId)
-                  return record === undefined ? [] : [{ sessionId, version: record.version }]
-                })
-                if (entries.length > 0) attention.clearUnreadMany(entries)
-              }
-              const markViewUnread = (): void => {
-                const sessionIds = matchingThreadIds.filter(sessionId => !attention.records.has(sessionId))
-                if (sessionIds.length > 0) attention.markUnreadMany(sessionIds)
-              }
-              const countSuffix = visibleCount === null ? '' : ` (${visibleCount})`
-              const accessibleLabel =
-                attentionLabel === undefined && visibleCount === null
-                  ? undefined
-                  : `${label}${countSuffix}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
-              return (
-                <ContextMenu key={view.id} onOpenChange={open => setViewMenuOpenId(open ? view.id : null)}>
-                  <ContextMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      data-thread-list-view-button=""
-                      variant={view.id === listThreadView.id ? 'secondary' : 'ghost'}
-                      size="sm"
-                      className={cn('dshx:flex-1', compactViewTabs ? 'dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-1.5' : 'dshx:min-w-20 dshx:shrink-0')}
-                      title={label}
-                      aria-label={accessibleLabel}
-                      aria-pressed={view.id === listThreadView.id}
-                      onClick={() => selectThreadViewPreset(view.id)}
-                    >
-                      {compactViewTabs ? (
-                        <>
-                          <span className="dshx:sr-only">{label}</span>
-                          {compactLabel.kind === 'icon' ? (
-                            <compactLabel.icon aria-hidden="true" data-testid="thread-view-compact-icon" />
-                          ) : (
-                            <span aria-hidden="true" data-testid="thread-view-compact-initial" className="dshx:font-semibold">
-                              {compactLabel.initial}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="dshx:truncate">{label}</span>
-                      )}
-                      {attentionLabel === undefined ? null : (
-                        <StatusDot
-                          size="sm"
-                          data-testid="thread-view-attention-dot"
-                          className={cn(
-                            ThreadAttentionPresentationModel.attentionDotClass({
-                              attentionLabel,
-                              attentionColors: preferences.attentionColors,
-                              unread: false,
-                              running: false,
-                            }),
-                          )}
-                        />
-                      )}
-                      {visibleCount === null ? null : <span className="dshx:shrink-0">{compactViewTabs ? visibleCount : `(${visibleCount})`}</span>}
-                    </Button>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent className="dshx-root">
-                    <ContextMenuItem
-                      disabled={!attention.available || !matchingThreadIds.some(sessionId => attention.records.has(sessionId))}
-                      onSelect={clearViewUnread}
-                    >
-                      {props.tSidebar('threadSidebarMarkViewRead')}
-                    </ContextMenuItem>
-                    <ContextMenuItem disabled={!attention.available || matchingThreadIds.length === 0} onSelect={markViewUnread}>
-                      {props.tSidebar('threadSidebarMarkViewUnread')}
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              )
-            })}
-          </div>
-          {/* The full-name tabs at their natural width, clipped to nothing: the row compacts only when it is narrower. */}
-          <div aria-hidden="true" className="dshx:relative dshx:h-0 dshx:w-0 dshx:overflow-hidden" hidden={isBoard}>
-            <div
-              ref={setFullViewTabs}
-              data-thread-view-tab-measure=""
-              className="dshx:invisible dshx:absolute dshx:top-0 dshx:left-0 dshx:flex dshx:w-max dshx:gap-1"
-            >
-              {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => (
-                <span
-                  key={view.id}
-                  className="dshx:inline-flex dshx:h-7 dshx:min-w-20 dshx:items-center dshx:justify-center dshx:gap-1.5 dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap"
+        {isBoard ? (
+          <header className={cn('dshx:px-2 dshx:py-1', isBoard && 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-4 dshx:py-2.5')}>
+            {isBoard ? <h1 className="dshx:text-base dshx:font-semibold">{props.tSidebar('threadSidebarBoardTitle')}</h1> : null}
+            <div className={cn('dshx:flex dshx:items-center dshx:gap-1', isBoard && 'dshx:shrink-0')}>
+              <Combobox
+                contentClassName="dshx:w-(--radix-popover-trigger-width) dshx:min-w-56"
+                emptyLabel={props.tSidebar('threadSidebarProjectSearchEmpty')}
+                label={props.tSidebar('threadSidebarProjectFilter')}
+                onValueChange={selectProject}
+                options={projectOptions}
+                searchAbove={0}
+                searchLabel={props.tSidebar('threadSidebarProjectSearch')}
+                searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
+                triggerClassName={cn(
+                  'dshx:h-8 dshx:min-w-0 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:font-medium dshx:hover:bg-accent',
+                  isBoard ? 'dshx:w-56 dshx:text-sm' : 'dshx:flex-1 dshx:text-base',
+                )}
+                triggerContent={
+                  <>
+                    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{projectFilterLabel}</span>
+                    <span className="dshx:inline-flex dshx:text-muted-foreground" aria-hidden="true">
+                      <ChevronDownIcon strokeWidth={1.5} size={14} />
+                    </span>
+                  </>
+                }
+                value={projectFilterValue}
+              />
+              {isBoard ? null : (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={settingsOpen ? 'secondary' : 'ghost'}
+                  aria-label={props.tSidebar('threadSidebarThreadListSettings')}
+                  aria-expanded={settingsOpen}
+                  onClick={() => setSettingsOpen(current => !current)}
                 >
-                  {label}
-                  {attentionLabel === undefined ? null : <span className="dshx:size-1.5 dshx:shrink-0" />}
-                  {visibleCount === null ? null : <span className="dshx:shrink-0">({visibleCount})</span>}
-                </span>
-              ))}
-            </div>
-          </div>
-          {showGroupControl || showFilterControl ? (
-            <div
-              className={cn(
-                'dshx:grid dshx:gap-1',
-                isBoard
-                  ? 'dshx:grid-flow-col dshx:auto-cols-max'
-                  : cn('dshx:pt-1', showGroupControl && showFilterControl ? 'dshx:grid-cols-2' : 'dshx:grid-cols-1'),
+                  <Settings2Icon />
+                </Button>
               )}
+            </div>
+            <div
+              ref={setViewTabRow}
+              role="group"
+              className={cn('dshx:flex dshx:gap-1', compactViewTabs ? 'dshx:overflow-x-hidden' : 'dshx:overflow-x-auto', !isBoard && 'dshx:pt-1')}
+              aria-label={props.tSidebar('threadSidebarListView')}
+              data-compact-view-tabs={compactViewTabs ? '' : undefined}
+              onKeyDown={event => navigateThreadList(event.nativeEvent)}
+              hidden={isBoard}
             >
-              {showGroupControl ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="dshx:min-w-0 dshx:justify-start dshx:text-xs"
-                      aria-label={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
-                    >
-                      <span className="dshx:truncate">
-                        {props.tSidebar('threadSidebarGroup')}: {props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}
-                      </span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="dshx-root dshx:min-w-48">
-                    <DropdownMenuLabel>{props.tSidebar('threadSidebarGroupBy')}</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
-                      {THREAD_GROUP_BY_OPTIONS.map(groupBy => (
-                        <DropdownMenuRadioItem key={groupBy} value={groupBy}>
-                          {props.tSidebar(threadGroupLabelKeys[groupBy])}
-                        </DropdownMenuRadioItem>
+              {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => {
+                const compactLabel = threadViewPresetCompactLabel(view)
+                // Read only by this tab's context menu: matching every listed row per tab on each render was the
+                // sidebar's hottest loop while a turn streams.
+                const matchingThreadIds =
+                  viewMenuOpenId === view.id
+                    ? threadViewAttentionEntries
+                        .filter(entry => ThreadViewModel.matchesAttentionView(entry, { filters: view.statusFilters, sourceFilter: view.sourceFilter }))
+                        .map(entry => entry.thread.id)
+                    : NO_VIEW_MENU_THREAD_IDS
+                const clearViewUnread = (): void => {
+                  const entries = matchingThreadIds.flatMap(sessionId => {
+                    const record = attention.records.get(sessionId)
+                    return record === undefined ? [] : [{ sessionId, version: record.version }]
+                  })
+                  if (entries.length > 0) attention.clearUnreadMany(entries)
+                }
+                const markViewUnread = (): void => {
+                  const sessionIds = matchingThreadIds.filter(sessionId => !attention.records.has(sessionId))
+                  if (sessionIds.length > 0) attention.markUnreadMany(sessionIds)
+                }
+                const countSuffix = visibleCount === null ? '' : ` (${visibleCount})`
+                // The built-in view reads "All" in the tab row so the three default views fit a 200px list as words, not
+                // icons (T1.3); its accessible name stays "All threads".
+                const shownLabel =
+                  view.id === ALL_THREADS_VIEW_ID && label === props.tSidebar('threadSidebarAllThreads') ? props.tSidebar('threadSidebarAllShort') : label
+                const accessibleLabel =
+                  attentionLabel === undefined && visibleCount === null
+                    ? undefined
+                    : `${label}${countSuffix}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
+                return (
+                  <ContextMenu key={view.id} onOpenChange={open => setViewMenuOpenId(open ? view.id : null)}>
+                    <ContextMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        data-thread-list-view-button=""
+                        variant={view.id === listThreadView.id ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={cn(
+                          // Grow from the content width, so a short "All" lends its room to "Working 1".
+                          'dshx:flex-auto dshx:text-xs',
+                          compactViewTabs ? 'dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-1.5' : 'dshx:min-w-0 dshx:shrink-0 dshx:gap-1 dshx:px-2',
+                          view.id !== listThreadView.id && 'dshx:text-muted-foreground',
+                        )}
+                        title={label}
+                        aria-label={accessibleLabel ?? (shownLabel === label ? undefined : label)}
+                        aria-pressed={view.id === listThreadView.id}
+                        onClick={() => selectThreadViewPreset(view.id)}
+                      >
+                        {compactViewTabs ? (
+                          <>
+                            <span className="dshx:sr-only">{label}</span>
+                            {compactLabel.kind === 'icon' ? (
+                              <compactLabel.icon aria-hidden="true" data-testid="thread-view-compact-icon" />
+                            ) : (
+                              <span aria-hidden="true" data-testid="thread-view-compact-initial" className="dshx:font-semibold">
+                                {compactLabel.initial}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="dshx:truncate">{shownLabel}</span>
+                        )}
+                        {attentionLabel === undefined ? null : (
+                          <StatusDot
+                            size="sm"
+                            data-testid="thread-view-attention-dot"
+                            className={cn(
+                              ThreadAttentionPresentationModel.attentionDotClass({
+                                attentionLabel,
+                                attentionColors: preferences.attentionColors,
+                                unread: false,
+                                running: false,
+                              }),
+                            )}
+                          />
+                        )}
+                        {visibleCount === null ? null : <span className="dshx:shrink-0 dshx:tabular-nums dshx:text-muted-foreground">{visibleCount}</span>}
+                      </Button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="dshx-root">
+                      <ContextMenuItem
+                        disabled={!attention.available || !matchingThreadIds.some(sessionId => attention.records.has(sessionId))}
+                        onSelect={clearViewUnread}
+                      >
+                        {props.tSidebar('threadSidebarMarkViewRead')}
+                      </ContextMenuItem>
+                      <ContextMenuItem disabled={!attention.available || matchingThreadIds.length === 0} onSelect={markViewUnread}>
+                        {props.tSidebar('threadSidebarMarkViewUnread')}
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+                )
+              })}
+            </div>
+            {/* The full-name tabs at their natural width, clipped to nothing: the row compacts only when it is narrower. */}
+            <div aria-hidden="true" className="dshx:relative dshx:h-0 dshx:w-0 dshx:overflow-hidden" hidden={isBoard}>
+              <div
+                ref={setFullViewTabs}
+                data-thread-view-tab-measure=""
+                className="dshx:invisible dshx:absolute dshx:top-0 dshx:left-0 dshx:flex dshx:w-max dshx:gap-1"
+              >
+                {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => (
+                  <span
+                    key={view.id}
+                    className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:justify-center dshx:gap-1 dshx:px-2 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap"
+                  >
+                    {view.id === ALL_THREADS_VIEW_ID && label === props.tSidebar('threadSidebarAllThreads') ? props.tSidebar('threadSidebarAllShort') : label}
+                    {attentionLabel === undefined ? null : <span className="dshx:size-1.5 dshx:shrink-0" />}
+                    {visibleCount === null ? null : <span className="dshx:shrink-0">{visibleCount}</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {showGroupControl || showFilterControl ? (
+              <div
+                className={cn(
+                  'dshx:grid dshx:gap-1',
+                  isBoard
+                    ? 'dshx:grid-flow-col dshx:auto-cols-max'
+                    : cn('dshx:pt-1', showGroupControl && showFilterControl ? 'dshx:grid-cols-2' : 'dshx:grid-cols-1'),
+                )}
+              >
+                {showGroupControl ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        // Readable at 200px (T1.3): the icon says "group by", so the value keeps the whole width.
+                        className="dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground"
+                        title={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
+                        aria-label={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
+                      >
+                        <LayersIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+                        <span className="dshx:truncate">{props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}</span>
+                        <ChevronDownIcon className="dshx:ml-auto dshx:size-3 dshx:shrink-0" aria-hidden="true" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="dshx-root dshx:min-w-48">
+                      <DropdownMenuLabel>{props.tSidebar('threadSidebarGroupBy')}</DropdownMenuLabel>
+                      <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
+                        {THREAD_GROUP_BY_OPTIONS.map(groupBy => (
+                          <DropdownMenuRadioItem key={groupBy} value={groupBy}>
+                            {props.tSidebar(threadGroupLabelKeys[groupBy])}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+                {showFilterControl ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground"
+                        title={`${props.tSidebar('threadSidebarFilter')}: ${activeFilterSummary}`}
+                        aria-label={`${props.tSidebar('threadSidebarFilter')}: ${activeFilterSummary}`}
+                      >
+                        <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+                        <span className="dshx:truncate">{activeFilterSummary}</span>
+                        <ChevronDownIcon className="dshx:ml-auto dshx:size-3 dshx:shrink-0" aria-hidden="true" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52">
+                      <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterStatus')}</DropdownMenuLabel>
+                      <DropdownMenuCheckboxItem
+                        checked={threadView.statusFilters.length === 0}
+                        onCheckedChange={checked => selectThreadStatusFilter('all', checked)}
+                        onSelect={event => event.preventDefault()}
+                      >
+                        {props.tSidebar(threadStatusFilterLabelKeys.all)}
+                      </DropdownMenuCheckboxItem>
+                      {THREAD_STATUS_FILTER_GROUPS.map(group => (
+                        <div key={group.id}>
+                          <DropdownMenuLabel>{props.tSidebar(threadStatusFilterGroupLabelKeys[group.id])}</DropdownMenuLabel>
+                          {group.filters.map(filter => (
+                            <DropdownMenuCheckboxItem
+                              checked={threadView.statusFilters.includes(filter)}
+                              key={filter}
+                              onCheckedChange={checked => selectThreadStatusFilter(filter, checked)}
+                              onSelect={event => event.preventDefault()}
+                            >
+                              {props.tSidebar(threadStatusFilterLabelKeys[filter])}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                        </div>
                       ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
-              {showFilterControl ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="dshx:min-w-0 dshx:justify-start dshx:text-xs"
-                      aria-label={`${props.tSidebar('threadSidebarFilter')}: ${activeFilterSummary}`}
-                    >
-                      <span className="dshx:truncate">
-                        {props.tSidebar('threadSidebarFilter')}: {activeFilterSummary}
-                      </span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52">
-                    <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterStatus')}</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterSource')}</DropdownMenuLabel>
+                      <DropdownMenuRadioGroup value={threadView.sourceFilter} onValueChange={selectThreadSourceFilter}>
+                        {THREAD_SOURCE_FILTER_OPTIONS.map(filter => (
+                          <DropdownMenuRadioItem key={filter} value={filter}>
+                            {props.tSidebar(threadSourceFilterLabelKeys[filter])}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+              </div>
+            ) : null}
+          </header>
+        ) : (
+          // Productivity pass Q5 (T5.3): above the first row the list keeps the project picker and one Filter menu; the
+          // views, grouping, status and source filters, the Threads pages (Board) and both settings live in that menu.
+          // The trigger keeps the former filter button's accessible name, "Filter: <active filters>".
+          <header className="dshx:px-2 dshx:py-1">
+            <div className="dshx:flex dshx:items-center dshx:gap-1">
+              <Combobox
+                contentClassName="dshx:w-(--radix-popover-trigger-width) dshx:min-w-56"
+                emptyLabel={props.tSidebar('threadSidebarProjectSearchEmpty')}
+                label={props.tSidebar('threadSidebarProjectFilter')}
+                onValueChange={selectProject}
+                options={projectOptions}
+                searchAbove={0}
+                searchLabel={props.tSidebar('threadSidebarProjectSearch')}
+                searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
+                triggerClassName="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:text-base dshx:font-medium dshx:hover:bg-accent"
+                triggerContent={
+                  <>
+                    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{projectFilterLabel}</span>
+                    <span className="dshx:inline-flex dshx:text-muted-foreground" aria-hidden="true">
+                      <ChevronDownIcon strokeWidth={1.5} size={14} />
+                    </span>
+                  </>
+                }
+                value={projectFilterValue}
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant={listFiltered ? 'secondary' : 'ghost'}
+                    size="sm"
+                    data-thread-list-filter=""
+                    // The list's keyboard model treats the view control as the way into the rows (thread-list-navigation.ts).
+                    data-thread-list-view-button=""
+                    // Arrow keys from the trigger move into the list, as the former view tabs did; Enter or Space opens it.
+                    // Radix's trigger opens its menu on ArrowDown unless the event is prevented first.
+                    onKeyDown={event => {
+                      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+                      navigateThreadList(event.nativeEvent)
+                      event.preventDefault()
+                    }}
+                    className="dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground"
+                    // Filter presets (b:xpvk): the trigger names the active preset ("Filter: Needs you (edited)"), not the
+                    // filters it holds; the Status and Source rows inside the menu still spell those out.
+                    aria-label={`${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}`}
+                    data-preset-edited={presetEdited ? '' : undefined}
+                  >
+                    <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+                    <span className="dshx:truncate">{presetsOn ? activeViewShortLabel : activeFilterSummary}</span>
+                    {presetEdited ? (
+                      <span
+                        aria-hidden="true"
+                        data-testid="thread-preset-edited-dot"
+                        className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full dshx:bg-primary"
+                      />
+                    ) : null}
+                    {activeViewTab?.attentionLabel === undefined ? null : (
+                      <StatusDot
+                        size="sm"
+                        data-testid="thread-view-attention-dot"
+                        className={cn(
+                          ThreadAttentionPresentationModel.attentionDotClass({
+                            attentionLabel: activeViewTab.attentionLabel,
+                            attentionColors: preferences.attentionColors,
+                            unread: false,
+                            running: false,
+                          }),
+                        )}
+                      />
+                    )}
+                    {/* With presets on the funnel already says "menu" and the preset name needs the room (b:xpvk). */}
+                    {presetsOn ? null : <ChevronDownIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="dshx-root dshx:max-h-(--radix-dropdown-menu-content-available-height) dshx:min-w-56 dshx:overflow-y-auto"
+                >
+                  {presetsOn ? (
+                    // Filter presets (b:xpvk): first in the menu, one click to apply, the active one checked.
+                    <DropdownMenuGroup aria-label={props.tSidebar('threadSidebarPresets')} data-thread-presets="">
+                      <DropdownMenuLabel>{props.tSidebar('threadSidebarPresets')}</DropdownMenuLabel>
+                      <DropdownMenuRadioGroup value={presetEdited ? '' : listThreadView.id} onValueChange={selectThreadViewPreset}>
+                        {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => (
+                          <DropdownMenuRadioItem
+                            key={view.id}
+                            value={view.id}
+                            // The former view tab's accessible name: "Done (1), Turn finished".
+                            aria-label={
+                              attentionLabel === undefined && visibleCount === null
+                                ? label
+                                : `${label}${visibleCount === null ? '' : ` (${visibleCount})`}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
+                            }
+                            data-thread-list-view-button=""
+                            data-preset-active={view.id === listThreadView.id ? '' : undefined}
+                            // An edited preset stays marked as the one the edits started from.
+                            className={cn(presetEdited && view.id === listThreadView.id && 'dshx:font-medium')}
+                          >
+                            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{label}</span>
+                            {presetEdited && view.id === listThreadView.id ? (
+                              <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarPresetEditedShort')}</span>
+                            ) : null}
+                            {attentionLabel === undefined ? null : (
+                              <StatusDot
+                                size="sm"
+                                data-testid="thread-view-attention-dot"
+                                className={cn(
+                                  ThreadAttentionPresentationModel.attentionDotClass({
+                                    attentionLabel,
+                                    attentionColors: preferences.attentionColors,
+                                    unread: false,
+                                    running: false,
+                                  }),
+                                )}
+                              />
+                            )}
+                            {visibleCount === null ? null : <span className="dshx:shrink-0 dshx:tabular-nums dshx:text-muted-foreground">{visibleCount}</span>}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                      {presetEdited ? (
+                        <>
+                          <DropdownMenuItem data-preset-save-changes="" onSelect={() => savePresetChanges()}>
+                            <SaveIcon aria-hidden="true" />
+                            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+                              {props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })}
+                            </span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectThreadViewPreset(listThreadView.id)}>
+                            <RotateCcwIcon aria-hidden="true" />
+                            {props.tSidebar('threadSidebarPresetDiscardChanges')}
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          threadViewSettings.views.length >= MAX_THREAD_VIEWS
+                            ? setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarPresetFull', { count: MAX_THREAD_VIEWS }) })
+                            : setPresetPrompt({ mode: 'create' })
+                        }
+                      >
+                        <BookmarkPlusIcon aria-hidden="true" />
+                        {props.tSidebar('threadSidebarPresetSaveAs')}
+                      </DropdownMenuItem>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger aria-label={`${props.tSidebar('threadSidebarPresetOptions')}: ${activeViewTab?.label ?? ''}`}>
+                          <PencilIcon aria-hidden="true" />
+                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.tSidebar('threadSidebarPresetOptions')}</span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="dshx-root dshx:min-w-52" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
+                          <DropdownMenuLabel className="dshx:truncate">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              setPresetPrompt({
+                                mode: 'rename',
+                                viewId: listThreadView.id,
+                                name: activeViewTab?.label ?? threadViewPresetLabel(listThreadView, props.tSidebar),
+                              })
+                            }
+                          >
+                            {props.tSidebar('threadSidebarPresetRename')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled={!presetEdited} onSelect={() => savePresetChanges()}>
+                            {props.tSidebar('threadSidebarPresetUpdate')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={threadViewSettings.views.length === 1 || viewTabs.length === 1}
+                            onSelect={() => setPresetToDelete({ id: listThreadView.id, label: activeViewTab?.label ?? '' })}
+                          >
+                            {props.tSidebar('threadSidebarPresetDelete')}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            disabled={!attention.available || !activeViewThreadIds.some(sessionId => attention.records.has(sessionId))}
+                            onSelect={clearActiveViewUnread}
+                          >
+                            {props.tSidebar('threadSidebarMarkViewRead')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled={!attention.available || activeViewThreadIds.length === 0} onSelect={markActiveViewUnread}>
+                            {props.tSidebar('threadSidebarMarkViewUnread')}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onSelect={() => setViewsManagerOpen(true)}>{props.tSidebar('threadSidebarPresetManage')}</DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                      <DropdownMenuSeparator />
+                    </DropdownMenuGroup>
+                  ) : (
+                    <>
+                      <DropdownMenuItem
+                        disabled={!attention.available || !activeViewThreadIds.some(sessionId => attention.records.has(sessionId))}
+                        onSelect={clearActiveViewUnread}
+                      >
+                        {props.tSidebar('threadSidebarMarkViewRead')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem disabled={!attention.available || activeViewThreadIds.length === 0} onSelect={markActiveViewUnread}>
+                        {props.tSidebar('threadSidebarMarkViewUnread')}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  {showGroupControl ? (
+                    // One click to see the list by project (polish pass b:r4et); unchecking returns to the default Status grouping.
                     <DropdownMenuCheckboxItem
-                      checked={threadView.statusFilters.length === 0}
-                      onCheckedChange={checked => selectThreadStatusFilter('all', checked)}
-                      onSelect={event => event.preventDefault()}
+                      checked={threadView.groupBy === 'project'}
+                      data-thread-group-by-project=""
+                      onCheckedChange={checked => selectThreadGroupBy(checked ? 'project' : 'state')}
                     >
-                      {props.tSidebar(threadStatusFilterLabelKeys.all)}
+                      <FolderIcon aria-hidden="true" />
+                      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.tSidebar('threadSidebarGroupByProject')}</span>
                     </DropdownMenuCheckboxItem>
-                    {THREAD_STATUS_FILTER_GROUPS.map(group => (
-                      <div key={group.id}>
-                        <DropdownMenuLabel>{props.tSidebar(threadStatusFilterGroupLabelKeys[group.id])}</DropdownMenuLabel>
-                        {group.filters.map(filter => (
+                  ) : null}
+                  {showGroupControl ? (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger
+                        aria-label={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
+                      >
+                        <LayersIcon aria-hidden="true" />
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+                          {props.tSidebar('threadSidebarGroup')}: {props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}
+                        </span>
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="dshx-root dshx:min-w-48" aria-label={props.tSidebar('threadSidebarGroupBy')}>
+                        <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
+                          {THREAD_GROUP_BY_OPTIONS.map(groupBy => (
+                            <DropdownMenuRadioItem key={groupBy} value={groupBy}>
+                              {props.tSidebar(threadGroupLabelKeys[groupBy])}
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  ) : null}
+                  {showFilterControl ? (
+                    <>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger aria-label={`${props.tSidebar('threadSidebarFilterStatus')}: ${statusFilterSummary}`}>
+                          <ListFilterIcon aria-hidden="true" />
+                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+                            {props.tSidebar('threadSidebarFilterStatus')}: {statusFilterSummary}
+                          </span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent
+                          className="dshx-root dshx:max-h-(--radix-dropdown-menu-content-available-height) dshx:min-w-52 dshx:overflow-y-auto"
+                          aria-label={props.tSidebar('threadSidebarFilterStatus')}
+                        >
                           <DropdownMenuCheckboxItem
-                            checked={threadView.statusFilters.includes(filter)}
-                            key={filter}
-                            onCheckedChange={checked => selectThreadStatusFilter(filter, checked)}
+                            checked={threadView.statusFilters.length === 0}
+                            onCheckedChange={checked => selectThreadStatusFilter('all', checked)}
                             onSelect={event => event.preventDefault()}
                           >
-                            {props.tSidebar(threadStatusFilterLabelKeys[filter])}
+                            {props.tSidebar(threadStatusFilterLabelKeys.all)}
                           </DropdownMenuCheckboxItem>
-                        ))}
-                      </div>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterSource')}</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup value={threadView.sourceFilter} onValueChange={selectThreadSourceFilter}>
-                      {THREAD_SOURCE_FILTER_OPTIONS.map(filter => (
-                        <DropdownMenuRadioItem key={filter} value={filter}>
-                          {props.tSidebar(threadSourceFilterLabelKeys[filter])}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
+                          {THREAD_STATUS_FILTER_GROUPS.map(group => (
+                            <div key={group.id}>
+                              <DropdownMenuLabel>{props.tSidebar(threadStatusFilterGroupLabelKeys[group.id])}</DropdownMenuLabel>
+                              {group.filters.map(filter => (
+                                <DropdownMenuCheckboxItem
+                                  checked={threadView.statusFilters.includes(filter)}
+                                  key={filter}
+                                  onCheckedChange={checked => selectThreadStatusFilter(filter, checked)}
+                                  onSelect={event => event.preventDefault()}
+                                >
+                                  {props.tSidebar(threadStatusFilterLabelKeys[filter])}
+                                </DropdownMenuCheckboxItem>
+                              ))}
+                            </div>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger
+                          aria-label={`${props.tSidebar('threadSidebarFilterSource')}: ${props.tSidebar(threadSourceFilterLabelKeys[threadView.sourceFilter])}`}
+                        >
+                          <UsersIcon aria-hidden="true" />
+                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+                            {props.tSidebar('threadSidebarFilterSource')}: {props.tSidebar(threadSourceFilterLabelKeys[threadView.sourceFilter])}
+                          </span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="dshx-root dshx:min-w-48" aria-label={props.tSidebar('threadSidebarFilterSource')}>
+                          <DropdownMenuRadioGroup value={threadView.sourceFilter} onValueChange={selectThreadSourceFilter}>
+                            {THREAD_SOURCE_FILTER_OPTIONS.map(filter => (
+                              <DropdownMenuRadioItem key={filter} value={filter}>
+                                {props.tSidebar(threadSourceFilterLabelKeys[filter])}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    </>
+                  ) : null}
+                  <DropdownMenuSeparator />
+                  {headerExtras.sections.map(section => (
+                    <DropdownMenuItem key={section.panelId} data-section={section.panelId} onSelect={section.open}>
+                      <span className="dshx:inline-flex dshx:size-4 dshx:items-center dshx:justify-center" aria-hidden="true">
+                        {section.icon}
+                      </span>
+                      {section.label}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuItem onSelect={() => setSettingsOpen(current => !current)}>
+                    <Settings2Icon aria-hidden="true" />
+                    {props.tSidebar('threadSidebarThreadListSettings')}
+                  </DropdownMenuItem>
+                  {headerExtras.customize === undefined ? null : (
+                    <DropdownMenuItem onSelect={headerExtras.customize.toggle}>
+                      <SlidersHorizontalIcon aria-hidden="true" />
+                      {headerExtras.customize.label}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-          ) : null}
-        </header>
+            {presetsOn && threadViewSettings.showPresetChips ? (
+              <PresetChips
+                presets={viewTabs.map(tab => ({ id: tab.view.id, label: tab.label }))}
+                activeId={listThreadView.id}
+                edited={presetEdited}
+                onApply={selectThreadViewPreset}
+                t={props.tSidebar}
+              />
+            ) : null}
+          </header>
+        )}
 
         {settingsOpen && !isBoard ? (
           <section
@@ -5170,6 +6441,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   onCheckedChange={checked => updateThreadViewControls({ showFilterControl: checked === true })}
                 />
                 {props.tSidebar('threadSidebarShowFilterControl')}
+              </Label>
+              <Label className="dshx:font-normal dshx:leading-snug">
+                <Checkbox
+                  aria-label={props.tSidebar('threadSidebarShowPresets')}
+                  checked={threadViewSettings.showPresets}
+                  onCheckedChange={checked => saveThreadViewSettings(ThreadViewPreferencesModel.setPresetsEnabled(threadViewSettings, checked === true))}
+                />
+                {props.tSidebar('threadSidebarShowPresets')}
+              </Label>
+              <Label className="dshx:font-normal dshx:leading-snug">
+                <Checkbox
+                  aria-label={props.tSidebar('threadSidebarShowPresetChips')}
+                  checked={threadViewSettings.showPresetChips}
+                  disabled={!threadViewSettings.showPresets}
+                  onCheckedChange={checked => saveThreadViewSettings({ ...threadViewSettings, showPresetChips: checked === true })}
+                />
+                {props.tSidebar('threadSidebarShowPresetChips')}
               </Label>
               <Button className="dshx:justify-start" onClick={() => setViewsManagerOpen(true)} size="sm" type="button" variant="outline">
                 {props.tSidebar('threadSidebarManageViews')}
@@ -5372,6 +6660,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         <div
           ref={scrollAreaRef}
           data-testid="thread-sidebar-scroll"
+          data-shortcut-scope={isBoard ? undefined : 'list'}
+          onPointerEnter={() => holdOrder('hover', true)}
+          onPointerLeave={() => holdOrder('hover', false)}
+          onFocus={() => holdOrder('focus', true)}
+          onBlur={event => {
+            if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) holdOrder('focus', false)
+          }}
           // A floor of about two rows: in a short docked column (free docking with the bottom pane open) the section
           // scrolls past its controls instead of squeezing the list to a sliver no row fits in.
           className={cn('dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3', isBoard && 'dshx:p-4')}
@@ -5379,6 +6674,70 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             if (!isBoard) navigateThreadList(event.nativeEvent)
           }}
         >
+          {heldUpdates > 0 ? (
+            <div className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:justify-center dshx:py-1">
+              <Button
+                size="xs"
+                variant="outline"
+                data-held-updates=""
+                className="dshx:rounded-full dshx:bg-background dshx:tabular-nums dshx:shadow-s1"
+                aria-label={`${tSidebar('threadSidebarHeldUpdates', { count: heldUpdates })}. ${tSidebar('threadSidebarHeldUpdatesHint')}`}
+                onClick={showHeldUpdates}
+              >
+                {tSidebar('threadSidebarHeldUpdates', { count: heldUpdates })}
+              </Button>
+            </div>
+          ) : null}
+          {peekSession === undefined ? null : (
+            <RowPeek anchor={peekAnchor} open onOpenChange={open => (open ? undefined : setPeekId(null))}>
+              <PeekCard
+                title={peekSession.displayTitle}
+                {...(peekStatus === undefined ? {} : { status: peekStatus.status })}
+                reply={peekReply}
+                {...(peekSignal?.choices === undefined
+                  ? {}
+                  : {
+                      question: {
+                        text: peekSignal.detail ?? peekSignal.reason,
+                        choices: peekSignal.choices,
+                        onAnswer: (choiceId: string) => {
+                          void inbox.act(peekSignal.itemId, 'Answer', choiceId)
+                          setPeekId(null)
+                        },
+                      },
+                    })}
+                facts={peekFacts}
+                actions={
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => openThread(peekSession.id)}>
+                      {tSidebar('threadSidebarKeyOpen')}
+                    </Button>
+                    {/* The row's menu (its action sheet on a phone), one tap from the peek a long press opened. */}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      data-peek-actions=""
+                      onClick={() => {
+                        const anchor = peekAnchor
+                        setPeekId(null)
+                        requestAnimationFrame(() =>
+                          ThreadRowMenu.open(anchor?.closest<HTMLElement>('article[data-thread-id]') ?? null, anchor ?? document.body),
+                        )
+                      }}
+                    >
+                      {tSidebar('threadSidebarPeekActions')}
+                    </Button>
+                  </>
+                }
+                labels={{
+                  lastReply: tSidebar('threadSidebarPeekLastReply'),
+                  noReply: tSidebar('threadSidebarPeekNoReply'),
+                  loading: tSidebar('threadSidebarPeekLoading'),
+                  close: tSidebar('threadSidebarPeekClose'),
+                }}
+              />
+            </RowPeek>
+          )}
           {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:py-6 dshx:text-sm dshx:text-muted-foreground">
               <Spinner />
@@ -5658,7 +7017,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         <span className="dshx:text-xs dshx:tabular-nums">({sectionRows.length})</span>
                         <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
                         <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                          {collapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
+                          {collapsed ? <ChevronDownIcon strokeWidth={1.5} size={12} /> : <ChevronUpIcon strokeWidth={1.5} size={12} />}
                         </span>
                       </button>
                       {!collapsed ? (
@@ -5781,7 +7140,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           void mutateDetachedBranch({ missingAncestorId: group.missingAncestorId, threadIds: group.threadIds, action: branchAction })
                         }
                       >
-                        {branchAction === 'restore' ? <IconUnarchiveOutlineRegular size={13} /> : <IconArchiveOutlineRegular size={13} />}
+                        {branchAction === 'restore' ? <ArchiveRestoreIcon strokeWidth={1.5} size={13} /> : <ArchiveIcon strokeWidth={1.5} size={13} />}
                       </Button>
                     )}
                   </div>
@@ -5824,13 +7183,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   onClick={() => setDraftsOpen(current => !current)}
                 >
                   <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                    <IconArchiveOutlineRegular size={14} />
+                    <ArchiveIcon strokeWidth={1.5} size={14} />
                   </span>
                   <span className="dshx:whitespace-nowrap">{props.tSidebar('threadSidebarDrafts')}</span>
                   <span className="dshx:text-xs dshx:tabular-nums">({draftSessions.length})</span>
                   <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
                   <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                    {draftsOpen ? <IconChevronUpOutlineRegular size={12} /> : <IconChevronDownOutlineRegular size={12} />}
+                    {draftsOpen ? <ChevronUpIcon strokeWidth={1.5} size={12} /> : <ChevronDownIcon strokeWidth={1.5} size={12} />}
                   </span>
                 </button>
                 <Button
@@ -5842,7 +7201,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   disabled={draftsCleaning}
                   onClick={() => void cleanUpDrafts()}
                 >
-                  <IconArchiveOutlineRegular size={13} />
+                  <ArchiveIcon strokeWidth={1.5} size={13} />
                 </Button>
               </div>
               {draftsOpen ? draftSessions.map(session => renderThreadRow(session, undefined)) : null}
@@ -5877,15 +7236,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               {props.tSidebar('threadSidebarSelectedCount', { count: selectedSessionIds.length })}
             </span>
             <Button size="xs" variant="outline" onClick={() => void applyToSelection(allSelectedPinned ? 'unpin' : 'pin')}>
-              {allSelectedPinned ? <IconPinFillRegular size={13} /> : <IconPinOutlineRegular size={13} />}
+              {allSelectedPinned ? <IconPinFillRegular size={13} /> : <PinIcon strokeWidth={1.5} size={13} />}
               {props.tSidebar(allSelectedPinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
             </Button>
             <Button size="xs" variant="outline" disabled={allSelectedSettled} onClick={settleSelection}>
-              <IconCheckCircleOutlineRegular size={13} />
+              <CircleCheckIcon strokeWidth={1.5} size={13} />
               {props.tSidebar('threadSidebarSettle')}
             </Button>
             <Button size="xs" variant="outline" onClick={() => void applyToSelection('archive')}>
-              <IconArchiveOutlineRegular size={13} />
+              <ArchiveIcon strokeWidth={1.5} size={13} />
               {props.tSidebar('threadSidebarArchive')}
             </Button>
             <Button
@@ -5906,6 +7265,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         settings={threadViewSettings}
         t={props.tSidebar}
       />
+      <PresetNameDialog
+        prompt={presetPrompt}
+        existingNames={threadViewSettings.views
+          .filter(view => presetPrompt?.mode !== 'rename' || view.id !== presetPrompt.viewId)
+          .map(view => threadViewPresetLabel(view, props.tSidebar))}
+        onSubmit={submitPresetName}
+        onClose={() => setPresetPrompt(null)}
+        t={props.tSidebar}
+      />
+      <PresetDeleteDialog preset={presetToDelete} onConfirm={deletePreset} onClose={() => setPresetToDelete(null)} t={props.tSidebar} />
     </TooltipProvider>
   )
 }

@@ -93,7 +93,7 @@ const CommentForm = ({ picked }: { readonly picked: PickedTarget }): JSX.Element
       <p className="dshx:mb-1 dshx:text-xs dshx:font-medium">
         {picked.mode === 'region' ? 'area' : picked.target.tag} {picked.target.text === undefined ? '' : `“${picked.target.text.slice(0, 48)}”`}
       </p>
-      <p className="dshx:mb-2 dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">{picked.target.selector}</p>
+      <p className="dshx:mb-2 dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{picked.target.selector}</p>
       <Textarea
         autoFocus
         value={note}
@@ -110,14 +110,14 @@ const CommentForm = ({ picked }: { readonly picked: PickedTarget }): JSX.Element
       <div className="dshx:mt-2 dshx:flex dshx:flex-wrap dshx:gap-1">
         <ToggleGroup type="single" size="sm" value={intent ?? ''} onValueChange={value => setIntent(value === '' ? null : (value as AnnotationIntent))}>
           {INTENTS.map(value => (
-            <ToggleGroupItem key={value} value={value} className="dshx:h-6 dshx:px-2 dshx:text-[11px]">
+            <ToggleGroupItem key={value} value={value} className="dshx:h-6 dshx:px-2 dshx:text-2xs">
               {value}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
         <ToggleGroup type="single" size="sm" value={severity ?? ''} onValueChange={value => setSeverity(value === '' ? null : (value as AnnotationSeverity))}>
           {SEVERITIES.map(value => (
-            <ToggleGroupItem key={value} value={value} className="dshx:h-6 dshx:px-2 dshx:text-[11px]">
+            <ToggleGroupItem key={value} value={value} className="dshx:h-6 dshx:px-2 dshx:text-2xs">
               {value}
             </ToggleGroupItem>
           ))}
@@ -188,7 +188,7 @@ export const PickerOverlay = (): JSX.Element | null => {
               className="dshx:absolute dshx:rounded-sm dshx:border-2 dshx:border-primary dshx:bg-primary/10"
               style={{ left: hover.box.x, top: hover.box.y, width: hover.box.width, height: hover.box.height }}
             >
-              <span className="dshx:absolute dshx:-top-6 dshx:left-0 dshx:max-w-72 dshx:truncate dshx:rounded dshx:bg-primary dshx:px-1.5 dshx:py-0.5 dshx:text-[11px] dshx:text-primary-foreground">
+              <span className="dshx:absolute dshx:-top-6 dshx:left-0 dshx:max-w-72 dshx:truncate dshx:rounded dshx:bg-primary dshx:px-1.5 dshx:py-0.5 dshx:text-2xs dshx:text-primary-foreground">
                 {hover.label}
               </span>
             </div>
@@ -198,7 +198,7 @@ export const PickerOverlay = (): JSX.Element | null => {
               className="dshx:absolute dshx:rounded-sm dshx:border-2 dshx:border-dashed dshx:border-primary dshx:bg-primary/10"
               style={{ left: dragBox.x, top: dragBox.y, width: dragBox.width, height: dragBox.height }}
             >
-              <span className="dshx:absolute dshx:-top-6 dshx:left-0 dshx:rounded dshx:bg-primary dshx:px-1.5 dshx:py-0.5 dshx:text-[11px] dshx:text-primary-foreground">
+              <span className="dshx:absolute dshx:-top-6 dshx:left-0 dshx:rounded dshx:bg-primary dshx:px-1.5 dshx:py-0.5 dshx:text-2xs dshx:text-primary-foreground">
                 {dragBox.width}×{dragBox.height}
               </span>
             </div>

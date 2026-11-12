@@ -99,8 +99,8 @@ export const BacklogTextBox = (props: {
   const inputClass = cn(
     'dshx:w-full dshx:overflow-y-auto dshx:whitespace-pre-wrap dshx:break-words dshx:bg-transparent dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
     reply
-      ? 'dshx:max-h-40 dshx:min-h-10 dshx:text-[13px]'
-      : 'dshx:min-h-28 dshx:rounded-lg dshx:border dshx:border-input dshx:p-2.5 dshx:text-[13px] dshx:leading-relaxed',
+      ? 'dshx:max-h-40 dshx:min-h-10 dshx:text-sm'
+      : 'dshx:min-h-28 dshx:rounded-lg dshx:border dshx:border-input dshx:p-2.5 dshx:text-sm dshx:leading-relaxed',
   )
 
   useEffect(() => {
@@ -256,7 +256,7 @@ export const BacklogTextBox = (props: {
       {props.children}
       {reply ? (
         <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-          <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
+          <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
             <AttachFilesButton onFiles={files => void addFiles(files)} />
             {tools}
             <span>
@@ -268,7 +268,7 @@ export const BacklogTextBox = (props: {
           </Button>
         </div>
       ) : (
-        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
+        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
           <AttachFilesButton onFiles={files => void addFiles(files)} label="Attach an image or file to this item" />
           {tools}
           <span>

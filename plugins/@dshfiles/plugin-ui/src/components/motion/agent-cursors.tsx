@@ -185,7 +185,7 @@ function CursorMark({
           <div className="dshx:flex dshx:items-center dshx:gap-3 dshx:text-xs dshx:font-medium">
             <span className="dshx:min-w-0 dshx:truncate">{cursor.name}</span>
             {cursor.cost !== undefined ? (
-              <span className="dshx:ml-auto dshx:rounded dshx:bg-background/15 dshx:px-1 dshx:text-[11px] dshx:font-normal">
+              <span className="dshx:ml-auto dshx:rounded dshx:bg-background/15 dshx:px-1 dshx:text-2xs dshx:font-normal">
                 <RollingNumber value={cursor.cost} format={money} />
               </span>
             ) : null}
@@ -201,7 +201,7 @@ function CursorStatus({ text }: { readonly text: string }) {
   const ref = React.useRef<HTMLSpanElement>(null)
   useEnter(ref, 'blurIn', { duration: 0.35 }, text)
   return (
-    <span ref={ref} className="dshx:min-w-0 dshx:truncate dshx:text-[11px] dshx:opacity-80">
+    <span ref={ref} className="dshx:min-w-0 dshx:truncate dshx:text-2xs dshx:opacity-80">
       {text}
     </span>
   )

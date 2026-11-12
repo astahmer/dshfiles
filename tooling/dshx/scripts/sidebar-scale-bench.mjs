@@ -24,7 +24,7 @@ const { chromium } = require('playwright')
 const { connectDshPlatformClient } = await import(new URL('../packages/dshx/dist/platform/index.js', import.meta.url).href)
 
 const NEW_THREAD = 'button[aria-label="New thread"]'
-const COMPOSER = 'div[aria-label="Describe what you want to build, / commands, @ files or sessions"]'
+const COMPOSER = 'div[aria-label="Describe what you want to build, / commands, @ files or threads"]'
 const SIDEBAR_ROW = '[data-thread-id]'
 
 const readOption = (name, fallback) => {

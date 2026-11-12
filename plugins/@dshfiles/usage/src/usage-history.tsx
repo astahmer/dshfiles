@@ -88,7 +88,7 @@ export const UsageBreakdownTable = (props: {
     </th>
   )
   return (
-    <section className="dshx:min-w-0 dshx:rounded-lg dshx:border dshx:p-3">
+    <section className="dshx:min-w-0 dshx:border-t dshx:border-border dshx:pt-4">
       <h3 className="dshx:mb-2 dshx:text-sm dshx:font-semibold">Usage distribution</h3>
       <div className="dshx:overflow-x-auto">
         <table className="dshx:w-full dshx:text-xs">
@@ -118,7 +118,7 @@ export const UsageBreakdownTable = (props: {
                         className="dshx:w-full dshx:text-left dshx:hover:underline"
                       >
                         <span className="dshx:block dshx:truncate">{row.key}</span>
-                        <span className="dshx:mt-1 dshx:flex dshx:items-center dshx:gap-2 dshx:text-[10px] dshx:text-muted-foreground">
+                        <span className="dshx:mt-1 dshx:flex dshx:items-center dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
                           <span className="dshx:h-1.5 dshx:min-w-0 dshx:flex-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
                             <span
                               className="dshx:block dshx:h-full dshx:rounded-full dshx:bg-chart-1"
@@ -142,7 +142,7 @@ export const UsageBreakdownTable = (props: {
         </table>
       </div>
       {(props.view.summary.missingUsage ?? 0) > 0 || props.view.summary.unpriced > 0 ? (
-        <p className="dshx:mt-2 dshx:text-[11px] dshx:text-muted-foreground">
+        <p className="dshx:mt-2 dshx:text-2xs dshx:text-muted-foreground">
           *Totals are incomplete; cost shares use priced known totals. Token averages and shares require complete usage.
         </p>
       ) : null}
@@ -183,7 +183,7 @@ export const UsageCalendar = (props: { readonly view: ChartView; readonly range:
   const startOffset = new Date(calendarFrom).getDay()
   const suffix = metric === 'cost' ? 'estimated USD' : metric === 'tokens' ? 'tokens' : 'requests'
   return (
-    <section className="dshx:rounded-lg dshx:border dshx:p-3">
+    <section className="dshx:border-t dshx:border-border dshx:pt-4">
       <header className="dshx:mb-2 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
         <h3 className="dshx:text-sm dshx:font-semibold">Daily calendar</h3>
         <ToggleGroup
@@ -214,7 +214,7 @@ export const UsageCalendar = (props: { readonly view: ChartView; readonly range:
           })}
         </div>
       </div>
-      <div className="dshx:mt-2 dshx:flex dshx:justify-between dshx:text-[10px] dshx:text-muted-foreground">
+      <div className="dshx:mt-2 dshx:flex dshx:justify-between dshx:text-2xs dshx:text-muted-foreground">
         <span>{days[0] === undefined ? '' : new Date(days[0].start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
         <span>
           {days[days.length - 1] === undefined

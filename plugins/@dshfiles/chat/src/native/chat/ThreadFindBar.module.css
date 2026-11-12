@@ -1,0 +1,179 @@
+/* dshfiles (productivity pass T4.1): the find bar floats over the top of the transcript, like the rail beside it. */
+.slot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 8;
+  height: 0;
+  container-type: inline-size;
+  pointer-events: none;
+}
+
+:global([data-conversation-scroll]) .slot {
+  position: sticky;
+}
+
+.bar {
+  position: absolute;
+  top: 8px;
+  right: 52px;
+  width: min(440px, calc(100cqw - 72px));
+  box-sizing: border-box;
+  padding: 4px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-elevation-panel);
+  pointer-events: auto;
+  animation: dsh-find-enter var(--dshx-duration-menu, 160ms) var(--dshx-motion-ease-enter, ease-out);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.icon {
+  flex: none;
+  margin-inline: 6px 2px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  outline: none;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font: var(--dsw-font-xs-13, 13px/20px var(--dsw-font-family));
+  font-size: max(13px, var(--dsh-content-font-size-secondary, 13px));
+}
+
+.input::placeholder {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* The native clear button and the search decoration duplicate our close button. */
+.input::-webkit-search-cancel-button,
+.input::-webkit-search-decoration {
+  appearance: none;
+}
+
+.count {
+  flex: none;
+  min-width: 56px;
+  padding-inline: 4px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.button:focus-visible,
+.retry:focus-visible {
+  outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 4px 2px 26px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.status[data-tone='danger'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.statusText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.retry {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+}
+
+.retry:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* A phone, a narrow pane or a thin dock: one full-width bar above the transcript, 44px targets. */
+@container (max-width: 600px) {
+  .bar {
+    right: 8px;
+    left: 8px;
+    width: auto;
+  }
+
+  .input {
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .button {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@keyframes dsh-find-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
+  }
+}

@@ -24,14 +24,14 @@ const STATUS_LABEL = { M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed', C:
 const FileStatusLetter = (props: { readonly status: FileStatus; readonly className?: string }): JSX.Element => (
   <span
     aria-label={STATUS_LABEL[props.status]}
-    className={cn('dshx:w-3 dshx:flex-none dshx:text-center dshx:font-mono dshx:text-[11px] dshx:font-semibold', STATUS_TONE[props.status], props.className)}
+    className={cn('dshx:w-3 dshx:flex-none dshx:text-center dshx:font-mono dshx:text-2xs dshx:font-semibold', STATUS_TONE[props.status], props.className)}
   >
     {props.status}
   </span>
 )
 
 export const LineCounts = (props: { readonly additions: number; readonly deletions: number; readonly className?: string }): JSX.Element => (
-  <span className={cn('dshx:flex dshx:flex-none dshx:gap-1 dshx:font-mono dshx:text-[11px]', props.className)}>
+  <span className={cn('dshx:flex dshx:flex-none dshx:gap-1 dshx:font-mono dshx:text-2xs', props.className)}>
     <span className="dshx:text-success">+{props.additions}</span>
     <span className="dshx:text-destructive">−{props.deletions}</span>
   </span>
@@ -50,7 +50,7 @@ export const FileViewToggle = (props: { readonly value: FileView; readonly onCha
   >
     {(['flat', 'tree'] as const).map(option => (
       <ToggleGroupItem
-        className="dshx:h-[18px] dshx:min-w-0 dshx:rounded-sm! dshx:px-1.5 dshx:text-[11px] dshx:font-normal dshx:text-muted-foreground dshx:data-[state=on]:bg-background dshx:data-[state=on]:font-semibold dshx:data-[state=on]:text-foreground"
+        className="dshx:h-[18px] dshx:min-w-0 dshx:rounded-sm! dshx:px-1.5 dshx:text-2xs dshx:font-normal dshx:text-muted-foreground dshx:data-[state=on]:bg-background dshx:data-[state=on]:font-semibold dshx:data-[state=on]:text-foreground"
         key={option}
         value={option}
       >
@@ -135,7 +135,7 @@ export const ChangedFiles = (props: ChangedFilesProps): JSX.Element => {
                 {parts.name}
               </span>
               {props.view === 'flat' && parts.directory.length > 0 && (
-                <span className="dshx:min-w-0 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{parts.directory}</span>
+                <span className="dshx:min-w-0 dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{parts.directory}</span>
               )}
               {props.showCounts !== false && <LineCounts additions={file.additions} deletions={file.deletions} />}
             </button>
@@ -206,7 +206,7 @@ export const ChangedFiles = (props: ChangedFilesProps): JSX.Element => {
           >
             <ChevronRightIcon className={cn('dshx:size-3 dshx:flex-none dshx:transition-transform', open && 'dshx:rotate-90')} />
             <span className="dshx:truncate">{node.name}</span>
-            <span className="dshx:ml-auto dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:font-mono dshx:text-[10px]">{node.fileCount}</span>
+            <span className="dshx:ml-auto dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:font-mono dshx:text-2xs">{node.fileCount}</span>
           </button>
         </li>,
         ...(open ? treeRows(node.children, depth + 1) : []),

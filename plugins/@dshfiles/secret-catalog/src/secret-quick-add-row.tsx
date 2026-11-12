@@ -111,7 +111,7 @@ export const SecretQuickAddRow = (props: SecretQuickAddRowProps): JSX.Element =>
           aria-label={t('quickAddName')}
           autoComplete="off"
           autoFocus
-          className="dshx:h-8 dshx:font-mono! dshx:text-[13px] dshx:font-semibold"
+          className="dshx:h-8 dshx:font-mono! dshx:text-sm dshx:font-semibold"
           disabled={pending}
           onChange={event => setName(SecretMutationForm.toEnvVarName(event.currentTarget.value))}
           onKeyDown={onKeyDown}

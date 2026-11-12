@@ -5,6 +5,8 @@ import { fileExtension, FileTypeIcon, fileSizeText, JsonBlock } from '@deepseek-
 import { InlineReferenceText } from '../../inline-references.tsx'
 import css from './MessageItem.module.css'
 import { userImageReferenceParts } from './user-image-references.js'
+import { looksLikeCode } from './code-like.ts'
+import { splitPromptFences, usePromptFold } from './prompt-fold.ts'
 import type { UserContentAttachment } from '../contract/slots.ts'
 
 const EMPTY_LABELS: readonly string[] = []
@@ -35,6 +37,9 @@ FactoryComponentPropsOf<'conversation.chat.user.content'>) {
   const compactImages = remainingAttachments.filter(attachment => attachment.type === 'image').length > 1
   const truncated = (total: number): string => t('json.truncated', { total })
   const showBubble = text !== '' || extraBlocks.length > 0
+  const hasFence = text.includes('```')
+  // A compact (ellipsis) rendering is already one line; only the transcript bubble folds.
+  const fold = usePromptFold(text, !ellipsis)
   return (
     <div className={css.userStack}>
       {remainingAttachments.length > 0 && (
@@ -65,14 +70,26 @@ FactoryComponentPropsOf<'conversation.chat.user.content'>) {
             ))}
         </div>
       )}
-      {showBubble && <div className={css.bubble}>
+      {showBubble && <div
+        className={css.bubble}
+        data-code-like={(!hasFence && looksLikeCode(text)) || undefined}
+        data-prompt-fold={fold.lines === null ? undefined : fold.open ? 'open' : 'closed'}
+      >
+        <div ref={fold.ref} className={css.bubbleBody}>
         {imageParts.parts.map((part, index) => {
           if (part.type === 'text') {
-            return (
-              <Fragment key={`text:${index}`}>
-                {renderFactorySlot('conversation.user.text', { text: part.text, facts, interactive, ellipsis })}
-              </Fragment>
-            )
+            // dshfiles (productivity pass T1.4): a pasted fence reads as a small code card, not raw ``` markers.
+            return splitPromptFences(part.text).map((segment, segmentIndex) => segment.kind === 'code'
+              ? (
+                <span key={`code:${index}:${segmentIndex}`} className={css.promptCode} data-lang={segment.lang || undefined}>
+                  {segment.code}
+                </span>
+              )
+              : (
+                <Fragment key={`text:${index}:${segmentIndex}`}>
+                  {renderFactorySlot('conversation.user.text', { text: segment.text, facts, interactive, ellipsis })}
+                </Fragment>
+              ))
           }
           const image = imageAttachments[part.index]
           if (image === undefined) return null
@@ -87,7 +104,13 @@ FactoryComponentPropsOf<'conversation.chat.user.content'>) {
         {extraBlocks.map((block, index) => (
           <JsonBlock key={index} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />
         ))}
+        </div>
       </div>}
+      {showBubble && fold.lines !== null && (
+        <button type="button" className={css.foldToggle} aria-expanded={fold.open} onClick={fold.toggle}>
+          {fold.open ? t('message.prompt.showLess') : t('message.prompt.showAll', { lines: fold.lines })}
+        </button>
+      )}
       {referenceLabels.length > 0 && (
         <div className={css.referenceSummary}>
           <InlineReferenceText text={t('message.referenceSummary', { labels: referenceLabels.join(t('message.referenceSeparator')) })} surface="summary" />

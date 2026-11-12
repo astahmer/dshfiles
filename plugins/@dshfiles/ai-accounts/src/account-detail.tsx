@@ -95,7 +95,7 @@ export const AccountDetail = (props: {
               <StatusDot tone="current" />
               {status?.label ?? 'Not connected'}
             </span>
-            <small className="dshx:mt-1 dshx:block dshx:text-[10px]">
+            <small className="dshx:mt-1 dshx:block dshx:text-2xs">
               {status?.checkedAt == null
                 ? 'Not checked by provider'
                 : `Last checked ${new Date(status.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}

@@ -9,7 +9,7 @@ import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel }
 
 const FIXTURE_SESSIONS = fileURLToPath(new URL('../../../../../plugins/@dshfiles/background-jobs/fixtures/sessions', import.meta.url))
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const WIRE_BOUND = 2_000
 /** A running command whose registered label is longer than the row schema allows. */
 const OVERSIZED_COMMAND = `sleep 120; echo ${'oversized-label-'.repeat(160)}`
@@ -231,7 +231,7 @@ Then('the composer dock previews the running job and streams its output', async 
     await expect.poll(async () => ((await output.textContent()) ?? '').length, { timeout: 30_000 }).toBeGreaterThan(earlier.length)
     // The same job also keeps its card under the tool call, inside the folded turn.
     await page
-      .getByText(/^Completed in /)
+      .getByText(/^Worked for /)
       .last()
       .click()
     await page.getByText('Ran commands', { exact: true }).last().click()

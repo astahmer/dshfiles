@@ -1,39 +1,27 @@
+import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import {
-  CheckCircle2Icon,
-  CircleDashedIcon,
-  CircleHelpIcon,
-  CircleOffIcon,
-  CopyIcon,
-  ExternalLinkIcon,
-  LocateFixedIcon,
-  PlayIcon,
-  SearchIcon,
-  SettingsIcon,
-  SparklesIcon,
-} from '@dshfiles/plugin-ui/icons'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { CopyIcon, ExternalLinkIcon, LocateFixedIcon, PlayIcon, SearchIcon, SettingsIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import type * as Types from 'effect/Types'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { DESTINATION_ORDER, type ChecklistItem, type FeatureRow, type Overview, type OverviewInput, type PackView } from './overview-model.js'
 import { PackChangeDialog, type PackChangeDialogProps, type PackTarget } from './pack-change-dialog.js'
-import type { PackAction, PluginState } from './pack-plan.js'
+import { CHECKLIST_GLYPH, CHECKLIST_LABEL, PLUGIN_GLYPH, PLUGIN_STATE_LABEL, PREREQUISITE_LABELS, pluginLabel } from './labels.js'
+import type { PackAction } from './pack-plan.js'
 import { Routes, type RouteServices } from './routes.js'
 import { onboardingSettings, type OnboardingSettings } from './settings.js'
 import { SuggestionsSection, type SuggestionsSectionProps } from './suggestions-section.js'
 import { SuggestionsStore } from './suggestions-store.js'
 import { SuggestionsWindow } from './suggestions-window.js'
-import { TOUCH } from './touch.js'
 import { TryItDialog, type TryItDialogProps, type TryItTarget } from './try-it-dialog.js'
 import { WhatsNewSection, type WhatsNewSectionProps } from './whats-new-section.js'
 import { WhatsNewStore } from './whats-new-store.js'
-
-const TOUCH_FIELD = 'dshx:max-sm:h-[44px] dshx:pointer-coarse:h-[44px]'
 
 const DESTINATION_LABELS = {
   threads: 'Threads',
@@ -52,16 +40,8 @@ const DESTINATION_LABELS = {
 const destinationLabels = new Map<string, string>(Object.entries(DESTINATION_LABELS))
 export const destinationLabel = (id: string): string => destinationLabels.get(id) ?? id
 
-const STATE_ICON = { done: CheckCircle2Icon, todo: CircleDashedIcon, unknown: CircleHelpIcon, off: CircleOffIcon } as const
-const STATE_LABEL = { done: 'Done', todo: 'To do', unknown: 'Unknown', off: 'Off' } as const
-const PLUGIN_VARIANT = { enabled: 'success', disabled: 'warning', 'not-installed': 'outline', unknown: 'outline' } as const satisfies Record<
-  PluginState,
-  string
->
-const PLUGIN_LABEL = { enabled: 'enabled', disabled: 'disabled', 'not-installed': 'not installed', unknown: 'unknown' } as const satisfies Record<
-  PluginState,
-  string
->
+/** The All chip's value: a single toggle group needs a value for every item. */
+const ALL = 'all'
 
 export interface GettingStartedProps {
   readonly settings: OnboardingSettings
@@ -85,54 +65,50 @@ const ChecklistRow = (props: {
   readonly copy: (text: string) => Promise<boolean>
 }): ReactNode => {
   const { item } = props
-  const Icon = STATE_ICON[item.state]
   const [copied, setCopied] = useState(false)
   const route = item.fix.route
   const routeOpen = route !== null && Routes.available(route, props.routes)
   const link = item.fix.shellCommand?.startsWith('https://') === true ? item.fix.shellCommand : null
+  const open = item.state !== 'done' && item.state !== 'off'
   return (
-    <li
-      className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-2 dshx:py-2"
+    <EntityRow
       data-checklist-item={item.id}
       data-state={item.state}
-    >
-      <Icon
-        aria-label={STATE_LABEL[item.state]}
-        className={cn('dshx:size-5 dshx:shrink-0', item.state === 'done' ? 'dshx:text-success' : 'dshx:text-muted-foreground')}
-        role="img"
-      />
-      <div className="dshx:min-w-0 dshx:flex-1">
-        <p className="dshx:text-sm dshx:font-medium">{item.title}</p>
-        <p className="dshx:text-xs dshx:text-muted-foreground">{item.detail}</p>
-      </div>
-      {item.state === 'done' || item.state === 'off' ? null : (
-        <div className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:gap-2">
-          {routeOpen ? (
-            <Button className={TOUCH} onClick={() => Routes.open(route, props.routes)} size="sm" variant="outline">
-              {item.fix.label}
-            </Button>
-          ) : null}
-          {link !== null ? (
-            <Button asChild className={TOUCH} size="sm" variant="outline">
-              <a href={link} rel="noopener noreferrer" target="_blank">
-                <ExternalLinkIcon /> {item.fix.label}
-              </a>
-            </Button>
-          ) : null}
-          {item.fix.shellCommand !== null && link === null ? (
-            <Button
-              aria-label={`Copy ${item.fix.shellCommand}`}
-              className={TOUCH}
-              onClick={async () => setCopied(await props.copy(item.fix.shellCommand ?? ''))}
-              size="sm"
-              variant="ghost"
-            >
-              <CopyIcon /> <code className="dshx:font-mono!">{copied ? 'Copied' : item.fix.shellCommand}</code>
-            </Button>
-          ) : null}
-        </div>
-      )}
-    </li>
+      description={item.detail}
+      heading={item.title}
+      role="listitem"
+      status={CHECKLIST_GLYPH[item.state]}
+      statusLabel={CHECKLIST_LABEL[item.state]}
+      trailing={
+        open ? (
+          <>
+            {routeOpen ? (
+              <Button onClick={() => Routes.open(route, props.routes)} size="sm" variant="outline">
+                {item.fix.label}
+              </Button>
+            ) : null}
+            {link !== null ? (
+              <Button asChild size="sm" variant="outline">
+                <a href={link} rel="noopener noreferrer" target="_blank">
+                  <ExternalLinkIcon /> {item.fix.label}
+                </a>
+              </Button>
+            ) : null}
+            {item.fix.shellCommand !== null && link === null ? (
+              <Button
+                aria-label={`Copy ${item.fix.shellCommand}`}
+                className="dshx:shrink"
+                onClick={async () => setCopied(await props.copy(item.fix.shellCommand ?? ''))}
+                size="sm"
+                variant="ghost"
+              >
+                <CopyIcon /> <code className="dshx:font-mono!">{copied ? 'Copied' : item.fix.shellCommand}</code>
+              </Button>
+            ) : null}
+          </>
+        ) : null
+      }
+    />
   )
 }
 
@@ -160,8 +136,9 @@ const PackCard = (props: {
       <ul aria-label={`${pack.title} plugins`} className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
         {pack.plugins.map(plugin => (
           <li key={plugin.name}>
-            <Badge data-plugin-state={plugin.state} variant={PLUGIN_VARIANT[plugin.state]}>
-              {plugin.name} · {PLUGIN_LABEL[plugin.state]}
+            <Badge className="dshx:gap-1 dshx:font-normal" data-plugin={plugin.name} data-plugin-state={plugin.state} variant="outline">
+              <StatusGlyph className="dshx:size-3" label={PLUGIN_STATE_LABEL[plugin.state]} status={PLUGIN_GLYPH[plugin.state]} />
+              {pluginLabel(plugin.name)}
             </Badge>
           </li>
         ))}
@@ -169,22 +146,19 @@ const PackCard = (props: {
       {pack.prerequisites.length === 0 ? null : (
         <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
           Needs
-          {pack.prerequisites.map(prerequisite => {
-            const Icon = STATE_ICON[prerequisite.state]
-            return (
-              <span className="dshx:inline-flex dshx:items-center dshx:gap-1" key={prerequisite.id}>
-                <Icon aria-label={STATE_LABEL[prerequisite.state]} className="dshx:size-3.5" role="img" />
-                {prerequisite.id}
-              </span>
-            )
-          })}
+          {pack.prerequisites.map(prerequisite => (
+            <span className="dshx:inline-flex dshx:items-center dshx:gap-1" data-prerequisite={prerequisite.id} key={prerequisite.id}>
+              <StatusGlyph className="dshx:size-3" label={CHECKLIST_LABEL[prerequisite.state]} status={CHECKLIST_GLYPH[prerequisite.state]} />
+              {PREREQUISITE_LABELS[prerequisite.id]}
+            </span>
+          ))}
         </p>
       )}
       {pack.keySettings.length === 0 || !props.routes.hasSettings() ? null : (
         <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
           {pack.keySettings.map(setting => (
             <Button
-              className={cn('dshx:h-auto dshx:shrink dshx:py-1.5 dshx:text-left dshx:whitespace-normal', TOUCH)}
+              className="dshx:h-auto dshx:shrink dshx:py-1.5 dshx:text-left dshx:whitespace-normal"
               key={`${setting.entryId}.${setting.fieldPath.join('.')}`}
               onClick={() => props.routes.openSettings({ setting: { entryId: setting.entryId, fieldPath: setting.fieldPath } })}
               size="sm"
@@ -198,28 +172,16 @@ const PackCard = (props: {
       {!changeable && onTryIt === null ? null : (
         <div className="dshx:flex dshx:flex-wrap dshx:gap-2 dshx:border-t dshx:border-border dshx:pt-2">
           {onTryIt === null ? null : (
-            <Button aria-label={`Try it: ${pack.title}`} className={TOUCH} onClick={event => onTryIt(event.currentTarget)} size="sm" variant="outline">
+            <Button aria-label={`Try it: ${pack.title}`} onClick={event => onTryIt(event.currentTarget)} size="sm" variant="outline">
               <SparklesIcon /> Try it
             </Button>
           )}
           {changeable ? (
             <>
-              <Button
-                aria-label={`Enable pack: ${pack.title}`}
-                className={TOUCH}
-                onClick={event => props.onChange('enable', event.currentTarget)}
-                size="sm"
-                variant="outline"
-              >
+              <Button aria-label={`Enable pack: ${pack.title}`} onClick={event => props.onChange('enable', event.currentTarget)} size="sm" variant="outline">
                 Enable pack
               </Button>
-              <Button
-                aria-label={`Disable pack: ${pack.title}`}
-                className={TOUCH}
-                onClick={event => props.onChange('disable', event.currentTarget)}
-                size="sm"
-                variant="ghost"
-              >
+              <Button aria-label={`Disable pack: ${pack.title}`} onClick={event => props.onChange('disable', event.currentTarget)} size="sm" variant="ghost">
                 Disable pack
               </Button>
             </>
@@ -241,50 +203,41 @@ const FeatureItem = (props: {
   const onTryIt = props.onTryIt
   const route = row.route
   const canOpen = route !== null && Routes.available(route, props.routes)
+  const verbs = row.walkable || onTryIt !== null || canOpen
   return (
-    <li className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-start dshx:gap-x-3 dshx:gap-y-2 dshx:py-2.5" data-feature={row.key}>
-      <div className="dshx:min-w-0 dshx:flex-1">
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2">
-          <p className="dshx:min-w-0 dshx:text-sm dshx:font-medium">{row.title}</p>
-          <span className="dshx:text-xs dshx:text-muted-foreground">{row.plugin}</span>
-        </div>
-        <p className="dshx:line-clamp-2 dshx:text-xs dshx:text-muted-foreground">{row.firstAction ?? row.summary}</p>
-        {row.currentSurface === null ? null : <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{row.currentSurface}</p>}
-      </div>
-      {row.walkable ? (
-        <Button
-          aria-label={`Show me where: ${row.title}`}
-          className={cn('dshx:shrink-0', TOUCH)}
-          onClick={() => props.showWhere(row.key)}
-          size="sm"
-          variant="ghost"
-        >
-          <LocateFixedIcon /> {onTryIt === null ? 'Show me where' : <span className="dshx:@max-pane-narrow:sr-only">Show me where</span>}
-        </Button>
-      ) : null}
-      {onTryIt === null ? null : (
-        <Button
-          aria-label={`Try it: ${row.title}`}
-          className={cn('dshx:shrink-0', TOUCH)}
-          onClick={event => onTryIt(event.currentTarget)}
-          size="sm"
-          variant="ghost"
-        >
-          <SparklesIcon /> <span className="dshx:@max-pane-narrow:sr-only">Try it</span>
-        </Button>
-      )}
-      {canOpen ? (
-        <Button
-          aria-label={`Open ${row.title}`}
-          className={cn('dshx:shrink-0', TOUCH)}
-          onClick={() => Routes.open(route, props.routes)}
-          size="sm"
-          variant="outline"
-        >
-          Open
-        </Button>
-      ) : null}
-    </li>
+    <EntityRow
+      data-feature={row.key}
+      description={
+        <>
+          <span className="dshx:line-clamp-2">{row.firstAction ?? row.summary}</span>
+          {row.currentSurface === null ? null : <span className="dshx:truncate">{row.currentSurface}</span>}
+        </>
+      }
+      heading={row.title}
+      meta={destinationLabel(row.destination)}
+      role="listitem"
+      trailing={
+        verbs ? (
+          <>
+            {row.walkable ? (
+              <Button aria-label={`Show me where: ${row.title}`} onClick={() => props.showWhere(row.key)} size="sm" variant="ghost">
+                <LocateFixedIcon /> {onTryIt === null ? 'Show me where' : <span className="dshx:@max-pane-narrow:sr-only">Show me where</span>}
+              </Button>
+            ) : null}
+            {onTryIt === null ? null : (
+              <Button aria-label={`Try it: ${row.title}`} onClick={event => onTryIt(event.currentTarget)} size="sm" variant="ghost">
+                <SparklesIcon /> <span className="dshx:@max-pane-narrow:sr-only">Try it</span>
+              </Button>
+            )}
+            {canOpen ? (
+              <Button aria-label={`Open ${row.title}`} onClick={() => Routes.open(route, props.routes)} size="sm" variant="outline">
+                Open
+              </Button>
+            ) : null}
+          </>
+        ) : null
+      }
+    />
   )
 }
 
@@ -334,7 +287,7 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
   const loadPreview = useCallback(
     async (target: PackTarget, signal: AbortSignal) => {
       const value = await loadOverview({ preview: { pack: target.pack, action: target.action }, curatedOnly: true, limit: 1 }, signal)
-      if (value.preview === null) throw new Error('This Host returned no pack preview.')
+      if (value.preview === null) throw new Error('No preview of this pack came back.')
       return value.preview
     },
     [loadOverview],
@@ -352,135 +305,134 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
   )
   const showFeatures = useCallback((plugin: string) => {
     setDestination(undefined)
-    setSearch(plugin)
+    // The plugin's name as people read it: every word of it still matches the plugin's own features.
+    setSearch(pluginLabel(plugin))
     searchInput.current?.focus()
   }, [])
 
   return (
     <main aria-label="Getting started" className="dshx-root dshx:@container dshx:h-full">
-      <Page heading="Getting started" scroll>
-        <div className="dshx:flex dshx:max-w-3xl dshx:min-w-0 dshx:flex-col dshx:gap-6">
-          <div>
-            <Button className={TOUCH} onClick={props.startWizard}>
-              <PlayIcon /> Start setup
-            </Button>
-          </div>
-          {overview.isError && data === undefined ? (
-            <EmptyState action={{ label: 'Try again', onSelect: () => void overview.refetch() }}>
-              Getting started could not read this Host. Check that the onboarding plugin is enabled in Settings › Plugins, then try again.
-            </EmptyState>
-          ) : null}
-          {props.settings.checklist && checklist !== null ? (
-            <PageSection heading="Setup checklist" meta={`${String(done)} of ${String(checklist.length)}`}>
-              <ul className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border">
-                {checklist.map(item => (
-                  <ChecklistRow copy={props.copy} item={item} key={item.id} routes={props.routes} />
-                ))}
-              </ul>
-            </PageSection>
-          ) : null}
-          {props.settings.whatsNew ? (
-            <WhatsNewSection
-              copy={props.copy}
-              lastSeen={lastSeen}
-              loadWhatsNew={props.loadWhatsNew}
-              markSeen={WhatsNewStore.markSeen}
-              showFeatures={showFeatures}
-            />
-          ) : null}
-          <SuggestionsSection
-            dismiss={SuggestionsStore.dismiss}
-            dismissed={dismissed}
-            enabled={props.settings.suggestions}
-            featured={featured}
-            findFeature={showFeatures}
-            loadSuggestions={props.loadSuggestions}
-            openSetting={props.routes.hasSettings() ? openSuggestionsSetting : null}
-            remember={SuggestionsStore.remember}
-            restoreDismissed={SuggestionsStore.restoreDismissed}
-            showWhere={props.showWhere}
-            today={today}
-          />
-          {props.settings.packs && data !== undefined ? (
-            <PageSection heading="Packs" meta={String(data.packs.length)}>
-              <ul className="dshx:grid dshx:grid-cols-2 dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
-                {data.packs.map(pack => (
-                  <PackCard
-                    key={pack.id}
-                    onChange={(action, button) => {
-                      trigger.current = button
-                      setPackTarget({ pack: pack.id, title: pack.title, action })
-                    }}
-                    onTryIt={tryIt ? button => openTryIt({ pack: pack.id, title: pack.title }, button) : null}
-                    pack={pack}
-                    routes={props.routes}
-                  />
-                ))}
-              </ul>
-            </PageSection>
-          ) : null}
-          <PageSection heading="Features" meta={data === undefined ? undefined : String(data.features.total)}>
-            <InputGroup className={TOUCH_FIELD}>
-              <InputGroupAddon>
-                <SearchIcon />
-              </InputGroupAddon>
-              <InputGroupInput
-                aria-label="Search features"
-                className={TOUCH_FIELD}
-                onChange={event => setSearch(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key === 'Escape' && search !== '') {
-                    event.preventDefault()
-                    setSearch('')
-                  }
-                }}
-                placeholder="Search features"
-                ref={searchInput}
-                value={search}
-              />
-            </InputGroup>
-            <div
-              aria-label="Destinations"
-              className="dshx:flex dshx:flex-wrap dshx:gap-1.5 dshx:pb-1 dshx:@max-pane-narrow:flex-nowrap dshx:@max-pane-narrow:overflow-x-auto"
-              role="toolbar"
-            >
-              {[
-                { id: undefined, label: 'All', count: undefined },
-                ...(data?.features.destinations ?? []).flatMap(entry => {
-                  const id = DESTINATION_ORDER.find(candidate => candidate === entry.id)
-                  return id === undefined ? [] : [{ id, label: destinationLabel(id), count: entry.count }]
-                }),
-              ].map(chip => (
-                <Button
-                  aria-pressed={destination === chip.id}
-                  className={cn('dshx:shrink-0', TOUCH)}
-                  key={chip.id ?? 'all'}
-                  onClick={() => setDestination(chip.id)}
-                  size="sm"
-                  variant={destination === chip.id ? 'secondary' : 'ghost'}
-                >
-                  {chip.label}
-                  {chip.count === undefined ? null : <span className="dshx:text-muted-foreground dshx:tabular-nums">{String(chip.count)}</span>}
-                </Button>
+      <Page
+        bodyClassName="dshx:gap-6 dshx:@max-pane-narrow:gap-5"
+        description="What this setup can do and what it still needs."
+        heading="Getting started"
+        primaryAction={{ id: 'start-setup', label: 'Start setup', icon: <PlayIcon />, onSelect: props.startWizard }}
+        scroll
+      >
+        {overview.isError && data === undefined ? (
+          <EmptyState action={{ label: 'Try again', onSelect: () => void overview.refetch() }}>
+            The checklist, packs and features could not be loaded. Try again; if it keeps failing, restart DSH from the bottom of the rail.
+          </EmptyState>
+        ) : null}
+        {props.settings.checklist && checklist !== null ? (
+          <PageSection heading="Setup checklist" meta={`${String(done)} of ${String(checklist.length)}`}>
+            <EntityList aria-label="Setup checklist">
+              {checklist.map(item => (
+                <ChecklistRow copy={props.copy} item={item} key={item.id} routes={props.routes} />
               ))}
-            </div>
-            {data !== undefined && data.features.rows.length === 0 ? (
-              <EmptyState action={{ label: 'Clear the search', onSelect: () => setSearch('') }}>No feature matches every word.</EmptyState>
-            ) : (
-              <ul aria-label="Features" className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border">
-                {(data?.features.rows ?? []).map(row => (
-                  <FeatureItem
-                    key={row.key}
-                    onTryIt={tryIt ? button => openTryIt({ feature: row.key, title: row.title }, button) : null}
-                    routes={props.routes}
-                    row={row}
-                    showWhere={props.showWhere}
-                  />
-                ))}
-              </ul>
-            )}
+            </EntityList>
           </PageSection>
-        </div>
+        ) : null}
+        {props.settings.whatsNew ? (
+          <WhatsNewSection
+            copy={props.copy}
+            lastSeen={lastSeen}
+            loadWhatsNew={props.loadWhatsNew}
+            markSeen={WhatsNewStore.markSeen}
+            showFeatures={showFeatures}
+          />
+        ) : null}
+        <SuggestionsSection
+          dismiss={SuggestionsStore.dismiss}
+          dismissed={dismissed}
+          enabled={props.settings.suggestions}
+          featured={featured}
+          findFeature={showFeatures}
+          loadSuggestions={props.loadSuggestions}
+          openSetting={props.routes.hasSettings() ? openSuggestionsSetting : null}
+          remember={SuggestionsStore.remember}
+          restoreDismissed={SuggestionsStore.restoreDismissed}
+          showWhere={props.showWhere}
+          today={today}
+        />
+        {props.settings.packs && data !== undefined ? (
+          <PageSection heading="Packs" meta={String(data.packs.length)}>
+            <ul className="dshx:grid dshx:grid-cols-2 dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
+              {data.packs.map(pack => (
+                <PackCard
+                  key={pack.id}
+                  onChange={(action, button) => {
+                    trigger.current = button
+                    setPackTarget({ pack: pack.id, title: pack.title, action })
+                  }}
+                  onTryIt={tryIt ? button => openTryIt({ pack: pack.id, title: pack.title }, button) : null}
+                  pack={pack}
+                  routes={props.routes}
+                />
+              ))}
+            </ul>
+          </PageSection>
+        ) : null}
+        <PageSection heading="Features" meta={data === undefined ? undefined : String(data.features.total)}>
+          <InputGroup>
+            <InputGroupAddon>
+              <SearchIcon />
+            </InputGroupAddon>
+            <InputGroupInput
+              aria-label="Search features"
+              className="dshx:h-auto dshx:self-stretch"
+              onChange={event => setSearch(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === 'Escape' && search !== '') {
+                  event.preventDefault()
+                  setSearch('')
+                }
+              }}
+              placeholder="Search features"
+              ref={searchInput}
+              value={search}
+            />
+          </InputGroup>
+          {/* A filter over one list: one Tab stop, arrow keys between destinations; a phone pane scrolls it sideways. */}
+          <ToggleGroup
+            aria-label="Destinations"
+            role="group"
+            className="dshx:w-full dshx:flex-wrap dshx:pb-1 dshx:@max-pane-narrow:flex-nowrap dshx:@max-pane-narrow:overflow-x-auto dshx:@max-pane-narrow:[scrollbar-width:none]"
+            onValueChange={next => setDestination(DESTINATION_ORDER.find(candidate => candidate === next))}
+            size="sm"
+            spacing={1}
+            type="single"
+            value={destination ?? ALL}
+          >
+            {[
+              { id: ALL, label: 'All', count: undefined },
+              ...(data?.features.destinations ?? []).flatMap(entry => {
+                const id = DESTINATION_ORDER.find(candidate => candidate === entry.id)
+                return id === undefined ? [] : [{ id, label: destinationLabel(id), count: entry.count }]
+              }),
+            ].map(chip => (
+              <ToggleGroupItem className="dshx:gap-1" key={chip.id} value={chip.id}>
+                {chip.label}
+                {chip.count === undefined ? null : <span className="dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">{String(chip.count)}</span>}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          {data !== undefined && data.features.rows.length === 0 ? (
+            <EmptyState action={{ label: 'Clear the search', onSelect: () => setSearch('') }}>No feature matches every word.</EmptyState>
+          ) : (
+            <EntityList aria-label="Features">
+              {(data?.features.rows ?? []).map(row => (
+                <FeatureItem
+                  key={row.key}
+                  onTryIt={tryIt ? button => openTryIt({ feature: row.key, title: row.title }, button) : null}
+                  routes={props.routes}
+                  row={row}
+                  showWhere={props.showWhere}
+                />
+              ))}
+            </EntityList>
+          )}
+        </PageSection>
       </Page>
       <PackChangeDialog
         applyPack={props.applyPack}

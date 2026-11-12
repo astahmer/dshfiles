@@ -11,11 +11,11 @@ import { secretLinkTarget } from './secret-link-reveal-model.js'
 import { secretCatalogSettings } from './settings.js'
 import { useSecretReveal } from './use-secret-reveal.js'
 
-const hint = 'dshx:text-[11px] dshx:text-muted-foreground'
+const hint = 'dshx:text-2xs dshx:text-muted-foreground'
 
 const OpenInCatalog = (props: { readonly alias: string; readonly t: SecretCatalogTranslate }): JSX.Element | null =>
   CatalogNavigation.available ? (
-    <Button type="button" variant="link" size="sm" className="dshx:h-auto dshx:p-0 dshx:text-[11px]" onClick={() => CatalogNavigation.open(props.alias)}>
+    <Button type="button" variant="link" size="sm" className="dshx:h-auto dshx:p-0 dshx:text-2xs" onClick={() => CatalogNavigation.open(props.alias)}>
       {props.t('refActionOpenCatalog')}
     </Button>
   ) : null
@@ -42,7 +42,7 @@ export const SecretLinkRevealControl = (props: SecretLinkRevealProps & { readonl
     return (
       <span className={hint} data-testid="secret-link-reveal-unavailable">
         {t('linkRevealUnavailable')}{' '}
-        <Button type="button" variant="link" size="sm" className="dshx:h-auto dshx:p-0 dshx:text-[11px]" onClick={() => void rows.refetch()}>
+        <Button type="button" variant="link" size="sm" className="dshx:h-auto dshx:p-0 dshx:text-2xs" onClick={() => void rows.refetch()}>
           {t('refActionRecheck')}
         </Button>
       </span>
@@ -96,7 +96,7 @@ export const SecretLinkRevealControl = (props: SecretLinkRevealProps & { readonl
         {loading ? <Spinner /> : revealed === null ? <EyeIcon aria-hidden className="dshx:size-3.5" /> : <EyeOffIcon aria-hidden className="dshx:size-3.5" />}
       </Button>
       {snapshot.matches('failed') ? (
-        <span role="alert" className="dshx:text-[11px] dshx:text-destructive">
+        <span role="alert" className="dshx:text-2xs dshx:text-destructive">
           {t('revealFailed')}
         </span>
       ) : null}

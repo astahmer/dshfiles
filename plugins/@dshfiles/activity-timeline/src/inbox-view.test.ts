@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AttentionItem } from './attention-api.js'
-import { InboxView } from './inbox-view.js'
+import { InboxSwipe, InboxView } from './inbox-view.js'
 
 const item = (overrides: Partial<AttentionItem> = {}): AttentionItem => ({
   id: 'item-1',
@@ -54,5 +54,21 @@ describe('inbox view', () => {
     expect(InboxView.sourceLabel('jj-integration.ready-to-land')).toBe('Ready to land')
     expect(InboxView.sourceLabel('hmr-gate.deferred-update')).toBe('Restart needed')
     expect(InboxView.sourceLabel('custom.source')).toBe('custom.source')
+  })
+})
+
+describe('InboxSwipe', () => {
+  it('maps left to Done and right to Snooze, and never to Land, Approve or an answer', () => {
+    const verbs = ['Done', 'Snooze', 'Land', 'Approve', 'Answer']
+    expect(InboxSwipe.verb({ verbs }, 'needs-you', 'left')).toBe('done')
+    expect(InboxSwipe.verb({ verbs }, 'other', 'right')).toBe('snooze')
+    expect(InboxSwipe.verb({ verbs: ['Land', 'Approve', 'Answer'] }, 'needs-you', 'left')).toBeUndefined()
+    expect(InboxSwipe.verb({ verbs: ['Land', 'Approve', 'Answer'] }, 'needs-you', 'right')).toBeUndefined()
+  })
+  it('does nothing on closed or muted items, and a snoozed item does not snooze again', () => {
+    expect(InboxSwipe.verb({ verbs: ['Done', 'Snooze'] }, 'closed', 'left')).toBeUndefined()
+    expect(InboxSwipe.verb({ verbs: ['Done', 'Snooze'] }, 'muted', 'right')).toBeUndefined()
+    expect(InboxSwipe.verb({ verbs: ['Done', 'Snooze'] }, 'snoozed', 'right')).toBeUndefined()
+    expect(InboxSwipe.verb({ verbs: ['Done', 'Snooze'] }, 'snoozed', 'left')).toBe('done')
   })
 })

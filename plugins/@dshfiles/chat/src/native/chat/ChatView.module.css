@@ -83,22 +83,40 @@
   --dsh-chat-flow-gap: 12px;
 }
 
+/* dshfiles (visual refresh T2.1): turns are separated by space, not rules: a new user message opens with a wider
+   gap than the rows inside a turn. */
+.flowItem:is([data-chat-flow-kind="user"], [data-chat-flow-kind="turn-trigger"]) {
+  --dsh-chat-flow-gap: 28px;
+}
+
+/* dshfiles (visual refresh T2.2): consecutive tool rows read as one list of 24px lines, 2px apart. */
+.flowItem[data-chat-flow-kind="tool-call"] + .flowItem[data-chat-flow-kind="tool-call"] {
+  --dsh-chat-flow-gap: 2px;
+}
+
 /* Settled-flow identity boundary. It is neutral until it becomes the natural
    measurement/mount unit for a virtualizer without changing the column gap. */
 .flowItem {
   min-width: 0;
 }
 
-/* Where an unread thread opened: above its final answer. */
+/* Where an unread thread opened: above its final answer, drawn like the Since you left divider (a muted label between
+   hairlines). With the recap card in the row, that card's divider is the only one. */
 .flowItem[data-chat-unread-label]::before {
   content: attr(data-chat-unread-label);
   display: block;
   margin-bottom: 8px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--dsw-alias-brand-primary);
-  color: var(--dsw-alias-brand-primary);
-  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
   font-weight: 600;
+  text-align: center;
+  background:
+    linear-gradient(var(--dsw-alias-border-l2), var(--dsw-alias-border-l2)) left center / calc(50% - 3em) 1px no-repeat,
+    linear-gradient(var(--dsw-alias-border-l2), var(--dsw-alias-border-l2)) right center / calc(50% - 3em) 1px no-repeat;
+}
+
+.flowItem[data-chat-unread-label]:has(> [data-since-you-left])::before {
+  content: none;
 }
 
 /* Bottom room: sized by the viewport owner while rows above the reader close,
@@ -156,8 +174,10 @@
   flex-direction: column;
   align-items: flex-start;
   --dsh-chat-flow-gap: 12px;
-  --dsw-alias-label-shimmer: var(--dsw-alias-label-deep-diving-shimmer);
-  color: var(--dsw-alias-label-deep-diving);
+  /* dshfiles (visual refresh P6): working is not a signal, so the live label is muted ink whose shimmer brightens to
+     the primary text; only Needs you and Failed carry colour. The native label is accent blue. */
+  --dsw-alias-label-shimmer: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-label-secondary);
   font-size: calc(var(--dsh-content-font-size, 14px) - 2px);
   line-height: calc(22px + var(--dsh-content-font-delta, 0px));
 }
@@ -168,7 +188,13 @@
   .flowItem:not([data-chat-flow-kind="user"]):not([data-chat-flow-kind="steering"]):not([data-chat-flow-kind="turn-trigger"]),
   [data-chat-group-key]
 ) ~ .running > .runningDivider {
-  display: block;
+  /* dshfiles (visual refresh T2.2): turns separate by spacing, so the rule above the live row never shows. */
+  display: none;
+}
+
+/* dshfiles (visual refresh T2.2): the live row's shimmer runs on the motion token (2.2s), not the native 1.5s. */
+.runningText * {
+  animation-duration: var(--dshx-duration-shimmer, 2.2s);
 }
 
 .runningDivider {
@@ -201,33 +227,6 @@
   /* The fixed footprint contains the animation's layout and paint. */
   contain: strict;
   overflow: hidden;
-}
-
-.runningWhaleAnimated {
-  display: none;
-  position: absolute;
-  inset: 0;
-}
-
-.runningWhaleStill {
-  display: initial;
-}
-
-@supports (mask-mode: alpha) and (mask-image: url('')) {
-  @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
-    .runningWhaleAnimated {
-      display: block;
-      background: currentColor;
-      mask: url('./running-whale@2x.png') center / 100% 100% no-repeat;
-      mask-mode: alpha;
-      /* Keep animated-mask repaints on an icon-sized composited layer. */
-      will-change: transform;
-    }
-
-    .runningWhaleStill {
-      display: none;
-    }
-  }
 }
 
 .openError {
@@ -323,10 +322,4 @@
   outline-offset: -2px;
   background-color: color-mix(in srgb, var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)) 6%, transparent);
   transition: outline-color 400ms ease;
-}
-
-/* Find in thread: the words of the current match, marked through the CSS Custom Highlight API (no DOM writes). */
-::highlight(dshfiles-chat-find) {
-  background-color: color-mix(in srgb, var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)) 35%, transparent);
-  color: inherit;
 }

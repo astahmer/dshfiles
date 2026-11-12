@@ -18,6 +18,7 @@ import { useServingAccount, type UseServingAccountSessions } from './use-serving
 import type { CredentialSetupPort } from './credential-setup-port.js'
 import { QuotaStrip } from './quota-footer.js'
 import { QuotaStatusItem } from './quota-status-item.js'
+import { QuotaStatusLine } from './quota-status-line.js'
 import { ThreadAccountSurface } from './thread-account-dialog.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
 import { QuotaForecastPanel } from './quota-forecast-panel.js'
@@ -183,6 +184,25 @@ export default defineClientPlugin({
         <ConnectedQuotaStrip useSessions={props.useSessions} />
       </PluginQueryProvider>
     )
+    const ConnectedQuotaStatusLine = (props: { readonly useSessions: UseServingAccountSessions; readonly compact: boolean }): JSX.Element => {
+      const serving = useServingAccount(props.useSessions)
+      return (
+        <ThreadAccountSurface key={serving.sessionId} sessionId={serving.sessionId}>
+          {choose => (
+            <QuotaStatusLine
+              {...(choose === undefined ? {} : { onUseForThread: choose })}
+              compact={props.compact}
+              onOpenAccounts={openAccounts}
+              onAddAccount={() => openSetup()}
+              onOpenUsageHistory={openUsageHistory}
+              onConnectAccount={reconnect}
+              activeAccountId={serving.activeAccountId}
+              activeAccountRunning={serving.running}
+            />
+          )}
+        </ThreadAccountSurface>
+      )
+    }
     const EdgeUsageHostView = (): JSX.Element => (
       <PluginQueryProvider>
         <EdgeUsageWidget onOpenUsageHistory={openUsageHistory} onConnectAccount={reconnect} />
@@ -248,15 +268,16 @@ export default defineClientPlugin({
     ctx.effect(() =>
       QuotaStatusItem.register({
         plugin: api,
-        View: props => <QuotaStripView useSessions={props.useSessions} />,
+        View: props => (
+          <PluginQueryProvider>
+            <ConnectedQuotaStatusLine compact={props.compact} useSessions={props.useSessions} />
+          </PluginQueryProvider>
+        ),
         open: () => openQuota({ view: 'accounts' }, USAGE_PANEL_ID),
       }),
     )
     // The same strip stays a movable Workbench view in free docking, where the thread sidebar still seats it above its foot.
-    api.ui.register(
-      { name: 'sidebar.footer.above', id: USAGE_STRIP_ID, order: 0, label: 'AI Accounts: Preview', locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
-      QuotaStripView,
-    )
+    api.ui.register({ name: 'sidebar.footer.above', id: USAGE_STRIP_ID, order: 0, label: 'Quota', locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, QuotaStripView)
     // The edge overlay mounts with the shell, so it survives panel switches; a
     // settings toggle decides whether it draws.
     api.ui.register(
@@ -264,7 +285,7 @@ export default defineClientPlugin({
         name: 'sidebar.footer.action',
         id: 'ai-accounts-edge',
         order: 3,
-        label: 'AI Accounts: Edge preview',
+        label: 'Quota edge preview',
         locale: AI_ACCOUNTS_LOCALE_NAMESPACE,
       },
       EdgeUsageHostView,

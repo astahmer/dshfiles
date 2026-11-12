@@ -70,6 +70,26 @@ export interface ToastsService {
   show(input: ToastInput): () => void
 }
 
+/**
+ * Where a command's keys apply, as `@dshfiles/shortcuts` matches them.
+ *
+ * - `global` (the default): anywhere; a modified chord also fires from a text field.
+ * - `page` / `not-typing`: anywhere except a text field or an IME composition.
+ * - `list`, `triage`, `changes`: only while focus (or, with nothing focused, the last region used) sits inside an
+ *   element marked `data-shortcut-scope="<scope>"`, and never while typing.
+ * - `composer`: only from inside an element marked `data-shortcut-scope="composer"`; modified chords only.
+ *
+ * Keys without a primary modifier (`J`, `Shift+J`, `?`, `G I`) never fire while typing, whatever the scope, and the
+ * user can turn them off (Settings › Shortcuts › Single-key shortcuts, WCAG 2.1.4).
+ */
+export type CommandScope = 'global' | 'page' | 'not-typing' | 'list' | 'triage' | 'changes' | 'composer'
+
+/** What triggered a command: the key spec that matched (`3`, `Shift+J`) and its event, absent from the palette. */
+export interface CommandTrigger {
+  readonly keys?: string
+  readonly event?: KeyboardEvent
+}
+
 /** A command the command palette lists and its keys run. */
 export interface CommandItem {
   /** Unique across plugins; prefix it with the plugin id, e.g. `@dshfiles/backlog.capture`. */
@@ -78,7 +98,10 @@ export interface CommandItem {
   readonly description?: string
   readonly keywords?: readonly string[]
   readonly group?: string
-  /** Default key chord, e.g. `Mod+Shift+K`; the owner decides whether it binds. */
+  /**
+   * Default keys: a chord (`Mod+Shift+K`, `Mod+Alt+Enter`, `Alt+J`), a single key (`J`, `Shift+J`, `?`, `Enter`) or a
+   * two-step sequence (`G I`: G, then I within 1.2 s). The owner decides whether it binds.
+   */
   readonly keys?: readonly string[]
   /** False takes it out of the palette and turns its keys off. */
   readonly enabled?: boolean
@@ -86,8 +109,16 @@ export interface CommandItem {
   readonly hidden?: boolean
   /** Lists it in Settings › Shortcuts so the user can rebind its keys; its id must map to a Host shortcut id (`CommandChords.shortcutId`). */
   readonly editable?: boolean
-  /** `page` turns its keys off while a text field has focus; `global` (the default) keeps them on. */
-  readonly scope?: 'global' | 'page'
+  /** Where its keys apply; see `CommandScope`. `page` turns them off while a text field has focus. */
+  readonly scope?: CommandScope
+  /**
+   * For a region scope (`list`, `triage`, `changes`, `composer`): the element whose keys these are. Its keys apply only
+   * while the matched region is this element or sits inside it, so two mounted lists can both bind `J`. Absent: any
+   * region of that scope.
+   */
+  readonly region?: () => Element | null | undefined
+  /** The cheat-sheet group it lists under; its scope's name by default (Global, List, Triage, Changes, Composer). */
+  readonly section?: string
   /**
    * Whether its keys still apply while a terminal owns the keyboard.
    *
@@ -100,7 +131,7 @@ export interface CommandItem {
   /** Shown in the palette before anything is typed. */
   readonly suggested?: boolean
   /** From a key press, false declines the key so it reaches its target. */
-  run(): void | false | Promise<void>
+  run(trigger?: CommandTrigger): void | false | Promise<void>
 }
 
 /** Leave `sessionId` out to address the composer the user sees. */

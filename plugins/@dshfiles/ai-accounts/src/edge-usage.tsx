@@ -208,8 +208,8 @@ export const EdgeUsageWidget = (props: {
                   style={{ left: position.x, top: position.y }}
                   type="button"
                 >
-                  <span className="dshx:text-[11px] dshx:font-extrabold">AI</span>
-                  <span className={cn('dshx:text-[11px] dshx:font-bold dshx:tabular-nums', primaryTone)}>
+                  <span className="dshx:text-2xs dshx:font-extrabold">AI</span>
+                  <span className={cn('dshx:text-2xs dshx:font-bold dshx:tabular-nums', primaryTone)}>
                     {primary === undefined ? '·' : String(Math.round(primary))}
                   </span>
                 </button>

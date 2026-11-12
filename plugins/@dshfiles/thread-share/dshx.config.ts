@@ -3,7 +3,11 @@ import { pluginUiVite } from '@dshfiles/plugin-ui/vite'
 
 export default defineConfig({
   name: '@dshfiles/thread-share',
-  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/session-controller', '@dshfiles/credential-port'] },
+  host: {
+    dshxRuntime: 'snapshot',
+    entry: 'src/host.ts',
+    bundleDependencies: ['@dshfiles/session-controller', '@dshfiles/plugin-ui', '@dshfiles/credential-port'],
+  },
   client: { entry: 'src/client.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

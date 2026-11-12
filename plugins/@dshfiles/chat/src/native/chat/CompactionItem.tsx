@@ -1,12 +1,9 @@
 // A compaction marker does not replace shadowed transcript rows. It is
 // expandable only when the current window includes its cited summary.
 
+import { ChevronDownIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { memo, useMemo, useState } from 'react'
-import {
-  IconApiOutlineRegular,
-  IconChevronDownOutlineRegular,
-  IconChevronRightOutlineRegular,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconApiOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { FencedMarkdown } from '../../fenced-markdown.tsx'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { markdownLabels } from '../markdown-labels.ts'
@@ -62,7 +59,7 @@ export const CompactionItem = memo(function CompactionItem({
             className={css.compactionDisclosureIcon}
             data-compaction-disclosure={open ? 'expanded' : 'collapsed'}
           >
-            {open ? <IconChevronDownOutlineRegular /> : <IconChevronRightOutlineRegular />}
+            {open ? <ChevronDownIcon size={14} strokeWidth={1.5} /> : <ChevronRightIcon size={14} strokeWidth={1.5} />}
           </span>
         </span>
         <span className={css.compactionTitle}>{title ?? t('message.compaction')}</span>

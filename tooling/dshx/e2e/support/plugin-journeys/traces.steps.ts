@@ -431,15 +431,45 @@ Then("this Host's own plugin spans arrive without any OTEL environment variable"
 })
 
 const sessionView = (page: Page) => page.getByTestId('traces-session-view')
-const conversationTab = (page: Page, name: string) => page.locator('[data-conversation-tabs]').getByRole('tab', { name, exact: true })
+/**
+ * Productivity pass Q5 (E5): Traces and Requests are thread-panel facets, opened from the thread header's
+ * More thread actions; the header has no view tabs and the stage stays on Chat.
+ */
+const conversationTabs = (page: Page) => page.locator('[data-conversation-tabs]')
+/** A composition without a thread panel keeps the header's view switch; one with it opens views from `⋯`. */
+const openThreadView = async (page: Page, name: string): Promise<void> => {
+  if ((await conversationTabs(page).count()) > 0) {
+    await conversationTabs(page).getByRole('tab', { name, exact: true }).click()
+    return
+  }
+  await page.getByRole('button', { name: 'More thread actions', exact: true }).filter({ visible: true }).first().click()
+  await page.getByRole('menuitem', { name: `Open ${name}`, exact: true }).click()
+}
 
 When('the thread Traces tab is opened', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'traces-thread-tab-follows-trajectory', async () => {
-    const names = await page.locator('[data-conversation-tabs]').getByRole('tab').allTextContents()
-    expect(names.indexOf('Traces')).toBeGreaterThan(names.indexOf('Chat'))
-    if (names.includes('Trajectory')) expect(names.indexOf('Traces')).toBe(names.indexOf('Trajectory') + 1)
-  })
-  await conversationTab(page, 'Traces').click()
+  await expect(page.locator('[data-conversation-session]').first()).toBeVisible()
+  if ((await conversationTabs(page).count()) > 0) {
+    await recordAssertion(page, 'traces-thread-tab-follows-trajectory', async () => {
+      const names = await conversationTabs(page).getByRole('tab').allTextContents()
+      expect(names.indexOf('Traces')).toBeGreaterThan(names.indexOf('Chat'))
+      if (names.includes('Trajectory')) expect(names.indexOf('Traces')).toBe(names.indexOf('Trajectory') + 1)
+    })
+    await conversationTabs(page).getByRole('tab', { name: 'Traces', exact: true }).click()
+  } else {
+    // Productivity pass Q5: with a thread panel, Traces is a facet opened from the header's More thread actions.
+    await page.getByRole('button', { name: 'More thread actions', exact: true }).filter({ visible: true }).first().click()
+    await recordAssertion(page, 'traces-thread-tab-follows-trajectory', async () => {
+      const names = (
+        await page
+          .getByRole('menuitem')
+          .filter({ hasText: /^Open / })
+          .allTextContents()
+      ).map(name => name.trim())
+      expect(names).toContain('Open Traces')
+      if (names.includes('Open Trajectory')) expect(names.indexOf('Open Traces')).toBe(names.indexOf('Open Trajectory') + 1)
+    })
+    await page.getByRole('menuitem', { name: 'Open Traces', exact: true }).click()
+  }
   await expect(sessionView(page)).toBeVisible()
 })
 
@@ -581,7 +611,7 @@ Then('the thread logs list only its own records', async ({ page }: { page: Page 
 })
 
 Then('the thread Requests tab lists only its requests', async ({ page }: { page: Page }) => {
-  await conversationTab(page, 'Requests').click()
+  await openThreadView(page, 'Requests')
   const view = page.getByTestId('requests-session-view')
   await recordAssertion(page, 'traces-thread-requests-tab', async () => {
     await expect(view).toBeVisible()
@@ -594,7 +624,7 @@ Then('the thread Requests tab lists only its requests', async ({ page }: { page:
 })
 
 Then('the thread Traces tab fits a 480 px wide window', async ({ page }: { page: Page }) => {
-  await conversationTab(page, 'Traces').click()
+  await openThreadView(page, 'Traces')
   await page.setViewportSize({ width: 480, height: 900 })
   await sessionView(page).getByRole('radio', { name: 'Turns', exact: true }).click()
   await recordAssertion(page, 'traces-thread-tab-narrow', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WorkspacePaths, workspaceName, workspaceNameLabel } from './workspace-paths.js'
+import { WorkspacePaths, workspaceName } from './workspace-paths.js'
 
 describe('WorkspacePaths.projectPathOf', () => {
   const customLayout = WorkspacePaths.threadDirectoriesOf([{ repoRoot: '/dev/dshfiles', threadsDirectory: '/elsewhere/threads/dshfiles/' }])
@@ -36,15 +36,5 @@ describe('workspaceName', () => {
   it('returns undefined for an empty path', () => {
     expect(workspaceName('')).toBeUndefined()
     expect(workspaceName('/')).toBeUndefined()
-  })
-})
-
-describe('workspaceNameLabel', () => {
-  it('hides the workspace name when it duplicates the project title', () => {
-    expect(workspaceNameLabel('dshfiles', 'dshfiles')).toBeUndefined()
-  })
-
-  it('keeps a distinct workspace name beside its project title', () => {
-    expect(workspaceNameLabel('thread-a', 'dshfiles')).toBe('thread-a')
   })
 })

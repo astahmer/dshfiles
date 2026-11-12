@@ -1,4 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test'
+import { StartupDialogs } from '../../packages/dshx/src/project/startup-dialogs.js'
+import { ThreadListFilter } from './thread-list-filter.js'
 
 const threadsRegion = (page: Page): Locator => page.getByRole('region', { name: 'Threads', exact: true })
 
@@ -14,12 +16,9 @@ const arrangeManually = async (page: Page, scope: Locator = threadsRegion(page))
   // The rail may sit on another destination (Settings after an account setup); the list lives under Threads.
   const railThreads = page.getByRole('tab', { name: 'Threads', exact: true })
   if ((await railThreads.count()) > 0 && (await railThreads.first().getAttribute('aria-selected')) !== 'true') await railThreads.first().click()
-  const manual = scope.getByRole('button', { name: 'Group: Arrange manually', exact: true })
-  if ((await manual.count()) === 0) {
-    await scope.getByRole('button', { name: /^Group: /u }).first().click()
-    await page.getByRole('menuitemradio', { name: 'Arrange manually', exact: true }).click()
-  }
-  await expect(manual).toBeVisible()
+  // The Group submenu of the list's Filter menu (productivity pass Q5); its trigger names the current grouping.
+  await ThreadListFilter.selectGroup(page, scope, 'Arrange manually')
+  await ThreadListFilter.expectGroup(page, scope, 'Arrange manually')
 }
 
 /**
@@ -30,12 +29,8 @@ const arrangeManually = async (page: Page, scope: Locator = threadsRegion(page))
 const groupByStatus = async (page: Page, scope: Locator = threadsRegion(page)): Promise<void> => {
   const railThreads = page.getByRole('tab', { name: 'Threads', exact: true })
   if ((await railThreads.count()) > 0 && (await railThreads.first().getAttribute('aria-selected')) !== 'true') await railThreads.first().click()
-  const status = scope.getByRole('button', { name: 'Group: Status', exact: true })
-  if ((await status.count()) === 0) {
-    await scope.getByRole('button', { name: /^Group: /u }).first().click()
-    await page.getByRole('menuitemradio', { name: 'Status', exact: true }).click()
-  }
-  await expect(status).toBeVisible()
+  await ThreadListFilter.selectGroup(page, scope, 'Status')
+  await ThreadListFilter.expectGroup(page, scope, 'Status')
 }
 
 /**
@@ -45,31 +40,78 @@ const groupByStatus = async (page: Page, scope: Locator = threadsRegion(page)): 
  */
 const newThreadButton = (page: Page): Locator => page.getByRole('button', { name: 'New thread', exact: true }).filter({ visible: true }).first()
 
+/** The Workbench's left layout and its once-per-browser merge marker (b:952m), as `@dshfiles/workbench` stores them. */
+const LEFT_LAYOUT_KEY = 'dshfiles.workbench.left-layout.v1'
+const SHELL_MERGE_KEY = 'dshfiles.workbench.shell-merge.v1'
+/** Workbench seats the account Preview once in a docked sidebar; the default Sidebar pane completes that marker. */
+const PREVIEW_SEATED_KEY = 'dshfiles.workbench.sidebar-preview-docked.v1'
+const NAVIGATION_PANE = 'dshfiles-thread-sidebar.workbench-navigation'
+const THREADS_PANE = 'dshfiles-thread-sidebar.workbench-threads'
+
 /**
- * The fixed rail layout is the default (docs/ade-ux §4.1). A journey about the older Dockview sidebar — its header
- * destinations, header and footer More menus, overflow modes, Workbench Threads panel — switches to Settings › Layout ›
- * Free docking first, as a user would. Idempotent: a page already docking is left alone.
+ * The left region as a former Free docking user kept it: Navigation above Threads, two tab-controlled groups. The
+ * merge (b:952m) keeps exactly this layout for that user, so a journey about the docked panes starts from it.
+ */
+const formerDockingLeftLayout = JSON.stringify({
+  grid: {
+    root: {
+      type: 'branch',
+      data: [
+        { type: 'leaf', data: { views: [NAVIGATION_PANE], activeView: NAVIGATION_PANE, id: '1' }, size: 160 },
+        { type: 'leaf', data: { views: [THREADS_PANE], activeView: THREADS_PANE, id: '2' }, size: 640 },
+      ],
+      size: 280,
+    },
+    width: 280,
+    height: 800,
+    orientation: 'VERTICAL',
+  },
+  panels: {
+    [NAVIGATION_PANE]: { id: NAVIGATION_PANE, contentComponent: 'workbench-panel', title: 'Navigation' },
+    [THREADS_PANE]: { id: THREADS_PANE, contentComponent: 'workbench-panel', title: 'Threads' },
+  },
+  activeGroup: '2',
+})
+
+/**
+ * One sidebar layout (b:952m): Fixed and Free docking are one docking region whose default is the rail and list as one
+ * Sidebar pane. A journey about the docked sidebar panes (Navigation's header destinations, its More menus, the
+ * Workbench Threads panel) starts from the arrangement a former Free docking user keeps: Navigation above Threads in the
+ * left region. It is seeded as the stored left layout, with the merge already applied in this browser, and the page
+ * reloads. Idempotent: a page already showing the Navigation and Threads panes is left alone; a composition without
+ * the Workbench has no docked panes and keeps the rail.
  */
 const useFreeDocking = async (page: Page): Promise<void> => {
   const rail = page.getByRole('navigation', { name: 'Destinations', exact: true })
-  if ((await rail.count()) === 0) return
-  // The palette command switches without opening the Settings page as a main tab; the rail's Settings list is the
-  // fallback in compositions without the command palette.
-  const palette = page.getByRole('dialog', { name: 'Command palette', exact: true })
-  const paletteButton = page.getByRole('button', { name: 'Open command palette', exact: true }).filter({ visible: true }).first()
-  if ((await paletteButton.count()) > 0) {
-    await paletteButton.click()
-    if (await palette.waitFor({ state: 'visible', timeout: 3_000 }).then(() => true, () => false)) {
-      await palette.getByRole('combobox').fill('Layout: free docking')
-      await palette.getByRole('option', { name: /Layout: free docking/u }).first().click()
-      await expect(rail).toHaveCount(0)
-      return
-    }
-  }
-  await rail.getByRole('tab', { name: 'Settings', exact: true }).click()
-  await page.getByRole('radiogroup', { name: 'Layout', exact: true }).getByRole('radio', { name: 'Free docking', exact: true }).click()
-  // Free docking drops the rail; its header is `Sidebar navigation` or, in a Workbench profile, a Navigation panel.
+  // Right after boot the shell may not have drawn the rail yet: wait briefly before concluding the page has none.
+  await rail
+    .first()
+    .waitFor({ state: 'attached', timeout: 5_000 })
+    .catch(() => undefined)
+  const panes = page.locator(`[data-workbench-panel-id="${NAVIGATION_PANE}"], [data-workbench-panel-id="${THREADS_PANE}"]`)
+  if ((await panes.count()) >= 2) return
+  if ((await page.locator('[data-workbench-region="left"]').count()) === 0) return
+  await page.evaluate(
+    ([layoutKey, mergeKey, previewKey, layout]) => {
+      localStorage.setItem(layoutKey ?? '', layout ?? '')
+      localStorage.setItem(mergeKey ?? '', 'true')
+      // A browser that docked before the merge had the Preview seated on its first docked load, as here.
+      localStorage.removeItem(previewKey ?? '')
+    },
+    [LEFT_LAYOUT_KEY, SHELL_MERGE_KEY, PREVIEW_SEATED_KEY, formerDockingLeftLayout],
+  )
+  await StartupDialogs.reloadPastProviderSetup(page)
+  await expect(page.locator(`[data-workbench-panel-id="${THREADS_PANE}"]`).first()).toBeAttached()
+  // The rail lives in the Sidebar pane, which that arrangement does not hold.
   await expect(rail).toHaveCount(0)
+  // The merge also kept the row under the list on for that user (showFooter): its Settings launcher and More menu.
+  await ThreadListFilter.openSidebarSettings(page)
+  const customize = page.getByRole('region', { name: 'Customize sidebar', exact: true })
+  const footer = customize.getByRole('checkbox', { name: 'Show the row under the list', exact: true })
+  if (!(await footer.isChecked())) await footer.click()
+  await expect(footer).toBeChecked()
+  await customize.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(customize).toHaveCount(0)
 }
 
 export class ThreadSidebarJourney {

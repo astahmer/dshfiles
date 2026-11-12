@@ -101,7 +101,11 @@ or sending two threads back to back, keeps every prompt in its own workspace.
 Typing never waits on jj, and a New thread whose draft never sends leaves one
 reusable spare rather than a pile of workspaces. With isolation off, a thread that started in another thread's workspace
 returns to the project checkout on arrival, which creates nothing. The chip
-shows the workspace name with a spinner while the first-send switch runs. Each
+reads "Preparing own workspace…" with a spinner while the first-send switch runs.
+A thread workspace is a detail of its thread (b:212a): the project chip, the run
+summary, the thread header ("Own workspace", "In the project") and the Inbox name
+the project and the thread, never the `thread-xxxxxx` folder, which stays in
+tooltips, the details' mono path and the row's Copy path item. Each
 new thread is moved at most once, so a manual toggle sticks, and a blank thread
 already alone in a thread workspace is already at its destination: a page
 reload, or the fresh Session DSH opens in the workspace a switch moved it to,
@@ -215,9 +219,10 @@ thread's own pending revisions are never counted as being behind. The default
 **Needs attention** view hides completed rows; **All** and a lifecycle filter
 reach everything.
 
-Each row keeps a human title first (the conversation title, else the pending
-revision's description, else the project name), with the workspace name and
-lifecycle as secondary metadata. It shows when it was last active, how many user
+Each row is its thread: the conversation title first, else the pending
+revision's description, else "Untitled thread", with the project and lifecycle as
+secondary metadata. The workspace folder is in that line's tooltip, the expanded
+details and the ⋯ menu's Copy path, never a label. It shows when it was last active, how many user
 messages the thread holds, how many revisions are pending, how far its base sits
 behind the bookmark, its status chip and the primary blocker. A blank New-thread
 slot the app left in the workspace is not a conversation: it never names the
@@ -342,6 +347,17 @@ both, or none. Archive acts on that Session only; Settle asks
 one writer. Both are disabled while the Session is running. Automatic settling
 and archiving are not a second policy here: "Settle integrated threads" and
 "Archive settled threads" in Settings › Thread sidebar already do it on a delay.
+
+### In the Inbox
+
+A conflicted workspace, or one whose queued land stopped, is a Failed Inbox item with Retry. A workspace with
+described work to land is one Ready item keyed by the workspace (`src/attention-provider.ts`): the headline names the
+thread (“Add login page” is ready to land.), the detail says what landing brings (`3 files, +120 −14 · feat: add
+login · 2 more revisions`, from `jj diff --stat` through the cached view reads). The item is updated in place and
+never re-fires: it stays as it is while the thread is busy, asking, describing or queued, resolves only when nothing
+is left to land, the workspace is gone or Land is blocked, and a new diff stat never reopens an item the user marked
+Done. In the Inbox, **Land** first shows what will land and asks to confirm, then runs the same guarded land as the
+Land view; **Review** opens the thread's Changes view. Agents land with `jj_thread_rebase`.
 
 ### Verified automatic integration
 
@@ -530,6 +546,37 @@ worktree fast-forwards (edits that block it fail as `repository.fetch-failed`
 and leave the branch); elsewhere the ref moves with compare-and-swap. Its span
 carries `dshx.fetch.vcs: git`, and git's stderr is credential-redacted before it
 reaches the timeline.
+
+### Update DSH
+
+The checkout DSH runs from (its `syncWorkspaceAfterLand` workspace, `default`) can follow `main@origin` without a
+chat. This plugin owns the Host half because it already owns both moves it needs, the fetch above and the
+`dshx checkout sync` it runs after a land (`WorkspaceSync`); thread-sidebar draws the control because it owns the
+restart verbs the update ends with (Settings › About › **Update DSH** and an **Update · N** status-strip item).
+
+- **Check** (`updateCheck`, agent tool `dsh_update_check`, read-only): `jj git fetch --remote <autoFetch.remote>` in that
+  checkout (no files move; a tracked bookmark follows the fetch the way jj always does), then **What's new**
+  (`::<target> ~ ::<workspace>@`, newest first, at most 50 listed), the bookmark against its remote copy (same,
+  remote ahead, local ahead, diverged) and `dshx checkout plan` for the target: files, installs, which plugins
+  hot-reload and whether DSH would need a restart. `fetch: false` reads only what is already fetched (the strip polls
+  this way).
+- **Apply** (`updateApply`, agent tool `dsh_update_apply`, `confirm: true` required, no default): one background job
+  that fetches, fast-forwards the bookmark only when it is a strict ancestor of its remote copy, then runs the same
+  `dshx checkout sync` a land runs, serialized with land-driven syncs. Its phase, the newest progress lines, the
+  rebuilt plugins and "restart needed" stay readable through `updateCheck`; an Activity event records the outcome.
+- **Never**: it never pushes, never moves a bookmark backwards or across diverged history (refused with the exact
+  `jj rebase` to run), never touches other thread workspaces' revisions, and never restarts DSH. A Host bundle change
+  ends with "restart needed", applied with the existing **Restart when idle**. A sync that meets described local work
+  is refused by dshx and changes nothing.
+- **Where**: `updateCheckout` names the checkout folder on this machine; empty uses the checkout this Host bundle was
+  loaded from. A registry install (no jj checkout) gets "unavailable" with what to set. The check also lists the same
+  update as shell commands ("Update by hand").
+- **Try this change live** (`landImpact`, agent tool `jj_thread_land_impact`, read-only; pulls-review's Land card
+  shows it as **Try live**): for a thread workspace, `dshx checkout plan` from that checkout to the thread's newest
+  landable commit, grouped by hmr-gate's rule (client-only bundles hot-reload, a changed Host half waits for Restart
+  when idle). A thread of another repository, or one with nothing to land, says so. It never lands, syncs or restarts.
+- **Limits**: the job lives in Host memory, like cleanup jobs: a Host restart (the usual next step) drops its trail,
+  while the checkout itself is the durable record and the next check reads it.
 
 ### Settle cleanup
 

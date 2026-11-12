@@ -317,15 +317,17 @@ conversation.
 
 ## Backlinks on threads and revisions
 
-A thread that backlog items link to shows their count in its header (a clipboard and a number, beside the other
-header utilities); clicking it lists each item as its reference chip, with the same card on hover. A revision's
+A thread that backlog items link to has **Linked backlog items (N)** in its header's ⋯ menu; the submenu lists each
+item by title and reference, and choosing one opens it in Backlog (b:ysaj: the header row keeps no indigo count chip,
+since the accent is for Needs you). A revision's
 details in the jj panel list the items that link to it under **Backlog**. Both read `backlog_referencing`, the
 agent tool, which matches a revision link written as a prefix of the change id (`jj:mounnnvz`) or the commit id
 (`jj:3f32cd26`), four characters or more and in either direction, so a short `jj:` in a note reaches the full id the
 panel shows; bookmarks and every other link type match exactly. Nothing renders when no item links there. A mounted
 count refreshes once a minute and stops when the backlog Host API is absent.
 
-The thread count fills the native `conversation.session.header.utilities` slot. The revision list fills
+The thread submenu is a `ThreadMenuSections` entry, a registry `@dshfiles/thread-sidebar/thread-menu-sections`
+declares and the header ⋯ renders with its own menu parts. The revision list fills
 `RevisionSections`, a registry `@dshfiles/jj-integration/revision-sections` declares and the jj panel
 (`@dshfiles/jujutsu`) renders, so neither jj plugin depends on this one.
 

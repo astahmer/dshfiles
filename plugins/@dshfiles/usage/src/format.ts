@@ -14,6 +14,12 @@ export class UsageFormattingModel {
     other: 'Other side call',
   } satisfies Readonly<Record<RequestPurpose, string>>
 
+  /** A subagent in the family list by its title; never its raw Session id (DESIGN.md: no raw ids in labels). */
+  static readonly familyMemberTitle = (member: { readonly title: string | null }): string => {
+    const title = member.title?.trim() ?? ''
+    return title === '' ? 'Untitled subagent' : title
+  }
+
   private static readonly relativeSuffix = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 
   /** `89K`, `1.3K`, `2.1M`; `–` when the count is unknown. */

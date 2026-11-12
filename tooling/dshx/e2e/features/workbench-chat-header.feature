@@ -5,6 +5,7 @@ Feature: Original conversation header inside Workbench
   @scenario:sidebar-right.workbench-header-opener
   Scenario: Original controls and child views stay bound to each fixed conversation
     Given an isolated Workbench header profile with all original view providers is booted
+    And the sidebar keeps the former Free docking panes
     When a disposable Workbench workspace has two real threads
     Then each fixed conversation has its original title actions and child-view header
     When the first conversation is moved aside through the restored header opener

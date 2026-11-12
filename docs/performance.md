@@ -1010,6 +1010,20 @@ first read pays 0.6 MB. `traces` stays eager on purpose: `RetentionWorker` prune
 store. `backlog` hydrates every item, alias and lease into its in-memory view at activation (`BacklogStore.layer`), and
 `session-search`'s Host half never opens its index at all.
 
+## Long threads (productivity pass Q4, 2026-11-09)
+
+Scratch DSH, a 200-turn fake-provider thread, WebKit 1440×900; median of the A/B runs on the same instance.
+
+| Interaction | main | Q4 | Verdict |
+| --- | --- | --- | --- |
+| Open the thread from another thread | median 383 ms (A/B, same instance) | median 375 ms | no regression; already over 250 ms before Q4 |
+| DOM after open | 4,490 nodes, 53 turns | 4,496 nodes, 53 turns | +6 (rail controls); find bar and Turns sheet mount on demand |
+| Find a match in turn 5 → highlight | impossible (browser find misses unloaded turns) | median ≈980 ms | over budget; the cost is the existing jump to an unloaded turn (`loadThrough` mounts every turn from it to the tail: 12,140 nodes) |
+
+Still open: a jump to an unloaded turn (rail click or find hit) should mount the target turn's neighbourhood instead of
+everything from it to the tail. Owner: the chat fork's `transcript-window.ts`. The `dshfilesTurnMarks` Host fold reads
+four event types by hand (no schema decode per event), so it adds no measurable Host cost on this thread.
+
 ## Cold Session reads proportional to the Session (2026-11-09, U6)
 
 Scratch Host on a clone of the live home (2,929 logs in 793 project directories, two SSH runtimes in multi-host),

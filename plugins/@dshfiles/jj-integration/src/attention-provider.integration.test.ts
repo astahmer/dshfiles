@@ -78,7 +78,9 @@ describe.skipIf(!jjAvailable)('jj-integration inbox provider', () => {
       severity: 'ready',
       verbs: ['Land', 'Open', 'Done', 'Snooze', 'MuteSource'],
     })
-    expect(item?.reason).toMatch(/is ready to land: 1 described revision not on the bookmark yet\.$/u)
+    // The headline names the thread; the detail is what landing brings, from jj's diff stat over the unlanded work.
+    expect(item?.reason).toMatch(/^“.+” is ready to land\.$/u)
+    expect(item?.detail).toMatch(/^1 file, \+\d+ −\d+ · feat: add /u)
 
     const outcome = await inbox.act({ id: item?.id ?? '', verb: 'Land' })
     expect(outcome).toMatchObject({ ok: true, message: 'Landed 1 revision on main.' })

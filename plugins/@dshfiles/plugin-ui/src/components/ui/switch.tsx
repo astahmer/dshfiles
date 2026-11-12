@@ -21,10 +21,12 @@ function Switch({
       )}
       {...props}
     >
+      {/* Dark mode (productivity pass Q5): ON is a bright track with a small dark knob, OFF a dark track with a dim
+          knob, so the bright side always means on; a full-size black knob on the bright track read as off. */}
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         className={cn(
-          'dshx:pointer-events-none dshx:block dshx:rounded-full dshx:bg-background dshx:ring-0 dshx:transition-transform dshx:group-data-[size=default]/switch:size-4 dshx:group-data-[size=sm]/switch:size-3 dshx:data-[state=checked]:translate-x-[calc(100%-2px)] dshx:data-[state=unchecked]:translate-x-0 dshx:dark:data-[state=checked]:bg-primary-foreground dshx:dark:data-[state=unchecked]:bg-foreground',
+          'dshx:pointer-events-none dshx:block dshx:rounded-full dshx:bg-background dshx:ring-0 dshx:transition-transform dshx:group-data-[size=default]/switch:size-4 dshx:group-data-[size=sm]/switch:size-3 dshx:data-[state=checked]:translate-x-[calc(100%-2px)] dshx:data-[state=unchecked]:translate-x-0 dshx:dark:data-[state=checked]:scale-75 dshx:dark:data-[state=checked]:bg-primary-foreground dshx:dark:data-[state=unchecked]:bg-muted-foreground',
         )}
       />
     </SwitchPrimitive.Root>

@@ -528,3 +528,25 @@
 .cardRich:not(.cardMinimized) {
   max-height: min(72vh, 720px);
 }
+
+/* dshfiles (visual refresh T5.4, phone rules "Transcript"): on touch a question's option rows are 48pt, so an answer
+   is one easy tap; the desktop row stays 40px. */
+@media (pointer: coarse) {
+  .option {
+    min-height: 48px;
+  }
+}
+
+/* dshfiles (visual refresh T5.4): the card's own small buttons (collapse, close, previous/next, Skip, Submit) answer a
+   44pt tap on touch, centred on the drawn control; option rows are already 48pt. */
+@media (pointer: coarse) {
+  .card :where(button:not(.option)) {
+    position: relative;
+  }
+
+  .card :where(button:not(.option))::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+  }
+}

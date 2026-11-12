@@ -13,7 +13,6 @@ import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { createActor, useSelector, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import { useQuery, useQueryClient, type QueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi, useContract, useSettings } from '@dshfiles/dshx/client'
-import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { RepositorySetup } from '@dshfiles/workspace-folder-picker/repository-setup-contract'
 import { HostChip, multiHostApi } from '@dshfiles/multi-host/destination'
@@ -413,22 +412,19 @@ export const DestinationBar = (props: {
     <TooltipProvider>
       <div className="dshx-root dshx:contents" aria-label={t('destination')}>
         <HostChipSlot localProjectPath={localProjectPath} />
-        {localProjectPath === undefined ? null : (
-          <span className="dshx:inline-flex">
-            <ProjectIcon path={localProjectPath} />
-          </span>
-        )}
         {toggle.busy ? (
           // Order 0 keeps it right after the native folder chip, which it stands in for until the switch lands.
           <span
             data-pending=""
             role="status"
-            aria-label={toggle.pending?.name ?? t('switchingDestination')}
-            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:bg-muted dshx:px-2 dshx:font-mono! dshx:text-xs dshx:text-muted-foreground"
+            aria-label={(toggle.pending?.name ?? null) === null ? t('switchingDestination') : t('preparingOwnWorkspace')}
+            // The folder name stays out of the chip (b:212a): the thread's workspace is a detail of the thread.
+            data-workspace-name={toggle.pending?.name ?? undefined}
+            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:bg-muted dshx:px-2 dshx:text-xs dshx:text-muted-foreground"
             style={{ order: 0 }}
           >
             <Spinner className="dshx:size-3.5" />
-            {toggle.pending?.name ?? t('switchingDestination')}
+            {(toggle.pending?.name ?? null) === null ? t('switchingDestination') : t('preparingOwnWorkspace')}
           </span>
         ) : null}
         {isJj ? (

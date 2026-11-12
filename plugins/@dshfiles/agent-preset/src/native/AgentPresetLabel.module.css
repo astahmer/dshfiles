@@ -22,6 +22,14 @@
   opacity: 0.7;
 }
 
+/* dshfiles (b:ark0): the name is its own flex item, so a label the header squeezes ends in an ellipsis; as a bare text
+   node it was an anonymous flex item, which text-overflow never reaches, and it was cut mid-letter. */
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* First sacrifice when the title row (the enclosing inline-size container)
    runs out of width: the preset is passive chrome, so it yields before any
    interactive header action loses its label. */

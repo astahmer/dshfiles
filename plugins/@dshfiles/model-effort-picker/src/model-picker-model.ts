@@ -114,10 +114,11 @@ export class ModelPickerModel {
     if (group === undefined || model === undefined) return undefined
     const name = ModelPickerModel.displayName({ group, model })
     const title = `${group.name} · ${name}`
-    const ambiguous = groups.some(
-      other => other.id !== group.id && other.models.some(candidate => ModelPickerModel.displayName({ group: other, model: candidate }) === name),
-    )
-    if (!ambiguous) return { model: name, title }
+    // b:4qjm: the chip reads just the model; it names the account only when the thread uses another account than the
+    // default one for this model (the first account, in priority order, that offers it). The menu's Account section and
+    // the tooltip always name it.
+    const fallback = ModelPickerModel.defaultAccountFor({ groups, model: current.model })
+    if (fallback === undefined || fallback.id === group.id) return { model: name, title }
     const initials = group.name
       .split(/\s+/u)
       .filter(Boolean)
@@ -126,6 +127,59 @@ export class ModelPickerModel {
       .slice(0, 3)
       .toUpperCase()
     return { model: name, providerTag: initials || group.id, title }
+  }
+
+  /** The account a model runs on by default: the first account, in catalog (priority) order, that offers it. */
+  static defaultAccountFor = (input: { readonly groups: readonly ModelGroup[]; readonly model: string }): ModelGroup | undefined =>
+    input.groups.find(group => group.models.some(model => model.id === input.model))
+
+  /**
+   * One list row per model (b:16yr). A route is still model × account; the view groups the routes of one model and one
+   * provider kind (same service, several accounts) into a row, so six accounts no longer list every model six times.
+   * The row stands for the account a click would use: the thread's account when it offers the model (choosing another
+   * model never moves the thread to another account), else the first account in catalog (priority) order. The detail
+   * panel chooses among `accounts`. Rows keep catalog order, the thread's own row first.
+   */
+  static modelRows = (input: {
+    readonly groups: readonly ModelGroup[]
+    readonly current: ModelSelection | null
+    readonly providerOf: (groupId: string) => string | undefined
+  }): readonly {
+    readonly key: string
+    readonly group: ModelGroup
+    readonly model: CatalogModel
+    readonly accounts: readonly ModelGroup[]
+    readonly active: boolean
+  }[] => {
+    const rows = new Map<string, { group: ModelGroup; model: CatalogModel; accounts: ModelGroup[] }>()
+    for (const group of input.groups) {
+      for (const model of group.models) {
+        const key = `${input.providerOf(group.id) ?? group.id}\u0000${model.id}`
+        const row = rows.get(key)
+        if (row === undefined) rows.set(key, { group, model, accounts: [group] })
+        else {
+          row.accounts.push(group)
+          if (input.current?.provider === group.id && input.current.model === model.id) {
+            row.group = group
+            row.model = model
+          }
+        }
+      }
+    }
+    const list = [...rows.entries()].map(([key, row]) => ({
+      key,
+      ...row,
+      active: input.current !== null && row.group.id === input.current.provider && row.model.id === input.current.model,
+    }))
+    return [...list].sort((left, right) => Number(right.active) - Number(left.active))
+  }
+
+  /** The same model on another account, keeping the effort when that account advertises it, else its default. */
+  private static selectionOn = (group: ModelGroup, model: CatalogModel, current: ModelSelection): ModelSelection => {
+    const keepsEffort = current.reasoningEffort === undefined || model.reasoning?.efforts.some(effort => effort.id === current.reasoningEffort) === true
+    const reasoningEffort = keepsEffort ? current.reasoningEffort : model.reasoning?.defaultEffort
+    const route: ModelSelection = { provider: group.id, model: model.id }
+    return reasoningEffort === undefined ? route : { ...route, reasoningEffort }
   }
 
   /**
@@ -152,10 +206,7 @@ export class ModelPickerModel {
     const model = group?.models.find(candidate => candidate.id === current.model)
     if (group === undefined || model === undefined) return undefined
 
-    const keepsEffort = current.reasoningEffort === undefined || model.reasoning?.efforts.some(effort => effort.id === current.reasoningEffort) === true
-    const reasoningEffort = keepsEffort ? current.reasoningEffort : model.reasoning?.defaultEffort
-    const route: ModelSelection = { provider: group.id, model: model.id }
-    return { group, selection: reasoningEffort === undefined ? route : { ...route, reasoningEffort } }
+    return { group, selection: ModelPickerModel.selectionOn(group, model, current) }
   }
 
   /** The family mark a row leads with, read from the model id and name rather than the account that serves it. */
@@ -214,9 +265,13 @@ export class ModelPickerModel {
     return { ...label, effort: model?.reasoning?.efforts.find(entry => entry.id === effort)?.name ?? effort }
   }
 
-  static effortName = (model: CatalogModel, current: ModelSelection | null): string => {
+  /**
+   * The reasoning effort the composer chip names: the chosen one, else the model's own default. Undefined when neither
+   * is known (the provider decides), so the chip shows the model alone instead of saying "Provider default".
+   */
+  static effortName = (model: CatalogModel, current: ModelSelection | null): string | undefined => {
     const selected = current?.reasoningEffort ?? model.reasoning?.defaultEffort
-    if (selected === undefined) return 'Provider default'
+    if (selected === undefined) return undefined
     return model.reasoning?.efforts.find(effort => effort.id === selected)?.name ?? selected
   }
 }

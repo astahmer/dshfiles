@@ -10,7 +10,7 @@ import { Clock, Duration, Effect, Layer, PubSub, Stream } from 'effect'
 import { MergedPullRequests } from '@dshfiles/jj-integration/merged-pull-requests'
 import { pullRequestApi } from './api.js'
 import { PullRequestCreator } from './create.js'
-import { GitHubCli } from './github-cli.js'
+import { GitHubCli, type GhCommandFailed } from './github-cli.js'
 import { GitLabCli } from './gitlab-cli.js'
 import { ForgePullRequests } from './forge-port.js'
 import { GitHubPointsFloor, PullRequestMonitor, PullRequestMonitorModel } from './monitor.js'
@@ -19,7 +19,7 @@ import { PullRequestSettings, pullRequestSettings } from './settings.js'
 import { PullRequestRefreshTriggers, TRIGGER_EVENT_TYPES, type ThreadEvent } from './refresh-triggers.js'
 import { PullRequestStore } from './store.js'
 import { ThreadContext } from './thread-context.js'
-import type { PullRequestLinkView, PullRequestRecord } from './pull-request-model.js'
+import type { ForgeSearchItem, ForgeSearchUnavailable, PullRequestLinkView, PullRequestRecord } from './pull-request-model.js'
 
 const pullRequestLinkViewOf = (record: PullRequestRecord): PullRequestLinkView => ({
   sessionId: record.sessionId,
@@ -75,6 +75,9 @@ const pollWorker = Layer.effectDiscard(
   }),
 ).pipe(Layer.provideMerge(creator), Layer.provideMerge(Settings.layer(pullRequestSettings)))
 
+/** The `search` method's output (b:ysaj: with the recovery reason the `#` picker shows). */
+type ForgeSearchOutput = { readonly items: readonly ForgeSearchItem[]; readonly unavailable?: ForgeSearchUnavailable }
+
 export default DshxPlugin.make({
   name: '@dshfiles/pull-requests',
   settings: [pullRequestSettings],
@@ -82,7 +85,17 @@ export default DshxPlugin.make({
   layer: pollWorker,
   apis: [
     Api.bind(pullRequestApi, {
-      search: input => GitHubCli.use(github => github.searchIssues(input).pipe(Effect.map(items => ({ items })))),
+      search: input =>
+        GitHubCli.use(github =>
+          github.searchIssues(input).pipe(
+            Effect.map((items): ForgeSearchOutput => ({ items })),
+            // gh missing or signed out (exit 4) is a recovery the `#` picker offers; any other failure stays an error.
+            Effect.catchTag('GhCommandFailed', (error): Effect.Effect<ForgeSearchOutput, GhCommandFailed> => {
+              const reason = error.missing === true ? 'gh-missing' : error.exitCode === 4 ? 'signed-out' : null
+              return reason === null ? Effect.fail(error) : Effect.succeed({ items: [], unavailable: { reason, message: error.message } })
+            }),
+          ),
+        ),
       link: (input, call) =>
         PullRequestMonitor.use(monitor => monitor.link(input, call.caller).pipe(Effect.map(link => ({ link: pullRequestLinkViewOf(link) })))),
       unlink: (input, call) => PullRequestMonitor.use(monitor => monitor.unlink(input, call.caller)),

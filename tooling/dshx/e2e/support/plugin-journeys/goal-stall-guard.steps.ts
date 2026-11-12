@@ -11,7 +11,7 @@ When('a goal whose rounds come back empty is set in a new thread', async ({ page
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await page.getByRole('button', { name: /^Select model/ }).click()
   await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill('/goal [[empty]] Write the release notes')
   await composer.press('Enter')
 })
@@ -22,7 +22,9 @@ When('three messages that come back empty are sent in a new thread without a goa
   await page.getByRole('button', { name: /^Select model/ }).click()
   await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
   for (let message = 1; message <= 3; message += 1) {
-    const composer = page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/ })
+    const composer = page.getByRole('textbox', {
+      name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/,
+    })
     await composer.fill(`[[empty]] Message ${String(message)}`)
     await composer.press('Enter')
     await expect(failedTurns(page)).toHaveCount(message, { timeout: 60_000 })
@@ -73,7 +75,7 @@ When('a one-round goal is started with a one-shot extension request', async ({ p
   await page.getByRole('button', { name: /^Select model/ }).click()
   await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
   const encodedObjective = String.raw`Finish handoff [[once call extend_goal_budget \u007b\u0022additional_rounds\u0022:1,\u0022progress\u0022:\u0022Primary handoff completed and verified.\u0022,\u0022remaining_work\u0022:\u0022One final result check remains.\u0022,\u0022justification\u0022:\u0022The original request authorizes this monitoring window.\u0022\u007d]]`
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill(`[[call create_goal {"objective":"${encodedObjective}","max_goal_rounds":1}]]`)
   await composer.press('Enter')
 })
@@ -86,7 +88,9 @@ Then('the extension is applied and the goal blocks at its new limit', async ({ p
 })
 
 When('completion evidence is delivered to the round-limited goal', async ({ page }: { page: Page }) => {
-  const composer = page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/ })
+  const composer = page.getByRole('textbox', {
+    name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/,
+  })
   await composer.fill('[[call complete_blocked_goal {"evidence":"All requirements passed review; final output was produced and verified."}]]')
   await composer.press('Enter')
 })

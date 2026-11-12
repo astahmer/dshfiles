@@ -2,7 +2,17 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
-import { PluginArtworkTerminal, ShortcutKeys, Button, IconChevronDownOutlineRegular, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
+import { PluginArtworkTerminal, ShortcutKeys, Button } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button as KitButton } from '@dshfiles/plugin-ui/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
 import type { TerminalLaunchShells } from '@deepseek-ai/dsh-api-terminal-controller/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -47,11 +57,24 @@ export function TerminalGuide({
     })
     return () => { lifetime.abort() }
   }, [open, attempt, loadShells])
-  const items = state.phase === 'ready'
-    ? state.choices.shells.map(shell => ({ id: shell.path, label: shell.name }))
+  // dshfiles: the shell menu is the kit dropdown (a bottom sheet on a phone), with lucide icons and 44px rows on touch.
+  const launch = (path: string): void => {
+    selectShell(path)
+    setOpen(false)
+    tab.actions.openTab('terminal', { replaceTab: true, params: { shellPath: path } })
+  }
+  const menu = state.phase === 'ready'
+    ? state.choices.shells.length === 0
+      ? <DropdownMenuItem disabled>{t('shellEmpty')}</DropdownMenuItem>
+      : <DropdownMenuRadioGroup value={state.choices.selectedShell ?? ''} onValueChange={launch}>
+        {state.choices.shells.map(shell => <DropdownMenuRadioItem key={shell.path} value={shell.path}>{shell.name}</DropdownMenuRadioItem>)}
+      </DropdownMenuRadioGroup>
     : state.phase === 'loading'
-      ? [{ id: 'loading', label: t('shellLoading'), disabled: true }]
-      : [{ id: 'error', label: t('failed', { message: state.message }), disabled: true }, { id: 'retry', label: t('retry') }]
+      ? <DropdownMenuItem disabled>{t('shellLoading')}</DropdownMenuItem>
+      : <>
+        <DropdownMenuItem disabled>{t('failed', { message: state.message })}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={(event) => { event.preventDefault(); setState({ phase: 'loading' }); setAttempt(value => value + 1) }}>{t('retry')}</DropdownMenuItem>
+      </>
   return <div className={css.entry} data-sidebar-right-guide-entry={kind}>
     <Button variant="ghost" className={css.main} aria-label={description === undefined ? title : `${title} ${description}`} aria-keyshortcuts={shortcut?.aria}
       onClick={() => { tab.actions.openTab('terminal', { replaceTab: true }) }} />
@@ -59,22 +82,16 @@ export function TerminalGuide({
     <span className={css.text}>
       <span className={css.titleRow}>
         <span className={css.title} aria-hidden="true">{title}</span>
-        <Menu
-          open={open} portal autoFocus align="end" className={css.menu}
-          items={items.length === 0 ? [{ id: 'empty', label: t('shellEmpty'), disabled: true }] : items}
-          selectedId={state.phase === 'ready' ? state.choices.selectedShell : undefined}
-          onClose={() => { setOpen(false) }}
-          onSelect={(path) => {
-            if (state.phase === 'failed') { setState({ phase: 'loading' }); setAttempt(value => value + 1); return }
-            selectShell(path)
-            setOpen(false)
-            tab.actions.openTab('terminal', { replaceTab: true, params: { shellPath: path } })
-          }}
-          anchor={<Button variant="ghost" className={css.trigger} aria-label={t('shell')} aria-haspopup="menu" aria-expanded={open}
-            onClick={() => { setState({ phase: 'loading' }); setOpen(value => !value) }}>
-            <IconChevronDownOutlineRegular />
-          </Button>}
-        />
+        <span className={`dshx-root ${css.menu}`}>
+          <DropdownMenu open={open} onOpenChange={(next) => { if (next) setState({ phase: 'loading' }); setOpen(next) }}>
+            <DropdownMenuTrigger asChild>
+              <KitButton variant="ghost" size="icon-xs" className={css.trigger} aria-label={t('shell')}>
+                <ChevronDownIcon aria-hidden />
+              </KitButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="dshx-root">{menu}</DropdownMenuContent>
+          </DropdownMenu>
+        </span>
       </span>
       {description !== undefined && <span className={css.description} aria-hidden="true">{description}</span>}
     </span>

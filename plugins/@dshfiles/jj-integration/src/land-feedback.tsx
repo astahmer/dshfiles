@@ -29,6 +29,4 @@ export const describeLandResult = (t: JjIntegrationTranslate, result: LandResult
 }
 
 /** Rebase rewrote the repository: the jujutsu plugin's changes card and chips listen for this to refetch. */
-export const announceRepositoryChange = (): void => {
-  window.dispatchEvent(new CustomEvent('dshfiles:jj-changed'))
-}
+export { announceRepositoryChange } from './repository-change.js'

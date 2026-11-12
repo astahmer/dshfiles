@@ -22,7 +22,10 @@ a link to the thread and its verbs inline: answer choices, Open, Done, Snooze (1
 and Mute source. Every open item a provider marks resumable also gets one page-level **Resume all**, so a batch of
 usage-limit stops leaves the list in one click. The history tabs offer Reopen, Unsnooze and Unmute, so every user
 transition can be undone. Browser
-alerts for new blocking items are opt-in, per browser, below the list.
+alerts for new Needs you items (questions and failures) are opt-in, per browser, below the list: the notification is
+titled with the thread, its body is the question or the failure, and a click opens that item's thread (or the Inbox
+when nothing else can show it). An item that can Land asks before it lands, showing what will land, and offers
+**Review**, which opens the thread's Changes view.
 
 ### The attention contract
 
@@ -39,12 +42,27 @@ imports a provider) and call it from their Host half with `HostApis.client(atten
 | `act({ id, verb, choiceId? })`                                                        | user                                                                                           | Answer, Approve, Land, Retry or Resume, handed to the owning provider through the `dshfiles/attention/act` serial Cordis event.                                                                                                         |
 
 Severities follow plan §4.7: `blocking` and `failed` are Needs you, `ready` is Other, `info` never reaches the inbox.
+A Ready item left unopened for 72 hours (no provider change, no reopen, no snooze ending in that time) moves to Done
+on a ten-minute sweep (plan E2), so Other holds what is worth a look rather than every finish since last week; Reopen
+brings it back for another 72 hours. Needs you and Failed never expire.
 Items live in the `dshfiles_attention` storage domain (bounded at 2000; closed items kept seven days). Browsers follow
 the `changed` event, which carries the new Needs you count, and fall back to polling while the event stream is down.
 
 First providers: `@dshfiles/agent-questions` (pending child-to-parent questions are blocking items about the parent
 thread, answerable in place with the question's options) and `@dshfiles/thread-sidebar` (unacknowledged finished turns
 are Ready, or Failed for an error or the token limit; opening the thread resolves the item).
+
+## Push for blocking items
+
+**Push blocking items to this device** (Inbox, under the in-tab alerts) sends each new Needs you or Failed item to a
+device even when no DSH tab is open; Ready items never push. Turning it on registers a service worker the Host serves
+from its own origin (`/dshfiles-web-push/sw.js`, scoped to its own folder so it controls no page), subscribes the
+browser with the Host's VAPID key and records the device. The Host keeps the keys and subscriptions in the
+`dshfiles_web_push` storage domain, encrypts each push (`aes128gcm`, Node crypto, no push library) and pushes once per
+item; the first read after a Host start only seeds, so a restart replays nothing. A subscription the push service
+forgot is dropped, any other failure stays on the device with its recovery. On an iPhone, push needs DSH added to the
+Home Screen (iOS 16.4+) and a secure origin (the Tailscale `https://…ts.net` URL); the Inbox says so. Agent tools:
+`inbox_push_devices`, `inbox_push_test`, `inbox_push_remove` (`confirm: true`); a device subscribes only itself.
 
 ## Data flow
 

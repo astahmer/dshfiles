@@ -10,6 +10,8 @@ import { defineClient, MenuItem, useRegistry } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { ToolCallSections, type ToolCallSectionProps } from '@dshfiles/tool-meta/tool-call-sections'
+import { TranscriptRunFolds } from '@dshfiles/chat/run-folds'
+import { jobRunFold } from './job-run-fold.js'
 import type { JobsClient } from './job-preview-model.js'
 import { JobPreviewDock, JobPreviewSection, type JobPreviewBindings } from './job-preview.js'
 import { Processes } from './processes-page.js'
@@ -90,6 +92,8 @@ export default defineClient({
         </PluginQueryProvider>
       )
       plugin.add(ToolCallSections, { id: '@dshfiles/background-jobs/job-preview', Section: plugin.bind(JobPreview) })
+      // Two or more consecutive job starts fold into one transcript row (b:7rv2); each card stays under the fold.
+      plugin.add(TranscriptRunFolds, jobRunFold({ jobs, t: translate }))
       ctx.slots.inject('conversation.input.dock', () =>
         ctx.slots.register(
           { name: 'conversation.input.dock', id: 'dshfiles-background-jobs-live', order: 3, inject: sessionId => ({ sessionId }) },

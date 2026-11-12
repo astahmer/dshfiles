@@ -64,7 +64,10 @@ import { WorkbenchView, type WorkbenchPanelDrop } from './workbench-view.js'
 import { NewViewTabs, type NewViewSelection } from './new-view.js'
 import { NewThreadSource } from './new-thread-source.js'
 import { TabRows } from './tab-row-visibility.js'
+import { MAIN_TABS_ATTRIBUTE, mainTabsHidden } from './header-seat.js'
 import { SidebarPreviewMigration } from './sidebar-preview-migration.js'
+import { ShellMerge, SIDEBAR_PANE_ID, workbenchLayoutReset, workbenchLeftKeep, workbenchShellMerge } from './shell-merge.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { PhoneSheet, phoneAwareDockActions, usePhoneSheetOpen, usePhoneWidth } from './phone-sheet.js'
 
 const DROP_DIRECTIONS = { top: 'above', bottom: 'below', left: 'left', right: 'right', center: 'within' } as const satisfies Record<
@@ -152,6 +155,8 @@ export default defineClient({
     const bottomStore = createLayoutStore({ surface: 'bottom' })
     const leftStore = createLayoutStore({ surface: 'left' })
     const sidebarPreviewMigration = SidebarPreviewMigration.create()
+    // One sidebar layout (b:952m): this browser applied the sidebar's merge request once.
+    const shellMergeDone = createStoredValue({ key: 'dshfiles.workbench.shell-merge.v1', schema: Schema.Boolean, fallback: false })
     let syncMainTabs: (() => void) | undefined
     let resettingLayout = false
     // On a phone the same controls open the thread panel sheet instead of the remembered desktop right pane.
@@ -476,7 +481,7 @@ export default defineClient({
                 <button
                   type="button"
                   role="menuitem"
-                  className="dshx:flex dshx:w-full dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-md) dshx:border-none dshx:bg-transparent dshx:px-[7px] dshx:py-1 dshx:text-left dshx:text-[length:calc(var(--dsh-content-font-size-secondary,13px)-1px)] dshx:text-(--dsw-alias-label-primary) dshx:hover:bg-(--dsw-alias-interactive-bg-hover)"
+                  className="dshx:flex dshx:w-full dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-md) dshx:border-none dshx:bg-transparent dshx:px-[7px] dshx:py-1 dshx:text-left dshx:text-xs dshx:text-(--dsw-alias-label-primary) dshx:hover:bg-(--dsw-alias-interactive-bg-hover)"
                   onClick={() => {
                     props.dismiss()
                     if (ctx.sidebarRight.mounted.getSnapshot() !== undefined) ctx.sidebarRight.close(props.tab.id)
@@ -571,7 +576,8 @@ export default defineClient({
       const preview = registry.get(SidebarPreviewMigration.panelId)
       if (preview === undefined) return
       sidebarPreviewMigration.seat({
-        alreadyPlaced: () => regions.holds(preview.id) || savedRegionOf(preview.id) !== undefined,
+        // The merged default (b:952m) is the old Fixed column, whose status strip already carries the previews.
+        alreadyPlaced: () => regions.holds(preview.id) || savedRegionOf(preview.id) !== undefined || api.getPanel(SIDEBAR_PANE_ID) !== undefined,
         place: () => {
           const active = api.activePanel
           // API insertion order is not visual order (Navigation was inserted
@@ -742,11 +748,34 @@ export default defineClient({
       return NewViewTabs.completeSelection(api, page.record.id, target)
     }
 
+    /**
+     * Fixed layout (productivity pass Q5, E6): the main region's tab rows are hidden, so a thread facet picked from its
+     * chooser (the New tab key, ⌘K) would become an unreachable centre tab over the thread. It opens in the thread panel
+     * instead, where facets live, and the chooser it was picked from closes. Free docking keeps the pick in place (D6).
+     */
+    const openFacetInThreadPanel = (
+      definition: WorkbenchPanelDefinition,
+      api: DockviewApi,
+      target?: { readonly group?: DockviewGroupPanel; readonly replacePanelId?: string },
+    ): boolean => {
+      const facet = definition.threadFacet
+      if (facet === undefined || !mainTabsHidden()) return false
+      if (facet.onScreen?.getSnapshot() === undefined) return false
+      try {
+        ctx.sidebarRight.openTab(facet.kind, { revealIfOpened: true })
+      } catch {
+        return false
+      }
+      if (target?.replacePanelId !== undefined) api.getPanel(target.replacePanelId)?.api.close()
+      return true
+    }
+
     /** Where an "Add panel" goes: the definition moves here if another region shows it. */
     const openIn =
       (region: WorkbenchRegionId) =>
       (definition: WorkbenchPanelDefinition, api: DockviewApi, target?: { readonly group?: DockviewGroupPanel; readonly replacePanelId?: string }): void => {
         if (terminalSource.open(definition, api, target)) return
+        if (region === 'main' && openFacetInThreadPanel(definition, api, target)) return
         if (revealFacetPage(definition, api, target)) return
         if (threadFacets.open(definition, api, target)) return
         if (newThreadSource.open(definition, api, target)) return
@@ -961,7 +990,7 @@ export default defineClient({
       const movable =
         active === undefined ? [] : [{ definition: { title: active.title, mainPanelId: panelMainTarget({ panel: active, registry }) }, panelId: active.id }]
       if (api === null || movable.length === 0) return null
-      // The left panes mount only in the sidebar's free-docking layout; the fixed rail layout has no left region to move to.
+      // The left region is always mounted behind the rail (b:952m); an older sidebar without it registers no reveal.
       const destinations = (['left', 'right', 'bottom', 'main'] as const).filter(
         destination => destination !== props.from && (destination !== 'left' || revealLeftPanel !== undefined),
       )
@@ -998,6 +1027,46 @@ export default defineClient({
     // surfaces and written back through the same stores, so a region that is
     // not mounted yet still receives the layout when it opens.
     const layoutStores = { main: store, dock: dockStore, bottom: bottomStore, left: leftStore }
+    /**
+     * Keep in sidebar (b:952m): dock a panel in the left region as a stacked pane under the Sidebar pane, taking it out
+     * of another region, or take it out of the left region. Requests wait for the left region to mount.
+     */
+    const applyLeftKeeps = (): void => {
+      const left = regions.get('left')
+      if (left === undefined) return
+      const requests = workbenchLeftKeep().take()
+      if (requests.length === 0) return
+      for (const request of requests) {
+        const definition = registry.get(request.viewId) ?? registry.list().find(panel => panel.mainPanelId === request.viewId)
+        if (definition === undefined) continue
+        const existing = left.getPanel(definition.id)
+        if (!request.keep) {
+          if (existing !== undefined) left.removePanel(existing)
+          continue
+        }
+        if (existing !== undefined) continue
+        for (const [, api] of regions.entries()) {
+          if (api === left) continue
+          const elsewhere = api.getPanel(definition.id)
+          if (elsewhere !== undefined) api.removePanel(elsewhere)
+        }
+        const sidebar = left.getPanel(SIDEBAR_PANE_ID)
+        left.addPanel(
+          sidebar === undefined
+            ? { id: definition.id, component: WORKBENCH_COMPONENT, title: definition.title, inactive: true }
+            : {
+                id: definition.id,
+                component: WORKBENCH_COMPONENT,
+                title: definition.title,
+                position: { referencePanel: sidebar, direction: 'below' },
+                initialHeight: 260,
+                inactive: true,
+              },
+        )
+      }
+      leftStore.set(left.toJSON())
+    }
+    ctx.effect(() => workbenchLeftKeep().subscribe(applyLeftKeeps), 'workbench: keep-in-sidebar requests')
     const resetLayout = (): void => {
       if (resettingLayout) return
       resettingLayout = true
@@ -1020,6 +1089,7 @@ export default defineClient({
           },
           restoreMain: () => {
             resettingLayout = false
+            workbenchLayoutReset().notify()
             const main = regions.get('main')
             if (ctx.get('mainSurface')?.mode() === 'workbench') {
               const channel = workbenchTabs()
@@ -1274,6 +1344,8 @@ export default defineClient({
                 onApi={api => {
                   drainPendingOpen('left', api)
                   seatSidebarPreview(api)
+                  // A keep request filed before the left region mounted is applied now (b:952m).
+                  window.setTimeout(applyLeftKeeps, 0)
                 }}
                 onAddSurface={() => addNestedSurface('left')}
                 headerActions={context => <MoveMenu from="left" {...context} />}
@@ -1408,6 +1480,50 @@ export default defineClient({
     // The row's presence lives outside the seat: the frame renders `shell.bottom`
     // only while the row is open, so the component that opens it must be mounted
     // regardless. `set` is what the header action and the command call.
+    // b:4v6p: the main tab rows show unless showMainTabs is off; the stylesheet and the header seat read this document
+    // attribute. The command flips the setting.
+    let switchMainTabs: (() => void) | undefined
+    const MainTabsPresence = decorate(() => {
+      const settings = useSettings(workbenchSettings)
+      const shown = settings.value?.showMainTabs !== false
+      const settingsReady = settings.status !== 'loading'
+      // One sidebar layout (b:952m): apply the sidebar's merge request once per browser (see shell-merge.ts).
+      useEffect(() => {
+        if (!settingsReady) return
+        const merge = workbenchShellMerge()
+        const apply = (): void => {
+          const request = merge.take()
+          if (request === undefined) return
+          const plan = shellMergeDone.get()
+            ? { savedLayouts: undefined, resetLeft: false, showMainTabs: request.former === 'docking' && request.firstOnHost }
+            : ShellMerge.plan({ request, left: leftStore.get(), savedLayouts: savedLayouts.get() })
+          if (plan.savedLayouts !== undefined) savedLayouts.set(plan.savedLayouts)
+          if (plan.resetLeft) {
+            leftStore.remove()
+            const left = regions.get('left')
+            if (left !== undefined) {
+              WorkbenchLayout.applyDefaultLayout(left, registry.list(), 'threads')
+              leftStore.set(left.toJSON())
+            }
+          }
+          shellMergeDone.set(true)
+          if (plan.showMainTabs) void settings.set('showMainTabs', true)
+        }
+        apply()
+        return merge.subscribe(apply)
+      }, [settings, settingsReady])
+      useLayoutEffect(() => {
+        document.documentElement.setAttribute(MAIN_TABS_ATTRIBUTE, shown ? 'shown' : 'hidden')
+        return () => document.documentElement.removeAttribute(MAIN_TABS_ATTRIBUTE)
+      }, [shown])
+      useEffect(() => {
+        switchMainTabs = () => void settings.set('showMainTabs', !shown)
+        return () => {
+          switchMainTabs = undefined
+        }
+      }, [settings, shown])
+      return null
+    })
     let switchBottomPanel: ((shown: boolean) => void) | undefined
     // One toggle for the header action and the keyboard: the row's own height says
     // whether it is open, so a chord pressed from any surface agrees with it.
@@ -1442,6 +1558,7 @@ export default defineClient({
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-workbench-bottom-panel', order: 45 }, BottomPanelPresence),
     )
+    ctx.effect(() => ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-workbench-main-tabs', order: 47 }, MainTabsPresence))
     ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-workbench-layout-dialog', order: 46 }, LayoutsDialog))
 
     const toggleRightPanel = dockActions.toggle
@@ -1449,12 +1566,28 @@ export default defineClient({
     const RESET_COMMAND_ID = 'workbench.resetLayout'
     const SHOW_TAB_ROWS_COMMAND_ID = 'workbench.showTabRows'
     const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
+    const MAIN_TABS_COMMAND_ID = 'workbench.toggleMainTabs'
+    if (isShortcutCommandId(MAIN_TABS_COMMAND_ID)) {
+      ctx.effect(
+        () =>
+          ctx.shortcuts.register({
+            id: MAIN_TABS_COMMAND_ID,
+            label: () => (mainTabsHidden() ? 'Layout: show tabs' : 'Layout: hide tabs'),
+            aliases: ['tabs', 'tab strip', 'where are my tabs', 'show tabs', 'hide tabs', 'main tabs'],
+            defaults: {},
+            regions: ['page', 'editable'],
+            modals: [],
+            resolve: () => ({ status: 'handled', run: () => switchMainTabs?.() }),
+          }),
+        'workbench: show or hide the main tabs',
+      )
+    }
     if (isShortcutCommandId(SHOW_TAB_ROWS_COMMAND_ID)) {
       ctx.effect(
         () =>
           ctx.shortcuts.register({
             id: SHOW_TAB_ROWS_COMMAND_ID,
-            label: () => 'Workbench: Show tab rows',
+            label: () => 'Show tab rows',
             aliases: ['show', 'hidden tabs', 'tab row', 'tab bar', 'restore tabs'],
             defaults: {},
             regions: ['page', 'editable'],
@@ -1475,7 +1608,8 @@ export default defineClient({
           ctx.shortcuts.register({
             id: RESET_COMMAND_ID,
             label: () => `${translate('title')}: ${translate('resetLayout')}`,
-            aliases: ['workbench', 'reset', 'layout', 'recover', 'conversation', 'composer', 'tabs'],
+            // The two former sidebar layouts (b:952m) are this one now: their names find it.
+            aliases: ['workbench', 'reset', 'layout', 'recover', 'conversation', 'composer', 'tabs', 'fixed layout', 'free docking', 'rail', 'sidebar'],
             // The palette/shortcut command lives outside every Dockview surface, so
             // it remains available when no main panel or header survived the layout.
             defaults: {},

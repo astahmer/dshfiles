@@ -229,9 +229,15 @@ export function apply(ctx: ClientContext): void {
     const handle = createSidebarRightStore(() => defaultSeed(tabs))
     // Each Session Context generation owns one Store. Background tab actions
     // use the latest adoption for that Session.
+    // dshfiles delta, merged with upstream b:9vr8: the renderer keeps a Session's store instance for its whole Context
+    // generation, so a thread that left the screen and came back renders that cached instance without a new `create`.
+    // One adoption path (`bind`) re-adopts it from both ends: the controller's mint (`rendered.mint`, upstream) and the
+    // seat's mount (`open` below, productivity pass Q5). `bound` names the adopted instance per Session.
+    const bound = new Map<SessionId, object>()
     const bind = (sessionId: SessionId, instance: ReturnType<typeof handle.create>): void => {
       sessionReleases.get(sessionId)?.()
       const releaseAdoption = adopt(sessionId, instance)
+      bound.set(sessionId, instance)
       let releaseProjection: (() => void) | undefined
       const navigationSubscriptions = new Map<TabId, () => void>()
       const sync = (): void => {
@@ -283,6 +289,7 @@ export function apply(ctx: ClientContext): void {
         for (const unsubscribe of navigationSubscriptions.values()) unsubscribe()
         navigationSubscriptions.clear()
         releaseAdoption()
+        if (bound.get(sessionId) === instance) bound.delete(sessionId)
       })
     }
     const rendered = createRenderedStores({ create: sessionId => handle.create(sessionId), bind })
@@ -290,8 +297,19 @@ export function apply(ctx: ClientContext): void {
       ...handle,
       create: scopeKey => {
         const instance = scopeKey === undefined ? handle.create(scopeKey) : rendered.create(scopeKey as SessionId)
+        const sessionId = scopeKey as SessionId | undefined
+        // The seat calls `open` when it mounts (resource-seat.tsx): a seat that renders a store which is not the
+        // adopted one re-adopts it through the same `bind` the controller's mint uses.
+        const actions: typeof instance.actions = {
+          ...instance.actions,
+          open: (...args: Parameters<typeof instance.actions.open>) => {
+            if (sessionId !== undefined && bound.get(sessionId) !== instance) bind(sessionId, instance)
+            instance.actions.open(...args)
+          },
+        }
         return {
           ...instance,
+          actions,
           clearPersisted() {
             instance.clearPersisted()
             if (scopeKey === undefined) return

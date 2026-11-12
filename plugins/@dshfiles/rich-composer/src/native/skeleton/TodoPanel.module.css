@@ -19,12 +19,11 @@
     var(--dsh-composer-dock-inset) -
     var(--dsh-composer-dock-inset)
   );
-  border: 0;
-  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
+  /* Visual refresh T3.1: the composer card below is the only elevated resting object, so this dock card rests flat
+     on the panel step with one hairline (no shadow, no menu blur). */
+  border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l1));
   border-radius: var(--dsw-radius-lg);
-  background: var(--dsw-specific-menu);
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
-  box-shadow: var(--dsw-elevation-panel);
+  background: var(--dshx-tone-panel, var(--dsw-specific-menu));
   /* The menu surface and the scrolling `.list` use the l2 scrollbar colors.
      Declared here because the custom properties inherit into `.list` (see
      ui-theme styles/scrollbar.css for the rebinding contract). */

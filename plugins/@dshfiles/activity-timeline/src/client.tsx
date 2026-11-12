@@ -6,7 +6,7 @@ import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { Changes, Command, createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { attentionApi } from './attention-api.js'
 import { NextWaiting } from './next-waiting.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -35,13 +35,25 @@ export default defineClient({
     const translate = ctx.locale.bind(ACTIVITY_TIMELINE_LOCALE_NAMESPACE)
     const label = (): string => `Activity Timeline: ${translate('title')}`
     const inboxTranslate = ctx.locale.bind(INBOX_LOCALE_NAMESPACE)
-    const navigation = { sessions: ctx.sessions, uiWorkspace: ctx.uiWorkspace, workspaces: ctx.workspaces }
+    // Review opens a thread's Changes view through dshx's Changes contract (diffs-review owns it), with no dependency.
+    const review = (input: { readonly sessionId: string; readonly workspacePath: string }): boolean => {
+      const changes = metadata?.plugin?.use(Changes).get()
+      return changes?.status === 'active' ? changes.value.review(input) : false
+    }
+    // Inbox › Closed links the retained notification history when thread-sidebar serves it (b:ysaj).
+    const NOTIFICATIONS_PANEL_ID = 'dshfiles-notification-history'
+    const openNotifications = (): boolean => {
+      if (!ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === NOTIFICATIONS_PANEL_ID)) return false
+      metadata?.plugin?.layout.openPanel(NOTIFICATIONS_PANEL_ID)
+      return true
+    }
+    const navigation = { sessions: ctx.sessions, uiWorkspace: ctx.uiWorkspace, workspaces: ctx.workspaces, review, openNotifications }
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register(
         { name: 'sidebar.panellist', id: INBOX_PANEL_ID, order: 2, label: () => inboxTranslate('title'), locale: INBOX_LOCALE_NAMESPACE },
         decorate(props => (
           <PluginQueryProvider>
-            <InboxGlyph size={props.size} navigation={navigation} />
+            <InboxGlyph size={props.size} navigation={navigation} openInbox={() => metadata?.plugin?.layout.openPanel(INBOX_PANEL_ID)} />
           </PluginQueryProvider>
         )),
       ),
@@ -59,7 +71,8 @@ export default defineClient({
     // Jump to next waiting (docs/ade-ux §4.8): ⌥J opens the next Needs you item's thread, cycling; with nothing waiting,
     // or an item that is not about a thread, it opens the Inbox. The Web shortcut registry admits no ⌥-letter default,
     // so the registry row lists the command in Settings › Key bindings and the palette (a user binding there runs it
-    // too) while a capture-phase listener claims ⌥J itself, as @dshfiles/shortcuts does for chords the registry cannot.
+    // too) while @dshfiles/shortcuts claims ⌥J itself through a hidden `Command`: ⌥J types ∆ on macOS, so its
+    // `not-typing` scope keeps it out of the composer and every text field.
     const inbox = createApiClient(ctx, attentionApi)
     let lastJumpedId: string | null = null
     const openInbox = (): void => {
@@ -98,16 +111,18 @@ export default defineClient({
         'activity-timeline: jump to next waiting',
       )
     }
-    ctx.effect(() => {
-      const onKeyDown = (event: KeyboardEvent): void => {
-        if (event.defaultPrevented || event.code !== 'KeyJ' || !event.altKey || event.metaKey || event.ctrlKey || event.shiftKey || event.repeat) return
-        event.preventDefault()
-        event.stopPropagation()
+    metadata?.plugin?.add(Command, {
+      id: '@dshfiles/activity-timeline.next-waiting',
+      title: inboxTranslate('jumpNextWaiting'),
+      keys: ['Alt+J'],
+      scope: 'not-typing',
+      section: 'Go to',
+      // The Host registry row above already lists it in the palette.
+      hidden: true,
+      run: () => {
         void jumpToNextWaiting().catch(openInbox)
-      }
-      window.addEventListener('keydown', onKeyDown, true)
-      return () => window.removeEventListener('keydown', onKeyDown, true)
-    }, 'activity-timeline: option-j')
+      },
+    })
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label, locale: ACTIVITY_TIMELINE_LOCALE_NAMESPACE }, PanelGlyph),
     )

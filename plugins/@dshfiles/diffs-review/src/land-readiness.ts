@@ -80,8 +80,67 @@ const checks = (receipts: readonly CheckReceipt[] | undefined): { readonly statu
   return { status: 'done', text: `Checks passed (${all.map(receipt => receipt.label).join(', ')})` }
 }
 
+/** The thread workspace fields "Land & next" reads from jj-integration's repository view. */
+export interface LandCandidate extends LandThread {
+  readonly path: string
+  readonly missing: boolean
+  readonly sessionIds: readonly string[]
+  readonly integrationQueuedAt?: number | undefined
+}
+
+/**
+ * The thread "Land & next" opens after this one lands: another workspace with described, conflict-free work that its
+ * Host says it can land now and no land already queued, in the repository's own order (the same repository first).
+ * Undefined when none is ready, so the card offers plain Land only.
+ */
+const nextReady = (input: {
+  readonly repositories: readonly { readonly repoRoot: string; readonly threads: readonly LandCandidate[] }[]
+  readonly currentPath: string
+}): { readonly path: string; readonly sessionId: string } | undefined => {
+  const comparable = (path: string): string => path.replace(/[\\/]+$/u, '')
+  const current = comparable(input.currentPath)
+  const ordered = [...input.repositories].sort(
+    (left, right) =>
+      Number(!left.threads.some(thread => comparable(thread.path) === current)) - Number(!right.threads.some(thread => comparable(thread.path) === current)),
+  )
+  for (const repository of ordered)
+    for (const thread of repository.threads) {
+      if (comparable(thread.path) === current || thread.missing || thread.sessionIds.length === 0) continue
+      if (thread.integrationQueuedAt !== undefined || thread.canRebase !== true || thread.unlanded.length === 0) continue
+      if (thread.unlanded.some(revision => revision.conflict || revision.description.trim().length === 0)) continue
+      const sessionId = thread.sessionIds[0]
+      if (sessionId !== undefined) return { path: thread.path, sessionId }
+    }
+  return undefined
+}
+
+/** What landing moves, in one line the card reads before the checks: titles first, then the size. */
+const changeSummary = (input: {
+  readonly revisions: readonly { readonly changeId: string; readonly description: string }[]
+  readonly files?: readonly { readonly additions: number; readonly deletions: number }[] | undefined
+  readonly shown?: number
+}): {
+  readonly titles: readonly { readonly changeId: string; readonly title: string }[]
+  readonly more: number
+  readonly stat: string | undefined
+} => {
+  const shown = input.shown ?? 3
+  const titles = input.revisions.slice(0, shown).map(revision => ({
+    changeId: revision.changeId.slice(0, 8),
+    title: revision.description.split('\n')[0]?.trim() || '(no description)',
+  }))
+  const files = input.files
+  const stat =
+    files === undefined
+      ? undefined
+      : `${files.length === 1 ? '1 file' : `${String(files.length)} files`} · +${String(files.reduce((sum, file) => sum + file.additions, 0))} −${String(files.reduce((sum, file) => sum + file.deletions, 0))}`
+  return { titles, more: Math.max(0, input.revisions.length - shown), stat }
+}
+
 export class LandCardModel {
   static readonly readiness = readiness
   static readonly behindText = behindText
   static readonly checks = checks
+  static readonly nextReady = nextReady
+  static readonly changeSummary = changeSummary
 }

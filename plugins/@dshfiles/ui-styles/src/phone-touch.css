@@ -1,0 +1,30 @@
+/*
+ * Native controls on touch (visual refresh T5.4). These belong to DSH core packages, so they are reached through CSS
+ * only, never patched: if a DSH bump renames a class, the rule simply stops matching and the control falls back to its
+ * native size (screens still work).
+ *
+ * Settings › Font size (`dsh-client-ui-theme` FontSizeRow): the stepper's arrows appear only on :hover/:focus and are
+ * 17×12px. On a coarse pointer they are always shown, sit beside the value instead of over it, and each is a 44pt
+ * button.
+ */
+@media (pointer: coarse) {
+  [class*='_stepper']:has(> [class*='_arrows'] > button[aria-label]) {
+    gap: 4px;
+    min-width: 0;
+    height: 44px;
+    padding: 0 0 0 12px;
+  }
+
+  [class*='_stepper'] > [class*='_arrows']:has(> button[aria-label]) {
+    position: static;
+    flex-direction: row-reverse;
+    gap: 0;
+    opacity: 1;
+  }
+
+  [class*='_stepper'] > [class*='_arrows'] > button[aria-label] {
+    width: 44px;
+    height: 44px;
+    background: transparent;
+  }
+}

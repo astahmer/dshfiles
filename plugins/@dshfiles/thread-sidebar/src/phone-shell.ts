@@ -14,7 +14,7 @@ export interface PhoneStageOrigin {
 export interface PhoneTopBar {
   readonly title: string
   readonly back: PhoneBackTarget | null
-  /** The stage shows a thread or a new-thread draft. */
+  /** The stage shows a thread (or a new-thread draft): the bar offers its panels. */
   readonly thread: boolean
 }
 
@@ -55,9 +55,10 @@ export const PhoneTopBarModel = {
     if (owner === undefined) {
       const title = input.selectedThreadId === null ? 'New thread' : input.stageTitle?.trim() || 'Thread'
       const from = input.origin === undefined ? undefined : PhoneTopBarModel.pageLabel(input.destinations, input.origin.panelId)
-      if (from !== undefined && input.origin !== undefined) return { title, back: { to: 'page', panelId: input.origin.panelId, label: from }, thread: true }
+      if (from !== undefined && input.origin !== undefined)
+        return { title, back: { to: 'page', panelId: input.origin.panelId, label: from }, thread: input.selectedThreadId !== null }
       const threads = input.destinations.find(candidate => candidate.id === 'threads')
-      return { title, back: { to: 'threads', label: threads?.label ?? 'Threads' }, thread: true }
+      return { title, back: { to: 'threads', label: threads?.label ?? 'Threads' }, thread: input.selectedThreadId !== null }
     }
     const section = owner.sections.find(candidate => candidate.panelId === input.activePanelId)
     // The Inbox page is the Inbox tab's root: it is named after the tab, not its first section ("Needs you").
@@ -120,6 +121,38 @@ export const useSoftwareKeyboard = (): void => {
       root.removeAttribute('data-phone-keyboard')
       root.style.removeProperty('--dsh-keyboard-inset')
       root.style.removeProperty('--dsh-visual-offset-top')
+    }
+  }, [])
+}
+
+/** iOS reads the standalone status-bar style from this meta when a home-screen web app launches. */
+const STATUS_BAR_META = 'apple-mobile-web-app-status-bar-style'
+
+/**
+ * The standalone (home-screen) status bar (visual refresh T5.3, phone rules "Safe areas"): in dark it is translucent
+ * with light text, so the top bar's own bg token shows through under `viewport-fit=cover`; in light it keeps dark text
+ * (`default`). `theme-color` already follows the computed body background (frame-layout's theme presenter), which is
+ * the bg token in both schemes. A meta the page already had is left alone.
+ */
+export const StatusBarStyle = {
+  forScheme: (dark: boolean): 'default' | 'black-translucent' => (dark ? 'black-translucent' : 'default'),
+} as const
+
+export const useStandaloneStatusBar = (): void => {
+  useEffect(() => {
+    if (document.querySelector(`meta[name="${STATUS_BAR_META}"]`) !== null) return
+    const meta = document.createElement('meta')
+    meta.name = STATUS_BAR_META
+    const apply = (): void => {
+      meta.content = StatusBarStyle.forScheme(document.body.hasAttribute('data-ds-dark-theme'))
+    }
+    apply()
+    document.head.append(meta)
+    const observer = new MutationObserver(apply)
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] })
+    return () => {
+      observer.disconnect()
+      meta.remove()
     }
   }, [])
 }

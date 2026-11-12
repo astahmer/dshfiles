@@ -303,7 +303,7 @@ export function CostWaterfall({
       <div role="table" aria-label="Steps" className="dshx:relative dshx:min-w-0">
         <div
           role="row"
-          className="dshx:flex dshx:h-8 dshx:items-center dshx:border-b dshx:border-border dshx:text-[10px] dshx:font-medium dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase"
+          className="dshx:flex dshx:h-8 dshx:items-center dshx:border-b dshx:border-border dshx:text-2xs dshx:font-medium dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase"
         >
           <span
             role="columnheader"
@@ -361,7 +361,7 @@ function Summary({
 }) {
   return (
     <div className={cn('dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:px-3 dshx:first:pl-0', className)}>
-      <dt className="dshx:truncate dshx:text-[10px] dshx:font-medium dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">{label}</dt>
+      <dt className="dshx:truncate dshx:text-2xs dshx:font-medium dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">{label}</dt>
       <dd className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-1.5 dshx:text-base dshx:font-medium dshx:tabular-nums">
         {children}
         {hint ? (
@@ -400,7 +400,7 @@ function TopChip() {
   return (
     <span
       ref={ref}
-      className="dshx:shrink-0 dshx:rounded-sm dshx:bg-warning/15 dshx:px-1 dshx:text-[10px] dshx:font-semibold dshx:tracking-wider dshx:text-warning"
+      className="dshx:shrink-0 dshx:rounded-sm dshx:bg-warning/15 dshx:px-1 dshx:text-2xs dshx:font-semibold dshx:tracking-wider dshx:text-warning"
     >
       TOP
     </span>
@@ -439,7 +439,7 @@ function CostBar({
     <span
       aria-hidden
       className={cn(
-        'dshx:absolute dshx:top-1/2 dshx:h-4 dshx:-translate-y-1/2 dshx:rounded-[5px] dshx:border',
+        'dshx:absolute dshx:top-1/2 dshx:h-4 dshx:-translate-y-1/2 dshx:rounded-md dshx:border',
         failed ? 'dshx:border-destructive/45 dshx:bg-destructive/15' : 'dshx:border-violet/35 dshx:bg-violet/15',
       )}
       style={{ left: `${left}%`, width: `max(4px, ${Math.max(0, width)}%)` }}
@@ -450,7 +450,7 @@ function CostBar({
 function DetailBox({ label, value }: { readonly label: string; readonly value: string | undefined }) {
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2">
-      <span className="dshx:text-[10px] dshx:font-medium dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">{label}</span>
+      <span className="dshx:text-2xs dshx:font-medium dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">{label}</span>
       <span className="dshx:truncate dshx:font-mono dshx:text-xs">{value ?? '–'}</span>
     </div>
   )

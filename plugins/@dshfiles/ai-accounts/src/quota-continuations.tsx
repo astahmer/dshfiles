@@ -107,7 +107,7 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
               <Item className="dshx:items-start dshx:gap-3 dshx:px-3 dshx:py-2" key={item.continuationId} role="listitem" size="sm" variant="outline">
                 <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
                   <ItemTitle className="dshx:min-w-0 dshx:truncate dshx:text-sm">{item.title ?? `Session ${item.sessionId}`}</ItemTitle>
-                  <span className="dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">{item.sessionId}</span>
+                  <span className="dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{item.sessionId}</span>
                   <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-xs dshx:text-muted-foreground">
                     <span>Failed {formatTime(item.failedAt)}</span>
                     {item.cwd === undefined ? null : <span className="dshx:break-all">Project {item.cwd}</span>}

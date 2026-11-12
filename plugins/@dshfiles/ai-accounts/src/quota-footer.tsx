@@ -80,7 +80,7 @@ const AccountUsageTooltip = (props: { readonly item: AccountSummaryItem; readonl
   )
 }
 
-const describeItem = (item: AccountSummaryItem, now: number, windowLayout: UsageWindowLayout = 'binding'): string => {
+export const describeItem = (item: AccountSummaryItem, now: number, windowLayout: UsageWindowLayout = 'binding'): string => {
   const availability = item.disabled ? '. OFF. Disabled for model routing' : ''
   if ('unavailable' in item) return `${item.displayName}: ${item.unavailable.label}. ${item.unavailable.reason}${availability}`
   const accountWindows = item.windows ?? [{ label: item.windowLabel, percentRemaining: item.percentRemaining, resetsAt: item.resetsAt }]
@@ -102,11 +102,11 @@ const SummaryName = (props: { readonly name: string | null; readonly off: boolea
   return (
     <span className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-0.5 dshx:leading-none">
       {props.name === null ? null : (
-        <span className={cn('dshx:text-[10px] dshx:font-semibold dshx:tracking-wide', props.off ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}>
+        <span className={cn('dshx:text-2xs dshx:font-semibold dshx:tracking-wide', props.off ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}>
           {props.name}
         </span>
       )}
-      {props.off ? <span className="dshx:text-[9px] dshx:font-medium dshx:tracking-wide dshx:text-muted-foreground">OFF</span> : null}
+      {props.off ? <span className="dshx:text-2xs dshx:font-medium dshx:tracking-wide dshx:text-muted-foreground">OFF</span> : null}
     </span>
   )
 }
@@ -125,7 +125,7 @@ const SummaryItem = (props: {
         <ProviderGlyph className="dshx:size-3.5" kind={props.item.kind} />
         <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:items-start dshx:leading-none">
           <SummaryName name={props.showShortName ? props.item.shortName : props.item.displayName} off={props.item.disabled === true} />
-          <span className="dshx:text-[10px] dshx:text-muted-foreground">{props.item.unavailable.label}</span>
+          <span className="dshx:text-2xs dshx:text-muted-foreground">{props.item.unavailable.label}</span>
         </span>
       </span>
     )
@@ -150,7 +150,7 @@ const SummaryItem = (props: {
           {lines.percent === null ? null : (
             <span
               className={cn(
-                'dshx:text-[11px] dshx:font-semibold dshx:tabular-nums',
+                'dshx:text-2xs dshx:font-semibold dshx:tabular-nums',
                 props.item.disabled ? 'dshx:text-muted-foreground' : props.item.onReserve ? 'dshx:text-info' : QUOTA_TONE_TEXT[tone],
               )}
             >
@@ -160,8 +160,8 @@ const SummaryItem = (props: {
           {lines.reset === null ? null : (
             <span
               className={cn(
-                'dshx:tabular-nums',
-                lines.percent === null ? 'dshx:text-[11px] dshx:font-semibold' : 'dshx:text-[10px]',
+                'dshx:text-2xs dshx:tabular-nums',
+                lines.percent === null && 'dshx:font-semibold',
                 !props.item.disabled && props.item.exhausted
                   ? 'dshx:text-destructive'
                   : !props.item.disabled && lines.percent === null
@@ -183,7 +183,7 @@ const SummaryItem = (props: {
                 <TooltipTrigger asChild>
                   <span
                     className={cn(
-                      'dshx:text-[11px] dshx:font-semibold dshx:tabular-nums',
+                      'dshx:text-2xs dshx:font-semibold dshx:tabular-nums',
                       props.item.disabled ? 'dshx:text-muted-foreground' : QUOTA_TONE_TEXT[windowTone],
                     )}
                   >
@@ -204,8 +204,10 @@ const meterButtonClass =
   'dshx-root dshx:inline-flex dshx:h-8 dshx:max-w-full dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-1 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50'
 
 /** The usage popover, anchored on whichever surface opened it; clicks inside `keepOpenWithin` do not dismiss it. */
-const UsagePopoverContent = (props: {
+export const UsagePopoverContent = (props: {
   readonly keepOpenWithin?: RefObject<HTMLElement | null>
+  /** `remaining`: grouped by provider, least left first (the status strip, b:4v6p); default: the user's order. */
+  readonly order?: 'arranged' | 'remaining'
   readonly onOpenUsageHistory: () => void
   readonly onConnectAccount: (accountId: string) => void
   readonly close: () => void
@@ -233,6 +235,7 @@ const UsagePopoverContent = (props: {
           props.onConnectAccount(accountId)
         }}
         onRefresh={() => void refresh()}
+        order={props.order ?? 'arranged'}
         refreshing={refreshing}
         usage={usage}
       />
@@ -428,16 +431,14 @@ const QuotaRailButton = (props: QuotaSurfaceProps): JSX.Element => {
                 ) : 'unavailable' in critical ? (
                   <>
                     <ProviderGlyph className="dshx:size-3.5" kind={critical.kind} />
-                    <span className="dshx:text-[10px] dshx:text-muted-foreground">
-                      {critical.unavailable.label === 'Sign in again' ? 'Sign in' : 'No quota'}
-                    </span>
+                    <span className="dshx:text-2xs dshx:text-muted-foreground">{critical.unavailable.label === 'Sign in again' ? 'Sign in' : 'No quota'}</span>
                   </>
                 ) : (
                   <>
                     <ProviderGlyph className="dshx:size-3.5" kind={critical.kind} />
                     <span
                       className={cn(
-                        'dshx:text-[10px] dshx:leading-none dshx:font-semibold dshx:tabular-nums',
+                        'dshx:text-2xs dshx:leading-none dshx:font-semibold dshx:tabular-nums',
                         critical.exhausted ? 'dshx:text-destructive' : QUOTA_TONE_TEXT[quotaTone(critical.percentRemaining)],
                       )}
                     >
@@ -510,7 +511,7 @@ const ActiveAccountWithoutQuota = (props: { readonly accountId: string; readonly
     >
       <ProviderGlyph kind={account.kind} className="dshx:size-3.5" />
       <span className="dshx:max-w-28 dshx:truncate">{account.displayName}</span>
-      <span className="dshx:text-[10px]">{props.label}</span>
+      <span className="dshx:text-2xs">{props.label}</span>
     </button>
   )
 }

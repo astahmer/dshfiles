@@ -15,7 +15,7 @@ import { PaletteRules } from './palette.js'
 import { paletteSettings, type PaletteSettings } from './settings.js'
 import { askDsh } from './ask-dsh.js'
 import { createThreadContentSearch } from './thread-content-source.js'
-import { useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { CirclePlusIcon, FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
@@ -35,6 +35,11 @@ import { ThreadPalette } from './thread-palette.js'
 
 const defaultSettings: PaletteSettings = paletteSettings.schema({})
 
+/** The web new-thread chord (plan Q2 T2.5): Cmd+T and Cmd+N belong to the browser tab. */
+const NEW_THREAD_CHORD = 'Mod+Shift+O'
+/** Sent by the composer (rich-composer's InputBar) when a send should be followed by a fresh new-thread draft. */
+const START_NEW_THREAD_EVENT = 'dshfiles:start-new-thread'
+
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
 
 interface PaletteOverlayProps extends PropsRuntime<'shell.overlay'>, PropsLocale<typeof COMMAND_PALETTE_LOCALE_NAMESPACE> {
@@ -47,6 +52,8 @@ interface PaletteOverlayProps extends PropsRuntime<'shell.overlay'>, PropsLocale
   /** Create a fresh thread for one Ask DSH question, send it, then open the thread. */
   readonly askDsh: (input: { readonly question: string; readonly workspaceId: WorkspaceId | undefined }) => Promise<void>
   readonly translate: TranslateNS<typeof COMMAND_PALETTE_LOCALE_NAMESPACE>
+  /** Keycaps the Host shortcut registry presents for a command id, so rows backed by it show their binding. */
+  readonly hostKeys: (shortcutId: string) => readonly string[] | undefined
 }
 
 /**
@@ -156,12 +163,28 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
     const path = workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)
     return path === undefined ? undefined : EntityLabels.repositoryPath(path)
   }
+  /**
+   * A thread row names its project (b:212a): a thread workspace is registered as "sample · thread-e4fde2", so its
+   * row reads the project it was cut from, never the folder.
+   */
+  const projectTitleOf = useCallback(
+    (workspaceId: WorkspaceId | undefined): string => {
+      if (workspaceId === undefined) return ''
+      const title = workspaceTitleById.get(workspaceId) ?? ''
+      const path = workspacePathById.get(workspaceId)
+      if (path === undefined || !EntityLabels.isThreadWorkspace(path)) return title
+      const repositoryPath = EntityLabels.repositoryPath(path)
+      const project = workspaceItems.find(item => item.path.replace(/\/+$/u, '') === repositoryPath)
+      return project?.title ?? (title.split(' · ')[0]?.trim() || title)
+    },
+    [workspaceItems, workspacePathById, workspaceTitleById],
+  )
   const threadEntries = useMemo(
     () =>
       sessions.flatMap(session => {
         if (!PaletteRules.isTopLevelThread(session) || session.blank || archivedSessionIds.has(session.id)) return []
         const workspaceId = workspaceForSession(session, sessionsById, workspaceBySession)
-        const project = workspaceId === undefined ? '' : (workspaceTitleById.get(workspaceId) ?? '')
+        const project = projectTitleOf(workspaceId)
         const path = workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)
         return [
           {
@@ -170,7 +193,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
           },
         ]
       }),
-    [archivedSessionIds, sessions, sessionsById, workspaceBySession, workspacePathById, workspaceTitleById],
+    [archivedSessionIds, projectTitleOf, sessions, sessionsById, workspaceBySession, workspacePathById],
   )
   const threads = useMemo(() => threadEntries.map(entry => entry.thread), [threadEntries])
   const threadsScope = (useSettings(paletteSettings).value ?? defaultSettings).threadsScope
@@ -204,6 +227,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
       additionalActions={workspaceActions}
       recentLimit={recentLimit}
       mac={navigator.platform.startsWith('Mac') || navigator.platform === 'macOS'}
+      hostKeys={props.hostKeys}
       copy={{
         title: props.translate('commandPaletteTitle'),
         threadsPlaceholder: props.translate('commandPaletteThreadsPlaceholder'),
@@ -388,6 +412,7 @@ export default defineClient({
                   })
                 }}
                 translate={translate}
+                hostKeys={shortcutId => ctx.shortcuts.catalog.getSnapshot().find(entry => entry.id === shortcutId)?.keys}
               />
             )),
           ),
@@ -416,16 +441,34 @@ export default defineClient({
         'command-palette: shortcut',
       )
     const startNewThread = (): void => ctx.uiWorkspace.startSession()
+    const newThreadShortcutId = 'commandPalette.newThread'
     const newThreadAction: PaletteAction = {
       id: '@dshfiles/command-palette/new-thread',
       label: () => translate('commandPaletteNewThread'),
+      shortcutId: newThreadShortcutId,
+      // The web build has no new-thread chord from the Host (Cmd+T is the browser's), so Mod+Shift+O is ours.
+      keys: [NEW_THREAD_CHORD],
       aliases: ['new thread', 'new chat', 'new session'],
       icon: <CirclePlusIcon className="dshx:size-4" />,
       group: 'action',
       run: startNewThread,
     }
     ctx.effect(() => PaletteApi.registerAction(newThreadAction), 'command-palette: new thread action')
-    const newThreadShortcutId = 'commandPalette.newThread'
+    plugin?.add(Command, {
+      id: '@dshfiles/command-palette.new-thread',
+      title: translate('commandPaletteNewThread'),
+      keys: [NEW_THREAD_CHORD],
+      section: 'Global',
+      // The palette row above already lists New thread with this chord.
+      hidden: true,
+      run: startNewThread,
+    })
+    // The composer asks for a fresh draft after Mod+Enter on the new-thread page and after Mod+Alt+Enter anywhere.
+    ctx.effect(() => {
+      const onStart = (): void => startNewThread()
+      window.addEventListener(START_NEW_THREAD_EVENT, onStart)
+      return () => window.removeEventListener(START_NEW_THREAD_EVENT, onStart)
+    }, 'command-palette: composer new draft')
     if (isShortcutCommandId(newThreadShortcutId))
       ctx.effect(() => {
         const register = (withDefaults: boolean) =>

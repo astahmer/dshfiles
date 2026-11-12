@@ -1,15 +1,35 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-import { installShortcuts, ShortcutKeyboardModel, type Shortcut } from './keyboard.js'
+import { CommandKeys } from '@dshfiles/dshx/client'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { ShortcutKeyboardModel, ShortcutLayer, type ShortcutBinding, type ShortcutScope } from './keyboard.js'
 
-const searchShortcut = (run: Shortcut['run'] = () => {}): Shortcut => ({ id: 'search', key: 'KeyP', modifier: 'primary', label: 'Search', run })
+const mac = (): boolean => ShortcutKeyboardModel.isMacPlatform(window.navigator.platform)
+const primaryHeld = (): KeyboardEventInit => (mac() ? { metaKey: true } : { ctrlKey: true })
 
-const press = (init: KeyboardEventInit): KeyboardEvent => new KeyboardEvent('keydown', { code: 'KeyP', key: 'p', bubbles: true, cancelable: true, ...init })
+const binding = (
+  spec: string,
+  run: ShortcutBinding['run'] = () => {},
+  scope: ShortcutScope = 'global',
+  extra: Partial<ShortcutBinding> = {},
+): ShortcutBinding => {
+  const keys = CommandKeys.parse(spec)
+  if (keys === undefined) throw new Error(`unparsable ${spec}`)
+  return { id: spec, keys, scope, label: spec, run, ...extra }
+}
 
-const primaryHeld = (): KeyboardEventInit => (ShortcutKeyboardModel.isMacPlatform(window.navigator.platform) ? { metaKey: true } : { ctrlKey: true })
+const codeOf = (key: string): string => (/^[a-z]$/u.test(key) ? `Key${key.toUpperCase()}` : /^\d$/u.test(key) ? `Digit${key}` : key)
+
+const press = (key: string, init: KeyboardEventInit = {}): KeyboardEvent =>
+  new KeyboardEvent('keydown', { code: codeOf(key), key, bubbles: true, cancelable: true, composed: true, ...init })
+
+const stepOf = (spec: string) => {
+  const parsed = CommandKeys.parse(spec)
+  if (parsed === undefined) throw new Error(spec)
+  return parsed.steps[0]
+}
 
 describe('isMacPlatform', () => {
-  it.each(['MacIntel', 'macOS', 'MacPPC'])('treats %s as macOS', platform => {
+  it.each(['MacIntel', 'macOS', 'MacPPC', 'iPhone'])('treats %s as macOS', platform => {
     expect(ShortcutKeyboardModel.isMacPlatform(platform)).toBe(true)
   })
 
@@ -18,38 +38,54 @@ describe('isMacPlatform', () => {
   })
 })
 
-describe('matchesShortcut', () => {
+describe('matchesStep', () => {
   it('resolves primary to Meta on macOS and Control elsewhere', () => {
-    expect(ShortcutKeyboardModel.matchesShortcut(press({ metaKey: true }), searchShortcut(), true)).toBe(true)
-    expect(ShortcutKeyboardModel.matchesShortcut(press({ ctrlKey: true }), searchShortcut(), true)).toBe(false)
-    expect(ShortcutKeyboardModel.matchesShortcut(press({ ctrlKey: true }), searchShortcut(), false)).toBe(true)
+    const step = stepOf('Mod+P')
+    expect(ShortcutKeyboardModel.matchesStep(press('p', { metaKey: true }), step, true)).toBe(true)
+    expect(ShortcutKeyboardModel.matchesStep(press('p', { ctrlKey: true }), step, true)).toBe(false)
+    expect(ShortcutKeyboardModel.matchesStep(press('p', { ctrlKey: true }), step, false)).toBe(true)
   })
 
   it('refuses a chord carrying an extra modifier', () => {
-    expect(ShortcutKeyboardModel.matchesShortcut(press({ metaKey: true, altKey: true }), searchShortcut(), true)).toBe(false)
-    expect(ShortcutKeyboardModel.matchesShortcut(press({ metaKey: true, shiftKey: true }), searchShortcut(), true)).toBe(false)
+    const step = stepOf('Mod+P')
+    expect(ShortcutKeyboardModel.matchesStep(press('p', { metaKey: true, altKey: true }), step, true)).toBe(false)
+    expect(ShortcutKeyboardModel.matchesStep(press('p', { metaKey: true, shiftKey: true }), step, true)).toBe(false)
+    expect(ShortcutKeyboardModel.matchesStep(press('j', { ctrlKey: true }), stepOf('J'), true)).toBe(false)
   })
 
-  it('requires shift exactly when the chord asks for it', () => {
-    const shifted = { ...searchShortcut(), alsoShift: true }
-    expect(ShortcutKeyboardModel.matchesShortcut(press({ metaKey: true, shiftKey: true }), shifted, true)).toBe(true)
-    expect(ShortcutKeyboardModel.matchesShortcut(press({ metaKey: true }), shifted, true)).toBe(false)
+  it('matches by physical key and asks for exactly the modifiers it names', () => {
+    expect(ShortcutKeyboardModel.matchesStep(press('∆', { code: 'KeyJ', altKey: true }), stepOf('Alt+J'), true)).toBe(true)
+    expect(ShortcutKeyboardModel.matchesStep(press('J', { code: 'KeyJ', shiftKey: true }), stepOf('Shift+J'), true)).toBe(true)
+    expect(ShortcutKeyboardModel.matchesStep(press('J', { code: 'KeyJ', shiftKey: true }), stepOf('J'), true)).toBe(false)
+    expect(ShortcutKeyboardModel.matchesStep(press('?', { code: 'Slash', shiftKey: true }), stepOf('?'), true)).toBe(true)
+    expect(ShortcutKeyboardModel.matchesStep(press('Enter', { metaKey: true, altKey: true }), stepOf('Mod+Alt+Enter'), true)).toBe(true)
   })
 })
 
-describe('parseChord', () => {
+describe('CommandKeys.parse', () => {
   it.each([
-    ['Mod+K', { key: 'KeyK', alsoShift: false }],
-    ['mod+shift+k', { key: 'KeyK', alsoShift: true }],
-    ['Primary+1', { key: 'Digit1', alsoShift: false }],
-    ['Mod+,', { key: 'Comma', alsoShift: false }],
-    ['Cmd+Enter', { key: 'Enter', alsoShift: false }],
-  ])('reads %s', (chord, expected) => {
-    expect(ShortcutKeyboardModel.parseChord(chord)).toEqual(expected)
+    ['Mod+K', false, false],
+    ['J', true, true],
+    ['Shift+J', true, true],
+    ['Alt+J', true, false],
+    ['G I', true, true],
+    ['?', true, true],
+    ['Escape', true, false],
+    ['Enter', true, false],
+    ['Shift+ArrowDown', true, false],
+  ])('reads %s (types text: %s, character key: %s)', (spec, typesText, characterKey) => {
+    expect(CommandKeys.parse(spec)).toMatchObject({ typesText, characterKey })
   })
 
-  it.each(['K', 'Shift+K', 'Mod+Alt+K', 'Mod+', 'Mod+F13'])('leaves %s unbound', chord => {
-    expect(ShortcutKeyboardModel.parseChord(chord)).toBeUndefined()
+  it.each(['Mod+', 'Hyper+K', 'G Mod+I', 'A B C', ''])('leaves %s unbound', spec => {
+    expect(CommandKeys.parse(spec)).toBeUndefined()
+  })
+
+  it('presents keycaps per platform and folds digit runs', () => {
+    expect(CommandKeys.keycaps('Mod+Shift+K', true)).toEqual([['⌘', '⇧', 'K']])
+    expect(CommandKeys.keycaps('Mod+Shift+K', false)).toEqual([['Ctrl', 'Shift', 'K']])
+    expect(CommandKeys.keycaps('G I', true)).toEqual([['G'], ['I']])
+    expect(CommandKeys.compact(['1', '2', '3', '4', 'Enter'])).toEqual(['1–4', 'Enter'])
   })
 })
 
@@ -93,8 +129,31 @@ describe('regionOf', () => {
   })
 })
 
-describe('installShortcuts', () => {
+describe('ShortcutLayer', () => {
   const disposers: Array<() => void> = []
+  let bindings: ShortcutBinding[] = []
+  let singleKeys = true
+  let clock = 0
+  const install = (): void => {
+    disposers.push(ShortcutLayer.install(window, { bindings: () => bindings, singleKeys: () => singleKeys, now: () => clock }))
+  }
+  const element = <K extends keyof HTMLElementTagNameMap>(
+    tag: K,
+    attributes: Record<string, string> = {},
+    parent: Element = document.body,
+  ): HTMLElementTagNameMap[K] => {
+    const node = document.createElement(tag)
+    for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value)
+    parent.appendChild(node)
+    return node
+  }
+
+  beforeEach(() => {
+    bindings = []
+    singleKeys = true
+    clock = 0
+    document.body.replaceChildren()
+  })
   afterEach(() => {
     for (const dispose of disposers.splice(0)) dispose()
   })
@@ -102,10 +161,11 @@ describe('installShortcuts', () => {
   it('claims a matching chord before bubble listeners see it', () => {
     const run = vi.fn()
     const bubbled = vi.fn()
-    disposers.push(installShortcuts(window, [searchShortcut(run)]))
+    bindings = [binding('Mod+P', run)]
+    install()
     window.addEventListener('keydown', bubbled)
     disposers.push(() => window.removeEventListener('keydown', bubbled))
-    const chord = press(primaryHeld())
+    const chord = press('p', primaryHeld())
     document.body.dispatchEvent(chord)
     expect(run).toHaveBeenCalledOnce()
     expect(chord.defaultPrevented).toBe(true)
@@ -114,30 +174,29 @@ describe('installShortcuts', () => {
 
   it('leaves events alone that someone else already handled or that repeat', () => {
     const run = vi.fn()
-    disposers.push(installShortcuts(window, [searchShortcut(run)]))
-    document.body.dispatchEvent(press({ ...primaryHeld(), repeat: true }))
-    const handled = press(primaryHeld())
+    bindings = [binding('Mod+P', run)]
+    install()
+    document.body.dispatchEvent(press('p', { ...primaryHeld(), repeat: true }))
+    const handled = press('p', primaryHeld())
     handled.preventDefault()
     document.body.dispatchEvent(handled)
     expect(run).not.toHaveBeenCalled()
   })
 
   it('lets a run that returns false decline the key', () => {
-    const bubbled = vi.fn()
-    disposers.push(installShortcuts(window, [searchShortcut(() => false)]))
-    window.addEventListener('keydown', bubbled)
-    disposers.push(() => window.removeEventListener('keydown', bubbled))
-    const chord = press(primaryHeld())
+    bindings = [binding('Mod+P', () => false)]
+    install()
+    const chord = press('p', primaryHeld())
     document.body.dispatchEvent(chord)
     expect(chord.defaultPrevented).toBe(false)
-    expect(bubbled).toHaveBeenCalledOnce()
   })
 
   it('leaves the key to the shell when the chord opts out of the terminal', () => {
     const run = vi.fn()
-    disposers.push(installShortcuts(window, [{ ...searchShortcut(run), allowInTerminal: false }]))
+    bindings = [{ ...binding('Mod+K', run), allowInTerminal: false }]
+    install()
     const input = termInput()
-    const chord = press(primaryHeld())
+    const chord = press('k', primaryHeld())
     input.dispatchEvent(chord)
     expect(run).not.toHaveBeenCalled()
     expect(chord.defaultPrevented).toBe(false)
@@ -145,9 +204,10 @@ describe('installShortcuts', () => {
 
   it('keeps claiming the chord in the terminal when it does not opt out', () => {
     const run = vi.fn()
-    disposers.push(installShortcuts(window, [{ ...searchShortcut(run), allowInEditable: false }]))
+    bindings = [binding('Mod+K', run)]
+    install()
     const input = termInput()
-    const chord = press(primaryHeld())
+    const chord = press('k', primaryHeld())
     input.dispatchEvent(chord)
     expect(run).toHaveBeenCalledOnce()
     expect(chord.defaultPrevented).toBe(true)
@@ -155,8 +215,139 @@ describe('installShortcuts', () => {
 
   it('stops listening once disposed', () => {
     const run = vi.fn()
-    installShortcuts(window, [searchShortcut(run)])()
-    document.body.dispatchEvent(press(primaryHeld()))
+    bindings = [binding('Mod+P', run)]
+    ShortcutLayer.install(window, { bindings: () => bindings })()
+    document.body.dispatchEvent(press('p', primaryHeld()))
     expect(run).not.toHaveBeenCalled()
+  })
+
+  it('keeps single keys, Shift keys and ⌥ letters out of text fields, and lets the characters through', () => {
+    const run = vi.fn()
+    bindings = [binding('J', run, 'not-typing'), binding('E', run, 'global'), binding('Alt+J', run, 'global'), binding('Shift+K', run, 'not-typing')]
+    install()
+    const composer = element('textarea')
+    const editable = element('div', { contenteditable: 'true' })
+    for (const target of [composer, editable]) {
+      for (const event of [press('j'), press('e'), press('∆', { code: 'KeyJ', altKey: true }), press('K', { code: 'KeyK', shiftKey: true })]) {
+        target.dispatchEvent(event)
+        expect(event.defaultPrevented).toBe(false)
+      }
+    }
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('never fires a single key during an IME composition', () => {
+    const run = vi.fn()
+    bindings = [binding('J', run, 'not-typing')]
+    install()
+    document.body.dispatchEvent(press('j', { isComposing: true }))
+    document.body.dispatchEvent(press('Process', { code: 'KeyJ', keyCode: 229 }))
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('still claims a modified global chord from a text field', () => {
+    const run = vi.fn()
+    bindings = [binding('Mod+/', run)]
+    install()
+    element('textarea').dispatchEvent(press('/', { ...primaryHeld(), code: 'Slash' }))
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('turns every character key off with the setting, and keeps chords and ⌥ letters on', () => {
+    const run = vi.fn()
+    bindings = [binding('J', run, 'not-typing'), binding('?', run), binding('G I', run, 'not-typing'), binding('Mod+K', run), binding('Alt+J', run)]
+    singleKeys = false
+    install()
+    document.body.dispatchEvent(press('j'))
+    document.body.dispatchEvent(press('?', { code: 'Slash', shiftKey: true }))
+    document.body.dispatchEvent(press('g'))
+    document.body.dispatchEvent(press('i'))
+    expect(run).not.toHaveBeenCalled()
+    document.body.dispatchEvent(press('k', primaryHeld()))
+    document.body.dispatchEvent(press('∆', { code: 'KeyJ', altKey: true }))
+    expect(run).toHaveBeenCalledTimes(2)
+  })
+
+  it('runs a sequence when the second key comes within 1.2 s, and drops it after', () => {
+    const go = vi.fn()
+    bindings = [binding('G I', go, 'not-typing')]
+    install()
+    const first = press('g')
+    document.body.dispatchEvent(first)
+    expect(first.defaultPrevented).toBe(true)
+    clock = 1_000
+    document.body.dispatchEvent(press('i'))
+    expect(go).toHaveBeenCalledOnce()
+    document.body.dispatchEvent(press('g'))
+    clock = 2_300
+    const late = press('i')
+    document.body.dispatchEvent(late)
+    expect(go).toHaveBeenCalledOnce()
+    expect(late.defaultPrevented).toBe(false)
+  })
+
+  it('judges an unknown second key on its own after a sequence prefix', () => {
+    const go = vi.fn()
+    const next = vi.fn()
+    bindings = [binding('G I', go, 'not-typing'), binding('J', next, 'not-typing')]
+    install()
+    document.body.dispatchEvent(press('g'))
+    document.body.dispatchEvent(press('j'))
+    expect(go).not.toHaveBeenCalled()
+    expect(next).toHaveBeenCalledOnce()
+  })
+
+  it('fires list keys only inside a list region, and lets the innermost owner win', () => {
+    const inbox = vi.fn()
+    const threads = vi.fn()
+    const sidebar = element('nav', { 'data-shortcut-scope': 'list' })
+    const panel = element('main', { 'data-shortcut-scope': 'list' })
+    const sidebarRow = element('button', {}, sidebar)
+    const panelRow = element('button', {}, panel)
+    bindings = [binding('J', threads, 'list', { region: () => sidebar }), binding('J', inbox, 'list', { region: () => panel })]
+    install()
+    panelRow.dispatchEvent(press('j'))
+    expect(inbox).toHaveBeenCalledOnce()
+    expect(threads).not.toHaveBeenCalled()
+    sidebarRow.dispatchEvent(press('j'))
+    expect(threads).toHaveBeenCalledOnce()
+    const outside = element('button')
+    const unscoped = press('j')
+    outside.dispatchEvent(unscoped)
+    expect(unscoped.defaultPrevented).toBe(false)
+  })
+
+  it('sends keys from the page to the region last used, else to an ambient one', () => {
+    const run = vi.fn()
+    const triage = element('section', { 'data-shortcut-scope': 'triage', 'data-shortcut-ambient': '' })
+    // jsdom lays nothing out; give the region a box so it counts as shown.
+    triage.getClientRects = () => [new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList
+    bindings = [binding('E', run, 'triage', { region: () => triage })]
+    install()
+    document.body.dispatchEvent(press('e'))
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('leaves plain keys to an open menu or dialog that is not a region', () => {
+    const run = vi.fn()
+    bindings = [binding('J', run, 'not-typing'), binding('?', run)]
+    install()
+    const menu = element('div', { role: 'menu' })
+    const item = element('div', { role: 'menuitem', tabindex: '-1' }, menu)
+    item.dispatchEvent(press('j'))
+    item.dispatchEvent(press('?', { code: 'Slash', shiftKey: true }))
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('fires composer chords only from inside the composer, and passes the trigger', () => {
+    const send = vi.fn()
+    const composer = element('div', { 'data-shortcut-scope': 'composer' })
+    const field = element('textarea', {}, composer)
+    bindings = [binding('Mod+Enter', send, 'composer')]
+    install()
+    element('textarea').dispatchEvent(press('Enter', primaryHeld()))
+    expect(send).not.toHaveBeenCalled()
+    field.dispatchEvent(press('Enter', primaryHeld()))
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ keys: 'Mod+Enter' }))
   })
 })

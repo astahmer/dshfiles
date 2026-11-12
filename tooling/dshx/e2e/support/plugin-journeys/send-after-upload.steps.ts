@@ -5,7 +5,7 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 const ATTACHMENT_FIXTURES = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
-const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 const UPLOAD_ROUTE = '**/api/session/uploadFileBinary**'
 
 const held = new WeakMap<Page, Route[]>()
@@ -32,7 +32,7 @@ When('a thread is started and its file upload is held', async ({ page }: { page:
     .filter({ visible: true })
     .first()
     .click()
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill('upload thread')
   await composer.press('Enter')
   await expect(threadComposer(page)).toBeVisible()

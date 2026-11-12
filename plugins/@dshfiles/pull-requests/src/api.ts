@@ -10,6 +10,7 @@ import {
 } from './create-model.js'
 import {
   forgeSearchItemSchema,
+  forgeSearchUnavailableSchema,
   issueStatesInputSchema,
   issueStatesOutputSchema,
   ownedUnwatchInputSchema,
@@ -63,12 +64,15 @@ export const pullRequestApi = defineApi({
         cwd: Schema.String.check(Schema.isMinLength(1)),
         query: Schema.String.check(Schema.isMaxLength(100), Schema.isPattern(/^[\p{L}\p{N} _.-]*$/u)),
       }),
-      output: Schema.Struct({ items: Schema.Array(forgeSearchItemSchema) }),
+      output: Schema.Struct({ items: Schema.Array(forgeSearchItemSchema), unavailable: Schema.optional(forgeSearchUnavailableSchema) }),
       description: 'Search recent issues and pull requests in the current GitHub repository. Read-only.',
       tool: {
         name: 'pull_request_search',
         readOnly: true,
-        render: output => output.items.map(item => `#${String(item.number)} ${item.title} ${item.url}`).join('\n') || 'No matching issues or pull requests.',
+        render: output =>
+          output.unavailable === undefined
+            ? output.items.map(item => `#${String(item.number)} ${item.title} ${item.url}`).join('\n') || 'No matching issues or pull requests.'
+            : `Search unavailable: ${output.unavailable.message}`,
       },
     }),
     link: method({

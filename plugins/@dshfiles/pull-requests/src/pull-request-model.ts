@@ -10,6 +10,16 @@ export const forgeSearchItemSchema = Schema.Struct({
 })
 export type ForgeSearchItem = typeof forgeSearchItemSchema.Type
 
+/**
+ * Why a `#` search found nothing to list (b:ysaj): the GitHub CLI is missing, or it is signed out. Any other failure
+ * (a folder with no GitHub remote) is not a forge, so the picker stays empty instead of offering a recovery.
+ */
+export const forgeSearchUnavailableSchema = Schema.Struct({
+  reason: Schema.Literals(['gh-missing', 'signed-out']),
+  message: Schema.String,
+})
+export type ForgeSearchUnavailable = typeof forgeSearchUnavailableSchema.Type
+
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
 const cwdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048))
 const pullRequestNumberSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))

@@ -4,7 +4,7 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { materializeNonblankThread } from '../thread-composer.js'
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const toolkit = (page: Page) => page.getByTestId('agent-toolkit')
 const section = (page: Page, name: RegExp) => toolkit(page).getByRole('region', { name })
 

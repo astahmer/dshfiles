@@ -2,6 +2,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import type {} from './locales.ts'
 
 /** The plugin coordinates once-per-page recovery; the component only owns an error notice. */
@@ -25,5 +26,9 @@ export function TerminalRecovery({ restore, t }: PropsRuntime<'conversation.sess
     })
     return () => { active = false }
   }, [restore, attempt])
-  return error === undefined ? null : <button type="button" title={t('recoveryFailed', { message: error })} onClick={() => { setError(undefined); setAttempt(value => value + 1) }}>{t('retryRecovery')}</button>
+  // dshfiles: a kit button whose accessible description carries the failure (no native title tooltip).
+  return error === undefined ? null : <span className="dshx-root" role="alert">
+    <Button type="button" size="xs" variant="ghost" onClick={() => { setError(undefined); setAttempt(value => value + 1) }}>{t('retryRecovery')}</Button>
+    <span className="dshx:sr-only">{t('recoveryFailed', { message: error })}</span>
+  </span>
 }

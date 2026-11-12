@@ -7,7 +7,10 @@ const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
 const toolDirective = (tool: string, input: object): string => `[[call ${tool} ${JSON.stringify(input)}]]`
 const timeline = (page: Page) => page.getByRole('list', { name: 'Shipped timeline', exact: true })
 const bucket = (page: Page, label: string) => timeline(page).getByRole('listitem', { name: new RegExp(`^${label}: \\d+ shipped$`, 'u') })
-const shippedRow = (page: Page, label: string, title: string) => bucket(page, label).getByRole('listitem', { name: /^Item b:/u }).filter({ hasText: title })
+const shippedRow = (page: Page, label: string, title: string) =>
+  bucket(page, label)
+    .getByRole('listitem', { name: /^Item b:/u })
+    .filter({ hasText: title })
 
 When('the Shipped view is opened', async ({ page }: { page: Page }) => {
   await page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name: 'Shipped', exact: true }).click()

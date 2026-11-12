@@ -40,6 +40,9 @@
     420px
   );
   contain: layout;
+  /* dshfiles (T4.2): the map's controls share the frame with the marks, which shrink first. */
+  display: flex;
+  flex-direction: column;
   cursor: pointer;
   pointer-events: auto;
   transform: translateY(-50%);
@@ -49,7 +52,8 @@
    the transcript, and gradient fades over the ends that can still scroll. */
 .scroller {
   position: relative;
-  max-height: inherit;
+  flex: 0 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -114,6 +118,25 @@
   opacity: 0.6;
 }
 
+/* dshfiles (productivity pass T4.2): typed marks. Colour only where the reader must act (a question, accent) or
+   recover (a failure, danger); an edit is a muted fill, a plain prompt keeps the neutral tick. */
+.markQuestion::before {
+  height: 4px;
+  background: var(--dsw-alias-state-business-primary);
+  opacity: 1;
+}
+
+.markFailed::before {
+  height: 4px;
+  background: var(--dsw-alias-state-error-primary);
+  opacity: 1;
+}
+
+.markEdited::before {
+  height: 4px;
+  background: var(--dsw-alias-label-tertiary);
+}
+
 .markPreview::before {
   transform: translateY(-50%) scaleX(0.9);
   background: var(--dsw-alias-label-tertiary);
@@ -126,6 +149,89 @@
 .markActive::before {
   transform: translateY(-50%) scaleX(1);
   background: var(--dsw-alias-label-primary);
+}
+
+/* An active or previewed typed mark keeps its colour; only its length grows. */
+.markQuestion.markActive::before,
+.markQuestion.markPreview::before {
+  background: var(--dsw-alias-state-business-primary);
+}
+
+.markFailed.markActive::before,
+.markFailed.markPreview::before {
+  background: var(--dsw-alias-state-error-primary);
+}
+
+/* The Turns on screen: one quiet band behind their marks. */
+.band {
+  position: absolute;
+  right: 0;
+  width: 24px;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-interactive-bg-hover-solid, var(--dsw-alias-interactive-bg-hover));
+  pointer-events: none;
+  transition: top 120ms ease, height 120ms ease;
+}
+
+/* Previous / next and the filter: shown while the rail is in use or filtered, so a quiet rail stays quiet. */
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-block: 2px;
+  opacity: 0;
+  transition: opacity var(--dshx-duration-fade, 120ms) ease;
+}
+
+.frame:hover .controls,
+.frame:focus-within .controls,
+.frame[data-filtered] .controls {
+  opacity: 1;
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.control:hover,
+.control[data-state='open'] {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.control[data-active] {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.control:focus-visible {
+  outline: 1px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -1px;
+}
+
+.previewKind {
+  margin-bottom: 2px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.previewKind[data-turn-kind='question'] {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.previewKind[data-turn-kind='failed'] {
+  color: var(--dsw-alias-state-error-primary);
 }
 
 /* Keyboard focus outranks both resting states: the tick takes the brand color
@@ -170,8 +276,9 @@
   background: var(--dsw-alias-bg-layer-1);
   box-shadow: var(--dsw-elevation-panel);
   pointer-events: none;
-  animation: dsh-turn-preview-enter 120ms ease-out;
-  transition: top 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* dshfiles (visual refresh T5.1): the preview is a popover, so it enters on the menu token and the enter curve. */
+  animation: dsh-turn-preview-enter var(--dshx-duration-menu, 160ms) var(--dshx-motion-ease-enter, ease-out);
+  transition: top var(--dshx-duration-menu, 160ms) var(--dshx-motion-ease-enter, cubic-bezier(0.2, 0.8, 0.2, 1));
 }
 
 .previewPrompt,
@@ -215,6 +322,8 @@
   .scroller,
   .mark::before,
   .markBusy::before,
+  .band,
+  .controls,
   .preview {
     transition: none;
     animation: none;

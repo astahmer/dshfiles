@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { ConversationStartMatch, NodeKey, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createToolResultMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ChatNode } from '../src/native/contract/chat-nodes.ts'
 import { ProcessState } from '../src/native/conversation-nodes/process-groups.ts'
 import { toolDefinition } from '../src/native/conversation-nodes/tool.ts'
@@ -76,6 +76,54 @@ const toolNode = (input: { readonly seq: number; readonly name: string }): ChatN
   return node as ChatNode
 }
 
+/** A call that already returned: its result is an error or not. */
+const settledToolNode = (input: { readonly seq: number; readonly name: string; readonly isError: boolean; readonly text?: string }): ChatNode => {
+  const start: ConversationStartMatch = {
+    role: 'start',
+    location: { kind: 'turn', turn },
+    event: {
+      type: 'tool/call',
+      seq: SessionSeq(input.seq),
+      time: input.seq,
+      data: { callId: ToolCallId(`call-${String(input.seq)}`), name: input.name, arguments: '{}', turn: 1, step: 1 },
+    },
+  }
+  const result: Parameters<typeof toolDefinition.update>[1] = {
+    role: 'update',
+    location: { kind: 'turn', turn },
+    event: {
+      type: 'tool/result',
+      seq: SessionSeq(input.seq + 1),
+      time: input.seq + 1,
+      surfaceOp: 'append',
+      data: {
+        turn: 1,
+        step: 1,
+        message: createToolResultMessage({
+          callId: ToolCallId(`call-${String(input.seq)}`),
+          content: input.text === undefined ? [] : [{ type: 'text', text: input.text }],
+          isError: input.isError,
+        }),
+      },
+    },
+  }
+  const pending: ToolContext = {
+    key: `tool-call:${String(input.seq)}`,
+    kind: 'tool-call',
+    id: `call-${String(input.seq)}`,
+    start,
+    matches: [start],
+    state: undefined,
+    current: new Map(),
+  }
+  const startedState = toolDefinition.start(pending, start, noPredecessors)
+  const settled: ToolContext = { ...pending, state: toolDefinition.update({ ...pending, state: startedState }, result) }
+  const node = toolDefinition.buildViewNode?.(settled) ?? null
+  if (node === null) throw new Error('tool node was not built')
+  // SAFETY: toolDefinition builds 'tool-call' Chat nodes, which is what this helper returns.
+  return node as ChatNode
+}
+
 const rootEntries = (nodes: readonly ChatNode[]) => {
   const keys = nodes.map(node => brandString<NodeKey>(node.key))
   const byKey = new Map(nodes.map((node, index) => [keys[index], node]))
@@ -144,6 +192,20 @@ describe('pinned tool calls', () => {
     expect(registry.kinds()).toEqual([])
     publish([{ toolName: 'html_render' }])
     expect(registry.refreshes).toBe(4)
+  })
+
+  it('never folds a question or a failed call: both stay in the Turn outside the process fold', () => {
+    const failed = settledToolNode({ seq: 13, name: 'bash', isError: true })
+    const passed = settledToolNode({ seq: 14, name: 'bash', isError: false })
+    const nodes = [toolNode({ seq: 11, name: 'bash' }), toolNode({ seq: 12, name: 'ask_user_question' }), failed, passed]
+    expect(nodes.map(node => node.groupTree)).toEqual([undefined, 'turn', 'turn', undefined])
+    expect(rootEntries(nodes)).toEqual(['group', 'node', 'node', 'group'])
+  })
+
+  it('treats a shell command that exited non-zero as failed, and exit 0 as folded work', () => {
+    const exited = settledToolNode({ seq: 21, name: 'bash', isError: false, text: 'missing fixture\n[exit code: 3]' })
+    const ok = settledToolNode({ seq: 23, name: 'bash', isError: false, text: 'step 1\n[exit code: 0]' })
+    expect([exited.groupTree, ok.groupTree]).toEqual(['turn', undefined])
   })
 
   it('places a pinned call in the Turn outside the process fold and the step groups around it', () => {

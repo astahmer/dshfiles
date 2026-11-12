@@ -9,5 +9,5 @@
       "@deepseek-ai/dsh-client-ui-conversation/client": ["./src/native/index.ts"]
     }
   },
-  "include": ["dshx.config.ts", "src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
+  "include": ["src/native/**/*.ts", "src/native/**/*.tsx", "dshx.config.ts", "src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
 }

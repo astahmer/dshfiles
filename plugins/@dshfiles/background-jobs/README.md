@@ -15,7 +15,7 @@ opt-in — the ones that already finished. Rows are classified deterministically
 from the job kind and its label, so "when did we last run the e2e suite", "which
 jj history commands ran today" and "what is still building" are one filter away.
 
-Open **Observe › Processes** from the rail (the reusable **Background Jobs: Jobs** view in free docking).
+Open **Observe › Processes** from the rail (the reusable **Background Jobs: Jobs** view in any Workbench pane).
 
 ## Where the rows come from
 

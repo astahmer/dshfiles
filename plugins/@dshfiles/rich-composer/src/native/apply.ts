@@ -51,7 +51,9 @@ import { InputBar } from './skeleton/InputBar.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { installStopShortcut } from './stop-shortcut.ts'
 import { liveViewBindings } from './conversation/live-bindings.ts'
-import { TRAJECTORY_VIEW_ID, resolveActiveView } from './view-selection.ts'
+import { DEFAULT_VIEW_ID, TRAJECTORY_VIEW_ID, resolveActiveView } from './view-selection.ts'
+import { ThreadViewsModel } from '../thread-views.ts'
+import { ThreadViewFacets, type ThreadViewPanel } from '../thread-view-facets.tsx'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
 import { CONVERSATION_SETTINGS_NAMESPACE, type ConversationSettings } from '../submission-settings.ts'
 import { PromptRecallModel } from '../prompt-recall.ts'
@@ -266,10 +268,21 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     const active = resolveActiveView(viewTabs(), preferred)
     if (active !== undefined) uiConversation.binding(sessionId).activate(active.id)
   }
+  // Productivity pass Q5 (E5): the stage always shows Chat; every other view is a thread-panel facet. A stored
+  // preference for another view (from the former header tabs) no longer moves the stage off Chat.
   const restoreView = (sessionId: SessionId): void => {
-    activateView(sessionId, readConversationViewPreference(sessionId))
+    const preferred = readConversationViewPreference(sessionId)
+    // Without a thread panel hosting the other views, the stored view selection still applies.
+    const pinned = ThreadViewsModel.hosted() && viewTabs().some(tab => tab.id === DEFAULT_VIEW_ID)
+    activateView(sessionId, pinned ? DEFAULT_VIEW_ID : preferred)
   }
   const conversationViews = createSnapshotStore<readonly ViewTab[]>(viewTabs())
+  const secondaryViews = (): readonly ViewTab[] => conversationViews.getSnapshot().filter(view => view.id !== DEFAULT_VIEW_ID)
+  const facetViews = createSnapshotStore<readonly ViewTab[]>(secondaryViews())
+  ThreadViewsModel.publish(secondaryViews())
+  // Boxed: the store's set() treats a function argument as an updater, and the panel is a component.
+  const facetPanel = createSnapshotStore<{ readonly Panel: ThreadViewPanel } | undefined>(undefined)
+  ThreadViewFacets.register({ ctx, views: facetViews, panel: facetPanel, openThread: sessionId => { workspaceNavigation.openSession(sessionId) } })
   ctx.effect(() => {
     const catalog = createSnapshotStore<readonly ConversationWorkbenchSession[]>([])
     const refreshCatalog = (): void => {
@@ -290,7 +303,8 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       name: 'shell.overlay', id: 'dshfiles-conversation-workbench-views', children: WORKBENCH_VIEW_CHILDREN,
     }, panels.Root))
     const offView = slots.inject(WORKBENCH_VIEW_SLOT, () => slots.register({ name: WORKBENCH_VIEW_SLOT }, ConversationWorkbenchView))
-    return () => { offView(); offRoot(); panels.dispose(); offCatalog() }
+    facetPanel.set({ Panel: panels.ViewPanel })
+    return () => { facetPanel.set(undefined); offView(); offRoot(); panels.dispose(); offCatalog() }
   }, 'ui-conversation: workbench view sources')
   const bindings = new Set<SessionBinding>()
   const trackedBindings = new WeakSet<SessionBinding>()
@@ -308,7 +322,11 @@ export function apply(ctx: Context, config: Config = Config({})): void {
         const candidate = next.at(index)
         return candidate !== undefined && tab.id === candidate.id && tab.label === candidate.label
       })
-    if (!unchanged) conversationViews.set(next)
+    if (!unchanged) {
+      conversationViews.set(next)
+      facetViews.set(secondaryViews())
+      ThreadViewsModel.publish(secondaryViews())
+    }
     const live = liveViewBindings({
       bindings,
       current: sessionId => sessions.binding(sessionId),
@@ -415,7 +433,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       'conversation.hero.workspace': { kind: 'single', scope: 'root' },
       'conversation.hero.agentPreset': { kind: 'single', scope: 'session-maybe' },
       'conversation.hero.options': { kind: 'list', scope: 'session' },
-      'conversation.composer.location': { kind: 'list', scope: 'session' },
+      'conversation.hero.suggestions': { kind: 'list', scope: 'root' },
     },
     slots: {
       views: { scope: 'session' },
@@ -472,8 +490,10 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     inject: (sessionId: SessionId, actions: BoundActions<typeof conversationStore>): ConversationSessionInjected => {
       const openView = (view: string, focus: string): void => {
         if (!viewTabs().some(tab => tab.id === view)) return
-        activateView(sessionId, view)
+        // The request rides the Session store: the stage's Chat consumes a Chat request, a facet's view its own.
         actions.openView(view, focus)
+        // A facet owner takes a non-Chat view into the thread panel; without one, the stage shows it as before.
+        if (view === DEFAULT_VIEW_ID || !ThreadViewsModel.open({ sessionId, viewId: view })) activateView(sessionId, view)
       }
       const inspectionTarget = () => uiConversation.views.entries().find(definition =>
         definition.toolCallFocus !== undefined
@@ -516,6 +536,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       'conversation.session.header.lineage': { kind: 'single', scope: 'session' },
       'conversation.session.header.actions': { kind: 'list', scope: 'session' },
       'conversation.session.header.utilities': { kind: 'list', scope: 'session' },
+      'conversation.session.header.changes': { kind: 'list', scope: 'session' },
       'conversation.session.header.corner': { kind: 'single', scope: 'session' },
     },
     store: conversationStore,
@@ -546,6 +567,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       'conversation.input.model': { kind: 'single', scope: 'session' },
       'conversation.input.activity': { kind: 'single', scope: 'session' },
       'conversation.composer.dock': { kind: 'list', scope: 'session' },
+      'conversation.composer.context': { kind: 'list', scope: 'session' },
     },
     inject: (sessionId: SessionId | undefined): ComposerBarInjected => {
       // Never thrown from here: this slot can render while a hot replacement swaps the Session generation or the

@@ -1,72 +1,120 @@
 import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { Command, defineClient, type CommandItem } from '@dshfiles/dshx/client'
+import { Command, CommandKeys, createSettingsClientRuntime, defineClient, runHostCommand, type Subscribable } from '@dshfiles/dshx/client'
+import { CheatSheet, CheatSheetState } from './cheat-sheet.js'
+import type { HostShortcutRow } from './cheat-sheet-model.js'
+import { CommandBindings } from './command-bindings.js'
 import { EditableCommands } from './editable-commands.js'
-import { installShortcuts, ShortcutKeyboardModel, type Shortcut } from './keyboard.js'
+import { ShortcutLayer, type ShortcutBinding } from './keyboard.js'
+import { shortcutsSettings } from './settings.js'
 
 /**
  * The layout service surface this plugin drives.
  *
- * `ILayout` is taken from the Host package rather than restated here: `selectPanel`
- * takes the branded `MainPanelId`, so a hand-written `(panelId: string | null)`
- * widens the parameter and the assignment no longer typechecks.
+ * `ILayout` is taken from the Host package rather than restated here: `selectPanel` takes the branded `MainPanelId`,
+ * so a hand-written `(panelId: string | null)` widens the parameter and the assignment no longer typechecks.
  */
 type Layout = ILayout
 
+interface HostCatalog {
+  readonly catalog: { getSnapshot(): unknown; subscribe(listener: () => void): () => void }
+}
+
+const isHostCatalog = (value: unknown): value is HostCatalog =>
+  typeof value === 'object' &&
+  value !== null &&
+  'catalog' in value &&
+  typeof value.catalog === 'object' &&
+  value.catalog !== null &&
+  'getSnapshot' in value.catalog &&
+  typeof value.catalog.getSnapshot === 'function'
+
+const NO_ROWS: readonly HostShortcutRow[] = []
+
+/** The Host registry's catalog rows that have keycaps, read defensively: it is another package's snapshot. */
+const hostRows = (shortcuts: unknown): Subscribable<readonly HostShortcutRow[]> | undefined => {
+  if (!isHostCatalog(shortcuts)) return undefined
+  let source: unknown
+  let rows: readonly HostShortcutRow[] = NO_ROWS
+  return {
+    get: () => {
+      const snapshot = shortcuts.catalog.getSnapshot()
+      if (snapshot === source) return rows
+      source = snapshot
+      rows = Array.isArray(snapshot)
+        ? snapshot.flatMap((entry: unknown): HostShortcutRow[] => {
+            if (typeof entry !== 'object' || entry === null) return []
+            const { id, label, keys } = entry as { id?: unknown; label?: unknown; keys?: unknown }
+            if (typeof id !== 'string' || typeof label !== 'string' || !Array.isArray(keys)) return []
+            const caps = keys.filter((key): key is string => typeof key === 'string')
+            return caps.length === 0 ? [] : [{ id, label, keys: caps }]
+          })
+        : NO_ROWS
+      return rows
+    },
+    subscribe: listener => shortcuts.catalog.subscribe(listener),
+  }
+}
+
 /**
- * Keyboard shortcuts that actually take effect.
+ * Keyboard shortcuts that actually take effect, in layers.
  *
- * The Host's shortcut runtime listens in the bubble phase, and on macOS and
- * Windows it skips DOM dispatch entirely in favour of native input that only an
- * Electron shell provides. Neither path can claim a chord the browser also owns,
- * which is why `primary+p` prints instead of searching. This installs one
- * capture-phase listener, which runs first and can.
+ * The Host's shortcut runtime listens in the bubble phase, and on macOS and Windows it skips DOM dispatch entirely in
+ * favour of native input that only an Electron shell provides. Neither path can claim a chord the browser also owns,
+ * and the Web registry has no single-key, sequence or `⌥`-letter layer. This installs one capture-phase listener that
+ * binds every dshx `Command`'s keys by scope (`keyboard.ts`), plus the `?` sheet that lists them.
  *
- * It is a plugin rather than desktop-only code so the same chords work in the
- * browser, in an installed PWA, and in the desktop shell.
- *
- * The command palette (⌘K) and thread search (⌘P) chords belong to
- * @dshfiles/thread-sidebar, which owns the palette and lets users rebind them in
- * Settings › Plugins › Thread sidebar; claiming them here too would race it.
+ * The command palette (⌘K) and thread search (⌘P) chords belong to @dshfiles/thread-sidebar and the palette, which
+ * let users rebind them in Settings; claiming them here too would race them.
  */
 export default defineClient({
   name: '@dshfiles/shortcuts',
   // Read through the dshx runtime too: api.commands.keys follows this service's catalog for user rebindings.
-  inject: ['shortcuts'],
+  inject: ['shortcuts', 'slots'],
   prefixIds: true,
-  setup(ctx, _decorate, metadata) {
-    // Resolved per key press rather than once at setup. The layout service is
-    // registered by another client entry, so reading it during setup can observe
-    // an empty context — and `layout?.toggleSidebar()` then no-ops behind optional
-    // chaining, which looks exactly like a swallowed chord: claimed, prevented, and
-    // silently inert. Looking it up when the chord fires cannot be too early.
+  setup(ctx, decorate, metadata) {
+    // Resolved per key press rather than once at setup. The layout service is registered by another client entry, so
+    // reading it during setup can observe an empty context — and `layout?.toggleSidebar()` then no-ops behind optional
+    // chaining, which looks exactly like a swallowed chord: claimed, prevented, and silently inert.
     const layout = (): Layout | undefined => ctx.get('layout')
-    const shortcuts: Shortcut[] = [
-      {
-        id: 'shortcuts.newSession',
-        key: 'KeyN',
-        modifier: 'primary',
-        allowInEditable: true,
-        label: 'New session',
+    const settings = createSettingsClientRuntime(ctx).binding(shortcutsSettings).scope
+    // An old Host without this namespace reads as unavailable: single keys stay on, the documented default.
+    const singleKeys = (): boolean => settings.getSnapshot().value?.singleKeys ?? true
+    const panelChord = (id: string, spec: string, label: string): ShortcutBinding | undefined => {
+      const keys = CommandKeys.parse(spec)
+      if (keys === undefined) return undefined
+      return {
+        id,
+        keys,
+        scope: 'global',
+        label,
         run: () => {
-          // Selecting the conversation panel is the closest the layout service
-          // comes to "start something new"; the composer takes it from there.
+          // Selecting the conversation panel is the closest the layout service comes to "start something new"; the
+          // composer takes it from there.
           requireLayout(layout).selectPanel(null)
         },
-      },
-      {
-        id: 'shortcuts.settings',
-        key: 'Comma',
-        modifier: 'primary',
-        allowInEditable: true,
-        label: 'Settings',
-        run: () => {
-          requireLayout(layout).selectPanel(null)
-        },
-      },
-    ]
+      }
+    }
+    // Cmd/Ctrl+N belongs to the browser on the web (it opens a window); New thread is Mod+Shift+O, owned by the palette.
+    const fixed = [panelChord('shortcuts.settings', 'Mod+,', 'Settings')].flatMap(binding => (binding === undefined ? [] : [binding]))
+    let commandBindings: readonly ShortcutBinding[] = []
+    ctx.effect(() => ShortcutLayer.install(window, { bindings: () => [...commandBindings, ...fixed], singleKeys }), 'shortcuts: keyboard')
 
-    ctx.effect(() => installShortcuts(window, shortcuts), 'shortcuts: keyboard')
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register(
+        { name: 'shell.overlay', id: 'shortcut-cheat-sheet', order: 110, label: () => 'Keyboard shortcuts' },
+        decorate(() =>
+          metadata?.plugin === undefined ? null : (
+            <CheatSheet
+              keys={metadata.plugin.commands.keys}
+              host={hostRows(ctx.get('shortcuts'))}
+              // The Host's own editor (Settings › Shortcuts) still rebinds keys; ⌘/ now opens this sheet first.
+              customize={() => runHostCommand(ctx.get('shortcuts'), 'shortcuts.open')}
+            />
+          ),
+        ),
+      ),
+    )
 
     const plugin = metadata?.plugin
     if (plugin === undefined) return
@@ -81,51 +129,28 @@ export default defineClient({
         requireLayout(layout).toggleSidebar()
       },
     })
-    plugin.keyed(plugin.commands.keys, keys => installShortcuts(window, commandShortcuts(plugin.list(Command).get(), keys)))
+    plugin.add(Command, {
+      id: 'cheat-sheet',
+      title: 'Keyboard shortcuts',
+      keywords: ['shortcuts', 'keys', 'keyboard', 'help', 'cheat sheet', 'hotkeys'],
+      keys: ['?', 'Mod+/'],
+      run: () => CheatSheetState.toggle(),
+    })
+    plugin.keyed(plugin.commands.keys, keys => {
+      commandBindings = CommandBindings.toBindings(plugin.list(Command).get(), keys)
+      return () => {
+        commandBindings = []
+      }
+    })
     plugin.keyed(plugin.list(Command), commands => EditableCommands.register({ shortcuts: ctx.get('shortcuts'), commands }))
   },
 })
 
 /**
- * Bind the keys every contributed command answers to now: its defaults, or the user's binding when it is editable.
- *
- * A command's keys stay unbound when they need a modifier other than primary
- * and shift, because only those chords can be claimed safely.
- */
-const commandShortcuts = (commands: readonly CommandItem[], keys: ReadonlyMap<string, readonly string[]>): Shortcut[] =>
-  commands.flatMap(command =>
-    (keys.get(command.id) ?? command.keys ?? []).flatMap(chord => {
-      const parsed = ShortcutKeyboardModel.parseChord(chord)
-      if (parsed === undefined) {
-        console.warn(`shortcuts: ${command.id} keeps ${chord} unbound; only primary (+ shift) chords can be claimed.`)
-        return []
-      }
-      return [
-        {
-          id: command.id,
-          key: parsed.key,
-          modifier: 'primary' as const,
-          alsoShift: parsed.alsoShift,
-          allowInEditable: command.scope !== 'page',
-          ...(command.allowInTerminal !== undefined && { allowInTerminal: command.allowInTerminal }),
-          label: command.title,
-          run: () => {
-            if (command.enabled === false) return false
-            const result = command.run()
-            if (result === false) return false
-            if (result instanceof Promise) result.catch((error: unknown) => console.error(`shortcuts: ${command.id} failed`, error))
-          },
-        },
-      ]
-    }),
-  )
-
-/**
  * The layout service, or a loud failure.
  *
- * Optional chaining here would turn a missing service into a chord that is
- * claimed and then silently does nothing — the exact symptom that made Cmd+B look
- * broken while the matcher was fine. Throwing names the cause instead.
+ * Optional chaining here would turn a missing service into a chord that is claimed and then silently does nothing — the
+ * exact symptom that made Cmd+B look broken while the matcher was fine. Throwing names the cause instead.
  */
 const requireLayout = (resolve: () => Layout | undefined): Layout => {
   const layout = resolve()

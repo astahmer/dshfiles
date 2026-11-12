@@ -26,7 +26,7 @@ const BankedResets = (props: { readonly count: number; readonly expiries: readon
   const earliest = ordered[0]
   return (
     <Collapsible>
-      <CollapsibleTrigger className="dshx:group dshx:flex dshx:max-w-full dshx:items-center dshx:gap-1 dshx:text-left dshx:text-[11px] dshx:text-info dshx:outline-none dshx:focus-visible:underline">
+      <CollapsibleTrigger className="dshx:group dshx:flex dshx:max-w-full dshx:items-center dshx:gap-1 dshx:text-left dshx:text-2xs dshx:text-info dshx:outline-none dshx:focus-visible:underline">
         <span className="dshx:truncate">
           ▣ {String(props.count)} banked reset{props.count === 1 ? '' : 's'}
           {earliest === undefined || earliest === null ? '' : ` · earliest expires ${new Date(earliest).toLocaleString()}`}
@@ -34,7 +34,7 @@ const BankedResets = (props: { readonly count: number; readonly expiries: readon
         <ChevronDownIcon className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground dshx:transition-transform dshx:group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <ol className="dshx:mt-1.5 dshx:flex dshx:flex-col dshx:gap-1 dshx:pl-4 dshx:text-[11px]">
+        <ol className="dshx:mt-1.5 dshx:flex dshx:flex-col dshx:gap-1 dshx:pl-4 dshx:text-2xs">
           {Array.from({ length: props.count }, (_, index) => {
             const expiry = ordered[index]
             return (
@@ -73,17 +73,17 @@ const AccountUsageCard = (props: {
         <header className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
           <ProviderGlyph className="dshx:size-3.5" kind={props.card.kind} />
           <strong className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-xs dshx:font-semibold">{props.card.displayName}</strong>
-          {!props.card.enabled ? <span className="dshx:text-[9px] dshx:font-medium dshx:tracking-wide dshx:text-muted-foreground">OFF</span> : null}
+          {!props.card.enabled ? <span className="dshx:text-2xs dshx:font-medium dshx:tracking-wide dshx:text-muted-foreground">OFF</span> : null}
           <UsagePlanBadge plan={usage.plan} />
           {limited ? (
-            <Badge className="dshx:h-5 dshx:px-1.5 dshx:text-[10px]" variant="destructive">
+            <Badge className="dshx:h-5 dshx:px-1.5 dshx:text-2xs" variant="destructive">
               Limit reached
             </Badge>
           ) : onReserve ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="dshx:inline-flex">
-                  <Badge className="dshx:h-5 dshx:bg-info/15 dshx:px-1.5 dshx:text-[10px] dshx:text-info" variant="secondary">
+                  <Badge className="dshx:h-5 dshx:bg-info/15 dshx:px-1.5 dshx:text-2xs dshx:text-info" variant="secondary">
                     On Luna Reserve
                   </Badge>
                 </span>
@@ -93,7 +93,7 @@ const AccountUsageCard = (props: {
           ) : null}
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="dshx:max-w-[45%] dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{props.hostName}</span>
+              <span className="dshx:max-w-[45%] dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{props.hostName}</span>
             </TooltipTrigger>
             <TooltipContent>{props.hostName}</TooltipContent>
           </Tooltip>
@@ -115,7 +115,7 @@ const AccountUsageCard = (props: {
           const resetLabel = window.reserve === true ? 'Reserve refills' : null
           return (
             <div className="dshx:flex dshx:flex-col dshx:gap-1" key={window.label}>
-              <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:text-[11px]">
+              <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:text-2xs">
                 <span className={cn('dshx:truncate', props.card.enabled && spent ? 'dshx:font-medium dshx:text-destructive' : 'dshx:text-muted-foreground')}>
                   {window.label}
                 </span>
@@ -133,7 +133,7 @@ const AccountUsageCard = (props: {
                 )}
                 value={Math.max(0, Math.min(100, window.percentRemaining))}
               />
-              <div className="dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
+              <div className="dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className={props.card.enabled && spent ? 'dshx:font-semibold dshx:text-destructive' : undefined}>
@@ -153,7 +153,7 @@ const AccountUsageCard = (props: {
         <UsageReadStatus onRetry={props.onRefresh} refreshing={props.refreshing} sweepReadAt={props.readAt} usage={usage} />
         {usage.bankedResets > 0 ? <BankedResets count={usage.bankedResets} expiries={usage.bankedResetExpiries} /> : null}
         {limited && usage.bankedResets > 0 && props.card.kind === 'codex' ? (
-          <p className="dshx:text-[11px] dshx:text-muted-foreground">Spend a banked reset with “Reset usage” in the Codex app; it is not used automatically.</p>
+          <p className="dshx:text-2xs dshx:text-muted-foreground">Spend a banked reset with “Reset usage” in the Codex app; it is not used automatically.</p>
         ) : null}
       </div>
       <AccountEnabledToggle instanceId={props.card.instanceId} name={props.card.displayName} />
@@ -167,7 +167,7 @@ const HiddenAccounts = (props: { readonly hidden: readonly OverviewCard[]; reado
   if (count === 0) return null
   return (
     <Collapsible className="dshx:shrink-0 dshx:border-t dshx:px-3 dshx:py-1.5">
-      <CollapsibleTrigger className="dshx:group dshx:flex dshx:w-full dshx:items-center dshx:gap-1 dshx:text-left dshx:text-[11px] dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:underline">
+      <CollapsibleTrigger className="dshx:group dshx:flex dshx:w-full dshx:items-center dshx:gap-1 dshx:text-left dshx:text-2xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:underline">
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{String(count)} hidden by you</span>
         <ChevronDownIcon className="dshx:size-3 dshx:shrink-0 dshx:transition-transform dshx:group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
@@ -178,7 +178,7 @@ const HiddenAccounts = (props: { readonly hidden: readonly OverviewCard[]; reado
               <ProviderGlyph className="dshx:size-3.5" kind={card.kind} />
               <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-medium">{card.displayName}</span>
               <Button
-                className="dshx:h-5 dshx:px-1.5 dshx:text-[11px]"
+                className="dshx:h-5 dshx:px-1.5 dshx:text-2xs"
                 onClick={() => props.arrangement.show(card.instanceId)}
                 size="xs"
                 type="button"
@@ -301,6 +301,7 @@ export const UsageOverview = (props: {
   readonly onRefresh: () => void
   readonly onOpenHistory: () => void
   readonly onConnectAccount: (accountId: string) => void
+  readonly order?: 'arranged' | 'remaining'
 }): JSX.Element => {
   const [tab, setTab] = useState<ProviderTab>('all')
   const now = useQuotaClock({ resetsAt: [], precision: 'second' })
@@ -308,9 +309,11 @@ export const UsageOverview = (props: {
   const activeTab = tab !== 'all' && !providers.includes(tab) ? 'all' : tab
   const arrangement = useUsageLayout()
   const sections = UsageOverviewModel.overviewSections(props.usage, activeTab, arrangement.layout)
-  const visibleCards = UsageOverviewModel.visibleCards(props.usage, activeTab, arrangement.layout)
-  const shownIds = visibleCards.map(card => card.instanceId)
-  const { settings, usagePopoverSize } = usePreferences()
+  const arrangedCards = UsageOverviewModel.visibleCards(props.usage, activeTab, arrangement.layout)
+  const visibleCards = props.order === 'remaining' ? UsageOverviewModel.byRemaining(arrangedCards) : arrangedCards
+  // Move left/right keeps working on the user's order, whichever order the popover shows.
+  const shownIds = arrangedCards.map(card => card.instanceId)
+  const { settings, usagePopoverSize, usageStripPinned } = usePreferences()
   const [draggedSize, setDraggedSize] = useState<{ readonly width: number; readonly height: number } | null>(null)
   const size = draggedSize ?? usagePopoverSize
   const sectionRef = useRef<HTMLElement>(null)
@@ -410,6 +413,14 @@ export const UsageOverview = (props: {
                 id={card.instanceId}
                 key={card.instanceId}
                 name={card.displayName}
+                pinAction={
+                  props.order === 'remaining'
+                    ? {
+                        pinned: usageStripPinned.includes(card.instanceId),
+                        onSelect: () => void settings.set('usageStripPinned', UsageOverviewModel.togglePinned(usageStripPinned, card.instanceId)),
+                      }
+                    : undefined
+                }
                 shownIds={shownIds}
               >
                 <AccountUsageCard

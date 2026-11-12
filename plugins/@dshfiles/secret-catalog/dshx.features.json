@@ -581,7 +581,7 @@
         "seed fake-secret-cli",
         "seed tool-call-thread",
         "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"[[call request_secret {\\\"alias\\\":\\\"SYNTHETIC_REQUESTED_TOKEN\\\",\\\"purpose\\\":\\\"Call the synthetic API.\\\"}]]\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"[[call request_secret {\\\"alias\\\":\\\"SYNTHETIC_REQUESTED_TOKEN\\\",\\\"purpose\\\":\\\"Call the synthetic API.\\\"}]]\"",
         "press Enter",
         "click button \"Enter value\"",
         "expect button \"Create and bind\""

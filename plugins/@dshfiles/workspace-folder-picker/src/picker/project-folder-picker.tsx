@@ -608,7 +608,7 @@ const PickerEntryRow = (props: PickerEntryRowProps): JSX.Element => {
           <span
             aria-hidden
             className={cn(
-              'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
+              'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-2xs dshx:font-semibold',
               projectGlyphTone(title),
             )}
           >

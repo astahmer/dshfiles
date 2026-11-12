@@ -32,6 +32,11 @@ export interface ThreadViewPreset extends ThreadViewPreferences {
   readonly name: string | null
   readonly enabled: boolean
   readonly showCount?: boolean | undefined
+  /**
+   * The project scope the preset applies (filter presets, b:xpvk): a project id, `''` for Unassigned, `null` for All
+   * projects. Absent: the preset leaves the project picker alone, as the built-in views always did.
+   */
+  readonly projectFilter?: string | null | undefined
 }
 
 export interface ThreadViewSettings {
@@ -39,6 +44,15 @@ export interface ThreadViewSettings {
   readonly activeViewId: string
   readonly showGroupControl: boolean
   readonly showFilterControl: boolean
+  /**
+   * The list's filters once they were changed after a preset was applied; absent while the list shows the active
+   * preset as saved. "Save changes" writes it into that preset, applying a preset drops it.
+   */
+  readonly draft?: ThreadViewPreferences | undefined
+  /** The Filter menu's Presets section, the preset name on its trigger, the preset keys and ⌘K rows. */
+  readonly showPresets: boolean
+  /** A row of preset chips under the list header; off by default so the header stays calm. */
+  readonly showPresetChips: boolean
 }
 
 export const DEFAULT_THREAD_VIEW_PRESETS = [
@@ -75,6 +89,8 @@ export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
   activeViewId: ALL_THREADS_VIEW_ID,
   showGroupControl: true,
   showFilterControl: true,
+  showPresets: true,
+  showPresetChips: false,
 }
 
 export const doneViewFilterMigration = createStoredValue({
@@ -132,6 +148,9 @@ const legacyThreadViewPresetSchema = SchemaHelpers.strictStruct(
   }),
 )
 
+/** A project id, `''` for Unassigned or `null` for All projects: the values the project picker writes. */
+export const projectFilterSchema = Schema.NullOr(Schema.String.check(Schema.isMaxLength(256)))
+
 const threadViewPresetSchema = SchemaHelpers.strictStruct(
   Schema.Struct({
     id: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u)),
@@ -141,18 +160,30 @@ const threadViewPresetSchema = SchemaHelpers.strictStruct(
     statusFilters: statusFiltersSchema,
     sourceFilter: sourceFilterSchema,
     showCount: Schema.optional(Schema.Boolean),
+    projectFilter: Schema.optional(projectFilterSchema),
   }),
 )
 
-/** The whole saved-view document; the Host settings value and the browser's older copy share it. */
-export const threadViewSettingsSchema = SchemaHelpers.strictStruct(
+const threadViewDraftSchema = SchemaHelpers.strictStruct(
   Schema.Struct({
-    views: Schema.Array(threadViewPresetSchema).check(Schema.isMinLength(1)).check(Schema.isMaxLength(MAX_THREAD_VIEWS)),
-    activeViewId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(64)),
-    showGroupControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
-    showFilterControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
+    groupBy: groupBySchema,
+    statusFilters: statusFiltersSchema,
+    sourceFilter: sourceFilterSchema,
   }),
 )
+
+const threadViewSettingsFields = {
+  views: Schema.Array(threadViewPresetSchema).check(Schema.isMinLength(1)).check(Schema.isMaxLength(MAX_THREAD_VIEWS)),
+  activeViewId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(64)),
+  showGroupControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
+  showFilterControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
+  draft: Schema.optional(threadViewDraftSchema),
+  showPresets: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
+  showPresetChips: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => false),
+}
+
+/** The whole saved-view document; the Host settings value and the browser's older copy share it. */
+export const threadViewSettingsSchema = SchemaHelpers.strictStruct(Schema.Struct(threadViewSettingsFields))
   .check(
     Schema.makeFilter(settings => {
       const ids = new Set<string>()
@@ -179,25 +210,13 @@ export const threadViewSettingsSchema = SchemaHelpers.strictStruct(
     }),
   )
   .pipe(
-    Schema.decodeTo(
-      Schema.toType(
-        SchemaHelpers.strictStruct(
-          Schema.Struct({
-            views: Schema.Array(threadViewPresetSchema).check(Schema.isMinLength(1)).check(Schema.isMaxLength(MAX_THREAD_VIEWS)),
-            activeViewId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(64)),
-            showGroupControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
-            showFilterControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
-          }),
-        ),
-      ),
-      {
-        decode: SchemaGetter.transform(settings => {
-          const activeView = settings.views.find(view => view.id === settings.activeViewId && view.enabled) ?? settings.views.find(view => view.enabled)
-          return { ...settings, activeViewId: activeView?.id ?? ALL_THREADS_VIEW_ID }
-        }),
-        encode: SchemaGetter.transform(settings => settings),
-      },
-    ),
+    Schema.decodeTo(Schema.toType(SchemaHelpers.strictStruct(Schema.Struct(threadViewSettingsFields))), {
+      decode: SchemaGetter.transform(settings => {
+        const activeView = settings.views.find(view => view.id === settings.activeViewId && view.enabled) ?? settings.views.find(view => view.enabled)
+        return { ...settings, activeViewId: activeView?.id ?? ALL_THREADS_VIEW_ID }
+      }),
+      encode: SchemaGetter.transform(settings => settings),
+    }),
   )
 
 const migrateStatusFilter = (statusFilter: (typeof THREAD_STATUS_FILTER_OPTIONS)[number] | 'not-working'): readonly ThreadStatusFilter[] => {
@@ -216,6 +235,8 @@ const legacyThreadViewSettingsSchema = SchemaHelpers.strictStruct(
 )
 
 const migrateLegacySettings = (legacy: typeof legacyThreadViewSettingsSchema.Type): ThreadViewSettings => ({
+  showPresets: DEFAULT_THREAD_VIEW_SETTINGS.showPresets,
+  showPresetChips: DEFAULT_THREAD_VIEW_SETTINGS.showPresetChips,
   ...legacy,
   views: legacy.views.map(({ statusFilter, ...view }) => ({ ...view, statusFilters: migrateStatusFilter(statusFilter) })),
 })
@@ -426,7 +447,9 @@ const setThreadViewEnabled = (settings: ThreadViewSettings, viewId: string, enab
   const views = settings.views.map(candidate => (candidate.id === viewId ? { ...candidate, enabled } : candidate))
   const activeViewId =
     settings.activeViewId === viewId && !enabled ? (views.find(candidate => candidate.enabled)?.id ?? ALL_THREADS_VIEW_ID) : settings.activeViewId
-  return { ...settings, views, activeViewId }
+  // A draft is relative to the active preset: it goes with it.
+  const { draft, ...rest } = settings
+  return activeViewId === settings.activeViewId && draft !== undefined ? { ...rest, draft, views, activeViewId } : { ...rest, views, activeViewId }
 }
 
 const removeThreadView = (settings: ThreadViewSettings, viewId: string): ThreadViewSettings => {
@@ -435,8 +458,125 @@ const removeThreadView = (settings: ThreadViewSettings, viewId: string): ThreadV
   if (view.enabled && settings.views.filter(candidate => candidate.enabled).length === 1) return settings
   const views = settings.views.filter(candidate => candidate.id !== viewId)
   const activeViewId = settings.activeViewId === viewId ? (views.find(view => view.enabled)?.id ?? ALL_THREADS_VIEW_ID) : settings.activeViewId
-  return { ...settings, views, activeViewId }
+  const { draft, ...rest } = settings
+  return activeViewId === settings.activeViewId && draft !== undefined ? { ...rest, draft, views, activeViewId } : { ...rest, views, activeViewId }
 }
+
+// Filter presets (b:xpvk): a saved view is a preset; changing a filter after applying one keeps a draft beside it, so
+// the preset stays as saved until the user saves the changes into it.
+
+const filtersOf = (view: ThreadViewPreferences): ThreadViewPreferences => ({
+  groupBy: view.groupBy,
+  statusFilters: [...view.statusFilters],
+  sourceFilter: view.sourceFilter,
+})
+
+const sameThreadViewFilters = (left: ThreadViewPreferences, right: ThreadViewPreferences): boolean =>
+  left.groupBy === right.groupBy && left.sourceFilter === right.sourceFilter && sameStatusFilters(left.statusFilters, right.statusFilters)
+
+const withoutDraft = (settings: ThreadViewSettings): ThreadViewSettings => {
+  const { draft: _draft, ...rest } = settings
+  return rest
+}
+
+/** The filters the list shows: the draft once the user changed one, else the active preset's. */
+const currentThreadViewFilters = (settings: ThreadViewSettings): ThreadViewPreferences => settings.draft ?? filtersOf(activeThreadView(settings))
+
+/**
+ * Change the list's filters. With presets on the saved preset stays as it is and the change is a draft beside it (a
+ * change back to the preset's own filters drops the draft); with presets off the change rewrites the active view, as
+ * before presets.
+ */
+const editThreadViewFilters = (settings: ThreadViewSettings, patch: Partial<ThreadViewPreferences>): ThreadViewSettings => {
+  if (!settings.showPresets) return updateThreadViewPreferences(withoutDraft(settings), patch)
+  const current = currentThreadViewFilters(settings)
+  const next = filtersOf({ ...current, ...patch })
+  return sameThreadViewFilters(next, activeThreadView(settings)) ? withoutDraft(settings) : { ...withoutDraft(settings), draft: next }
+}
+
+/** Whether the list no longer shows the active preset as saved: a changed filter, or a project scope the preset names. */
+const isThreadViewEdited = (settings: ThreadViewSettings, workspaceFilter: string | null): boolean => {
+  if (settings.draft !== undefined) return true
+  const projectFilter = activeThreadView(settings).projectFilter
+  return projectFilter !== undefined && projectFilter !== workspaceFilter
+}
+
+export interface AppliedThreadViewPreset {
+  readonly settings: ThreadViewSettings
+  /** The project scope to set with it; absent when the preset leaves the project picker alone. */
+  readonly workspaceFilter?: string | null
+}
+
+/** Apply an enabled preset: it becomes active, any draft goes, and a preset that names a project scope sets it. */
+const applyThreadViewPreset = (settings: ThreadViewSettings, viewId: string): AppliedThreadViewPreset => {
+  const view = settings.views.find(candidate => candidate.id === viewId)
+  if (view === undefined || !view.enabled) return { settings }
+  const applied = { ...withoutDraft(settings), activeViewId: view.id }
+  return view.projectFilter === undefined ? { settings: applied } : { settings: applied, workspaceFilter: view.projectFilter }
+}
+
+/**
+ * Write the list's current filters into one preset ("Save changes", "Update with current filters"). The project scope
+ * joins it when the preset already names one or the list is scoped to a project; a project-neutral preset updated on
+ * All projects stays neutral.
+ */
+const saveCurrentFiltersToPreset = (settings: ThreadViewSettings, viewId: string, workspaceFilter: string | null): ThreadViewSettings => {
+  const view = settings.views.find(candidate => candidate.id === viewId)
+  if (view === undefined) return settings
+  const filters = currentThreadViewFilters(settings)
+  const projectFilter = view.projectFilter !== undefined || workspaceFilter !== null ? workspaceFilter : undefined
+  const { projectFilter: _previous, ...rest } = view
+  const updated: ThreadViewPreset = projectFilter === undefined ? { ...rest, ...filters } : { ...rest, ...filters, projectFilter }
+  const saved = saveThreadView(settings, updated)
+  return view.id === activeThreadView(settings).id ? withoutDraft(saved) : saved
+}
+
+/** Save the list's current filters and project scope as a new preset at `position` (default: last) and apply it. */
+const createPresetFromCurrent = (
+  settings: ThreadViewSettings,
+  input: { readonly id: string; readonly name: string; readonly workspaceFilter: string | null; readonly position?: number },
+): ThreadViewSettings => {
+  const view: ThreadViewPreset = {
+    id: input.id,
+    name: input.name.trim(),
+    enabled: true,
+    ...currentThreadViewFilters(settings),
+    projectFilter: input.workspaceFilter,
+  }
+  return { ...withoutDraft(insertThreadView(settings, view, input.position)), activeViewId: view.id }
+}
+
+/**
+ * Turn presets on or off. Turning them off folds an unsaved draft into the active view, which is what the list then
+ * shows and what a filter change would have done before presets.
+ */
+const setPresetsEnabled = (settings: ThreadViewSettings, enabled: boolean): ThreadViewSettings => {
+  if (enabled || settings.draft === undefined) return { ...settings, showPresets: enabled }
+  return { ...updateThreadViewPreferences(withoutDraft(settings), settings.draft), showPresets: false }
+}
+
+/** Put a view at `position` (clamped; default last): the Undo of a delete puts it back where it was. */
+const insertThreadView = (settings: ThreadViewSettings, view: ThreadViewPreset, position?: number): ThreadViewSettings => {
+  const others = settings.views.filter(candidate => candidate.id !== view.id)
+  const index = position === undefined ? others.length : Math.max(0, Math.min(position, others.length))
+  return { ...settings, views: [...others.slice(0, index), view, ...others.slice(index)] }
+}
+
+const renameThreadView = (settings: ThreadViewSettings, viewId: string, name: string): ThreadViewSettings => {
+  const view = settings.views.find(candidate => candidate.id === viewId)
+  return view === undefined ? settings : saveThreadView(settings, { ...view, name: name.trim() })
+}
+
+/** The enabled preset `direction` steps from the active one, wrapping; the `[` and `]` keys. */
+const adjacentThreadViewId = (settings: ThreadViewSettings, direction: -1 | 1): string | undefined => {
+  const enabled = settings.views.filter(view => view.enabled)
+  if (enabled.length === 0) return undefined
+  const index = enabled.findIndex(view => view.id === activeThreadView(settings).id)
+  return enabled[(index + direction + enabled.length) % enabled.length]?.id
+}
+
+/** A new preset id; getRandomValues also works on plain HTTP LAN pages, unlike randomUUID. */
+const newThreadViewId = (): string => `custom-${Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => byte.toString(16).padStart(2, '0')).join('')}`
 
 /** The browser copy this plugin wrote before the saved views became Host settings; read once to migrate. */
 export const threadViewPreferences = createStoredValue({
@@ -477,4 +617,16 @@ export class ThreadViewPreferencesModel {
   static readonly removeThreadView = removeThreadView
   static readonly updateThreadViewPreferences = updateThreadViewPreferences
   static readonly updateThreadViewSettings = updateThreadViewSettings
+  static readonly currentThreadViewFilters = currentThreadViewFilters
+  static readonly sameThreadViewFilters = sameThreadViewFilters
+  static readonly editThreadViewFilters = editThreadViewFilters
+  static readonly setPresetsEnabled = setPresetsEnabled
+  static readonly isThreadViewEdited = isThreadViewEdited
+  static readonly applyThreadViewPreset = applyThreadViewPreset
+  static readonly saveCurrentFiltersToPreset = saveCurrentFiltersToPreset
+  static readonly createPresetFromCurrent = createPresetFromCurrent
+  static readonly insertThreadView = insertThreadView
+  static readonly renameThreadView = renameThreadView
+  static readonly adjacentThreadViewId = adjacentThreadViewId
+  static readonly newThreadViewId = newThreadViewId
 }

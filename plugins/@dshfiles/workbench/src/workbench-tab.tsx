@@ -1,7 +1,16 @@
 import type { IDockviewPanelHeaderProps } from 'dockview-react'
 import { useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/context-menu'
+import { SidebarFolderTargets } from './shell-merge.js'
 import { PinIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { DEFAULT_CLOSE_BUTTON_POSITION, workbenchTabs } from './tabs.js'
@@ -172,6 +181,26 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
               </>
             ))}
           {tab === undefined && <GroupCloseItems panel={props.api} closePanel={closePanel} />}
+          {/* Add to sidebar ▸ ‹folder› (b:952m): a reusable view or page, never a thread tab or a chooser. */}
+          {(() => {
+            const sidebar = SidebarFolderTargets.get()
+            if (sidebar === undefined || definition === undefined || tab !== undefined || definition.newView === true || definition.hiddenFromAdd === true)
+              return null
+            const folders = sidebar.folders()
+            if (folders.length === 0) return null
+            return (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>Add to sidebar</ContextMenuSubTrigger>
+                <ContextMenuSubContent>
+                  {folders.map(folder => (
+                    <ContextMenuItem key={folder.id} onSelect={() => sidebar.add(definition.mainPanelId ?? definition.id, folder.id)}>
+                      {folder.title}
+                    </ContextMenuItem>
+                  ))}
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            )
+          })()}
           <ContextMenuItem
             onSelect={() => {
               const panel = props.containerApi.getPanel(props.api.id)

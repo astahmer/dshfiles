@@ -1,16 +1,16 @@
-# Conversation cleanup
+# Thread cleanup
 
-![Conversation cleanup preview](docs/screenshots/conversation-cleanup.png)
+![Thread cleanup preview](docs/screenshots/conversation-cleanup.png)
 
-Optional bulk cleanup of **settled OR archived** local conversations. Nothing runs automatically.
+Optional bulk cleanup of **done (settled) OR archived** local threads. Nothing runs automatically.
 
 ## Use
 
 1. Install this bundle with `pnpm profile:sync --profile <name> --bundle @dshfiles/conversation-cleanup` or `dshx add @dshfiles/conversation-cleanup --profile <name>`, then load its Host half with a user-managed restart if required. The `dshx add` route also writes the profile row. A Plugin Manager local package install skips that row. It is not enabled in the shared Web profile.
-2. Open **Settings → Conversation cleanup → Preview cleanup**.
-3. Inspect the exact conversation IDs. Export anything worth keeping using DSH's conversation export before continuing.
-4. Choose **Delete previewed conversations**, then **Permanently delete**. Cancel changes nothing.
-5. Read the per-conversation receipt. Preview again for another batch when more than 200 conversations qualify.
+2. Open **Settings → Thread cleanup → Preview cleanup**.
+3. Inspect the listed threads (by title, or Untitled thread · project; the thread id is in each row's tooltip). Export anything worth keeping using DSH's thread export before continuing.
+4. Choose **Delete previewed threads**, then **Permanently delete**. Cancel changes nothing.
+5. Read the per-thread receipt. Preview again for another batch when more than 200 threads qualify.
 
 **Deletion is irreversible.** Only canonical local JSONL log generations are deleted. Shared attachments, workspaces, backups, sidecars and derived search/memory/usage indexes remain. This is not secure erasure or a data-retention compliance feature. Those other owners may retain copies or excerpts; this plugin does not claim to erase them.
 

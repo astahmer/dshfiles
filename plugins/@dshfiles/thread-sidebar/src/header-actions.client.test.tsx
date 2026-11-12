@@ -36,6 +36,8 @@ const labels = {
   threadSidebarThreadActions: 'Thread actions',
   threadSidebarMoreThreadActions: 'More thread actions',
   threadSidebarReferencedBy: 'Referenced by',
+  threadSidebarFindInThread: 'Find in thread',
+  threadSidebarTurns: 'Turns',
 } satisfies Readonly<Record<string, string>>
 
 const NO_THREAD_DIRECTORIES: ReadonlyMap<string, string> = new Map()
@@ -179,7 +181,15 @@ describe('HeaderThreadActions', () => {
     mount({ archived: true })
     expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
     openMoreMenu()
-    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Restore', 'Copy thread ID', 'Copy thread link', 'Referenced by'])
+    // Find in thread (with its ⌘F / Ctrl+F keycap) and Turns lead the menu, archived or not: reading tools, not lifecycle verbs.
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+      'Find in threadCtrlF',
+      'Turns',
+      'Restore',
+      'Copy thread ID',
+      'Copy thread link',
+      'Referenced by',
+    ])
     cleanup()
     mount({ blank: true })
     expect(screen.queryByRole('group', { name: 'Thread actions' })).toBeNull()

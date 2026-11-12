@@ -20,6 +20,24 @@ const isSecondaryWorkspace = (location: ThreadLocation): boolean => location.wor
 
 const defaultThreadsDirectory = (repoRoot: string): string => `${repoRoot}-threads`
 
+/** The dshx CLI this plugin builds with. */
+const dshxBin = (): string => join(dirname(createRequire(import.meta.url).resolve('@dshfiles/dshx')), 'cli', 'bin.js')
+
+/** `dshx checkout plan`: what moving the checkout to a revision would rebuild and restart, read only. */
+const checkoutPlanArgv = (input: { readonly repoRoot: string; readonly workspace: string; readonly revision: string }): readonly string[] => [
+  process.execPath,
+  dshxBin(),
+  'checkout',
+  'plan',
+  '--workspace',
+  input.workspace,
+  '--revision',
+  input.revision,
+  '--cwd',
+  input.repoRoot,
+  '--json',
+]
+
 /** `dshx checkout sync` from the dshx this plugin builds with; accepts an exact landed commit or the bookmark tip. */
 const checkoutSyncArgv = (input: {
   readonly repoRoot: string
@@ -28,7 +46,7 @@ const checkoutSyncArgv = (input: {
   readonly revision?: string | undefined
 }): readonly string[] => [
   process.execPath,
-  join(dirname(createRequire(import.meta.url).resolve('@dshfiles/dshx')), 'cli', 'bin.js'),
+  dshxBin(),
   'checkout',
   'sync',
   '--workspace',
@@ -47,4 +65,6 @@ export class ThreadWorkspaceModel {
   static readonly managedNamePattern = managedThreadWorkspaceName
   static readonly isManagedName = (name: string): boolean => managedThreadWorkspaceName.test(name)
   static readonly checkoutSyncArgv = checkoutSyncArgv
+  static readonly checkoutPlanArgv = checkoutPlanArgv
+  static readonly dshxBin = dshxBin
 }

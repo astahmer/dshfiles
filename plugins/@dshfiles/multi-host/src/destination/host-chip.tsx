@@ -124,7 +124,7 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
           <Tooltip>
             <TooltipTrigger asChild>
               <PopoverTrigger asChild>
-                <Button variant="ghost" className={chipClassName} aria-label={`Run on ${label}`} data-run-segment="host">
+                <Button variant="ghost" className={chipClassName} aria-label={`Run on ${label}`} data-run-segment="host" data-host-kind={destination.kind}>
                   {destination.kind === 'local' ? <LaptopIcon className="dshx:size-3.5" /> : <ServerIcon className="dshx:size-3.5" />}
                   {label}
                   {state === undefined ? null : <StatusDot tone={state.tone} />}

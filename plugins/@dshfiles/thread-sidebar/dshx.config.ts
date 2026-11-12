@@ -19,6 +19,8 @@ export default defineConfig({
     // The shell's rail destinations and the section registry plugins add their pages to (docs/ade-ux §4.2).
     destinations: 'src/destinations.ts',
     'thread-row-actions': 'src/thread-row-actions.ts',
+    // Sections other plugins add to the thread header's ⋯ menu (b:ysaj: linked backlog items).
+    'thread-menu-sections': 'src/thread-menu-sections.ts',
     // Updates other plugins know only a Host restart applies, shown in thread-sidebar's one restart status item.
     'restart-sources': 'src/restart-sources.ts',
     // A picker gesture in another plugin asks the sidebar's fan-out dialog to open with its models preselected.

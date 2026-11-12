@@ -132,18 +132,18 @@ export const BacklogItemMenu = (props: {
             {selection.length > 1 ? `${String(selection.length)} selected · ` : null}
             {BacklogReference.labelOf(item)} · {item.title}
           </ContextMenuLabel>
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.startThread(selection)}>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-sm" onSelect={() => props.startThread(selection)}>
             <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />
             Start thread{countSuffix}…
           </ContextMenuItem>
           {props.openItem === undefined ? null : (
-            <ContextMenuItem className="dshx:text-[13px]" onSelect={() => props.openItem?.(item.id)}>
+            <ContextMenuItem className="dshx:text-sm" onSelect={() => props.openItem?.(item.id)}>
               <span aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
               Open item
             </ContextMenuItem>
           )}
           <ContextMenuSub>
-            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-sm">
               <CopyIcon aria-hidden className="dshx:size-3.5" />
               Copy
               {countSuffix}
@@ -152,7 +152,7 @@ export const BacklogItemMenu = (props: {
               {itemCopyEntries({ item, selection }).map(entry => {
                 const Icon = copyEntryIcons[entry.key]
                 return (
-                  <ContextMenuItem key={entry.key} className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(entry.text())}>
+                  <ContextMenuItem key={entry.key} className="dshx:gap-2 dshx:text-sm" onSelect={() => void writeClipboard(entry.text())}>
                     <Icon aria-hidden className="dshx:size-3.5" />
                     {entry.label}
                   </ContextMenuItem>
@@ -161,7 +161,7 @@ export const BacklogItemMenu = (props: {
             </ContextMenuSubContent>
           </ContextMenuSub>
           {tweetUrl === undefined ? null : (
-            <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" disabled={actions.enrichTweet.isPending} onSelect={() => void importTweet()}>
+            <ContextMenuItem className="dshx:gap-2 dshx:text-sm" disabled={actions.enrichTweet.isPending} onSelect={() => void importTweet()}>
               <LinkIcon aria-hidden className="dshx:size-3.5" />
               Retrieve tweet content
             </ContextMenuItem>
@@ -176,7 +176,7 @@ export const BacklogItemMenu = (props: {
           )}
           <ContextMenuSeparator />
           <ContextMenuSub>
-            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-sm">
               <ItemGlyphs.StatusIcon status={item.status} />
               Status
               {countSuffix}
@@ -190,7 +190,7 @@ export const BacklogItemMenu = (props: {
                 }}
               >
                 {BacklogItems.statuses.map(status => (
-                  <ContextMenuRadioItem key={status} value={status} className="dshx:text-[13px]">
+                  <ContextMenuRadioItem key={status} value={status} className="dshx:text-sm">
                     <ItemGlyphs.StatusIcon status={status} />
                     {ItemGlyphs.statusLabels[status]}
                   </ContextMenuRadioItem>
@@ -199,7 +199,7 @@ export const BacklogItemMenu = (props: {
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSub>
-            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-sm">
               <WorkGlyphs.PriorityIcon priority={item.priority ?? 'none'} />
               Priority
               {countSuffix}
@@ -213,7 +213,7 @@ export const BacklogItemMenu = (props: {
                 }}
               >
                 {BacklogItems.priorities.map(priority => (
-                  <ContextMenuRadioItem key={priority} value={priority} className="dshx:text-[13px]">
+                  <ContextMenuRadioItem key={priority} value={priority} className="dshx:text-sm">
                     <WorkGlyphs.PriorityIcon priority={priority} />
                     {WorkGlyphs.priorityLabels[priority]}
                     <ContextMenuShortcut>{ItemPickers.priorityShortcut(priority)}</ContextMenuShortcut>
@@ -223,25 +223,25 @@ export const BacklogItemMenu = (props: {
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSub>
-            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-sm">
               <CalendarIcon aria-hidden className="dshx:size-3.5" />
               Due date
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="dshx-root dshx:min-w-52">
               {ItemPickers.dueShortcuts(today).map(shortcut => (
-                <ContextMenuItem key={shortcut.label} className="dshx:gap-2 dshx:text-[13px]" onSelect={() => update({ due: shortcut.due })}>
+                <ContextMenuItem key={shortcut.label} className="dshx:gap-2 dshx:text-sm" onSelect={() => update({ due: shortcut.due })}>
                   {shortcut.label}
                   <ContextMenuShortcut>{shortcut.due}</ContextMenuShortcut>
                 </ContextMenuItem>
               ))}
               <ContextMenuSeparator />
-              <ContextMenuItem className="dshx:text-[13px]" onSelect={() => update({ due: null })}>
+              <ContextMenuItem className="dshx:text-sm" onSelect={() => update({ due: null })}>
                 Clear due date
               </ContextMenuItem>
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSub>
-            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-sm">
               <ItemGlyphs.KindIcon kind={item.kind} />
               Kind
               {countSuffix}
@@ -255,7 +255,7 @@ export const BacklogItemMenu = (props: {
                 }}
               >
                 {BacklogItems.kinds.map(kind => (
-                  <ContextMenuRadioItem key={kind} value={kind} className="dshx:text-[13px]">
+                  <ContextMenuRadioItem key={kind} value={kind} className="dshx:text-sm">
                     <ItemGlyphs.KindIcon kind={kind} />
                     {ItemGlyphs.kindLabels[kind]}
                   </ContextMenuRadioItem>
@@ -264,7 +264,7 @@ export const BacklogItemMenu = (props: {
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSub>
-            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-sm">
               <ItemGlyphs.AttentionIcon attention={attention} />
               Attention
               {countSuffix}
@@ -278,7 +278,7 @@ export const BacklogItemMenu = (props: {
                 }}
               >
                 {BacklogItems.attentions.map(attention => (
-                  <ContextMenuRadioItem key={attention} value={attention} className="dshx:text-[13px]">
+                  <ContextMenuRadioItem key={attention} value={attention} className="dshx:text-sm">
                     <ItemGlyphs.AttentionIcon attention={attention} />
                     {ItemGlyphs.attentionLabels[attention]}
                   </ContextMenuRadioItem>
@@ -287,18 +287,18 @@ export const BacklogItemMenu = (props: {
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSub>
-            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-sm">
               <FolderIcon aria-hidden className="dshx:size-3.5" />
               Project
               {countSuffix}
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="dshx-root dshx:min-w-52">
               <ContextMenuRadioGroup value={item.project ?? NO_PROJECT} onValueChange={value => update({ project: value === NO_PROJECT ? null : value })}>
-                <ContextMenuRadioItem value={NO_PROJECT} className="dshx:text-[13px]">
+                <ContextMenuRadioItem value={NO_PROJECT} className="dshx:text-sm">
                   No project
                 </ContextMenuRadioItem>
                 {props.projectPaths.map(project => (
-                  <ContextMenuRadioItem key={project} value={project} title={project} className="dshx:max-w-72 dshx:text-[13px]">
+                  <ContextMenuRadioItem key={project} value={project} title={project} className="dshx:max-w-72 dshx:text-sm">
                     <ItemGlyphs.ProjectDot project={project} />
                     <span className="dshx:min-w-0 dshx:truncate">{ItemGlyphs.projectName(project)}</span>
                   </ContextMenuRadioItem>
@@ -309,45 +309,45 @@ export const BacklogItemMenu = (props: {
           <ContextMenuSeparator />
           {many || (item.lease ?? null) === null ? null : (
             <ContextMenuItem
-              className="dshx:gap-2 dshx:text-[13px]"
+              className="dshx:gap-2 dshx:text-sm"
               onSelect={() => actions.release.mutate(item.id, { onError: BacklogNotices.failure('The claim was not released.') })}
             >
               <LockOpenIcon aria-hidden className="dshx:size-3.5" />
               Release claim
             </ContextMenuItem>
           )}
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => update({ pinned: !item.pinned })}>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-sm" onSelect={() => update({ pinned: !item.pinned })}>
             <PinIcon aria-hidden className="dshx:size-3.5" />
             {item.pinned ? 'Unpin' : 'Pin'} {many ? 'items' : 'item'}
             {countSuffix}
           </ContextMenuItem>
           {props.triageOff ? null : (
-            <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => applyToSelection(props.triage)}>
+            <ContextMenuItem className="dshx:gap-2 dshx:text-sm" onSelect={() => applyToSelection(props.triage)}>
               <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
               Run triage
               {countSuffix}
             </ContextMenuItem>
           )}
           <ContextMenuSub>
-            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-sm">
               <RepeatIcon aria-hidden className="dshx:size-3.5" />
               Make recurring
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="dshx-root dshx:min-w-44">
               {(['daily', 'weekly', 'monthly'] as const).map(recurrence => (
-                <ContextMenuItem key={recurrence} className="dshx:text-[13px]" onSelect={() => update({ recurrence })}>
+                <ContextMenuItem key={recurrence} className="dshx:text-sm" onSelect={() => update({ recurrence })}>
                   {Recurrence.label(recurrence)}
                 </ContextMenuItem>
               ))}
               <ContextMenuSeparator />
-              <ContextMenuItem className="dshx:text-[13px]" onSelect={() => update({ recurrence: null })}>
+              <ContextMenuItem className="dshx:text-sm" onSelect={() => update({ recurrence: null })}>
                 Stop repeating
               </ContextMenuItem>
             </ContextMenuSubContent>
           </ContextMenuSub>
           {item.project === null || many ? null : (
             <ContextMenuItem
-              className="dshx:gap-2 dshx:text-[13px]"
+              className="dshx:gap-2 dshx:text-sm"
               onSelect={() =>
                 actions.scheduleRule.mutate(
                   { rule: 'triage', project: item.project ?? '', timing: nightlyTiming() },
@@ -364,11 +364,11 @@ export const BacklogItemMenu = (props: {
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => setMergeOpen(true)}>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-sm" onSelect={() => setMergeOpen(true)}>
             <MergeIcon aria-hidden className="dshx:size-3.5" />
             Merge into…{countSuffix}
           </ContextMenuItem>
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px] dshx:text-destructive" onSelect={() => setDeleteOpen(true)}>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-sm dshx:text-destructive" onSelect={() => setDeleteOpen(true)}>
             <Trash2Icon aria-hidden className="dshx:size-3.5" />
             Delete permanently{countSuffix}…
           </ContextMenuItem>

@@ -206,12 +206,15 @@ export interface AgentPresetSettingsState {
   status: 'idle' | 'loading' | 'ready' | 'unavailable' | 'error'
   error: string | null
   options: readonly AgentPresetOption[]
+  /** The Host-effective default (b:4qjm): the thread header names a preset only when it differs. */
+  defaultPreset: string
 }
 
 const INITIAL: AgentPresetSettingsState = {
   status: 'idle',
   error: null,
   options: [],
+  defaultPreset: '',
 }
 
 /** Reads the roster for the surfaces that only display it. */
@@ -248,6 +251,7 @@ export class AgentPresetSettingsController {
       status: 'ready',
       error: null,
       options: presetOptions(presets),
+      defaultPreset: presets.find(preset => preset.isDefault)?.id ?? presets[0]?.id ?? '',
     })
   }
 

@@ -1,0 +1,292 @@
+/*
+ * Visual refresh P2 (T2.4): code and diff cards in the transcript. Unlayered, like the theme block, so it reaches the
+ * native core cards (markdown CodeBlock, the edit tool's DiffBlock, CodeCard, deliverables) without patching core.
+ *
+ * - Cards and code take the 8px card radius of the token scale (the Host's `lg` step is 12px after P0, which is the
+ *   composer/menu radius). Scoped to the transcript, so menus and dialogs keep 12px.
+ * - Code reads in the mono face at 12.5/18, never smaller; a larger Settings › code font size still wins (`max()`), and
+ *   the line height follows its delta.
+ * - Diff lines already take the status-trio tints (P0 maps `--dsw-alias-code-diff-*` onto `--dshx-tone-*-bg`); line
+ *   numbers stay on the tertiary label, the muted step.
+ */
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) {
+  --dsw-radius-lg: 8px;
+  --dsw-font-markdown-code-block: 400 max(var(--dsh-code-font-size, 11px), 12.5px) / calc(18px + var(--dsh-code-font-delta, 0px)) var(--ds-font-family-code);
+  --dsw-font-markdown-code-block-font-size: max(var(--dsh-code-font-size, 11px), 12.5px);
+  --dsw-font-markdown-code-block-line-height: calc(18px + var(--dsh-code-font-delta, 0px));
+}
+
+/*
+ * Productivity pass T1.2: code and tables in Markdown read at 12px or more, and code keeps its shape. Chat marks the
+ * native Markdown root `data-dsh-markdown` (its own class is hashed).
+ *
+ * - Inline code flows with the sentence (`display: inline`, `box-decoration-break: clone`) instead of the primitive's
+ *   `inline-flex` box that turned a long path into a rectangle; 0.9em, never under 12px, tone-2 fill, no border.
+ * - The code card's header is a 24px band with a 12px label; the body keeps Geist Mono 12.5/18.
+ * - Wrapped code (Chat's wrap toggle) wraps each line with a 2ch hanging indent instead of restarting at column 0;
+ *   unwrapped code (the default) scrolls sideways. Chat folds a card after 24 lines.
+ * - Tables read 13/20 (14/20 on a phone), header 600, numbers in tabular figures; cells from 8ch to 40ch instead of
+ *   `min(30vw, 320px)`, which was 117px on a phone; code in a cell is 12px, not 11px.
+ * - On a touch screen a wide table scrolls (the primitive only scrolls it on hover) with a sticky first column.
+ */
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] :not(pre) > code {
+  display: inline;
+  padding: 0 0.3em;
+  border: 0;
+  border-radius: var(--dsw-radius-xs);
+  background-color: var(--dsw-alias-markdown-inline-code);
+  font-size: max(12px, 0.9em) !important;
+  line-height: inherit;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] .md-code-block [data-code-block-banner] {
+  min-height: 24px;
+  padding: 0 4px 0 14px;
+  font-size: 12px;
+  line-height: 24px;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] .md-code-block [data-code-block-banner] * {
+  font-size: 12px;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] .md-code-block pre {
+  padding: 6px 14px 12px;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] .md-code-block[data-code-wrap='true'] pre {
+  white-space: pre-wrap;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] .md-code-block[data-code-wrap='true'] pre code:has(> .line) {
+  display: block;
+  white-space: normal;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] .md-code-block[data-code-wrap='true'] pre code > .line {
+  display: block;
+  min-height: 1lh;
+  padding-inline-start: 2ch;
+  text-indent: -2ch;
+  white-space: pre-wrap;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] table {
+  font-variant-numeric: tabular-nums;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] :is(th, td) {
+  min-width: 8ch;
+  max-width: 40ch;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] th {
+  font-weight: 600;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] :is(th, td) code {
+  font-size: 12px !important;
+}
+
+@media (pointer: coarse) {
+  :is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] :is(th, td) {
+    font-size: 14px;
+  }
+
+  :is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] .md-table-wide {
+    overflow-x: auto;
+    padding-bottom: 0;
+  }
+
+  :is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] .md-table-wide :is(th, td):first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    padding-right: 12px;
+    background: var(--dsw-alias-bg-base);
+  }
+}
+
+/*
+ * Productivity pass T1.3: links are underlined at rest (WCAG 1.4.1: colour alone does not mark them), at 35% of the
+ * link colour, and fully on hover or focus, at weight 400. File references are quiet chips in the muted tone instead
+ * of link-blue: Chat labels an inline-code mention `name.ts:24` (`data-file-chip="mention"`) and marks a Markdown file
+ * link (`data-file-chip="link"`); both open the file as before.
+ */
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] a {
+  font-weight: 400;
+  text-decoration-line: underline;
+  text-decoration-style: solid;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 3px;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: solid;
+  text-decoration-color: currentColor;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] code[data-file-chip] {
+  padding: 0;
+  background: none;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] :is(code[data-file-chip] > button, [data-file-chip='link'] > button) {
+  display: inline;
+  margin: 0;
+  padding: 0 0.35em;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-markdown-inline-code);
+  color: var(--dsw-alias-label-secondary);
+  font-weight: 400;
+  text-decoration: none;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  cursor: pointer;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] [data-file-chip='link'] > button {
+  font-size: 0.9em;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow'])
+  [data-dsh-markdown]
+  :is(code[data-file-chip] > button, [data-file-chip='link'] > button):is(:hover, :focus-visible) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  text-decoration: none;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] [data-file-chip] svg {
+  width: 1em;
+  height: 1em;
+  margin-right: 0.25em;
+  vertical-align: -0.15em;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] [data-chip-keep] {
+  white-space: nowrap;
+}
+
+/*
+ * Productivity pass T1.6: GitHub alerts as callouts in the status trios (note and important in the accent, tip in
+ * success, warning in warning, caution in danger), with a titled first line; a plain quote keeps the quiet rule.
+ * `<details>` from a reply is a closed disclosure with a chevron.
+ */
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] blockquote {
+  margin: 12px 0;
+  border-left-width: 2px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] blockquote[data-callout] {
+  --dsh-callout-tone: var(--dshx-tone-info);
+  --dsh-callout-fill: var(--dshx-tone-info-bg);
+  padding: 8px 12px;
+  border-left: 2px solid var(--dsh-callout-tone);
+  border-radius: 0 var(--dsw-radius-md) var(--dsw-radius-md) 0;
+  background: color-mix(in srgb, var(--dsh-callout-fill) 50%, transparent);
+  color: var(--dsw-alias-label-primary);
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] blockquote[data-callout='tip'] {
+  --dsh-callout-tone: var(--dshx-tone-success);
+  --dsh-callout-fill: var(--dshx-tone-success-bg);
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] blockquote[data-callout='warning'] {
+  --dsh-callout-tone: var(--dshx-tone-warning);
+  --dsh-callout-fill: var(--dshx-tone-warning-bg);
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] blockquote[data-callout='caution'] {
+  --dsh-callout-tone: var(--dshx-tone-danger);
+  --dsh-callout-fill: var(--dshx-tone-danger-bg);
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] blockquote[data-callout] > p {
+  margin: 0;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] blockquote[data-callout] > p + :is(p, ul, ol) {
+  margin-top: 4px;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] [data-callout-title] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsh-callout-tone);
+  font-weight: 600;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] details[data-md-details] {
+  margin: 12px 0;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] details[data-md-details] > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 12px;
+  color: var(--dsw-alias-label-secondary);
+  font-weight: 500;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] details[data-md-details] > summary::-webkit-details-marker {
+  display: none;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] details[data-md-details] > summary::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease);
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] details[data-md-details][open] > summary::before {
+  transform: rotate(45deg);
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] details[data-md-details] > summary:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] details[data-md-details] > summary:focus-visible {
+  outline: 1.5px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+  border-radius: var(--dsw-radius-lg);
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] details[data-md-details] > :not(summary) {
+  margin-inline: 12px;
+}
+
+:is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] details[data-md-details] > :last-child:not(summary) {
+  margin-bottom: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] details[data-md-details] > summary::before {
+    transition: none;
+  }
+}

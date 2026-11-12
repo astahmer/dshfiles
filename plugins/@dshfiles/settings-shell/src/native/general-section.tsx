@@ -23,7 +23,11 @@ const revealSettingsEntry = (input: { readonly container: HTMLElement; readonly 
 
 /** The General section column; rows come from `settings.general.item` registrants. */
 export const GeneralSection = (
-  props: Pick<PropsRenderSlots<'settings.general.item'>, 'renderSlot'> & { readonly target?: string | undefined },
+  props: Pick<PropsRenderSlots<'settings.general.item'>, 'renderSlot'> & {
+    readonly target?: string | undefined
+    /** A notice above the rows (a newer DSH release); it never sits among the preferences. */
+    readonly banner?: React.ReactNode
+  },
 ): JSX.Element => {
   const column = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -42,6 +46,7 @@ export const GeneralSection = (
       )}
       ref={column}
     >
+      {props.banner}
       {props.renderSlot('settings.general.item', {})}
     </div>
   )
@@ -49,11 +54,7 @@ export const GeneralSection = (
 
 /** The release the native client build embeds; the port keeps the version it was taken from. */
 export const CurrentVersionRow = (props: { readonly t: ShellTranslate; readonly version: string }): JSX.Element => (
-  <div
-    className="dshx:py-4 dshx:text-[14px] dshx:leading-[22px] dshx:wrap-anywhere dshx:text-[var(--dsw-alias-label-primary)]"
-    data-settings-entry="current-version"
-    tabIndex={-1}
-  >
+  <div className="dshx:py-4 dshx:text-base dshx:leading-[22px] dshx:wrap-anywhere dshx:text-foreground" data-settings-entry="current-version" tabIndex={-1}>
     {props.t('general.currentVersion', { version: props.version })}
   </div>
 )
@@ -73,10 +74,8 @@ export const DeveloperToolsRow = (props: {
       data-settings-entry="developer-tools"
     >
       <div>
-        <div className="dshx:text-[14px] dshx:leading-5">{props.t('developerTools.title')}</div>
-        <div className="dshx:mt-1 dshx:text-[12px] dshx:leading-[18px] dshx:text-[var(--dsw-alias-label-secondary)]">
-          {props.t('developerTools.description')}
-        </div>
+        <div className="dshx:text-base dshx:leading-5">{props.t('developerTools.title')}</div>
+        <div className="dshx:mt-1 dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">{props.t('developerTools.description')}</div>
         {failed && <div role="alert">{props.t('developerTools.error')}</div>}
       </div>
       <Switch

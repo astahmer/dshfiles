@@ -1,6 +1,7 @@
 /** Localized two-column selector shared by Chat preference rows. */
+import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
 import { useRef, useState } from 'react'
-import { IconChevronDownOutlineRegular, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './PreferenceRow.module.css'
 
 /**
@@ -34,7 +35,7 @@ export function PreferenceRow({ title, description, value, selectedLabel, option
       onClick={() => { setOpen(value => !value) }}
     >
       {selectedLabel}
-      <IconChevronDownOutlineRegular className={css.chevron} />
+      <ChevronDownIcon size={14} strokeWidth={1.5} className={css.chevron} />
     </button>
   )
 

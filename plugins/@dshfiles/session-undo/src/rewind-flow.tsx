@@ -64,6 +64,8 @@ export const useRewindFlow = (props: {
 }): {
   readonly pending: boolean
   readonly failure: string | null
+  /** dshfiles: dismiss the failure line the unpinned control shows beside the composer's More menu. */
+  readonly clearFailure: () => void
   readonly run: (move: Move) => void
   readonly confirmRewind: (turn: number) => void
   readonly dialog: ReactNode
@@ -159,6 +161,7 @@ export const useRewindFlow = (props: {
   return {
     pending: move.isPending,
     failure,
+    clearFailure: () => setFailure(null),
     run: input => move.mutate(input),
     confirmRewind: turn => setDialog({ kind: 'confirm', turn }),
     dialog: element,

@@ -47,8 +47,8 @@ export const FallbacksSection = (props: {
     if (state.error !== undefined && state.error !== null) return null
     return (
       <section aria-label="Fallbacks" className="dshx:mt-2.5 dshx:flex dshx:flex-col dshx:gap-1">
-        <p className="dshx:text-[11px] dshx:font-medium">Fallback chain</p>
-        <p className="dshx:text-[10px] dshx:text-muted-foreground">Loading fallbacks…</p>
+        <p className="dshx:text-2xs dshx:font-medium">Fallback chain</p>
+        <p className="dshx:text-2xs dshx:text-muted-foreground">Loading fallbacks…</p>
       </section>
     )
   }
@@ -78,7 +78,7 @@ export const FallbacksSection = (props: {
 
   const addFallback = (
     <Button
-      className="dshx:h-6 dshx:gap-1 dshx:rounded-md dshx:px-1.5 dshx:text-[10px] dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground"
+      className="dshx:h-6 dshx:gap-1 dshx:rounded-md dshx:px-1.5 dshx:text-2xs dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground"
       disabled={disabled || !canAdd || props.current === null}
       onClick={() => {
         if (props.current !== null) save(ModelPickerModel.withFallback(chain, ModelPickerModel.fallbackFor(props.current)))
@@ -101,7 +101,7 @@ export const FallbacksSection = (props: {
               <TooltipTrigger asChild>
                 <Button
                   aria-label={`After a fallback answers: ${RETURN_LABELS[snapshot.returnPolicy]}. Switch to ${RETURN_LABELS[nextPolicy]}.`}
-                  className="dshx:h-5 dshx:gap-1 dshx:px-1 dshx:text-[10px] dshx:font-normal dshx:text-muted-foreground"
+                  className="dshx:h-5 dshx:gap-1 dshx:px-1 dshx:text-2xs dshx:font-normal dshx:text-muted-foreground"
                   disabled={disabled}
                   onClick={() => void write(() => api.setReturnPolicy({ returnPolicy: nextPolicy }))}
                   size="xs"
@@ -168,11 +168,11 @@ export const FallbacksSection = (props: {
         onReorder={(from, to) => save(ModelPickerModel.reorderedFallback(chain, from, to))}
         reorderDisabled={disabled}
         route={props.current === null ? 'selection' : `${props.current.provider}/${props.current.model}`}
-        summary={chain.length === 0 ? null : <span className="dshx:text-[10px]">{chain.length === 1 ? '1 route' : `${String(chain.length)} routes`}</span>}
+        summary={chain.length === 0 ? null : <span className="dshx:text-2xs">{chain.length === 1 ? '1 route' : `${String(chain.length)} routes`}</span>}
       />
 
       {snapshot.active !== null && (
-        <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-[10px] dshx:text-muted-foreground" role="status">
+        <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground" role="status">
           <Undo2Icon aria-hidden="true" className="dshx:size-3" />
           <span className="dshx:min-w-0 dshx:truncate">
             {serving?.model} · {serving?.provider}
@@ -185,7 +185,7 @@ export const FallbacksSection = (props: {
 
       {chain.length === 0 ? (
         <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-          <p className="dshx:text-[10px] dshx:text-muted-foreground">No fallbacks</p>
+          <p className="dshx:text-2xs dshx:text-muted-foreground">No fallbacks</p>
           {addFallback}
         </div>
       ) : null}
@@ -195,7 +195,7 @@ export const FallbacksSection = (props: {
           {addFallback}
           {snapshot.threadChain === null ? null : (
             <Button
-              className="dshx:h-6 dshx:shrink-0 dshx:px-1.5 dshx:text-[10px] dshx:text-muted-foreground"
+              className="dshx:h-6 dshx:shrink-0 dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground"
               disabled={disabled}
               onClick={() => void write(() => api.setChain({ sessionId: props.sessionId, chain: null }))}
               size="xs"
@@ -208,7 +208,7 @@ export const FallbacksSection = (props: {
       )}
 
       {error === null ? null : (
-        <p className="dshx:text-[10px] dshx:text-destructive" role="alert">
+        <p className="dshx:text-2xs dshx:text-destructive" role="alert">
           {error}
         </p>
       )}

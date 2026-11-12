@@ -19,16 +19,12 @@ describe('NewViewChooser', () => {
   it('shows and searches producer-qualified names with stable special-view ordering', () => {
     const definitions = [
       source('backlog', 'Backlog: Items'),
-      source('dshfiles-thread-sidebar.workbench-navigation', 'Thread Sidebar: Navigation'),
+      source('dshfiles-thread-sidebar.workbench-navigation', 'Navigation'),
       source('dshfiles-settings', 'Settings Shell: Settings'),
       source('current-conversation', 'Rich Composer: Current conversation', { allowMultiple: true }),
     ]
     render(<NewViewChooser definitions={definitions} onSelect={() => undefined} />)
-    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual([
-      'Settings Shell: Settings',
-      'Thread Sidebar: Navigation',
-      'Backlog: Items',
-    ])
+    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Settings Shell: Settings', 'Navigation', 'Backlog: Items'])
     fireEvent.change(screen.getByRole('textbox', { name: 'Search views' }), { target: { value: 'Rich Composer' } })
     expect(screen.queryByRole('button')).toBeNull()
     expect(screen.getByText('No matching views.')).toBeDefined()

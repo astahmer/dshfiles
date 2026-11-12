@@ -8,11 +8,11 @@
  * exactly one route — pick a host directory, new or existing — because the
  * occupant's own create-folder affordance already covers creating one.
  */
+import { ProjectAddFlow } from '@dshfiles/workspace-folder-picker/project-add-flow'
+import { PlusIcon } from '@dshfiles/plugin-ui/icons'
 import type { ReactNode, RefObject } from 'react'
 import { useCallback, useEffect, useReducer } from 'react'
-import {
-  Button, IconFolderCloseRegular, IconPlusOutlineRegular, Menu, Modal, type MenuEntry,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconFolderCloseRegular, Menu, Modal, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   WorkspaceId, WorkspaceSnapshot, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -25,6 +25,7 @@ import {
 import css from './WorkspacePicker.module.css'
 
 const ADD_WORKSPACE = '::add-workspace'
+const NEW_PROJECT = '::new-project'
 
 /** Core flow props: the owner supplies popover control and pick semantics. */
 export interface WorkspacePickFlowProps {
@@ -107,8 +108,13 @@ export function WorkspacePickFlow({
   useEffect(() => {
     if (flowOpen && !flowAvailable) dispatchFlow({ type: 'occupant.lost' })
   }, [flowOpen, flowAvailable])
+  // Productivity pass Q5 (T5.5): Add folder and New project are both one pick away; New project opens the same flow on
+  // its create view (ProjectAddFlow.request), which used to hide behind the flow's "New ▾" button.
   const addEntries: MenuEntry[] = flowAvailable
-    ? [{ id: ADD_WORKSPACE, label: t('menu.addWorkspace'), icon: <IconPlusOutlineRegular size={16} />, disabled: flowBusy }]
+    ? [
+      { id: ADD_WORKSPACE, label: t('menu.addWorkspace'), icon: <IconFolderCloseRegular size={16} />, disabled: flowBusy },
+      { id: NEW_PROJECT, label: t('menu.newProject'), icon: <PlusIcon strokeWidth={1.5} size={16} />, disabled: flowBusy },
+    ]
     : []
   // With workspaces listed, the add action pins below the scroll region
   // (divider + always visible); otherwise it IS the menu.
@@ -155,7 +161,7 @@ export function WorkspacePickFlow({
   // loading status instead of jumping into a flow the arriving list would have
   // made unnecessary; the add-only surface lists nothing and never waits.
   const listSettled = addOnly || workspaceSnapshot.phase === 'ready'
-  const addIsTheOnlyEntry = !pinAdd && listSettled && addEntries.length === 1
+  const addIsTheOnlyEntry = !pinAdd && listSettled && addEntries.length > 0
   // `flowBusy` gates this exactly as it disables the equivalent menu entry: a
   // pick still being adopted owns the surface until it settles.
   useEffect(() => {
@@ -173,6 +179,11 @@ export function WorkspacePickFlow({
 
   const handleSelect = (id: string): void => {
     if (id === ADD_WORKSPACE) {
+      openDirectoryFlow()
+      return
+    }
+    if (id === NEW_PROJECT) {
+      ProjectAddFlow.request('create')
       openDirectoryFlow()
       return
     }

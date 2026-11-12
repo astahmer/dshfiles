@@ -34,6 +34,7 @@ import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
 import { BACKLOG_PANEL_ID } from './panel-draft.js'
 import { backlogInlineReference } from './backlog-inline-reference.js'
 import { RevisionBacklinks, ThreadBacklinks } from './backlinks-chips.js'
+import { ThreadMenuSections, type ThreadMenuSectionProps } from '@dshfiles/thread-sidebar/thread-menu-sections'
 import { MessageQuote } from './message-quote.js'
 import { QuoteReplyButton } from './quote-reply-button.js'
 import { BacklogReferencePreview } from './backlog-reference-preview.jsx'
@@ -383,16 +384,6 @@ export default defineClient({
         }),
       ),
     )
-    ctx.slots.inject('conversation.session.header.utilities', () =>
-      ctx.slots.register(
-        { name: 'conversation.session.header.utilities', id: 'dshfiles-backlog-backlinks', order: 40, inject: sessionId => ({ sessionId }) },
-        decorate((props: { readonly sessionId: SessionId }) => (
-          <PluginQueryProvider>
-            <ThreadBacklinks sessionId={props.sessionId} />
-          </PluginQueryProvider>
-        )),
-      ),
-    )
     ctx.slots.inject('conversation.chat.assistant-actions', () =>
       ctx.slots.register(
         { name: 'conversation.chat.assistant-actions', id: 'dshfiles-backlog-quote-reply', order: 80, inject: sessionId => ({ sessionId }) },
@@ -410,6 +401,13 @@ export default defineClient({
         </PluginQueryProvider>
       )
       plugin.add(RevisionSections, { id: '@dshfiles/backlog/backlinks', order: 10, Component: plugin.bind(Backlinks) })
+      // The thread header's ⋯ (thread-sidebar), not a chip in the header row (b:ysaj).
+      const ThreadBacklinksSection = (props: ThreadMenuSectionProps): JSX.Element => (
+        <PluginQueryProvider>
+          <ThreadBacklinks {...props} openItem={openInBacklog} />
+        </PluginQueryProvider>
+      )
+      plugin.add(ThreadMenuSections, { id: '@dshfiles/backlog/thread-backlinks', order: 10, Component: plugin.bind(ThreadBacklinksSection) })
     }
   },
 })

@@ -28,7 +28,7 @@ const body = (page: Page, id: string): Locator => main(page).locator(`[data-work
 const own = (page: Page): Locator => body(page, journey(page).empty)
 const content = (page: Page): Locator => own(page).locator('[data-conversation-content]')
 const input = (page: Page): Locator =>
-  own(page).getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/ })
+  own(page).getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/ })
 const focus = async (page: Page, key: keyof WelcomeJourney): Promise<void> => {
   await main(page).getByRole('tab', { name: title[key], exact: true }).click()
   await expect.poll(() => new URL(page.url()).searchParams.get('thread')).toBe(journey(page)[key])
@@ -36,10 +36,10 @@ const focus = async (page: Page, key: keyof WelcomeJourney): Promise<void> => {
 }
 const welcome = async (page: Page): Promise<void> => {
   await expect(content(page)).toHaveAttribute('data-content-phase', 'hero')
-  await expect(own(page).getByText('Into the Unknown', { exact: true })).toBeVisible()
+  await expect(own(page).locator('[data-hero-headline]')).toHaveText(/^What should we build/)
   await expect(input(page)).toHaveCount(1)
   await expect(input(page)).toBeEditable()
-  await expect(own(page).getByRole('button', { name: 'Choose workspace', exact: true })).toBeVisible()
+  await expect(own(page).getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toBeVisible()
   const geometry = await content(page).evaluate(element => {
     const rect = element.getBoundingClientRect()
     const editable = element.querySelector('[role="textbox"][contenteditable="true"]')?.getBoundingClientRect()
@@ -88,7 +88,9 @@ Then('the empty thread shows the native centered welcome and one scoped composer
   await recordAssertion(page, 'workbench-empty-session-native-hero-geometry', async () => {
     await welcome(page)
     await page.screenshot({ path: test.info().outputPath('workbench-centered-new-thread.png'), animations: 'disabled' })
-    await own(page).getByRole('button', { name: 'Choose workspace', exact: true }).click()
+    await own(page)
+      .getByRole('button', { name: /^Choose (?:project|workspace)$/u })
+      .click()
     const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
     await expect(picker).toBeVisible()
     await expect(picker.getByRole('option', { name: /Welcome project/ })).toBeVisible()
@@ -152,11 +154,11 @@ When('its first real message is sent from the welcome composer', async ({ page }
 
 Then('the same editor becomes a normal fixed conversation without the welcome', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-populated-session-remains-normal-fixed-chat', async () => {
-    await expect(own(page).getByText('Into the Unknown', { exact: true })).toHaveCount(0)
+    await expect(own(page).locator('[data-hero-headline]')).toHaveCount(0)
     await expect(content(page)).toHaveAttribute('data-content-phase', 'active')
     await expect(input(page)).toHaveCount(1)
     await expect(input(page)).toBeVisible()
-    await expect(own(page).getByRole('button', { name: 'Choose workspace', exact: true })).toHaveCount(0)
+    await expect(own(page).getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toHaveCount(0)
     await focus(page, 'existing')
     await focus(page, 'empty')
     await expect(content(page)).toHaveAttribute('data-content-phase', 'active')

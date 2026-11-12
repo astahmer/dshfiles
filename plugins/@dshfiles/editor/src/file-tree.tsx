@@ -113,7 +113,7 @@ const Directory = (props: TreeProps & { readonly path: string; readonly depth: n
           </li>
         )
       })}
-      {listing.data.truncated && <li className="dshx:px-2 dshx:text-[11px] dshx:text-muted-foreground">More entries not shown.</li>}
+      {listing.data.truncated && <li className="dshx:px-2 dshx:text-2xs dshx:text-muted-foreground">More entries not shown.</li>}
     </ul>
   )
 }

@@ -5,7 +5,9 @@ import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { type DockProps, DraggableQueueDock, QUEUE_DOCK_STYLE } from './client.js'
+import { ComposerMoreItems } from '@dshfiles/rich-composer/composer-more'
 import { ScheduledSendsDock, SendLaterAction, type LoadModels } from './scheduled-sends-ui.js'
+import { SendLaterRequests } from './send-later-requests.js'
 import { SessionQueueEditorModel } from './session-queue-editor.js'
 import { QUEUE_REORDER_LOCALE_NAMESPACE, queueReorderLocale } from './locales.js'
 
@@ -47,7 +49,7 @@ export default defineClient({
   // setup(ctx) reads ctx.slots and ctx.sessions; declaring them here is what
   // activates those services. Without this the plugin loads but never mounts.
   inject: ['slots', 'sessions', 'uiWorkspace', 'modelDirectories'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
     // The native picker's catalog for one thread; absent while the model-selection plugin is not loaded.
     const modelsFor =
       (sessionId: Parameters<typeof ctx.modelDirectories.directoryFor>[0]): LoadModels =>
@@ -63,6 +65,19 @@ export default defineClient({
         )),
       ),
     )
+    // The composer bar carries no Send later chip: it is a row of the composer's More menu (fork fit of xuusuwsn).
+    const plugin = metadata?.plugin
+    if (plugin !== undefined)
+      ctx.effect(() =>
+        plugin.add(ComposerMoreItems, {
+          id: '@dshfiles/queue-reorder.send-later',
+          group: 'send',
+          order: 40,
+          label: 'Send later…',
+          available: SendLaterRequests.available,
+          select: SendLaterRequests.send,
+        }),
+      )
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
         { name: 'conversation.input.dock', id: 'scheduled-sends', order: 19, inject: sessionId => ({ loadModels: modelsFor(sessionId) }) },

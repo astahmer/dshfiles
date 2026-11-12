@@ -36,7 +36,7 @@ export const ExtraUsageMeter = (props: {
           value={summary.percentUsed}
         />
       )}
-      <span className="dshx:text-[11px] dshx:text-muted-foreground">{summary.detail}</span>
+      <span className="dshx:text-2xs dshx:text-muted-foreground">{summary.detail}</span>
     </div>
   )
 }

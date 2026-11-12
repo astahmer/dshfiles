@@ -5,7 +5,8 @@ import { recordAssertion } from '../steps.js'
 
 const main = (page: Page): Locator => page.locator('[data-slot="shell.main"]')
 const conversation = (page: Page): Locator => main(page).locator('[data-conversation-session]').filter({ visible: true })
-const input = (page: Page): Locator => conversation(page).getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+const input = (page: Page): Locator =>
+  conversation(page).getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })
 const historyEnd = 'Long scrolling history final paragraph'
 const draft = 'Unsent long-chat draft remains editable'
 const passes = new WeakMap<Page, number>()
@@ -53,7 +54,7 @@ When('the second Workbench conversation receives a long history message', async 
   await expect(
     conversation(page)
       .getByRole('status')
-      .filter({ hasText: /^(Completed|Failed|Stopped|Cancelled)$/ }),
+      .filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ }),
   ).toHaveCount(2, { timeout: 60_000 })
 })
 
@@ -61,6 +62,13 @@ Then('the long Workbench chat scrolls within its pane with its original editable
   const pass = (passes.get(page) ?? 0) + 1
   passes.set(page, pass)
   await recordAssertion(page, `workbench-long-chat-scroll-${pass}`, async () => {
+    // Chat folds a long prompt (productivity pass T1.4); the reader opens it, which is what makes this history long.
+    // A dispatched click opens it without Playwright's auto-scroll, so an off-screen composer still shows below.
+    const showAll = conversation(page).getByRole('button', { name: /^Show all · \d+ lines$/ })
+    if ((await showAll.count()) > 0) {
+      await showAll.first().dispatchEvent('click')
+      await expect(conversation(page).getByRole('button', { name: 'Show less', exact: true }).first()).toBeAttached()
+    }
     // Save geometry before actions: Playwright's auto-scroll must not conceal an off-screen composer.
     const geometry = await measurements(page)
     await writeFile(test.info().outputPath(`long-chat-geometry-${pass}.json`), JSON.stringify(geometry, null, 2))

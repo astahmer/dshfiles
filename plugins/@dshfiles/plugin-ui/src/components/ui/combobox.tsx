@@ -116,7 +116,7 @@ export const Combobox = (props: {
               <CommandGroup heading={group.name} key={group.name ?? ''}>
                 {group.options.map(option => (
                   <CommandItem
-                    className="dshx:gap-2 dshx:text-[13px]"
+                    className="dshx:gap-2 dshx:text-sm"
                     disabled={option.disabled === true}
                     key={option.value}
                     keywords={[option.label, ...(option.description === undefined ? [] : [option.description]), ...(option.keywords ?? [])]}
@@ -127,7 +127,7 @@ export const Combobox = (props: {
                       <>
                         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{option.label}</span>
                         {option.description === undefined ? null : (
-                          <span className="dshx:max-w-32 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{option.description}</span>
+                          <span className="dshx:max-w-32 dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{option.description}</span>
                         )}
                       </>
                     )}

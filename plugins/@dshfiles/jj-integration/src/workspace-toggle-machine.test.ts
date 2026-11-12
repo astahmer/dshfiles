@@ -601,6 +601,39 @@ describe('deferWorkspaceSubmit', () => {
     expect(blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
   })
 
+  it('moves a send typed in the Session a switch is leaving into the destination, never sending it where the user left', async () => {
+    const toggle = startToggle()
+    toggle.actor.send({ type: 'toggle', request: isolateRequest() })
+    // The fork opens the destination in its own tab: the main view names it while the left composer is still on screen,
+    // and the draft typed there after the pick was never carried over.
+    const editable = (draft: string) => {
+      const composer = composerWithDraft(draft)
+      return { ...composer, input: { ...composer.input, setDraft: (next: string) => composer.edit(next) } }
+    }
+    const sourceComposer = editable('typed right after choosing Own workspace')
+    const targetComposer = editable('')
+    const source: WorkspaceComposer = { sessionId: SessionId('left'), workspaceId: 'project', blank: true, input: sourceComposer.input }
+    const target: WorkspaceComposer = { sessionId: SessionId('destination'), workspaceId: 'ws-thread-abc123', blank: true, input: targetComposer.input }
+    const { blocks } = blocksRecorder()
+    const pending = deferWorkspaceSubmit({
+      actor: toggle.actor,
+      source,
+      submitSource: 'enter',
+      current: () => target,
+      blocks,
+      reason: 'Preparing your own workspace…',
+      failureMessage: 'Workspace setup failed.',
+      changedMessage: 'The draft changed.',
+      signal: new AbortController().signal,
+    })
+    toggle.release()
+    await expect(pending).resolves.toBe('sent')
+    expect(sourceComposer.submissions).toEqual([])
+    expect(targetComposer.submissions).toEqual([{ mode: 'queue', source: 'enter' }])
+    expect(targetComposer.input.state.getSnapshot().draft).toBe('typed right after choosing Own workspace')
+    expect(sourceComposer.input.state.getSnapshot().draft).toBe('')
+  })
+
   it('delivers the first send into the workspace the deferred isolation provisioned', async () => {
     const toggle = startToggle()
     arriveAt(toggle, { sessionId: 'source', workspaceId: 'project' })

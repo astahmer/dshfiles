@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { previewApi, type DevServerView } from './api.js'
 import { DevServerPoll } from './dev-server-poll.js'
 import { PreviewOpener } from './preview-opener.js'
+import { LoopbackNoticeView } from './loopback-notice.js'
 
 /**
  * Dev servers in Observe › Processes and in the thread panel's Jobs facet (docs/ade-ux §6 "Processes in 3 boards").
@@ -30,6 +31,7 @@ const ServerRows = (props: { readonly sessionId: string; readonly servers: reado
   })
   return (
     <>
+      <LoopbackNoticeView notice={opener.notice} onDismiss={opener.dismissNotice} />
       <EntityList>
         {props.servers.map(server => (
           <EntityRow
@@ -39,7 +41,14 @@ const ServerRows = (props: { readonly sessionId: string; readonly servers: reado
             trailing={
               <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
                 {server.ports[0] === undefined ? null : (
-                  <Button variant="outline" size="xs" onClick={() => opener.open(server.ports[0]?.url ?? '')}>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={() => {
+                      const first = server.ports[0]
+                      if (first !== undefined) opener.openPort(first)
+                    }}
+                  >
                     <OpenIcon aria-hidden />
                     Open
                   </Button>

@@ -9,7 +9,7 @@
       "reach": [
         "click button \"New session\"",
         "expect button \"Workspace: *\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Keep this draft\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Keep this draft\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "expect button \"Remove image red.png\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
@@ -22,7 +22,7 @@
         "expect button \"Remove image red.png\"",
         "expect button \"Remove file note.txt\"",
         "click button \"Workspace: *\"",
-        "click option \"In place*\"",
+        "click option \"In the project*\"",
         "expect text \"sample\"",
         "expect text \"Keep this draft\"",
         "expect button \"Remove image red.png\"",
@@ -389,7 +389,7 @@
       "summary": "With isolation off, a blank thread inherited from a prior thread workspace returns to the owning project checkout; with isolation on, it keeps that folder until its first send and then provisions its own workspace instead of reusing it.",
       "reach": [
         "click button \"New thread\"",
-        "click button \"Choose workspace\"",
+        "click button \"Choose project\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
         "press Enter",
@@ -398,12 +398,12 @@
         "click option \"Own workspace*\"",
         "expect text \"sample \u00b7 thread-*\"",
         "expect button \"Workspace: Own workspace*\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"previous workspace thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"previous workspace thread\"",
         "press Enter",
         "expect text \"previous workspace thread\"",
         "click button \"New thread\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
-        "expect button \"Choose workspace\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
+        "expect button \"Choose project\"",
         "expect button \"Workspace: Own workspace*\""
       ],
       "surfaces": ["host", "client", "integration"],
@@ -497,7 +497,7 @@
       "reach": [
         "click button \"New thread\"",
         "expect button \"Workspace: *\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"prepared while writing\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"prepared while writing\"",
         "expect text \"prepared while writing\""
       ],
       "surfaces": ["client"],
@@ -670,8 +670,8 @@
       "summary": "One header control shows the thread's jj workspace name, a badge with revisions ready to integrate, and a menu holding Integrate, the Thread workspaces side panel, and Download session log. A thread that works in the shared project checkout keeps the control and says so, instead of losing the only way to its workspace actions. The session-log row is the only trigger for that export: the export plugin's own header menu is shadowed at a lower priority, and its cell reports each finished export as a toast.",
       "reach": [
         "seed rebase-ready-thread",
-        "expect button \"Current thread workspace: thread-*\"",
-        "click button \"Current thread workspace: thread-*\"",
+        "expect button \"Own workspace actions\"",
+        "click button \"Own workspace actions\"",
         "expect text \"Land on main\"",
         "expect button \"Land this thread on main\"",
         "expect button \"Open thread workspaces in side panel\"",
@@ -680,7 +680,7 @@
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "thread-header: Current thread workspace menu",
+      "currentSurface": "thread-header: Own workspace menu",
       "configuration": [],
       "states": ["thread-workspace", "shared-checkout", "to-rebase", "blocked", "session-log-in-menu"],
       "failureModes": [
@@ -720,14 +720,14 @@
       "summary": "One conversation-header control names the current thread's jj workspace, how many revisions are ready to integrate, and whether integration is blocked; its menu holds Integrate, the Thread workspaces side panel, and Download session log. Hovering the current-thread workspace chip lazily previews a bounded revision graph of thread work, the configured bookmark and its origin ref, plus the default workspace. Integrate a thread's described work into the target bookmark from that menu, the panel, the newest completed turn, or the compatible `/rebase` composer command. The turn-end row names the pending revisions and offers the same Integrate one click from the answer the user just read; it disappears once the work lands. Under the hood, jj rebases thread revisions onto the current bookmark tip, then advances the bookmark; existing bookmark ancestry stays intact. The in-chat notice shows the tip change ID and offers the configured follow-up action for the current thread. Queueing or cancelling an integration leaves a dated chat notice; the active queued notice offers Undo, and a subtle thread-list tag disappears when cancelled or completed. Queue notices share the Host-memory lifetime of the queue. Integration refuses non-thread workspaces and is disabled while any thread session is working or waiting for input; an agent handed back conflicts or descriptions may integrate its own thread once they are fixed, while every other session of that thread must still be idle. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
       "reach": [
         "seed rebase-ready-thread",
-        "hover button \"Current thread workspace: thread-*\"",
+        "hover button \"Own workspace actions\"",
         "expect heading \"Revision graph\"",
         "press Escape",
-        "click button \"Current thread workspace: thread-*\"",
+        "click button \"Own workspace actions\"",
         "expect button \"Land this thread on main\"",
         "expect text \"1 to land\"",
         "press Escape",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/rebase\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"/rebase\"",
         "press Enter",
         "expect text \"Landed 1 revision(s) on main.\"",
         "expect button \"Mark this landed thread done\""
@@ -735,7 +735,7 @@
       "surfaces": ["host", "tool", "command", "client", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "thread-header: Current thread workspace \u203a Integrate",
+      "currentSurface": "thread-header: Own workspace \u203a Integrate",
       "configuration": [
         {
           "key": "askAgentToFixLanding",
@@ -965,7 +965,7 @@
       "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, blocked, conflicts, integrating, integrated, no changes, unverified) is kept separate from lifecycle (active, idle, finished, missing), so a workspace that merely sits behind the bookmark is 'no changes', never a blocker. Empty sections are not rendered while their counts stay in the filter bar. Rows prioritise the conversation title (falling back to the pending revision description, then the project name), the specific blocker, the pending-versus-behind distinction and a contextual action; workspace and thread ids stay secondary and copyable. Batch integration enqueues ready workspaces serially through the existing coordinator, and the queue line names what is active, queued or failed.",
       "reach": [
         "seed rebase-ready-thread",
-        "click button \"Current thread workspace: thread-*\"",
+        "click button \"Own workspace actions\"",
         "expect button \"Open thread workspaces in side panel\"",
         "click button \"Open thread workspaces in side panel\"",
         "expect heading \"Land\"",
@@ -1175,7 +1175,7 @@
       "summary": "One row expands in place: every blocker in priority order, the pending revisions with their change ids, the thread's sessions, the workspace path with a copy action, and an on-demand preview of the latest messages. The workspace and thread ids stay secondary and copyable rather than driving the row. Open in thread opens that thread with its Changes facet (through the dshx Changes contract) when diffs-review is loaded; this page stays the cross-thread view.",
       "reach": [
         "seed rebase-ready-thread",
-        "click button \"Current thread workspace: thread-*\"",
+        "click button \"Own workspace actions\"",
         "expect button \"Open thread workspaces in side panel\"",
         "click button \"Open thread workspaces in side panel\"",
         "expect heading \"Land\"",
@@ -1255,14 +1255,14 @@
       "reach": [
         "seed rebase-ready-thread",
         "click button \"New session\"",
-        "click button \"Choose workspace\"",
+        "click button \"Choose project\"",
         "expect tab \"Projects\"",
         "expect option \"No folder*\""
       ],
       "surfaces": ["host", "client"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace",
+      "currentSurface": "composer: Choose project",
       "configuration": [],
       "states": ["projects", "everything", "workspaces", "absolute-path", "native-picker", "native-unavailable"],
       "failureModes": [
@@ -1300,7 +1300,7 @@
     {
       "id": "land-inbox-items",
       "title": "Blocked and ready-to-land workspaces in the Inbox",
-      "summary": "A thread workspace whose revisions conflict, or whose queued land stopped, is a Failed Inbox item (Land blocked) with Retry; an idle workspace with described revisions not on the bookmark is a Ready item with Land. Land and Retry run the same guarded land as the Land view, only when the user chooses them; items resolve when the workspace lands, the conflict goes away or nothing is left to land. A land from a client view (the thread's Changes facet, the Land view) re-reads the workspaces at once, so its item resolves without waiting for the provider's safety tick.",
+      "summary": "A thread workspace whose revisions conflict, or whose queued land stopped, is a Failed Inbox item (Land blocked) with Retry; a workspace with described revisions not on the bookmark is one Ready item, keyed by the workspace and updated in place: its headline names the thread (\u201c<thread title>\u201d is ready to land.) and its detail says what landing brings (files, \u00b1lines from jj diff --stat, the first revision title). It stays as it is while the thread is busy, asking, describing or queued, and resolves only when nothing is left to land, the workspace is gone or Land is blocked, so it never re-fires; a changed detail never reopens an item the user marked Done. Land (after the Inbox shows what will land and asks to confirm) and Retry run the same guarded land as the Land view, only when the user chooses them; Review opens the thread\u2019s Changes view; items resolve when the workspace lands, the conflict goes away or nothing is left to land. A land from a client view (the thread's Changes facet, the Land view) re-reads the workspaces at once, so its item resolves without waiting for the provider's safety tick.",
       "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
       "reachNarrow": ["click button \"Inbox\"", "expect heading \"Inbox\""],
       "surfaces": ["host", "integration"],
@@ -1308,7 +1308,7 @@
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox \u203a jj-integration.land-blocked / jj-integration.ready-to-land",
       "configuration": [],
-      "states": ["conflicted", "queued-land-failed", "ready-to-land", "busy", "queued", "landed", "inbox-absent"],
+      "states": ["conflicted", "queued-land-failed", "ready-to-land", "busy", "queued", "landed", "inbox-absent", "kept-while-busy", "detail-updated-in-place"],
       "failureModes": [
         "Without the inbox (activity-timeline) loaded, landing works exactly as before; the provider reconciles when the inbox announces it is ready.",
         "Retry or Land on a workspace that still conflicts, is busy or has undescribed revisions lands nothing and returns the same recovery text as the Land view.",
@@ -1327,13 +1327,25 @@
           "kind": "unit-test",
           "id": "jj-integration.inbox-ready-drafts",
           "file": "plugins/@dshfiles/jj-integration/src/attention-provider.test.ts",
-          "testName": "states an idle described thread as Ready with Land, about its newest conversation"
+          "testName": "states an idle described thread as one Ready item named by its thread, with what landing brings"
         },
         {
           "kind": "unit-test",
           "id": "jj-integration.inbox-blocked-drafts",
           "file": "plugins/@dshfiles/jj-integration/src/attention-provider.test.ts",
           "testName": "states conflicts as Failed with Retry even while the thread works, and nothing for busy, queued or undescribed work"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.inbox-ready-kept-while-busy",
+          "file": "plugins/@dshfiles/jj-integration/src/attention-provider.test.ts",
+          "testName": "keeps a ready item while its thread is busy, asking, describing or queued, and resolves it only when nothing is left to land"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.inbox-ready-diff-stat",
+          "file": "plugins/@dshfiles/jj-integration/src/attention-provider.test.ts",
+          "testName": "reads the summary line of jj diff --stat"
         },
         {
           "kind": "unit-test",
@@ -1382,7 +1394,7 @@
       "summary": "A project can flag profile-trusted project-checks actions to prepare a fresh thread workspace (runOnWorkspaceCreate), optionally holding the first turn until one finishes (awaitBeforeFirstTurn), and actions to run when a thread settles (onSettle). jj-integration dispatches them through Project Checks durable task queue after the workspace exists, so a reload or a second tab reuses the same run, and renders each action above the composer as a live phase with a cancel control. Nothing from dsh.project.json may add or run an action, and an action only qualifies when its trusted root spans both the checkout and the thread workspace, so the rule never widens a root.",
       "reach": [
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"setup my workspace\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"setup my workspace\"",
         "expect text \"Setting up\""
       ],
       "surfaces": ["client", "host", "integration"],

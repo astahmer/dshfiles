@@ -48,7 +48,7 @@
       "id": "settings-workbench-panels",
       "title": "One dockable Settings hub with real navigation and forms",
       "summary": "The New tab chooser offers one Settings hub with actual section navigation, search and native/plugin forms. Leaf sections remain registered for saved layouts and explicit links but are hidden from primary suggestions. The authorized shell renderer and ConfigForm remain the owners. Workbench pane chrome is mandatory; hidden right-pane tabs retain their state. It is the same grouped page as the stage page, for free-docking layouts.",
-      "reach": ["click button \"Collapse sidebar\"", "click button \"New tab\"", "click button \"Settings\"", "expect button \"General\""],
+      "reach": ["click button \"Collapse sidebar\"", "press ControlOrMeta+Alt+KeyT", "click button \"Settings\"", "expect button \"General\""],
       "surfaces": ["client", "integration"],
       "surface": "settingsSection",
       "destination": "settings",

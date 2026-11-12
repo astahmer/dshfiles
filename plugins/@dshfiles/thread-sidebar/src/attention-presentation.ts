@@ -20,9 +20,12 @@ const attentionColorKeys = {
   threadSidebarTurnFinished: 'turnFinished',
 } satisfies Record<Exclude<ThreadAttentionLabel, 'threadSidebarNeedsResume' | 'threadSidebarInterrupted'>, AttentionColorKey>
 
-/** The recovery labels describe a Host fact, not a user preference, so they keep fixed colors. */
+/**
+ * The recovery labels describe a Host fact, not a user preference, so they keep fixed colors: a resume waits on you
+ * (the indigo Needs you hue), an interrupted turn failed (red). Colour is a signal (visual refresh P1).
+ */
 const attentionColorForLabel = (label: ThreadAttentionLabel, attentionColors: AttentionColors): AttentionColor => {
-  if (label === 'threadSidebarNeedsResume') return 'warning'
+  if (label === 'threadSidebarNeedsResume') return 'info'
   if (label === 'threadSidebarInterrupted') return 'danger'
   return attentionColors[attentionColorKeys[label]]
 }
@@ -51,7 +54,8 @@ const attentionLabelClass = (label: ThreadAttentionLabel, attentionColors: Atten
 const attentionDotClass = (input: ThreadStatusVisualInput): string => {
   if (input.attentionLabel !== undefined) return attentionDotClasses[attentionColorForLabel(input.attentionLabel, input.attentionColors)]
   if (input.unread) return 'dshx:bg-primary'
-  if (input.running) return 'dshx:animate-pulse dshx:bg-info'
+  // Working is colourless (the status vocabulary): only Needs you and Failed carry a hue.
+  if (input.running) return 'dshx:animate-pulse dshx:bg-muted-foreground'
   return 'dshx:bg-muted-foreground/45'
 }
 

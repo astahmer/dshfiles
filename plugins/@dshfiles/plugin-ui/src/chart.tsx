@@ -24,7 +24,7 @@ export interface ChartFrameProps {
 export const ChartFrame = (props: ChartFrameProps): JSX.Element => (
   <figure
     className={cn(
-      'dshx:m-0 dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground',
+      'dshx:m-0 dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground',
       'dshx:[--ts-chart-1:var(--dsw-alias-state-business-primary)] dshx:[--ts-chart-2:var(--dsw-alias-state-success-primary)] dshx:[--ts-chart-3:var(--dsw-alias-state-warn-primary)]',
       'dshx:[--ts-chart-4:var(--dsw-alias-state-error-primary)] dshx:[--ts-chart-5:var(--dsw-alias-brand-primary)] dshx:[--ts-chart-6:var(--dsw-alias-label-tertiary)]',
       props.className,

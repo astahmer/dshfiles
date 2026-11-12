@@ -8,24 +8,47 @@ import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.
 import { Then, When, Given } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
 
-const COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
+const COMPOSER = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
 const NOTE_PLACEHOLDER = 'What is wrong or what should change?'
 
 const composer = (page: Page) => page.getByRole('textbox', { name: COMPOSER, exact: true })
 const annotateAction = (page: Page) => page.getByRole('button', { name: 'Annotate an element', exact: true })
 const noteField = (page: Page) => page.getByRole('textbox', { name: NOTE_PLACEHOLDER, exact: true })
+const moreButton = (page: Page) => page.locator('[data-composer-card] [data-composer-more]').filter({ visible: true }).first()
+const pointAtUi = (page: Page) => page.getByRole('menuitem', { name: /^Point at UI…/u })
+
+/**
+ * Open the annotations popover the way the composer offers it: its own button where the bar shows one (a count chip,
+ * a pinned bar, a surface without the More menu), else the More menu's "Point at UI…" row (composer redesign b:v9yh).
+ */
+const openAnnotations = async (page: Page): Promise<void> => {
+  const button = annotateAction(page).filter({ visible: true }).first()
+  // Right after boot the composer may not have drawn either entry yet.
+  await expect(button.or(moreButton(page))).toBeVisible({ timeout: 30_000 })
+  if ((await button.count()) > 0) {
+    await button.click()
+    return
+  }
+  await moreButton(page).click()
+  await pointAtUi(page).click()
+}
 
 Then('the composer shows the annotate action', async ({ page }: { page: Page }) => {
-  await expect(annotateAction(page)).toBeVisible({ timeout: 30_000 })
+  // Either the tool's own button or its row in the composer's More menu.
+  await expect(annotateAction(page).or(moreButton(page)).first()).toBeVisible({ timeout: 30_000 })
+  if ((await annotateAction(page).filter({ visible: true }).count()) > 0) return
+  await moreButton(page).click()
+  await expect(pointAtUi(page)).toBeVisible()
+  await page.keyboard.press('Escape')
 })
 
 When('the element picker starts and the composer is picked', async ({ page }: { page: Page }) => {
-  await annotateAction(page).click()
+  await openAnnotations(page)
   await page.getByRole('button', { name: 'Pick element', exact: true }).click()
   await expect(page.getByText('Click an element', { exact: false }).first()).toBeVisible()
   // Picking the plugin's own action proves the capture path end to end, and its class hash
   // is one the Host can resolve through this package's client source map.
-  await annotateAction(page).click()
+  await annotateAction(page).filter({ visible: true }).first().click()
   await expect(noteField(page))
     .toBeVisible({ timeout: 5_000 })
     .catch(async error => {
@@ -49,7 +72,7 @@ When('the annotation note {string} is added', async ({ page }: { page: Page }, n
 
 Then('the annotation is listed with the note {string}', async ({ page }: { page: Page }, note: string) => {
   await recordAssertion(page, 'annotations-list-row', async () => {
-    await annotateAction(page).click()
+    await openAnnotations(page)
     await expect(page.getByText(note, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
   })
 })
@@ -196,7 +219,7 @@ const extensionOrigin = (): string => {
 let ingestToken = ''
 
 When('the HTML preview dialog opens the fixture page', async ({ page }: { page: Page }) => {
-  await annotateAction(page).click()
+  await openAnnotations(page)
   await page.getByRole('button', { name: 'Preview HTML', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
@@ -224,7 +247,7 @@ When('the fixture button is annotated with {string}', async ({ page }: { page: P
 Then('the preview annotation is linked to the fixture file', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'annotations-preview-source', async () => {
     await page.keyboard.press('Escape')
-    await annotateAction(page).click()
+    await openAnnotations(page)
     await expect(page.getByText(/annotations\/sample\.html:1/).first()).toBeVisible({ timeout: 15_000 })
     await page.keyboard.press('Escape')
   })
@@ -232,7 +255,7 @@ Then('the preview annotation is linked to the fixture file', async ({ page }: { 
 })
 
 When('the extension pairs with DSH', async ({ page }: { page: Page }) => {
-  await annotateAction(page).click()
+  await openAnnotations(page)
   await page.getByText('Browser extension', { exact: true }).click()
   await page.getByRole('button', { name: 'Pair extension', exact: true }).click()
   const origin = new URL(page.url()).origin
@@ -273,7 +296,7 @@ When('the extension posts an annotation with that token', async ({ page }: { pag
 Then('the panel lists the unassigned extension annotation', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'annotations-intake-row', async () => {
     await page.keyboard.press('Escape')
-    await annotateAction(page).click()
+    await openAnnotations(page)
     await expect(page.getByText('From Chrome', { exact: false }).first()).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText('from chrome', { exact: false }).first()).toBeVisible()
   })
@@ -319,7 +342,7 @@ When('Chrome is launched with the fixture page open', async ({ page }: { page: P
   if (address === null || typeof address === 'string') throw new Error('no fixture port')
   fixtureUrl = `http://127.0.0.1:${address.port}/`
 
-  await annotateAction(page).click()
+  await openAnnotations(page)
   await page.getByText('Chrome without an extension', { exact: true }).click()
   await page.getByRole('button', { name: 'Launch Chrome', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Pick on the active tab', exact: true })).toBeVisible({ timeout: 45_000 })
@@ -419,7 +442,7 @@ When('the active tab is picked and the fixture button is clicked with {string}',
 Then('the annotation comes from the Chrome tab with {string}', async ({ page }: { page: Page }, note: string) => {
   await recordAssertion(page, 'annotations-chrome-tab', async () => {
     await page.keyboard.press('Escape')
-    await annotateAction(page).click()
+    await openAnnotations(page)
     await expect(page.getByText('#fixture-button', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(note, { exact: false }).first()).toBeVisible()
   })
@@ -427,7 +450,7 @@ Then('the annotation comes from the Chrome tab with {string}', async ({ page }: 
 
 When('the picker browser is stopped', async ({ page }: { page: Page }) => {
   await page.keyboard.press('Escape')
-  await annotateAction(page).click()
+  await openAnnotations(page)
   await page.getByText('Chrome without an extension', { exact: true }).click()
   await page.getByRole('button', { name: 'Stop', exact: true }).click()
   await new Promise<void>(resolve => {

@@ -1,10 +1,10 @@
 import * as React from 'react'
 import { cn } from '../lib/utils.js'
-import { StatusGlyph, WorkStatusModel, type WorkStatus } from './work-status.js'
+import { StatusGlyph, WorkStatusModel, type StatusGlyphState } from './work-status.js'
 
 export interface EntityRowProps extends Omit<React.ComponentPropsWithoutRef<'div'>, 'title' | 'onSelect'> {
   /** Omit only for rows that are not work items; give every row of a list the same choice so the titles align. */
-  readonly status?: WorkStatus
+  readonly status?: StatusGlyphState
   /** Translated accessible name for the glyph. */
   readonly statusLabel?: string
   /** Hide the glyph from assistive technology when the row names its state in text (a badge, a status line). */
@@ -44,8 +44,9 @@ export const EntityRow = React.forwardRef<HTMLDivElement, EntityRowProps>(functi
             data-slot="entity-row-title"
             className={cn(
               'dshx:min-w-0 dshx:text-sm dshx:break-words',
-              status !== undefined && WorkStatusModel.isEmphasized(status) && 'dshx:font-semibold',
-              status !== undefined && WorkStatusModel.isMuted(status) && 'dshx:text-muted-foreground',
+              status !== undefined && WorkStatusModel.isWorkStatus(status) && WorkStatusModel.isEmphasized(status) && 'dshx:font-semibold',
+              (status === 'stopped' || (status !== undefined && WorkStatusModel.isWorkStatus(status) && WorkStatusModel.isMuted(status))) &&
+                'dshx:text-muted-foreground',
             )}
           >
             {heading}
@@ -100,7 +101,7 @@ export const EntityRow = React.forwardRef<HTMLDivElement, EntityRowProps>(functi
             type="button"
             aria-current={selected ? 'true' : undefined}
             onClick={onSelect}
-            className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-start dshx:gap-2 dshx:rounded-sm dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/60"
+            className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-start dshx:gap-2 dshx:rounded-sm dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/60 dshx:pointer-coarse:min-h-11"
           >
             {body}
           </button>

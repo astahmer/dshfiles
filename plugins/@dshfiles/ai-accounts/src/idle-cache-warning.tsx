@@ -169,7 +169,7 @@ const IdleCacheWarning = (props: {
       <PopoverTrigger asChild>
         <button
           aria-label={`${label}. ${IdleCacheModel.detail(facts)}`}
-          className="dshx-root dshx:inline-flex dshx:min-w-0 dshx:shrink dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-2 dshx:py-px dshx:text-xs dshx:whitespace-nowrap dshx:text-warning dshx:tabular-nums dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
+          className="dshx-root dshx:inline-flex dshx:min-w-0 dshx:shrink dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-2 dshx:py-px dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:pointer-coarse:min-h-11 dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
           data-ai-accounts-idle-cache=""
           type="button"
         >

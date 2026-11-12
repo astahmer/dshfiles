@@ -25,6 +25,10 @@ interface DraftViewGate {
   promptHistory: (() => readonly string[]) | undefined
   /** Replace the whole draft with a recalled prompt or the draft recall started from. */
   replaceDraft: (text: string) => void
+  /** The new-thread page's composer: Primary+Enter sends in the background and keeps a fresh draft. */
+  draftPage: boolean
+  /** Open a fresh draft once this send has gone out. */
+  requestFreshDraft: () => void
 }
 
 /**
@@ -158,12 +162,28 @@ export function installDraftKeymap(
         g.showToast(g.t('file.stillUploading'))
         return
       }
+      // On the new-thread page Primary+Enter starts this thread in the background: it sends, and the page comes
+      // back with a fresh draft for the next one (dshfiles plan Q2 T2.5).
+      if (accelerated && g.draftPage) {
+        keyboard.submit(resolveSubmitMode(g.busyEnter, g.running, 'enter', g.steeringAvailable), 'enter')
+        g.requestFreshDraft()
+        return
+      }
       keyboard.submit(resolveSubmitMode(
         g.busyEnter,
         g.running,
         accelerated ? 'accelerated' : 'enter',
         g.steeringAvailable,
       ), 'enter')
+    },
+    submitAndNewDraft: () => {
+      const g = gate.current
+      if (g.uploadsPending) {
+        g.showToast(g.t('file.stillUploading'))
+        return
+      }
+      keyboard.submit(resolveSubmitMode(g.busyEnter, g.running, 'enter', g.steeringAvailable), 'enter')
+      g.requestFreshDraft()
     },
     intakeFiles: (files, directories) => { gate.current.intakeFiles(files, directories) },
     pasteText: (text) => {

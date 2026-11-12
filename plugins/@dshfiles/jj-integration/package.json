@@ -41,6 +41,10 @@
     "./revision-graph": {
       "types": "./src/revision-graph.ts",
       "default": "./dist/revision-graph.js"
+    },
+    "./repository-change": {
+      "types": "./src/repository-change.ts",
+      "default": "./dist/repository-change.js"
     }
   },
   "scripts": {

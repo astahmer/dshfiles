@@ -15,9 +15,9 @@ const en = {
   turnLabel: 'Turn {turn}',
   untitledPrompt: '(no text)',
   confirmTitle: 'Rewind to before turn {turn}?',
-  confirmLost: 'The thread continues in a fork cut before this turn. These {count} turns leave the conversation:',
+  confirmLost: 'The thread continues in a fork cut before this turn. These {count} turns leave the thread:',
   confirmFiles: 'Workspace files go back to how they were when turn {turn} started; edits made since are replaced.',
-  confirmNoFiles: 'Turn {turn} has no file snapshot: only the conversation rewinds, files stay as they are.',
+  confirmNoFiles: 'Turn {turn} has no file snapshot: only the thread rewinds, files stay as they are.',
   checkpointFiles: 'files',
   confirmRedo: 'Redo brings the turns and their files back until the fork runs a new turn.',
   confirmAction: 'Rewind',
@@ -26,8 +26,12 @@ const en = {
   anywayUndo: 'Undo anyway',
   anywayRewind: 'Rewind anyway',
   anywayRedo: 'Redo anyway',
+  moreRewind: 'Rewind to an earlier turn…',
+  moreRedo: 'Redo the undone turn',
   turnRevision: 'Turn {turn} left its files in this revision',
   restoreHere: 'Restore to after this turn',
+  restoreHereShort: 'Restore to here',
+  turnRevisionShort: 'Turn revision',
 }
 
 const zh = {
@@ -54,8 +58,12 @@ const zh = {
   anywayUndo: '仍然撤销',
   anywayRewind: '仍然回退',
   anywayRedo: '仍然重做',
+  moreRewind: '回退到更早的一轮…',
+  moreRedo: '重做被撤销的一轮',
   turnRevision: '第 {turn} 轮的文件保存在此修订中',
   restoreHere: '恢复到这一轮之后',
+  restoreHereShort: '恢复到这里',
+  turnRevisionShort: '本轮修订',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

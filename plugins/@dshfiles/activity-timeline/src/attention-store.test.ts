@@ -125,6 +125,48 @@ describe('attention inbox store', () => {
     }),
   )
 
+  it.effect('closes Ready items unseen for 72 hours, never Needs you or Failed, and reopen brings one back for another window', () =>
+    Effect.gen(function* () {
+      const root = yield* temporaryRoot
+      const hour = 60 * 60 * 1000
+      yield* Effect.gen(function* () {
+        const inbox = yield* AttentionInbox
+        yield* TestClock.setTime(1_000)
+        const ready = (yield* inbox.publish(publishInput('ready', { severity: 'ready' }))).item
+        yield* inbox.publish(publishInput('blocking'))
+        yield* inbox.publish(publishInput('failed', { severity: 'failed' }))
+        const snoozed = (yield* inbox.publish(publishInput('snoozed', { severity: 'ready' }))).item
+        yield* inbox.snooze({ id: snoozed.id, until: 1_000 + 80 * hour })
+
+        yield* TestClock.setTime(1_000 + 71 * hour)
+        expect(yield* inbox.expireUnseen).toBe(0)
+        yield* TestClock.setTime(1_000 + 72 * hour)
+        expect(yield* inbox.expireUnseen).toBe(1)
+        const closed = yield* inbox.list({ view: 'closed', limit: 10 })
+        expect(closed.items.map(item => item.dedupeKey)).toEqual(['ready'])
+        expect(closed.counts).toMatchObject({ needsYou: 2, other: 0, snoozed: 1 })
+
+        // Reversible: reopen shows it in Other again, and the next sweep leaves it for a new window.
+        yield* inbox.reopen({ id: ready.id })
+        expect(yield* inbox.expireUnseen).toBe(0)
+        expect((yield* inbox.list({ view: 'other', limit: 10 })).items.map(item => item.dedupeKey)).toEqual(['ready'])
+
+        // A snooze that ended counts from its end; Needs you and Failed are still open a week later.
+        yield* TestClock.setTime(1_000 + 143 * hour)
+        expect(yield* inbox.expireUnseen).toBe(0)
+        yield* TestClock.setTime(1_000 + 152 * hour)
+        expect(yield* inbox.expireUnseen).toBe(2)
+        const later = yield* inbox.list({ view: 'needs-you', limit: 10 })
+        expect(later.items.map(item => item.dedupeKey).sort()).toEqual(['blocking', 'failed'])
+        expect(later.counts).toMatchObject({ other: 0, snoozed: 0, closed: 2 })
+
+        // A provider stating something new about an expired item reopens it, like any Done item.
+        yield* inbox.publish(publishInput('ready', { severity: 'ready', reason: 'Turn finished again' }))
+        expect((yield* inbox.list({ view: 'other', limit: 10 })).items.map(item => item.dedupeKey)).toEqual(['ready'])
+      }).pipe(Effect.provide(inboxIn(root)))
+    }),
+  )
+
   it.effect('mutes and unmutes a source, durably', () =>
     Effect.gen(function* () {
       const root = yield* temporaryRoot

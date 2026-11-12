@@ -1,0 +1,87 @@
+/* Chat's code card controls (productivity pass T1.2); the card itself is the native CodeBlock. */
+.fold {
+  position: relative;
+  min-width: 0;
+}
+
+/* Portalled into the native toolbar's action group: the same 24px icon button as copy, placed before it. */
+.wrap {
+  order: -1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.wrap:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.wrap[aria-pressed='true'] {
+  color: var(--dsw-alias-label-primary);
+}
+
+.wrap:focus-visible,
+.toggle:focus-visible {
+  outline: 1.5px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+
+/* Folded: about 24 lines of the 18px code leading, fading into the toggle. */
+.fold[data-code-fold='closed'] :global(.md-code-block) pre {
+  max-height: calc(24 * var(--dsw-font-markdown-code-block-line-height, 18px) + 8px);
+  overflow-y: hidden;
+  mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent);
+}
+
+.toggle {
+  display: block;
+  margin: 4px 0 0;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: var(--dshx-density-text-meta, 12px);
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* The card's own bottom margin sits above the toggle; pull the toggle up under the card. */
+.fold[data-code-fold] :global(.md-code-block) {
+  margin-bottom: 0;
+}
+
+@media (pointer: coarse) {
+  .wrap,
+  .toggle {
+    position: relative;
+  }
+
+  /* A 44pt tap target: vertical only beside copy, so the two buttons never share a point. */
+  .wrap::after {
+    content: '';
+    position: absolute;
+    inset: -10px -2px;
+  }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    inset: -12px -4px;
+  }
+}

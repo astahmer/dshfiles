@@ -1,9 +1,8 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { ActivityFeed, type ActivityActor, type ActivityFeedEvent } from '@dshfiles/plugin-ui/components/motion/activity-feed'
-import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
+import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
@@ -277,11 +276,12 @@ export const ActivityTimelinePanel = (props: {
           <AlertDescription>{errorMessage(feedQuery.error, t('loadFailed'))}</AlertDescription>
         </Alert>
       )}
-      <div className="dshx:grid dshx:min-h-0 dshx:gap-3 dshx:@4xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <Card className="dshx:min-w-0">
-          <CardHeader className="dshx:flex dshx:flex-row dshx:items-center dshx:justify-between dshx:gap-2 dshx:pb-2">
-            <CardTitle className="dshx:text-sm">{t('title')}</CardTitle>
-            <div className="dshx:flex dshx:items-center dshx:gap-2">
+      {/* Two sections, no cards (visual refresh T4.4): spacing plus one hairline between feed and detail. */}
+      <div className="dshx:grid dshx:min-h-0 dshx:gap-4 dshx:@4xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <PageSection
+          heading={t('title')}
+          actions={
+            <>
               {pendingNew > 0 ? (
                 <Button size="sm" variant="secondary" onClick={jumpToLatest}>
                   {t('newEvents')} ({pendingNew})
@@ -292,99 +292,94 @@ export const ActivityTimelinePanel = (props: {
                   {t('loadOlder')}
                 </Button>
               )}
-            </div>
-          </CardHeader>
-          <CardContent className="dshx:p-2">
-            <div
-              ref={scrollRef}
-              onScroll={event => {
-                const target = event.currentTarget
-                nearBottomRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80
-                if (nearBottomRef.current) setPendingNew(0)
-              }}
-              className="dshx:flex dshx:h-[62vh] dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:pr-1"
-            >
-              {items.length === 0 && !feedQuery.isPending ? (
-                <EmptyState>{debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}</EmptyState>
-              ) : null}
-              <div key="activity-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
-              <ActivityFeed events={feedEvents} emptyLabel={null} onSelectEvent={selectFeedEvent} />
-            </div>
-            {feedQuery.isFetchingNextPage ? (
-              <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">
-                {t('loadingOlder')}
+            </>
+          }
+        >
+          <div
+            ref={scrollRef}
+            onScroll={event => {
+              const target = event.currentTarget
+              nearBottomRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80
+              if (nearBottomRef.current) setPendingNew(0)
+            }}
+            className="dshx:flex dshx:h-[62vh] dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:pr-1"
+          >
+            {items.length === 0 && !feedQuery.isPending ? (
+              <EmptyState>{debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}</EmptyState>
+            ) : null}
+            <div key="activity-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
+            <ActivityFeed events={feedEvents} emptyLabel={null} onSelectEvent={selectFeedEvent} />
+          </div>
+          {feedQuery.isFetchingNextPage ? (
+            <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">
+              {t('loadingOlder')}
+            </p>
+          ) : null}
+        </PageSection>
+        <PageSection
+          heading={t('detail')}
+          className="dshx:max-h-[62vh] dshx:overflow-y-auto dshx:border-t dshx:border-border dshx:pt-4 dshx:text-sm dshx:@4xl:border-t-0 dshx:@4xl:border-l dshx:@4xl:pt-0 dshx:@4xl:pl-4"
+        >
+          {selected === null ? <EmptyState>{t('emptyDetail')}</EmptyState> : null}
+          {selected !== null && selected.kind === 'group' ? (
+            <>
+              <p className="dshx:text-sm dshx:font-medium">{selected.summary}</p>
+              <p className="dshx:text-xs dshx:text-muted-foreground">
+                {t('groupMembers')}: {selected.eventIds.length} {t('events')}
               </p>
-            ) : null}
-          </CardContent>
-        </Card>
-        <Card className="dshx:min-w-0">
-          <CardHeader className="dshx:pb-2">
-            <CardTitle className="dshx:text-sm">{t('detail')}</CardTitle>
-          </CardHeader>
-          <CardContent className="dshx:flex dshx:max-h-[62vh] dshx:flex-col dshx:gap-2 dshx:overflow-y-auto dshx:text-sm">
-            {selected === null ? <EmptyState>{t('emptyDetail')}</EmptyState> : null}
-            {selected !== null && selected.kind === 'group' ? (
-              <>
-                <p className="dshx:text-sm dshx:font-medium">{selected.summary}</p>
-                <p className="dshx:text-xs dshx:text-muted-foreground">
-                  {t('groupMembers')}: {selected.eventIds.length} {t('events')}
-                </p>
-                <Button size="sm" variant="outline" onClick={() => setDetailed(true)}>
-                  {t('detailed')}
+              <Button size="sm" variant="outline" onClick={() => setDetailed(true)}>
+                {t('detailed')}
+              </Button>
+            </>
+          ) : null}
+          {selectedEvent === undefined ? null : (
+            <>
+              <p className="dshx:break-words dshx:text-sm dshx:font-medium">{selectedEvent.summary}</p>
+              <p className="dshx:text-xs dshx:text-muted-foreground" title={formatExact(selectedEvent.at)}>
+                {selectedEvent.type} · {formatTime(selectedEvent.at)} · {formatExact(selectedEvent.at)}
+              </p>
+              {selectedEvent.detail === null ? null : <p className="dshx:break-words dshx:text-xs">{selectedEvent.detail}</p>}
+              {selectedEvent.sessionId === null ? null : (
+                <Button size="sm" variant="outline" onClick={() => openEventSession(selectedEvent)}>
+                  {t('openSession')}
                 </Button>
-              </>
-            ) : null}
-            {selectedEvent === undefined ? null : (
-              <>
-                <p className="dshx:break-words dshx:text-sm dshx:font-medium">{selectedEvent.summary}</p>
-                <p className="dshx:text-xs dshx:text-muted-foreground" title={formatExact(selectedEvent.at)}>
-                  {selectedEvent.type} · {formatTime(selectedEvent.at)} · {formatExact(selectedEvent.at)}
-                </p>
-                {selectedEvent.detail === null ? null : <p className="dshx:break-words dshx:text-xs">{selectedEvent.detail}</p>}
-                {selectedEvent.sessionId === null ? null : (
-                  <Button size="sm" variant="outline" onClick={() => openEventSession(selectedEvent)}>
-                    {t('openSession')}
-                  </Button>
-                )}
-                {navigationError.length === 0 ? null : (
-                  <Alert variant="destructive">
-                    <AlertDescription>{navigationError}</AlertDescription>
-                  </Alert>
-                )}
-                <Separator />
-                <p className="dshx:text-xs dshx:font-semibold">{t('metadata')}</p>
-                <pre className="dshx:overflow-x-auto dshx:rounded dshx:bg-muted/60 dshx:p-2 dshx:text-xs">
-                  {JSON.stringify(selectedEvent.metadata, null, 2)}
-                </pre>
-                <p className="dshx:text-xs dshx:font-semibold">{t('references')}</p>
-                <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
-                  {selectedEvent.references.map(reference => (
-                    <Badge key={`${reference.kind}:${reference.id}`} variant="outline">
-                      {reference.kind}: {reference.kind === 'session' ? sessionLabel(reference.id) : reference.id.slice(0, 12)}
-                    </Badge>
+              )}
+              {navigationError.length === 0 ? null : (
+                <Alert variant="destructive">
+                  <AlertDescription>{navigationError}</AlertDescription>
+                </Alert>
+              )}
+              <Separator />
+              <p className="dshx:text-xs dshx:font-semibold">{t('metadata')}</p>
+              <pre className="dshx:overflow-x-auto dshx:rounded dshx:bg-muted/60 dshx:p-2 dshx:text-xs">{JSON.stringify(selectedEvent.metadata, null, 2)}</pre>
+              <p className="dshx:text-xs dshx:font-semibold">{t('references')}</p>
+              <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
+                {selectedEvent.references.map(reference => (
+                  <Badge key={`${reference.kind}:${reference.id}`} variant="outline">
+                    {reference.kind}: {reference.kind === 'session' ? sessionLabel(reference.id) : reference.id.slice(0, 12)}
+                  </Badge>
+                ))}
+                {selectedEvent.references.length === 0 ? <span className="dshx:text-xs dshx:text-muted-foreground">—</span> : null}
+              </div>
+              <p className="dshx:text-xs dshx:font-semibold">{t('related')}</p>
+              {(relatedQuery.data?.events ?? []).length < 2 ? (
+                <p className="dshx:text-xs dshx:text-muted-foreground">—</p>
+              ) : (
+                <div className="dshx:flex dshx:flex-col dshx:gap-1">
+                  {(relatedQuery.data?.events ?? []).slice(0, 20).map(event => (
+                    <span key={event.id} className="dshx:text-xs" title={formatExact(event.at)}>
+                      {formatTime(event.at)} · {event.summary}
+                    </span>
                   ))}
-                  {selectedEvent.references.length === 0 ? <span className="dshx:text-xs dshx:text-muted-foreground">—</span> : null}
                 </div>
-                <p className="dshx:text-xs dshx:font-semibold">{t('related')}</p>
-                {(relatedQuery.data?.events ?? []).length < 2 ? (
-                  <p className="dshx:text-xs dshx:text-muted-foreground">—</p>
-                ) : (
-                  <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                    {(relatedQuery.data?.events ?? []).slice(0, 20).map(event => (
-                      <span key={event.id} className="dshx:text-xs" title={formatExact(event.at)}>
-                        {formatTime(event.at)} · {event.summary}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <p className="dshx:text-xs dshx:text-muted-foreground">
-                  {t('provenance')}: {t(selectedEvent.provenance)}
-                </p>
-              </>
-            )}
-            <p className="dshx:mt-auto dshx:text-xs dshx:text-muted-foreground">{t('routineHidden')}</p>
-          </CardContent>
-        </Card>
+              )}
+              <p className="dshx:text-xs dshx:text-muted-foreground">
+                {t('provenance')}: {t(selectedEvent.provenance)}
+              </p>
+            </>
+          )}
+          <p className="dshx:mt-auto dshx:text-xs dshx:text-muted-foreground">{t('routineHidden')}</p>
+        </PageSection>
       </div>
     </Page>
   )

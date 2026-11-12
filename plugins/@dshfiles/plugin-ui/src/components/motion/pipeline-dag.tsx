@@ -135,7 +135,7 @@ export function PipelineDag({
         <RunStatus status={status} />
       </header>
       <div role="list" aria-label={`${heading} steps`} className="dshx:flex dshx:flex-col dshx:px-2">
-        <div aria-hidden className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
+        <div aria-hidden className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
           <span className="dshx:min-w-0 dshx:flex-1 dshx:pl-1" style={{ marginLeft: layout.lanes * 16 + 8 }}>
             Step
           </span>

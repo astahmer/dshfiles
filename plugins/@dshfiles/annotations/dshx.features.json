@@ -9,7 +9,7 @@
       "surfaces": ["client", "host", "api", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Annotate an element",
+      "currentSurface": "composer: ⋯ › Point at UI… (/annotate); a count chip while annotations are open",
       "configuration": [],
       "states": ["idle", "picking", "commenting", "saved", "stale", "resolved", "dismissed"],
       "failureModes": [
@@ -20,15 +20,17 @@
       ],
       "externalDependencies": [],
       "reach": [
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
-        "click button \"Annotate an element\"",
+        "click button \"New thread\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
+        "click button \"More composer actions\"",
+        "click menuitem \"Point at UI…*\"",
         "click button \"Pick element\"",
         "expect text \"Click an element*\"",
         "click button \"Annotate an element\"",
         "expect textbox \"What is wrong or what should change?\"",
         "fill textbox \"What is wrong or what should change?\" \"the tab strip overlaps the sidebar\"",
         "click button \"Add\"",
-        "expect text \"Annotated UI feedback (1)\"",
+        "expect text \"Annotated UI feedback (1)*\"",
         "click button \"Annotate an element\"",
         "expect text \"plugins/@dshfiles/annotations/src*\""
       ],
@@ -344,7 +346,7 @@
       "surfaces": ["client", "host", "api"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Annotate an element › DSH-owned Chrome",
+      "currentSurface": "composer: ⋯ › Point at UI… › DSH-owned Chrome",
       "configuration": [
         {
           "key": "chromePath",

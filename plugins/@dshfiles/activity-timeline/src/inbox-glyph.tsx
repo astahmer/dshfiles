@@ -1,5 +1,6 @@
 import { useApi, useApiEvent } from '@dshfiles/dshx/client'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { attentionApi } from './attention-api.js'
 import { InboxNotifications } from './inbox-notifications.js'
@@ -7,9 +8,9 @@ import { inboxKeys, useInboxOpener, type Navigation } from './inbox-panel.js'
 
 /**
  * The Inbox nav glyph and its one badge: the Needs you count, a projection of inbox state (plan §4.8). It also hosts
- * the opt-in blocking alerts, because the nav entry is mounted for as long as the sidebar is.
+ * the opt-in browser alerts, because the nav entry is mounted for as long as the sidebar is.
  */
-export const InboxGlyph = (props: { readonly size?: number; readonly navigation: Navigation }): JSX.Element => {
+export const InboxGlyph = (props: { readonly size?: number; readonly navigation: Navigation; readonly openInbox?: () => void }): JSX.Element => {
   const api = useApi(attentionApi)
   const queryClient = useQueryClient()
   const openSubject = useInboxOpener(props.navigation)
@@ -19,7 +20,16 @@ export const InboxGlyph = (props: { readonly size?: number; readonly navigation:
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.list({ view: 'needs-you', limit: 100 }, { signal: hostSignal }) }),
     refetchInterval: eventStatus === 'live' ? 60_000 : 15_000,
   })
-  InboxNotifications.useBlockingAlerts(needsYou.data?.items, item => void openSubject(item.subject))
+  const sessionLabel = EntityLabels.useSessionLabel(props.navigation.sessions)
+  // A click opens the item where the user acts on it: its thread (the question or the failure is there), or its page;
+  // an item nothing can open falls back to the Inbox, which lists it.
+  InboxNotifications.useBlockingAlerts(
+    needsYou.data?.items,
+    item => {
+      if (!openSubject(item.subject)) props.openInbox?.()
+    },
+    sessionLabel,
+  )
   const count = needsYou.data?.counts.needsYou ?? 0
   const size = props.size ?? 18
   return (
@@ -29,7 +39,7 @@ export const InboxGlyph = (props: { readonly size?: number; readonly navigation:
         <path d="M4 13h4.5l1 2h5l1-2H20" />
       </svg>
       {count === 0 ? null : (
-        <span className="dshx:absolute dshx:-right-2 dshx:-top-1.5 dshx:min-w-4 dshx:rounded-full dshx:bg-primary dshx:px-1 dshx:text-center dshx:text-[10px] dshx:font-semibold dshx:leading-4 dshx:text-primary-foreground">
+        <span className="dshx:absolute dshx:-right-2 dshx:-top-1.5 dshx:min-w-4 dshx:rounded-full dshx:bg-primary dshx:px-1 dshx:text-center dshx:text-2xs dshx:font-semibold dshx:leading-4 dshx:text-primary-foreground">
           {count > 99 ? '99+' : count}
           <span className="dshx:sr-only"> need you</span>
         </span>

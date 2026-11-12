@@ -36,6 +36,8 @@ export interface ComposerKeymapHandlers {
   canSubmit(): boolean
   /** Plain Enter submits; exactly Ctrl+Enter or Cmd+Enter selects accelerated delivery. */
   submit(accelerated: boolean): void
+  /** Primary+Alt+Enter: send, then open a fresh draft; absent leaves the chord unbound. */
+  submitAndNewDraft?(): void
   /**
    * Pasted files with directory metadata supplied by the clipboard entry API.
    * @param files - browser files in clipboard order.
@@ -151,6 +153,13 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
     editor.registerCommand(KEY_ENTER_COMMAND, (event) => {
       // Returning true stops Lexical's fallback line break without consuming
       // the DOM event that application shortcuts need.
+      // Primary+Alt+Enter sends and opens a fresh draft for the next thread (dshfiles plan Q2 T2.5).
+      if (event !== null && event.altKey && (event.ctrlKey !== event.metaKey) && !event.shiftKey
+        && !isComposingEvent(event, recentlyComposing) && handlers.submitAndNewDraft !== undefined) {
+        event.preventDefault()
+        if (!event.repeat && handlers.canSubmit()) handlers.submitAndNewDraft()
+        return true
+      }
       if (event !== null && (event.altKey || event.getModifierState('AltGraph')
         || (event.ctrlKey && event.metaKey) || (event.shiftKey && (event.ctrlKey || event.metaKey)))) return true
       // Plain Shift+Enter keeps its native line break, including during composition.

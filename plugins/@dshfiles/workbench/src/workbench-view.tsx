@@ -1,7 +1,7 @@
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { EllipsisIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { PlusIcon, SquareSplitHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
   DockviewReact,
@@ -20,6 +20,7 @@ import { WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutStore, type WorkbenchD
 import type { WorkbenchTranslate } from './locales.js'
 import { workbenchRegions, type WorkbenchRegionId } from './dock-regions.js'
 import type { WorkbenchPanelDefinition, WorkbenchPanelRegistry } from './registry.js'
+import { SIDEBAR_PANE_ID } from './shell-merge.js'
 import { createWorkbenchTab } from './workbench-tab.js'
 import { NewViewChooser } from './new-view-chooser.js'
 import { NewViewTabs, type NewViewSelection } from './new-view.js'
@@ -33,10 +34,20 @@ import { GroupMinimums } from './group-minimums.js'
 import { TabRows } from './tab-row-visibility.js'
 import { TabReveal } from './tab-reveal.js'
 import { HiddenTabRowRestore, TabRowVoidMenu, type TabRowMenuTarget } from './tab-row-controls.js'
+import { PanelChromeContext, type PanelChrome } from './header-seat.js'
 
 /** Variables live in the injected dockview sheet (`dockview-theme.css`), mapped to the Host `--dsw-*` tokens. */
 const workbenchTheme: DockviewTheme = { name: 'dshfiles', className: 'dshfiles-workbench-theme' }
 const SurfaceVisibility = createContext(true)
+/** One stable chrome value per Dockview panel, so the seat context does not re-render the panel on every render. */
+const chromes = new WeakMap<IDockviewPanelProps['api'], PanelChrome>()
+const chromeOf = (props: IDockviewPanelProps): PanelChrome => {
+  const known = chromes.get(props.api)
+  if (known !== undefined && known.containerApi === props.containerApi) return known
+  const chrome = { api: props.api, containerApi: props.containerApi }
+  chromes.set(props.api, chrome)
+  return chrome
+}
 
 /** A panel dropped onto a surface, with that surface's own instance so the embedder can adopt it. */
 export interface WorkbenchPanelDrop {
@@ -201,15 +212,24 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
           style={{ contain: 'layout paint' }}
           onPointerDownCapture={activateOnPointer}
         >
-          <HiddenTabRowRestore api={panelProps.api} containerApi={panelProps.containerApi} />
-          <Panel
-            panelId={id}
-            visible={visible && surfaceVisible}
-            onClose={() => {
-              definition.beforeClose?.()
-              panelProps.api.close()
-            }}
-          />
+          {/* The Sidebar pane (b:952m) is the old Fixed column: no hover control over its list; ⌘K Show tab rows restores its row. */}
+          {id === SIDEBAR_PANE_ID ? null : <HiddenTabRowRestore api={panelProps.api} containerApi={panelProps.containerApi} />}
+          {/* A thread panel seats its conversation header in this group's tab row (one header row, T1.4). */}
+          <PanelChromeContext.Provider value={chromeOf(panelProps)}>
+            <Panel
+              panelId={id}
+              visible={visible && surfaceVisible}
+              onClose={() => {
+                // A definition rejects the close by throwing; the occurrence then stays.
+                try {
+                  definition.beforeClose?.()
+                } catch {
+                  return
+                }
+                panelProps.api.close()
+              }}
+            />
+          </PanelChromeContext.Provider>
         </div>
       )
     }
@@ -492,13 +512,16 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
     const takeOpenRequests = (): void => {
       // Saved layouts keep stable IDs, not outdated copy. Refresh only reusable
       // template titles; never overwrite semantic/user/resource occurrence names.
+      // A template title is a qualified "Plugin: View" on either side: the new
+      // definition's, or the saved one a template has since renamed to a plain
+      // view name (DESIGN.md: pane titles carry no plugin name).
       for (const panel of api.panels) {
         const definition = registry.get(NewViewTabs.sourceId(panel.toJSON().params, panel.id))
         if (
           definition !== undefined &&
           definition.tabId === undefined &&
           !definition.hiddenFromAdd &&
-          definition.title.includes(': ') &&
+          (definition.title.includes(': ') || (panel.title ?? '').includes(': ')) &&
           panel.title !== definition.title
         )
           panel.api.setTitle(definition.title)
@@ -566,7 +589,12 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
               }}
             >
               <DropdownMenuTrigger asChild>
-                <SurfaceAction label="Pane options" icon={<EllipsisIcon aria-hidden />} iconOnly onPointerDown={event => event.stopPropagation()} />
+                <SurfaceAction
+                  label="Pane options"
+                  icon={<SquareSplitHorizontalIcon aria-hidden />}
+                  iconOnly
+                  onPointerDown={event => event.stopPropagation()}
+                />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {current.props.headerActions?.({ api: current.api, openIds: current.openIds, menu: true })}

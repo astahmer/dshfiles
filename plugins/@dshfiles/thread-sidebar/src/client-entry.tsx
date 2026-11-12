@@ -20,14 +20,18 @@ import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type Transl
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { createApiClient, defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
+import { Changes, Command, createApiClient, defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
+import { HeroSuggestionCards, type HeroSuggestionActions } from './hero-suggestions.js'
+import { DESTINATION_GO_KEYS, GO_DESTINATION_EVENT, SHOW_DESTINATION_EVENT } from './destination-shell.js'
 import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
 import { WorkingStatusItem, WorkingStatusModel } from './working-status-item.js'
 import { RestartStatusItem } from './restart-status-item.js'
+import { openUpdateDshSettings, UPDATE_DSH_SECTION_ID, UpdateDshSection, UpdateStatusItem } from './update-dsh.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { DestinationSections } from './destinations.js'
+import type { RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
+import { DESTINATIONS, DestinationSections } from './destinations.js'
 import { WaitingThreadsPanel } from './waiting-threads-panel.js'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
@@ -40,10 +44,13 @@ import { registerSidebarWorkbenchPanels } from './workbench-panels.js'
 import { ThreadAsideOpenProvider, ThreadSidebar, type ThreadSidebarStandardProps } from './client.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { HeaderThreadActions } from './header-actions.js'
+import { HeaderLiveActivity } from './header-live-activity.js'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
 import type { SubagentPreviewBindings } from './subagent-provenance/subagent-live-preview.js'
 import { SubagentPreviewDock } from './subagent-provenance/subagent-preview-dock.js'
 import { SubagentProvenanceToolRow, type SubagentToolViewProps } from './subagent-provenance/subagent-tool-row.js'
+import { subagentRunFold } from './subagent-provenance/subagent-run-fold.js'
+import { TranscriptRunFolds } from '@dshfiles/chat/run-folds'
 import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.js'
 import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
@@ -92,6 +99,8 @@ const WAITING_THREADS_PANEL_ID = 'thread-sidebar-waiting'
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
+    /** A Space peek of a thread row: its last reply, held while the peek shows. */
+    threadSidebarPeek: unknown
     threadSidebarFollowUp: unknown
     /** One subagent followed from its transcript row while that row is open. */
     threadSidebarSubagentPreview: unknown
@@ -280,6 +289,20 @@ export default defineClient({
 
     const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
     const translate = ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)
+    // G then a key opens a destination, as its rail button does (plan Q2 keymap). The palette already lists the
+    // destinations, so these stay out of it and show in the ? sheet and the rail tooltips.
+    for (const destination of DESTINATIONS)
+      plugin?.add(Command, {
+        id: `@dshfiles/thread-sidebar.go-${destination.id}`,
+        title: translate('threadSidebarKeyGoTo', { destination: destination.label }),
+        keys: [DESTINATION_GO_KEYS[destination.id]],
+        scope: 'not-typing',
+        section: 'Go to',
+        hidden: true,
+        run: () => {
+          window.dispatchEvent(new CustomEvent(GO_DESTINATION_EVENT, { detail: destination.id }))
+        },
+      })
     if (plugin !== undefined) {
       // The status strip's "N working" item; frame-layout owns the strip and renders nothing when it is not the frame.
       const WorkingItem = (props: StatusItemProps): JSX.Element | null => (
@@ -311,6 +334,9 @@ export default defineClient({
             autoCountdown: seconds => translate('threadSidebarAutoRestartCountdown', { seconds }),
             postpone: translate('threadSidebarAutoRestartPostpone'),
             autoUnsupervised: translate('threadSidebarAutoRestartUnsupervised'),
+            copyCommand: translate('threadSidebarAutoRestartCopyCommand'),
+            copied: translate('threadSidebarCopied'),
+            turnOffAuto: translate('threadSidebarAutoRestartTurnOff'),
           }}
         />
       )
@@ -325,6 +351,20 @@ export default defineClient({
             component: plugin.bind(RestartItem),
           }),
         'thread-sidebar: restart status item',
+      )
+      // Update DSH (E3): the section and strip item live beside the restart verbs they end with; the Host half is
+      // jj-integration's checkout sync, so this plugin only reads and calls it.
+      ctx.effect(
+        () =>
+          plugin.add(StatusItems, {
+            id: '@dshfiles/thread-sidebar.update-dsh',
+            side: 'global',
+            order: 85,
+            label: 'Update',
+            component: plugin.bind(UpdateStatusItem),
+            open: openUpdateDshSettings,
+          }),
+        'thread-sidebar: update status item',
       )
     }
     const skillMentions = createSkillMentionSource({
@@ -595,6 +635,14 @@ export default defineClient({
           locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
         },
         decorate(({ t }: { t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> }) => <NotificationSettingsTab t={t} />),
+      ),
+    )
+
+    // Update DSH (E3): Settings › About; it ends at this plugin's own restart verbs.
+    ctx.slots.inject('settings.section', () =>
+      ctx.slots.register(
+        { name: 'settings.section', registrant: '@dshfiles/thread-sidebar', id: UPDATE_DSH_SECTION_ID, order: 90, label: () => 'Update DSH' },
+        decorate(() => <UpdateDshSection />),
       ),
     )
 
@@ -920,6 +968,8 @@ export default defineClient({
       },
       canOpenAside: childId => ctx.sessions.subagentAddress(SessionId(childId)) !== undefined,
     }
+    const subagentCopy = ctx.locale.bind(SUBAGENT_LOCALE_NAMESPACE)
+    const subagentCount = (count: number): string => subagentCopy(count === 1 ? 'count.total.one' : 'count.total.other', { count })
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
         { name: 'conversation.input.dock', id: 'thread-sidebar-subagents-live', order: 4, inject: sessionId => ({ sessionId }) },
@@ -930,11 +980,14 @@ export default defineClient({
             useSessionStatus={props.useSessionStatus}
             sessionId={props.sessionId}
             preview={subagentPreview}
+            count={subagentCount}
           />
         )),
       ),
     )
     const SubagentRow = decorate((props: SubagentToolViewProps) => <SubagentProvenanceToolRow {...props} preview={subagentPreview} />)
+    // Two or more consecutive subagent rows fold into one transcript row (b:7rv2).
+    plugin?.add(TranscriptRunFolds, subagentRunFold({ t: translate, count: subagentCount }))
     for (const key of ['subagent', 'subagent_fork'])
       ctx.slots.inject('tool.call.toolview', () =>
         ctx.slots.register(
@@ -953,6 +1006,42 @@ export default defineClient({
       const continued = await createApiClient(ctx, threadActionsApi).continueIn({ sessionId, projectId })
       return { continuedSessionId: SessionId(continued.continuedSessionId), settled: continued.settled }
     }
+
+    // The new-thread hero's Resume / Review / Inbox cards (visual refresh T3.4), from the statuses this list computes.
+    const heroActions: HeroSuggestionActions = {
+      open: sessionId => openThread(SessionId(sessionId)),
+      review: input => {
+        const changes = plugin?.use(Changes).get()
+        if (changes?.status !== 'active') return false
+        changes.value.review(input)
+        return true
+      },
+      openInbox: () => window.dispatchEvent(new CustomEvent(SHOW_DESTINATION_EVENT, { detail: 'inbox' })),
+    }
+    ctx.slots.inject('conversation.hero.suggestions', () =>
+      ctx.slots.register(
+        { name: 'conversation.hero.suggestions', id: 'thread-sidebar-hero-suggestions', order: 10 },
+        decorate((props: PropsRuntime<'conversation.hero.suggestions'> & { readonly heroSessionId: string | undefined }) => (
+          <PluginQueryProvider>
+            <HeroSuggestionCards heroSessionId={props.heroSessionId} useSessions={props.useSessions} actions={heroActions} now={Date.now} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+
+    // The working signal sits before the header's actions, so it reads beside the title (polish pass b:r4et).
+    ctx.slots.inject('conversation.session.header.utilities', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.session.header.utilities',
+          id: 'thread-sidebar-live-activity',
+          order: 10,
+          label: () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarWorking'),
+          locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
+        },
+        decorate(HeaderLiveActivity),
+      ),
+    )
 
     ctx.slots.inject('conversation.session.header.utilities', () =>
       ctx.slots.register(
@@ -990,6 +1079,13 @@ export default defineClient({
       ),
     )
 
+    /** A peek holds only a thread the catalog lists, so a stale row id never creates a binding. */
+    const retainPeek: RetainThread = (sessionId, signal) => {
+      const listed = ctx.sessions.list.getSnapshot().ids.find(candidate => candidate === sessionId)
+      if (listed === undefined) throw new Error('This thread is not listed any more.')
+      const reference = ctx.sessions.retain(listed, { source: 'threadSidebarPeek', signal })
+      return { ready: reference.ready.then(binding => ({ eventSource: binding.eventSource })), release: () => reference.release() }
+    }
     const ThreadSidebarWithHistoryLookahead = (props: Parameters<typeof ThreadSidebar>[0]): JSX.Element => {
       const [lookaheadSessionIds, setLookaheadSessionIds] = useState<readonly SessionSummary['id'][]>([])
       useEffect(
@@ -1009,7 +1105,7 @@ export default defineClient({
       return (
         <PluginQueryProvider>
           <ThreadAsideOpenProvider value={openAside}>
-            <ThreadSidebar {...props} onNavigationLookahead={updateLookaheadSessionIds} />
+            <ThreadSidebar {...props} onNavigationLookahead={updateLookaheadSessionIds} retainPeek={retainPeek} />
           </ThreadAsideOpenProvider>
         </PluginQueryProvider>
       )

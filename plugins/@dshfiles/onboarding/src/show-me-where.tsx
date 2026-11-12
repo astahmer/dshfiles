@@ -4,13 +4,22 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { destinationLabel } from './getting-started-page.js'
-import { TOUCH } from './touch.js'
 import { PHONE_QUERY, ReachModel, type FeatureReach, type WalkStep } from './reach-model.js'
 import { Routes, type RouteServices } from './routes.js'
 import { createWalk, type WalkController, type WalkSnapshot } from './walk-controller.js'
 
+/**
+ * The walk's card: a popover-layer surface (12px radius, s2) pinned to a viewport edge. Both insets are set and the width
+ * is capped, so it is the full width minus a margin on a phone and a 24rem card at the right edge elsewhere, with no
+ * viewport breakpoint. It stays non-modal: the user clicks the ringed control behind it.
+ */
+export const WALK_CARD =
+  'dshx:pointer-events-auto dshx:fixed dshx:inset-x-2 dshx:ml-auto dshx:flex dshx:max-w-96 dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-3 dshx:text-popover-foreground dshx:shadow-s2'
+
 /** Host modals sit at 1000: the ring and card stay under them unless the target itself lives in a higher layer. */
 const BELOW_MODALS = 999
+/** The walk card's own layer when no ringed control lifts it. */
+export const WALK_LAYER = BELOW_MODALS
 const RING_GAP = 4
 
 export interface ShowMeWhereProps {
@@ -96,10 +105,7 @@ const Walk = (props: ShowMeWhereProps & { readonly controller: WalkController; r
       {ringed === null ? null : <Ring element={ringed} />}
       <section
         aria-label="Show me where"
-        className={cn(
-          'dshx:pointer-events-auto dshx:fixed dshx:right-3 dshx:flex dshx:w-96 dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-3 dshx:text-popover-foreground dshx:shadow-lg dshx:max-sm:inset-x-2 dshx:max-sm:w-auto',
-          lowerHalf ? 'dshx:top-3' : 'dshx:bottom-3',
-        )}
+        className={cn(WALK_CARD, lowerHalf ? 'dshx:top-[max(0.75rem,var(--dshx-safe-top))]' : 'dshx:bottom-[max(0.75rem,var(--dshx-safe-bottom))]')}
         data-walk-card=""
         data-walk-phase={snapshot.phase}
         style={{ zIndex }}
@@ -123,23 +129,23 @@ const Walk = (props: ShowMeWhereProps & { readonly controller: WalkController; r
         {snapshot.phase === 'arrived' ? <p className="dshx:text-xs">You reached it.</p> : null}
         <div className="dshx:flex dshx:flex-wrap dshx:justify-end dshx:gap-2">
           {snapshot.phase === 'missing' && canOpen ? (
-            <Button className={TOUCH} onClick={() => Routes.open(route, props.routes)} size="sm" variant="outline">
+            <Button onClick={() => Routes.open(route, props.routes)} size="sm" variant="outline">
               Open
             </Button>
           ) : null}
           {snapshot.phase === 'unsupported' ? (
-            <Button asChild className={TOUCH} size="sm" variant="outline">
+            <Button asChild size="sm" variant="outline">
               <a href={reach.docsUrl} rel="noopener noreferrer" target="_blank">
                 <ExternalLinkIcon /> Docs
               </a>
             </Button>
           ) : null}
           {showNext ? (
-            <Button className={TOUCH} onClick={controller.next} ref={firstButton} size="sm">
+            <Button onClick={controller.next} ref={firstButton} size="sm">
               Next
             </Button>
           ) : null}
-          <Button className={TOUCH} onClick={controller.end} ref={showNext ? undefined : firstButton} size="sm" variant="ghost">
+          <Button onClick={controller.end} ref={showNext ? undefined : firstButton} size="sm" variant="ghost">
             End
           </Button>
         </div>
@@ -151,6 +157,31 @@ const Walk = (props: ShowMeWhereProps & { readonly controller: WalkController; r
     (props.document ?? document).body,
   )
 }
+
+/** The walk's steps did not load: the same card as a walk, with Try again and End (on the body, like the walk). */
+export const WalkUnreadable = (props: { readonly onRetry: () => void; readonly onEnd: () => void; readonly document?: Document }): ReactNode =>
+  createPortal(
+    <section
+      aria-label="Show me where"
+      className={cn('dshx-root dshx:bottom-[max(0.75rem,var(--dshx-safe-bottom))]', WALK_CARD)}
+      data-onboarding-walk=""
+      data-walk-card=""
+      data-walk-phase="unreadable"
+      role="alert"
+      style={{ zIndex: WALK_LAYER }}
+    >
+      <p className="dshx:text-sm">Show me where could not load this feature's steps. Try again, or end the walk and open the feature from Getting started.</p>
+      <div className="dshx:flex dshx:justify-end dshx:gap-2">
+        <Button onClick={props.onRetry} size="sm">
+          Try again
+        </Button>
+        <Button onClick={props.onEnd} size="sm" variant="ghost">
+          End
+        </Button>
+      </div>
+    </section>,
+    (props.document ?? document).body,
+  )
 
 /** The viewport is phone-width; crossing the breakpoint (a rotation) re-renders and restarts the walk on the other steps. */
 const usePhone = (root: Document | undefined): boolean => {

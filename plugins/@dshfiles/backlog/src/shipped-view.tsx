@@ -50,31 +50,31 @@ const ItemRow = (props: {
       onClick={() => props.select(entry.id)}
       onMouseMove={() => props.hover(entry.id)}
       className={cn(
-        'dshx:flex dshx:h-8 dshx:min-w-0 dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-[13px] dshx:outline-none dshx:transition-colors dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
+        'dshx:flex dshx:h-8 dshx:min-w-0 dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-sm dshx:outline-none dshx:transition-colors dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
         entry.id === props.openId ? 'dshx:bg-accent/80' : entry.id === props.cursorId ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/30',
       )}
     >
       <ItemGlyphs.KindIcon kind={entry.kind} />
-      <BacklogMentionHandle item={entry} className="dshx:w-12 dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" />
+      <BacklogMentionHandle item={entry} className="dshx:w-12 dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" />
       <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
         {entry.title}
         {entry.summary === undefined ? null : <span className="dshx:text-muted-foreground"> — {entry.summary}</span>}
       </span>
       {entry.byAgent ? (
-        <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:bg-info/12 dshx:px-1.5 dshx:text-[11px] dshx:text-info">
+        <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:bg-info/12 dshx:px-1.5 dshx:text-2xs dshx:text-info">
           <BotIcon aria-hidden className="dshx:size-3" />
           <span className="dshx:@max-pane-compact:sr-only">Agent</span>
         </span>
       ) : null}
       {entry.doneBy.startsWith('agent:') ? (
-        <span className="dshx:shrink-0 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground dshx:@max-pane-compact:hidden">
+        <span className="dshx:shrink-0 dshx:truncate dshx:text-2xs dshx:text-muted-foreground dshx:@max-pane-compact:hidden">
           done by {ItemGlyphs.actorName(entry.doneBy)} for {ItemGlyphs.actorName(entry.owner)}
         </span>
       ) : null}
       {entry.revisions.slice(0, 2).map(revision => (
         <span
           key={revision}
-          className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded dshx:bg-muted dshx:px-1 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground dshx:@max-pane-compact:hidden"
+          className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded dshx:bg-muted dshx:px-1 dshx:font-mono! dshx:text-2xs dshx:text-muted-foreground dshx:@max-pane-compact:hidden"
         >
           <GitCommitHorizontalIcon aria-hidden className="dshx:size-3" />
           {revision.slice(0, 8)}
@@ -87,13 +87,13 @@ const ItemRow = (props: {
           target="_blank"
           rel="noreferrer"
           onClick={event => event.stopPropagation()}
-          className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded dshx:bg-muted dshx:px-1 dshx:text-[11px] dshx:text-muted-foreground dshx:hover:text-foreground dshx:@max-pane-compact:hidden"
+          className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded dshx:bg-muted dshx:px-1 dshx:text-2xs dshx:text-muted-foreground dshx:hover:text-foreground dshx:@max-pane-compact:hidden"
         >
           <GitPullRequestIcon aria-hidden className="dshx:size-3" />
           {pullRequestLabel(url)}
         </a>
       ))}
-      <span className="dshx:w-10 dshx:shrink-0 dshx:text-right dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(entry.doneAt)}</span>
+      <span className="dshx:w-10 dshx:shrink-0 dshx:text-right dshx:text-2xs dshx:text-muted-foreground">{ItemGlyphs.ago(entry.doneAt)}</span>
     </li>
   )
 }
@@ -125,8 +125,8 @@ const Summary = (props: {
     <div className="dshx:flex dshx:flex-col dshx:gap-2">
       {summary === null ? null : (
         <div className="dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/30 dshx:px-3 dshx:py-2.5">
-          <p className="dshx:whitespace-pre-wrap dshx:text-[13px] dshx:leading-relaxed">{summary.text}</p>
-          <div className="dshx:mt-2 dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
+          <p className="dshx:whitespace-pre-wrap dshx:text-sm dshx:leading-relaxed">{summary.text}</p>
+          <div className="dshx:mt-2 dshx:flex dshx:items-center dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
             <SparklesIcon aria-hidden className="dshx:size-3" />
             <span className="dshx:min-w-0 dshx:truncate">
               {summary.model} · {ItemGlyphs.ago(summary.generatedAt)}
@@ -189,7 +189,7 @@ const BucketSection = (props: {
         <header className="dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-2">
           <h3 className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold">{label}</h3>
           <span className="dshx:shrink-0 dshx:text-sm dshx:tabular-nums dshx:text-muted-foreground">{bucket.count} shipped</span>
-          <span className={cn('dshx:shrink-0 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:tabular-nums', deltaTone[delta.tone])}>
+          <span className={cn('dshx:shrink-0 dshx:rounded-full dshx:px-1.5 dshx:text-2xs dshx:tabular-nums', deltaTone[delta.tone])}>
             <span className="dshx:sr-only">Change from the previous period: </span>
             {delta.text}
           </span>
@@ -276,7 +276,7 @@ export const ShippedView = (props: {
         </header>
         {shipped.isError ? (
           hostLacksShipped(shipped.error) ? (
-            <p role="alert" className="dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-4 dshx:text-[13px]">
+            <p role="alert" className="dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-4 dshx:text-sm">
               The running DSH Host predates Shipped. Restart the DSH Host process to load it; the other backlog views keep working until then.
             </p>
           ) : (

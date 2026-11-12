@@ -46,7 +46,7 @@ import { useObservable } from './native/use-observable.js'
 import { WELCOME_LOCALE_NAMESPACE, WELCOME_STEP_ID, WelcomeNotice, WelcomeNoticeStore, welcomeLocale, type WelcomeTranslate } from './native/welcome-notice.js'
 import { settingsShellApi } from './shell-api.js'
 import { bundleLabelsOf, type BundleLabel } from './bundle-labels.js'
-import { DshReleaseNotice } from './release-notice.js'
+import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
 import { PluginEntryCard } from './plugin-entry-card.js'
@@ -127,8 +127,11 @@ const CurrentVersion = (props: { readonly t: ShellTranslate }): JSX.Element => {
   return (
     <>
       <CurrentVersionRow t={props.t} version={upstream.data?.installed ?? PORTED_FROM.version} />
+      <PluginQueryProvider>
+        <DshReleaseCheck t={props.t} />
+      </PluginQueryProvider>
       {upstream.data?.stale === true && (
-        <p className="dshx:m-0 dshx:pb-4 dshx:text-[12px] dshx:text-warning" role="note">
+        <p className="dshx:m-0 dshx:pb-4 dshx:text-xs dshx:text-warning" role="note">
           {props.t('port.stale', { ported: upstream.data.portedFrom, installed: upstream.data.installed ?? '' })}
         </p>
       )}
@@ -142,6 +145,12 @@ export default defineClient({
   inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout', 'modules'],
   setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
+    // A newer DSH release is a quiet banner above the General rows, not a preference row (visual refresh T4.4).
+    const ReleaseBanner = decorate((props: { readonly t: ShellTranslate }) => (
+      <PluginQueryProvider>
+        <DshReleaseBanner t={props.t} />
+      </PluginQueryProvider>
+    ))
     const connection = Schema.decodeUnknownSync(clientConnectionSchema)(ctx.get('connection'))
     const openSettingsCommand = shortcutCommandId(OPEN_SETTINGS_COMMAND)
 
@@ -666,7 +675,7 @@ export default defineClient({
         <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-4" data-settings-shell-plugin-page={props.packageId}>
           {pages.map(page => (
             <section aria-label={page.title} className="dshx:flex dshx:flex-col" key={page.ns}>
-              {pages.length > 1 && <h4 className="dshx:m-0 dshx:text-[13px] dshx:font-semibold dshx:text-muted-foreground">{page.title}</h4>}
+              {pages.length > 1 && <h4 className="dshx:m-0 dshx:text-sm dshx:font-semibold dshx:text-muted-foreground">{page.title}</h4>}
               <SettingsForm fields={page.fields} form={formFor(page.ns)} namespace={page.ns} t={t} />
             </section>
           ))}
@@ -883,7 +892,7 @@ export default defineClient({
           children: { 'settings.general.item': { kind: 'list', scope: 'root' } },
         },
         (props: PropsRenderSlots<'settings.general.item'> & SettingsSectionSearchProps) => (
-          <GeneralSection renderSlot={props.renderSlot} target={props.target} />
+          <GeneralSection banner={<ReleaseBanner t={t} />} renderSlot={props.renderSlot} target={props.target} />
         ),
       ),
     )
@@ -897,16 +906,6 @@ export default defineClient({
             t={props.t}
           />
         ),
-      ),
-    )
-    ctx.slots.inject('settings.general.item', () =>
-      ctx.slots.register(
-        { name: 'settings.general.item', id: 'dsh-release-notice', order: 10, locale: SHELL_LOCALE_NAMESPACE },
-        decorate((props: { readonly t: ShellTranslate }) => (
-          <PluginQueryProvider>
-            <DshReleaseNotice t={props.t} />
-          </PluginQueryProvider>
-        )),
       ),
     )
     ctx.slots.inject('settings.general.item', () =>

@@ -3,8 +3,8 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { selectModelForNewThread } from '../threads.js'
 
-const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
-const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
+const NEW_THREAD_COMPOSER = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 
 const newThreadComposer = (page: Page) => page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
 const mentionRows = (page: Page) => page.getByRole('listbox').getByRole('option')

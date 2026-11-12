@@ -77,7 +77,7 @@ export const ServiceMapView = (props: {
                   x={(startX + endX) / 2}
                   y={(startY + endY) / 2 - 6}
                   textAnchor="middle"
-                  className={cn('dshx:font-mono dshx:text-[10px]', failing ? 'dshx:fill-destructive' : 'dshx:fill-muted-foreground')}
+                  className={cn('dshx:font-mono dshx:text-2xs', failing ? 'dshx:fill-destructive' : 'dshx:fill-muted-foreground')}
                 >
                   {`${String(edge.count)}× ${failing ? TraceFormat.percent(edge.errorRate) : TraceFormat.duration(edge.p50Ms)}`}
                 </text>
@@ -112,7 +112,7 @@ export const ServiceMapView = (props: {
                 <text x={16} y={21} className="dshx:fill-foreground dshx:text-xs dshx:font-medium">
                   {node.service.length > 28 ? `${node.service.slice(0, 27)}…` : node.service}
                 </text>
-                <text x={16} y={38} className="dshx:fill-muted-foreground dshx:font-mono dshx:text-[10px]">
+                <text x={16} y={38} className="dshx:fill-muted-foreground dshx:font-mono dshx:text-2xs">
                   {summary === undefined
                     ? ''
                     : `${String(summary.count)} ${props.t('spans')} · ${TraceFormat.percent(summary.errorRate)} · p95 ${TraceFormat.duration(summary.p95Ms)}`}

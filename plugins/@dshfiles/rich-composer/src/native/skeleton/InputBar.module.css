@@ -8,15 +8,120 @@
      is owned by the chat scroller. No top pad: the composer stack's gap owns
      the space above; the status strip still carries its own margin. */
   padding: 0 var(--dsh-composer-side-clearance) 4px;
+  /* The bar's own width decides when its control row becomes one scrolling line (narrow panes, phones). Every
+     overlay the bar opens is portalled or absolute against the card, so this containment moves none of them. */
+  container-type: inline-size;
 }
 
+.send {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The meter line (visual refresh T3.2): ONE quiet row under the card — summary chip · dock readings · N queued in
+   the tertiary label. It never wraps and its readings never shrink into fragments: a line wider than the bar scrolls
+   sideways from its start instead. */
+/* The meter line (composer follow-up b:gyk7): one quiet line under the card. Where the thread runs sits left (the run
+   summary, the plugins' location entries marked data-composer-meta="location", N queued); the readings sit right
+   after a spacer (activity, tokens, cost). Items wrap whole onto a second line instead of truncating into fragments;
+   a narrow bar hides the readings behind ⋯. Plugin entries arrive through the display: contents dock slot, so they
+   are flex items of this line and take their place by `order`. */
 .dock {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  column-gap: 6px;
+  row-gap: 2px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--dsh-composer-card-max-width);
+  min-height: 24px;
+  padding: 4px 4px 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.dock > *,
+.dock > :global([data-slot]) > * {
+  flex: none;
+  order: 3;
+}
+
+.dock > :global([data-run-summary]) {
+  order: 0;
+  flex: 0 1 auto;
+}
+
+.dock :global([data-composer-meta='location']) {
+  order: 1;
+}
+
+/* The location continues the run summary's sentence: "sample · Local · ahead of main by 2". */
+.dock:has(> :global([data-run-summary])) :global([data-composer-meta='location'])::before {
+  content: '·';
+  margin-left: -8px;
+  margin-right: 0;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dock > .queued {
+  order: 1;
+}
+
+.meterSpacer {
+  order: 2;
+  flex: 1 0 0;
+  min-width: 0;
+}
+
+.meterMore {
+  display: none;
+  order: 4;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  max-width: 100%;
-  padding-top: 4px;
+  min-width: 24px;
+  height: 20px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.meterMore:hover,
+.meterMore:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.dock:not(:has(> :global([data-run-summary]), :global([data-composer-stat]), :global([data-composer-meta]), .queued)) {
+  display: none;
+}
+
+/* A narrow bar keeps the location line whole and moves the readings behind ⋯ (shown only when there are some). */
+@container (max-width: 560px) {
+  .dock:not([data-meter-expanded]) :global([data-composer-stat]) {
+    display: none;
+  }
+
+  .dock:has(:global([data-composer-stat])) .meterMore {
+    display: inline-flex;
+  }
+
+  .dock[data-meter-expanded] .meterSpacer {
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .dock[data-meter-expanded] .meterMore {
+    order: 5;
+  }
 }
 
 .hero .dock:empty {
@@ -77,20 +182,26 @@
   position: relative; /* overlay anchor positioning context */
   display: flex;
   flex-direction: column;
-  /* figma Input 75:8208: 12px between the text area and the button row; the
-     card's top pad before .InputText tightened from the drawn 10 to 8. */
-  gap: 12px;
+  /* Composer redesign (b:v9yh): no dead band. The text line carries its own 10px pads, so the card adds only 4px above
+     it and nothing between it and the bar. */
+  gap: 0;
   width: 100%;
   max-width: var(--dsh-composer-card-max-width);
-  padding-top: 8px;
-  /* Input stroke: the light neutral (l2, one step above the menus' l1),
-     drawn as the elevation hairline so it costs no layout; the shadow is the
-     soft elevation tier. Fill: the input surface token (elevated in dark). */
+  padding-top: 4px;
+  /* Visual refresh T3.1: the composer is the ONE elevated resting object. A 12px card (the composer step of the
+     radius scale), one hairline drawn as a ring so it costs no layout, the s1 shadow and an inner top highlight
+     (dark's s1 carries its own, so the light highlight is switched off there). Fill: the input surface token (the
+     raised step in dark). Everything else around it stays flat. */
   border: 0;
-  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-panel);
-  background: var(--dsw-specific-input-major);
-  box-shadow: var(--dsw-elevation-soft);
+  --dsh-composer-card-fill: var(--dsw-specific-input-major);
+  --dsh-composer-card-highlight: var(--dshx-tone-bg, transparent);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsh-composer-card-fill);
+  box-shadow:
+    0 0 0 1px var(--dshx-tone-line, var(--dsw-alias-border-l2)),
+    var(--dshx-elevation-1, var(--dsw-elevation-soft)),
+    inset 0 1px 0 var(--dsh-composer-card-highlight);
+  transition: box-shadow var(--dshx-duration-hover, 80ms) var(--dshx-motion-ease-enter, ease);
   /* The draft text follows the Settings font-size preference (the textarea,
      mirror, and backdrop all inherit from here, so the three layers stay in
      step); the line height keeps the default 10px leading via the shared px
@@ -106,11 +217,24 @@
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
+:global(body[data-ds-dark-theme]) .card {
+  --dsh-composer-card-highlight: transparent;
+}
+
+/* Focus inside the card strengthens the ring one step (a signal of where typing goes), never the accent. */
+.card:focus-within {
+  box-shadow:
+    0 0 0 1px var(--dshx-tone-border-strong, var(--dsw-alias-border-l3)),
+    var(--dshx-elevation-1, var(--dsw-elevation-soft)),
+    inset 0 1px 0 var(--dsh-composer-card-highlight);
+}
+
 /* No-workspace trigger state: an inset 1px dashed outline marks the card as a
    workspace picker rather than a live composer. Keeping the complete stroke
    inside the rounded box prevents clipped corner pixels from reading heavier. */
-.cardWorkspaceTrigger {
-  --dsw-elevation-stroke-color: transparent;
+.cardWorkspaceTrigger,
+.cardWorkspaceTrigger:focus-within {
+  box-shadow: var(--dshx-elevation-1, var(--dsw-elevation-soft));
   cursor: pointer;
 }
 
@@ -120,7 +244,7 @@
   inset: 0;
   box-sizing: border-box;
   border: 1px dashed currentColor;
-  border-radius: var(--dsw-radius-panel);
+  border-radius: var(--dsw-radius-lg);
   color: var(--dsw-alias-border-l4);
   transition: color 100ms ease;
   pointer-events: none;
@@ -198,10 +322,10 @@
    bar inset. */
 .input {
   box-sizing: border-box;
-  /* Docked floor: one 24px line + 4px top pad = 28 content height; 36 leaves
-     an 8px breath below the line (the hero keeps its own 52px floor below). */
-  min-height: 36px;
-  padding: 4px 8px 0 14px;
+  /* One comfortable line (composer redesign b:v9yh): a 24px line between 10px pads, 44px in all, growing with the
+     draft. The hero uses the same floor. */
+  min-height: 44px;
+  padding: 10px 8px 10px 14px;
   font-family: var(--dsw-font-family);
   font-size: inherit;
   line-height: inherit;
@@ -247,7 +371,7 @@
    36px floor. */
 .placeholder {
   position: absolute;
-  inset: 4px 8px auto 14px;
+  inset: 10px 8px auto 14px;
   color: var(--dsw-alias-label-caption);
   white-space: nowrap;
   overflow: hidden;
@@ -272,20 +396,26 @@
   cursor: pointer;
 }
 
-/* Hero (centered empty-state) keeps the 2-line floor (figma min-h 52 = ~2 × 24
-   line + 4pt); the docked composer collapses to the content height. */
-.hero .input {
-  min-height: 52px;
+/* The muted sigil hint after "Ask anything" (InputBar sets the variable only for the default placeholder). It leaves
+   first when the line gets short: narrow bars and touch screens show "Ask anything" alone. */
+.placeholder::after {
+  content: var(--dsh-composer-placeholder-hint, '');
+  margin-left: 12px;
+  color: var(--dsw-alias-label-caption);
+  font-size: var(--dshx-density-text-meta, 12px);
+  opacity: 0.8;
 }
 
-/* The hero's 52px floor fits two lines, so its placeholder clamps at two
-   instead of the docked single line. */
-.hero .placeholder {
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+@container (max-width: 560px) {
+  .placeholder::after {
+    content: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .placeholder::after {
+    content: none;
+  }
 }
 
 /* Toolbar: attach + Plan + Read-only on the left; model + send on the right
@@ -295,11 +425,9 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  /* 2px moved from the bottom pad to the top: the whole control row sits 2px
-     lower in the card (it read too high against the textarea) while the
-     controls' own centering stays untouched. */
-  padding: 2px 8px 6px;
+  gap: 8px;
+  /* Composer redesign (b:v9yh): the bar sits right under the text line, 8px off the card's edges. */
+  padding: 0 8px 8px;
   min-width: 0;
   /* Size container so the chips inside can collapse to icon-only when the
      card runs out of row width (PermissionSelect @container rule). Anonymous
@@ -313,6 +441,22 @@
   --dsh-composer-model-icon-display: block;
 }
 
+/* The icon step (b:gyk7): the model is an icon now, so its seat keeps that icon's width instead of shrinking away,
+   and the ghost buttons drop the gaps between them (each keeps its own padding), so + · mode · ⋯ · model fit the
+   ~112px a 176px docked pane leaves before Send's seat. */
+.row[data-model-icon] .modelSeat,
+.row[data-model-icon] .standardControls {
+  flex: none;
+}
+
+.row[data-model-icon],
+.row[data-model-icon] .tools,
+.row[data-model-icon] .modes,
+.row[data-model-icon] .trailing,
+.row[data-model-icon] .standardControls {
+  column-gap: 0;
+}
+
 .tools,
 .modes,
 .trailing {
@@ -321,15 +465,14 @@
   min-width: 0;
 }
 
-/* figma 75:8208 drew 16 between + and the mode chips and 4 between Plan /
-   Read-only; both gaps settled on 12 so the pill chips read as separate
-   controls without drifting from the + control. */
+/* Composer redesign (b:v9yh): two packed groups. The left one is + then the mode chip; ghost controls carry their own
+   padding, so a 4px gap keeps them one group instead of spread items. */
 .tools {
-  gap: 12px;
+  gap: 4px;
 }
 
 .modes {
-  gap: 12px;
+  gap: 4px;
 }
 
 .trailing {
@@ -340,16 +483,7 @@
      model trigger (external:107). The auto margin re-anchors it right on the
      wrapped line; on a single line space-between already pins it right. */
   margin-left: auto;
-  gap: 12px;
-}
-
-/* Compact spacing preserves room for the fixed-width controls in narrow cards. */
-@container (max-width: 560px) {
-  .tools,
-  .modes,
-  .trailing {
-    gap: 8px;
-  }
+  gap: 4px;
 }
 
 /* Attach circle (figma + control): 28px, selector fill, primary glyph. */
@@ -408,37 +542,73 @@
   cursor: default;
 }
 
-/* Primary send (figma IconButton 34:10465): 34px circle, #3964FE light /
-   #679EFE dark — the info-fill pair (500→400), NOT button-primary (ink);
-   white glyph; empty text = 0.4 opacity. */
+/* Primary send (visual refresh T3.3): ONE round button in ink, not the accent (colour is a signal for Needs you and
+   Failed only). Its glyph morphs with what a click does now: send, queue behind the running turn, steer into it, or
+   stop. Composer redesign (b:v9yh): 32px on a fine pointer, 36pt on touch; with nothing to send it is no disc at all,
+   only a muted arrow. */
 .primary {
   display: grid;
   place-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 999px;
   corner-shape: round;
-  background: var(--dsw-alias-button-info-fill);
-  /* Static white, not the foreground token: the arrow stays white on the blue
-     fill in both themes (design 34:10465). */
-  color: #fff;
+  background: var(--dshx-tone-text, var(--dsw-alias-label-primary));
+  color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
   cursor: pointer;
-  transition: background-color 100ms ease;
-  /* Opts out of the row's 2px downward shift (.row top pad): the send circle
-     keeps its original seat while the smaller chips sit lower. Transform, not
-     margin, so flex centering math is untouched. */
-  transform: translateY(-2px);
+  transition:
+    background-color var(--dshx-duration-hover, 80ms) var(--dshx-motion-ease-enter, ease),
+    color var(--dshx-duration-hover, 80ms) var(--dshx-motion-ease-enter, ease);
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--dsw-alias-button-info-hover);
+  background: color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 84%, var(--dshx-tone-bg, var(--dsw-alias-bg-base)));
+}
+
+.primary:focus-visible {
+  outline: 2px solid var(--dshx-tone-accent, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
 }
 
 .primary:disabled {
-  opacity: 0.4;
+  background: transparent;
+  color: var(--dsw-alias-label-caption);
   cursor: default;
+}
+
+/* The glyph enters with a short scale-and-fade when the mode changes (the glyph is keyed by mode). */
+.sendGlyph {
+  animation: send-glyph-in var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease) both;
+}
+
+@keyframes send-glyph-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes send-glyph-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+@media (pointer: coarse) {
+  .primary {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* Touch input never under 16px (visual refresh T3.5): WebKit zooms the page on focus below it. A larger
+     Settings › Font size still wins. */
+  .card {
+    font-size: max(var(--dshx-density-text-input, 16px), var(--dsh-content-font-size, 14px));
+  }
 }
 
 .retry {
@@ -452,10 +622,10 @@
   cursor: pointer;
 }
 
-.standardControls { display: flex; align-items: center; gap: 12px; min-width: 0; }
-/* The model seat when the hero run row cannot hold it: it keeps its drawn width
-   in the tool row beside the submit action, exactly where a started thread
-   keeps it, instead of squeezing the row's own segments. */
+.standardControls { display: flex; align-items: center; gap: 2px; min-width: 0; }
+/* A plugin control that only keeps an invisible anchor in the bar (undo, prompts while they live in More) costs no gap. */
+.standardControls > :empty { display: none; }
+/* The model seat: beside the submit action, in a new thread's bar and a started thread's alike. */
 .modelSeat { display: flex; flex: none; align-items: center; min-width: 0; }
 .tools[hidden], .standardControls[hidden] { display: none; }
 .trailingActive { flex: 1; margin-left: 0; }
@@ -463,29 +633,55 @@
 .activity:empty { display: none; }
 .activityExpanded { flex: 1; min-width: 0; }
 
-/* Run row (hero): every choice made before the first message on one line above
-   the card — project · host · workspace · agent mode · file access · model.
-   The frame is the size container, so the row can query its own width. */
-.runRowFrame {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: var(--dsh-composer-card-max-width);
-  margin-bottom: 6px;
-  container-type: inline-size;
-}
-
+/* Run row (hero, visual refresh T3.2): every choice made before the first message rides inside the card's bottom
+   bar as quiet ghost pickers — project · host · workspace · agent mode · options · file access after the +
+   control, the model seat beside Send. The leading groups dissolve into the bar (display: contents), so the bar is
+   one wrapping flow: the pickers fill the first line and Send stays at the end of the last. */
 .runRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 4px;
   min-width: 0;
-  /* Optical alignment: the project chip's folder glyph lines up with the
-     card's + button below. */
-  padding: 0 4px;
 }
 
-.runRow > * {
+.rowHero {
+  row-gap: 4px;
+  /* 2px: the run pickers are ghost chips with their own padding, and the new-thread bar needs the room to stay on one
+     line with the mode chip's words (b:gyk7). */
+  column-gap: 2px;
+  /* A wrapped first line keeps its pickers packed; the trailing group's auto margin still pins Send right. */
+  justify-content: flex-start;
+}
+
+.rowHero > .tools:not([hidden]),
+.rowHero .runRow,
+.rowHero .modes {
+  display: contents;
+}
+
+/* One line before wrapping (visual refresh T5.4, carried from T3): once the bar is compact (`data-model-compact`: the
+   effort badge hides, Prompts becomes an icon) the run pickers tighten their side padding, and the hidden file input,
+   which is a zero-width flex item, stops costing a gap. Wrapping stays the last resort. */
+.rowHero[data-model-compact] .runRow :where(button) {
+  padding-inline: 6px;
+}
+
+.row input[type='file'] {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* The project segment orders itself first among the run segments (ConversationRoot .runProject, order -2); the +
+   control still leads the bar. */
+.rowHero .add {
+  order: -3;
+  margin-right: 4px;
+}
+
+.runRow > *,
+.rowHero .runRow > * {
   flex: none;
 }
 
@@ -499,33 +695,122 @@
   display: none;
 }
 
-/* "Who answers" sits at the trailing edge, above the send button, while the row
-   can hold it beside its own segments; the bar keeps it in the tool row
-   otherwise (run-row-placement.ts). */
-.runModel {
-  margin-left: auto;
+/* Agent mode and file access read as ONE segmented control in the new-thread bar (composer redesign b:v9yh). They
+   are two owners (the agent preset and the mode chip) with no combined Host setting, so the bar seats them side by
+   side under one hairline; plugin options move after them. */
+.rowHero :global([data-hero-options]) {
+  order: 1;
 }
 
-/* Narrow panes and phones: one line that scrolls sideways instead of a
-   wrapping stack; the trailing fade says there is more. */
+.rowHero .trailing {
+  order: 2;
+}
+
+/* The new-thread bar keeps the mode chip's words through the compact step (whose tighter run-picker padding makes the
+   room), so it says "Can edit" as the thread's bar does (b:gyk7); a bar that still overflows wraps (no icon step here). */
+.rowHero[data-model-compact] :global([data-composer-mode-label]) {
+  display: inline;
+}
+
+.rowHero[data-model-compact] :global([data-composer-mode-chip]) > svg:last-child {
+  display: block;
+}
+
+/* The agent mode picker (b:4v6p) is off by default: it hides while the draft keeps the default preset and its menu is
+   closed, and shows for a non-default preset (a Creator draft, a pick from ⌘K or ⋯) so a thread never starts in a mode
+   the bar did not say. Settings › Composer › showAgentPresetPicker keeps it in view. */
+.rowHero .runRow > [data-run-segment='agent-mode'][data-agent-quiet]:has(:global([data-agent-preset-default])):not(:has(:global([data-agent-preset-open]))) {
+  display: none;
+}
+
+/* Only while both halves show a control: a lone segment stays a plain ghost chip (the file-access chip appears once
+   the new thread's Host session reports its permissions). */
+.rowHero .runRow:has(> [data-run-segment='agent-mode'] button):not(:has(> [data-run-segment='agent-mode'][data-agent-quiet] :global([data-agent-preset-default]):not(:global([data-agent-preset-open])))):has(> .runSegment[data-run-segment='file-access'] button) > [data-run-segment='agent-mode'],
+.rowHero .runRow:has(> [data-run-segment='agent-mode'] button):not(:has(> [data-run-segment='agent-mode'][data-agent-quiet] :global([data-agent-preset-default]):not(:global([data-agent-preset-open])))):has(> .runSegment[data-run-segment='file-access'] button) > .runSegment[data-run-segment='file-access'] {
+  box-shadow: inset 0 0 0 1px var(--dshx-tone-line, var(--dsw-alias-border-l2));
+}
+
+.rowHero .runRow:has(> [data-run-segment='agent-mode'] button):not(:has(> [data-run-segment='agent-mode'][data-agent-quiet] :global([data-agent-preset-default]):not(:global([data-agent-preset-open])))):has(> .runSegment[data-run-segment='file-access'] button) > [data-run-segment='agent-mode'] {
+  border-radius: var(--dsw-radius-md) 0 0 var(--dsw-radius-md);
+}
+
+/* The pair reads as one control with one chevron at its end (b:gyk7), which also keeps the new-thread bar on one line
+   at desktop widths. */
+.rowHero .runRow:has(> [data-run-segment='agent-mode'] button):not(:has(> [data-run-segment='agent-mode'][data-agent-quiet] :global([data-agent-preset-default]):not(:global([data-agent-preset-open])))):has(> .runSegment[data-run-segment='file-access'] button) > [data-run-segment='agent-mode'] button > svg:last-child {
+  display: none;
+}
+
+.rowHero .runRow:has(> [data-run-segment='agent-mode'] button):not(:has(> [data-run-segment='agent-mode'][data-agent-quiet] :global([data-agent-preset-default]):not(:global([data-agent-preset-open])))):has(> .runSegment[data-run-segment='file-access'] button) > .runSegment[data-run-segment='file-access'] {
+  margin-left: -5px;
+  border-radius: 0 var(--dsw-radius-md) var(--dsw-radius-md) 0;
+}
+
+/* Narrow panes and phones (visual refresh T3.5): the whole bar is ONE line that scrolls sideways instead of a
+   wrapping stack, and every chip keeps a 44pt hit area on a coarse pointer. Send sits outside the scrolling line
+   (T5.4): the line ends where Send's seat begins, so no chip ever slides under the button. */
 @container (max-width: 560px) {
-  .runRow {
+  .row {
     flex-wrap: nowrap;
+    justify-content: flex-start;
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
-    padding-right: 20px;
   }
 
-  .runRow::-webkit-scrollbar {
+  .row::-webkit-scrollbar {
     display: none;
   }
 
-  .runModel {
-    margin-left: 0;
+  .tools,
+  .modes {
+    flex: none;
+  }
+
+  /* The model name is the one label that truncates (composer redesign b:v9yh): its seat shrinks instead of the row
+     scrolling, so nothing slides under Send. */
+  .standardControls,
+  .modelSeat {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  /* The trailing group dissolves into the row, so Send's sticky containing block is the whole scrolling row and it
+     stays in view however far the chips scroll. */
+  .trailing {
+    display: contents;
+  }
+
+  /* Send leaves the scrolling line: positioned against the card (the row is not a containing block), so the row's
+     overflow neither clips nor scrolls it. The row's box ends one seat short of the card's edge. */
+  .row {
+    /* Send's 36pt seat plus an 8pt clear gap before it. */
+    margin-right: var(--dsh-composer-send-seat, 48px);
+  }
+
+  .row:has(.send > :nth-child(2)) {
+    --dsh-composer-send-seat: 92px;
+  }
+
+  .send {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    z-index: 1;
+  }
+
+  /* The chips scroll inside the bar; nothing they hold may widen the card (menus open above it, never sideways). */
+  .card {
+    overflow-x: clip;
+  }
+
+  /* The new-thread bar wraps instead (composer redesign b:v9yh): project, host, workspace, mode and model are all
+     choices to read before the first message, so none may hide off the edge of a scrolling line. Send keeps its seat
+     at the end of the last line. */
+  .rowHero {
+    flex-wrap: wrap;
+    overflow-x: visible;
   }
 }
 
@@ -538,4 +823,26 @@
   font-variant-numeric: tabular-nums;
   line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
   white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  @container (max-width: 560px) {
+    .send {
+      bottom: 6px;
+    }
+  }
+}
+
+/* Touch (visual refresh T5.4): every control in the bar — the + control, the run pickers, the mode chips — keeps its
+   drawn 28px size but answers a 44pt tap, centred on it, like the kit's buttons. */
+@media (pointer: coarse) {
+  .row :where(button) {
+    position: relative;
+  }
+
+  .row :where(button)::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+  }
 }

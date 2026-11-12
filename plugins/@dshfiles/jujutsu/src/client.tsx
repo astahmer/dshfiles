@@ -151,6 +151,8 @@ interface JujutsuPanelProps {
   readonly view?: View
   /** Open revisions in the review surface, when the plugin that owns it is loaded; false when it could not. */
   readonly reviewRevisions?: ((input: { readonly workspacePath: string; readonly revisions: readonly string[] }) => boolean) | undefined
+  /** The title of the thread working in a folder, so a thread workspace is named by its thread (b:212a). */
+  readonly threadTitleOf?: ((path: string) => string | undefined) | undefined
 }
 
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
@@ -160,11 +162,11 @@ const REVIEW_PROGRESS_MIGRATED_KEY = 'dshfiles.jujutsu.review-progress.migrated'
 const REPO_HISTORY_LIMIT = 12
 
 const CODE_BLOCK =
-  'dshx:max-h-80 dshx:overflow-auto dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:p-2 dshx:font-mono dshx:text-[11px] dshx:leading-snug dshx:whitespace-pre'
+  'dshx:max-h-80 dshx:overflow-auto dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:p-2 dshx:font-mono dshx:text-2xs dshx:leading-snug dshx:whitespace-pre'
 const DISCLOSURE_TRIGGER =
-  'dshx:group/disclosure dshx:flex dshx:items-center dshx:gap-1 dshx:py-1 dshx:text-[11px] dshx:font-semibold dshx:text-muted-foreground dshx:hover:text-foreground'
+  'dshx:group/disclosure dshx:flex dshx:items-center dshx:gap-1 dshx:py-1 dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground dshx:hover:text-foreground'
 
-const COMPACT_BADGE = 'dshx:h-4 dshx:max-w-40 dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:font-mono dshx:text-[10px] dshx:leading-none'
+const COMPACT_BADGE = 'dshx:h-4 dshx:max-w-40 dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:font-mono dshx:text-2xs dshx:leading-none'
 
 const storedRepoHistory = createStoredValue({ key: REPO_HISTORY_KEY, schema: Schema.Array(Schema.String), fallback: [] })
 const storedRepoPath = createStoredValue({ key: SELECTED_REPO_KEY, schema: Schema.String, fallback: '' })
@@ -1436,7 +1438,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           </div>
         ) : (
           <>
-            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-[11px] dshx:text-muted-foreground">
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground">
               <span className="dshx:font-semibold">Changed files</span>
               <span className="dshx:font-mono">{details.files.length}</span>
               <FileViewToggle onChange={value => setPreference('fileView', value)} value={preferences.fileView} />
@@ -1455,7 +1457,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               )}
               <LineCounts additions={details.additions} className="dshx:ml-auto" deletions={details.deletions} />
             </div>
-            <Label className="dshx:gap-1.5 dshx:self-start dshx:text-[11px] dshx:font-normal dshx:text-muted-foreground">
+            <Label className="dshx:gap-1.5 dshx:self-start dshx:text-2xs dshx:font-normal dshx:text-muted-foreground">
               <Checkbox checked={hideReviewedFiles} className="dshx:size-3.5" onCheckedChange={checked => setHideReviewedFiles(checked === true)} />
               Hide reviewed files
             </Label>
@@ -1764,7 +1766,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   {item.kind === 'day' ? (
                     <button
                       aria-expanded={!collapsedDays.has(item.day)}
-                      className="dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-left dshx:text-[11px] dshx:font-semibold dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                      className="dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-left dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
                       data-row-focus=""
                       onClick={() =>
                         setCollapsedDays(current => {
@@ -1788,7 +1790,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   ) : item.kind === 'push' ? (
                     <div
                       aria-label={`Last pushed revision: ${item.bookmark}@${item.remote}`}
-                      className="dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-[11px] dshx:font-semibold dshx:text-muted-foreground"
+                      className="dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground"
                       data-push-boundary=""
                     >
                       <span className="dshx:relative dshx:h-full dshx:flex-none" style={{ width: graphWidth }}>
@@ -2190,7 +2192,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               {confirmResult !== null && confirmResult.output.length > 0 && (
                 <Alert className="dshx:px-3 dshx:py-2">
                   <AlertDescription>
-                    <pre className="dshx:max-h-40 dshx:w-full dshx:overflow-auto dshx:font-mono dshx:text-[11px] dshx:whitespace-pre-wrap dshx:text-foreground">
+                    <pre className="dshx:max-h-40 dshx:w-full dshx:overflow-auto dshx:font-mono dshx:text-2xs dshx:whitespace-pre-wrap dshx:text-foreground">
                       {confirmResult.output}
                     </pre>
                   </AlertDescription>
@@ -2220,7 +2222,15 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           />
         )}
 
-        {state !== undefined && <WorkspaceCleanupDialog onCleaned={refreshRepository} onOpenChange={setCleanupOpen} open={cleanupOpen} path={state.root} />}
+        {state !== undefined && (
+          <WorkspaceCleanupDialog
+            onCleaned={refreshRepository}
+            onOpenChange={setCleanupOpen}
+            open={cleanupOpen}
+            path={state.root}
+            threadTitleOf={props.threadTitleOf}
+          />
+        )}
       </TooltipProvider>
     </main>
   )
@@ -2446,7 +2456,7 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
       {props.preview?.summary ?? 'Preparing a state-bound preview…'}
     </p>
     {props.preview !== undefined && (
-      <pre className="dshx:max-h-40 dshx:overflow-auto dshx:rounded-sm dshx:bg-muted dshx:p-2 dshx:font-mono! dshx:text-[11px] dshx:whitespace-pre-wrap">
+      <pre className="dshx:max-h-40 dshx:overflow-auto dshx:rounded-sm dshx:bg-muted dshx:p-2 dshx:font-mono! dshx:text-2xs dshx:whitespace-pre-wrap">
         {props.preview.detail}
       </pre>
     )}
@@ -2500,7 +2510,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const workspaceLabel = (workspace: string): JSX.Element => (
     <span
       className={cn(
-        'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:cursor-grab dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:font-medium dshx:text-background',
+        'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:cursor-grab dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-2xs dshx:font-medium dshx:text-background',
         revision.workingCopy ? 'dshx:bg-info' : 'dshx:bg-teal',
       )}
       draggable
@@ -2560,7 +2570,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
           <PopoverTrigger asChild>
             <button
               aria-label={`Show ${rowWorkspaces.hidden.length} more workspaces`}
-              className="dshx:h-4 dshx:flex-none dshx:rounded-full dshx:border dshx:border-border dshx:px-1.5 dshx:text-[11px] dshx:leading-[14px] dshx:font-medium dshx:text-muted-foreground dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+              className="dshx:h-4 dshx:flex-none dshx:rounded-full dshx:border dshx:border-border dshx:px-1.5 dshx:text-2xs dshx:leading-[14px] dshx:font-medium dshx:text-muted-foreground dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
               type="button"
             >
               +{rowWorkspaces.hidden.length} more
@@ -2582,7 +2592,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
               <ContextMenuTrigger asChild>
                 <span
                   className={cn(
-                    'dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:truncate dshx:rounded-sm dshx:border dshx:px-1 dshx:font-mono dshx:text-[11px] dshx:leading-[14px] dshx:font-medium',
+                    'dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:truncate dshx:rounded-sm dshx:border dshx:px-1 dshx:font-mono dshx:text-2xs dshx:leading-[14px] dshx:font-medium',
                     local
                       ? 'dshx:cursor-grab dshx:border-foreground/45 dshx:text-foreground'
                       : 'dshx:border-dashed dshx:border-muted-foreground/50 dshx:text-muted-foreground',
@@ -2611,7 +2621,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
       {revision.tags.map(name => (
         <Tooltip key={name}>
           <TooltipTrigger asChild>
-            <span className="dshx:h-4 dshx:max-w-32 dshx:flex-none dshx:truncate dshx:rounded-sm dshx:border dshx:border-warning/60 dshx:px-1 dshx:font-mono dshx:text-[11px] dshx:leading-[14px] dshx:text-warning">
+            <span className="dshx:h-4 dshx:max-w-32 dshx:flex-none dshx:truncate dshx:rounded-sm dshx:border dshx:border-warning/60 dshx:px-1 dshx:font-mono dshx:text-2xs dshx:leading-[14px] dshx:text-warning">
               {name}
             </span>
           </TooltipTrigger>
@@ -2621,7 +2631,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
       {revision.divergent && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="dshx:flex-none dshx:text-[11px] dshx:text-violet">divergent</span>
+            <span className="dshx:flex-none dshx:text-2xs dshx:text-violet">divergent</span>
           </TooltipTrigger>
           <TooltipContent side="bottom">Divergent: several visible commits share this change ID</TooltipContent>
         </Tooltip>
@@ -2685,7 +2695,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 <TooltipTrigger asChild>
                   <button
                     aria-expanded={props.expanded}
-                    className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-left dshx:text-[13px] dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                    className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-left dshx:text-sm dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
                     data-row-focus=""
                     onClick={props.onToggle}
                     type="button"
@@ -2715,7 +2725,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
               </Tooltip>
               {!described && !revision.immutable && (
                 <button
-                  className="dshx:flex-none dshx:rounded-sm dshx:bg-muted dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground dshx:opacity-0 dshx:outline-none dshx:group-hover/row:opacity-100 dshx:hover:text-foreground dshx:focus-visible:opacity-100 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                  className="dshx:flex-none dshx:rounded-sm dshx:bg-muted dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground dshx:opacity-0 dshx:outline-none dshx:group-hover/row:opacity-100 dshx:hover:text-foreground dshx:focus-visible:opacity-100 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
                   onClick={props.onDescribe}
                   type="button"
                 >
@@ -2726,7 +2736,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 <TooltipTrigger asChild>
                   <time
                     className={cn(
-                      'dshx:flex-none dshx:text-right dshx:text-[11px] dshx:text-muted-foreground/80 dshx:tabular-nums dshx:@max-xs:hidden',
+                      'dshx:flex-none dshx:text-right dshx:text-2xs dshx:text-muted-foreground/80 dshx:tabular-nums dshx:@max-xs:hidden',
                       props.revisionDate === 'both' ? 'dshx:w-16' : 'dshx:w-8',
                     )}
                     dateTime={props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime)}
@@ -2742,7 +2752,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span aria-hidden className="dshx:w-12 dshx:flex-none dshx:text-right">
-                    <span className="dshx:rounded-sm dshx:bg-muted-foreground/15 dshx:px-1 dshx:py-px dshx:font-mono dshx:text-[10px]">
+                    <span className="dshx:rounded-sm dshx:bg-muted-foreground/15 dshx:px-1 dshx:py-px dshx:font-mono dshx:text-2xs">
                       <span className={revision.immutable ? 'dshx:text-muted-foreground' : 'dshx:font-semibold dshx:text-foreground/85'}>
                         {changeId.slice(0, revision.shortestChangeId.length)}
                       </span>

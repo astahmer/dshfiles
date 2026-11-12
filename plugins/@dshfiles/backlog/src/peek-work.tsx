@@ -135,7 +135,7 @@ const ChildRow = (props: { readonly child: BacklogSummaryView; readonly select: 
       <button
         type="button"
         onClick={() => props.select(child.id)}
-        className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
+        className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-sm dshx:transition-colors dshx:hover:bg-accent/50"
       >
         <WorkGlyphs.PriorityIcon priority={child.priority} />
         <ItemGlyphs.StatusIcon status={child.status} />

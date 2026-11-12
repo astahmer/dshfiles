@@ -5,8 +5,8 @@ import { When, Then } from '../bdd.js'
 import { recordAssertion, finishJourneyAssertions } from '../steps.js'
 
 const SCRATCH = 'Workbench: Scratchpad'
-const THREADS = 'Thread Sidebar: Threads'
-const PREVIEW = 'AI Accounts: Preview'
+const THREADS = 'Threads'
+const PREVIEW = 'Quota'
 const STATUS_ID = 'dshfiles-thread-sidebar.workbench-status'
 const regions = (page: Page, name: string): Locator => page.locator(`[data-workbench-region=${JSON.stringify(name)}]`).first()
 const tab = (page: Page, name: string): Locator => page.getByRole('tab', { name, exact: true, includeHidden: true })
@@ -123,7 +123,7 @@ Then('the global tab-row recovery command and a new tab arriving on reload revea
     await expect(palette).toBeVisible()
     await palette.getByRole('tab', { name: 'Everything', exact: true }).click()
     await palette.getByRole('combobox').fill('Show tab rows')
-    await palette.getByRole('option', { name: /Workbench: Show tab rows/ }).click()
+    await palette.getByRole('option', { name: /Show tab rows/ }).click()
     await expect(row(page, SCRATCH)).toBeVisible()
     await draftUnchanged(page)
     await hide(page, SCRATCH)
@@ -319,7 +319,7 @@ When('an old saved sidebar without a docked Preview is restored', async ({ page 
       STATUS_ID,
     )
   legacyPanels.set(page, ids)
-  await hide(page, 'Thread Sidebar: Navigation')
+  await hide(page, 'Navigation')
   await tab(page, PREVIEW)
     .getByRole('button', { name: `Close ${PREVIEW}`, exact: true })
     .click()
@@ -333,7 +333,7 @@ Then('its existing views and hidden row survive the once-only Preview conversion
     const ids = legacyPanels.get(page)
     if (ids === undefined) throw new Error('Old sidebar occurrence snapshot is missing')
     for (const id of ids) await expect(own(page, id)).toHaveCount(1)
-    await expect(row(page, 'Thread Sidebar: Navigation')).toBeHidden()
+    await expect(row(page, 'Navigation')).toBeHidden()
     await expect(regions(page, 'left').getByRole('tab', { name: PREVIEW, exact: true })).toBeVisible()
     await expect(tab(page, PREVIEW)).toHaveCount(1)
     await expect(own(page, STATUS_ID)).toHaveCount(1)
@@ -343,20 +343,24 @@ Then('its existing views and hidden row survive the once-only Preview conversion
     expect(previewBox.y).toBeGreaterThanOrEqual(threadsBox.y + threadsBox.height - 1)
     await StartupDialogs.reloadPastProviderSetup(page)
     await expect(tab(page, PREVIEW)).toHaveCount(1)
-    await expect(row(page, 'Thread Sidebar: Navigation')).toBeHidden()
+    await expect(row(page, 'Navigation')).toBeHidden()
   })
 })
-Then('resetting the layout restores the default visible rows and regular Preview', async ({ page }: { page: Page }) => {
+// One sidebar layout (b:952m): Reset layout restores the default left region, the Sidebar pane alone (the rail and its
+// list, tab row hidden), not the former docking groups; the account Preview lives in the status strip there.
+Then('resetting the layout restores the default Sidebar pane', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-preview-explicit-reset-defaults', async () => {
     await page.getByRole('button', { name: 'Open command palette', exact: true }).click()
     const palette = page.getByRole('dialog', { name: 'Command palette', exact: true })
     await palette.getByRole('tab', { name: 'Everything', exact: true }).click()
     await palette.getByRole('combobox').fill('Reset layout')
     await palette.getByRole('option', { name: /Workbench: Reset layout/ }).click()
-    await expect(row(page, 'Thread Sidebar: Navigation')).toBeVisible()
-    await expect(row(page, THREADS)).toBeVisible()
-    await expect(row(page, PREVIEW)).toBeVisible()
-    await expect(own(page, STATUS_ID)).toHaveCount(1)
+    const left = regions(page, 'left')
+    await expect(left.locator('[data-workbench-panel-id="dshfiles-thread-sidebar.workbench-sidebar"]')).toHaveCount(1)
+    await expect(left.getByRole('navigation', { name: 'Destinations', exact: true })).toBeVisible()
+    await expect(left.locator('[data-workbench-panel-id]')).toHaveCount(1)
+    await expect(left.getByRole('tab', { name: 'Sidebar', exact: true })).toBeHidden()
+    await expect(own(page, STATUS_ID)).toHaveCount(0)
     await page.screenshot({ path: test.info().outputPath('regular-sidebar-preview.png'), animations: 'disabled' })
   })
   await finishJourneyAssertions(page)

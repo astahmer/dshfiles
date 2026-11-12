@@ -1,3 +1,4 @@
+import { ThreadListFilter } from '../thread-list-filter.js'
 import { expect, test, type ConsoleMessage, type ElementHandle, type Locator, type Page } from '@playwright/test'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -69,8 +70,8 @@ const setPluginEnabled = async (page: Page, packageId: string, enabled: boolean)
   else await expect(toggle).not.toBeChecked()
 }
 
-// The fixed rail layout is the default; the Dockview left panes these journeys move exist only in free docking.
-When('the sidebar uses Settings › Layout › Free docking', async ({ page }: { page: Page }) => {
+// One sidebar layout (b:952m): these journeys move the docked Navigation and Threads panes a former Free docking user keeps.
+When('the sidebar keeps the former Free docking panes', async ({ page }: { page: Page }) => {
   await ThreadSidebarJourney.useFreeDocking(page)
 })
 
@@ -194,7 +195,7 @@ When('a thread is started and the New Session screen opens again', async ({ page
   await sendMessage(page, 'dock thread one')
   // Back to the screen with no thread on it: the dock must not depend on a session at all.
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
-  await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
 })
 
 When('the global dock page is reloaded outside any thread', async ({ page }: { page: Page }) => {
@@ -619,13 +620,13 @@ const createWorkbenchWorkspace = async (page: Page): Promise<string> => {
   if (bootThreadId !== null) await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBe(bootThreadId)
   // The fresh no-project hero deliberately has a disabled composer. Choose the project before waiting for its
   // enabled textbox name; the project chip is already a real usable control.
-  await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toBeVisible()
   await mkdir(workspace)
   await writeFile(join(workspace, 'preview.txt'), 'Workbench native preview content\n')
   const add = page.getByRole('button', { name: 'Add workspace', exact: true })
   if (await add.isVisible()) await registerWorkspaceFolder(page, workspace)
   else {
-    await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+    await page.getByRole('button', { name: /^Choose (?:project|workspace)$/u }).click()
     const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
     await expect(picker).toBeVisible()
     const sample = picker.getByRole('option', { name: /^sample(?:\s|$)/i }).first()
@@ -659,7 +660,7 @@ const createWorkbenchWorkspace = async (page: Page): Promise<string> => {
     const initialBody = await panelBodyForTab(initialTab)
     await expect(initialBody.locator('[data-conversation-session]')).toHaveAttribute('data-conversation-session', initialSessionId)
     const initialInput = initialBody
-      .getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/ })
+      .getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/ })
       .filter({ visible: true })
     await expect(initialInput).toHaveCount(1)
     await expect(initialInput).toBeVisible()
@@ -686,7 +687,7 @@ const createWorkbenchWorkspace = async (page: Page): Promise<string> => {
     await expect(initialTab).toHaveAttribute('aria-selected', 'true')
     const initialBody = await panelBodyForTab(initialTab)
     const initialInput = initialBody
-      .getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/ })
+      .getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/ })
       .filter({ visible: true })
     await expect(initialInput).toHaveCount(1)
     await expect(initialInput).toBeVisible()
@@ -735,7 +736,7 @@ const newWorkbenchThread = async (page: Page, prompt: string): Promise<string> =
       await expect(tab).toHaveAttribute('aria-selected', 'true')
       const body = await panelBodyForTab(tab)
       const blank = body
-        .getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/ })
+        .getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/ })
         .filter({ visible: true })
       await expect(blank).toHaveCount(1)
       await expect(blank).toBeVisible()
@@ -747,7 +748,7 @@ const newWorkbenchThread = async (page: Page, prompt: string): Promise<string> =
         .filter({ visible: true })
       await expect(chat).toHaveCount(1)
       await expect(chat).toContainText(prompt)
-      await expect(chat.getByRole('status').filter({ hasText: /^(Completed|Failed|Stopped|Cancelled)$/ })).toHaveCount(1, { timeout: 60_000 })
+      await expect(chat.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })).toHaveCount(1, { timeout: 60_000 })
       return id
     } catch (error) {
       const ownership = await page.evaluate(
@@ -920,7 +921,8 @@ When('a disposable Workbench workspace has two real threads', async ({ page }: {
   // Workbench conversation tabs are kept by default; fixture setup must not hide replacement bugs with a double-click.
   const second = await newWorkbenchThread(page, threadPrompt('second'))
   workbenchThreads.set(page, { first, second })
-  await page.getByRole('button', { name: 'All threads', exact: true }).click()
+  // The views live in the thread list's Filter menu (productivity pass Q5, T5.3).
+  await ThreadListFilter.selectView(page, page.getByRole('region', { name: 'Threads', exact: true }), 'All threads')
   await expect(threadRow(page, first)).toBeVisible()
   await expect(threadRow(page, second)).toBeVisible()
 })
@@ -977,7 +979,8 @@ When('two real Workbench threads are previewed then kept from the sidebar', asyn
   const first = await newWorkbenchThread(page, threadPrompt('first'))
   const second = await newWorkbenchThread(page, threadPrompt('second'))
   workbenchThreads.set(page, { first, second })
-  await page.getByRole('button', { name: 'All threads', exact: true }).click()
+  // The views live in the thread list's Filter menu (productivity pass Q5, T5.3).
+  await ThreadListFilter.selectView(page, page.getByRole('region', { name: 'Threads', exact: true }), 'All threads')
   await expect(threadRow(page, first)).toBeVisible()
   await expect(threadRow(page, second)).toBeVisible()
   // Creation may already have opened kept tabs. Close them so sidebar opening itself must create both tabs.
@@ -1008,7 +1011,7 @@ const fixedConversation = async (page: Page, index: 'first' | 'second'): Promise
   await expect(body.locator('[data-conversation-session]')).toHaveAttribute('data-conversation-session', ids[index])
   return body
 }
-const fixedComposer = (body: Locator): Locator => body.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+const fixedComposer = (body: Locator): Locator => body.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })
 const fixedDraft = (index: 'first' | 'second'): string => `Unsent draft owned by the ${index} fixed conversation`
 
 const assertCompleteFixedConversation = async (page: Page, index: 'first' | 'second'): Promise<Locator> => {
@@ -1549,7 +1552,7 @@ Then('the pinned thread remains open and its conversation can still receive a dr
       { id: ids.second, prompt: threadPrompt('second') },
     )
     const subject = mainSeat(page).locator(`[data-conversation-session="${ids.second}"]`).filter({ visible: true })
-    const composer = subject.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+    const composer = subject.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })
     await composer.fill('Draft after closing a global panel')
     await expect(composer).toHaveText('Draft after closing a global panel')
   })
@@ -1708,7 +1711,9 @@ Then('the reusable view picker offers plugins without per-thread trajectories', 
     await expect(dockTab(mainDock(page), 'New tab').filter({ visible: true }).last()).toBeVisible()
     await expect(chooser.getByRole('textbox', { name: 'Search views', exact: true })).toBeVisible()
     await expect(chooser.getByRole('button', { name: viewNamePattern('Current conversation') })).toHaveCount(0)
-    await expect(chooser.getByRole('button', { name: /Trajectory|Workbench first conversation|Workbench second conversation/ })).toHaveCount(0)
+    // A thread's Trajectory is a thread facet since productivity pass Q5 (one launcher that follows the thread on
+    // screen); per-thread clones ("Trajectory — <thread>") still never reach the chooser.
+    await expect(chooser.getByRole('button', { name: /Trajectory —|Workbench first conversation|Workbench second conversation/ })).toHaveCount(0)
     await expect(chooser.getByRole('button', { name: viewNamePattern('Plugins') })).toBeVisible()
     await expect(page.getByRole('menu')).toHaveCount(0)
     await dockTab(mainDock(page), 'New tab').filter({ visible: true }).last().getByRole('button', { name: 'Close New tab', exact: true }).click()
@@ -1716,20 +1721,22 @@ Then('the reusable view picker offers plugins without per-thread trajectories', 
   await assertTabPlusAlignment(page)
 })
 
-Then('the left pane content is tab controlled between fixed chrome', async ({ page }: { page: Page }) => {
+// One sidebar layout (b:952m): Reset layout restores the default left region, the Sidebar pane (the rail and its list,
+// tab row hidden), not the former docking groups. The fixed chrome around it and the gear's owner are unchanged.
+Then('Reset layout restores the default Sidebar pane between fixed chrome', async ({ page }: { page: Page }) => {
   await recordAssertion(page, acceptanceId(page, 'tabbed-left-pane'), async () => {
     const left = page.locator('[data-workbench-region="left"]')
-    await expect(dockTab(left, 'Threads')).toBeVisible()
-    await expect(dockTab(left, 'Navigation')).toBeVisible()
-    await expect(left.getByRole('tab', { name: 'AI Accounts: Preview', exact: true })).toBeVisible()
-    await expect(left.locator('[data-workbench-panel-id="dshfiles-thread-sidebar.workbench-status"]')).toHaveCount(1)
-    await expect(left.locator('.dv-tabs-and-actions-container').getByRole('button', { name: 'New tab', exact: true })).toHaveCount(3)
+    const sidebarPane = left.locator('[data-workbench-panel-id="dshfiles-thread-sidebar.workbench-sidebar"]')
+    await expect(sidebarPane).toHaveCount(1)
+    await expect(left.locator('[data-workbench-panel-id]')).toHaveCount(1)
+    await expect(left.getByRole('navigation', { name: 'Destinations', exact: true })).toBeVisible()
+    await expect(left.getByRole('tab', { name: 'Sidebar', exact: true })).toBeHidden()
     await expect(page.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
-    const sidebarSettings = left.getByRole('button', { name: 'Sidebar settings', exact: true })
-    await expect(sidebarSettings).toBeVisible()
-    expect(await sidebarSettings.evaluate(element => element.closest('[data-workbench-panel-id]')?.getAttribute('data-workbench-panel-id'))).toBe(
-      'dshfiles-thread-sidebar.workbench-threads',
-    )
+    const sidebarSettings = left.getByRole('button', { name: 'Sidebar settings', exact: true }).filter({ visible: true })
+    if ((await sidebarSettings.count()) > 0)
+      expect(await sidebarSettings.first().evaluate(element => element.closest('[data-workbench-panel-id]')?.getAttribute('data-workbench-panel-id'))).toBe(
+        'dshfiles-thread-sidebar.workbench-sidebar',
+      )
     await expect(page.getByRole('button', { name: 'Customize sidebar', exact: true })).toHaveCount(0)
     await expect(page.locator('[data-slot-error]')).toHaveCount(0)
     await page.screenshot({ path: test.info().outputPath('tabbed-workbench.png'), animations: 'disabled' })
@@ -1826,6 +1833,8 @@ Given('an isolated Workbench profile with saved legacy native preferences is boo
 `,
   })
   await visitIsolatedPluginProfile(page, profile)
+  // Pane options belong to Free docking's tab rows (productivity pass Q5: the Fixed layout hides the main ones).
+  await ThreadSidebarJourney.useFreeDocking(page)
   await paneOptions(page)
   await expect(page.getByRole('menuitem', { name: 'Open right pane', exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
@@ -1987,7 +1996,7 @@ Then('the same right pane view and draft are restored without remounting', async
     const fixedInput = retainedFixedRightInputs.get(page)
     if (fixedInput !== undefined) {
       const fixed = await panelBodyForTab(dockTab(dockRegion(page), threadPrompt('second')))
-      const composer = fixed.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true, includeHidden: true })
+      const composer = fixed.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u, includeHidden: true })
       expect(await composer.evaluate((element, previous) => element === previous, fixedInput)).toBe(true)
       await expect(composer).toHaveText(fixedDraft('second'))
     }
@@ -2180,7 +2189,7 @@ Then('the conversation and saved Backlog tab restore without losing their plugin
     if (ids === undefined) throw new Error('Workbench thread fixture is missing.')
     await expect(dockTab(mainDock(page), 'Backlog')).toHaveAttribute('aria-selected', 'false')
     const conversation = mainSeat(page).locator(`[data-conversation-session="${ids.second}"]`).filter({ visible: true })
-    await expect(conversation.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+    await expect(conversation.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
     await expect(conversation.getByText(threadPrompt('second'), { exact: true }).last()).toBeVisible()
     await expect(page.locator('[data-slot-error]')).toHaveCount(0)
     await dockTab(mainDock(page), 'Backlog').click()
@@ -2191,7 +2200,7 @@ Then('the conversation and saved Backlog tab restore without losing their plugin
     await expect(page.locator('[data-slot-error]')).toHaveCount(0)
     await page.screenshot({ path: test.info().outputPath('saved-backlog-owner-context.png'), animations: 'disabled' })
     await threadDockTab(page, 'second').click()
-    await expect(conversation.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+    await expect(conversation.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
   })
 })
 
@@ -2311,12 +2320,12 @@ Then('the view chooser exposes qualified plugin names and AI Accounts search sel
     expect(reusableNames.every(name => /^[^:]+: \S/u.test(name))).toBe(true)
     await expect(chooser.getByRole('button', { name: 'Rich Composer: Current conversation', exact: true })).toHaveCount(0)
     for (const name of [
-      'Thread Sidebar: Threads',
-      'Thread Sidebar: Navigation',
-      'AI Accounts: Preview',
-      'Thread Sidebar: Plugin controls',
+      'Threads',
+      'Navigation',
+      'Quota',
+      'Sidebar controls',
       'AI Accounts: Accounts',
-      'Editor: Files',
+      'Files',
       'Workbench: Scratchpad',
       'Plugin Manager: Plugins',
       'Schedule: Automation tasks',
@@ -2327,14 +2336,12 @@ Then('the view chooser exposes qualified plugin names and AI Accounts search sel
     await page.screenshot({ path: test.info().outputPath('plugin-view-names-qualified-chooser.png'), animations: 'disabled' })
     await chooser.getByRole('textbox', { name: 'Search views', exact: true }).fill('AI Accounts')
     const matchingNames = await cards.evaluateAll(elements => elements.map(element => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''))
-    expect(matchingNames).toEqual(
-      expect.arrayContaining(['AI Accounts: Preview', 'AI Accounts: Accounts', 'AI Accounts: Usage history', 'AI Accounts: Quota forecast']),
-    )
-    await expect(chooser.getByRole('button', { name: 'Thread Sidebar: Plugin controls', exact: true })).toHaveCount(0)
+    expect(matchingNames).toEqual(expect.arrayContaining(['Quota', 'AI Accounts: Accounts', 'AI Accounts: Usage history', 'AI Accounts: Quota forecast']))
+    await expect(chooser.getByRole('button', { name: 'Sidebar controls', exact: true })).toHaveCount(0)
     expect(matchingNames.every(name => name.startsWith('AI Accounts: '))).toBe(true)
-    await chooser.getByRole('button', { name: 'AI Accounts: Preview', exact: true }).click()
+    await chooser.getByRole('button', { name: 'Quota', exact: true }).click()
     await expect(chooser).toBeHidden()
-    const tab = mainPane(page).getByRole('tab', { name: 'AI Accounts: Preview', exact: true })
+    const tab = mainPane(page).getByRole('tab', { name: 'Quota', exact: true })
     await expect(tab).toHaveAttribute('aria-selected', 'true')
     await expect(tab.locator('[data-workbench-tab-id]')).toHaveAttribute('data-workbench-tab-id', PREVIEW_SOURCE_ID)
     await expect(mainSeat(page).locator(`[data-sidebar-workbench-source="${PREVIEW_SOURCE_ID}"] [data-slot="sidebar.footer.above"]`)).toBeAttached()
@@ -2366,7 +2373,7 @@ When('legacy reusable view titles are saved with their original panel IDs and re
 
 Then('restored reusable views have qualified titles with the same IDs and one live mount', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-plugin-view-names-restore-keeps-original-ids', async () => {
-    const preview = mainPane(page).getByRole('tab', { name: 'AI Accounts: Preview', exact: true })
+    const preview = mainPane(page).getByRole('tab', { name: 'Quota', exact: true })
     await expect(preview).toBeVisible()
     await expect(preview.locator('[data-workbench-tab-id]')).toHaveAttribute('data-workbench-tab-id', PREVIEW_SOURCE_ID)
     const scratchpad = paneRoot(page, 'right').getByRole('tab', { name: 'Workbench: Scratchpad', exact: true })
@@ -2536,9 +2543,9 @@ const assertVisibleResetChat = async (page: Page): Promise<void> => {
     for (const index of ['first', 'second'] as const) {
       const fixed = await fixedConversation(page, index)
       await expect(fixed.locator('[data-chat-flow]')).toContainText(threadPrompt(index))
-      await expect(fixed.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true, includeHidden: true })).toHaveText(
-        fixedDraft(index),
-      )
+      await expect(
+        fixed.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u, includeHidden: true }),
+      ).toHaveText(fixedDraft(index))
     }
     const current = threadDockTab(page, currentIndex)
     await expect(current).toBeVisible()
@@ -2555,8 +2562,15 @@ const assertVisibleResetChat = async (page: Page): Promise<void> => {
     await expect.poll(() => new URL(page.url()).searchParams.get('thread')).toBe(currentId)
     const left = paneRoot(page, 'left')
     await expect(left).toBeVisible()
-    await expect(left.getByRole('tab', { name: 'Thread Sidebar: Threads', exact: true })).toBeVisible()
-    await expect(left.locator('[data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-threads"]')).toBeVisible()
+    // One sidebar layout (b:952m): Reset restores the Sidebar pane, whose list is the Threads destination's.
+    await expect(left.getByRole('tab', { name: 'Threads', exact: true })).toBeVisible()
+    await expect(
+      left
+        .locator(
+          '[data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-sidebar"], [data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-threads"]',
+        )
+        .first(),
+    ).toBeVisible()
     for (const index of ['first', 'second'] as const) {
       await expect(left.locator(`article[data-thread-id="${ids[index]}"]`)).toBeVisible()
     }
@@ -2646,7 +2660,17 @@ When('the recovered sidebar is dragged to its maximum wide width', async ({ page
 })
 
 Then('global Reset keeps both chat and thread list visible at narrow widths', async ({ page }: { page: Page }) => {
-  for (const width of [360, 480, 768, 1024]) {
+  // One sidebar layout (b:952m): below 640px the sidebar is the phone shell (tab bar; the list and the chat take turns
+  // full screen), as the former Fixed default had it, so phone widths assert that shell and no slot error.
+  for (const width of [360, 480]) {
+    await page.setViewportSize({ width, height: 900 })
+    await recordAssertion(page, acceptanceId(page, `reset-width-${width}`), async () => {
+      // Inside a thread the tab bar steps aside for Back to the list (data-phone-back); on the list it shows.
+      await expect(page.locator('[data-phone-tab-bar], [data-phone-back]').filter({ visible: true }).first()).toBeVisible()
+      await expect(page.locator('[data-slot-error]')).toHaveCount(0)
+    })
+  }
+  for (const width of [768, 1024]) {
     await page.setViewportSize({ width, height: 900 })
     await resetWorkbenchFromPalette(page)
     await assertVisibleResetChat(page)

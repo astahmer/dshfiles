@@ -18,8 +18,10 @@ describe('touch targets', () => {
 
   it('widens raw buttons inside a plugin root, except those that draw with ::after', () => {
     const rawButton = ".dshx-root button:not([data-slot]):not([class*='after:']):not([data-slot^='conversation.'] *)"
-    expect(coarse).toContain(`[data-slot='toggle-group-item'],\n      ${rawButton}\n    ) {`)
-    expect(coarse).toContain(`[data-slot='toggle-group-item'],\n      ${rawButton}\n    )::after {`)
+    // The fork's list also holds triggers, switches, checkboxes and radio items (T5.4); the raw button closes it.
+    const escaped = rawButton.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+    expect(coarse).toMatch(new RegExp(`\\[data-slot='toggle-group-item'\\],[^{]*${escaped}\\s*\\) \\{`, 'u'))
+    expect(coarse).toMatch(new RegExp(`\\[data-slot='toggle-group-item'\\],[^{]*${escaped}\\s*\\)::after \\{`, 'u'))
   })
 
   it('gives menu, select and command rows a 44px row on a coarse pointer', () => {

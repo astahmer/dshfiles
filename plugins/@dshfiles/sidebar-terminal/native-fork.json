@@ -1,4 +1,5 @@
 {
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Delta: the excerpt chip wiring (face, index, terminal, locales) and the visual-refresh restyle (upstream UI fit): kit shell menu and lucide chevron in TerminalGuide, a lucide tab glyph in TerminalIcon, kit buttons in TerminalCleanup and TerminalRecovery, type and radius tokens in the CSS modules.",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-client-ui-sidebar-terminal",
@@ -12,7 +13,13 @@
     "src/native/client/index.ts",
     "src/native/client/terminal.tsx",
     "src/native/client/terminal.module.css",
-    "src/native/client/locales.ts"
+    "src/native/client/locales.ts",
+    "src/native/client/TerminalCleanup.module.css",
+    "src/native/client/TerminalCleanup.tsx",
+    "src/native/client/TerminalGuide.module.css",
+    "src/native/client/TerminalGuide.tsx",
+    "src/native/client/TerminalIcon.tsx",
+    "src/native/client/TerminalRecovery.tsx"
   ],
   "added": [
     "src/native/client/TerminalExcerptAction.tsx",

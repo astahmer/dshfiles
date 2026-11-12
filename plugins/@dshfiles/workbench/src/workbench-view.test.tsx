@@ -379,15 +379,15 @@ describe('WorkbenchView', () => {
     const storage = memoryStorage()
     const registry = createWorkbenchPanelRegistry()
     const id = 'legacy.status-view'
-    registry.register({ id, title: 'Sidebar status', component: DraftPanel })
+    registry.register({ id, title: 'AI Accounts: Preview', component: DraftPanel })
     const first = renderWorkbench(registry, storage)
-    expect(first.api.getPanel(id)?.title).toBe('Sidebar status')
+    expect(first.api.getPanel(id)?.title).toBe('AI Accounts: Preview')
     await flushLayoutChange()
     first.view.unmount()
-    registry.register({ id, title: 'AI Accounts: Preview', component: DraftPanel })
+    registry.register({ id, title: 'Quota', component: DraftPanel })
     const restored = renderWorkbench(registry, storage)
-    expect(restored.api.getPanel(id)?.title).toBe('AI Accounts: Preview')
-    expect(screen.getByRole('tab', { name: 'AI Accounts: Preview' })).toBeDefined()
+    expect(restored.api.getPanel(id)?.title).toBe('Quota')
+    expect(screen.getByRole('tab', { name: 'Quota' })).toBeDefined()
     const input = draftOf(id)
     fireEvent.change(input, { target: { value: 'keep this view state' } })
     const mountCount = mounts.get(id)
@@ -400,6 +400,19 @@ describe('WorkbenchView', () => {
     expect(mounts.get(id)).toBe(mountCount)
     await flushLayoutChange()
     expect(restored.store.get()?.panels[id]?.title).toBe('AI Accounts: 预览')
+  })
+
+  it('keeps a plain saved occurrence name when its template also has a plain name', async () => {
+    const storage = memoryStorage()
+    const registry = createWorkbenchPanelRegistry()
+    const id = 'plain.view'
+    registry.register({ id, title: 'Sidebar status', component: DraftPanel })
+    const first = renderWorkbench(registry, storage)
+    await flushLayoutChange()
+    first.view.unmount()
+    registry.register({ id, title: 'Quota', component: DraftPanel })
+    const restored = renderWorkbench(registry, storage)
+    expect(restored.api.getPanel(id)?.title).toBe('Sidebar status')
   })
 
   it('reports a hidden retained surface to its real panel without losing state or remounting', () => {

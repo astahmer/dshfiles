@@ -1,12 +1,20 @@
 # @dshfiles/chat
 
+![A finished turn folds its work under one Worked for row](docs/screenshots/folded-work.png)
+
 ![Open a thread on its latest messages](docs/screenshots/windowed-transcript.png)
 
 ![Scroll to a turn, step or tool call on request](docs/screenshots/focus-from-plugin.png)
 
 ![Choose how widely Chat image previews can browse](docs/screenshots/image-gallery-scope.png)
 
-![Find in thread across the whole transcript](docs/screenshots/find-in-thread.png)
+![Find text anywhere in a long thread](docs/screenshots/find-in-thread.png)
+
+![Typed turn map with filters and Turn keys](docs/screenshots/turn-map.png)
+
+![Since you left: divider and recap above the first unseen Turn](docs/screenshots/since-you-left.png)
+
+![Runs of background jobs and subagents fold into one summary row](docs/screenshots/run-folds.png)
 
 ![Mark where the model or effort changed](docs/screenshots/route-change-markers.png)
 
@@ -71,6 +79,9 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/chat/TurnTailNodeView.tsx` | adds the thread's `openView` to every `conversation.chat.turnTail` entry's owner props (`ChatTurnTailExtras`) |
 | `src/native/contract/slots.ts` (also) | `TurnTailOwnerProps` extends `ChatTurnTailExtras` |
 | `src/native/chat/AssistantMarkdown.tsx` | rewrites links whose scheme a dshx `LinkHandler` claims before `MarkdownText`, which keeps only http(s) and mailto hrefs, and routes clicks on them to the handler (`MarkdownLinks.openFromClick` on the root's click and aux-click capture) |
+| `src/native/chat/ChatView.tsx` (also), `ChatFlow.tsx`, `TurnNavigator.tsx`, `TurnNavigator.module.css`, `turn-rail-items.ts` | productivity pass Q4 (long threads): rail items carry their `turn/start` sequence and a kind from the `dshfilesTurnMarks` projection (question accent, failure danger, edit muted fill), the rail draws a band behind the Turns on screen, previous / next buttons and an All / Questions / Errors / Edits filter; ChatView mounts the find bar, the Turns sheet and the Since-you-left placement, registers itself for the thread shortcuts and takes requests from the thread `⋯` menu; ChatFlow inserts the Since-you-left divider before the first unseen Turn's row |
+| `src/native/chat/ThreadFindBar.tsx`, `find-reveal.ts`, `thread-find-model.ts`, `TurnsSheet.tsx`, `since-you-left.ts`, `SinceYouLeftCard.tsx`, `chat-view-registry.ts` (+ CSS modules) | new: find in thread (session-search's `findInThread`, loaded-Turns fallback, reveal through folds with the CSS Custom Highlight API), the phone Turns sheet, the recap math and card, and the per-page registry of mounted Chat views the ⌘F / `[` / `]` commands act on |
+| `src/turn-marks.ts`, `src/thread-tools.ts`, `src/thread-find-port.ts` | new: the published `@dshfiles/chat/turn-marks` contract (projection key, wire shape, kind and filter rules; turn-summary serves it), the `@dshfiles/chat/thread-tools` handoff (thread-sidebar's `⋯` menu opens find / Turns; it hands over the unread record before clearing it) and the registered-API port to session-search |
 | `src/native/chat/ChatView.module.css` | outlines (inside its box, so a folded group's scroll body does not clip it) and tints the row carrying `data-chat-focus` |
 | `src/native/conversation-nodes/tool.ts` | a call whose tool name a `PinnedToolCalls` provider registered gets group-tree position `turn`, so it stays visible outside the completed Turn's fold and splits the step group around it |
 | `src/native/conversation-nodes/chat-snapshot-builder.ts` | an incremental update whose only structural change is the latest Turn's tail row moving later keeps the visible order, so it skips the whole-window re-sort and Location rebuild every streamed chunk would otherwise pay |
@@ -80,13 +91,18 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/code-fences.tsx`, `src/code-fence-transform.tsx`, `src/fenced-markdown.tsx`, `src/report-once.ts` | new: the published `@dshfiles/chat/code-fences` registry, the transform `InlineReferenceMarkdown` applies, the published `@dshfiles/chat/fenced-markdown` renderer (below), and the log-once reporter both registries use |
 | `src/native/chat/ReasoningContent.tsx`, `CompactionItem.tsx` | reasoning and the compaction summary render through `FencedMarkdown`, so a claimed fence renders there too |
 | `src/native/chat/AssistantMarkdown.tsx` (also), `UserContent.tsx`, `ChatView.tsx` (also) | text blocks render through `InlineReferenceMarkdown`, the Referenced-session line through `InlineReferenceText`, and the transcript sits in an `InlineReferenceScope` naming its Session |
+| `src/markdown-prose.tsx`, `src/native/chat/AssistantMarkdown.module.css` | productivity pass Q1 (readable replies): both Markdown renderers mark the native root `data-dsh-markdown`, and the answer styles hang off it — prose capped at `34em`, the root's size and leading inherited (15/24 on a phone instead of the primitive's 14px), 12px paragraph rhythm, headings 17/24, 16/24 and 14/22 at 600, list markers restored; upstream's dead `white-space: pre-wrap` (it targeted the unhashed class name) is gone |
+| `src/code-fold.tsx`, `src/code-fold.module.css`, `src/markdown-prose.tsx` (also) | every native code card in Chat Markdown goes through `CodeFold`: no-wrap with horizontal scroll by default, Chat owns the card's `wrap` prop and portals its wrap toggle into the native toolbar (wrapped lines take a 2ch hanging indent from `ui-styles`' `transcript.css`), and a settled card folds after 24 lines behind "Show all · N lines"; a fence a code-fence renderer claimed is left to that renderer |
+| `src/markdown-prose.tsx` (also), `src/native/chat/AssistantNodeView.tsx` | file references read as quiet chips: an inline-code mention the native resolver linked shows `name.ts:24` (its parent folder only when two references in the message share the name, trailing punctuation kept on its line), a Markdown file link is marked `data-file-chip="link"`, and a mention written with a line (`name.ts:24`, `#L24`) resolves through its path and opens at that line; links are underlined at rest (`ui-styles`' `transcript.css`) |
+| `src/native/chat/UserContent.tsx` (also), `MessageItem.module.css`, `prompt-fold.ts` | a prompt taller than 8 lines (6 on a phone) folds behind "Show all · N lines" with a fade; the folded body keeps `overflow: hidden`, so browser find still matches it and scrolling to a match opens the fold; a pasted fence renders as a small code card without its ``` markers, and a prompt that is code throughout takes the code-card fill |
+| `src/native/chat/MessageIconActions.tsx` (also), `MessageIconActions.module.css`, `TurnTailNodeView.tsx`, `MessageItem.tsx` (also), `time-divider.ts`, `AssistantNodeView.tsx` (also), `filler-reply.ts`, `ReasoningTiming.tsx`, `locale.ts` | quieter reply chrome: a reply's row is copy plus one `⋯` menu (feedback, Trace, branch, usage), shown on hover or focus on a pointer device and always on touch, the latest reply and user message included; times leave the rows and show as a centred divider above a user message after a day change or 30 quiet minutes (and above the thread's first turn; never above a turn whose predecessor is still unloaded, so paging history in moves nothing); reasoning clocks drop seconds; a settled reply that only acknowledges its tools ("Tool finished.") reads as a muted meta line under its turn's work row (kept in the DOM: scratch seeds and journeys wait for that text) |
+| `src/markdown-prose.tsx` (also) | GitHub alerts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) render as titled callouts in the status trios, and a top-level raw `<details>` … `</details>` pair wraps the Markdown blocks between them in a closed disclosure; only the two tags and the `<summary>` text are read, so no author HTML reaches the DOM, and an unclosed tag stays text |
 | `src/native/chat/use-chat-viewport.ts`, `use-chat-scroll.ts`, `ChatView.tsx` (also) | a commit's scroll work (follow the tail, restore, keep a paging anchor) runs from a ResizeObserver delivery after the next layout instead of inside the layout effect, so a streamed publication or a first open no longer forces a synchronous layout; the older-rows sentinel reads its first scroll offset in its observer callback |
 | `src/session-usage-cost.ts`, `src/native/chat/StatsPills.tsx`, `src/native/apply.ts` (also) | new: the published `@dshfiles/chat/session-usage-cost` seat; the composer usage pill declares it as a child of its dock entry and renders it after its label and beside each bucket of its dialog (below) |
 | `src/native/conversation-nodes/assistant.ts`, `turn-tail.ts`, `AssistantMarkdown.tsx` (also) | text visibility is carried per streamed block and tested with `/\S/` instead of `trim()`, so a chunk no longer copies the whole message text |
 | `src/native/conversation-nodes/route-change.ts`, `register.ts`, `src/native/chat/RouteChangeRow.tsx`, `RouteChangeRow.module.css`, `register-node-renderers.ts`, `src/native/locale.ts` | new: the `route-change` Definition and its keyed renderer (below), registered beside the request-prompt node, with three labels |
-| `src/transcript-find.ts`, `src/transcript-find-bar.tsx`, `ChatView.tsx` (also), `ChatView.module.css` (also), `turn-rail-items.ts`, `apply.ts` (also), `src/client-entry.tsx` (also) | new: the find bar (below); `ChatView` renders it and registers the view as a `Find in thread` target, `turnStarts` maps an event seq to its Turn, `apply` decorates `ChatView` so the bar reads the session-search API, and the client entry adds the command |
 | `src/native/unread-landing.ts`, `src/native/settings/UnreadLandingRow.tsx`, `chat-settings.ts` (also), `host.ts` (also), `apply.ts` (also), `slots.ts` (also), `ChatNodeSeat.tsx` (also), `use-chat-viewport.ts` (also), `use-chat-scroll.ts` (also), `ChatView.tsx` (also), `ChatView.module.css` (also), `locale.ts` (also) | new: open an unread thread at its final answer (below): the `unreadLanding` volatile setting and its General row, a per-browser seen-answer memory, `data-chat-final-answer` on the latest settled answer row, and the first-open landing with its New divider |
-| `src/turn-admission-panel.tsx`, `src/client-entry.tsx` (also) | new: the Settings › General **Running threads limit** row and the composer's **Waiting for a free slot** notice for `@dshfiles/session-controller`'s running-thread limit (see its README) |
+| `src/turn-admission-panel.tsx`, `src/client-entry.tsx` (also) | new: the Settings › General **Running threads limit** row and the composer's **Waits to start** notice for `@dshfiles/session-controller`'s running-thread limit (see its README) |
 
 ### Open an unread thread at its final answer
 
@@ -96,30 +112,15 @@ this browser never reached, Chat lands with that answer at the top under a **New
 transcript marks the answer read, so the next open lands at the end as before; sending a message removes the divider.
 A running thread always follows its tail.
 
+With **Since you left** (unseen Turns from the unread record), the landing is the same, and the Since you left divider
+and recap card ride at the top of that answer row: the thread opens on the recap with the answer right under it, and
+that divider is the only one (no **New** label). The card still sums every unseen Turn and its chips jump to them. When
+the latest Turn failed or asked a question (no final answer), or with **Bottom**, the recap stays above the first unseen
+Turn as before. The **New** divider is drawn like the Since you left one: a muted label between hairlines.
+
 **Settings › General › Open unread threads at**: **Final answer** (default) or **Bottom** (the previous behaviour).
 Live, no restart. Read state is per browser (`localStorage`, the 500 most recently read threads), so another browser
 opens the thread at its answer once.
-
-### Find in thread
-
-The window mounts only the rows near the viewport, so the browser's own find misses older messages and folded tool
-output. **Find in thread** (`Mod+F` through the shortcuts plugin, or the command palette) opens a bar over the Chat view
-the reader is using: it asks `findInThread` of the `@dshfiles/session-search` API for every matching event of the whole
-Session ([Session search: find in one thread](../session-search/README.md#find-in-one-thread)), in transcript order.
-
-- Typing searches after 200 ms; every word must match and the last one matches as a prefix. The newest match is
-  selected first; Enter and Shift+Enter (or the arrows) step forward and back, wrapping at both ends; Escape closes.
-- Each match maps to the Turn that holds it through the host `turnOutline` (an event belongs to the last Turn that
-  started at or before it) and lands through the `chat-focus` request, which pages unloaded history in. The typed words
-  are then marked in that Turn's mounted rows with the CSS Custom Highlight API, which writes nothing into the
-  transcript's DOM, and the first one scrolls to the middle.
-- The bar shows the match's kind (message, reply, tool call, tool output) and its snippet, so a hit inside a folded
-  group or past a tool payload's index cap is still readable there; only rows on screen are marked.
-- The index skips model thinking (core's text extraction leaves it out), and one event counts once however many times
-  it matches.
-- Without session-search the bar says to add it and restart DSH; with another `sessionQuery` backend it says to disable
-  the stock row. With no Chat view on screen the command hands the key back to the browser.
-- Agents get the same read as the `thread_find` tool.
 
 ### Model and effort switch markers
 

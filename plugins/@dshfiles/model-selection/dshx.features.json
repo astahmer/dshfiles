@@ -8,7 +8,7 @@
       "summary": "The full native model directory, reasoning menu and /model popup share one selection owner. Client-only blanks and existing Host blanks stage model choice until first send; nonblank Sessions preflight every route change against validated context pressure before submitting the shared selection RPC.",
       "reach": [
         "click button \"New thread\"",
-        "click button \"Choose workspace\"",
+        "click button \"Choose project\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
         "press Enter",

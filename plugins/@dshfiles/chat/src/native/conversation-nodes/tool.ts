@@ -294,6 +294,31 @@ function rootToolName(root: ToolCallBlock): string {
   return root.name
 }
 
+/** dshfiles (visual refresh T2.2): tools that ask the user something; their card is never folded away. */
+const QUESTION_TOOL_NAMES: ReadonlySet<string> = new Set(['ask_user_question'])
+
+/**
+ * dshfiles (visual refresh T2.2): a call stays in the Turn, outside the "Worked for" fold and the step groups, when it
+ * is the Turn's deliverable (a PinnedToolCalls provider), when it failed, or when it asks the user a question: errors,
+ * approvals and questions never fold.
+ */
+export function keepsOutsideFold(root: ToolCallBlock): boolean {
+  const name = rootToolName(root)
+  if (PinnedToolNames.has(name) || QUESTION_TOOL_NAMES.has(name)) return true
+  if (!('kind' in root)) return false
+  return root.isError || exitedNonZero(root.content)
+}
+
+/** The shell tools end a command's output with `[exit code: N]` and report a failing command as a normal result. */
+const EXIT_FOOTER = /\[exit code: (-?\d+|null)\]\s*$/
+
+function exitedNonZero(content: ToolResultNode['content']): boolean {
+  const last = content.findLast(part => typeof part === 'object' && part !== null && 'type' in part && part.type === 'text')
+  const text = last !== undefined && 'text' in last && typeof last.text === 'string' ? last.text : undefined
+  const code = text === undefined ? undefined : EXIT_FOOTER.exec(text)?.[1]
+  return code !== undefined && code !== '0'
+}
+
 /** Root Tool preparation, dispatch, result, and nested PTC calls. */
 export const toolDefinition: ConversationNodeDefinition<ToolState> = {
   kind: 'tool-call',
@@ -351,8 +376,8 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
     const preparing = !('kind' in projected) && projected.phase === 'preparing'
     const visibility = preparing && interruptedAt !== undefined ? 'hidden' : 'visible'
     const location = contextLocation(context)
-    // dshfiles: a pinned tool's call is the Turn's deliverable, so it stays in the Turn outside the process fold.
-    const groupTree = PinnedToolNames.has(rootToolName(projected)) ? 'turn' : undefined
+    // dshfiles: a pinned, failed or question call stays in the Turn outside the process fold.
+    const groupTree = keepsOutsideFold(projected) ? 'turn' : undefined
     const data = current?.data.root === projected ? current.data : { root: projected } satisfies ToolChatData
     if (current?.data === data && current.anchorSeq === anchor
       && current.visibility === visibility && current.location === location && current.groupTree === groupTree) return current

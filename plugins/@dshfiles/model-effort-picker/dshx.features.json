@@ -110,17 +110,17 @@
     },
     {
       "id": "account-swap",
-      "title": "Swap to the next account offering the same model",
-      "summary": "A swap button beside the composer model picker moves the Session to the next provider route, in catalog order, that offers the selected model id, keeping the reasoning effort when the target advertises it.",
+      "title": "Switch the thread to another account offering the same model",
+      "summary": "The model menu's Account section (b:4qjm) names the thread's account and lists every other account offering the selected model id; choosing one moves the Session there, keeping the reasoning effort when the target advertises it. The chip names the account only off the default account for the model. An optional swap button beside the picker (accountSwap, off by default) rotates to the next such route.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: model picker \u203a account swap",
+      "currentSurface": "composer: model picker › Account section",
       "configuration": [
         {
           "key": "accountSwap",
-          "defaultValue": "true",
-          "constraints": "Boolean; show the swap button. It only renders when another route offers the selected model.",
+          "defaultValue": "false",
+          "constraints": "Boolean; also show the swap button beside the picker. It only renders when another route offers the selected model.",
           "choices": ["true", "false"],
           "coveredBy": ["model-effort-picker.account-swap-next"]
         },
@@ -216,8 +216,8 @@
     },
     {
       "id": "model-fan-out-gesture",
-      "title": "Shift-click models to fan out",
-      "summary": "Shift-click a model row to collect it for fan-out instead of switching this thread's model; a bar above the list counts the selection and Fan out\u2026 opens thread-sidebar's fan-out dialog with those routes preselected once two are collected. Scratch has one advertised model, so the reach covers the gesture and the counted bar; the two-route handoff and the dialog are exercised by unit tests and thread-sidebar's own fan-out journey.",
+      "title": "Select several models to fan out",
+      "summary": "Turn on Select several below the list (or shift-click, or long-press on touch) so a model row collects it for fan-out instead of switching this thread's model; the bar counts the selection and Fan out\u2026 opens thread-sidebar's fan-out dialog with those routes preselected once two are collected. Scratch has one advertised model, so the reach covers the gesture and the counted bar; the two-route handoff and the dialog are exercised by unit tests and thread-sidebar's own fan-out journey.",
       "surfaces": ["client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -228,7 +228,7 @@
         "click button \", reasoning *\"",
         "shiftclick button \"Use gpt-6-luna*\"",
         "shiftclick button \"Use claude-sonnet-5-5*\"",
-        "expect text \"2 models selected\"",
+        "expect text \"2 selected\"",
         "click button \"Fan out\u2026\"",
         "expect dialog \"Send to several models\""
       ],

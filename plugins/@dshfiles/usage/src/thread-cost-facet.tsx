@@ -194,11 +194,11 @@ export const ThreadCostFacet = (props: {
               <li key={member.sessionId} className="dshx:border-t dshx:border-border/60 dshx:first:border-t-0">
                 <button
                   type="button"
-                  className="dshx:flex dshx:min-h-11 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:py-1.5 dshx:text-left dshx:hover:bg-accent/50"
+                  className="dshx:flex dshx:min-h-row dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:py-1.5 dshx:text-left dshx:hover:bg-accent/50 dshx:pointer-coarse:min-h-touch"
                   style={{ paddingInlineStart: `${String((member.depth - 1) * 12)}px` }}
                   onClick={() => props.onShowRequests(member.sessionId)}
                 >
-                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{member.title ?? member.sessionId}</span>
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{UsageFormattingModel.familyMemberTitle(member)}</span>
                   <span className="dshx:shrink-0 dshx:tabular-nums dshx:text-muted-foreground">{member.requests}</span>
                   <span className="dshx:w-16 dshx:shrink-0 dshx:text-right dshx:tabular-nums">{money(member.cost)}</span>
                 </button>

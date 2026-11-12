@@ -19,8 +19,23 @@ import {
 import { HostSnapshotsModel } from './snapshots.js'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArchiveIcon, ArchiveRestoreIcon, BellIcon, BellOffIcon, CopyIcon, EllipsisIcon, PauseIcon, PinIcon, PinOffIcon } from '@dshfiles/plugin-ui/icons'
-import { useLayoutEffect, useMemo, useState } from 'react'
+import {
+  ArchiveIcon,
+  ArchiveRestoreIcon,
+  BellIcon,
+  BellOffIcon,
+  CopyIcon,
+  EllipsisIcon,
+  ListIcon,
+  PauseIcon,
+  PinIcon,
+  PinOffIcon,
+  SearchIcon,
+} from '@dshfiles/plugin-ui/icons'
+import { ThreadToolsModel } from '@dshfiles/chat/thread-tools'
+import { ThreadViewsModel } from '@dshfiles/rich-composer/thread-views'
+import { PanelRightIcon } from '@dshfiles/plugin-ui/icons'
+import { useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { ThreadDirectories } from './workspace-paths.js'
 import { ThreadMuteModel, THREAD_MUTE_OPTIONS, type ThreadMuteOption } from './thread-mute.js'
 import { ThreadChildrenModel } from './thread-children.js'
@@ -32,6 +47,8 @@ import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
 import { SettledThreadsModel } from './settled-threads.js'
 import { useStableValue } from './stable-value.js'
+import { useRegistry } from '@dshfiles/dshx/client'
+import { ThreadMenuSections } from './thread-menu-sections.js'
 
 interface HeaderThreadActionsInjected {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -94,6 +111,35 @@ const useCrowdedHeader = (bar: HTMLElement | null): boolean => {
   return crowded
 }
 
+/** Submenu content sized like the menu's own submenus. */
+const SectionSubContent = (props: { readonly 'aria-label'?: string; readonly children?: ReactNode }): JSX.Element => (
+  <DropdownMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={props['aria-label']}>
+    {props.children}
+  </DropdownMenuSubContent>
+)
+
+/** Sections other plugins add (b:ysaj: Linked backlog items), each with this menu's own parts. */
+const RegisteredThreadMenuSections = (props: { readonly sessionId: string }): JSX.Element | null => {
+  const sections = useRegistry(ThreadMenuSections)
+  if (sections.length === 0) return null
+  return (
+    <>
+      {[...sections]
+        .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
+        .map(section => (
+          <section.Component
+            key={section.id}
+            sessionId={props.sessionId}
+            Item={DropdownMenuItem}
+            Sub={DropdownMenuSub}
+            SubTrigger={DropdownMenuSubTrigger}
+            SubContent={SectionSubContent}
+          />
+        ))}
+    </>
+  )
+}
+
 export const HeaderThreadActions = ({
   sessionId,
   useSessions,
@@ -119,6 +165,8 @@ export const HeaderThreadActions = ({
   // Expired mutes are pruned by the sidebar's own clock; this header only needs the moment it opened.
   const [openedAt] = useState(() => Date.now())
   const crowded = useCrowdedHeader(bar)
+  // Trajectory, Traces, Requests: thread-panel facets since productivity pass Q5 (E5); this menu opens them.
+  const threadViews = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.list, ThreadViewsModel.list)
   // Only lineage, blankness, running and folder feed the derivations below; a streaming turn republishes the list
   // several times a second with none of them changed, and three mounted conversations each render this header.
   const actionRowsById = useStableValue(sessionState.byId, sameActionRows)
@@ -258,6 +306,22 @@ export const HeaderThreadActions = ({
             <TooltipContent side="bottom">{moreLabel}</TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="end" className="dshx-root dshx:min-w-48" aria-label={moreLabel}>
+            {/* Long-thread tools (productivity pass Q4); on a phone this menu is the way in (no ⌘F, no rail). */}
+            <DropdownMenuItem keys="Mod+F" onSelect={() => ThreadToolsModel.request({ sessionId, tool: 'find' })}>
+              <SearchIcon aria-hidden="true" />
+              {t('threadSidebarFindInThread')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => ThreadToolsModel.request({ sessionId, tool: 'turns' })}>
+              <ListIcon aria-hidden="true" />
+              {t('threadSidebarTurns')}
+            </DropdownMenuItem>
+            {threadViews.map(view => (
+              <DropdownMenuItem key={view.id} data-thread-view-open={view.id} onSelect={() => ThreadViewsModel.open({ sessionId, viewId: view.id })}>
+                <PanelRightIcon aria-hidden="true" />
+                {t('threadSidebarOpenThreadView', { view: view.label })}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
             {archived ? null : (
               <>
                 {showPinButton ? null : (
@@ -318,6 +382,7 @@ export const HeaderThreadActions = ({
               {t('threadSidebarCopyLink')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <RegisteredThreadMenuSections sessionId={sessionId} />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>{t('threadSidebarReferencedBy')}</DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>

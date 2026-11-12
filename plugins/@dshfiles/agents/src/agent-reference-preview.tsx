@@ -11,7 +11,7 @@ import { AgentInlineReference } from './agent-inline-reference.js'
 import { installAgentMentionChips } from './agent-reference-links.js'
 import { agentsApi } from './api.js'
 
-const labelClass = 'dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
+const labelClass = 'dshx:text-2xs dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
 /** The card lists the newest threads; the Agents page keeps the rest. */
 const PREVIEW_THREADS = 4
 

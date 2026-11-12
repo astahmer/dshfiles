@@ -6,6 +6,7 @@ import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { turnSummarySettings } from './settings.js'
 import { TURN_ACTIVITY_KEY } from './turn-activity-node.js'
 import { TurnActivity, type TurnActivitySummary, type TurnSegment } from './turn-activity.js'
+import { TurnFileChips } from './turn-file-chips.js'
 import { hasWalkthrough, TurnWalkthroughList, TurnWalkthroughToggle } from './turn-walkthrough.js'
 
 type OpenList = 'files' | 'commands' | 'failures'
@@ -98,7 +99,11 @@ export const TurnSummaryLine = (props: {
   const end = props.turn.end?.time
   const duration = settings?.duration !== false && start !== undefined && end !== undefined ? TurnActivity.duration(end - start) : undefined
   const changesSeq = summary.changesSeq
-  const label = (segment: TurnSegment, index: number): string => (index === 0 ? segment.text.charAt(0).toUpperCase() + segment.text.slice(1) : segment.text)
+  const openChanges = changesSeq === undefined ? undefined : () => props.openChanges({ seq: changesSeq, turn: props.turn.turn })
+  // With file chips the edits are named once (GitHub #47): `editedFiles: !walkthrough` above already leaves the
+  // "Edited N files" part out, and the chips lead the line, so no segment is capitalised as its first word.
+  const label = (segment: TurnSegment, index: number): string =>
+    index === 0 && !walkthrough ? segment.text.charAt(0).toUpperCase() + segment.text.slice(1) : segment.text
   const segmentView = (segment: TurnSegment, index: number): ReactNode => {
     const list = segment.key === 'files' || segment.key === 'commands' ? segment.key : undefined
     if (list !== undefined && openLists)
@@ -113,9 +118,18 @@ export const TurnSummaryLine = (props: {
     <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" data-dshfiles-turn-summary="">
       <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-1.5 dshx:gap-y-0.5">
         <ListChecksIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
+        {walkthrough && (
+          <TurnFileChips
+            files={summary.editedFileStats}
+            moreOpen={walkthroughOpen}
+            onMore={() => setWalkthroughOpen(current => !current)}
+            onOpen={file => (openChanges === undefined ? props.openFile(file.path) : openChanges())}
+            opensChanges={openChanges !== undefined}
+          />
+        )}
         {segments.map((segment, index) => (
           <Fragment key={segment.key}>
-            {index > 0 && <span aria-hidden>·</span>}
+            {(index > 0 || walkthrough) && <span aria-hidden>·</span>}
             {segmentView(segment, index)}
           </Fragment>
         ))}
@@ -140,7 +154,8 @@ export const TurnSummaryLine = (props: {
         )}
         {walkthrough ? (
           <>
-            {segments.length > 0 || failures > 0 || duration !== undefined ? <span aria-hidden>·</span> : null}
+            {/* The file chips lead the line, so the toggle always follows a part. */}
+            <span aria-hidden>·</span>
             <TurnWalkthroughToggle open={walkthroughOpen} onToggle={() => setWalkthroughOpen(current => !current)} />
           </>
         ) : null}
@@ -148,13 +163,7 @@ export const TurnSummaryLine = (props: {
       {open === 'files' && <FileList openFile={props.openFile} summary={summary} />}
       {open === 'commands' && <CommandList onlyFailed={false} summary={summary} />}
       {open === 'failures' && canList && <CommandList onlyFailed summary={summary} />}
-      {walkthrough && walkthroughOpen && (
-        <TurnWalkthroughList
-          openChanges={changesSeq === undefined ? undefined : () => props.openChanges({ seq: changesSeq, turn: props.turn.turn })}
-          openFile={props.openFile}
-          summary={summary}
-        />
-      )}
+      {walkthrough && walkthroughOpen && <TurnWalkthroughList openChanges={openChanges} openFile={props.openFile} summary={summary} />}
     </div>
   )
 }

@@ -16,6 +16,7 @@ import {
   PlusIcon,
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
+import { checkTones, issueStateTones, pullStateTones } from './linked-state-tones.js'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 
@@ -78,8 +79,8 @@ const Criteria = (props: { readonly id: number; readonly criteria: readonly Back
               <span
                 className={
                   criterion.done
-                    ? 'dshx:min-w-0 dshx:flex-1 dshx:text-[13px] dshx:text-muted-foreground dshx:line-through'
-                    : 'dshx:min-w-0 dshx:flex-1 dshx:text-[13px]'
+                    ? 'dshx:min-w-0 dshx:flex-1 dshx:text-sm dshx:text-muted-foreground dshx:line-through'
+                    : 'dshx:min-w-0 dshx:flex-1 dshx:text-sm'
                 }
               >
                 {criterion.text}
@@ -141,7 +142,7 @@ const SectionText = (props: {
       placeholder={props.placeholder}
       value={draft}
       rows={Math.min(12, Math.max(3, draft.split('\n').length + 1))}
-      className="dshx:text-[13px]"
+      className="dshx:text-sm"
       onChange={event => setDraft(event.currentTarget.value)}
       onBlur={() => {
         if (draft !== props.value) props.save(draft)
@@ -168,7 +169,7 @@ const Plan = (props: { readonly detail: BacklogDetailView }): JSX.Element => {
       <Heading label="Plan">
         {item.planApproval === 'pending' ? (
           <>
-            <span className="dshx:rounded-full dshx:bg-warning/15 dshx:px-1.5 dshx:text-[11px] dshx:text-warning">Waiting for your approval</span>
+            <span className="dshx:rounded-full dshx:bg-warning/15 dshx:px-1.5 dshx:text-2xs dshx:text-warning">Waiting for your approval</span>
             <Button
               size="xs"
               variant="outline"
@@ -179,7 +180,7 @@ const Plan = (props: { readonly detail: BacklogDetailView }): JSX.Element => {
             </Button>
           </>
         ) : item.planApproval === 'approved' ? (
-          <span className="dshx:rounded-full dshx:bg-success/15 dshx:px-1.5 dshx:text-[11px] dshx:text-success">Approved</span>
+          <span className="dshx:rounded-full dshx:bg-success/15 dshx:px-1.5 dshx:text-2xs dshx:text-success">Approved</span>
         ) : null}
       </Heading>
       <SectionText
@@ -248,7 +249,7 @@ const Gates = (props: { readonly id: number; readonly gates: readonly BacklogGat
             return (
               <li
                 key={gate.id}
-                className="dshx:group/gate dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:text-[13px] dshx:hover:bg-accent/40"
+                className="dshx:group/gate dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:text-sm dshx:hover:bg-accent/40"
               >
                 {open ? (
                   <HourglassIcon aria-label="Open" className="dshx:size-3.5 dshx:shrink-0 dshx:text-warning" />
@@ -256,7 +257,7 @@ const Gates = (props: { readonly id: number; readonly gates: readonly BacklogGat
                   <CheckIcon aria-label="Met" className="dshx:size-3.5 dshx:shrink-0 dshx:text-success" />
                 )}
                 <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', !open && 'dshx:text-muted-foreground')}>{BacklogGates.label(gate)}</span>
-                {gate.detail === undefined ? null : <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{gate.detail}</span>}
+                {gate.detail === undefined ? null : <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">{gate.detail}</span>}
                 <Button
                   size="icon-xs"
                   variant="ghost"
@@ -309,16 +310,8 @@ const Gates = (props: { readonly id: number; readonly gates: readonly BacklogGat
 }
 
 const pullStateIcons = { open: GitPullRequestIcon, merged: GitMergeIcon, closed: GitPullRequestClosedIcon, unknown: CircleDotIcon } as const
-const pullStateTones = {
-  open: 'dshx:text-success',
-  merged: 'dshx:text-violet',
-  closed: 'dshx:text-destructive',
-  unknown: 'dshx:text-muted-foreground',
-} as const
-const checkTones = { passing: 'dshx:text-success', failing: 'dshx:text-destructive', pending: 'dshx:text-warning', none: 'dshx:text-muted-foreground' } as const
 const issueOf = BacklogGates.issueOf
 const issueStateIcons = { open: CircleDotIcon, closed: CircleCheckIcon, unknown: CircleDotIcon } as const
-const issueStateTones = { open: 'dshx:text-success', closed: 'dshx:text-violet', unknown: 'dshx:text-muted-foreground' } as const
 
 /** When the forge state was last read, so a stale state reads as stale. */
 const CheckedAge = (props: { readonly checkedAt: number | null | undefined }): JSX.Element | null =>
@@ -326,7 +319,7 @@ const CheckedAge = (props: { readonly checkedAt: number | null | undefined }): J
     <time
       dateTime={new Date(props.checkedAt).toISOString()}
       aria-label={`Checked ${new Date(props.checkedAt).toLocaleString()}`}
-      className="dshx:text-[11px] dshx:text-muted-foreground"
+      className="dshx:text-2xs dshx:text-muted-foreground"
     >
       {ItemGlyphs.ago(props.checkedAt)}
     </time>
@@ -370,10 +363,7 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
           {pulls.map(pull => {
             const Icon = pullStateIcons[pull.state]
             return (
-              <li
-                key={pull.url}
-                className="dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-[13px] dshx:max-sm:min-h-11 dshx:pointer-coarse:min-h-11"
-              >
+              <li key={pull.url} className="dshx:flex dshx:min-h-control dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-sm dshx:pointer-coarse:min-h-touch">
                 <Icon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0', pullStateTones[pull.state])} />
                 <a
                   href={pull.url}
@@ -383,10 +373,10 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
                 >
                   {pull.repo}#{pull.number}
                 </a>
-                <span aria-label={`State ${pull.state}`} className={cn('dshx:text-[11px]', pullStateTones[pull.state])}>
+                <span aria-label={`State ${pull.state}`} className={cn('dshx:text-2xs', pullStateTones[pull.state])}>
                   {pull.state === 'unknown' ? (states.data?.available === false ? 'plain link' : pull.watched ? 'not read yet' : 'not watched') : pull.state}
                 </span>
-                {pull.checks === 'none' ? null : <span className={cn('dshx:text-[11px]', checkTones[pull.checks])}>checks {pull.checks}</span>}
+                {pull.checks === 'none' ? null : <span className={cn('dshx:text-2xs', checkTones[pull.checks])}>checks {pull.checks}</span>}
                 <CheckedAge checkedAt={pull.checkedAt} />
               </li>
             )
@@ -398,10 +388,7 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
           {issues.map(issue => {
             const Icon = issueStateIcons[issue.state]
             return (
-              <li
-                key={issue.url}
-                className="dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-[13px] dshx:max-sm:min-h-11 dshx:pointer-coarse:min-h-11"
-              >
+              <li key={issue.url} className="dshx:flex dshx:min-h-control dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-sm dshx:pointer-coarse:min-h-touch">
                 <Icon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0', issueStateTones[issue.state])} />
                 <a
                   href={issue.url}
@@ -411,7 +398,7 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
                 >
                   {issue.repo}#{issue.number}
                 </a>
-                <span aria-label={`Issue state ${issue.state}`} className={cn('dshx:text-[11px]', issueStateTones[issue.state])}>
+                <span aria-label={`Issue state ${issue.state}`} className={cn('dshx:text-2xs', issueStateTones[issue.state])}>
                   {issue.state === 'unknown'
                     ? states.data?.available === false
                       ? 'plain link'

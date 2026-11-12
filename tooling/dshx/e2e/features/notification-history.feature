@@ -1,11 +1,12 @@
 Feature: Durable thread notification history
 
   Notification rows come from native Host turns, never an injected history writer.
-  This isolated profile has no provider credentials, so real submitted turns fail.
+  This isolated profile has no provider credentials, so real submitted turns fail. It loads frame-layout, which keeps
+  the page under the phone top bar instead of beneath it, as every phone profile does.
 
   @scenario:thread-sidebar.notification-history
   Scenario: Retain thread events and manage their history across browser tabs
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/frame-layout" is booted
     When a real submitted turn produces a notification history entry
     Then notification history shows the source event at desktop and phone widths
     And notification read and dismiss actions are reversible and shared across tabs

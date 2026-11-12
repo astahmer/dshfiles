@@ -45,7 +45,8 @@ export const zh = {
   'search.pending': '正在搜索会话历史…',
   'search.noMatches': '无匹配会话',
   'search.hasMore': '仅显示前 {n} 条结果，请缩小搜索范围。',
-  'menu.addWorkspace': '添加工作区…',
+  'menu.addWorkspace': '添加文件夹…',
+  'menu.newProject': '新建项目…',
   'picker.loading': '正在加载工作区…',
   'conflict.named': '已存在名为“{name}”的工作区。',
   'folderError.title': '无法打开文件夹',
@@ -132,7 +133,7 @@ export type WorkspaceKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
-  'defaultWorkspace.failed': 'Unable to create default workspace. Use Choose workspace to select a folder.',
+  'defaultWorkspace.failed': 'Unable to create default workspace. Use Choose project to select a folder.',
   'draft.workspaceRequired': 'Choose a workspace first.',
   'draft.initializationFailed': 'Could not fill the draft. Please try again shortly.',
   'group.ungrouped': 'Ungrouped',
@@ -171,7 +172,8 @@ export const en = {
   'search.pending': 'Searching session history…',
   'search.noMatches': 'No matching sessions',
   'search.hasMore': 'Showing the first {n} results. Narrow your search.',
-  'menu.addWorkspace': 'Add workspace…',
+  'menu.addWorkspace': 'Add folder…',
+  'menu.newProject': 'New project…',
   'picker.loading': 'Loading workspaces…',
   'conflict.named': 'A workspace named “{name}” already exists.',
   'folderError.title': 'Couldn’t open folder',

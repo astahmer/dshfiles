@@ -3,7 +3,11 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/diffs-review',
-  modules: { 'review-page-context': 'src/review-page-context.ts' },
+  modules: {
+    'review-page-context': 'src/review-page-context.ts',
+    // Verbs other plugins add beside Land (pull-requests' Open PR); they depend on this plugin, never the reverse.
+    'land-card-actions': 'src/land-card-actions.ts',
+  },
   host: {
     dshxRuntime: 'snapshot',
     entry: 'src/host.ts',

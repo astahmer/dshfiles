@@ -257,7 +257,7 @@ function CheckpointRow({
       {checkpoint.files !== undefined ? (
         <span
           className={cn(
-            'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-[13px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden',
+            'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-sm dshx:text-muted-foreground dshx:@max-pane-narrow:hidden',
             abandoned && 'dshx:opacity-50',
           )}
         >
@@ -265,9 +265,7 @@ function CheckpointRow({
           {checkpoint.files} {checkpoint.files === 1 ? 'file' : 'files'}
         </span>
       ) : null}
-      <span
-        className={cn('dshx:w-10 dshx:shrink-0 dshx:text-right dshx:text-[13px] dshx:text-muted-foreground dshx:tabular-nums', abandoned && 'dshx:opacity-50')}
-      >
+      <span className={cn('dshx:w-10 dshx:shrink-0 dshx:text-right dshx:text-sm dshx:text-muted-foreground dshx:tabular-nums', abandoned && 'dshx:opacity-50')}>
         {checkpoint.time}
       </span>
     </li>

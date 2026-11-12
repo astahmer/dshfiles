@@ -4,7 +4,11 @@ import { defineSettings, type SettingsValue } from '@dshfiles/dshx/settings'
 export const onboardingSettings = defineSettings({
   namespace: 'dshfiles-onboarding',
   schema: Schema.object({
-    wizard: Schema.boolean().default(true).description('Show the three-step setup wizard (account, project, first task) while no thread is open.'),
+    wizard: Schema.boolean()
+      .default(true)
+      .description(
+        'Open the three-step setup wizard (account, project, first task) by itself while an AI account or a project is still missing. A profile that has both never gets it on its own; ⌘K Show the setup wizard replays it.',
+      ),
     checklist: Schema.boolean()
       .default(true)
       .description('Show the self-ticking setup checklist on Getting started. Off skips every Host check, the GitHub one included.'),

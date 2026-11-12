@@ -1,51 +1,66 @@
-/* Dockview variables mapped to the Host `--dsw-*` tokens, so light/dark follow DSH. */
+/* Dockview chrome on the visual-refresh tokens (T1.5; ui-styles generates the
+ * --dshx-tone-* palette, the --dsw-* fallbacks keep a profile without it
+ * readable). Tabs sit on the content background with one hairline, splitters
+ * are invisible until hovered or dragged, drop targets use the accent trio and
+ * floating groups are the only shadowed chrome (s2). */
 .dshfiles-workbench-theme {
-  --dv-tabs-and-actions-container-font-size: 12px;
-  --dv-tabs-and-actions-container-height: 32px;
+  --dv-tabs-and-actions-container-font-size: 13px;
+  --dv-tabs-and-actions-container-height: var(--dshx-size-bar, 36px);
   --dv-tab-font-size: inherit;
   --dv-tab-margin: 0;
   --dv-tab-close-icon-size: inherit;
-  --dv-border-radius: 6px;
+  --dv-border-radius: var(--dsw-radius-sm, 6px);
   --dv-tab-border-radius: 0px;
   --dv-sash-border-radius: 0px;
-  --dv-dropdown-border-radius: 6px;
+  --dv-dropdown-border-radius: var(--dsw-radius-sm, 6px);
   --dv-spacing-padding: 0px;
   --dv-overlay-z-index: 999;
   --dv-sash-color: transparent;
-  --dv-active-sash-color: var(--dsw-alias-state-business-primary);
-  --dv-active-sash-transition-duration: 0.1s;
+  --dv-active-sash-color: var(--dshx-tone-accent, var(--dsw-alias-state-business-primary));
+  --dv-active-sash-transition-duration: 0.12s;
   --dv-active-sash-transition-delay: 0.3s;
-  --dv-paneview-active-outline-color: var(--dsw-alias-state-business-primary);
-  --dv-drag-over-background-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
-  --dv-drag-over-border-color: var(--dsw-alias-state-business-primary);
-  --dv-drag-over-border: 1px solid var(--dsw-alias-state-business-primary);
-  --dv-edge-dock-indicator-color: var(--dsw-alias-state-business-primary);
-  --dv-tabs-container-scrollbar-color: var(--dsw-alias-border-l3);
+  --dv-paneview-active-outline-color: var(--dshx-tone-accent, var(--dsw-alias-state-business-primary));
+  --dv-drag-over-background-color: var(--dshx-tone-accent-bg, color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent));
+  --dv-drag-over-border-color: var(--dshx-tone-accent-border, var(--dsw-alias-state-business-primary));
+  --dv-drag-over-border: 1px solid var(--dshx-tone-accent-border, var(--dsw-alias-state-business-primary));
+  --dv-edge-dock-indicator-color: var(--dshx-tone-accent, var(--dsw-alias-state-business-primary));
+  --dv-tabs-container-scrollbar-color: var(--dshx-tone-line, var(--dsw-alias-border-l3));
   --dv-icon-hover-background-color: var(--dsw-alias-interactive-bg-hover);
-  --dv-floating-box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
-  --dv-floating-border: 1px solid var(--dsw-alias-border-l2);
-  --dv-floating-group-border: 1px solid var(--dsw-alias-border-l2);
+  --dv-floating-box-shadow: var(--dshx-elevation-2);
+  --dv-floating-border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  --dv-floating-group-border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
   --dv-floating-group-dragging-opacity: 0.6;
   --dv-floating-titlebar-height: 22px;
-  --dv-floating-titlebar-background-color: var(--dsw-alias-bg-layer-1);
+  --dv-floating-titlebar-background-color: var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1));
   --dv-floating-titlebar-border-bottom: var(--dv-floating-border);
-  --dv-group-view-background-color: var(--dsw-alias-bg-base);
-  --dv-tabs-and-actions-container-background-color: var(--dsw-alias-bg-layer-1);
-  --dv-activegroup-visiblepanel-tab-background-color: var(--dsw-alias-bg-base);
-  --dv-activegroup-hiddenpanel-tab-background-color: var(--dsw-alias-bg-layer-1);
-  --dv-inactivegroup-visiblepanel-tab-background-color: var(--dsw-alias-bg-base);
-  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--dsw-alias-bg-layer-1);
-  --dv-tab-divider-color: var(--dsw-alias-border-l2);
+  --dv-group-view-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
+  --dv-tabs-and-actions-container-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-layer-1));
+  --dv-activegroup-visiblepanel-tab-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
+  --dv-activegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
+  --dv-inactivegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-tab-divider-color: transparent;
   --dv-activegroup-visiblepanel-tab-color: var(--dsw-alias-label-primary);
   --dv-activegroup-hiddenpanel-tab-color: var(--dsw-alias-label-secondary);
   --dv-inactivegroup-visiblepanel-tab-color: var(--dsw-alias-label-secondary);
   --dv-inactivegroup-hiddenpanel-tab-color: var(--dsw-alias-label-tertiary);
-  --dv-separator-border: var(--dsw-alias-border-l2);
-  --dv-paneview-header-border-color: var(--dsw-alias-border-l2);
+  --dv-separator-border: var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  --dv-paneview-header-border-color: var(--dshx-tone-line, var(--dsw-alias-border-l2));
   color: var(--dsw-alias-label-primary);
 }
 
-/* VS Code tab chrome: the selected tab carries an accent top edge (muted outside the focused group) on the base
+/* One hairline under each group's tab row (an inset shadow, so Dockview's
+ * measured header height does not change); hovered tabs lift to the raised step.
+ * Splitters keep Dockview's own delayed hover accent. */
+.dshfiles-workbench-theme .dv-tabs-and-actions-container {
+  box-shadow: inset 0 -1px 0 var(--dshx-tone-line, var(--dsw-alias-border-l2));
+}
+
+.dshfiles-workbench-theme .dv-tab:hover {
+  background-color: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Tab chrome: the selected tab carries an accent top edge (muted outside the focused group) on the base
  * background, and close buttons appear on the selected tab, on hover and with keyboard focus. */
 .dshfiles-workbench-theme .dv-tabs-container > .dv-tab.dv-active-tab::before {
   content: '';
@@ -55,15 +70,54 @@
   right: 0;
   height: 2px;
   pointer-events: none;
-  background-color: var(--dsw-alias-border-l3);
+  background-color: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
 }
 
+/* Selection in the focused group is the one accent the chrome carries. */
 .dshfiles-workbench-theme .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-active-tab::before {
-  background-color: var(--dsw-alias-state-business-primary);
+  background-color: var(--dshx-tone-accent, var(--dsw-alias-state-business-primary));
 }
 
 .dshfiles-workbench-theme .dv-tab.dv-inactive-tab:not(:hover):not(:focus-within) [data-workbench-tab-close] {
   opacity: 0;
+}
+
+/* Touch has no hover (visual refresh T5.4): a tab's close stays visible and answers a 44pt tap. */
+@media (pointer: coarse) {
+  .dshfiles-workbench-theme .dv-tab.dv-inactive-tab:not(:hover):not(:focus-within) [data-workbench-tab-close] {
+    opacity: 1;
+  }
+
+  .dshfiles-workbench-theme [data-workbench-tab-close] {
+    position: relative;
+  }
+
+  .dshfiles-workbench-theme [data-workbench-tab-close]::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc((100% - 44px) / 2));
+  }
+}
+
+/* One header row (T1.4): a thread panel seats its conversation header (title,
+ * actions, view switch) in its group's tab row, between the tabs and the pane
+ * actions. The void beside the tabs keeps a 12px grip so the whole group still
+ * drags (D6); an empty seat takes no space. */
+.dshfiles-workbench-theme [data-workbench-header-seat] {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.dshfiles-workbench-theme [data-workbench-header-seat]:empty {
+  display: none;
+}
+
+.dshfiles-workbench-theme .dv-tabs-and-actions-container:has(> [data-workbench-header-seat]:not(:empty)) > .dv-void-container {
+  flex: 0 0 12px;
 }
 
 /* Only a root region's immediate native Dockview owns window-wide floats.
@@ -105,6 +159,14 @@
   z-index: calc(var(--dv-overlay-z-index, 999) + var(--dshfiles-workbench-window-rank) * 2 + 1) !important;
 }
 
+/* Main tab rows off (productivity pass Q5, E6; opt-in since b:4v6p, Settings › Workbench › showMainTabs off): the main
+ * region is the stage, not a tab set. Threads switch from the list, ⌘K and the keys, so its tab rows (tabs, New tab,
+ * Pane options) are chrome that duplicates the sidebar: hide them and let the thread header take the row. Since the one
+ * sidebar layout (b:952m) this setting alone decides; the right pane keeps its facet tabs. */
+[data-workbench-main-tabs='hidden'] [data-workbench-region='main'] .dv-tabs-and-actions-container {
+  display: none;
+}
+
 /* Phone (plans/ade-ux §8 phase 6): the stage is a stack, not tabs. With the phone shell present (the left-column
  * occupant marks the document with data-shell-phone-nav and draws a top bar with Back), the main region's tab rows
  * are desktop chrome that only crowd 390px: hide them; the list, Back and the thread panel sheet navigate instead.
@@ -116,6 +178,6 @@
 
   /* Inside the thread panel sheet, the facet tabs stay but get touch-sized rows. */
   [data-phone-sheet] .dshfiles-workbench-theme {
-    --dv-tabs-and-actions-container-height: 40px;
+    --dv-tabs-and-actions-container-height: 44px;
   }
 }

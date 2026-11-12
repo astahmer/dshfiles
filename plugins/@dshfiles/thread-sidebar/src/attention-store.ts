@@ -83,10 +83,17 @@ const legacyAttentionRecord = (entry: ThreadAttentionMigrationEntry, version: nu
         manuallyUnread: entry.manuallyUnread,
       }
 
+/** The first unseen finish a new finish keeps: the existing record's, else this finish's own sequence. */
+const firstUnreadSeq = (existing: ThreadAttentionView | undefined, seq: number | null): number | null => {
+  if (existing === undefined || existing.finishedAt === null) return seq
+  return existing.firstUnreadSeq ?? existing.finishedSeq ?? seq
+}
+
 export class ThreadAttentionStoreModel {
   static readonly boundRemovals = (input: { readonly removedAt: Map<string, number>; readonly floor: number; readonly limit: number }): number =>
     boundRemovals(input.removedAt, input.floor, input.limit)
   static readonly finishReasonFromEvent = finishReasonFromEvent
+  static readonly firstUnreadSeq = firstUnreadSeq
   static readonly nextVersion = nextAttentionVersion
   static readonly keysToTrim = attentionKeysToTrim
   static readonly legacyRecord = legacyAttentionRecord
@@ -270,6 +277,7 @@ export class ThreadAttention extends Context.Service<
                   finishedSeq: existing?.finishedSeq ?? null,
                   finishedReason: existing?.finishedReason ?? null,
                   manuallyUnread: true,
+                  ...(existing?.firstUnreadSeq === undefined ? {} : { firstUnreadSeq: existing.firstUnreadSeq }),
                 },
               ],
               remove: [],
@@ -287,6 +295,7 @@ export class ThreadAttention extends Context.Service<
                 finishedSeq: existing?.finishedSeq ?? null,
                 finishedReason: existing?.finishedReason ?? null,
                 manuallyUnread: true,
+                ...(existing?.firstUnreadSeq === undefined ? {} : { firstUnreadSeq: existing.firstUnreadSeq }),
               }
             }),
             remove: [],
@@ -317,19 +326,24 @@ export class ThreadAttention extends Context.Service<
         changesSince: revision => Effect.map(SynchronizedRef.get(state), current => changesOf(current, revision)),
         changes: Stream.fromPubSub(changed),
         recordFinish: Effect.fn('thread attention record')(function* (input) {
-          yield* apply('record', (records, takeVersion) => ({
-            put: [
-              {
-                sessionId: input.sessionId,
-                version: takeVersion(),
-                finishedAt: input.time,
-                finishedSeq: input.seq,
-                finishedReason: input.reason,
-                manuallyUnread: records.get(input.sessionId)?.manuallyUnread ?? false,
-              },
-            ],
-            remove: [],
-          }))
+          yield* apply('record', (records, takeVersion) => {
+            const existing = records.get(input.sessionId)
+            return {
+              put: [
+                {
+                  sessionId: input.sessionId,
+                  version: takeVersion(),
+                  finishedAt: input.time,
+                  finishedSeq: input.seq,
+                  finishedReason: input.reason,
+                  manuallyUnread: existing?.manuallyUnread ?? false,
+                  // The first unseen finish stays while more turns finish unseen; reading the thread drops the record.
+                  firstUnreadSeq: ThreadAttentionStoreModel.firstUnreadSeq(existing, input.seq),
+                },
+              ],
+              remove: [],
+            }
+          })
         }),
         acknowledge: Effect.fn('thread attention acknowledge')(function* (input) {
           return yield* apply('acknowledge', plans.acknowledge(input))

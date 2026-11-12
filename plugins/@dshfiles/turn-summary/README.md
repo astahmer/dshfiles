@@ -6,9 +6,13 @@
 
 A footer under each finished turn that says what the agent did with tools:
 
-> Edited 3 files +42 −7 › · ran 6 commands › · tests 40/42 · read 4 files · 2 searches · **1 failed ›** · 1m 12s
+> `pricing.ts +40 −3` `cart.ts +2 −4` · ran 6 commands › · tests 40/42 · read 4 files · 2 searches · **1 failed ›** · 1m 12s
 
-- **Edited files** count distinct files that were actually written (a rejected edit is not counted), with lines added and removed. The count opens the files with per-file `+N −M`; each opens in the editor.
+- **Changed-file chips** (visual refresh T2.3) name each file the turn actually wrote (a rejected edit is not counted)
+  with its lines added and removed; a chip opens that turn's review in the Changes facet (the file in the editor until
+  the Host has addressed the turn's changes). Four chips show, the rest fold into `+N more`, which opens the
+  walkthrough. With the walkthrough setting off, the footer falls back to the `Edited 3 files +42 −7 ›` count, whose
+  list opens each file in the editor.
 - **Commands** open every command (its description, or the first line of the command) with how it ended.
 - **Tests** are passed / total from the last Vitest, Jest or pytest summary a command printed in the turn; red when any failed.
 - The red **failure count** opens the failed commands and how each ended: `exit 1`, `signal SIGKILL`, `no exit code`, or `error` when the tool rejected the call.

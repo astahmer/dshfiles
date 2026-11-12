@@ -28,7 +28,7 @@ export const UsageRefreshNotice = (props: {
       </span>
       <span className="dshx:sr-only">{props.failure}</span>
       <Button
-        className="dshx:h-5 dshx:shrink-0 dshx:px-1.5 dshx:text-[11px]"
+        className="dshx:h-5 dshx:shrink-0 dshx:px-1.5 dshx:text-2xs"
         disabled={props.refreshing}
         onClick={props.onRetry}
         size="xs"
@@ -46,7 +46,7 @@ export const UsageRefreshNotice = (props: {
 export const UsageUpdatedAt = (props: { readonly readAt: number }): JSX.Element => {
   const now = useQuotaClock({ resetsAt: [] })
   return (
-    <p className="dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
+    <p className="dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
       Updated {UsageOverviewModel.formatReadAge(props.readAt, now)} · <time dateTime={new Date(props.readAt).toISOString()}>{readingTime(props.readAt)}</time>
     </p>
   )
@@ -72,7 +72,7 @@ export const UsageReadStatus = (props: {
   const nextReading = UsageOverviewModel.nextReading(usage, now)
   const failed = unreadable || reason !== null
   return (
-    <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
+    <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
       {reason === null ? null : <span className="dshx:min-w-0 dshx:basis-full dshx:break-words dshx:text-warning">{reason}</span>}
       <span>
         {unreadable ? `Last tried ${age}` : reason === null ? `Updated ${age}` : `Last good reading ${age}`} ·{' '}
@@ -80,7 +80,7 @@ export const UsageReadStatus = (props: {
       </span>
       {nextReading === null ? null : <span>{nextReading}</span>}
       {failed && nextReading === null ? (
-        <Button className="dshx:h-5 dshx:px-1.5 dshx:text-[11px]" disabled={props.refreshing} onClick={props.onRetry} size="xs" type="button" variant="outline">
+        <Button className="dshx:h-5 dshx:px-1.5 dshx:text-2xs" disabled={props.refreshing} onClick={props.onRetry} size="xs" type="button" variant="outline">
           Retry
         </Button>
       ) : null}

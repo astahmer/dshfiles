@@ -1,5 +1,5 @@
+import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
 import { memo } from 'react'
-import { IconChevronDownOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeViewProps } from '../contract/slots.ts'
 import { turnProcessAlwaysOpen } from '../contract/turn-process.ts'
 import { formatRunDuration } from './message-chrome.ts'
@@ -55,7 +55,7 @@ export const TurnProcessNodeView = memo(function TurnProcessNodeView({
             <span key={index} className={part.numeric ? css.durationNumber : undefined}>{part.text}</span>
           ))}
         </span>
-        {canCollapse && <IconChevronDownOutlineRegular className={css.chevron} />}
+        {canCollapse && <ChevronDownIcon size={14} strokeWidth={1.5} className={css.chevron} />}
       </button>
     </>
   )

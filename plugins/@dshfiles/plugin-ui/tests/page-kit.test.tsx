@@ -5,7 +5,7 @@ import { fireEvent } from '@testing-library/dom'
 import { act, cleanup, render } from '@testing-library/react'
 import { EntityList, EntityRow } from '../src/components/entity-row.js'
 import { EmptyState, Page, PageSection } from '../src/components/page.js'
-import { StatusGlyph, WorkStatusModel, workStatusValues, type WorkStatus } from '../src/components/work-status.js'
+import { STATUS_SPINNER_PERIOD_MS, StatusGlyph, WorkStatusModel, workStatusValues, type WorkStatus } from '../src/components/work-status.js'
 
 afterEach(() => {
   cleanup()
@@ -71,7 +71,26 @@ describe('WorkStatus', () => {
     expect(classOf('working')).toContain('text-muted-foreground')
     expect(classOf('needs-you')).toContain('text-info')
     expect(classOf('failed')).toContain('text-destructive')
-    expect(classOf('idle')).not.toMatch(/text-/)
+    expect(classOf('idle')).toContain('label-tertiary')
+    // Colour is a signal: only the two attention states carry a hue.
+    expect(classOf('ready')).not.toMatch(/text-(info|destructive|success|warning)/)
+  })
+
+  it('draws the glyph-only stale and stopped states and phase-locks the working spinner', () => {
+    const view = render(
+      <>
+        <StatusGlyph status="stale" />
+        <StatusGlyph status="stopped" />
+        <StatusGlyph status="working" />
+        <StatusGlyph status="working" label="Also working" />
+      </>,
+    )
+    expect(view.getByRole('img', { name: 'Stale' }).getAttribute('data-status')).toBe('stale')
+    expect(view.getByRole('img', { name: 'Stopped' }).getAttribute('data-status')).toBe('stopped')
+    const spinners = [...view.container.querySelectorAll<SVGElement>('[data-glyph-spinner]')]
+    expect(spinners).toHaveLength(2)
+    for (const spinner of spinners) expect(spinner.style.animationDelay).toMatch(/^-\d+ms$/)
+    expect(spinners[0]?.style.animationDuration).toBe(`${String(STATUS_SPINNER_PERIOD_MS)}ms`)
   })
 
   it('is hidden from assistive technology when decorative', () => {

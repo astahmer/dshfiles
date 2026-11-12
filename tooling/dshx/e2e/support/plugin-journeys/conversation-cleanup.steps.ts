@@ -19,7 +19,7 @@ import {
 const sessionIds = ['session-cleanup-archived-one', 'session-cleanup-archived-two']
 const sessionRootName = 'conversation-cleanup-sessions'
 const storageRootName = 'conversation-cleanup-storage'
-const confirmationTitle = 'Permanently delete these conversations?'
+const confirmationTitle = 'Permanently delete these threads?'
 const originalLogs = new WeakMap<Page, readonly { readonly path: string; readonly contents: string }[]>()
 
 const cleanupPatch = `- id: session-persistence-jsonl
@@ -67,7 +67,7 @@ const sessionDirectory = (homeRoot: string, sessionId: string): string => join(h
 const cleanupSection = (page: Page) =>
   settingsPage(page)
     .locator('section')
-    .filter({ has: page.getByRole('heading', { name: 'Conversation cleanup', exact: true }) })
+    .filter({ has: page.getByRole('heading', { name: 'Thread cleanup', exact: true }) })
 
 Given('the isolated conversation-cleanup profile has two cold archived conversations', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
@@ -93,9 +93,9 @@ Given('the isolated conversation-cleanup profile has two cold archived conversat
 
 When('the conversation cleanup settings are opened', async ({ page }: { page: Page }) => {
   await openSettingsDialog(page)
-  await settingsNavEntry(page, 'Conversation cleanup').click()
+  await settingsNavEntry(page, 'Thread cleanup').click()
   await expect(cleanupSection(page)).toBeVisible()
-  await expect(cleanupSection(page).getByRole('button', { name: 'Delete previewed conversations', exact: true })).toBeDisabled()
+  await expect(cleanupSection(page).getByRole('button', { name: 'Delete previewed threads', exact: true })).toBeDisabled()
 })
 
 When('the conversation cleanup preview is requested', async ({ page }: { page: Page }) => {
@@ -104,19 +104,21 @@ When('the conversation cleanup preview is requested', async ({ page }: { page: P
 
 Then('both archived conversations appear in the cleanup preview', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'conversation-cleanup-preview-lists-cold-archived-logs', async () => {
-    await expect(cleanupSection(page).getByText('Conversations to delete: 2', { exact: true })).toBeVisible()
+    await expect(cleanupSection(page).getByText('Threads to delete: 2', { exact: true })).toBeVisible()
     for (const sessionId of sessionIds) {
-      const candidate = cleanupSection(page).getByRole('listitem').filter({ hasText: sessionId })
+      // b:ysaj: rows name the thread (title, else Untitled thread · project); the Session id stays in the tooltip.
+      const candidate = cleanupSection(page).getByRole('listitem').filter({ has: page.locator(`[data-cleanup-candidate="${sessionId}"]`) })
       await expect(candidate).toHaveCount(1)
+      await expect(candidate).not.toContainText(sessionId)
       await expect(candidate).toContainText('Archived')
     }
-    await expect(cleanupSection(page).getByRole('button', { name: 'Delete previewed conversations', exact: true })).toBeEnabled()
+    await expect(cleanupSection(page).getByRole('button', { name: 'Delete previewed threads', exact: true })).toBeEnabled()
     await page.screenshot({ path: test.info().outputPath('conversation-cleanup.png') })
   })
 })
 
 When('conversation cleanup deletion is cancelled', async ({ page }: { page: Page }) => {
-  await cleanupSection(page).getByRole('button', { name: 'Delete previewed conversations', exact: true }).click()
+  await cleanupSection(page).getByRole('button', { name: 'Delete previewed threads', exact: true }).click()
   const confirmation = page.getByRole('alertdialog', { name: confirmationTitle, exact: true })
   await expect(confirmation).toBeVisible()
   await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
@@ -129,12 +131,12 @@ Then('both conversation logs remain unchanged on disk', async ({ page }: { page:
     if (logs === undefined) throw new Error('Seeded conversation logs were not recorded; run the cleanup Given step first.')
     expect(logs).toHaveLength(2)
     for (const log of logs) expect(await readFile(log.path, 'utf8')).toBe(log.contents)
-    await expect(cleanupSection(page).getByText('Conversations to delete: 2', { exact: true })).toBeVisible()
+    await expect(cleanupSection(page).getByText('Threads to delete: 2', { exact: true })).toBeVisible()
   })
 })
 
 When('conversation cleanup deletion is confirmed', async ({ page }: { page: Page }) => {
-  await cleanupSection(page).getByRole('button', { name: 'Delete previewed conversations', exact: true }).click()
+  await cleanupSection(page).getByRole('button', { name: 'Delete previewed threads', exact: true }).click()
   const confirmation = page.getByRole('alertdialog', { name: confirmationTitle, exact: true })
   await expect(confirmation).toBeVisible()
   await confirmation.getByRole('button', { name: 'Permanently delete', exact: true }).click()
@@ -145,7 +147,7 @@ Then('both conversation log generations are deleted from disk', async ({ page }:
   await recordAssertion(page, 'conversation-cleanup-confirm-deletes-persistence', async () => {
     await expect(cleanupSection(page).getByRole('heading', { name: 'Deletion results', exact: true })).toBeVisible()
     for (const sessionId of sessionIds) {
-      const result = cleanupSection(page).getByRole('listitem').filter({ hasText: sessionId })
+      const result = cleanupSection(page).getByRole('listitem').filter({ has: page.locator(`[data-cleanup-result="${sessionId}"]`) })
       await expect(result).toHaveCount(1)
       await expect(result).toContainText('Deleted')
       const directory = sessionDirectory(profileFor(page).homeRoot, sessionId)
@@ -156,10 +158,10 @@ Then('both conversation log generations are deleted from disk', async ({ page }:
 
 Then('the cleanup preview is empty and deletion is disabled', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'conversation-cleanup-next-preview-is-empty', async () => {
-    await expect(cleanupSection(page).getByText('Conversations to delete: 0', { exact: true })).toBeVisible()
-    await expect(cleanupSection(page).getByText('No eligible conversations in this preview.', { exact: true })).toBeVisible()
+    await expect(cleanupSection(page).getByText('Threads to delete: 0', { exact: true })).toBeVisible()
+    await expect(cleanupSection(page).getByText('No threads to clean up in this preview.', { exact: true })).toBeVisible()
     await expect(cleanupSection(page).getByRole('listitem')).toHaveCount(0)
-    await expect(cleanupSection(page).getByRole('button', { name: 'Delete previewed conversations', exact: true })).toBeDisabled()
+    await expect(cleanupSection(page).getByRole('button', { name: 'Delete previewed threads', exact: true })).toBeDisabled()
   })
   await finishJourneyAssertions(page)
 })

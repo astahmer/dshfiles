@@ -17,6 +17,7 @@ import { DISTRIBUTION_HINT, DISTRIBUTION_LABEL, DISTRIBUTIONS } from './account-
 import { aiAccountsApi, type AccountsFile, type UsageHistoryMeta } from './api.js'
 import { FAILURE_KINDS, type FailureKind, type KindPolicy } from './failure-policy.js'
 import { pricingStatusLine } from './pricing-status.js'
+import { RouteRules, RouteRuleTable } from './route-rule-table.js'
 import { usePreferences } from './use-preferences.js'
 import { SHORT_NAME_MAX_LENGTH, UsageOverviewModel } from './usage-overview-model.js'
 
@@ -417,6 +418,14 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             />
           )}
         </Row>
+        <Row
+          hint="How long until each account resets, after what it has left (“51% · 1d 21h”); dropped first when the bar is full."
+          label="Show reset times in the status bar"
+        >
+          {id => (
+            <Switch checked={preferences.showResetTimes} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('showResetTimes', value))} />
+          )}
+        </Row>
         {file === null ? null : (
           <UsageAccountsPicker
             accounts={file.accounts.filter(account => account.enabled)}
@@ -764,6 +773,9 @@ const textToMinutes = (text: string) => {
   return { overrides, skipped }
 }
 
+/** Choices of the lifetime table; a stored value outside them stays selectable. */
+const CACHE_LIFETIME_MINUTES: readonly number[] = [5, 10, 15, 30, 60, 120, 240, 1_440]
+
 const IdleCacheGroup = (props: { readonly readOnly: boolean; readonly write: (task: Promise<unknown>) => void }): JSX.Element => {
   const preferences = usePreferences()
   const settings = preferences.settings
@@ -785,6 +797,8 @@ const IdleCacheGroup = (props: { readonly readOnly: boolean; readonly write: (ta
     if (retentionDraft === null || retentionDraft === retentionText || invalidRetention > 0) return
     props.write(settings.set('promptCacheRetention', retention).then(() => setRetentionDraft(null)))
   }
+  // b:ysaj: the rules are an account → model table by default; the text form stays for bulk edits and unknown routes.
+  const [asText, setAsText] = useState(false)
   const saveLifetimes = (): void => {
     if (draft === null || draft === savedText) return
     props.write(settings.set('promptCacheMinutes', parsed.overrides).then(() => setDraft(null)))
@@ -817,47 +831,119 @@ const IdleCacheGroup = (props: { readonly readOnly: boolean; readonly write: (ta
         )}
       </Row>
       <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
-        <Label className="dshx:text-sm dshx:font-normal" htmlFor="ai-accounts-prompt-cache-retention">
-          Cache retention
-        </Label>
+        <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
+          <Label className="dshx:text-sm dshx:font-normal" htmlFor={asText ? 'ai-accounts-prompt-cache-retention' : undefined}>
+            Cache retention
+          </Label>
+          <Button
+            className="dshx:h-auto dshx:px-0 dshx:pointer-coarse:min-h-11"
+            onClick={() => setAsText(current => !current)}
+            size="xs"
+            type="button"
+            variant="link"
+          >
+            {asText ? 'Edit as a table' : 'Edit as text'}
+          </Button>
+        </div>
         <p className="dshx:text-xs dshx:text-muted-foreground">
-          One rule per line: <code>route/model = long</code> or <code>route/* = short</code>. Use long only where the provider and model support extended
-          caching.
+          Long keeps a prompt cached longer where the provider and model support extended caching; short is the provider default.
         </p>
-        <Textarea
-          className="dshx:min-h-16 dshx:font-mono! dshx:text-xs"
-          disabled={props.readOnly}
-          id="ai-accounts-prompt-cache-retention"
-          onBlur={saveRetention}
-          onChange={event => setRetentionDraft(event.target.value)}
-          placeholder="claude_work/* = long"
-          spellCheck={false}
-          value={retentionDraft ?? retentionText}
-        />
-        {invalidRetention === 0 ? null : <p className="dshx:text-xs dshx:text-destructive">Use route/model = short or long on every line before saving.</p>}
+        {asText ? (
+          <>
+            <p className="dshx:text-xs dshx:text-muted-foreground">
+              One rule per line: <code>route/model = long</code> or <code>route/* = short</code>.
+            </p>
+            <Textarea
+              className="dshx:min-h-16 dshx:font-mono! dshx:text-xs"
+              disabled={props.readOnly}
+              id="ai-accounts-prompt-cache-retention"
+              onBlur={saveRetention}
+              onChange={event => setRetentionDraft(event.target.value)}
+              placeholder="claude_work/* = long"
+              spellCheck={false}
+              value={retentionDraft ?? retentionText}
+            />
+            {invalidRetention === 0 ? null : <p className="dshx:text-xs dshx:text-destructive">Use route/model = short or long on every line before saving.</p>}
+          </>
+        ) : (
+          <RouteRuleTable<'short' | 'long'>
+            defaultValue="long"
+            disabled={props.readOnly}
+            label="Cache retention"
+            onChange={rules => props.write(settings.set('promptCacheRetention', RouteRules.record(rules)))}
+            renderValue={input => (
+              <Select disabled={props.readOnly} value={input.value} onValueChange={value => input.onChange(value === 'short' ? 'short' : 'long')}>
+                <SelectTrigger aria-label={input.label} className="dshx:h-8 dshx:w-full dshx:text-xs dshx:pointer-coarse:h-11" size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="short">Short</SelectItem>
+                  <SelectItem value="long">Long</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            rules={RouteRules.of(preferences.promptCacheRetention)}
+          />
+        )}
       </div>
       <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
-        <Label className="dshx:text-sm dshx:font-normal" htmlFor="ai-accounts-prompt-cache-minutes">
+        <Label className="dshx:text-sm dshx:font-normal" htmlFor={asText ? 'ai-accounts-prompt-cache-minutes' : undefined}>
           Cache lifetimes
         </Label>
         <p className="dshx:text-xs dshx:text-muted-foreground">
-          One rule per line in minutes: <code>route/model = 60</code>, or <code>route/*</code>. Without a rule, Anthropic models use 5 and OpenAI or Codex
-          models 10; other providers stay quiet.
+          How long a provider keeps a prompt cached, in minutes. Without a rule, Anthropic models use 5 and OpenAI or Codex models 10; other providers stay
+          quiet.
         </p>
-        <Textarea
-          className="dshx:min-h-16 dshx:font-mono! dshx:text-xs"
-          disabled={props.readOnly || !preferences.idleCacheWarning}
-          id="ai-accounts-prompt-cache-minutes"
-          onBlur={saveLifetimes}
-          onChange={event => setDraft(event.target.value)}
-          placeholder="claude_work/* = 60"
-          spellCheck={false}
-          value={draft ?? savedText}
-        />
-        {parsed.skipped === 0 ? null : (
-          <p className="dshx:text-xs dshx:text-destructive">
-            {String(parsed.skipped)} line{parsed.skipped === 1 ? '' : 's'} not in <code>route/model = minutes</code> form will be dropped.
-          </p>
+        {asText ? (
+          <>
+            <p className="dshx:text-xs dshx:text-muted-foreground">
+              One rule per line in minutes: <code>route/model = 60</code>, or <code>route/*</code>.
+            </p>
+            <Textarea
+              className="dshx:min-h-16 dshx:font-mono! dshx:text-xs"
+              disabled={props.readOnly || !preferences.idleCacheWarning}
+              id="ai-accounts-prompt-cache-minutes"
+              onBlur={saveLifetimes}
+              onChange={event => setDraft(event.target.value)}
+              placeholder="claude_work/* = 60"
+              spellCheck={false}
+              value={draft ?? savedText}
+            />
+            {parsed.skipped === 0 ? null : (
+              <p className="dshx:text-xs dshx:text-destructive">
+                {String(parsed.skipped)} line{parsed.skipped === 1 ? '' : 's'} not in <code>route/model = minutes</code> form will be dropped.
+              </p>
+            )}
+          </>
+        ) : (
+          <RouteRuleTable<number>
+            defaultValue={60}
+            disabled={props.readOnly || !preferences.idleCacheWarning}
+            label="Cache lifetimes"
+            onChange={rules => props.write(settings.set('promptCacheMinutes', RouteRules.record(rules)))}
+            renderValue={input => (
+              <Select
+                disabled={props.readOnly || !preferences.idleCacheWarning}
+                value={String(input.value)}
+                onValueChange={value => input.onChange(Number(value))}
+              >
+                <SelectTrigger aria-label={input.label} className="dshx:h-8 dshx:w-full dshx:text-xs dshx:pointer-coarse:h-11" size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(CACHE_LIFETIME_MINUTES.includes(input.value)
+                    ? CACHE_LIFETIME_MINUTES
+                    : [...CACHE_LIFETIME_MINUTES, input.value].toSorted((a, b) => a - b)
+                  ).map(minutes => (
+                    <SelectItem key={minutes} value={String(minutes)}>
+                      {minutes >= 60 && minutes % 60 === 0 ? `${String(minutes / 60)} h` : `${String(minutes)} min`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            rules={RouteRules.of(preferences.promptCacheMinutes)}
+          />
         )}
       </div>
     </Group>

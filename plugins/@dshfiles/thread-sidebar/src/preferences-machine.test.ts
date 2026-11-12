@@ -16,6 +16,7 @@ const deferred = <Value>() => {
 const settledLegacy = (overrides: Partial<LegacyPreferences> = {}): LegacyPreferences => ({
   threadViews: { settings: DEFAULT_THREAD_VIEW_SETTINGS, doneFiltersMigrated: true, shippedFiltersMigrated: true },
   collapsedGroups: [],
+  boardView: null,
   ...overrides,
 })
 

@@ -13,6 +13,7 @@ import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 import { materializeNonblankThread } from '../thread-composer.js'
 import { ThreadSidebarJourney } from '../thread-list-grouping.js'
+import { ThreadListFilter } from '../thread-list-filter.js'
 
 const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
@@ -69,7 +70,6 @@ const openThreadBoard = async (page: Page): Promise<void> => {
   await openGlobalPanel(page, 'Board')
   await expect(threadBoard(page)).toBeVisible()
 }
-const sidebarNavigation = (page: Page) => page.getByRole('navigation', { name: 'Sidebar navigation' })
 const customizeSidebar = (page: Page) => page.getByRole('region', { name: 'Customize sidebar' })
 const sidebarSettings = (page: Page) => page.getByRole('region', { name: 'Thread list settings' })
 const paletteDialog = (page: Page) => page.getByRole('dialog', { name: 'Command palette' })
@@ -102,9 +102,8 @@ const openSettledThreadRowMenu = async (page: Page, row: Locator, item: string):
   }).toPass({ timeout: 30_000 })
   return menuItem
 }
-// Pin, Park, Settle and Archive sit under the row menu's Change status submenu.
+// Pin, Settle, Park and Archive lead the row menu (productivity pass E8): top-level items, not a submenu.
 const chooseRowStatusAction = async (page: Page, action: string): Promise<void> => {
-  await page.getByRole('menuitem', { name: 'Change status', exact: true }).click()
   await page.getByRole('menuitem', { name: action, exact: true }).click()
 }
 
@@ -140,7 +139,7 @@ const sectionOfSidebar = (page: Page, section: string): Locator => threadSidebar
 const startBlankThread = async (page: Page): Promise<string> => {
   await expect.poll(() => currentThreadId(page), { message: 'The page never restored its first thread selection after boot.', timeout: 15_000 }).not.toBeNull()
   const existingThreadId = currentThreadId(page)
-  const blankComposer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const blankComposer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   if (existingThreadId !== null && (await blankComposer.isVisible())) return existingThreadId
   const createdThreadIds = new Set<string>()
   const recordCreatedThread = async (response: Response): Promise<void> => {
@@ -171,7 +170,7 @@ const startBlankThread = async (page: Page): Promise<string> => {
 }
 
 const selectBlankThreadAwayFrom = async (page: Page, excludedThreadId: string): Promise<string> => {
-  const blankComposer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const blankComposer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   const existingThreadId = currentThreadId(page)
   if (existingThreadId !== null && existingThreadId !== excludedThreadId && (await blankComposer.isVisible())) return existingThreadId
   await ThreadSidebarJourney.newThreadButton(page).click()
@@ -196,7 +195,7 @@ const selectBlankThreadAwayFrom = async (page: Page, excludedThreadId: string): 
 const settingsSurface = (page: Page): Locator => settingsPage(page).or(page.getByRole('dialog')).filter({ hasText: 'Built-in plugins' }).first()
 
 const openSidebarSettings = async (page: Page): Promise<void> => {
-  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
+  await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
   await expect(sidebarSettings(page)).toBeVisible()
 }
 
@@ -221,14 +220,7 @@ const setThreadStatusFilters = async (
   selectedLabels: readonly string[],
   scope: Locator = threadSidebar(page),
 ): Promise<void> => {
-  await scope.getByRole('button', { name: triggerName, exact: true }).click()
-  for (const label of statusFilterLabels) {
-    const item = page.getByRole('menuitemcheckbox', { name: label, exact: true })
-    const shouldBeChecked = label === 'All threads' ? selectedLabels.length === 0 : selectedLabels.includes(label)
-    if ((await item.getAttribute('aria-checked')) === String(shouldBeChecked)) continue
-    await item.click()
-  }
-  await page.keyboard.press('Escape')
+  await ThreadListFilter.setStatus(page, scope, triggerName, statusFilterLabels, selectedLabels)
 }
 
 // All threads ships grouped by status (Needs you, Working, Ready, Idle, Done); journeys that assert an Active, Parked or
@@ -236,7 +228,7 @@ const setThreadStatusFilters = async (
 const showThreadsByStatus = async (page: Page): Promise<void> => {
   const railThreads = page.getByRole('tab', { name: 'Threads', exact: true })
   if ((await railThreads.count()) > 0 && (await railThreads.first().getAttribute('aria-selected')) !== 'true') await railThreads.first().click()
-  await threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true }).getByRole('button', { name: 'All threads', exact: true }).click()
+  await ThreadListFilter.selectView(page, threadSidebar(page), 'All threads')
   await ThreadSidebarJourney.arrangeManually(page)
 }
 
@@ -245,8 +237,8 @@ const selectThreadViewValue = async (page: Page, triggerName: string, value: str
     await setThreadStatusFilters(page, triggerName, value === 'All threads' ? [] : [value], scope)
     return
   }
-  await scope.getByRole('button', { name: triggerName, exact: true }).click()
-  await page.getByRole('menuitemradio', { name: value, exact: true }).click()
+  if (triggerName.startsWith('Group: ')) await ThreadListFilter.selectGroup(page, scope, value)
+  else await ThreadListFilter.selectSource(page, scope, triggerName, value)
 }
 
 When('a blank Host thread is started', async ({ page }: { page: Page }) => {
@@ -365,7 +357,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await expect(undoEnabled).toBeChecked()
   await undoDuration.fill('2')
   await expect(undoDuration).toHaveValue('2')
-  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
+  await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
 
   await startBlankThread(page)
   const timedPrompt = 'thread sidebar archive duration e2e'
@@ -383,7 +375,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await openSidebarSettings(page)
   await undoEnabled.uncheck()
   await expect(undoEnabled).not.toBeChecked()
-  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
+  await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
 
   await startBlankThread(page)
   const disabledPrompt = 'thread sidebar archive disabled e2e'
@@ -450,7 +442,8 @@ const phoneSubmenuJourneys = new WeakMap<Page, PhoneSubmenuJourney>()
 const PHONE_VIEWPORT = { width: 390, height: 844 }
 
 const sendFailingPrompt = async (page: Page, prompt: string, previousThreadId?: string): Promise<string> => {
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  // The fork's composer says threads where the stock one says sessions.
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill(prompt)
   await composer.press('Enter')
   if (previousThreadId !== undefined) await expect.poll(() => currentThreadId(page), { timeout: 15_000 }).not.toBe(previousThreadId)
@@ -513,14 +506,14 @@ Then(
     }
     try {
       await recordAssertion(page, 'thread-sidebar-phone-notify-submenu-fits', async () => {
-        await openRowSubmenu(/^Notify .* when this thread finishes$/u)
+        await openRowSubmenu(/^Notify…$/u)
         await expectSubmenuFitsThePhone()
         const path = $testInfo.outputPath('thread-subscription-notify-phone.png')
         await page.screenshot({ path, animations: 'disabled' })
         await $testInfo.attach('thread-subscription-notify-phone', { path, contentType: 'image/png' })
         await submenu.getByRole('menuitemradio', { name: 'Only when stuck', exact: true }).click()
         await expect(submenu).toBeHidden()
-        await openRowSubmenu(/^Notify .* when this thread finishes$/u)
+        await openRowSubmenu(/^Notify…$/u)
         await expect(submenu.getByRole('menuitemradio', { name: 'Only when stuck', exact: true })).toHaveAttribute('aria-checked', 'true')
         await page.keyboard.press('Escape')
         await page.keyboard.press('Escape')
@@ -716,7 +709,7 @@ When('a No folder thread is started and turned into a project from its row menu'
   // The composer's picker and the jj-integration replacement mount a moment apart; a click during the hand-off can open
   // a picker without No folder. Close and reopen until the replacement is the one answering.
   await expect(async () => {
-    await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+    await page.getByRole('button', { name: /^Choose (?:project|workspace)$/u }).click()
     const noFolder = picker.getByRole('option', { name: /^No folder/ }).first()
     if (!(await noFolder.isVisible({ timeout: 2_000 }).catch(() => false))) {
       await page.keyboard.press('Escape')
@@ -766,12 +759,7 @@ Then('the thread sits under its own project and its scratch folder exists', asyn
     expect(existsSync(journey.projectPath)).toBe(true)
   })
   await recordAssertion(page, 'promoted-thread-groups-under-its-own-project', async () => {
-    const groupButton = threadSidebar(page)
-      .getByRole('button', { name: /^Group: /u })
-      .first()
-    await expect(groupButton).toBeVisible()
-    await groupButton.click()
-    await page.getByRole('menuitemradio', { name: 'Project', exact: true }).click()
+    await ThreadListFilter.selectGroup(page, threadSidebar(page), 'Project')
     const group = threadSidebar(page).getByRole('region', { name: journey.projectTitle, exact: true })
     await expect(group.locator(`article[data-thread-id="${journey.threadId}"]`)).toHaveCount(1)
     await expect(
@@ -833,7 +821,7 @@ Then('separate remote grouping is opt-in, reorderable and persists across reload
     await expect(separateRemoteThreads).not.toBeChecked()
     await separateRemoteThreads.check()
     await expect.poll(headerNames).toEqual(['Active(0)', 'Settled(1)', 'Archived(1)', 'Remote(0)'])
-    await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
+    await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
   })
   await recordAssertion(page, 'thread-sidebar-section-drag-reorders', async () => {
     await dragHeaderToTop(2)
@@ -849,7 +837,7 @@ Then('separate remote grouping is opt-in, reorderable and persists across reload
     const separateRemoteThreads = sidebarSettings(page).getByRole('checkbox', { name: 'Show remote threads in a separate group' })
     await expect(separateRemoteThreads).toBeChecked()
     await separateRemoteThreads.uncheck()
-    await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
+    await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
     await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)'])
   })
   await finishJourneyAssertions(page)
@@ -970,7 +958,7 @@ const selectSettledArchiveDelay = async (page: Page, value: string): Promise<voi
   await delayGroup.getByRole('button').click()
   await page.getByRole('menuitemradio', { name: value, exact: true }).click()
   await expect(delayGroup.getByRole('button', { name: value, exact: true })).toBeVisible()
-  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
+  await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
 }
 
 When('a thread is settled with a one-week settled-archive delay', async ({ page }: { page: Page }) => {
@@ -1019,7 +1007,7 @@ When('separate remote threads are enabled and the thread board page is opened', 
   await showThreadsByStatus(page)
   await openSidebarSettings(page)
   await sidebarSettings(page).getByRole('checkbox', { name: 'Show remote threads in a separate group' }).check()
-  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
+  await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
   await expect(threadSidebar(page).locator('[data-remote-threads]')).toHaveCount(1)
   await openThreadBoard(page)
 })
@@ -1034,7 +1022,7 @@ Then('the board shows only columns, grouped and filtered independently from the 
   })
   await recordAssertion(page, 'thread-sidebar-board-keeps-independent-view-state', async () => {
     // The sidebar keeps the list; the page carries the board's own view controls.
-    await expect(threadSidebar(page).getByRole('button', { name: 'Group: Arrange manually', exact: true })).toBeVisible()
+    await ThreadListFilter.expectGroup(page, threadSidebar(page), 'Arrange manually')
     // The board keeps the drag-to-arrange sections as its columns; the list defaults to the status grouping.
     await expect(board.getByRole('button', { name: 'Group: Arrange manually', exact: true })).toBeVisible()
   })
@@ -1049,13 +1037,13 @@ Then('the board shows only columns, grouped and filtered independently from the 
   await expect(board.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
   await expect(board.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
   await expect(board.getByRole('combobox', { name: 'Project filter', exact: true })).toHaveText('Unassigned')
-  await expect(threadSidebar(page).getByRole('button', { name: 'Group: Arrange manually', exact: true })).toBeVisible()
+  await ThreadListFilter.expectGroup(page, threadSidebar(page), 'Arrange manually')
   await expect(threadSidebar(page).getByRole('combobox', { name: 'Project filter', exact: true })).toHaveText('All projects')
 
   await page.reload()
   const reloadedSidebar = threadSidebar(page)
   await expect(reloadedSidebar).toBeVisible()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Group: Arrange manually', exact: true })).toBeVisible()
+  await ThreadListFilter.expectGroup(page, reloadedSidebar, 'Arrange manually')
   await expect(reloadedSidebar.getByRole('combobox', { name: 'Project filter', exact: true })).toHaveText('All projects')
 
   await openThreadBoard(page)
@@ -1265,7 +1253,15 @@ When('a thread is snoozed until tomorrow morning from its sidebar row', async ({
   await page.getByRole('menuitem', { name: 'Until tomorrow morning', exact: true }).click()
   const marker = targetRow.getByRole('img', { name: 'Muted', exact: true })
   await expect(marker).toBeVisible()
-  await marker.hover()
+  // A 200px sidebar row leads with its project mark (polish pass b:r4et), so on hover the row's action strip can sit
+  // over the marker; its mute button (named Muted once the thread is muted) then says the same wake time. Hover whichever
+  // the pointer reaches.
+  const markerReachable = await marker.hover({ trial: true, timeout: 2_000 }).then(
+    () => true,
+    () => false,
+  )
+  if (markerReachable) await marker.hover()
+  else await targetRow.getByRole('button', { name: 'Muted', exact: true }).hover()
   await expect(
     page
       .getByRole('tooltip')
@@ -1342,7 +1338,6 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await selectThreadViewValue(page, 'Filter: Working', 'All threads')
   await expect(targetRow).toBeVisible()
   await openThreadRowMenu(targetRow)
-  await page.getByRole('menuitem', { name: 'Change status', exact: true }).click()
   const archiveItem = page.getByRole('menuitem', { name: 'Archive', exact: true })
   await expect(archiveItem).toBeEnabled()
   const archivedThreadId = await targetRow.getAttribute('data-thread-id')
@@ -1359,7 +1354,8 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await expect(targetRow).toBeVisible()
   await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(displayTitle)
   await setThreadStatusFilters(page, 'Filter: Archived · Main threads', ['Working', 'Archived'])
-  await expect(threadSidebar(page).getByRole('button', { name: 'Filter: Working · Archived · Main threads', exact: true })).toBeVisible()
+  // Filter presets (b:xpvk): the trigger names the preset the filters started from, marked edited until saved.
+  await expect(threadSidebar(page).getByRole('button', { name: 'Filter: All threads (edited)', exact: true })).toBeVisible()
   await expect(targetRow).toBeVisible()
   await setThreadStatusFilters(page, 'Filter: Working · Archived · Main threads', ['Archived'])
 
@@ -1389,22 +1385,25 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
     // The group was collapsed before the reload; a Host-synced preference is still collapsed, and expanding restores it.
     // Wait for the reloaded sidebar to render the synced view before touching a header: while Host settings load, a
     // header it shows can still be replaced, and a click on that detached node never reaches the page.
-    await expect(threadSidebar(page).getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
-    await expect(threadSidebar(page).getByRole('button', { name: 'Filter: Archived · Main threads', exact: true })).toBeVisible()
+    await ThreadListFilter.expectGroup(page, threadSidebar(page), 'Date')
+    await expect(threadSidebar(page).getByRole('button', { name: 'Filter: All threads (edited)', exact: true })).toBeVisible()
     const todayHeader = threadSidebar(page).getByRole('button', { name: /^Today/u })
     await expect(todayHeader).toBeVisible()
     await expect(todayHeader).toHaveAttribute('aria-expanded', 'false')
     await expect(targetRow).toHaveCount(0)
     await todayHeader.click()
     await expect(targetRow).toBeVisible()
-    await expect(threadSidebar(page).getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
-    await expect(threadSidebar(page).getByRole('button', { name: 'Filter: Archived · Main threads', exact: true })).toBeVisible()
+    await ThreadListFilter.expectGroup(page, threadSidebar(page), 'Date')
+    await expect(threadSidebar(page).getByRole('button', { name: 'Filter: All threads (edited)', exact: true })).toBeVisible()
     await expect(targetRow).toBeVisible()
     await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(displayTitle)
-    await threadSidebar(page).getByRole('button', { name: 'Filter: Archived · Main threads', exact: true }).click()
+    // Status and Source are submenus of the Filter menu (productivity pass Q5, T5.3).
+    await ThreadListFilter.openSubmenu(page, threadSidebar(page), /^Status: /u)
     await expect(page.getByRole('menuitemcheckbox', { name: 'Archived', exact: true })).toHaveAttribute('aria-checked', 'true')
+    await ThreadListFilter.close(page)
+    await ThreadListFilter.openSubmenu(page, threadSidebar(page), /^Source: /u)
     await expect(page.getByRole('menuitemradio', { name: 'Main threads', exact: true })).toHaveAttribute('aria-checked', 'true')
-    await page.keyboard.press('Escape')
+    await ThreadListFilter.close(page)
   })
   await finishJourneyAssertions(page)
 })
@@ -1439,11 +1438,10 @@ When('a view context menu marks a thread unread', async ({ page }: { page: Page 
   await composer.fill('thread sidebar view context unread e2e target')
   await composer.press('Enter')
   const row = threadRow(page, threadId)
-  const allThreadsTab = threadSidebar(page).locator('button[data-thread-list-view-button][title="All threads"]')
-
   await expect(row).toHaveCount(1)
-  await allThreadsTab.click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Mark all as unread', exact: true }).click()
+  // Productivity pass Q5: the view's read / unread verbs are in the Filter menu, under the active preset's options.
+  await ThreadListFilter.selectView(page, threadSidebar(page), 'All threads')
+  await ThreadListFilter.clickViewItem(page, threadSidebar(page), 'Mark all as unread')
   await expect(row.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
 })
 
@@ -1451,10 +1449,7 @@ Then('the same view context menu marks it read', async ({ page }: { page: Page }
   const threadId = viewContextUnreadJourneys.get(page)
   if (threadId === undefined) throw new Error('view context menu journey did not create a thread')
   const row = threadRow(page, threadId)
-  const allThreadsTab = threadSidebar(page).locator('button[data-thread-list-view-button][title="All threads"]')
-
-  await allThreadsTab.click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Mark all as read', exact: true }).click()
+  await ThreadListFilter.clickViewItem(page, threadSidebar(page), 'Mark all as read')
   await recordAssertion(page, 'thread-sidebar-view-context-read-unread', async () => {
     await expect(row.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
   })
@@ -1536,11 +1531,13 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
   await recordAssertion(page, 'thread-sidebar-turn-finished-outlives-its-client', async () => {
     await page.reload()
     await expect(finishedLabel(page)).toBeVisible({ timeout: 60_000 })
-    const tabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
-    const doneTab = tabs.getByRole('button', { name: 'Done (1), Turn finished', exact: true })
+    // The views are the Filter menu's presets (Q5, b:xpvk); each keeps the former tab's name and dot.
+    const tabs = await ThreadListFilter.openViews(page, threadSidebar(page))
+    const doneTab = tabs.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })
     await expect(doneTab).toBeVisible()
     await expect(doneTab.getByTestId('thread-view-attention-dot')).toHaveClass(/bg-success/)
-    await expect(tabs.getByRole('button', { name: 'All threads', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
+    await expect(tabs.getByRole('menuitemradio', { name: 'All threads', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
+    await ThreadListFilter.close(page)
   })
   const otherTab = await page.context().newPage()
   try {
@@ -1548,23 +1545,33 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
     await recordAssertion(page, 'thread-sidebar-turn-finished-is-shared-across-tabs', async () => {
       await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
       await expect(
-        threadSidebar(otherTab).getByRole('button', { name: 'Done (1), Turn finished', exact: true }).getByTestId('thread-view-attention-dot'),
+        (await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab)))
+          .getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })
+          .getByTestId('thread-view-attention-dot'),
       ).toBeVisible()
+      await ThreadListFilter.close(otherTab)
       await otherTab.reload()
       await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
       await expect(
-        threadSidebar(otherTab).getByRole('button', { name: 'Done (1), Turn finished', exact: true }).getByTestId('thread-view-attention-dot'),
+        (await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab)))
+          .getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })
+          .getByTestId('thread-view-attention-dot'),
       ).toBeVisible()
+      await ThreadListFilter.close(otherTab)
     })
     await recordAssertion(page, 'thread-sidebar-turn-finished-clears-in-every-tab', async () => {
       await openThreadRow(threadRow(otherTab, journey.targetThreadId))
       await expect(finishedLabel(otherTab)).toHaveCount(0, { timeout: 15_000 })
-      await expect(threadSidebar(otherTab).getByRole('button', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0)
-      await expect(threadSidebar(otherTab).getByRole('button', { name: 'Done', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
+      const otherViews = await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab))
+      await expect(otherViews.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0)
+      await expect(otherViews.getByRole('menuitemradio', { name: ThreadListFilter.viewName('Done') }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
+      await ThreadListFilter.close(otherTab)
       await page.bringToFront()
       await page.reload()
       await expect(finishedLabel(page)).toHaveCount(0, { timeout: 30_000 })
-      await expect(threadSidebar(page).getByRole('button', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0)
+      const views = await ThreadListFilter.openViews(page, threadSidebar(page))
+      await expect(views.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0)
+      await ThreadListFilter.close(page)
     })
   } finally {
     await otherTab.close()
@@ -1582,7 +1589,7 @@ When('auto-settle is enabled for one thread while global auto-settle stays off',
   await expect(targetRow).toHaveCount(1)
   await openSidebarSettings(page)
   await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })).not.toBeChecked()
-  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
+  await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
   await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
   const enableForThread = page.getByRole('menuitemradio', { name: 'Settle after idle threshold', exact: true })
@@ -1599,7 +1606,7 @@ Then('the per-thread override survives reload without changing the global settin
   await recordAssertion(page, 'thread-sidebar-global-auto-settle-remains-off', async () => {
     await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })).not.toBeChecked()
   })
-  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
+  await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
   await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-per-thread-auto-settle-survives-reload', async () => {
@@ -1639,6 +1646,12 @@ Then('the selected attention color survives a browser reload', async ({ page }: 
   })
   await finishJourneyAssertions(page)
 })
+
+/** Back to the Threads destination when the rail shows another (opening Settings from the rail selects its own). */
+const backToThreads = async (page: Page): Promise<void> => {
+  const tab = page.getByRole('navigation', { name: 'Destinations', exact: true }).getByRole('tab', { name: 'Threads', exact: true })
+  if ((await tab.count()) > 0 && (await tab.getAttribute('aria-selected')) !== 'true') await tab.click()
+}
 
 /**
  * Opens the plugin's own Settings section. It is found by its label, not by a nav id: a profile whose
@@ -1746,41 +1759,64 @@ Then('the notification settings survive a browser reload', async ({ page }: { pa
   await finishJourneyAssertions(page)
 })
 
-When('the header is expanded, reordered, and one destination is hidden', async ({ page }: { page: Page }) => {
-  // Header destinations belong to the free-docking sidebar; the fixed layout's rail is not reorderable.
+/** Customize sidebar › Header links: the order and visibility the Navigation pane draws its destinations in. */
+const headerLinks = (page: Page): Locator =>
+  customizeSidebar(page)
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Header links', exact: true }) })
+const navigationToolbar = (page: Page): Locator => workbenchNavigation(page).getByRole('toolbar', { name: 'Sidebar navigation', exact: true })
+/** The thread list itself: in a Workbench profile its Dockview group is also a region named Threads. */
+const threadList = (page: Page): Locator => page.locator('[data-thread-surface="sidebar"]').first()
+const navigationLayout = new WeakMap<Page, { readonly moved: string; readonly firstBefore: string | null; readonly count: number }>()
+
+When('the Navigation pane destinations are reordered and one is hidden', async ({ page }: { page: Page }) => {
+  // One sidebar layout (b:952m): the header destinations are the Workbench Navigation pane, which the former Free
+  // docking arrangement seats above Threads.
   await ThreadSidebarJourney.useFreeDocking(page)
-  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).first().click()
-  const customize = customizeSidebar(page)
-  await expect(customize).toBeVisible()
-  await customize.getByRole('radio', { name: 'Expanded labels', exact: true }).click()
-  await customize.getByRole('button', { name: 'Move down: New thread', exact: true }).click()
-  const navigation = sidebarNavigation(page)
-  await expect(navigation.getByRole('button').nth(0)).toHaveAccessibleName('Search threads')
-  await expect(navigation.getByRole('button').nth(1)).toHaveAccessibleName('New thread')
-  await customize.getByRole('checkbox', { name: 'Show item: Search threads', exact: true }).click()
-  await expect(navigation.getByRole('button', { name: 'Search threads', exact: true })).toHaveCount(0)
-  await customize.getByRole('button', { name: 'Done', exact: true }).click()
+  const toolbar = navigationToolbar(page)
+  await expect(toolbar).toBeVisible()
+  const destinations = toolbar.locator('button[aria-current], button[aria-label]').filter({ hasNot: page.getByText('More sidebar destinations') })
+  const firstBefore = await destinations.first().getAttribute('aria-label')
+  const countBefore = await toolbar.getByRole('button').count()
+  await ThreadListFilter.openSidebarSettings(page)
+  await expect(customizeSidebar(page)).toBeVisible()
+  // New thread and Search threads lead the list; the first destination row follows them.
+  const moveDown = headerLinks(page).getByRole('button', { name: /^Move down: /u })
+  const name = (await moveDown.nth(2).getAttribute('aria-label')) ?? ''
+  const moved = name.replace(/^Move down: /u, '')
+  await moveDown.nth(2).click()
+  await expect(headerLinks(page).getByRole('button', { name: `Move up: ${moved}`, exact: true })).toBeEnabled()
+  await expect.poll(() => destinations.first().getAttribute('aria-label')).not.toBe(firstBefore)
+  await headerLinks(page)
+    .getByRole('checkbox', { name: `Show item: ${moved}`, exact: true })
+    .click()
+  await expect(toolbar.getByRole('button')).toHaveCount(countBefore - 1)
+  navigationLayout.set(page, { moved, firstBefore, count: countBefore - 1 })
+  await customizeSidebar(page).getByRole('button', { name: 'Done', exact: true }).click()
   await page.reload()
-  await expect(threadSidebar(page)).toBeVisible()
-  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).first().click()
+  await expect(threadList(page)).toBeVisible()
 })
 
-Then('the custom layout survives a browser reload', async ({ page }: { page: Page }) => {
-  const customize = customizeSidebar(page)
+Then('the custom navigation survives a browser reload', async ({ page }: { page: Page }) => {
+  const saved = navigationLayout.get(page)
+  if (saved === undefined) throw new Error('The reordered navigation was not recorded')
   await recordAssertion(page, 'thread-sidebar-navigation-layout-survives-reload', async () => {
-    await expect(customize.getByRole('radio', { name: 'Expanded labels', exact: true })).toBeChecked()
-    await expect(customize.getByRole('checkbox', { name: 'Show item: Search threads', exact: true })).not.toBeChecked()
-    await expect(customize.getByRole('button', { name: 'Move up: New thread', exact: true })).toBeEnabled()
-    const navigation = sidebarNavigation(page)
-    await expect(navigation.getByRole('button', { name: 'Search threads', exact: true })).toHaveCount(0)
-    await expect(navigation.getByRole('button', { name: 'New thread', exact: true })).toHaveText('New thread')
+    await expect(navigationToolbar(page).getByRole('button')).toHaveCount(saved.count)
+    await ThreadListFilter.openSidebarSettings(page)
+    await expect(headerLinks(page).getByRole('checkbox', { name: `Show item: ${saved.moved}`, exact: true })).not.toBeChecked()
+    await expect(headerLinks(page).getByRole('button', { name: `Move up: ${saved.moved}`, exact: true })).toBeEnabled()
   })
   await finishJourneyAssertions(page)
 })
 
 When('the sidebar footer More menu is opened', async ({ page }: { page: Page }) => {
-  // The footer and header More menus belong to the free-docking sidebar; the fixed layout lists every page on the rail.
+  // One sidebar layout (b:952m): the header More menu is the Workbench Navigation pane's; the row under the list is
+  // shown from Customize sidebar, as a former Free docking user has it.
   await ThreadSidebarJourney.useFreeDocking(page)
+  await ThreadListFilter.openSidebarSettings(page)
+  const footer = customizeSidebar(page).getByRole('checkbox', { name: 'Show the row under the list', exact: true })
+  if (!(await footer.isChecked())) await footer.click()
+  await customizeSidebar(page).getByRole('button', { name: 'Done', exact: true }).click()
   await page.getByRole('button', { name: 'More', exact: true }).click()
 })
 
@@ -1795,7 +1831,8 @@ Then('the footer menu lists Settings and the sidebar pages and opens the Plugins
   })
   await plugins.click()
   await recordAssertion(page, 'thread-sidebar-footer-more-opens-the-plugins-page', async () => {
-    await expect(sidebarNavigation(page).getByRole('button', { name: 'Plugins', exact: true })).toHaveAttribute('aria-current', 'page')
+    // The Navigation pane marks the open page current; a Workbench profile names it by its view (Plugin Manager: Plugins).
+    await expect(navigationToolbar(page).getByRole('button', { name: /^(?:.+: )?Plugins$/u })).toHaveAttribute('aria-current', 'page')
   })
 })
 
@@ -1818,20 +1855,27 @@ Then('the header menu offers Settings and Customize sidebar', async ({ page }: {
 })
 
 When('the Workbench Navigation panel is opened in menu-only overflow', async ({ page }: { page: Page }) => {
+  // The Workbench Navigation panel is Free docking's sidebar header (productivity pass Q5 hides the main tab rows in
+  // the Fixed layout). Free docking seats one in the left pane; open one in the main pane only when it has none.
+  await ThreadSidebarJourney.useFreeDocking(page)
   const main = page.locator('[data-workbench-region="main"]').first()
-  const newTab = main.getByRole('button', { name: 'New tab', exact: true }).filter({ visible: true }).first()
-  await newTab.click()
-  const chooser = main.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })
-  await expect(chooser).toBeVisible()
-  await chooser.getByRole('button', { name: viewNamePattern('Navigation') }).click()
+  if ((await workbenchNavigation(page).count()) === 0) {
+    await main.getByRole('button', { name: 'New tab', exact: true }).filter({ visible: true }).first().click()
+    const chooser = main.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })
+    await expect(chooser).toBeVisible()
+    await chooser.getByRole('button', { name: viewNamePattern('Navigation') }).click()
+  }
   await expect(workbenchNavigation(page)).toBeVisible()
   await page.evaluate(
     ([key, preferences]) => localStorage.setItem(key ?? '', preferences ?? ''),
-    [PREFERENCES_STORAGE_KEY, JSON.stringify({ ...DEFAULT_PREFERENCES, navigationOverflow: 'menu' })],
+    [PREFERENCES_STORAGE_KEY, JSON.stringify({ ...DEFAULT_PREFERENCES, layoutMode: 'docking', navigationOverflow: 'menu' })],
   )
   await page.reload()
-  const navigationTab = main.getByRole('tab', { name: viewNamePattern('Navigation') })
-  if ((await navigationTab.getAttribute('aria-selected')) !== 'true') await navigationTab.click()
+  const navigationTab = page
+    .getByRole('tab', { name: viewNamePattern('Navigation') })
+    .filter({ visible: true })
+    .first()
+  if ((await navigationTab.count()) > 0 && (await navigationTab.getAttribute('aria-selected')) !== 'true') await navigationTab.click()
   const navigation = workbenchNavigation(page)
   await expect(navigation).toBeVisible()
   await expect(navigation.getByRole('toolbar', { name: 'Sidebar navigation', exact: true })).toHaveCSS('overflow-x', 'hidden')
@@ -1845,7 +1889,10 @@ Then('the Workbench Navigation More menu offers Settings', async ({ page }: { pa
     await expect(menu.getByRole('option', { name: 'Settings', exact: true })).toBeVisible()
     await expect(menu.getByRole('option', { name: 'Customize sidebar', exact: true })).toBeVisible()
   })
-  await menu.getByRole('option', { name: 'Settings', exact: true }).click()
+  // The menu is anchored in the narrow left pane in Free docking, where it keeps settling; pick Settings by its filter.
+  await menu.getByPlaceholder('Filter destinations…').fill('Settings')
+  await expect(menu.getByRole('option', { name: 'Settings', exact: true })).toBeVisible()
+  await page.keyboard.press('Enter')
   await recordAssertion(page, 'thread-sidebar-workbench-navigation-more-opens-settings', async () => {
     await expect(settingsSurface(page)).toBeVisible()
   })
@@ -1855,32 +1902,35 @@ Then('the Workbench Navigation More menu offers Settings', async ({ page }: { pa
 // The overflow mode has no Customize control; a browser copy is what the sidebar hands to Host settings on load.
 When('the sidebar header moves overflowing destinations into its More menu only', async ({ page }: { page: Page }) => {
   await ThreadSidebarJourney.useFreeDocking(page)
-  await expect(sidebarNavigation(page).getByRole('button', { name: 'More sidebar destinations', exact: true })).toBeVisible()
+  await expect(workbenchNavigation(page).getByRole('button', { name: 'More sidebar destinations', exact: true })).toBeVisible()
   await page.evaluate(
     ([key, preferences]) => localStorage.setItem(key ?? '', preferences ?? ''),
     [PREFERENCES_STORAGE_KEY, JSON.stringify({ ...DEFAULT_PREFERENCES, navigationOverflow: 'menu' })],
   )
   await page.reload()
-  await expect(threadSidebar(page)).toBeVisible()
-  await expect(sidebarNavigation(page).getByRole('toolbar', { name: 'Sidebar navigation', exact: true })).toHaveCSS('overflow-x', 'hidden')
+  await expect(threadList(page)).toBeVisible()
+  await expect(navigationToolbar(page)).toHaveCSS('overflow-x', 'hidden')
 })
 
 Then('the header More menu still offers Settings and opens a destination the row left out', async ({ page }: { page: Page }) => {
-  const navigation = sidebarNavigation(page)
+  const navigation = workbenchNavigation(page)
   const toolbar = navigation.getByRole('toolbar', { name: 'Sidebar navigation', exact: true })
   const menu = page.getByRole('dialog').filter({ has: page.getByPlaceholder('Filter destinations…') })
-  const movedDestination = 'Land'
+  // The Land page (jj-integration). The Workbench Navigation pane names it by its view (b:952m: the standalone header
+  // that called it Land is retired), so match either name.
+  const landName = /^(?:.+: )?(?:Land|Workspaces|Thread integration)$/u
   await recordAssertion(page, 'thread-sidebar-menu-overflow-offers-settings', async () => {
     await navigation.getByRole('button', { name: 'More sidebar destinations', exact: true }).click()
-    await expect(menu.getByRole('option', { name: movedDestination, exact: true })).toBeVisible()
+    await expect(menu.getByRole('option', { name: landName }).first()).toBeVisible()
     await expect(menu.getByRole('option', { name: 'Settings', exact: true })).toBeVisible()
     await expect(menu.getByRole('option', { name: 'Customize sidebar', exact: true })).toBeVisible()
-    await page.keyboard.press('Escape')
-    await expect(menu).toHaveCount(0)
   })
   await recordAssertion(page, 'thread-sidebar-menu-overflow-opens-a-moved-destination', async () => {
-    await expect(toolbar.getByRole('button', { name: movedDestination, exact: true })).toHaveCount(0)
-    await openGlobalPanel(page, movedDestination)
+    await expect(toolbar.getByRole('button', { name: landName })).toHaveCount(0)
+    // The menu keeps re-laying out in the narrow left pane, so Playwright never sees the option stable; a dispatched
+    // click still runs the option's own select handler, as a real click does.
+    await menu.getByRole('option', { name: landName }).first().dispatchEvent('click')
+    await expect(menu).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Land', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
@@ -1948,7 +1998,7 @@ When('two nonblank Host threads are listed in the sidebar', async ({ page }: { p
 
 const prepareKeyboardNavigationViews = async (page: Page): Promise<void> => {
   const sidebar = threadSidebar(page)
-  await sidebar.getByRole('button', { name: 'Thread list settings', exact: true }).click()
+  await ThreadListFilter.clickItem(page, sidebar, 'Thread list settings')
   await sidebarSettings(page).getByRole('button', { name: 'Manage views', exact: true }).click()
   const viewManager = page.getByRole('dialog')
   // The non-All built-in views all become plain lists, so every tab in the row holds the same two rows.
@@ -1962,18 +2012,16 @@ const prepareKeyboardNavigationViews = async (page: Page): Promise<void> => {
   await viewManager.getByRole('checkbox', { name: 'All threads', exact: true }).check()
   await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
   await viewManager.getByRole('button', { name: 'Close', exact: true }).click()
-  await sidebar.getByRole('button', { name: 'Thread list settings', exact: true }).click()
+  await ThreadListFilter.clickItem(page, sidebar, 'Thread list settings')
 }
 
 Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', async ({ page }: { page: Page }) => {
   const journey = threadHistoryJourneys.get(page)
   if (journey === undefined) throw new Error('No Host-created thread history was recorded for this browser page.')
   await prepareKeyboardNavigationViews(page)
-  const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
   for (const viewName of ['All threads', 'Working', 'Done', 'Later']) {
-    const viewButton =
-      viewName === 'Working' ? viewTabs.getByRole('button', { name: /^Working(?: \(\d+\))?$/ }) : viewTabs.getByRole('button', { name: viewName, exact: true })
-    await viewButton.click()
+    // Picking a view in the Filter menu returns focus to its trigger; arrow keys go on into the list from there.
+    await ThreadListFilter.selectView(page, threadSidebar(page), viewName)
     const rows = threadSidebar(page).locator('button[data-thread-main-action][data-thread-id]')
     await expect(rows).toHaveCount(2)
     const visibleIds = await rows.evaluateAll(buttons => buttons.map(button => button.getAttribute('data-thread-id')))
@@ -1996,10 +2044,18 @@ Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', asy
       await expect.poll(() => currentThreadId(page)).toBe(secondId)
     })
   }
-  await viewTabs.getByRole('button', { name: 'All threads', exact: true }).click()
-  const rowIds = await threadSidebar(page)
-    .locator('article[data-thread-id]')
-    .evaluateAll(rows => rows.map(row => row.getAttribute('data-thread-id')))
+  await ThreadListFilter.selectView(page, threadSidebar(page), 'All threads')
+  // The list re-renders after the view switch; wait until it lists the Host-created threads again.
+  const listedRows = threadSidebar(page).locator('article[data-thread-id]')
+  await expect
+    .poll(() =>
+      listedRows.evaluateAll(
+        (rows, ids) => rows.some(row => ids.includes(row.getAttribute('data-thread-id') ?? '')),
+        [journey.firstThreadId, journey.secondThreadId],
+      ),
+    )
+    .toBe(true)
+  const rowIds = await listedRows.evaluateAll(rows => rows.map(row => row.getAttribute('data-thread-id')))
   const targetId = rowIds.find(id => id === journey.firstThreadId || id === journey.secondThreadId)
   if (targetId === undefined || targetId === null) throw new Error('Neither Host-created thread is listed in the sidebar.')
   const targetIndex = rowIds.indexOf(targetId)
@@ -2038,6 +2094,8 @@ Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', asy
     await settingsDialog.getByRole('button', { name: 'Move focus only', exact: true }).click()
     await page.keyboard.press('Escape')
     await expect(settingsDialog).toBeHidden()
+    // Settings opened from the rail (no foot row in the Fixed layout, b:4v6p) leaves its destination selected.
+    await backToThreads(page)
     const beforeFocusOnly = currentThreadId(page)
     await targetTrigger.focus()
     await page.keyboard.press('ArrowDown')
@@ -2047,6 +2105,7 @@ Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', asy
     await reopenedSettings.getByRole('button', { name: 'Switch immediately', exact: true }).click()
     await page.keyboard.press('Escape')
     await expect(reopenedSettings).toBeHidden()
+    await backToThreads(page)
   })
   await recordAssertion(page, 'thread-sidebar-keyboard-bulk-settle', async () => {
     await targetTrigger.focus()
@@ -2102,10 +2161,14 @@ When('a visible Host thread is mentioned from its context menu at the captured c
       diagnostics.push(JSON.stringify(values))
     })
   })
-  await openThreadRowMenu(targetRow)
+  // The target's turn ends (no provider answers) at an unpredictable moment, and its row then moves into the Ready
+  // section, remounting it and closing an open context menu. Reopen the menu on the moved row until the click lands.
   const mentionMenuItem = page.getByRole('menuitem', { name: '@Mention thread', exact: true })
-  await expect(mentionMenuItem).toBeVisible()
-  await mentionMenuItem.click()
+  await expect(async () => {
+    await openThreadRowMenu(threadRow(page, targetThreadId))
+    await expect(mentionMenuItem).toBeVisible({ timeout: 3_000 })
+    await mentionMenuItem.click({ timeout: 3_000 })
+  }).toPass({ timeout: 30_000 })
   threadMentionJourneys.set(page, { targetPrompt, diagnostics })
 })
 
@@ -2157,7 +2220,8 @@ const unreadInboxRow = (page: Page): Locator => {
   return threadRow(page, unreadInboxThreadId)
 }
 
-const ATTENTION_REASON = /^(Marked unread\.|Turn failed\.|Turn finished; ready to review\.)/u
+// The headline leads with the thread title when the Host knows it ("“Title” finished · ready to review").
+const ATTENTION_REASON = /^(Marked unread\.|Turn failed\.|Turn finished; ready to review\.)|” (finished · ready to review|failed|marked unread)$/u
 
 /** The row's unread state, whatever glyph its status grouping draws. */
 const unreadMark = (page: Page): Locator => threadSidebar(page).locator(`article[data-thread-id="${unreadInboxThreadId ?? ''}"][data-unread]`)
@@ -2304,6 +2368,60 @@ Then('no restart action or confirmation appears without pending Host changes', a
     await expect(paletteDialog(page).getByRole('option', { name: /Restart DSH/ })).toHaveCount(0)
     await expect(page.getByRole('dialog', { name: 'Restart DSH?' })).toHaveCount(0)
     await expect(page.getByTestId('status-item-restart')).toHaveCount(0)
+    // Nor on the rail (b:kgcc): its Restart DSH is there only while the supervisor offers one.
+    await expect(page.locator('[data-rail-action="restart"]')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+// b:kgcc: Restart, Copy DSH URL and Pair a phone sit on the rail directly above Settings; the setting puts them back in
+// the row under the list.
+const railActions = (page: Page): Locator => page.getByRole('tablist', { name: 'Destinations' }).getByRole('group', { name: 'DSH actions' })
+const railCopyUrl = (page: Page): Locator => railActions(page).getByRole('button', { name: 'Copy DSH URL for agents', exact: true })
+
+const setCustomizeCheckbox = async (page: Page, name: string, checked: boolean): Promise<void> => {
+  await ThreadListFilter.openSidebarSettings(page)
+  const box = customizeSidebar(page).getByRole('checkbox', { name, exact: true })
+  if ((await box.isChecked()) !== checked) await box.click()
+  await expect(box).toBeChecked({ checked })
+  await customizeSidebar(page).getByRole('button', { name: 'Done', exact: true }).click()
+}
+
+When('the Copy DSH URL action on the rail is used', async ({ page }: { page: Page }) => {
+  // The dsh-web supervisor records the launch URL in <DSH home>/runtime/web-url; a fixture Host has no supervisor, so the
+  // journey records this Host's own URL there as the supervisor would, then reloads so the sidebar reads it.
+  const profile = profileFor(page)
+  await mkdir(join(profile.homeRoot, 'runtime'), { recursive: true })
+  await writeFile(join(profile.homeRoot, 'runtime', 'web-url'), `${profile.url}\n`, { mode: 0o600 })
+  await reloadPastProviderSetup(page)
+  await expect(railCopyUrl(page)).toBeVisible()
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await railCopyUrl(page).click()
+})
+
+Then('it confirms the copy, sits directly above Settings, and the setting moves it to the row under the list', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-rail-copy-url-confirms', async () => {
+    await expect(railActions(page).getByRole('status')).toHaveText('Copied')
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toMatch(/^https?:\/\//u)
+  })
+  await recordAssertion(page, 'thread-sidebar-rail-actions-above-settings', async () => {
+    // The group is the rail's last block before Settings, and the URL action is drawn once, only there.
+    await expect
+      .poll(() => railActions(page).evaluate(group => group.nextElementSibling?.getAttribute('data-destination') ?? null))
+      .toBe('settings')
+    await expect(page.getByRole('button', { name: 'Copy DSH URL for agents', exact: true })).toHaveCount(1)
+  })
+  await setCustomizeCheckbox(page, 'Show DSH actions on the rail', false)
+  await setCustomizeCheckbox(page, 'Show the row under the list', true)
+  await recordAssertion(page, 'thread-sidebar-rail-actions-setting-moves-them-to-the-footer', async () => {
+    await expect(railActions(page)).toHaveCount(0)
+    await expect(page.locator('footer').getByRole('button', { name: 'Copy DSH URL for agents', exact: true })).toBeVisible()
+  })
+  await setCustomizeCheckbox(page, 'Show the row under the list', false)
+  await setCustomizeCheckbox(page, 'Show DSH actions on the rail', true)
+  await recordAssertion(page, 'thread-sidebar-rail-actions-come-back', async () => {
+    await expect(railCopyUrl(page)).toBeVisible()
+    await expect(page.locator('footer:visible').getByRole('button', { name: 'Copy DSH URL for agents', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -2419,7 +2537,7 @@ Then('the side panel hosts that thread again', async ({ page }: { page: Page }) 
 })
 
 When('the side-panel hover action is switched off in Customize sidebar', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).first().click()
+  await ThreadListFilter.openSidebarSettings(page)
   const customize = customizeSidebar(page)
   await expect(customize).toBeVisible()
   await customize.getByRole('checkbox', { name: 'Open in side panel', exact: true }).click()
@@ -2441,7 +2559,7 @@ Then('the thread row keeps the context-menu action but drops the hover one', asy
 })
 
 When('the settle hover action is moved to the front in Customize sidebar', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).first().click()
+  await ThreadListFilter.openSidebarSettings(page)
   const customize = customizeSidebar(page)
   await expect(customize).toBeVisible()
   const moveUp = customize.getByRole('button', { name: 'Move up: Settle', exact: true })
@@ -2634,7 +2752,7 @@ Then('the blocked session is listed only in the Usage limit group when grouped b
 
     await showThreadsByStatus(page)
     await selectThreadViewValue(page, 'Group: Arrange manually', 'Date')
-    await expect(threadSidebar(page).getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
+    await ThreadListFilter.expectGroup(page, threadSidebar(page), 'Date')
     const group = page.getByRole('region', { name: 'Usage limit', exact: true })
     await expect(group.locator(`[data-thread-id="${sessionId}"]`)).toBeVisible()
     // A usage-limit row is a bare button, a list row an article: count the main action both carry.
@@ -2720,7 +2838,7 @@ const MINIMUM_SIDEBAR_WIDTH = 240
 
 When('the thread sidebar is narrowed to its minimum width', async ({ page }: { page: Page }) => {
   const sidebar = threadSidebar(page)
-  await expect(sidebar.getByRole('group', { name: 'Thread list view', exact: true })).toBeVisible()
+  await expect(ThreadListFilter.trigger(sidebar)).toBeVisible()
   await sidebar.evaluate((region, width) => {
     if (!(region instanceof HTMLElement)) throw new Error('The thread sidebar region is not an HTML element.')
     region.style.width = `${width}px`
@@ -2728,53 +2846,38 @@ When('the thread sidebar is narrowed to its minimum width', async ({ page }: { p
   }, MINIMUM_SIDEBAR_WIDTH)
 })
 
-// The isolated profile has no resizable frame column; widening the row itself measures the real tabs and fonts.
+// Productivity pass Q5 (T5.3): the views moved from a tab row into the Filter menu, which lists every view by its full
+// name at any width; the step keeps its name and checks the header row still fits the given width.
 When('the view tab row is {int} pixels wide', async ({ page }: { page: Page }, width: number) => {
-  const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
-  await expect(viewTabs).toBeVisible()
-  await viewTabs.evaluate((row, rowWidth) => {
-    if (!(row instanceof HTMLElement)) throw new Error('The view tab row is not an HTML element.')
-    row.style.width = `${rowWidth}px`
-    row.style.flexShrink = '0'
-  }, width)
+  const trigger = ThreadListFilter.trigger(threadSidebar(page))
+  await expect(trigger).toBeVisible()
+  const box = await trigger.boundingBox()
+  expect(box?.width ?? 0).toBeLessThanOrEqual(width)
 })
 
 Then('every view tab shows its full name', async ({ page }: { page: Page }) => {
-  const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
   await recordAssertion(page, 'thread-sidebar-full-view-tabs', async () => {
-    await expect(viewTabs).not.toHaveAttribute('data-compact-view-tabs')
-    await expect(viewTabs.getByTestId('thread-view-compact-initial')).toHaveCount(0)
-    await expect(viewTabs.getByTestId('thread-view-compact-icon')).toHaveCount(0)
-    for (const name of ['All threads', 'Working', 'Done']) {
-      await expect(viewTabs.locator(`button[title="${name}"]`)).toContainText(name)
-    }
+    const views = await ThreadListFilter.openViews(page, threadSidebar(page))
+    for (const name of ['All threads', 'Working', 'Done'])
+      await expect(views.getByRole('menuitemradio', { name: ThreadListFilter.viewName(name) })).toContainText(name)
+    await ThreadListFilter.close(page)
   })
   await finishJourneyAssertions(page)
 })
 
 Then('every view tab fits without scrolling and keeps its full name as tooltip and accessible name', async ({ page }: { page: Page }) => {
-  const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
-  const tabs = viewTabs.locator('button[data-thread-list-view-button]')
+  // Productivity pass Q5 (T5.3): the views are the Filter menu's view submenu, so every view keeps its full name at any
+  // list width and the trigger shows the active one.
+  await ThreadListFilter.openViews(page, threadSidebar(page))
+  const views = page.getByRole('menuitemradio')
   await recordAssertion(page, 'thread-sidebar-compact-view-tabs-fit', async () => {
-    await expect(viewTabs).toHaveAttribute('data-compact-view-tabs', '')
-    await expect.poll(() => viewTabs.evaluate(row => row.scrollWidth - row.clientWidth)).toBeLessThanOrEqual(0)
-    await expect(viewTabs.getByTestId('thread-view-compact-icon').first()).toBeVisible()
+    const names = await views.evaluateAll(items => items.map(item => item.getAttribute('aria-label') ?? ''))
+    expect(names).toEqual(expect.arrayContaining(['All threads', 'Working', 'Done']))
   })
-  const names = await tabs.evaluateAll(buttons => buttons.map(button => button.getAttribute('title') ?? ''))
-  expect(names).toEqual(expect.arrayContaining(['All threads', 'Working', 'Done']))
-  const rowBox = await viewTabs.boundingBox()
-  if (rowBox === null) throw new Error('The view tab row has no layout box.')
   await recordAssertion(page, 'thread-sidebar-compact-view-tabs-names', async () => {
-    for (const [index, name] of names.entries()) {
-      const tab = tabs.nth(index)
-      await expect(tab).toHaveAccessibleName(new RegExp(`^${name}(?: \\(\\d+\\))?(?:, .+)?$`))
-      const tabBox = await tab.boundingBox()
-      if (tabBox === null) throw new Error(`The ${name} view tab has no layout box.`)
-      expect(tabBox.x + tabBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 1)
-    }
+    await page.getByRole('menuitemradio', { name: 'Done', exact: true }).click()
+    await expect(ThreadListFilter.trigger(threadSidebar(page))).toContainText('Done')
   })
-  await viewTabs.locator('button[title="Done"]').click()
-  await expect(viewTabs.locator('button[title="Done"]')).toHaveAttribute('aria-pressed', 'true')
   await finishJourneyAssertions(page)
 })
 
@@ -2822,10 +2925,10 @@ When('the GUI is opened with a prompt link for a registered project', async ({ p
 })
 
 Then('a new thread in that project holds the prompt unsent and the address no longer carries the link', async ({ page }: { page: Page }) => {
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await recordAssertion(page, 'thread-sidebar-prompt-link-prefills-new-thread', async () => {
     await expect(composer).toContainText(promptLinkText, { timeout: 20_000 })
-    await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(promptLinkProject)
+    await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toHaveText(promptLinkProject)
   })
   await recordAssertion(page, 'thread-sidebar-prompt-link-strips-address', async () => {
     const params = new URL(page.url()).searchParams
@@ -2852,7 +2955,7 @@ When('a thread delegates a long command to a subagent', async ({ page }: { page:
     .click()
   await registerWorkspaceFolder(page, workspace, openNewThreadAddWorkspace)
   await startThreadWithModel(page, { project: 'subagent-preview-project', model: 'commandcode_work/gpt-6-luna' })
-  const composer = page.getByRole('textbox', { name: /(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions/ })
+  const composer = page.getByRole('textbox', { name: /(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)/ })
   await expect(composer).toBeEnabled({ timeout: 45_000 })
   await composer.fill(`[[once call subagent {"description":"Long child","prompt":"${SUBAGENT_CHILD_DIRECTIVE}"}]]`)
   await composer.press('Enter')
@@ -2882,7 +2985,7 @@ Then('stopping the subagent from the dock takes a confirmation', async ({ page }
 Then("the transcript row opens the subagent's thread", async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-subagent-preview-owner-link', async () => {
     await page
-      .getByText(/^Completed in /)
+      .getByText(/^Worked for /)
       .first()
       .click()
     await page.getByText('Coordinated subagents', { exact: true }).first().click()

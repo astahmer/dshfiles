@@ -9,7 +9,7 @@ import { finishJourneyAssertions, recordAssertion, restartScratchProfileInBrowse
 import { createScratchDirectory, startThreadWithModel } from '../threads.js'
 import { openGlobalPanel } from '../plugin-view-names.js'
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const THREAD_TITLE = 'Timed question fixture'
 const QUESTION_TEXT = 'Which environment should the timed-question fixture deploy to?'
 /** Short enough to watch the foreground wait end inside a journey, long enough to read the countdown first. */
@@ -48,7 +48,10 @@ export const seedPresetRow = async (): Promise<string> => {
 }
 
 const questionCard = (page: Page) => page.locator('[data-question-key]').filter({ hasText: QUESTION_TEXT })
-const countdown = (page: Page) => questionCard(page).locator('header span').filter({ hasText: /^Continuing in \d+s$/u })
+const countdown = (page: Page) =>
+  questionCard(page)
+    .locator('header span')
+    .filter({ hasText: /^Continuing in \d+s$/u })
 const secondsLeft = async (page: Page): Promise<number> => Number(/(\d+)s$/u.exec((await countdown(page).textContent()) ?? '')?.[1] ?? Number.NaN)
 const probe = async (name: string, content: () => Promise<string>): Promise<void> => {
   const directory = process.env.DSHX_PROBE_DIR
@@ -207,7 +210,12 @@ Then('the question card is no longer answerable', async ({ page }: { page: Page 
     await expect(page.getByRole('button', { name: 'Answer', exact: true })).toHaveCount(0, { timeout: 10_000 })
     await expect(questionCard(page).getByRole('button', { name: 'Submit', exact: true })).toHaveCount(0)
   })
-  await probe('cancelled.html', () => page.locator('[data-conversation-content]').first().evaluate(element => element.outerHTML))
+  await probe('cancelled.html', () =>
+    page
+      .locator('[data-conversation-content]')
+      .first()
+      .evaluate(element => element.outerHTML),
+  )
   await finishJourneyAssertions(page)
 })
 
@@ -227,7 +235,12 @@ When('the scratch Host restarts and the thread is reopened', async ({ page }: { 
 })
 
 Then('the pending question card survives the restart', async ({ page }: { page: Page }) => {
-  await probe('restarted.html', () => page.locator('[data-conversation-content]').first().evaluate(element => element.outerHTML))
+  await probe('restarted.html', () =>
+    page
+      .locator('[data-conversation-content]')
+      .first()
+      .evaluate(element => element.outerHTML),
+  )
   await recordAssertion(page, 'agent-questions-root-timed-restart', async () => {
     await expect(questionCard(page)).toBeVisible({ timeout: 30_000 })
   })

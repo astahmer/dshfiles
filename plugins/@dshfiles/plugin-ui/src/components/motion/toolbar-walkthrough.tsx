@@ -230,7 +230,7 @@ const CoachCard = React.forwardRef<HTMLDivElement, CoachCardProps>(function Coac
         <span
           ref={arrowRef}
           aria-hidden
-          className="dshx:absolute dshx:-bottom-1.5 dshx:left-[143px] dshx:size-3.5 dshx:rotate-45 dshx:rounded-[3px] dshx:bg-primary"
+          className="dshx:absolute dshx:-bottom-1.5 dshx:left-[143px] dshx:size-3.5 dshx:rotate-45 dshx:rounded-xs dshx:bg-primary"
         />
       </div>
     </div>

@@ -116,7 +116,7 @@ const groupsOf = (items: readonly BacklogSummaryView[], by: GroupBy): Group[] =>
           <span className="dshx:text-muted-foreground">No parent</span>
         ) : (
           <>
-            <span className="dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.label(parent)}</span>
+            <span className="dshx:font-mono! dshx:text-2xs dshx:text-muted-foreground">{BacklogReference.label(parent)}</span>
             <span className="dshx:max-w-80 dshx:truncate">{titles.get(parent) ?? ''}</span>
           </>
         ),
@@ -221,7 +221,7 @@ const Row = (props: {
         style={{ viewTransitionName: itemTransitionName('row', item.id) }}
         className={cn(
           columns,
-          'dshx:group/row dshx:h-10 dshx:cursor-default dshx:items-center dshx:border-b dshx:border-border/50 dshx:pr-3 dshx:text-[13px] dshx:transition-colors dshx:duration-75 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
+          'dshx:group/row dshx:h-10 dshx:cursor-default dshx:items-center dshx:border-b dshx:border-border/50 dshx:pr-3 dshx:text-sm dshx:transition-colors dshx:duration-75 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
           background,
         )}
       >
@@ -257,19 +257,19 @@ const Row = (props: {
               onPick={priority => actions.update.mutate({ id: item.id, priority })}
             />
           </span>
-          <BacklogMentionHandle item={item} className="dshx:w-12 dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground" />
+          <BacklogMentionHandle item={item} className="dshx:w-12 dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground" />
           {rename.renaming ? (
             <BacklogInlineTitle
               id={item.id}
               value={item.title}
               cancel={rename.endRename}
-              className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-[13px] dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
+              className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-sm dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
             />
           ) : (
             <BacklogText
               text={item.title}
               className={cn(
-                'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[13px] dshx:[&>div]:truncate dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
+                'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:[&>div]:truncate dshx:[&>div]:text-sm! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
                 closed && 'dshx:text-muted-foreground dshx:line-through dshx:[&>div]:text-muted-foreground! dshx:[&>div]:line-through',
               )}
             />
@@ -286,18 +286,18 @@ const Row = (props: {
           <WorkGlyphs.RunStateChip run={run} compact />
           {item.proposal === null ? null : <WandSparklesIcon aria-label="Suggestion waiting" className="dshx:size-3 dshx:shrink-0 dshx:text-violet" />}
           {item.tags.slice(0, 2).map(tag => (
-            <span key={tag} className="dshx:hidden dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground dshx:@min-[52rem]:inline">
+            <span key={tag} className="dshx:hidden dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground dshx:@min-[52rem]:inline">
               #{tag}
             </span>
           ))}
           {item.links.length === 0 ? null : (
-            <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:text-[11px] dshx:text-muted-foreground">
+            <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:text-2xs dshx:text-muted-foreground">
               <LinkIcon aria-hidden className="dshx:size-3" />
               {item.links.length}
             </span>
           )}
           {item.activity.comments === 0 ? null : (
-            <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:text-[11px] dshx:text-muted-foreground">
+            <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:text-2xs dshx:text-muted-foreground">
               <MessageSquareIcon aria-hidden className="dshx:size-3" />
               {item.activity.comments}
             </span>
@@ -330,9 +330,7 @@ const Row = (props: {
         <span className={roomyOnly}>
           <ItemGlyphs.ActorStack actorIds={item.actors.map(actor => actor.id)} max={2} />
         </span>
-        <span className="dshx:text-right dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
-          {ItemGlyphs.ago(backlogSortTime(item, props.sort))}
-        </span>
+        <span className="dshx:text-right dshx:text-2xs dshx:tabular-nums dshx:text-muted-foreground">{ItemGlyphs.ago(backlogSortTime(item, props.sort))}</span>
       </div>
     </BacklogItemMenu>
   )
@@ -461,7 +459,7 @@ export const ItemsView = (props: {
                 <DropdownMenuContent align="start" className="dshx-root">
                   <DropdownMenuRadioGroup value={props.groupBy} onValueChange={value => props.setGroupBy(groupByOf(value))}>
                     {groupByValues.map(value => (
-                      <DropdownMenuRadioItem key={value} value={value} className="dshx:text-[13px]">
+                      <DropdownMenuRadioItem key={value} value={value} className="dshx:text-sm">
                         {groupLabels[value]}
                       </DropdownMenuRadioItem>
                     ))}
@@ -478,7 +476,7 @@ export const ItemsView = (props: {
           role="row"
           className={cn(
             columns,
-            'dshx:sticky dshx:top-0 dshx:z-20 dshx:h-8 dshx:items-center dshx:border-b dshx:border-border dshx:bg-background dshx:pr-3 dshx:text-[11px] dshx:font-medium dshx:text-muted-foreground',
+            'dshx:sticky dshx:top-0 dshx:z-20 dshx:h-8 dshx:items-center dshx:border-b dshx:border-border dshx:bg-background dshx:pr-3 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground',
           )}
         >
           <span className="dshx:flex dshx:justify-center">
@@ -524,7 +522,7 @@ export const ItemsView = (props: {
                 {entry.kind === 'header' ? (
                   <div
                     role="rowgroup"
-                    className="dshx:flex dshx:h-9 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border/60 dshx:bg-muted/50 dshx:px-2 dshx:text-[13px]"
+                    className="dshx:flex dshx:h-9 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border/60 dshx:bg-muted/50 dshx:px-2 dshx:text-sm"
                   >
                     <button
                       type="button"

@@ -91,7 +91,7 @@ When('a disposable terminal workspace has a selected real conversation', async (
   await page.getByRole('button', { name: 'New thread', exact: true }).filter({ visible: true }).first().click()
   // Boot already shows a blank conversation, so New thread opens a second one; wait for it before using its chip.
   if (bootThreadId !== null) await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBe(bootThreadId)
-  await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+  await page.getByRole('button', { name: /^Choose (?:project|workspace)$/u }).click()
   const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
   await expect(picker).toBeVisible()
   await picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true }).fill(workspace)
@@ -104,7 +104,7 @@ When('a disposable terminal workspace has a selected real conversation', async (
   const composer = pane(page, 'main')
     .locator(`[data-conversation-session=${JSON.stringify(sessionId)}]`)
     .getByRole('textbox', {
-      name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/,
+      name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/,
     })
   await expect(composer).toBeEditable()
   journeys.set(page, { root, workspace, sessionId, terminals: new Map() })
@@ -119,7 +119,7 @@ When('the {string} pane opens a genuine terminal from its view picker', async ({
   // The left footer Preview is also a regular group now. Select the actual
   // full-height Threads group, not a positional last button in compact chrome.
   const leftThreads = target
-    .getByRole('tab', { name: 'Thread Sidebar: Threads', exact: true })
+    .getByRole('tab', { name: 'Threads', exact: true })
     .locator('xpath=ancestor::*[contains(concat(" ",normalize-space(@class)," ")," dv-groupview ")][1]')
   await (region === 'left' ? leftThreads.getByRole('button', { name: 'New tab', exact: true }) : plus.first()).click()
   const chooser = target.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })

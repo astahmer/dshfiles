@@ -130,6 +130,55 @@ export class ThreadListNavigationModel {
     return sessionIds
   }
 
+  /**
+   * J/K (the shortcut layer's list keys): move the highlight as ArrowDown/ArrowUp do, from the focused row; with no row
+   * focused, land on the open thread's row first, else the first or last row. Never opens a thread.
+   */
+  static move(input: {
+    readonly list: HTMLElement
+    readonly direction: ThreadNavigationDirection
+    readonly extend: boolean
+    readonly selection: ThreadSelectionState
+    readonly onSelectionChange: (selection: ThreadSelectionState) => void
+    readonly onLookahead: (sessionIds: readonly string[]) => void
+  }): boolean {
+    const rows = ThreadListNavigationModel.visibleRows(input.list)
+    if (rows.length === 0) return false
+    const focused = input.list.ownerDocument.activeElement
+    const focusedIndex = rows.findIndex(row => focused !== null && row.button.contains(focused))
+    const currentIndex = rows.findIndex(row => row.button.getAttribute('aria-current') === 'page')
+    const from = focusedIndex === -1 ? currentIndex : focusedIndex
+    const index =
+      focusedIndex === -1
+        ? currentIndex === -1
+          ? input.direction === 1
+            ? 0
+            : rows.length - 1
+          : currentIndex
+        : Math.max(0, Math.min(rows.length - 1, focusedIndex + input.direction))
+    return ThreadListNavigationModel.focusRow({
+      rows,
+      index,
+      direction: input.direction,
+      selection: input.selection,
+      extend: input.extend,
+      fallbackAnchorId: rows[from]?.id ?? rows[index]?.id ?? '',
+      onSelectionChange: input.onSelectionChange,
+      onLookahead: input.onLookahead,
+      switchThread: false,
+      open: undefined,
+      list: input.list,
+    })
+  }
+
+  /** The thread id of the row that holds focus, if one does. */
+  static focusedRowId(list: HTMLElement): string | undefined {
+    const focused = list.ownerDocument.activeElement
+    if (focused === null || !list.contains(focused)) return undefined
+    const button = focused.closest<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
+    return button === null || !list.contains(button) ? undefined : button.dataset.threadId
+  }
+
   private static focusRow(input: {
     readonly rows: readonly VisibleThreadRow[]
     readonly index: number

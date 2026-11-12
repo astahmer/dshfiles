@@ -14,7 +14,8 @@
       "states": ["ingesting", "indexed", "behind", "failed"],
       "failureModes": [
         "Filters the backend cannot serve are refused with SESSION_QUERY_INVALID_FILTER rather than silently ignored.",
-        "An interrupted ingest resumes from the stored per-log cursor instead of restarting the corpus."
+        "An interrupted ingest resumes from the stored per-log cursor instead of restarting the corpus.",
+        "User text is never FTS5 syntax: every word is quoted (apostrophes, quotes, AND/OR/NEAR, a leading -), a quoted phrase stays one phrase, a trailing * is a prefix search, and text with nothing searchable answers no match instead of an error."
       ],
       "externalDependencies": [],
       "verification": [
@@ -29,6 +30,12 @@
           "id": "session-search.title-cache",
           "file": "plugins/@dshfiles/session-search/src/engine-titles.test.ts",
           "testName": "folds a Session title once until that Session appends an event"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-search.user-text-query",
+          "file": "plugins/@dshfiles/session-search/tests/fts-query.spec.ts",
+          "testName": "searches apostrophes, quotes and fts5 operators in user text literally"
         },
         {
           "kind": "gherkin",
@@ -51,11 +58,11 @@
     {
       "id": "find-in-thread",
       "title": "Find every match in one thread",
-      "summary": "Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the thread_find agent tool. An archived Session is indexed for that request.",
+      "summary": "Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the session_find_in_thread agent tool. An archived Session is indexed for that request.",
       "surfaces": ["host", "storage", "api", "tool"],
       "surface": "infrastructure",
       "destination": "none",
-      "currentSurface": "host: session-search findInThread API and thread_find tool",
+      "currentSurface": "host: session-search findInThread API and session_find_in_thread tool",
       "configuration": [],
       "states": ["matches", "no-match", "not-owner"],
       "failureModes": [

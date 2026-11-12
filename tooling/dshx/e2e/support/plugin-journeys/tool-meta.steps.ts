@@ -6,7 +6,7 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
-const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
 const BASH_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 3 && echo tool-meta', description: 'Wait three seconds' })}]]`
 const LONG_BASH_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 20 && echo wait-timer-job', description: 'Hold a job for the wait timer' })}]]`
 const WAIT_DIRECTIVE = `[[call background_jobs_wait ${JSON.stringify({ timeoutMs: 12_000 })}]]`
@@ -29,7 +29,7 @@ const timingLine = (page: Page) => page.locator('[data-dshfiles-tool-meta]')
 
 /** A settled turn folds its steps and groups its shell calls; both are reopened to reach the tool card. */
 const revealSettledToolCard = async (page: Page): Promise<void> => {
-  await expect(page.getByRole('status').filter({ hasText: /^(Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
   const card = page.locator('[data-chat-call-id]').first()
   if (await card.isVisible()) return
   const group = page.getByText('Ran commands', { exact: true }).last()
@@ -37,7 +37,7 @@ const revealSettledToolCard = async (page: Page): Promise<void> => {
   await expect(async () => {
     if (!(await group.isVisible()))
       await page
-        .getByText(/^Completed in /)
+        .getByText(/^Worked for /)
         .last()
         .click()
     await expect(group.or(card).first()).toBeVisible({ timeout: 2_000 })
@@ -59,7 +59,7 @@ When('the fake model starts a three-second bash call in a fresh workspace', asyn
 
 Then('the running tool card counts its elapsed seconds', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'tool-meta-running-call-counts-up', async () => {
-    const timer = page.getByRole('timer', { name: /^Running for \d+ s, started \d{2}:\d{2}:\d{2}$/ })
+    const timer = page.getByRole('timer', { name: /^Running for \d+ s, started \d{2}:\d{2}$/ })
     await expect(timer).toBeVisible({ timeout: 30_000 })
     const first = Number(/^(\d+) s/.exec((await timer.textContent()) ?? '')?.[1])
     await expect(async () => {
@@ -206,9 +206,9 @@ Then('the approval card is gone and the command never ran', async ({ page }: { p
 Then('once the turn settles the tool card shows how long the call took and when it started', async ({ page }: { page: Page }) => {
   await revealSettledToolCard(page)
   await recordAssertion(page, 'tool-meta-settled-call-shows-duration-and-start', async () => {
-    const note = page.getByRole('note', { name: /^Took \d+\.\d s, started \d{2}:\d{2}:\d{2}$/ })
+    const note = page.getByRole('note', { name: /^Took \d+\.\d s, started \d{2}:\d{2}$/ })
     await expect(note).toBeVisible()
-    await expect(note).toHaveText(/^[3-9]\.\d s · \d{2}:\d{2}:\d{2}$/)
+    await expect(note).toHaveText(/^[3-9]\.\d s · \d{2}:\d{2}$/)
     await expect(page.getByRole('timer')).toHaveCount(0)
   })
   await finishJourneyAssertions(page)

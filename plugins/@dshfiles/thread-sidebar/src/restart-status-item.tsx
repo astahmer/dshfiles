@@ -2,6 +2,7 @@ import type { StatusItemProps } from '@dshfiles/frame-layout/status-strip'
 import { useApi, useApiQuery, useRegistry } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { threadSidebarRestartApi, type AutoRestartStatusWire } from './restart-api.js'
 import { RestartBridge, type RestartRequest } from './restart-bridge.js'
@@ -19,6 +20,10 @@ export interface RestartStatusText {
   readonly postpone: string
   /** No supervisor can restart DSH: start it with this command. */
   readonly autoUnsupervised: string
+  readonly copyCommand: string
+  readonly copied: string
+  /** Turns `autoRestartWhenIdle` off, the other way out of the unsupervised notice. */
+  readonly turnOffAuto: string
 }
 
 const AUTO_RESTART_POLL_MS = 5_000
@@ -47,8 +52,11 @@ const useNow = (active: boolean): number => {
   return now
 }
 
-/** The Host's automatic-restart state, polled while the item is mounted; undefined on a Host without it. */
-const useAutoRestart = (): AutoRestartView => {
+/**
+ * The Host's automatic-restart state, polled while the caller is mounted; undefined on a Host without it. The status
+ * item and the rail's Restart (sidebar-shell) read it the same way.
+ */
+export const useAutoRestart = (): AutoRestartView => {
   const query = useApiQuery(threadSidebarRestartApi, 'autoRestartStatus', { input: {} })
   const refetch = query.refetch
   const status = query.status === 'error' ? undefined : query.data
@@ -115,6 +123,9 @@ export const RestartStatusItem = (props: StatusItemProps & { readonly text: Rest
   const plugins = useMemo(() => RestartBridge.combine([notice.hostPlugins, sourcePackages, autoUpdates]), [notice.hostPlugins, sourcePackages, autoUpdates])
   const [open, setOpen] = useState(false)
   const restartApi = useApi(threadSidebarRestartApi)
+  const commandCopy = useCopyFeedback()
+  // The rail's Restart carries the same countdown, Postpone and verbs: one restart control (b:kgcc).
+  if (notice.onRail) return null
   if (plugins.length === 0 && notice.waitingLabel === null && auto.secondsLeft === null) return null
   const label = auto.secondsLeft === null ? (notice.waitingLabel ?? props.text.pending(plugins.length)) : props.text.autoCountdown(auto.secondsLeft)
   const postpone = (): void => {
@@ -154,6 +165,14 @@ export const RestartStatusItem = (props: StatusItemProps & { readonly text: Rest
             <code className="dshx:break-all dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:py-0.5 dshx:font-mono dshx:text-xs" data-testid="auto-restart-command">
               {auto.status.command}
             </code>
+            <div className="dshx:flex dshx:flex-wrap dshx:justify-end dshx:gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => run('turn-off-auto-restart')}>
+                {props.text.turnOffAuto}
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => void commandCopy.copy(auto.status?.command ?? '')}>
+                {commandCopy.copied ? props.text.copied : props.text.copyCommand}
+              </Button>
+            </div>
           </div>
         ) : null}
         {notice.available ? (

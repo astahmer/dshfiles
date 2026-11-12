@@ -378,7 +378,7 @@ function LeafBar({ step, tone, width, finished }: { readonly step: ReplayStep; r
       ref={ref}
       aria-hidden
       className={cn(
-        'dshx:flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:rounded-[4px] dshx:text-card',
+        'dshx:flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:rounded-sm dshx:text-card',
         step.kind === 'model' && toneSolid[tone],
         step.kind === 'tool' && toneSoft[tone],
         step.kind === 'handoff' && cn('dshx:border dshx:bg-transparent', toneBorder[tone]),
@@ -435,7 +435,7 @@ function AgentBar({
         <span
           key={piece.key}
           className={cn(
-            'dshx:absolute dshx:inset-y-0 dshx:flex dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:rounded-[4px] dshx:text-card',
+            'dshx:absolute dshx:inset-y-0 dshx:flex dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:rounded-sm dshx:text-card',
             piece.kind === 'model' && toneSolid[tone],
             piece.kind === 'tool' && toneSoft[tone],
             piece.kind === 'handoff' && cn('dshx:border dshx:bg-transparent', toneBorder[tone]),
@@ -466,7 +466,7 @@ function SlowestChip() {
   return (
     <span
       ref={ref}
-      className="dshx:shrink-0 dshx:rounded-full dshx:bg-warning/15 dshx:px-1.5 dshx:text-[10px] dshx:leading-4 dshx:font-medium dshx:text-warning dshx:@max-pane-narrow:hidden"
+      className="dshx:shrink-0 dshx:rounded-full dshx:bg-warning/15 dshx:px-1.5 dshx:text-2xs dshx:leading-4 dshx:font-medium dshx:text-warning dshx:@max-pane-narrow:hidden"
     >
       Slowest
     </span>

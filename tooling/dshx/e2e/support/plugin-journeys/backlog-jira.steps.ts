@@ -64,7 +64,11 @@ const serveOnLoopback = async (fake: ReturnType<typeof fakeJira>): Promise<{ rea
 
 const remoteSync = (page: Page) => page.getByRole('region', { name: 'Remote sync' })
 const jiraConnection = (page: Page) => remoteSync(page).getByRole('region', { name: 'Connection Jira' })
-const feedItem = (page: Page, title: string) => page.getByRole('feed', { name: 'Backlog feed' }).getByRole('article', { name: /^Item b:/u }).filter({ hasText: title })
+const feedItem = (page: Page, title: string) =>
+  page
+    .getByRole('feed', { name: 'Backlog feed' })
+    .getByRole('article', { name: /^Item b:/u })
+    .filter({ hasText: title })
 
 Given('a fake Jira site holds the issue {string}', async ({ page }: { page: Page }, summary: string) => {
   const fake = fakeJira()

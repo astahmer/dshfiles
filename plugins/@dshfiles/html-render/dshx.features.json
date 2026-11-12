@@ -5,10 +5,10 @@
     {
       "id": "html-page-card",
       "title": "Agent-published HTML page as a sandboxed card",
-      "summary": "The html_render agent tool publishes a self-contained HTML page (chart, mockup, table) that the chat transcript shows as a card: a sandboxed iframe themed with the DSH light/dark tokens, resizable, with Copy HTML, Open in new tab and Expand to full screen. The card stays visible after the Turn completes (Chat's PinnedToolCalls keeps it outside the \"Completed in\" fold). The page is persisted in the tool result's presentation metadata, so a reload shows it again; the model gets only a one-line summary.",
+      "summary": "The html_render agent tool publishes a self-contained HTML page (chart, mockup, table) that the chat transcript shows as a card: a sandboxed iframe themed with the DSH light/dark tokens, resizable, with Copy HTML, Open in new tab and Expand to full screen. The card stays visible after the Turn completes (Chat's PinnedToolCalls keeps it outside the \"Worked for\" fold). The page is persisted in the tool result's presentation metadata, so a reload shows it again; the model gets only a one-line summary.",
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render {\\\"title\\\":\\\"Sales dashboard\\\",\\\"html\\\":\\\"<style>body{display:grid;gap:12px}.bars{display:flex;align-items:end;gap:8px;height:140px}.bars div{flex:1;background:var(--dsh-accent);border-radius:4px 4px 0 0}</style><h2>Q3 revenue</h2><div class='bars'><div style='height:40%'></div><div style='height:65%'></div><div style='height:52%'></div><div style='height:90%'></div></div><p id='status' style='color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Rendered by an inline script'</script>\\\",\\\"height\\\":300}]]\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call html_render {\\\"title\\\":\\\"Sales dashboard\\\",\\\"html\\\":\\\"<style>body{display:grid;gap:12px}.bars{display:flex;align-items:end;gap:8px;height:140px}.bars div{flex:1;background:var(--dsh-accent);border-radius:4px 4px 0 0}</style><h2>Q3 revenue</h2><div class='bars'><div style='height:40%'></div><div style='height:65%'></div><div style='height:52%'></div><div style='height:90%'></div></div><p id='status' style='color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Rendered by an inline script'</script>\\\",\\\"height\\\":300}]]\"",
         "press Enter",
         "expect region \"Sales dashboard\""
       ],
@@ -80,10 +80,10 @@
       "summary": "The html_preview agent tool shows an HTML file from the calling thread's workspace in the same sandboxed, themed card as html_render. The path is relative to the thread working directory and must resolve (symlinks followed) inside the thread workspace. Relative <link rel=\"stylesheet\">, <script src> and <img src> files inside the workspace are inlined; other references stay as written and are blocked by the card's no-network policy. The page is persisted in the tool result's presentation metadata; the model gets a one-line summary naming what was not inlined.",
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call write {\\\"file_path\\\":\\\"index.html\\\",\\\"content\\\":\\\"<h2>Workspace page</h2><p style='color:var(--dsh-accent)'>Shown from the thread workspace</p>\\\"}]]\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call write {\\\"file_path\\\":\\\"index.html\\\",\\\"content\\\":\\\"<h2>Workspace page</h2><p style='color:var(--dsh-accent)'>Shown from the thread workspace</p>\\\"}]]\"",
         "press Enter",
         "expect text \"Tool finished.\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_preview {\\\"path\\\":\\\"index.html\\\",\\\"title\\\":\\\"Workspace page\\\"}]]\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call html_preview {\\\"path\\\":\\\"index.html\\\",\\\"title\\\":\\\"Workspace page\\\"}]]\"",
         "press Enter",
         "expect region \"Workspace page\""
       ],
@@ -137,10 +137,10 @@
       "summary": "The html_render_screenshot agent tool renders a page this thread published with html_render or html_preview (by call id, or the latest) in the @dshfiles/preview Host Chromium and returns a JPEG the model can see. The page gets the card's no-network CSP and fixed light or dark theme tokens and runs in an allow-scripts, opaque-origin srcdoc frame inside an offline browser context. Pages are remembered per thread for the current DSH run only (16 per thread, 32 MB in total).",
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render {\\\"title\\\":\\\"Screenshot target\\\",\\\"html\\\":\\\"<h2 style='color:var(--dsh-accent)'>Screenshot target</h2>\\\"}]]\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call html_render {\\\"title\\\":\\\"Screenshot target\\\",\\\"html\\\":\\\"<h2 style='color:var(--dsh-accent)'>Screenshot target</h2>\\\"}]]\"",
         "press Enter",
         "expect region \"Screenshot target\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render_screenshot {}]]\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call html_render_screenshot {}]]\"",
         "press Enter",
         "expect text \"Tool finished.\""
       ],

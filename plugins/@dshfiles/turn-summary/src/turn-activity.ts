@@ -1,5 +1,7 @@
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
-import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
+import { EditLines, type LineCounts } from './edit-lines.js'
+
+export type { LineCounts } from './edit-lines.js'
 
 export interface ToolCallRecord {
   readonly callId: string
@@ -34,31 +36,6 @@ export interface CommandRun {
   /** Undefined while the command has no result, `ok` on exit 0, else how it failed (as in FailedCommand). */
   readonly outcome: string | undefined
 }
-
-/** Lines added and removed, by one edit or across a turn. */
-export interface LineCounts {
-  readonly added: number
-  readonly removed: number
-}
-
-/** The edit-tool argument fields line counting reads; the model wrote them, so each stays unparsed until read. */
-interface EditArgumentsData {
-  readonly content?: unknown
-  readonly edits?: unknown
-  readonly old_string?: unknown
-  readonly old_str?: unknown
-  readonly new_string?: unknown
-  readonly new_str?: unknown
-}
-
-/** One `apply_patch` edit's replaced and replacing text. */
-interface PatchEditData {
-  readonly old?: unknown
-  readonly new?: unknown
-}
-
-const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null
-const readString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined)
 
 /** Test counts from the last test-runner summary a command printed this turn (Vitest, Jest or pytest). */
 export interface TestCounts {
@@ -188,34 +165,9 @@ export class TurnActivity {
     return summary.editedFileStats.reduce((sum, file) => ({ added: sum.added + file.added, removed: sum.removed + file.removed }), { added: 0, removed: 0 })
   }
 
-  /**
-   * Lines one edit adds and removes, from its arguments: the replaced and replacing text of `edit` /
-   * `str_replace_editor` / each `apply_patch` edit with their shared leading and trailing lines dropped, or the whole
-   * content of a `write` (counted as added; the file it replaced is not in the call).
-   */
+  /** Lines one edit adds and removes, from its arguments; see {@link EditLines.of}. */
   static editLines(tool: string, argumentsText: string): LineCounts {
-    let parsed: unknown
-    try {
-      parsed = decodeJson(jsonValueSchema, argumentsText)
-    } catch {
-      return { added: 0, removed: 0 }
-    }
-    const args: EditArgumentsData = isObject(parsed) ? parsed : {}
-    if (tool === 'write') return { added: TurnActivity.lineCount(readString(args.content) ?? ''), removed: 0 }
-    const pairs: (readonly [string, string])[] = []
-    if (Array.isArray(args.edits)) {
-      for (const candidate of args.edits) {
-        const edit: PatchEditData = isObject(candidate) ? candidate : {}
-        pairs.push([readString(edit.old) ?? '', readString(edit.new) ?? ''])
-      }
-    } else pairs.push([readString(args.old_string) ?? readString(args.old_str) ?? '', readString(args.new_string) ?? readString(args.new_str) ?? ''])
-    return pairs.reduce(
-      (sum, [before, after]) => {
-        const lines = TurnActivity.diffLines(before, after)
-        return { added: sum.added + lines.added, removed: sum.removed + lines.removed }
-      },
-      { added: 0, removed: 0 },
-    )
+    return EditLines.of(tool, argumentsText)
   }
 
   /** The last test-runner summary in a command's output: Vitest `Tests  2 failed | 40 passed (42)`, Jest, pytest. */
@@ -229,21 +181,6 @@ export class TurnActivity {
     if (passed + failed === 0) return undefined
     const total = Number(/\((\d+)\)/.exec(last)?.[1] ?? /(\d+) total/.exec(last)?.[1] ?? passed + failed)
     return { passed, failed, total }
-  }
-
-  private static lineCount(text: string): number {
-    if (text === '') return 0
-    return text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
-  }
-
-  private static diffLines(before: string, after: string): LineCounts {
-    const old = before === '' ? [] : before.split('\n')
-    const next = after === '' ? [] : after.split('\n')
-    let start = 0
-    while (start < old.length && start < next.length && old[start] === next[start]) start += 1
-    let end = 0
-    while (end < old.length - start && end < next.length - start && old[old.length - 1 - end] === next[next.length - 1 - end]) end += 1
-    return { added: next.length - start - end, removed: old.length - start - end }
   }
 
   /** The parts of the footer line, in reading order; `includeReads` drops reads and searches when off. */

@@ -1,9 +1,11 @@
 import { Composer, useApi, useContract, useSettings } from '@dshfiles/dshx/client'
+import { ComposerBar, type ComposerBarPlacement } from '@dshfiles/rich-composer/composer-more'
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
-import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { AlarmClockIcon, PencilIcon, SendIcon, XIcon } from '@dshfiles/plugin-ui/icons'
@@ -11,9 +13,10 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { useEffect, useId, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { scheduledSendApi, type ScheduledSend, type SendModel } from './scheduled-send-api.js'
 import { SendTime } from './send-time.js'
+import { SendLaterRequests } from './send-later-requests.js'
 import { queueReorderSettings } from './settings.js'
 
 /** The provider groups of the native model picker, as the thread's model directory loads them. */
@@ -50,7 +53,17 @@ const useNow = (): Date => {
   return now
 }
 
-/** The composer seat: Send later, beside Send. */
+const noSubscription = (): (() => void) => () => undefined
+const alwaysPinned = (): boolean => true
+
+/** Pinned (a button in the bar) only while the user keeps the composer extras there; otherwise a row of the More menu. */
+const usePinned = (): boolean => {
+  const bar = useContract(ComposerBar)
+  const placement: ComposerBarPlacement | undefined = bar.status === 'active' ? bar.value : undefined
+  return useSyncExternalStore(placement?.subscribe ?? noSubscription, placement?.pinned ?? alwaysPinned, placement?.pinned ?? alwaysPinned)
+}
+
+/** The composer seat: Send later, a row of the composer's More menu (a button beside Send only while extras are pinned). */
 export const SendLaterAction = (props: {
   readonly sessionId: string
   readonly useInput: <Selected>(selector: (state: { readonly draft: string; readonly attachmentIds: readonly unknown[] }) => Selected) => Selected
@@ -68,6 +81,15 @@ export const SendLaterAction = (props: {
   const customId = useId()
   // The presets read the time the popover opened, so their labels hold still while it stays open.
   const [now, setNow] = useState(() => new Date())
+  const pinned = usePinned()
+  const openRef = useRef((): void => undefined)
+  openRef.current = () => {
+    setNow(new Date())
+    setCustom(SendTime.toLocalInput(Date.now() + 60 * 60_000))
+    setOpen(true)
+  }
+  const sendLaterOn = settings?.sendLater !== false
+  useEffect(() => (sendLaterOn ? SendLaterRequests.on(props.sessionId, () => openRef.current()) : undefined), [props.sessionId, sendLaterOn])
 
   const schedule = useMutation({
     mutationFn: async (sendAt: number) => {
@@ -85,7 +107,7 @@ export const SendLaterAction = (props: {
     onError: error => setNotice(errorMessage(error, 'The message could not be scheduled. Try again, or send it now.')),
   })
 
-  if (settings?.sendLater === false) return null
+  if (!sendLaterOn) return null
   const empty = draft.trim().length === 0
   const blocked =
     attachments > 0 ? 'Attachments cannot be scheduled. Send the message now, or remove them first.' : empty ? 'Write a message to schedule it.' : ''
@@ -102,19 +124,27 @@ export const SendLaterAction = (props: {
         setCustom(SendTime.toLocalInput(opened.getTime() + 60 * 60_000))
       }}
     >
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-label="Send later"
-          className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:min-h-11 dshx:data-[state=open]:bg-accent dshx:data-[state=open]:text-foreground"
-          onMouseDown={event => event.preventDefault()}
-        >
-          <AlarmClockIcon />
-          <span className="dshx:@max-pane-compact:sr-only dshx:in-data-model-compact:sr-only">Later</span>
-        </Button>
-      </PopoverTrigger>
+      {pinned ? null : (
+        // Opened from the More menu: an invisible anchor beside Send keeps the popover above the bar.
+        <PopoverAnchor asChild>
+          <span aria-hidden="true" className="dshx:inline-block dshx:h-6 dshx:w-0" data-send-later-anchor="" />
+        </PopoverAnchor>
+      )}
+      {pinned ? (
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Send later"
+            className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:min-h-11 dshx:data-[state=open]:bg-accent dshx:data-[state=open]:text-foreground"
+            onMouseDown={event => event.preventDefault()}
+          >
+            <AlarmClockIcon />
+            <span className="dshx:@max-pane-compact:sr-only dshx:in-data-model-compact:sr-only">Later</span>
+          </Button>
+        </PopoverTrigger>
+      ) : null}
       <PopoverContent align="end" side="top" className="dshx-root dshx:flex dshx:w-72 dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-2 dshx:p-2">
         <h2 className="dshx:px-1 dshx:text-sm dshx:font-semibold">Send later</h2>
         {blocked === '' ? null : <p className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{blocked}</p>}
@@ -216,7 +246,7 @@ const ScheduledSendDialog = (props: {
 
   return (
     <Dialog open onOpenChange={next => (next ? undefined : props.onClose())}>
-      <DialogContent className="dshx-root dshx:sm:max-w-lg">
+      <DialogContent className="dshx-root">
         <DialogHeader>
           <DialogTitle>Edit scheduled message</DialogTitle>
         </DialogHeader>
@@ -338,74 +368,85 @@ export const ScheduledSendsDock = (props: {
   const rows = sends.data?.sends ?? []
   if (rows.length === 0) return null
 
+  // The queue dock's anatomy (queue-reorder client.tsx): an inset panel on the composer's top edge, a header once it
+  // holds more than one row, 32px rows with a faint lead icon, the words, and quiet row verbs.
   return (
-    <section
-      className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:bg-background dshx:p-1"
-      style={props.style}
-      aria-label="Scheduled messages"
-    >
-      <ul className="dshx:flex dshx:flex-col dshx:gap-1">
-        {rows.map(send => (
-          <li key={send.id} className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-sm">
-            <AlarmClockIcon
-              className={cn('dshx:size-4 dshx:flex-none', send.status === 'failed' ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}
-              aria-hidden
-            />
-            <span className={cn('dshx:flex-none dshx:text-xs dshx:font-medium', send.status === 'failed' && 'dshx:text-destructive')}>
-              {send.status === 'failed' ? 'Not sent' : send.status === 'sending' ? 'Sending…' : SendTime.label(send.sendAt, now)}
-            </span>
-            {send.model === undefined ? null : (
-              <span className="dshx:flex-none dshx:rounded dshx:bg-muted dshx:px-1 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
-                {send.model.model}
-                {send.model.reasoningEffort === undefined ? '' : ` · ${send.model.reasoningEffort}`}
+    <section className="dshx-root dshx:@container" data-scheduled-sends-dock="" style={props.style} aria-label="Scheduled messages">
+      <div className="dshx:w-full dshx:overflow-hidden dshx:rounded-t-lg dshx:border dshx:border-b-0 dshx:bg-popover dshx:py-0.5 dshx:text-popover-foreground">
+        {rows.length > 1 ? (
+          <div className="dshx:flex dshx:h-row dshx:items-center dshx:gap-2 dshx:px-3">
+            <AlarmClockIcon aria-hidden className="dshx:size-3.5 dshx:flex-none dshx:text-muted-foreground" />
+            <span className="dshx:text-sm dshx:font-medium dshx:tabular-nums">{rows.length} scheduled</span>
+            <span className="dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">soonest first</span>
+          </div>
+        ) : null}
+        <ul className="dshx:flex dshx:max-h-60 dshx:flex-col dshx:gap-px dshx:overflow-y-auto dshx:px-1 dshx:pb-0.5">
+          {rows.map(send => (
+            <li
+              key={send.id}
+              data-scheduled-send={send.status}
+              className="dshx:group/row dshx:flex dshx:min-h-row dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:py-0.5 dshx:hover:bg-accent/50"
+            >
+              <AlarmClockIcon
+                className={cn('dshx:size-3.5 dshx:flex-none', send.status === 'failed' ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}
+                aria-hidden
+              />
+              <span className={cn('dshx:flex-none dshx:text-xs dshx:font-medium dshx:tabular-nums', send.status === 'failed' && 'dshx:text-destructive')}>
+                {send.status === 'failed' ? 'Not sent' : send.status === 'sending' ? 'Sending…' : SendTime.label(send.sendAt, now)}
               </span>
-            )}
-            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{send.text}</span>
-            {send.note === undefined ? null : <span className="dshx:sr-only">{send.note}</span>}
-            <div className="dshx:flex dshx:flex-none dshx:items-center">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                className="dshx:pointer-coarse:size-11"
-                aria-label="Edit scheduled message"
-                disabled={send.status === 'sending'}
-                onClick={() => setEditing(send)}
-              >
-                <PencilIcon />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                className="dshx:pointer-coarse:size-11"
-                aria-label="Send now"
-                disabled={send.status === 'sending' || sendNow.isPending}
-                onClick={() => sendNow.mutate(send.id)}
-              >
-                <SendIcon />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                className="dshx:pointer-coarse:size-11"
-                aria-label="Cancel scheduled message"
-                disabled={send.status === 'sending' || cancel.isPending}
-                onClick={() => cancel.mutate(send.id)}
-              >
-                <XIcon />
-              </Button>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {rows.some(send => send.note !== undefined) ? (
-        <p className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{rows.find(send => send.note !== undefined)?.note}</p>
-      ) : null}
-      <p className="dshx:px-1 dshx:text-xs dshx:text-destructive dshx:empty:hidden" role="status" aria-live="polite">
-        {notice}
-      </p>
+              {send.model === undefined ? null : (
+                <Badge variant="muted" className="dshx:flex-none dshx:font-normal dshx:@max-pane-narrow:hidden" data-scheduled-model="">
+                  {send.model.model}
+                  {send.model.reasoningEffort === undefined ? '' : ` · ${send.model.reasoningEffort}`}
+                </Badge>
+              )}
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm">{send.text}</span>
+              {send.note === undefined ? null : <span className="dshx:sr-only">{send.note}</span>}
+              <div className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-60 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100 dshx:pointer-coarse:opacity-100">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="dshx:pointer-coarse:size-touch"
+                  aria-label="Edit scheduled message"
+                  disabled={send.status === 'sending'}
+                  onClick={() => setEditing(send)}
+                >
+                  <PencilIcon />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="dshx:pointer-coarse:size-touch"
+                  aria-label="Send now"
+                  disabled={send.status === 'sending' || sendNow.isPending}
+                  onClick={() => sendNow.mutate(send.id)}
+                >
+                  <SendIcon />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="dshx:pointer-coarse:size-touch"
+                  aria-label="Cancel scheduled message"
+                  disabled={send.status === 'sending' || cancel.isPending}
+                  onClick={() => cancel.mutate(send.id)}
+                >
+                  <XIcon />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {rows.some(send => send.note !== undefined) ? (
+          <p className="dshx:border-t dshx:px-3 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">{rows.find(send => send.note !== undefined)?.note}</p>
+        ) : null}
+        <p className="dshx:border-t dshx:px-3 dshx:py-1 dshx:text-xs dshx:text-destructive dshx:empty:hidden" role="status" aria-live="polite">
+          {notice}
+        </p>
+      </div>
       {editing === null ? null : <ScheduledSendDialog send={editing} loadModels={props.loadModels} onClose={() => setEditing(null)} />}
     </section>
   )

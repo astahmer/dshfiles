@@ -51,6 +51,10 @@
     "./project-folder-setup": {
       "types": "./src/project-folder-setup.tsx",
       "default": "./dist/project-folder-setup.js"
+    },
+    "./project-add-flow": {
+      "types": "./src/project-add-flow.ts",
+      "default": "./dist/project-add-flow.js"
     }
   },
   "scripts": {
@@ -88,10 +92,12 @@
     "@deepseek-ai/dsh-subprocess": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@deepseek-ai/dsh-workspace": "catalog:",
+    "@dshfiles/command-palette": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
+    "jsdom": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "react": "catalog:",

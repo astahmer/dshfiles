@@ -34,6 +34,10 @@ export interface InboxThreadSignal {
   readonly verb: InlineVerb | undefined
   /** When the item last became open: the moment the thread "came back to you". */
   readonly openedAt: number
+  /** The question it asks, when it carries one; a peek shows it with its choices. */
+  readonly detail?: string
+  /** Answer choices, for an item the user answers in place (1–9 in a peek). */
+  readonly choices?: readonly { readonly id: string; readonly label: string; readonly recommended?: boolean }[]
 }
 
 export interface ThreadStatusInput {

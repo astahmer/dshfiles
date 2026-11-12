@@ -12,6 +12,8 @@ import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import css from './MessageItem.module.css'
+import { formatMessageClock } from './message-chrome.ts'
+import { needsTimeDivider, previousTurnTime } from './time-divider.ts'
 import { ResumeInterrupted } from '../../resume-interrupted.tsx'
 
 const EMPTY_TEXT_FACTS: Readonly<Partial<UserTextFacts>> = {}
@@ -303,10 +305,20 @@ export function PendingSubmissionBubble({ submission, loadImage, renderFactorySl
 
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderFactorySlot, loadImage, t,
+  node, renderFactorySlot, loadImage, t, useChat,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
+  // dshfiles (productivity pass T1.5): the message's time shows as a divider only after a day change or 30 quiet minutes.
+  const turn = node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn.turn : undefined
+  const previous = useChat(snapshot => (turn === undefined ? undefined : previousTurnTime(snapshot, turn)))
+  const divider = node.kind === 'user' && turn !== undefined && needsTimeDivider(previous, data.time, turn)
   return (
+    <>
+    {divider && (
+      <div className={css.timeDivider} role="separator">
+        <time dateTime={new Date(data.time).toISOString()}>{formatMessageClock(data.time, t)}</time>
+      </div>
+    )}
     <UserStyleBubble
       content={data.content}
       interactive
@@ -324,6 +336,7 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
         />
       )}
     />
+    </>
   )
 })
 

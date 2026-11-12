@@ -16,8 +16,8 @@ import { spawnGuardedDetached } from './guarded-spawn.js'
 import { ScratchRegistry } from './registry.js'
 import { ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 
-const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
-const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
+const NEW_THREAD_COMPOSER = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 
 /** Both a local blank draft and a Host-backed blank Session can be the New thread surface. */
 const fakeProviderComposer = (page: Page) =>
@@ -99,7 +99,7 @@ const openSeedThreadComposer = async (page: Page, timeoutMs: number) => {
   await page.getByRole('button', { name: NEW_THREAD_START_BUTTON_NAME }).first().click({ timeout: timeoutMs })
   // A local draft may show only its project chooser; a Host-backed blank already
   // has a bound Session and uses the ordinary thread composer instead.
-  const draft = composer.or(page.getByRole('button', { name: 'Choose workspace', exact: true })).first()
+  const draft = composer.or(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).first()
   const composerAppeared = await draft.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 1_000) }).then(
     () => true,
     error => {
@@ -115,7 +115,7 @@ const openSeedThreadComposer = async (page: Page, timeoutMs: number) => {
 /** Choose a project only on an unbound draft; a materialized Session already owns its cwd. */
 const prepareFakeProviderComposer = async (page: Page, projectName: string, timeoutMs: number): Promise<void> => {
   await openSeedThreadComposer(page, timeoutMs)
-  const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
+  const projectButton = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
   if ((await projectButton.isVisible()) && (await projectButton.textContent())?.trim() !== projectName) {
     await projectButton.click({ timeout: timeoutMs })
     // The native picker is a menu; @dshfiles/jj-integration replaces it with a searchable list.
@@ -251,7 +251,7 @@ const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs:
   }
   const composer = await openSeedThreadComposer(page, timeoutMs)
   const projectName = basename(state.project.path)
-  const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
+  const projectButton = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
   if ((await projectButton.textContent())?.trim() !== projectName) {
     await projectButton.click({ timeout: timeoutMs })
     await page.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true }).fill(projectName, { timeout: timeoutMs })
@@ -263,11 +263,17 @@ const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs:
     await workspacePicker.click({ timeout: timeoutMs })
     await page.getByRole('option', { name: /^Own workspace/ }).click({ timeout: timeoutMs })
   }
-  const threadLabel = new RegExp(`^${projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} · (thread-[\\w-]+)$`)
+  // rich-composer's chip names the project and carries the thread workspace's folder on a data attribute (b:212a); the
+  // stock composer still reads "<project> · thread-xxxxxx".
+  const projectSegment = page.locator('[data-run-segment="project"][data-thread-workspace]').filter({ visible: true }).first()
+  const stockLabel = new RegExp(`^${projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} · (thread-[\\w-]+)$`)
   const deadline = Date.now() + timeoutMs
   let threadName: string | undefined
   while (threadName === undefined && Date.now() < deadline) {
-    threadName = threadLabel.exec((await projectButton.textContent())?.trim() ?? '')?.[1]
+    threadName =
+      (await projectSegment.count()) > 0
+        ? /^thread-[\w-]+$/u.exec((await projectSegment.getAttribute('data-thread-workspace').catch(() => null)) ?? '')?.[0]
+        : stockLabel.exec((await projectButton.textContent())?.trim() ?? '')?.[1]
     if (threadName === undefined) await page.waitForTimeout(250)
   }
   if (threadName === undefined) {
@@ -516,6 +522,15 @@ const configureFakeProviderThread = async (input: {
     )
   }
   const fake = await startFakeProvider(state, timeoutMs)
+  // A thread-panel facet an earlier reach opened (Traces, Requests, Jobs…) keeps the right pane open across pages and
+  // halves the AI accounts page; its narrow layout hides the controls this seed drives. Close the pane first.
+  await page
+    .locator('[data-workbench-region="right"]')
+    .getByRole('button', { name: 'Close pane', exact: true })
+    .filter({ visible: true })
+    .first()
+    .click({ timeout: 1_500 })
+    .catch(() => undefined)
   await openAIAccountsPanel(page, timeoutMs)
   const accountName = await openFakeProviderAccount({ state, page, timeoutMs, baseUrl: fake.baseUrl, apiKey: input.apiKey ?? 'dshx-dev-fake-key' })
   const current = await readFakeProviderAccount(state.home)
@@ -590,7 +605,7 @@ const seedQueuePreviewThread = async (state: ScratchState, page: Page, timeoutMs
   const process = await configureFakeProviderThread({ state, page, seed: 'queue-preview-thread', timeoutMs })
   await sendFakeProviderTurn(page, '[[title Queue source]] [[hold]]', timeoutMs)
   await page.getByText('Queue source', { exact: true }).first().waitFor({ state: 'visible', timeout: timeoutMs })
-  const composer = page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+  const composer = page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill('first queued, with an image and a file', { timeout: timeoutMs })
   await page
     .locator('[data-composer-card] input[type="file"]')
@@ -1161,8 +1176,10 @@ const postOtlp = async (input: {
 }
 
 /**
- * Tag two synthetic agent turns with the open thread's session id and post them. The thread's own Traces tab names both
- * the Session id and the receiver endpoint, so the page stays on that thread (back on its Chat tab).
+ * Tag two synthetic agent turns with the open thread's session id and post them. The thread's own Traces facet names
+ * both the Session id and the receiver endpoint; it opens from the thread header's More thread actions (the header has
+ * no view tabs since productivity pass Q5) and is closed again, so the stage stays on that thread's Chat and the next
+ * open reads the posted turns.
  */
 const seedOtlpSessionTurns = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
   if (!state.bundles.includes('@dshfiles/traces'))
@@ -1171,9 +1188,9 @@ const seedOtlpSessionTurns = async (state: ScratchState, page: Page, timeoutMs: 
       'Seed otlp-session-turns needs @dshfiles/traces.',
       'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/traces ...".',
     )
-  const tabs = page.locator('[data-conversation-tabs]')
   try {
-    await tabs.getByRole('tab', { name: 'Traces', exact: true }).click({ timeout: timeoutMs })
+    await page.getByRole('button', { name: 'More thread actions', exact: true }).filter({ visible: true }).first().click({ timeout: timeoutMs })
+    await page.getByRole('menuitem', { name: 'Open Traces', exact: true }).click({ timeout: timeoutMs })
   } catch {
     throw new ScratchError(
       'seed-needs-thread',
@@ -1196,7 +1213,13 @@ const seedOtlpSessionTurns = async (state: ScratchState, page: Page, timeoutMs: 
   const payload = otlpSessionTurns(sessionId)
   await postOtlp({ endpoint, signal: 'traces', body: payload.traces, timeoutMs })
   await postOtlp({ endpoint, signal: 'logs', body: payload.logs, timeoutMs })
-  await tabs.getByRole('tab', { name: 'Chat', exact: true }).click({ timeout: timeoutMs })
+  // Best effort: an open facet keeps its first (empty) summary until it remounts.
+  await page
+    .getByRole('button', { name: 'Close Traces', exact: true })
+    .filter({ visible: true })
+    .first()
+    .click({ timeout: 2_000 })
+    .catch(() => undefined)
 }
 
 /** Open the Traces panel and read the endpoint its receiver badge shows; a scratch binds a free port. */

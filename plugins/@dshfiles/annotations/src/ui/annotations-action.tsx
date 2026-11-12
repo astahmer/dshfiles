@@ -1,11 +1,12 @@
 import { usePhoneThreadTool } from '@dshfiles/rich-composer/phone-thread-menu'
-import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type JSX } from 'react'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { CrosshairIcon, SquareDashedIcon } from '@dshfiles/plugin-ui/icons'
-import { useApi, usePlugin, useResource, type ComposerToolProps } from '@dshfiles/dshx/client'
+import { useApi, useContract, usePlugin, useResource, type ComposerToolProps } from '@dshfiles/dshx/client'
+import { ComposerBar, type ComposerBarPlacement } from '@dshfiles/rich-composer/composer-more'
 import { retryOnceUnlessTimedOut, runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -19,6 +20,17 @@ import { annotationsUi, useAnnotationsUi } from './state.js'
 import { pairingMachine } from './pairing-machine.js'
 import { PreviewDialog } from './preview-dialog.js'
 import { noRowAction, rowActionReducer } from './row-action.js'
+import { annotationsRequests, showsAnnotationsButton } from './composer-requests.js'
+
+const noSubscription = (): (() => void) => () => undefined
+const alwaysPinned = (): boolean => true
+
+/** True while the composer owner keeps its More menu (the user did not pin the extras back into the bar). */
+const useInMoreMenu = (): boolean => {
+  const bar = useContract(ComposerBar)
+  const placement: ComposerBarPlacement | undefined = bar.status === 'active' ? bar.value : undefined
+  return !useSyncExternalStore(placement?.subscribe ?? noSubscription, placement?.pinned ?? alwaysPinned, placement?.pinned ?? alwaysPinned)
+}
 
 const selectorLabel = (annotation: Annotation): string => annotation.target.selector.split(' > ').slice(-1)[0] ?? annotation.target.tag
 
@@ -76,6 +88,9 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
   })
   const rows = useMemo(() => list.data?.annotations ?? [], [list.data])
   const count = rows.length
+  const inMoreMenu = useInMoreMenu()
+  const showButton = showsAnnotationsButton({ surface: props.surface, inMoreMenu, count, working })
+  useEffect(() => annotationsRequests.on(scope, () => setOpen(true)), [scope])
 
   const intake = useQuery({
     queryKey: ['annotations', 'intake'],
@@ -223,24 +238,36 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label="Annotate an element"
-            {...phoneTool.triggerProps}
-            onMouseDown={event => event.preventDefault()}
-            className="dshx-root dshx:relative dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent"
-          >
-            <CrosshairIcon className="dshx:size-4" />
-            {count === 0 ? null : (
-              <span className="dshx:absolute dshx:-top-1 dshx:-right-1 dshx:rounded-full dshx:bg-primary dshx:px-1 dshx:text-[10px] dshx:leading-4 dshx:text-primary-foreground">
-                {count}
-              </span>
-            )}
-          </Button>
-        </PopoverTrigger>
+        {showButton ? null : (
+          // Opened from the composer's More menu or /annotate: an invisible anchor keeps the popover above the bar.
+          <PopoverAnchor asChild>
+            <span aria-hidden className="dshx:inline-block dshx:h-6 dshx:w-0" data-annotations-anchor="" />
+          </PopoverAnchor>
+        )}
+        {showButton ? (
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Annotate an element"
+              {...phoneTool.triggerProps}
+              data-annotations-count={count}
+              onMouseDown={event => event.preventDefault()}
+              className="dshx-root dshx:relative dshx:gap-1 dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent"
+            >
+              <CrosshairIcon className="dshx:size-4" />
+              {count === 0 ? null : inMoreMenu && props.surface === 'conversation' ? (
+                // The conversation bar shows the tool only for open annotations: a quiet count chip, not a badge.
+                <span className="dshx:text-xs dshx:font-medium dshx:tabular-nums">{count}</span>
+              ) : (
+                <span className="dshx:absolute dshx:-top-1 dshx:-right-1 dshx:rounded-full dshx:bg-primary dshx:px-1 dshx:text-2xs dshx:leading-4 dshx:text-primary-foreground">
+                  {count}
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+        ) : null}
         <PopoverContent
           onCloseAutoFocus={phoneTool.onCloseAutoFocus}
           align="start"
@@ -263,18 +290,18 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
           </div>
           {intake.data !== undefined && intake.data.items.length > 0 ? (
             <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-b dshx:px-3 dshx:py-2">
-              <p className="dshx:text-[11px] dshx:font-medium">From Chrome · {intake.data.items.length}</p>
+              <p className="dshx:text-2xs dshx:font-medium">From Chrome · {intake.data.items.length}</p>
 
               {intake.data.items.map(item => (
                 <div key={item.id} className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-                  <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
+                  <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">
                     {item.draft.note.length === 0 ? item.draft.target.selector : item.draft.note}
                   </span>
                   <Button
                     type="button"
                     size="sm"
                     variant="secondary"
-                    className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
+                    className="dshx:h-6 dshx:px-1.5 dshx:text-2xs"
                     disabled={attach.isPending}
                     onClick={() => attach.mutate([item.id])}
                   >
@@ -285,8 +312,8 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
             </div>
           ) : null}
           <details className="dshx:border-b dshx:px-3 dshx:py-2">
-            <summary className="dshx:cursor-pointer dshx:text-[11px] dshx:text-muted-foreground">Chrome without an extension</summary>
-            <p className="dshx:mt-1 dshx:text-[11px] dshx:text-muted-foreground">
+            <summary className="dshx:cursor-pointer dshx:text-2xs dshx:text-muted-foreground">Chrome without an extension</summary>
+            <p className="dshx:mt-1 dshx:text-2xs dshx:text-muted-foreground">
               A DSH-owned Chrome profile with a loopback debugging port. Nothing is installed and your daily Chrome is untouched.
             </p>
             <div className="dshx:mt-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
@@ -310,11 +337,11 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
                 </>
               )}
             </div>
-            <p className="dshx:mt-1 dshx:truncate dshx:font-mono dshx:text-[10px] dshx:text-muted-foreground">
+            <p className="dshx:mt-1 dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">
               {chromeStatus.data?.running === true ? chromeStatus.data.endpoint : 'not running'}
             </p>
             {setupQuery.data?.chromePath === '' ? (
-              <p className="dshx:mt-1 dshx:text-[11px] dshx:text-destructive">No Chrome found; set its path in Settings.</p>
+              <p className="dshx:mt-1 dshx:text-2xs dshx:text-destructive">No Chrome found; set its path in Settings.</p>
             ) : null}
             {setupQuery.data?.pickActiveTab !== false && chromeStatus.data?.running === true ? (
               <div className="dshx:mt-1">
@@ -327,12 +354,12 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
               <ul className="dshx:mt-1 dshx:flex dshx:flex-col dshx:gap-1">
                 {chromeStatus.data.pages.map(page => (
                   <li key={page.id} className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-                    <span className="dshx:truncate dshx:text-[11px]">{page.title}</span>
+                    <span className="dshx:truncate dshx:text-2xs">{page.title}</span>
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
+                      className="dshx:h-6 dshx:px-1.5 dshx:text-2xs"
                       disabled={pickOnChrome.isPending}
                       onClick={() => pickOnChrome.mutate(page.id)}
                     >
@@ -342,23 +369,21 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
                 ))}
               </ul>
             )}
-            {pickOnChrome.isPending ? <p className="dshx:mt-1 dshx:text-[11px] dshx:text-muted-foreground">Waiting for a click in that tab…</p> : null}
+            {pickOnChrome.isPending ? <p className="dshx:mt-1 dshx:text-2xs dshx:text-muted-foreground">Waiting for a click in that tab…</p> : null}
           </details>
           <details className="dshx:border-b dshx:px-3 dshx:py-2">
-            <summary className="dshx:cursor-pointer dshx:text-[11px] dshx:text-muted-foreground">Browser extension</summary>
-            <p className="dshx:mt-1 dshx:text-[11px] dshx:text-muted-foreground">
-              Chrome cannot install an unpacked extension for you. Once per Chrome profile:
-            </p>
-            <ol className="dshx:mt-1 dshx:list-decimal dshx:space-y-1 dshx:pl-4 dshx:text-[11px]">
+            <summary className="dshx:cursor-pointer dshx:text-2xs dshx:text-muted-foreground">Browser extension</summary>
+            <p className="dshx:mt-1 dshx:text-2xs dshx:text-muted-foreground">Chrome cannot install an unpacked extension for you. Once per Chrome profile:</p>
+            <ol className="dshx:mt-1 dshx:list-decimal dshx:space-y-1 dshx:pl-4 dshx:text-2xs">
               <li>
                 In <code>chrome://extensions</code> with Developer mode on, drag this folder in:
                 <div className="dshx:mt-0.5 dshx:flex dshx:items-center dshx:gap-1">
-                  <code className="dshx:truncate dshx:font-mono dshx:text-[10px]">{setupQuery.data?.extensionPath ?? '…'}</code>
+                  <code className="dshx:truncate dshx:font-mono dshx:text-2xs">{setupQuery.data?.extensionPath ?? '…'}</code>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
+                    className="dshx:h-6 dshx:px-1.5 dshx:text-2xs"
                     onClick={() => void plugin.system.copy(setupQuery.data?.extensionPath ?? '')}
                   >
                     Copy
@@ -385,30 +410,30 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
               </Button>
               {pairStatus.data?.pairedAt === undefined ? (
                 pairing.matches('armed') ? (
-                  <span className="dshx:text-[11px] dshx:text-muted-foreground">Waiting for the extension…</span>
+                  <span className="dshx:text-2xs dshx:text-muted-foreground">Waiting for the extension…</span>
                 ) : null
               ) : (
-                <span className="dshx:text-[11px] dshx:text-muted-foreground">Paired ✓</span>
+                <span className="dshx:text-2xs dshx:text-muted-foreground">Paired ✓</span>
               )}
             </div>
-            <p className="dshx:mt-1 dshx:break-all dshx:font-mono dshx:text-[10px] dshx:text-muted-foreground">
+            <p className="dshx:mt-1 dshx:break-all dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">
               {location.origin}
               {INGEST_PATH}
             </p>
             <details className="dshx:mt-1">
-              <summary className="dshx:cursor-pointer dshx:text-[11px] dshx:text-muted-foreground">Paste a token instead</summary>
+              <summary className="dshx:cursor-pointer dshx:text-2xs dshx:text-muted-foreground">Paste a token instead</summary>
               {tokenQuery.data === undefined ? (
-                <Button type="button" size="sm" variant="ghost" className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]" onClick={() => void tokenQuery.refetch()}>
+                <Button type="button" size="sm" variant="ghost" className="dshx:h-6 dshx:px-1.5 dshx:text-2xs" onClick={() => void tokenQuery.refetch()}>
                   Show token
                 </Button>
               ) : (
                 <div className="dshx:flex dshx:items-center dshx:gap-1">
-                  <code className="dshx:truncate dshx:font-mono dshx:text-[10px]">{tokenQuery.data.token}</code>
+                  <code className="dshx:truncate dshx:font-mono dshx:text-2xs">{tokenQuery.data.token}</code>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
+                    className="dshx:h-6 dshx:px-1.5 dshx:text-2xs"
                     onClick={() => void plugin.system.copy(tokenQuery.data?.token ?? '')}
                   >
                     Copy
@@ -420,7 +445,7 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
           {actionErrors.length === 0 ? null : (
             <div className="dshx:border-b dshx:px-3 dshx:py-1">
               {actionErrors.map(message => (
-                <p key={message} className="dshx:text-[11px] dshx:text-destructive">
+                <p key={message} className="dshx:text-2xs dshx:text-destructive">
                   {message}
                 </p>
               ))}
@@ -436,22 +461,22 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
                 {rows.map(annotation => (
                   <li key={annotation.id} className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-b dshx:px-3 dshx:py-2">
                     <div className="dshx:flex dshx:items-center dshx:gap-2">
-                      <span className="dshx:truncate dshx:font-mono dshx:text-[11px]">{selectorLabel(annotation)}</span>
-                      <Badge variant={statusVariant(annotation)} className="dshx:text-[10px]">
+                      <span className="dshx:truncate dshx:font-mono dshx:text-2xs">{selectorLabel(annotation)}</span>
+                      <Badge variant={statusVariant(annotation)} className="dshx:text-2xs">
                         {annotation.status === 'stale' ? `stale · ${annotation.target.staleReason ?? 'changed'}` : (annotation.severity ?? annotation.status)}
                       </Badge>
-                      {annotation.intent === undefined ? null : <span className="dshx:text-[10px] dshx:text-muted-foreground">{annotation.intent}</span>}
+                      {annotation.intent === undefined ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{annotation.intent}</span>}
                     </div>
                     {annotation.note.length === 0 ? null : <p className="dshx:line-clamp-2 dshx:text-xs dshx:text-muted-foreground">{annotation.note}</p>}
                     {annotation.target.source === undefined ? null : (
-                      <p className="dshx:truncate dshx:font-mono dshx:text-[10px] dshx:text-muted-foreground">
+                      <p className="dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">
                         {annotation.target.source.file}:{annotation.target.source.line}
                       </p>
                     )}
                     {annotation.thread.length === 0 ? null : (
                       <ul className="dshx:flex dshx:flex-col dshx:gap-0.5">
                         {annotation.thread.slice(-2).map(message => (
-                          <li key={message.id} className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
+                          <li key={message.id} className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">
                             <span className="dshx:font-medium">{message.role}</span>: {message.body}
                           </li>
                         ))}
@@ -497,20 +522,14 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
                       </div>
                     ) : null}
                     <div className="dshx:flex dshx:items-center dshx:gap-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
-                        onClick={() => resolve.mutate(annotation)}
-                      >
+                      <Button type="button" size="sm" variant="ghost" className="dshx:h-6 dshx:px-1.5 dshx:text-2xs" onClick={() => resolve.mutate(annotation)}>
                         Resolve
                       </Button>
                       <Button
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
+                        className="dshx:h-6 dshx:px-1.5 dshx:text-2xs"
                         onClick={() => dispatchRowAction({ type: 'dismiss', id: annotation.id })}
                       >
                         Dismiss
@@ -519,7 +538,7 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
+                        className="dshx:h-6 dshx:px-1.5 dshx:text-2xs"
                         onClick={() => dispatchRowAction({ type: 'reply', id: annotation.id })}
                       >
                         Reply

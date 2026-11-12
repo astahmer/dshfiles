@@ -1,6 +1,6 @@
 import { useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { useApi, useResource, useSettings } from '@dshfiles/dshx/client'
+import { useApi, usePlugin, useResource, useSettings } from '@dshfiles/dshx/client'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
@@ -17,6 +17,7 @@ import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { BacklogSettingsSheet } from './backlog-settings-sheet.js'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import {
   KeyRoundIcon,
@@ -184,7 +185,7 @@ const FilterMenu = (props: {
       >
         <ListFilterIcon className="dshx:size-3.5" />
         <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">Filter</span>
-        {active > 0 ? <span className="dshx:rounded-full dshx:bg-info/15 dshx:px-1.5 dshx:text-[10px] dshx:text-info">{active}</span> : null}
+        {active > 0 ? <span className="dshx:rounded-full dshx:bg-info/15 dshx:px-1.5 dshx:text-2xs dshx:text-info">{active}</span> : null}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx-root dshx:w-56">
         <DropdownMenuLabel className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">Kind</DropdownMenuLabel>
@@ -194,14 +195,14 @@ const FilterMenu = (props: {
             checked={props.kinds.includes(kind)}
             onSelect={event => event.preventDefault()}
             onCheckedChange={checked => props.setKinds(checked ? [...props.kinds, kind] : props.kinds.filter(other => other !== kind))}
-            className="dshx:gap-2 dshx:text-[13px]"
+            className="dshx:gap-2 dshx:text-sm"
           >
             <ItemGlyphs.KindIcon kind={kind} />
             {ItemGlyphs.kindLabels[kind]}
           </DropdownMenuCheckboxItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuCheckboxItem checked={props.showDormant} onCheckedChange={checked => props.setShowDormant(checked)} className="dshx:text-[13px]">
+        <DropdownMenuCheckboxItem checked={props.showDormant} onCheckedChange={checked => props.setShowDormant(checked)} className="dshx:text-sm">
           Include dormant, archived and snoozed
         </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
@@ -228,9 +229,7 @@ const AgentItemsToggle = (props: { readonly hidden: boolean; readonly hiddenCoun
           <Icon aria-hidden className="dshx:size-3.5" />
           <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">Agent items</span>
           {props.hidden && props.hiddenCount > 0 ? (
-            <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[10px] dshx:tabular-nums dshx:text-muted-foreground">
-              {props.hiddenCount}
-            </span>
+            <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-2xs dshx:tabular-nums dshx:text-muted-foreground">{props.hiddenCount}</span>
           ) : null}
         </button>
       </TooltipTrigger>
@@ -264,7 +263,7 @@ const SavedViews = (props: {
       >
         <BookmarkIcon className="dshx:size-3.5" />
         <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">Views</span>
-        {props.views.length === 0 ? null : <span className="dshx:text-[10px] dshx:tabular-nums">{props.views.length}</span>}
+        {props.views.length === 0 ? null : <span className="dshx:text-2xs dshx:tabular-nums">{props.views.length}</span>}
       </PopoverTrigger>
       <PopoverContent align="end" className="dshx-root dshx:w-72 dshx:p-1">
         {props.views.length === 0 ? (
@@ -281,8 +280,8 @@ const SavedViews = (props: {
                 }}
                 className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:px-2 dshx:py-1.5 dshx:text-left"
               >
-                <span className="dshx:truncate dshx:text-[13px]">{saved.name}</span>
-                <span className="dshx:truncate dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">
+                <span className="dshx:truncate dshx:text-sm">{saved.name}</span>
+                <span className="dshx:truncate dshx:font-mono! dshx:text-2xs dshx:text-muted-foreground">
                   {viewLabels[saved.view]}
                   {saved.query === '' ? '' : ` · ${saved.query}`}
                 </span>
@@ -702,6 +701,31 @@ export const BacklogPanel = (props: {
     return true
   }
 
+  // J and K go through the shortcut layer (@dshfiles/shortcuts), which already refuses them while typing, in an IME
+  // composition or with single-key shortcuts off, and lists them in the ? sheet; the arrows stay native to the list.
+  useCommands(usePlugin(), [
+    {
+      id: '@dshfiles/backlog.next',
+      title: 'Next item',
+      keys: ['J'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: () => panelRoot.current,
+      run: () => moveCursor(1),
+    },
+    {
+      id: '@dshfiles/backlog.previous',
+      title: 'Previous item',
+      keys: ['K'],
+      scope: 'list',
+      section: 'Lists',
+      hidden: true,
+      region: () => panelRoot.current,
+      run: () => moveCursor(-1),
+    },
+  ])
+
   const modifierHeld = usePrimaryModifierHeld()
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
@@ -718,8 +742,8 @@ export const BacklogPanel = (props: {
     if (event.key === 'Enter' && event.target instanceof HTMLElement && event.target.closest('button, a[href]') !== null) return
     const viewKey = viewForShortcut(event.key)
     if (viewKey !== undefined) switchView(viewKey)
-    else if (event.key === 'j' || event.key === 'ArrowDown') moveCursor(1)
-    else if (event.key === 'k' || event.key === 'ArrowUp') moveCursor(-1)
+    else if (event.key === 'ArrowDown') moveCursor(1)
+    else if (event.key === 'ArrowUp') moveCursor(-1)
     else if (event.key === 'Enter' && cursorId !== null) select(cursorId)
     else if (event.key === 'Escape' && expanded) setExpanded(false)
     else if (event.key === 'Escape' && openId !== null) setOpenId(null)
@@ -764,6 +788,7 @@ export const BacklogPanel = (props: {
         ref={panelRoot}
         tabIndex={-1}
         onKeyDown={onKeyDown}
+        data-shortcut-scope="list"
         className="dshx-root dshx:@container dshx:relative dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground dshx:outline-none"
       >
         <header className="dshx:flex dshx:h-12 dshx:shrink-0 dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:px-4 dshx:@max-pane-narrow:gap-2 dshx:@max-pane-narrow:px-3 dshx:@max-pane-compact:overflow-x-auto">
@@ -786,7 +811,7 @@ export const BacklogPanel = (props: {
                       <Icon aria-hidden className="dshx:size-3.5" />
                       <span className="dshx:@max-pane-compact:sr-only">{viewLabels[entry]}</span>
                       {modifierHeld && (
-                        <kbd aria-hidden className="dshx:font-mono dshx:text-[10px] dshx:text-muted-foreground dshx:tabular-nums dshx:-ml-0.5">
+                        <kbd aria-hidden className="dshx:font-mono dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums dshx:-ml-0.5">
                           {index + 1}
                         </kbd>
                       )}
@@ -875,14 +900,14 @@ export const BacklogPanel = (props: {
                       setPreference({ sort: { ...stored.sort, [view]: next } })
                     }}
                   >
-                    <DropdownMenuRadioItem value="updated" className="dshx:text-[13px]">
+                    <DropdownMenuRadioItem value="updated" className="dshx:text-sm">
                       Last update
                     </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="created" className="dshx:text-[13px]">
+                    <DropdownMenuRadioItem value="created" className="dshx:text-sm">
                       Creation date
                     </DropdownMenuRadioItem>
                     {view === 'items' ? (
-                      <DropdownMenuRadioItem value="priority" className="dshx:text-[13px]">
+                      <DropdownMenuRadioItem value="priority" className="dshx:text-sm">
                         Priority
                       </DropdownMenuRadioItem>
                     ) : null}

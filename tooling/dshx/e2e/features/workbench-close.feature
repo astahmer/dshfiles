@@ -3,6 +3,7 @@ Feature: Workbench conversation close ownership
   @scenario:workbench.repeated-close-navigation
   Scenario: Repeated real tab close gestures never activate the closed chat or replace another conversation
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar keeps the former Free docking panes
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     And each fixed-session conversation receives its own draft

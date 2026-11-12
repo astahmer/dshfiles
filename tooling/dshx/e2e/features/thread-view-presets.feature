@@ -14,3 +14,10 @@ Feature: Thread view presets
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
     When a view context menu marks a thread unread
     Then the same view context menu marks it read
+
+  @scenario:thread-sidebar.filter-presets
+  Scenario: Save filter presets and switch between them
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/command-palette, @dshfiles/shortcuts" is booted
+    When two filter presets are saved from the Filter menu
+    Then the presets switch from the Filter menu, the command palette and the bracket keys
+    And an edited preset saves its changes and a deleted preset comes back with Undo

@@ -12,7 +12,7 @@ const drafts = {
 } as const
 const main = (page: Page): Locator => page.locator('[data-slot="shell.main"]')
 const tab = (page: Page, name: string): Locator => main(page).getByRole('tab', { name, exact: true })
-const composer = (body: Locator): Locator => body.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+const composer = (body: Locator): Locator => body.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })
 const conversations = new WeakMap<Page, Record<keyof typeof names, string>>()
 
 const body = (page: Page, id: string): Locator => main(page).locator(`[data-workbench-panel-id=${JSON.stringify(tabPanelId(`thread:${id}`))}]`)
@@ -68,13 +68,13 @@ When('a third real Workbench conversation has its own draft', async ({ page }: {
   // A genuinely empty fixed Session now owns the native welcome, not the
   // populated-chat placeholder. Keep later active/draft assertions unchanged.
   await expect(own.locator('[data-conversation-content]')).toHaveAttribute('data-content-phase', 'hero')
-  const welcomeInput = own.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const welcomeInput = own.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await expect(welcomeInput).toBeVisible()
   await expect(welcomeInput).toHaveAttribute('contenteditable', 'true')
   await welcomeInput.fill(names.third)
   await welcomeInput.press('Enter')
   await expect(own.getByText(names.third, { exact: true })).toBeVisible()
-  await expect(own.getByRole('status').filter({ hasText: /^(Completed|Failed|Stopped|Cancelled)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(own.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })).toHaveCount(1, { timeout: 60_000 })
   await expect(composer(own)).toHaveAttribute('contenteditable', 'true')
   await composer(own).fill(drafts.third)
   const ids = { first: await identity(page, names.first), second: await identity(page, names.second), third }

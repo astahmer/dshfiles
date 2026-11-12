@@ -1,6 +1,6 @@
 # Diffs review
 
-![The Changes facet: Land card, scopes, viewed marks and the diff](docs/screenshots/changes-facet.png)
+![The Changes facet mid-way through keyboard review: Land card with what changed, viewed marks, the current file](docs/screenshots/changes-facet.png)
 
 This plugin reviews diffs: a thread's turns, a jj or git workspace against its bookmark, a saved
 landed range, or several selected revisions. It owns the thread panel's **Changes** facet (review →
@@ -49,17 +49,34 @@ read it, and can it land?" without leaving the thread:
 - **Line comments.** Click or drag line numbers in a diff, write a comment and choose **Add to next
   message**: it becomes a line-comment chip in the thread's composer through the public dshx
   `Composer` contract (rich-composer sends it as `<comment path lines>`).
-- **Land card** on top: the target bookmark, how far behind it the workspace is, conflicts,
-  undescribed revisions and the thread's project-check receipts. **Land** previews the exact
+- **Land card** on top: what landing moves first (the revision titles, up to three with "+N more", and
+  the thread's file count and ±lines from the Whole thread diff), then the target bookmark, how far
+  behind it the workspace is, conflicts, undescribed revisions and the thread's project-check receipts. **Land** previews the exact
   revisions in a confirm dialog and then calls jj-integration's `land` with all of its Host guards;
   it is disabled with the reason when revisions conflict or lack a description. A thread that is
   working or waiting offers **Land when idle** (jj-integration's queued land, with Undo). **History**
-  opens the revision graph for rebase-only or describe work. After a land, the Inbox's Ready to land
-  item resolves at once.
+  opens the revision graph for rebase-only or describe work. Other plugins add verbs beside Land through the
+  `land-card-actions` dshx module (pull-requests adds **Open PR**, then the PR's state and CI checks). After a land, the Inbox's Ready to land
+  item resolves at once. When another thread is ready to land (jj-integration says it can land now,
+  every revision described and conflict-free, nothing queued; the same repository first), the
+  confirmation names it and offers **Land & next**: once the land reports _landed_, that thread comes
+  on screen with its Changes facet. A refused or failed land opens nothing.
+- **Try live** (on the card while there is work to land): what the running DSH would pick up once this thread lands
+  and its checkout syncs, from jj-integration's read-only `landImpact` (`dshx checkout plan`, agent tool
+  `jj_thread_land_impact`): files reaching the checkout DSH runs from, which plugins hot-reload in open tabs (client
+  bundle only, hmr-gate's rule) and which wait for **Restart when idle** (Host bundle or manifest changed). It never
+  lands, syncs or restarts; a thread of another repository says landing it changes nothing in DSH.
+- **Keyboard review** (the `changes` scope of [shortcuts](../shortcuts/README.md), listed in the `?`
+  sheet under Changes): **J/K** next/previous file, **N/P** next/previous hunk (across files),
+  **V** marks the current file viewed and moves to the next unviewed one, **C** opens a comment on the
+  current hunk's lines, **⇧L** opens the Land preview (or focuses the card and its reason when Land is
+  not ready). No key lands: the preview's buttons do.
 
 ![Important files stay first after a viewed mark](docs/screenshots/important-files-first.jpg)
 
-![Land previews the revisions before anything moves](docs/screenshots/land-card.png)
+![Land previews the revisions, with Land & next](docs/screenshots/land-card.png)
+
+![Try live: what the running DSH picks up once this thread lands](docs/screenshots/try-live.png)
 
 ![A line comment waits in the composer as a chip](docs/screenshots/diff-line-comments.png)
 

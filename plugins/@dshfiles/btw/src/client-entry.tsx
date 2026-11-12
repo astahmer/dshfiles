@@ -13,6 +13,7 @@ import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime } from '@deep
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { defineClient } from '@dshfiles/dshx/client'
+import { ComposerBar, ComposerMoreItems } from '@dshfiles/rich-composer/composer-more'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { MessageCircleQuestionIcon } from '@dshfiles/plugin-ui/icons'
@@ -295,11 +296,50 @@ export default defineClient({
         }
       }, 'dshfiles-btw: side question shortcut')
 
+    // The composer owns its bar (polish pass b:r4et): the side-question button sits in its More menu unless the user pins
+    // the occasional controls back. An absent owner keeps the button in the bar.
+    const bar = metadata?.plugin?.use(ComposerBar)
+    const pinnedNow = (): boolean => {
+      const live = bar?.get()
+      return live?.status === 'active' ? live.value.pinned() : true
+    }
+    const subscribePinned = (listener: () => void): (() => void) => {
+      let inner = (): void => undefined
+      const follow = (): void => {
+        inner()
+        const live = bar?.get()
+        inner = live?.status === 'active' ? live.value.subscribe(listener) : () => undefined
+      }
+      const outer =
+        bar?.subscribe(() => {
+          follow()
+          listener()
+        }) ?? (() => undefined)
+      follow()
+      return () => {
+        outer()
+        inner()
+      }
+    }
+    metadata?.plugin?.add(ComposerMoreItems, {
+      id: '@dshfiles/btw.ask',
+      group: 'side',
+      order: 30,
+      label: t('composerChip'),
+      keys: ['Mod+Alt+/'],
+      available: sessionId => listedThread(sessionId) !== undefined,
+      select: sessionId => {
+        askAbout(sessionId)
+      },
+    })
+
     const ComposerChip = (props: PropsRuntime<'conversation.input.right'>): ReactNode => {
       const available = props.useSessions(state => state.byId[props.sessionId]?.blank === false)
+      // The composer's More menu holds the side question while the bar is unpinned; the phone tool follows the bar.
+      const pinned = useSyncExternalStore(subscribePinned, pinnedNow, pinnedNow)
       const label = t('composerChip')
-      const phoneTool = usePhoneThreadTool({ id: '@dshfiles/btw/ask', label, open: () => askAbout(props.sessionId), available })
-      if (!available) return null
+      const phoneTool = usePhoneThreadTool({ id: '@dshfiles/btw/ask', label, open: () => askAbout(props.sessionId), available: available && pinned })
+      if (!available || !pinned) return null
       return (
         <TooltipProvider delayDuration={500}>
           <Tooltip>

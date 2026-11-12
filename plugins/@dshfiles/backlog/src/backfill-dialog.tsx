@@ -52,7 +52,7 @@ export const BackfillDialog = (props: {
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-col dshx:gap-3">
-          <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[13px]">
+          <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
             <input type="checkbox" checked={retriage} onChange={event => setRetriage(event.currentTarget.checked)} disabled={busy} />
             Also re-triage items triage already looked at
           </label>

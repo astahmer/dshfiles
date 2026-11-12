@@ -31,6 +31,11 @@ export interface StatusItem {
   readonly order?: number
   /** One-word name for the phone chip list and assistive technology ("Quota", "Working", "Restart"). */
   readonly label: string
+  /**
+   * False when the item's own words already say what it is ("Jarvis 51% left"): the phone pill then reads its text
+   * without the label in front. Content an item marks `data-status-detail` shows in the opened list, never in the pill.
+   */
+  readonly summaryLabel?: boolean
   /** Bind it with `api.bind(...)` so its hooks read the providing plugin's context. */
   readonly component: StatusItemComponent
   /** Opens the item's full page; the frame renders the item as a button that calls it. */

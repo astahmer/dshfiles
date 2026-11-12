@@ -69,16 +69,16 @@ const ThreadRow = (props: { readonly thread: PanelThread; readonly selected: boo
         <MessageSquareIcon className="dshx:size-[18px]" />
       </span>
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-        <span className="dshx:line-clamp-1 dshx:text-[13px] dshx:font-medium">{thread.title}</span>
-        <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{PanelFormat.threadSubtitle(thread)}</span>
+        <span className="dshx:line-clamp-1 dshx:text-sm dshx:font-medium">{thread.title}</span>
+        <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{PanelFormat.threadSubtitle(thread)}</span>
         <span className="dshx:line-clamp-1 dshx:text-xs dshx:text-muted-foreground">{thread.digested ? thread.decision : 'Waiting to be digested…'}</span>
       </span>
-      <span className="dshx:flex dshx:w-28 dshx:shrink-0 dshx:flex-col dshx:items-end dshx:gap-1 dshx:text-[11px] dshx:text-muted-foreground">
+      <span className="dshx:flex dshx:w-28 dshx:shrink-0 dshx:flex-col dshx:items-end dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground">
         <span className="dshx:tabular-nums">{PanelFormat.formatDay(thread.updatedAt)}</span>
         <Badge
           variant="outline"
           className={cn(
-            'dshx:h-4 dshx:border-transparent dshx:px-1.5 dshx:text-[10px]',
+            'dshx:h-4 dshx:border-transparent dshx:px-1.5 dshx:text-2xs',
             thread.digested ? 'dshx:bg-info/10 dshx:text-info' : 'dshx:bg-warning/10 dshx:text-warning',
           )}
         >
@@ -104,7 +104,7 @@ const CitationRow = (props: { readonly citation: MemoryCitation; readonly openTh
       <div className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-xs">
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <span className="dshx:line-clamp-2">{citation.target ?? `${citation.ref} (no longer in memory)`}</span>
-          <span className="dshx:text-[11px] dshx:text-muted-foreground">
+          <span className="dshx:text-2xs dshx:text-muted-foreground">
             {citation.ref} · cited in {PanelFormat.formatStamp(citation.at)}
           </span>
         </span>
@@ -135,7 +135,7 @@ const CitationRow = (props: { readonly citation: MemoryCitation; readonly openTh
       ) : null}
       <button
         type="button"
-        className="dshx:w-fit dshx:text-[11px] dshx:text-muted-foreground dshx:hover:underline"
+        className="dshx:w-fit dshx:text-2xs dshx:text-muted-foreground dshx:hover:underline"
         onClick={() => props.openThread(citation.thread)}
       >
         Open citing thread {PanelFormat.threadRef(citation.thread)}
@@ -210,7 +210,7 @@ const DigestedThreadDetail = (props: {
           <div className="dshx:text-xs">
             <Markdown text={digestBody} />
           </div>
-          <p className="dshx:text-[11px] dshx:text-muted-foreground">
+          <p className="dshx:text-2xs dshx:text-muted-foreground">
             {thread.source === 'model' ? 'Written by a cheap model from the thread transcript.' : 'Built from the thread record without a model call.'}
           </p>
         </section>
@@ -234,9 +234,9 @@ const DigestedThreadDetail = (props: {
                     </span>
                     <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
                       <span className="dshx:line-clamp-2 dshx:text-xs">{note.text}</span>
-                      <span className="dshx:text-[11px] dshx:text-muted-foreground">{PanelFormat.formatStamp(note.createdAt)}</span>
+                      <span className="dshx:text-2xs dshx:text-muted-foreground">{PanelFormat.formatStamp(note.createdAt)}</span>
                     </span>
-                    <span className={cn('dshx:shrink-0 dshx:rounded-full dshx:px-1.5 dshx:py-px dshx:text-[10px]', tone.badge)}>{tone.label}</span>
+                    <span className={cn('dshx:shrink-0 dshx:rounded-full dshx:px-1.5 dshx:py-px dshx:text-2xs', tone.badge)}>{tone.label}</span>
                   </button>
                 </li>
               )
@@ -255,7 +255,7 @@ const DigestedThreadDetail = (props: {
                 className="dshx:flex dshx:w-full dshx:flex-col dshx:gap-0.5 dshx:py-2 dshx:text-left dshx:hover:bg-accent/30"
               >
                 <span className="dshx:text-xs">{note.text}</span>
-                <span className="dshx:text-[11px] dshx:text-muted-foreground">
+                <span className="dshx:text-2xs dshx:text-muted-foreground">
                   {PanelFormat.noteToneOf(note.type).label} · {PanelFormat.formatStamp(note.createdAt)} · {note.citations} citations
                 </span>
               </button>
@@ -276,8 +276,8 @@ const DigestedThreadDetail = (props: {
           {timeline.map((entry, index) => (
             <li key={`${entry.at}:${String(index)}`} className="dshx:flex dshx:flex-col dshx:gap-0.5">
               <span className="dshx:text-xs dshx:font-medium">{entry.title}</span>
-              {entry.detail === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{entry.detail}</span>}
-              <span className="dshx:text-[11px] dshx:text-muted-foreground">{PanelFormat.formatStamp(entry.at)}</span>
+              {entry.detail === undefined ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{entry.detail}</span>}
+              <span className="dshx:text-2xs dshx:text-muted-foreground">{PanelFormat.formatStamp(entry.at)}</span>
             </li>
           ))}
         </ol>
@@ -286,7 +286,7 @@ const DigestedThreadDetail = (props: {
         {raw.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Reading the thread excerpt…</p> : null}
         {raw.isError ? <p className="dshx:text-xs dshx:text-destructive">The thread excerpt could not be read.</p> : null}
         {raw.isSuccess ? (
-          <pre className="dshx:max-h-96 dshx:overflow-auto dshx:whitespace-pre-wrap dshx:rounded-lg dshx:bg-muted/50 dshx:p-3 dshx:font-mono! dshx:text-[11px]">
+          <pre className="dshx:max-h-96 dshx:overflow-auto dshx:whitespace-pre-wrap dshx:rounded-lg dshx:bg-muted/50 dshx:p-3 dshx:font-mono! dshx:text-2xs">
             {raw.data.summary}
           </pre>
         ) : null}
@@ -385,7 +385,7 @@ export const ThreadsTab = (props: {
               onChange={event => setSearch(event.currentTarget.value)}
               className="dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:bg-transparent dshx:text-sm dshx:outline-none"
             />
-            <kbd className="dshx:rounded dshx:border dshx:border-border dshx:px-1 dshx:text-[10px] dshx:text-muted-foreground">/</kbd>
+            <kbd className="dshx:rounded dshx:border dshx:border-border dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">/</kbd>
           </div>
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
             <Combobox
@@ -423,9 +423,9 @@ export const ThreadsTab = (props: {
             />
           </div>
           <div className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-2 dshx:pt-0.5">
-            <span className="dshx:text-[13px] dshx:font-semibold">{PanelFormat.formatCount(visible.length)} threads</span>
+            <span className="dshx:text-sm dshx:font-semibold">{PanelFormat.formatCount(visible.length)} threads</span>
             <span className="dshx:flex-1" />
-            <span className="dshx:text-[11px] dshx:text-muted-foreground">
+            <span className="dshx:text-2xs dshx:text-muted-foreground">
               {PanelFormat.formatCount(diagnosed)} digested · {PanelFormat.formatCount(list.length - diagnosed)} not digested ·{' '}
               {PanelFormat.formatCount(citing)} cite memories
             </span>
@@ -468,7 +468,7 @@ export const ThreadsTab = (props: {
               </span>
               <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
                 <h2 className="dshx:line-clamp-2 dshx:text-sm dshx:font-semibold dshx:leading-snug">{selected.title}</h2>
-                <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{PanelFormat.threadSubtitle(selected)}</span>
+                <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{PanelFormat.threadSubtitle(selected)}</span>
               </div>
               <Button size="xs" variant="outline" onClick={() => props.openThread(selected.id)}>
                 Open thread <ArrowUpRightIcon />
@@ -495,7 +495,7 @@ export const ThreadsTab = (props: {
               </Button>
             </div>
             <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-3 dshx:overflow-auto dshx:p-4">
-              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:text-[11px] dshx:text-muted-foreground">
+              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground">
                 <span>{PanelFormat.formatStamp(detail.data?.createdAt ?? selected.createdAt)}</span>
                 <span>·</span>
                 <span>Agent</span>

@@ -1,4 +1,5 @@
 import type { SidebarPreferences } from './organization.js'
+import { DEFAULT_THREAD_BOARD_VIEW, type ThreadBoardViewSettings } from './thread-board-view.js'
 import { ThreadViewPreferencesModel, type ThreadViewSettings } from './thread-view-preferences.js'
 
 /** The browser view settings an earlier build wrote, plus the one-shot flags that recorded their migration. */
@@ -15,7 +16,14 @@ export interface LegacyThreadViews {
 export interface LegacyPreferences {
   readonly threadViews: LegacyThreadViews
   readonly collapsedGroups: readonly string[]
+  /**
+   * The Board view this browser kept before it followed the user (E9); null while the Host's settings cannot hold it yet
+   * (a Host older than the field), so it stays the live browser copy until that Host restarts.
+   */
+  readonly boardView: ThreadBoardViewSettings | null
 }
+
+const isDefaultBoardView = (view: ThreadBoardViewSettings): boolean => JSON.stringify(view) === JSON.stringify(DEFAULT_THREAD_BOARD_VIEW)
 
 /**
  * One Host patch carrying every legacy value worth moving: an untouched Host view document adopts the browser one and
@@ -36,6 +44,13 @@ export const planLegacyPreferencesMigration = (input: {
   const migrated = shouldUpgradeShipped ? ThreadViewPreferencesModel.upgradeShippedViewFilters(doneMigrated) : doneMigrated
   const collapsedGroups = input.legacy.collapsedGroups.length > 0 && input.host.collapsedGroups.length === 0 ? [...input.legacy.collapsedGroups] : null
   const threadViewsChanged = adoptLegacy || migrated !== source
-  if (collapsedGroups === null) return threadViewsChanged ? { threadViews: migrated } : {}
-  return threadViewsChanged ? { threadViews: migrated, collapsedGroups } : { collapsedGroups }
+  // A browser's own Board view moves once, onto a Host that still holds the default one; a Host that already holds a
+  // chosen Board view keeps it (another device chose it).
+  const legacyBoard = input.legacy.boardView
+  const boardView = legacyBoard !== null && !isDefaultBoardView(legacyBoard) && isDefaultBoardView(input.host.boardView) ? legacyBoard : null
+  return {
+    ...(threadViewsChanged ? { threadViews: migrated } : {}),
+    ...(collapsedGroups === null ? {} : { collapsedGroups }),
+    ...(boardView === null ? {} : { boardView }),
+  }
 }

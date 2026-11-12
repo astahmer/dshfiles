@@ -119,7 +119,7 @@
       "summary": "The Requests tab of Observe › Usage, with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose filter and a date range. Each row opens the thread that made the request. A thread's Cost facet opens it filtered to that thread (Show every thread clears the filter).",
       "reach": [
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a usage request\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Seed a usage request\"",
         "press Enter",
         "click tab \"Observe\"",
         "click button \"Usage\"",
@@ -510,7 +510,7 @@
       "id": "thread-cost-facet",
       "title": "Thread panel Cost facet",
       "summary": "A Cost tab in the thread panel (the right pane's tab chooser): the account route and model of the thread's last request, list-price cost per turn with tokens, models and failures, side requests apart, and links to this thread's requests (Usage › Requests filtered to the thread), Usage › Quota for that route, and Traces. A thread with subagents heads the facet with its family cost (the thread plus every subagent session below it) and lists each subagent's cost; Thread / With subagents switches the headline. The read-only `usage_thread_family_cost` Agent tool returns the same totals. Registered as a right-pane page tab type, so it follows the thread on stage without changing sidebar-right.",
-      "reach": ["seed tool-call-thread", "click button \"New tab\"", "click button \"Cost*\"", "expect text \"Per turn\""],
+      "reach": ["seed tool-call-thread", "press ControlOrMeta+Alt+KeyT", "click button \"route, cost per turn*\"", "expect text \"Per turn\""],
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",

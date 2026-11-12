@@ -2,6 +2,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
@@ -55,11 +56,13 @@ const DockRow = (props: DockProps & { readonly parentId: string; readonly childI
 
 /**
  * This thread's working subagents above the composer. A parent commonly ends its turn to wait for them, which folds the
- * delegation rows; this keeps each child in reach and clears as they go idle. Two or more rows get a group header that
- * collapses them all; the choice holds while children start and finish. Both selectors read plain strings, so
- * unrelated list and status updates do not re-render it.
+ * delegation rows; this keeps each child in reach and clears as they go idle. Two or more fold into one sticky row,
+ * "N subagents working", closed by default like background-jobs' dock; the reader's choice holds while children start
+ * and finish. Both selectors read plain strings, so unrelated list and status updates do not re-render it.
  */
-export const SubagentPreviewDock = (props: DockProps & { readonly sessionId: string; readonly preview: SubagentPreviewBindings }): JSX.Element | null => {
+export const SubagentPreviewDock = (
+  props: DockProps & { readonly sessionId: string; readonly preview: SubagentPreviewBindings; readonly count?: (count: number) => string },
+): JSX.Element | null => {
   const parentId = SessionId(props.sessionId)
   const children = props.useSessions(list =>
     (list.projectionsBySession[parentId]?.values.subagentCatalog ?? [])
@@ -70,10 +73,13 @@ export const SubagentPreviewDock = (props: DockProps & { readonly sessionId: str
   const working = props.useSessionStatus(statuses =>
     (children === '' ? [] : children.split(ID_SEPARATOR)).filter(id => statuses.get(SessionId(id))?.running === true).join(ID_SEPARATOR),
   )
-  const [collapsed, setCollapsed] = useState(false)
+  // Two or more working children fold into one row (b:7rv2), the same row as background-jobs' dock; the reader's choice
+  // holds while children start and finish, and resets with the thread (the dock is keyed by its session).
+  const [expanded, setExpanded] = useState(false)
   if (working === '') return null
-  const workingIds = working.split(ID_SEPARATOR)
-  const grouped = workingIds.length > 1
+  const list = working.split(ID_SEPARATOR)
+  const folded = list.length >= 2
+  const count = props.count?.(list.length) ?? String(list.length)
   return (
     <div
       aria-label={props.preview.t('subagentPreviewDock')}
@@ -81,22 +87,21 @@ export const SubagentPreviewDock = (props: DockProps & { readonly sessionId: str
       className="dshx-root dshx:mx-auto dshx:flex dshx:max-h-72 dshx:w-[calc(100%-var(--dsh-composer-side-clearance,0px)*2)] dshx:max-w-(--dsh-composer-card-max-width) dshx:flex-col dshx:overflow-y-auto"
       data-dshfiles-live-preview-dock="subagents"
     >
-      {grouped ? (
+      {folded ? (
         <button
           type="button"
-          aria-expanded={!collapsed}
-          aria-label={props.preview.t('subagentPreviewDockToggle')}
+          aria-expanded={expanded}
           className="dshx:sticky dshx:top-0 dshx:z-10 dshx:my-1 dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background dshx:px-2 dshx:text-left dshx:text-xs dshx:hover:bg-accent dshx:pointer-coarse:h-11"
-          data-dshfiles-live-preview-dock-header=""
-          onClick={() => setCollapsed(value => !value)}
+          data-dshfiles-live-preview-fold="subagents"
+          onClick={() => setExpanded(value => !value)}
         >
-          <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', !collapsed && 'dshx:rotate-90')} />
+          <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', expanded && 'dshx:rotate-90')} />
           <BotIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.preview.t('subagentPreviewDock')}</span>
-          <Badge variant="secondary">{workingIds.length}</Badge>
+          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{`${count} ${subagentStateLabel(props.preview.t, 'working').toLocaleLowerCase()}`}</span>
+          <StatusGlyph status="working" decorative />
         </button>
       ) : null}
-      {grouped && collapsed ? null : workingIds.map(childId => <DockRow key={childId} {...props} parentId={props.sessionId} childId={childId} />)}
+      {!folded || expanded ? list.map(childId => <DockRow key={childId} {...props} parentId={props.sessionId} childId={childId} />) : null}
     </div>
   )
 }

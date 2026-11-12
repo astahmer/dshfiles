@@ -10,6 +10,7 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, ClockIcon, FolderGit2Icon, PanelRightIcon, RefreshCwIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
@@ -73,7 +74,8 @@ const folderName = (path: string): string =>
     .pop() ?? path
 
 /**
- * One control for this thread's jj workspace: its name and state, Rebase, and the thread-workspaces panel.
+ * One control for this thread's jj workspace: where it edits files and its state, Land, and the thread-workspaces panel.
+ * The workspace's folder name appears only in the menu's mono path line (b:212a).
  *
  * It never unmounts: a thread that works in the shared project checkout says so instead of hiding the only entry
  * point to its workspace actions, which is what made the old header look like it had lost the button.
@@ -210,8 +212,11 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   // `current` is undefined until the status query answers and null when the path is not a thread workspace.
   const loading = current === undefined && cwd !== null
   const name = current?.name ?? (cwd === null || cwd.length === 0 ? props.t('unknownWorkspace') : folderName(cwd))
+  // b:212a: the control says where the thread edits files, in the picker's words; the folder name stays in the details.
+  const ownWorkspace = isThread || (loading && EntityLabels.isThreadWorkspace(cwd))
+  const placeLabel = ownWorkspace ? props.t('workspaceSegmentOwn') : props.t('workspaceSegmentInPlace')
   const label = props.t('rebaseThread', { bookmark })
-  const triggerLabel = isThread ? props.t('currentThreadWorkspace', { name }) : props.t('workspaceMenuShared', { name })
+  const triggerLabel = ownWorkspace ? props.t('currentThreadWorkspace') : props.t('workspaceMenuShared', { name })
   const rebaseDisabled = rebasesPending || !isThread || unlanded === 0 || !canRebase
   const integrationQueued = current?.integrationQueuedAt !== undefined
   const canQueueIntegration = isThread && unlanded > 0 && !canRebase && !rebasesPending
@@ -237,10 +242,14 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   }
 
   const glyph = <FolderGit2Icon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0" />
+  // b:czs9: the chip never shrinks below what it shows. A shrunk chip centred its badge and chevron over the elapsed
+  // time and the ⋯ beside it. It sheds parts instead, by the header row's width (an inline-size container): its label
+  // below 32rem (after the live activity's elapsed time, 36rem), then its count below 26rem. The count stays in this
+  // chip's menu ("458 to rebase"), which the same tap opens.
   const countBadge =
     unlanded > 0 ? (
       <Badge
-        className={cn('dshx:h-4 dshx:px-1.5 dshx:text-[10px]', conflicted && 'dshx:bg-warning/20 dshx:text-warning')}
+        className={cn('dshx:h-4 dshx:px-1.5 dshx:text-2xs dshx:@max-[26rem]:hidden', conflicted && 'dshx:bg-warning/20 dshx:text-warning')}
         variant={conflicted ? 'ghost' : 'secondary'}
       >
         <RollingNumber value={unlanded} />
@@ -250,13 +259,15 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const trigger = (
     <Button
       aria-label={triggerLabel}
-      className="dshx-root dshx:min-w-0 dshx:max-w-44 dshx:shrink dshx:gap-1.5 dshx:px-2"
+      className="dshx-root dshx:max-w-44 dshx:gap-1.5 dshx:px-2"
+      data-workspace-name={isThread ? current.name : undefined}
+      data-workspace-place={ownWorkspace ? 'own' : 'project'}
       size="sm"
       type="button"
       variant="outline"
     >
       {glyph}
-      <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs">{name}</span>
+      <span className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:@max-[32rem]:hidden">{placeLabel}</span>
       {countBadge}
       {integrationQueued ? <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
       <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
@@ -265,7 +276,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
 
   return (
     <TooltipProvider>
-      <span className="dshx-root dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+      <span className="dshx-root dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1">
         <Popover open={workspaceMenuOpen} onOpenChange={onWorkspaceMenuOpenChange}>
           {current === null || current === undefined ? (
             <Tooltip>
@@ -287,7 +298,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
             <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-3 dshx:pt-3">
               <div className="dshx:flex dshx:items-center dshx:gap-2">
                 <FolderGit2Icon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-                <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-sm dshx:font-medium">{name}</span>
+                <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{placeLabel}</span>
               </div>
               <Tooltip>
                 <TooltipTrigger asChild>

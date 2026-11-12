@@ -15,13 +15,13 @@ export const ProjectIcon = (props: { readonly path: string; readonly label?: str
     staleTime: 5 * 60_000,
     retry: false,
   })
-  const box = cn('dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:rounded-[3px]', props.className)
+  const box = cn('dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:rounded-xs', props.className)
   const data = icon.data
   if (data === undefined) {
     // Before the Host answers (and if it never does) the first letter still says which project this is.
     const initial = props.label?.trim().charAt(0).toLocaleUpperCase() ?? ''
     return (
-      <span className={cn(box, 'dshx:bg-muted dshx:text-[9px] dshx:font-semibold dshx:text-muted-foreground')} aria-hidden="true">
+      <span className={cn(box, 'dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground')} aria-hidden="true">
         {initial}
       </span>
     )
@@ -30,7 +30,7 @@ export const ProjectIcon = (props: { readonly path: string; readonly label?: str
     return <img className={cn(box, 'dshx:object-contain')} src={data.value} alt="" aria-hidden="true" data-project-icon-source={data.source} />
   return (
     <span
-      className={cn(box, 'dshx:bg-muted dshx:text-[9px] dshx:font-semibold dshx:text-muted-foreground')}
+      className={cn(box, 'dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground')}
       aria-hidden="true"
       data-project-icon-source="monogram"
     >

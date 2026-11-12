@@ -165,7 +165,7 @@ function RevisionRow({
           <span
             tabIndex={-1}
             className={cn(
-              'dshx:flex dshx:size-[18px] dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-[8px] dshx:font-semibold dshx:text-foreground dshx:ring-2 dshx:ring-offset-2 dshx:ring-offset-card dshx:transition-transform dshx:duration-200 dshx:group-hover:scale-125',
+              'dshx:flex dshx:size-[18px] dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:ring-2 dshx:ring-offset-2 dshx:ring-offset-card dshx:transition-transform dshx:duration-200 dshx:group-hover:scale-125',
               laneRing[tone],
             )}
           >
@@ -186,7 +186,7 @@ function RevisionRow({
         {revision.bookmark ? (
           <span
             className={cn(
-              'dshx:flex dshx:h-5 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1 dshx:rounded dshx:px-1.5 dshx:font-mono dshx:text-[10.5px]',
+              'dshx:flex dshx:h-5 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1 dshx:rounded dshx:px-1.5 dshx:font-mono dshx:text-2xs',
               revision.bookmark.current ? 'dshx:bg-info/15 dshx:text-info' : 'dshx:bg-muted dshx:text-muted-foreground',
             )}
           >
@@ -195,7 +195,7 @@ function RevisionRow({
             {revision.bookmark.current ? <FolderIcon className="dshx:size-3 dshx:shrink-0" /> : null}
           </span>
         ) : revision.note ? (
-          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
             <span className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', laneFill[tone])} />
             <span className="dshx:min-w-0 dshx:truncate">{revision.note}</span>
           </span>
@@ -216,12 +216,12 @@ function RevisionRow({
         onClick={() => onSelect?.(revision.id)}
         className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-3 dshx:border-l dshx:border-border/60 dshx:pr-3 dshx:pl-3 dshx:text-left dshx:outline-none dshx:disabled:cursor-default dshx:focus-visible:bg-accent"
       >
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[12.5px] dshx:text-foreground">
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-xs dshx:text-foreground">
           {revision.message}
           <span className="dshx:sr-only"> by {revision.author.name}</span>
         </span>
-        <span className="dshx:shrink-0 dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{revision.hash}</span>
-        <span className="dshx:w-7 dshx:shrink-0 dshx:text-right dshx:text-[11px] dshx:text-muted-foreground">{revision.age}</span>
+        <span className="dshx:shrink-0 dshx:font-mono dshx:text-2xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{revision.hash}</span>
+        <span className="dshx:w-7 dshx:shrink-0 dshx:text-right dshx:text-2xs dshx:text-muted-foreground">{revision.age}</span>
       </button>
     </div>
   )
@@ -248,7 +248,7 @@ function GapRow({
         disabled={!onExpand}
         onClick={() => onExpand?.(gap.id)}
         aria-label={`Show ${gap.count} folded revisions`}
-        className="dshx:group/gap dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1 dshx:border-l dshx:border-border/60 dshx:pr-3 dshx:pl-3 dshx:text-left dshx:text-[11px] dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:text-foreground dshx:disabled:cursor-default"
+        className="dshx:group/gap dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1 dshx:border-l dshx:border-border/60 dshx:pr-3 dshx:pl-3 dshx:text-left dshx:text-2xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:text-foreground dshx:disabled:cursor-default"
       >
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
           {gap.label ?? 'Revisions'} (<RollingNumber value={gap.count} />)

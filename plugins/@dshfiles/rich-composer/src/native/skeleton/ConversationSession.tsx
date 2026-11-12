@@ -1,15 +1,16 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
 import clsx from 'clsx'
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
   ConversationSessionHeaderSlotProps, ConversationSessionSlotProps,
 } from '../contract/slots.ts'
 import { resolveActiveView } from '../view-selection.ts'
+import { ThreadViewsModel } from '../../thread-views.ts'
 import { DefaultConversationViews } from './DefaultConversationViews.tsx'
-import { usePhoneShell } from './phone-thread-tools.ts'
 import { phoneMenuScope, usePhoneMenuReader, usePhoneThreadMenu } from '../../phone-thread-menu.tsx'
 import css from './ConversationRoot.module.css'
 
@@ -113,6 +114,32 @@ function SessionTitleEditor({ title, label, error, onCommit, onCancel }: Session
 }
 
 /**
+ * The phone shell (thread-sidebar's stack navigation: `data-shell-phone-nav` on the document under 640px) draws its
+ * own 44pt top bar with Back and the title. There the conversation header gives up its row (visual refresh T1.4):
+ * the title is already in the bar, and the view switch and header actions move into one `⋯` sheet.
+ */
+const PHONE_QUERY = '(max-width: 639.98px)'
+const phoneShell = {
+  subscribe: (listener: () => void): (() => void) => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => undefined
+    const media = window.matchMedia(PHONE_QUERY)
+    media.addEventListener('change', listener)
+    const observer = new MutationObserver(listener)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-shell-phone-nav'] })
+    return () => {
+      media.removeEventListener('change', listener)
+      observer.disconnect()
+    }
+  },
+  snapshot: (): boolean =>
+    typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia(PHONE_QUERY).matches
+    && document.documentElement.hasAttribute('data-shell-phone-nav'),
+}
+const usePhoneShell = (): boolean => useSyncExternalStore(phoneShell.subscribe, phoneShell.snapshot, () => false)
+
+/**
  * Renders Session header chrome above the resident conversation scrollport.
  * @param props - Strict Session store, view ledger, navigation, render, and locale shares.
  * @returns Session navigation controls, with title and tabs after conversation starts.
@@ -124,6 +151,10 @@ export function ConversationSessionHeader({
   const tabs = useConversationViews(value => value)
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
+  // Productivity pass Q5 (E5, docs/ade-ux §4.4 "no sub-tabs in the header"): where a thread panel hosts Trajectory,
+  // Traces and Requests as facets (thread-view-facets.tsx), the header's `⋯` opens them and the stage is always Chat.
+  // A composition without a right pane keeps this view switch, so those views stay reachable.
+  const facetsHosted = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.hosted, ThreadViewsModel.hosted)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const phone = usePhoneShell()
   const { service: phoneMenu, snapshot: phoneMenuState } = usePhoneThreadMenu()
@@ -131,7 +162,6 @@ export function ConversationSessionHeader({
   usePhoneMenuReader(readerId === null ? null : { id: readerId, sessionId })
   const phoneToolsOpen = readerId !== null && phoneMenuState.openReader === readerId
   const phoneTools = phoneMenuState.tools.filter(tool => tool.readerId === readerId)
-  const closePhoneThreadTools = () => phoneMenu?.close()
   const phoneMenuRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     if (!phone || !phoneToolsOpen) return
@@ -177,91 +207,193 @@ export function ConversationSessionHeader({
       return false
     }
   }
-  const showTabs = !hideChrome && tabs.length > 1
-  // A selected view other than the first keeps its strip on a phone, so the way back to it is never hidden.
-  const secondaryViewActive = active !== undefined && active.id !== tabs[0]?.id
-  const renderViewTabs = (className: string | undefined, activeClassName: string | undefined, onPicked?: () => void) => tabs.map(viewTab => (
-    <button key={viewTab.id} type="button" role="tab" aria-selected={viewTab.id === active?.id}
-      className={clsx(className, viewTab.id === active?.id && activeClassName)}
-      onClick={() => { selectView(viewTab.id); onPicked?.() }}>
-      {viewTab.label}
-    </button>
-  ))
-  const tabStrip = (
-    // data-conversation-tabs: marks the tab strip, which the window-chrome
-    // geometry and the browser coverage lane anchor on.
-    <div className={css.tabs} role="tablist" data-conversation-tabs="">
-      {renderViewTabs(css.tab, css.tabActive)}
-    </div>
-  )
-  const headerActions = (
-    <div className={css.headerActions}>
-      {renderSlot('conversation.session.header.actions', {})}
-    </div>
-  )
-  const headerUtilities = (
-    <div className={css.headerUtilities}>
-      {renderSlot('conversation.session.header.utilities', {})}
-    </div>
-  )
-  const headerCorner = (
-    <div className={css.headerCorner} data-conversation-header-corner="">
-      {renderSlot('conversation.session.header.corner', {})}
-    </div>
-  )
-  // The phone top bar names the thread and owns the menu button: no second title row here.
-  if (phone && !phoneToolsOpen) return showTabs && secondaryViewActive && tabStrip
-  if (phone)
-    return (
-      <div className={css.phoneMenuLayer} data-phone-thread-menu="">
-        <button type="button" className={css.phoneMenuScrim} aria-label={t('session.phoneMenuClose')} tabIndex={-1} onClick={closePhoneThreadTools} />
-        <div
-          className={css.phoneMenu}
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
-          ref={phoneMenuRef}
-          aria-label={t('session.phoneTools')}
+  // dshfiles (parent decision for the 2026-11-11 upstream merge): our ⋯ sheet stays the phone thread menu, and it is the
+  // launcher of upstream's PhoneThreadMenu, so composer tools registered there (side question, saved prompts,
+  // annotations, …) hide in place and are listed in the sheet. Without that contract the sheet keeps its own state.
+  const [localMenuOpen, setLocalMenuOpen] = useState(false)
+  const sharedMenu = phoneMenu !== undefined && readerId !== null
+  const menuOpen = sharedMenu ? phoneToolsOpen : localMenuOpen
+  const setMenuOpen = (next: boolean | ((open: boolean) => boolean)): void => {
+    const value = typeof next === 'function' ? next(menuOpen) : next
+    if (phoneMenu === undefined || readerId === null) {
+      setLocalMenuOpen(value)
+      return
+    }
+    if (value === phoneToolsOpen) return
+    if (value) phoneMenu.toggle(readerId)
+    else phoneMenu.close()
+  }
+  useEffect(() => {
+    if (!phone) setLocalMenuOpen(false)
+  }, [phone])
+  // dshfiles (productivity pass Q6): every mounted conversation renders this header, kept-alive ones in hidden panels
+  // included, and the phone bar is portalled out of them, so eight open threads stacked eight bars (and eight Changes
+  // pills, read as one ghosted `+N −N`) in the top bar's corner. Only the conversation whose own header seat is on
+  // screen portals its bar. The header row itself is not drawn on a phone (the bar replaces it), so the test is on the
+  // conversation that holds it: it has no box while its panel is hidden.
+  const phoneAnchorRef = useRef<HTMLSpanElement | null>(null)
+  const [onScreen, setOnScreen] = useState(false)
+  useLayoutEffect(() => {
+    const anchor = phoneAnchorRef.current
+    if (!phone || anchor === null) return
+    // Slot wrappers are `display: contents` (no box of their own): the seat is the first ancestor that draws one.
+    let seat: Element = anchor.closest('header')?.parentElement ?? anchor
+    while (seat.parentElement !== null && getComputedStyle(seat).display === 'contents') seat = seat.parentElement
+    // Workbench keeps an off-screen conversation in a Dockview render overlay hidden by `visibility`, which neither a
+    // box test nor a size observer sees: read the computed visibility, and watch that overlay's attributes too.
+    const check = (): void => {
+      const boxed = typeof seat.checkVisibility === 'function' ? seat.checkVisibility() : seat.getClientRects().length > 0
+      setOnScreen(boxed && getComputedStyle(seat).visibility === 'visible')
+    }
+    check()
+    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(check) : undefined
+    resize?.observe(seat)
+    const overlay = seat.closest('.dv-render-overlay')
+    const mutation = overlay === null || typeof MutationObserver !== 'function' ? undefined : new MutationObserver(check)
+    if (overlay !== null) mutation?.observe(overlay, { attributes: true, attributeFilter: ['style', 'class', 'hidden'] })
+    return () => {
+      resize?.disconnect()
+      mutation?.disconnect()
+    }
+  }, [phone, hideChrome])
+  // The sheet is the launcher only while its bar is on screen: a hidden kept-alive conversation leaves its tools in place.
+  useLayoutEffect(() => {
+    if (!phone || !onScreen || phoneMenu === undefined || readerId === null) return
+    return phoneMenu.attachLauncher(readerId)
+  }, [phone, onScreen, phoneMenu, readerId])
+  // The phone bar grows with the Changes pill (T3.2): publish its width so the shell's top bar keeps that much of its
+  // trailing corner free (thread-sidebar reads --dsh-phone-bar-width) and the panels button never sits under it.
+  const phoneBarRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const bar = phoneBarRef.current
+    if (!phone || bar === null) return
+    const root = document.documentElement
+    let published: string | undefined
+    const publish = (): void => {
+      const width = bar.getBoundingClientRect().width
+      if (width === 0) return
+      published = `${Math.ceil(width)}px`
+      root.style.setProperty('--dsh-phone-bar-width', published)
+    }
+    // An engine without ResizeObserver keeps the first measurement.
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(publish) : undefined
+    observer?.observe(bar)
+    publish()
+    return () => {
+      observer?.disconnect()
+      if (published !== undefined && root.style.getPropertyValue('--dsh-phone-bar-width') === published) {
+        root.style.removeProperty('--dsh-phone-bar-width')
+      }
+    }
+  }, [phone, hideChrome, onScreen])
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+    window.addEventListener('keydown', close)
+    // dshfiles (productivity pass Q4): choosing an action from a menu the sheet holds (its menus portal out of it)
+    // closes the sheet, as an action sheet does, so the chosen tool (Find in thread, Turns) is not left under it.
+    // A submenu trigger only opens its submenu. The close waits a task so the item's own handler runs first.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const chosen = (event: MouseEvent) => {
+      const item = event.target instanceof Element ? event.target.closest('[role^="menuitem"]') : null
+      if (item === null || item.hasAttribute('aria-haspopup') || item.getAttribute('aria-disabled') === 'true') return
+      timer = setTimeout(() => { setMenuOpen(false) }, 0)
+    }
+    document.addEventListener('click', chosen, true)
+    return () => {
+      window.removeEventListener('keydown', close)
+      document.removeEventListener('click', chosen, true)
+      if (timer !== undefined) clearTimeout(timer)
+    }
+  }, [menuOpen])
+  const showTabs = !hideChrome && !facetsHosted && tabs.length > 1
+  // One tab grammar (T1.4): a segmented control in the title row, not an underlined second row.
+  // data-conversation-tabs: marks the view switch, which the window-chrome
+  // geometry and the browser coverage lane anchor on.
+  const views = showTabs && (
+    <div className={css.tabs} role="tablist" aria-label={t('session.views')} data-conversation-tabs="">
+      {tabs.map(viewTab => (
+        <button
+          key={viewTab.id}
+          type="button"
+          role="tab"
+          aria-selected={viewTab.id === active?.id}
+          className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+          onClick={() => {
+            selectView(viewTab.id)
+            setMenuOpen(false)
+          }}
         >
-          {showTabs && (
-            <section className={css.phoneMenuSection}>
-              <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuViews')}</h3>
-              <div role="tablist" className={css.phoneMenuList}>
-                {renderViewTabs(css.phoneMenuItem, css.phoneMenuItemActive, closePhoneThreadTools)}
-              </div>
-            </section>
-          )}
-          {!hideChrome && <section className={css.phoneMenuSection}>
-            <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuThread')}</h3>
-            <div className={css.phoneMenuRow}>
-              {headerActions}
-              {headerUtilities}
-              <div className={css.phoneMenuCorner} onClickCapture={() => requestAnimationFrame(closePhoneThreadTools)}>
-                {headerCorner}
-              </div>
-            </div>
-          </section>}
+          {viewTab.label}
+        </button>
+      ))}
+    </div>
+  )
+  if (phone) {
+    if (hideChrome) return null
+    const anchor = <span ref={phoneAnchorRef} className={css.phoneBarAnchor} aria-hidden data-conversation-phone-anchor="" />
+    if (!onScreen) return anchor
+    // Portalled to the body: the bar sits in the shell's fixed top bar, outside any transformed or
+    // paint-contained stage ancestor; React context (this Session's slots) still flows through the portal.
+    // The sheet and its scrim get their own portal (b:ppd0): the bar is transformed (it follows the visual viewport),
+    // which makes it the containing block of any fixed descendant, so a sheet inside it was a bar-wide box growing up
+    // off the top of the screen instead of a full-width bottom sheet.
+    return <>{anchor}{createPortal(
+      <div ref={phoneBarRef} className={css.phoneBar} data-conversation-phone-bar="">
+        <div className={css.phoneChanges}>{renderSlot('conversation.session.header.changes', {})}</div>
+        <button
+          type="button"
+          className={css.phoneMenuButton}
+          aria-label={t('session.menu')}
+          aria-haspopup="dialog"
+          aria-expanded={menuOpen}
+          onClick={() => { setMenuOpen(open => !open) }}
+        >
+          <svg aria-hidden viewBox="0 0 16 16" width="20" height="20" fill="currentColor">
+            <circle cx="3" cy="8" r="1.4" />
+            <circle cx="8" cy="8" r="1.4" />
+            <circle cx="13" cy="8" r="1.4" />
+          </svg>
+        </button>
+      </div>,
+      document.body,
+    )}{menuOpen && createPortal(
+      <>
+        <button
+          type="button"
+          className={css.phoneScrim}
+          aria-label={t('session.closeMenu')}
+          onClick={() => { setMenuOpen(false) }}
+        />
+        <div className={css.phoneSheet} role="dialog" aria-label={t('session.menu')} data-conversation-phone-sheet="" ref={phoneMenuRef} tabIndex={-1}>
+          <span className={css.phoneGrabber} aria-hidden />
+          {views}
+          <div className={css.phoneSheetActions}>
+            {renderSlot('conversation.session.header.actions', {})}
+            {renderSlot('conversation.session.header.utilities', {})}
+          </div>
           {phoneTools.length > 0 && (
-            <section className={css.phoneMenuSection}>
-              <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuComposer')}</h3>
-              <div className={css.phoneMenuList}>
-                {phoneTools.map(tool => (
-                  <button
-                    key={tool.id}
-                    type="button"
-                    className={css.phoneMenuItem}
-                    data-phone-thread-tool-proxy=""
-                    onClick={() => { phoneMenu?.pick(tool) }}
-                  >
-                    {tool.label}
-                  </button>
-                ))}
-              </div>
-            </section>
+            <div className={css.phoneSheetTools} data-phone-sheet-tools="">
+              {phoneTools.map(tool => (
+                <button
+                  key={tool.id}
+                  type="button"
+                  className={css.phoneSheetTool}
+                  data-phone-thread-tool-proxy=""
+                  onClick={() => { phoneMenu?.pick(tool) }}
+                >
+                  {tool.label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
-      </div>
-    )
+      </>,
+      document.body,
+    )}</>
+  }
   return (
     <>
       <div className={css.titleRow}>
@@ -348,14 +480,21 @@ export function ConversationSessionHeader({
                 })}
                 {ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}
               </nav>
-              {headerActions}
+              <div className={css.headerActions}>
+                {renderSlot('conversation.session.header.actions', {})}
+              </div>
+              {views}
             </div>
-            {headerUtilities}
+            <div className={css.headerUtilities}>
+              {renderSlot('conversation.session.header.changes', {})}
+              {renderSlot('conversation.session.header.utilities', {})}
+            </div>
           </>
         )}
-        {headerCorner}
+        <div className={css.headerCorner} data-conversation-header-corner="">
+          {renderSlot('conversation.session.header.corner', {})}
+        </div>
       </div>
-      {showTabs && tabStrip}
     </>
   )
 }

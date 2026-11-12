@@ -48,6 +48,16 @@ const pin = async (page: Page, body: Locator, name: 'Pin' | 'Unpin'): Promise<vo
   if (await folded.isVisible()) await folded.click()
   else {
     await page.keyboard.press('Escape')
+    // The menu (now longer, with the Open view items) can still be closing; its overlay takes the click until it is gone.
+    if (
+      !(await menu.waitFor({ state: 'hidden', timeout: 2_000 }).then(
+        () => true,
+        () => false,
+      ))
+    ) {
+      await page.keyboard.press('Escape')
+      await menu.waitFor({ state: 'hidden' })
+    }
     await direct.click()
   }
 }
@@ -93,9 +103,14 @@ Then('each fixed conversation has its original title actions and child-view head
       await expect(header(body)).toBeVisible()
       await expect(header(body).getByRole('button', { name: title, exact: true })).toBeVisible()
       await expect(header(body).getByRole('button', { name: 'More thread actions', exact: true })).toBeVisible()
-      await expect(header(body).getByRole('button', { name: /^(Workspace actions for|Current thread workspace:)/ })).toBeVisible()
-      await expect(header(body)).toContainText('Standard mode')
-      for (const name of ['Chat', 'Trajectory', 'Traces', 'Requests']) await expect(header(body).getByRole('tab', { name, exact: true })).toBeVisible()
+      await expect(header(body).getByRole('button', { name: /^(Workspace actions for|Own workspace actions$)/ })).toBeVisible()
+      // yvvovowp: the header names only a non-default agent mode; these threads run the default one.
+      await expect(header(body)).not.toContainText('Standard mode')
+      // Productivity pass Q5 (E5): no view tabs in the header; the thread `⋯` opens the views as thread-panel facets.
+      await expect(header(body).getByRole('tab')).toHaveCount(0)
+      const views = await more(page, body)
+      for (const name of ['Trajectory', 'Traces', 'Requests']) await expect(views.getByRole('menuitem', { name: `Open ${name}`, exact: true })).toBeVisible()
+      await page.keyboard.press('Escape')
       await expect(body.locator('[data-composer-input]')).toHaveCount(1)
     }
     expect(ids.first).not.toBe(ids.second)
@@ -157,15 +172,30 @@ Then('native child views switch independently without replacing the resident edi
     const ids = identities(page)
     const a = await bodyOf(page, outerTab(right(page), FIRST))
     const b = await bodyOf(page, outerTab(main(page), SECOND))
-    for (const name of ['Trajectory', 'Traces', 'Requests', 'Chat']) {
-      await header(a).getByRole('tab', { name, exact: true }).click()
-      await expect(header(a).getByRole('tab', { name, exact: true })).toHaveAttribute('aria-selected', 'true')
-      await expect(header(b).getByRole('tab', { name: 'Chat', exact: true })).toHaveAttribute('aria-selected', 'true')
-      if (name === 'Traces') await expect(a.getByTestId('traces-session-view')).toHaveAttribute('data-session-id', ids.first)
-      if (name === 'Requests') await expect(a.getByTestId('requests-session-view')).toHaveAttribute('data-session-id', ids.first)
-      await expect(input(a)).toHaveText(DRAFT)
-      expect(await input(a).evaluate((element, original) => element === original, ids.editor)).toBe(true)
+    // Each view opens as a facet of the on-screen thread (the second, in the main pane); both stages stay on Chat and
+    // the first thread's resident editor is never replaced.
+    for (const name of ['Trajectory', 'Traces', 'Requests']) {
+      await (await more(page, b)).getByRole('menuitem', { name: `Open ${name}`, exact: true }).click()
+      // The facet opens as a selected tab; an empty view (no trajectory for a failed turn) has no height to be "visible".
+      await expect(page.getByRole('tab', { name, exact: true, selected: true })).toBeVisible()
+      await expect(page.locator('[data-thread-view-facet]').first()).toBeAttached()
+      if (name === 'Traces') await expect(page.getByTestId('traces-session-view').filter({ visible: true })).toHaveAttribute('data-session-id', ids.second)
+      if (name === 'Requests') await expect(page.getByTestId('requests-session-view').filter({ visible: true })).toHaveAttribute('data-session-id', ids.second)
+      await expect(header(b).getByRole('tab')).toHaveCount(0)
+      // The facet opens in front of the first thread in the right pane: its editor stays mounted, behind the tab.
+      const resident = a.locator('[data-composer-input]').first()
+      await expect(resident).toHaveText(DRAFT)
+      expect(await resident.evaluate((element, original) => element === original, ids.editor)).toBe(true)
     }
+    // Close the facets again: the next step hides this group's tab row, which a single-tab group offers.
+    for (const name of ['Trajectory', 'Traces', 'Requests']) {
+      const facet = page.getByRole('tab', { name, exact: true })
+      await facet.getByRole('button', { name: /^Close/u }).click()
+      await expect(facet).toHaveCount(0)
+    }
+    await outerTab(right(page), FIRST).click()
+    await expect(input(a)).toHaveText(DRAFT)
+    expect(await input(a).evaluate((element, original) => element === original, ids.editor)).toBe(true)
     await page.screenshot({ path: test.info().outputPath('restored-original-conversation-header.png'), animations: 'disabled' })
   })
 })
@@ -180,15 +210,13 @@ Then('the header remains usable with its Workbench tab row hidden and after relo
     await header(a).getByRole('button', { name: 'More thread actions', exact: true }).click()
     await expect(page.getByRole('menuitem', { name: 'Copy thread ID', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
-    await header(a).getByRole('tab', { name: 'Traces', exact: true }).click()
     await StartupDialogs.reloadPastProviderSetup(page)
     const restored = right(page)
       .locator(`[data-workbench-thread]`)
       .filter({ has: page.locator(`[data-conversation-session=${JSON.stringify(ids.first)}]`) })
     await expect(header(restored)).toBeVisible()
-    await expect(header(restored).getByRole('tab', { name: 'Traces', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(header(restored).getByRole('tab')).toHaveCount(0)
     await expect(input(restored)).toHaveText(DRAFT)
-    await header(restored).getByRole('tab', { name: 'Chat', exact: true }).click()
     await right(page).getByRole('button', { name: 'Show tab row', exact: true }).click()
     await right(page).getByRole('button', { name: 'Close pane', exact: true }).click()
     await outerTab(main(page), SECOND).click()
@@ -201,9 +229,8 @@ Then('the header remains usable with its Workbench tab row hidden and after relo
       await expect(header(b).getByRole('button', { name: 'More thread actions', exact: true })).toBeInViewport()
       await (await more(page, b)).getByRole('menuitem', { name: 'Copy thread ID', exact: true }).click()
       await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(ids.second)
-      await header(b).getByRole('tab', { name: 'Requests', exact: true }).click()
-      await expect(b.getByTestId('requests-session-view')).toHaveAttribute('data-session-id', ids.second)
-      await header(b).getByRole('tab', { name: 'Chat', exact: true }).click()
+      await (await more(page, b)).getByRole('menuitem', { name: 'Open Requests', exact: true }).click()
+      await expect(page.getByTestId('requests-session-view').filter({ visible: true }).first()).toHaveAttribute('data-session-id', ids.second)
       if (width === 360) {
         await page.screenshot({ path: test.info().outputPath('restored-conversation-header-360.png'), animations: 'disabled' })
         await header(b).screenshot({ path: test.info().outputPath('restored-conversation-header-narrow.png'), animations: 'disabled' })

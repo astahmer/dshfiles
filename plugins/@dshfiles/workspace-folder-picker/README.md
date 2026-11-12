@@ -91,7 +91,11 @@ with this local job beyond the idea.
 
 ![Create a new project](docs/screenshots/project-create.png)
 
-**New → New project…** creates `<parent>/<name>`, runs `jj git init
+**New project…** sits in the composer's project menu (beside **Add folder…**), at the end of the thread list's project
+picker, in ⌘K and as a button of the **Add a project** dialog (productivity pass Q5; it used to hide behind **New ▾**).
+Any surface opens the flow through the `@dshfiles/workspace-folder-picker/project-add-flow` dshx module:
+`ProjectAddFlow.open('browse' | 'create' | 'clone')` raises it in its own dialog, `request(view)` starts the next
+native flow on that view. It creates `<parent>/<name>`, runs `jj git init
 --colocate`, writes a `README.md`, commits it as `chore: initialize <name>`,
 creates the `main` bookmark on that commit and registers the folder as a
 project. When the GitHub CLI is installed, **Create a private GitHub

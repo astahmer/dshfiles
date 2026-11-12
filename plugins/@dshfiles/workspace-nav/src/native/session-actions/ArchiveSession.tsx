@@ -6,6 +6,7 @@
  * notice a successful archive raises and the diagnostics for Host rejections
  * live in the injected callbacks, not here.
  */
+import { ArchiveIcon, ArchiveRestoreIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import type { SessionActivity } from '@deepseek-ai/dsh-api-workspace-controller/client'
 // Type-only: the family keys each provider merges; a key this program did not compile takes the generic line.
@@ -13,9 +14,7 @@ import type {} from '@deepseek-ai/dsh-agent/types'
 import type {} from '@deepseek-ai/dsh-jobs/view'
 import type {} from '@deepseek-ai/dsh-schedule/client'
 import type {} from '@deepseek-ai/dsh-subagent/client'
-import {
-  Button, IconArchiveOutlineRegular, IconUnarchiveOutlineRegular, MenuItemButton, Modal, Tooltip,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, MenuItemButton, Modal, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   ArchiveSessionInjected, SessionArchiveConfirmInjected, SessionArchiveConfirmProps, SessionArchiveConfirmRequest,
   SessionMenuItemProps, SessionRowActionProps,
@@ -37,7 +36,7 @@ export function ArchiveSessionMenuItem({
   return (
     <MenuItemButton
       shortcut={archived ? undefined : shortcut}
-      icon={archived ? <IconUnarchiveOutlineRegular size={14} /> : <IconArchiveOutlineRegular size={14} />}
+      icon={archived ? <ArchiveRestoreIcon strokeWidth={1.5} size={14} /> : <ArchiveIcon strokeWidth={1.5} size={14} />}
       onSelect={() => {
         setMenuOpen(false)
         ;(archived ? unarchiveSession : archiveSession)(sessionId)
@@ -65,7 +64,7 @@ export function ArchiveSessionRowButton({
         aria-label={t(archived ? 'menu.unarchiveSession' : 'menu.archiveSession')}
         onClick={() => { (archived ? unarchiveSession : archiveSession)(sessionId) }}
       >
-        {archived ? <IconUnarchiveOutlineRegular size={14} /> : <IconArchiveOutlineRegular size={14} />}
+        {archived ? <ArchiveRestoreIcon strokeWidth={1.5} size={14} /> : <ArchiveIcon strokeWidth={1.5} size={14} />}
       </button>
     </Tooltip>
   )

@@ -42,6 +42,11 @@
           "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "queue-reorder.steer-queued",
+          "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "queue-reorder.queue-ordering-unit-move-preserves-identity",
           "file": "plugins/@dshfiles/queue-reorder/src/queue-order.test.ts",
@@ -369,14 +374,15 @@
       "summary": "Schedule the composer's message from Send later (presets or a picked time); it waits above the composer with its time and optional model and effort, can be edited, sent now or cancelled back into the composer, survives a Host restart in plugin storage, and is sent once through the session controller under its own request id. Agent tools scheduled_send_list/create/update/cancel/now call the same Host methods.",
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Ship the weekly report\"",
-        "click button \"Send later\"",
+        "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Ship the weekly report\"",
+        "click button \"More composer actions\"",
+        "click menuitem \"Send later…\"",
         "expect group \"Send at\""
       ],
       "surfaces": ["client", "host", "storage", "api", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Send later; dock: Scheduled messages",
+      "currentSurface": "composer ⋯: Send later…; dock: Scheduled messages",
       "configuration": [
         {
           "key": "sendLater",

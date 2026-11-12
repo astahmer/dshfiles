@@ -39,3 +39,22 @@ Feature: Shortcuts
     When a plugin contributes the editable command "Say hello" on "Mod+Shift+Y"
     And "Say hello" is rebound to primary+Shift+U in Keyboard shortcuts
     Then primary+Shift+U runs "Say hello" and primary+Shift+Y no longer does
+
+  @scenario:shortcuts.scoped-keys
+  Scenario: Single keys type in the composer and open the shortcut sheet from the page
+    Given the isolated plugin profile "@dshfiles/shortcuts" is booted
+    When the composer is focused
+    And "j", "e", "?" and Option-J are typed into the composer
+    Then the composer holds "je?" and no shortcut ran
+    When "?" is pressed outside any text field
+    Then the keyboard shortcut sheet opens with its sections
+
+  @scenario:shortcuts.cheat-sheet
+  Scenario: The shortcut sheet turns single-key shortcuts off and on
+    Given the isolated plugin profile "@dshfiles/shortcuts" is booted
+    When the shortcut sheet is opened with primary+Slash
+    And single-key shortcuts are switched off in the sheet
+    Then "?" no longer opens the shortcut sheet
+    When the shortcut sheet is opened with primary+Slash
+    And single-key shortcuts are switched on in the sheet
+    Then "?" opens the shortcut sheet again

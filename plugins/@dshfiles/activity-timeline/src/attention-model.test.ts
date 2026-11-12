@@ -88,6 +88,26 @@ describe('attention model', () => {
     expect(AttentionModel.done(resolved, 3_000)).toEqual({ ok: false, refusal: 'resolved' })
   })
 
+  it('updates a Done item in place when only its detail changes, and reopens it when its headline changes', () => {
+    const landing = (detail: string, reason = '“Add login” is ready to land.'): AttentionPublish =>
+      question({
+        source: 'jj-integration.ready-to-land',
+        dedupeKey: '/w:ready',
+        severity: 'ready',
+        reason,
+        detail,
+        verbs: ['Land', 'Open', 'Done'],
+        choices: [],
+      })
+    const done = okItem(AttentionModel.done(created(landing('1 file, +3 −0 · feat: add login')), 2_000))
+    const refreshed = AttentionModel.publish(done, landing('2 files, +9 −1 · feat: add login'), 3_000)
+    expect(refreshed).toMatchObject({ changed: true, item: { doneAt: 2_000, detail: '2 files, +9 −1 · feat: add login', occurrences: 1 } })
+    expect(AttentionModel.viewOf(refreshed.item, new Set(), 3_000)).toBe('closed')
+    const renamed = AttentionModel.publish(refreshed.item, landing('2 files, +9 −1 · feat: add login', '“Add login form” is ready to land.'), 4_000)
+    expect(renamed.item.doneAt).toBeNull()
+    expect(AttentionModel.viewOf(renamed.item, new Set(), 4_000)).toBe('other')
+  })
+
   it('splits needs-you from other, hides muted sources and never lists info', () => {
     const blocking = created()
     const failed = created(question({ dedupeKey: 'q-2', severity: 'failed' }), 2_000)

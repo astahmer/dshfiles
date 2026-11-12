@@ -26,7 +26,7 @@
       ],
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"question\\\":\\\"Which layout should the release notes use?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin\\\"},{\\\"label\\\":\\\"One flat list\\\"}]}],\\\"timeout\\\":-1}]]\"",
+        "fill textbox \"commands, @ files or threads*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"question\\\":\\\"Which layout should the release notes use?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin\\\"},{\\\"label\\\":\\\"One flat list\\\"}]}],\\\"timeout\\\":-1}]]\"",
         "press Enter",
         "expect text \"Which layout should the release notes use?\""
       ],
@@ -84,7 +84,7 @@
       ],
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"header\\\":\\\"Release notes\\\",\\\"question\\\":\\\"Pick a layout for [the 0.2 release notes](https://example.test/notes)\\\\n\\\\nBoth drafts list the same **12 changes**:\\\\n\\\\n| Layout | Lines |\\\\n| --- | ---: |\\\\n| Grouped | 48 |\\\\n| Flat | 31 |\\\\n\\\\n```html preview Lines per layout\\\\n<style>body{margin:8px;display:grid;gap:8px}.bars{display:flex;align-items:end;gap:8px;height:110px}.bars div{flex:1;border-radius:4px 4px 0 0;background:var(--dsh-accent)}</style><div class='bars'><div style='height:100%'></div><div style='height:64%'></div></div><p id='status' style='margin:0;color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Grouped 48 lines, flat 31 lines'</script>\\\\n```\\\\n\\\\nWhich one should ship?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin (Recommended)\\\",\\\"description\\\":\\\"Each plugin gets a heading, in the order of `profiles/web/package.json`.\\\"},{\\\"label\\\":\\\"One flat list\\\",\\\"description\\\":\\\"Shorter, but **no grouping**; see [the draft](https://example.test/flat).\\\"}]}],\\\"timeout\\\":-1}]]\"",
+        "fill textbox \"commands, @ files or threads*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"header\\\":\\\"Release notes\\\",\\\"question\\\":\\\"Pick a layout for [the 0.2 release notes](https://example.test/notes)\\\\n\\\\nBoth drafts list the same **12 changes**:\\\\n\\\\n| Layout | Lines |\\\\n| --- | ---: |\\\\n| Grouped | 48 |\\\\n| Flat | 31 |\\\\n\\\\n```html preview Lines per layout\\\\n<style>body{margin:8px;display:grid;gap:8px}.bars{display:flex;align-items:end;gap:8px;height:110px}.bars div{flex:1;border-radius:4px 4px 0 0;background:var(--dsh-accent)}</style><div class='bars'><div style='height:100%'></div><div style='height:64%'></div></div><p id='status' style='margin:0;color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Grouped 48 lines, flat 31 lines'</script>\\\\n```\\\\n\\\\nWhich one should ship?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin (Recommended)\\\",\\\"description\\\":\\\"Each plugin gets a heading, in the order of `profiles/web/package.json`.\\\"},{\\\"label\\\":\\\"One flat list\\\",\\\"description\\\":\\\"Shorter, but **no grouping**; see [the draft](https://example.test/flat).\\\"}]}],\\\"timeout\\\":-1}]]\"",
         "press Enter",
         "expect region \"Lines per layout\""
       ],

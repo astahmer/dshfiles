@@ -44,18 +44,18 @@ export const OpenConfigAction = (props: {
   return (
     <div className="dshx-root dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
       {errorText !== null && (
-        <span className="dshx:max-w-[200px] dshx:truncate dshx:text-[12px] dshx:leading-[18px] dshx:text-destructive" role="alert" title={errorText}>
+        <span className="dshx:max-w-[200px] dshx:truncate dshx:text-xs dshx:leading-[18px] dshx:text-destructive" role="alert" title={errorText}>
           {errorText}
         </span>
       )}
       {feedback?.kind === 'copied' && (
-        <span className="dshx:text-[12px] dshx:text-muted-foreground" role="status">
+        <span className="dshx:text-xs dshx:text-muted-foreground" role="status">
           {t('config.copied')}
         </span>
       )}
       <div className="dshx:inline-flex dshx:h-7 dshx:items-stretch dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs">
         <button
-          className="dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:border-none dshx:bg-transparent dshx:px-2.5 dshx:text-[12px] dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground dshx:hover:bg-accent dshx:disabled:cursor-default dshx:disabled:opacity-60"
+          className="dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:border-none dshx:bg-transparent dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground dshx:hover:bg-accent dshx:disabled:cursor-default dshx:disabled:opacity-60"
           disabled={state.opening || busy}
           onClick={() => send({ type: 'primary' })}
           title={path ?? undefined}
@@ -90,7 +90,7 @@ export const OpenConfigAction = (props: {
                     <DropdownMenuItem key={app.id} onSelect={() => send({ type: 'open.with', applicationId: app.id })}>
                       {app.icon === null ? <CodeIcon /> : <img alt="" className="dshx:size-4" src={app.icon} />}
                       <span className="dshx:flex-1 dshx:truncate">{app.name.replace(/\.app$/u, '')}</span>
-                      {app.default && <span className="dshx:text-[11px] dshx:text-muted-foreground">{t('config.default')}</span>}
+                      {app.default && <span className="dshx:text-2xs dshx:text-muted-foreground">{t('config.default')}</span>}
                     </DropdownMenuItem>
                   ))}
                 </>

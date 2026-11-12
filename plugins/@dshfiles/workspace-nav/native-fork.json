@@ -26,13 +26,21 @@
     }
   ],
   "delta": [
-    "src/native/navigation.ts",
-    "src/native/index.ts",
-    "src/native/rows/WorkspaceBrowser.tsx",
     "src/native/WorkspacePicker.tsx",
+    "src/native/index.ts",
+    "src/native/navigation.ts",
     "src/native/pin-order.ts",
+    "src/native/rows/Rows.tsx",
+    "src/native/rows/WorkspaceBrowser.tsx",
+    "src/native/session-actions/ArchiveSession.tsx",
+    "src/native/session-actions/ForkSession.tsx",
+    "src/native/session-actions/PinSession.tsx",
+    "src/native/session-actions/RenameSession.tsx",
+    "src/native/session-actions/SessionId.tsx",
     "src/native/stores.ts",
-    "src/native/tree.ts"
+    "src/native/toast/Toast.tsx",
+    "src/native/tree.ts",
+    "src/native/locales.ts"
   ],
   "added": ["src/native/rows/workspace-dialogs.ts", "src/native/workspace-pick-flow.ts"]
 }

@@ -29,7 +29,7 @@ export const ServiceStrip = (props: {
             <ServiceDot service={service.service} />
             <span className="dshx:min-w-0 dshx:truncate">{service.service}</span>
           </span>
-          <span className="dshx:flex dshx:items-baseline dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
+          <span className="dshx:flex dshx:items-baseline dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
             <span>
               <span className="dshx:font-mono dshx:text-sm dshx:text-foreground">{service.count}</span> {props.t('spans')}
             </span>
@@ -113,7 +113,7 @@ export const ErrorGroups = (props: {
             {group.errorType === null ? null : <Badge variant="outline">{group.errorType}</Badge>}
           </div>
           {group.message === null ? null : <p className="dshx:break-words dshx:font-mono dshx:text-xs dshx:text-destructive">{group.message}</p>}
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:text-[11px] dshx:text-muted-foreground">
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:text-2xs dshx:text-muted-foreground">
             <span>
               {props.t('firstSeen')} {TraceFormat.clock(group.firstSeenMs)}
             </span>

@@ -7,7 +7,7 @@
     "moduleResolution": "NodeNext",
     "jsx": "react-jsx",
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node", "@dshfiles/dshx/client/env"]
   },
   "include": ["src"]
 }

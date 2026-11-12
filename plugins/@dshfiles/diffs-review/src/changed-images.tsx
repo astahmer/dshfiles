@@ -40,7 +40,7 @@ const Side = (props: { readonly side: ImageSide; readonly alt: string }): JSX.El
   }
   return (
     <figure className="dshx:m-0 dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1" data-image-side={props.side.label}>
-      <figcaption className="dshx:text-[11px] dshx:text-muted-foreground">{props.side.label}</figcaption>
+      <figcaption className="dshx:text-2xs dshx:text-muted-foreground">{props.side.label}</figcaption>
       <div className="dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/40 dshx:p-1">{body()}</div>
     </figure>
   )

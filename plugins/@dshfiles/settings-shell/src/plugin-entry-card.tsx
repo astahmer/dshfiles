@@ -32,7 +32,7 @@ const EntryCard = (props: { readonly entry: PluginEntry; readonly t: ShellTransl
       data-plugin-entry={entry.entryId}
     >
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-x-3 dshx:gap-y-1">
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:text-[12px] dshx:text-muted-foreground">
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:text-xs dshx:text-muted-foreground">
           <span className="dshx:min-w-0 dshx:truncate">
             <code className="dshx:font-mono dshx:text-foreground">{entry.entryId}</code>
             {' · '}
@@ -48,7 +48,7 @@ const EntryCard = (props: { readonly entry: PluginEntry; readonly t: ShellTransl
               {entry.pendingRestart === 'enable' ? t('entryCard.startsAfterRestart') : t('entryCard.stopsAfterRestart')}
             </Badge>
           )}
-          <Label className="dshx:text-[13px]" htmlFor={switchId}>
+          <Label className="dshx:text-sm" htmlFor={switchId}>
             {t('entryCard.enabled')}
           </Label>
           <Switch
@@ -60,16 +60,16 @@ const EntryCard = (props: { readonly entry: PluginEntry; readonly t: ShellTransl
         </div>
       </div>
       {entry.readOnlyReason !== null && (
-        <p className="dshx:m-0 dshx:text-[12px] dshx:text-muted-foreground">{t('entryCard.readOnly', { reason: entry.readOnlyReason })}</p>
+        <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{t('entryCard.readOnly', { reason: entry.readOnlyReason })}</p>
       )}
-      {entry.seedRegion && <p className="dshx:m-0 dshx:text-[12px] dshx:text-muted-foreground">{t('entryCard.seedRegion')}</p>}
+      {entry.seedRegion && <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{t('entryCard.seedRegion')}</p>}
       {verdict !== undefined && (
-        <p className="dshx:m-0 dshx:text-[12px] dshx:text-destructive" role="status">
+        <p className="dshx:m-0 dshx:text-xs dshx:text-destructive" role="status">
           {verdict}
         </p>
       )}
       {change.isError && (
-        <p className="dshx:m-0 dshx:text-[12px] dshx:text-destructive" role="status">
+        <p className="dshx:m-0 dshx:text-xs dshx:text-destructive" role="status">
           {errorMessage(change.error, t('entryCard.failed', { reason: '' }))}
         </p>
       )}

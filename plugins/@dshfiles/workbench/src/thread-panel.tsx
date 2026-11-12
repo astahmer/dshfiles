@@ -5,6 +5,8 @@ import { ConversationScope } from './conversation-header.js'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { PropsRenderFactories, PropsRuntime, SessionProviderComponent } from '@deepseek-ai/dsh-client-ui-slots'
 import { Fragment, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useHeaderSeat } from './header-seat.js'
 
 export const WORKBENCH_CONVERSATION_SLOT = 'dshfiles.workbench.conversation'
 export const WORKBENCH_THREAD_CHILDREN = { [WORKBENCH_CONVERSATION_SLOT]: { kind: 'single', scope: 'session' } } as const
@@ -55,11 +57,15 @@ export const WorkbenchThreadConversation = (props: ConversationSources & PropsRe
   // here re-renders the header and every Session slot entry under it.
   const activeTargets = props.useConversation(snapshot => snapshot.activeTargets)
   const summaryBlank = props.useSessions(snapshot => snapshot.byId[session.sessionId]?.blank)
+  // One header row (T1.4): in its group's tab row when this panel is the visible tab there; a portal keeps the
+  // header inside this panel's Session binding. Inline (as before) when the row is hidden or on the phone.
+  const seat = useHeaderSeat()
+  const header = props.renderFactorySlot('dshfiles.workbench.conversation-header', seat === null ? { reserveHostCorner: true } : { seated: true })
   // Both producer-owned Factories inherit this panel's fixed Session. Native
   // Content keeps its resident editor and per-Session child-view selection.
   return (
     <Scope>
-      {props.renderFactorySlot('dshfiles.workbench.conversation-header', { reserveHostCorner: true })}
+      {seat === null ? header : createPortal(header, seat)}
       {props.renderFactorySlot('conversation.content', HeroPolicy.content(session, { activeTargets }, summaryBlank))}
     </Scope>
   )

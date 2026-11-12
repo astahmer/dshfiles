@@ -1,0 +1,86 @@
+/* dshfiles (b:7rv2): the summary row of a run of background jobs or subagents. It reads like a tool row: one 24px
+   line in the tertiary label tone, the row's glyph at the end; colour only for Failed and Needs you counts. */
+.row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 24px;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: var(--dsh-content-font-size, 14px);
+  text-align: left;
+  cursor: pointer;
+  transition: color 100ms ease;
+}
+
+.row:hover,
+.row:focus-visible {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+  border-radius: var(--dsw-radius-sm);
+}
+
+.row[aria-expanded="true"] {
+  margin-bottom: 2px;
+}
+
+.chevron,
+.icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(16px + var(--dsh-content-font-delta, 0px));
+  height: calc(16px + var(--dsh-content-font-delta, 0px));
+}
+
+.iconSvg {
+  width: calc(14px + var(--dsh-content-font-delta, 0px));
+  height: calc(14px + var(--dsh-content-font-delta, 0px));
+}
+
+.label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elapsed {
+  font-variant-numeric: tabular-nums;
+}
+
+.failed {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.needsYou {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.glyph {
+  flex: none;
+}
+
+/* A finger needs the 44pt target on a phone; the line stays one line. */
+@media (pointer: coarse) {
+  .row {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    transition: none;
+  }
+}

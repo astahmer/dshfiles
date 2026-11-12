@@ -163,7 +163,7 @@ export function CallStackTree({
           {summary ?? (
             <>
               <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-                <span className="dshx:size-2.5 dshx:rounded-[2px] dshx:bg-success" />
+                <span className="dshx:size-2.5 dshx:rounded-xs dshx:bg-success" />
                 <span className="dshx:text-foreground/80">
                   <RollingNumber value={counts.new} /> new
                 </span>
@@ -180,7 +180,7 @@ export function CallStackTree({
         aria-label={listLabel}
         enter={null}
         exit="fadeOut"
-        className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:p-0 dshx:font-mono dshx:text-[12.5px]"
+        className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:p-0 dshx:font-mono dshx:text-xs"
         onMouseLeave={() => setHovered(null)}
         items={rows.map((row, index) => ({
           key: row.frame.id,
@@ -247,7 +247,7 @@ function FrameRow({
   const hasChildren = (frame.children?.length ?? 0) > 0
   const status = frame.status ?? 'existing'
   const sameFile = frame.file !== undefined && frame.file === row.parentFile
-  const squareClass = cn('dshx:block dshx:size-2.5 dshx:shrink-0 dshx:rounded-[2px]', squareTone[status], onPath && 'dshx:ring-2 dshx:ring-success/30')
+  const squareClass = cn('dshx:block dshx:size-2.5 dshx:shrink-0 dshx:rounded-xs', squareTone[status], onPath && 'dshx:ring-2 dshx:ring-success/30')
   // Motion pops the wrapper; the button's hover scale stays on its own element so the two never compound.
   const squareEl = hasChildren ? (
     <button
@@ -282,7 +282,7 @@ function FrameRow({
           <>
             <span
               ref={elbow}
-              className="dshx:absolute dshx:top-0 dshx:h-1/2 dshx:origin-top dshx:rounded-bl-[5px] dshx:border-b dshx:border-l dshx:border-border"
+              className="dshx:absolute dshx:top-0 dshx:h-1/2 dshx:origin-top dshx:rounded-bl-md dshx:border-b dshx:border-l dshx:border-border"
               style={{ left: indent(depth - 1, 5), width: indent(1, -5) }}
             />
             {last ? null : <span className="dshx:absolute dshx:top-1/2 dshx:bottom-0 dshx:w-px dshx:bg-border" style={{ left: indent(depth - 1, 5) }} />}
@@ -302,7 +302,7 @@ function FrameRow({
           {frame.receiver ? `${frame.receiver}.` : ''}
           <span className="dshx:font-semibold dshx:text-foreground">{frame.name}</span>
           {frame.bare === true ? null : `(${frame.args ?? ''})`}
-          {!expanded && hasChildren ? <span className="dshx:ml-2 dshx:rounded dshx:bg-muted dshx:px-1 dshx:text-[11px]">+{frame.children?.length}</span> : null}
+          {!expanded && hasChildren ? <span className="dshx:ml-2 dshx:rounded dshx:bg-muted dshx:px-1 dshx:text-2xs">+{frame.children?.length}</span> : null}
         </button>
         {frame.line !== undefined ? (
           <span className="dshx:shrink-0 dshx:text-muted-foreground">

@@ -1,5 +1,6 @@
 /** Copy the row's Session ID without opening its history. */
-import { IconCopyOutlineRegular, MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
+import { CopyIcon } from '@dshfiles/plugin-ui/icons'
+import { MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionIdInjected, SessionMenuItemProps } from '../contract/slots.ts'
 
 /**
@@ -10,7 +11,7 @@ import type { SessionIdInjected, SessionMenuItemProps } from '../contract/slots.
 export function SessionIdMenuItem({ sessionId, useMenuOpenState, copySessionId, t }: SessionMenuItemProps<SessionIdInjected>) {
   const [, setMenuOpen] = useMenuOpenState()
   return (
-    <MenuItemButton icon={<IconCopyOutlineRegular />} onSelect={() => {
+    <MenuItemButton icon={<CopyIcon size={14} strokeWidth={1.5} />} onSelect={() => {
       setMenuOpen(false)
       void copySessionId(sessionId)
     }}>

@@ -1,12 +1,11 @@
 /** Chat display preferences stored in the Host user-settings document. */
 
 import z from '@deepseek-ai/schemastery'
+import { TRANSCRIPT_VIEW_FIELD, TRANSCRIPT_VIEW_MODES, type TranscriptViewMode } from './transcript-view-modes.ts'
 
-/** Settings namespace owned by the Chat target. */
-export const CHAT_SETTINGS_NAMESPACE = 'dshfiles-chat'
-
-/** Field carrying the work-details presentation mode. */
-export const TRANSCRIPT_VIEW_FIELD = 'transcriptView'
+// dshfiles: the namespace, field and modes live in the dependency-free transcript-view-modes module, which Chat's
+// view-mode agent tools (host.ts) import too.
+export { CHAT_SETTINGS_NAMESPACE, TRANSCRIPT_VIEW_FIELD, TRANSCRIPT_VIEW_MODES, type TranscriptViewMode } from './transcript-view-modes.ts'
 
 /** Field carrying the independent work-details collapse timing. */
 export const COLLAPSE_TIMING_FIELD = 'collapseTiming'
@@ -43,12 +42,6 @@ export type CollapseTiming = typeof COLLAPSE_TIMINGS[number]
 
 /** Preserve completion-time folding when no timing preference is saved. */
 export const DEFAULT_COLLAPSE_TIMING: CollapseTiming = 'completion'
-
-/** Work-details presentation modes a user can choose. */
-export const TRANSCRIPT_VIEW_MODES = ['compact', 'standard', 'detailed', 'verbose'] as const
-
-/** Work-details presentation mode. */
-export type TranscriptViewMode = typeof TRANSCRIPT_VIEW_MODES[number]
 
 /**
  * Saved value from the two-mode generation of this setting. Read as `detailed`;

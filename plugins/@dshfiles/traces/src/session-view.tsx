@@ -40,7 +40,7 @@ const Stat = (props: { readonly label: TracesLocaleKey; readonly value: ReactNod
     className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:rounded-md dshx:border dshx:border-border dshx:px-2.5 dshx:py-1.5"
     data-stat={props.label}
   >
-    <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{props.t(props.label)}</span>
+    <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{props.t(props.label)}</span>
     <span className={cn('dshx:truncate dshx:font-mono dshx:text-sm', props.tone === 'error' ? 'dshx:text-destructive' : '')}>{props.value}</span>
   </div>
 )

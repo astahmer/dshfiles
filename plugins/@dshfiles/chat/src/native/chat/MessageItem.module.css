@@ -17,26 +17,38 @@
      resolves to the original 525px on the default column and widens with a
      dragged or adaptive column. The 748px fallback covers mounts outside the
      conversation column, where the axis variable is absent. */
-  max-width: min(calc(var(--dsh-chat-content-width, 748px) * 0.702), 82%);
+  /* dshfiles (visual refresh T2.1): the bubble may take up to 80% of the column (the plan's message grammar). */
+  max-width: min(calc(var(--dsh-chat-content-width, 748px) * 0.8), 80%);
 }
 .bubble {
   /* Figma's 525px cap held as a share of the width axis (525/748 ≈ 0.702) so
      the bubble widens with a user-dragged or adaptive column; percentage
      keeps narrow windows sane. */
   max-width: 100%;
+  box-sizing: border-box;
   background: var(--dsw-specific-bubble);
+  /* dshfiles (visual refresh T2.1): xl is the 12px step of the P0 scale; the fill is the raised tone. */
   border-radius: var(--dsw-radius-xl);
   /* 42px single-line bubble at the default size: 22 line + 10 vertical
      padding each side; the Settings font-size preference moves size and line
      height together through the body-published axis. */
-  padding: 10px 16px;
-  font-size: var(--dsh-content-font-size, 14px);
+  padding: 10px 14px;
+  font-size: max(var(--dsh-content-font-size, 14px), var(--dshx-density-text-prose, 14px));
   line-height: calc(22px + var(--dsh-content-font-delta, 0px));
   color: var(--dsw-alias-label-primary);
   /* The projected user text is inline runs; the bubble owns wrapping so a
      decorated single-line message stays one line. */
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* dshfiles (visual refresh T2.1): a message that is mostly code or JSON reads as code, in the mono face at the
+   code size, and wraps anywhere instead of overflowing the bubble. */
+.bubble[data-code-like] {
+  font-family: var(--dsh-font-family-code, ui-monospace, monospace);
+  font-size: 12.5px;
+  line-height: 18px;
 }
 
 .referenceSummary {
@@ -228,7 +240,8 @@
   border-bottom: 1.5px solid currentcolor;
   content: '';
   transform: rotate(-45deg);
-  transition: transform 120ms ease;
+  /* dshfiles (visual refresh T5.1): disclosure chevrons turn on the collapse token. */
+  transition: transform var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease);
 }
 
 .retrySummary:hover {
@@ -368,4 +381,114 @@
   color: var(--dsw-alias-label-tertiary, rgba(0, 0, 0, 0.45));
   font-size: 12px;
   line-height: 15px;
+}
+
+/* dshfiles (productivity pass T1.4): a prompt taller than 8 lines (6 on a phone) folds to that height with a fade and
+   a "Show all · N lines" toggle under the bubble. The body keeps `overflow: hidden` rather than `clip`, so browser
+   find can still scroll to a folded match, which opens the fold (prompt-fold.ts). */
+.bubbleBody {
+  --dsh-prompt-fold-lines: 8;
+  min-width: 0;
+}
+
+@media (pointer: coarse) and (max-width: 28rem) {
+  .bubbleBody {
+    --dsh-prompt-fold-lines: 6;
+  }
+}
+
+.bubble[data-prompt-fold='closed'] .bubbleBody {
+  max-height: calc(var(--dsh-prompt-fold-lines) * 1lh);
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black calc(100% - 1.5lh), transparent);
+}
+
+.foldToggle {
+  margin-top: -2px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: var(--dshx-density-text-meta, 12px);
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.foldToggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.foldToggle:focus-visible {
+  outline: 1.5px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .foldToggle {
+    position: relative;
+  }
+
+  .foldToggle::after {
+    content: '';
+    position: absolute;
+    inset: -12px -4px;
+  }
+}
+
+/* dshfiles (productivity pass T1.4): a pasted fence inside a prompt, as a small code card in the mono face. A prompt
+   that is code throughout (`data-code-like`) takes the same card fill. */
+.promptCode {
+  display: block;
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-markdown-code-block);
+  font-family: var(--dsh-font-family-code, ui-monospace, monospace);
+  font-size: 12.5px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.promptCode[data-lang]::before {
+  content: attr(data-lang);
+  display: block;
+  margin-bottom: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
+.promptCode:first-child {
+  margin-top: 0;
+}
+
+.promptCode:last-child {
+  margin-bottom: 0;
+}
+
+.bubble[data-code-like] {
+  background: var(--dsw-alias-markdown-code-block);
+}
+
+/* dshfiles (productivity pass T1.5): a centred time between turns, only after a day change or 30 quiet minutes. */
+.timeDivider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 12px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dshx-density-text-meta, 12px);
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeDivider::before,
+.timeDivider::after {
+  content: '';
+  flex: 1;
+  height: 0.5px;
+  background: var(--dsw-alias-border-l2);
 }

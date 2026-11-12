@@ -3,6 +3,7 @@ Feature: Empty fixed conversation welcome
   @scenario:workbench.empty-thread-welcome
   Scenario: An empty fixed thread keeps the native centered welcome until its first message
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar keeps the former Free docking panes
     When a real empty fixed conversation and an existing chat are opened
     Then the empty thread shows the native centered welcome and one scoped composer
     And its welcome draft survives switching reload and a narrow split pane

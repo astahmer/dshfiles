@@ -50,6 +50,9 @@ export type AccountSummaryItem = QuotaSummaryItem | UnavailableSummaryItem
 
 export const SHORT_NAME_MAX_LENGTH = 6
 
+/** At or below this much left an account turns warning amber; colour stays off a healthy account. */
+export const LOW_QUOTA_PERCENT = 15
+
 const windowRank = (label: string): number => {
   const lower = label.toLowerCase()
   if (lower.includes('session')) return 0
@@ -221,28 +224,216 @@ export class UsageOverviewModel {
   /**
    * The lines of one sidebar meter for the chosen label. A meter never goes
    * blank: asking for the reset alone falls back to the percent while no reset
-   * is known.
+   * is known. Every quota surface says what is left ("51% left"), never a bare
+   * percent, and the reset in words ("resets in 2 h"), never a glyph.
    */
   static meterLines = (
     item: QuotaSummaryItem,
     now: number,
     label: 'both' | 'percent' | 'reset',
   ): { readonly percent: string | null; readonly reset: string | null } => {
+    // The sidebar meter is a narrow two-line card, so its reset keeps the short units ("resets in 2h 0m").
     const short = UsageOverviewModel.formatResetShort(item.resetsAt, now)
-    const reset = short === null || label === 'percent' ? null : short === 'now' ? 'resetting' : `↻ ${short}`
+    const reset = short === null || label === 'percent' ? null : short === 'now' ? 'resetting' : `resets in ${short}`
     const percent = item.disabled
-      ? `${String(Math.round(item.percentRemaining))}%`
+      ? `${String(Math.round(item.percentRemaining))}% left`
       : item.exhausted
         ? `${item.shortName} limit reached`
-        : `${item.onReserve ? '☾ ' : ''}${String(Math.round(item.percentRemaining))}%`
+        : UsageOverviewModel.leftText(item)
     return { percent: label === 'reset' && reset !== null ? null : percent, reset }
   }
 
-  /** "Resets in 1h 11m", "Resets in 5d 20h", or a plain fallback. */
+  /** "1 d 21 h", "2 h 5 min", "9 min", "now", or null without a known reset: the long form tooltips and pages read. */
+  static formatResetSpaced = (resetsAt: number | null, now: number): string | null => {
+    if (resetsAt === null || !Number.isFinite(resetsAt)) return null
+    const remaining = resetsAt - now
+    if (remaining <= 0) return 'now'
+    const minutes = Math.floor(remaining / 60_000)
+    const days = Math.floor(minutes / 1_440)
+    if (days > 0) return `${String(days)} d ${String(Math.floor((minutes % 1_440) / 60))} h`
+    if (minutes >= 60) return `${String(Math.floor(minutes / 60))} h ${String(minutes % 60)} min`
+    return `${String(Math.max(1, minutes))} min`
+  }
+
+  /** The local weekday and 24-hour clock of a reset ("Thu 03:00"). */
+  static resetClock = (resetsAt: number): string => {
+    const date = new Date(resetsAt)
+    const weekday = date.toLocaleDateString(undefined, { weekday: 'short' })
+    const clock = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+    return `${weekday} ${clock}`
+  }
+
+  /** "Resets in 1 d 21 h · Thu 03:00", "Resetting now", or null without a known reset. */
+  static resetLine = (resetsAt: number | null, now: number): string | null => {
+    const spaced = UsageOverviewModel.formatResetSpaced(resetsAt, now)
+    if (spaced === null || resetsAt === null) return null
+    if (spaced === 'now') return 'Resetting now'
+    return `Resets in ${spaced} · ${UsageOverviewModel.resetClock(resetsAt)}`
+  }
+
+  /** What one account has left, in the one wording every quota surface uses: "51% left", "40% reserve left". */
+  static leftText = (item: Pick<QuotaSummaryItem, 'percentRemaining' | 'onReserve'>): string =>
+    `${String(Math.round(item.percentRemaining))}% ${item.onReserve ? 'reserve left' : 'left'}`
+
+  /**
+   * The status strip's tone for one account (one convention for every quota surface): neutral while healthy, warning at
+   * 15% left or less, danger only once the limit is reached (requests fail: a Failed state).
+   */
+  static stripTone = (item: AccountSummaryItem): 'ok' | 'low' | 'critical' => {
+    if ('unavailable' in item || item.disabled === true) return 'ok'
+    if (item.exhausted) return 'critical'
+    return item.percentRemaining <= LOW_QUOTA_PERCENT ? 'low' : 'ok'
+  }
+
+  /**
+   * Which accounts the status strip shows as segments and which the `+N` holds (b:hbtt). Every account keeps the
+   * user's own order (priority); when not all fit, the open thread's account is kept first, then enabled accounts in
+   * order, and accounts that are off (dimmed) fold into `+N` before any enabled one. Pins are an optional filter: once
+   * the user pins accounts, only those are segments and the others count in `+N`.
+   */
+  static stripSegments = (input: {
+    readonly items: readonly AccountSummaryItem[]
+    readonly pinned?: readonly string[]
+    readonly activeId?: string | null
+    /** How many segments fit; `Infinity` while the strip is not measured (tests, first paint). */
+    readonly capacity: number
+  }): { readonly inline: readonly AccountSummaryItem[]; readonly overflow: readonly AccountSummaryItem[] } => {
+    const pinned = input.pinned ?? []
+    const pins = pinned.length === 0 ? [] : input.items.filter(item => pinned.includes(item.instanceId))
+    const candidates = pins.length > 0 ? pins : [...input.items]
+    const rest = pins.length > 0 ? input.items.filter(item => !pins.includes(item)) : []
+    const room = Number.isFinite(input.capacity) ? Math.max(1, Math.floor(input.capacity)) : candidates.length
+    if (room >= candidates.length) return { inline: candidates, overflow: rest }
+    const chosen = new Set(
+      UsageOverviewModel.segmentPriority(candidates, input.activeId ?? null)
+        .slice(0, room)
+        .map(item => item.instanceId),
+    )
+    return { inline: candidates.filter(item => chosen.has(item.instanceId)), overflow: [...candidates.filter(item => !chosen.has(item.instanceId)), ...rest] }
+  }
+
+  /** The order segments are kept in when not all fit: the thread's account, enabled accounts, then accounts that are off. */
+  static segmentPriority = (items: readonly AccountSummaryItem[], activeId: string | null): AccountSummaryItem[] => {
+    const active = items.filter(item => item.instanceId === activeId)
+    const others = items.filter(item => item.instanceId !== activeId)
+    return [...active, ...others.filter(item => item.disabled !== true), ...others.filter(item => item.disabled === true)]
+  }
+
+  /**
+   * How many segments of the given widths fit in a budget, keeping room for the `+N` chip when some are left out;
+   * at least one. A budget of 0 or less with no measured widths means "not measured": every segment shows.
+   */
+  static fitCount = (widths: readonly number[], budget: number, moreWidth: number, gap = 0): number => {
+    if (widths.length === 0) return 0
+    if (widths.every(width => width <= 0)) return Number.POSITIVE_INFINITY
+    const total = widths.reduce((sum, width) => sum + width, 0) + gap * (widths.length - 1)
+    if (total <= budget) return widths.length
+    let used = 0
+    let count = 0
+    for (const width of widths) {
+      const next = used + (count === 0 ? 0 : gap) + width
+      if (next + gap + moreWidth > budget) break
+      used = next
+      count += 1
+    }
+    return Math.max(1, count)
+  }
+
+  /**
+   * How many accounts the phone pill names before `+N` (b:hbtt): the pill is text, at most `min(80vw, 320px)` wide, so
+   * this counts characters at 6.5 px each (12 px Geist with tabular figures measures about 6.2). At least three.
+   */
+  static pillCount = (texts: readonly string[], viewportWidth: number): number => {
+    const CHAR = 6.5
+    const chip = Math.min(viewportWidth * 0.8, 320)
+    // The pill's padding and dot, and the "+N" that follows a cut list.
+    const budget = chip - 36 - 3 * CHAR
+    let used = 0
+    let count = 0
+    for (const text of texts) {
+      const next = used + (count === 0 ? 0 : 3 * CHAR) + text.length * CHAR
+      if (next > budget) break
+      used = next
+      count += 1
+    }
+    return Math.min(texts.length, Math.max(3, count))
+  }
+
+  /** One segment's words (b:hbtt): "51%" (what is left), "limit" once reached, "off", "sign in", or "–" without a reading. */
+  static segmentWords = (item: AccountSummaryItem): string => {
+    if (item.disabled === true) return 'off'
+    if ('unavailable' in item) return item.unavailable.label === 'Sign in again' ? 'sign in' : '–'
+    if (item.exhausted) return 'limit'
+    return `${String(Math.round(item.percentRemaining))}%`
+  }
+
+  /**
+   * The compact reset after a segment's words (b:jaz6): "1d 21h", "3h 12m", "12m", or null when the account is off,
+   * reports no reading or no known reset, or its reset is already due (the next reading replaces it).
+   */
+  static segmentReset = (item: AccountSummaryItem, now: number): string | null => {
+    if ('unavailable' in item || item.disabled === true) return null
+    const short = UsageOverviewModel.formatResetShort(item.resetsAt, now)
+    return short === null || short === 'now' ? null : short
+  }
+
+  /** Whether a segment keeps its reset when room runs short: at the limit or at 15% left or less (b:jaz6). */
+  static resetMatters = (item: AccountSummaryItem): boolean => UsageOverviewModel.stripTone(item) !== 'ok'
+
+  /**
+   * How many segments fit and which keep their reset time (b:jaz6). Widths are in keep order
+   * ({@link segmentPriority}), each with (`full`) and without (`bare`) its reset; an account without a reset has equal
+   * widths. Resets go first from healthy accounts, kept on limited and low ones; only then does `+N` take accounts.
+   */
+  static segmentPlan = (input: {
+    readonly full: readonly number[]
+    readonly bare: readonly number[]
+    readonly urgent: readonly boolean[]
+    readonly budget: number
+    readonly moreWidth: number
+    readonly gap?: number
+  }): { readonly count: number; readonly resets: 'all' | 'urgent' } => {
+    const gap = input.gap ?? 0
+    const all = UsageOverviewModel.fitCount(input.full, input.budget, input.moreWidth, gap)
+    if (all >= input.full.length) return { count: all, resets: 'all' }
+    const mixed = input.bare.map((width, index) => (input.urgent[index] === true ? (input.full[index] ?? width) : width))
+    return { count: UsageOverviewModel.fitCount(mixed, input.budget, input.moreWidth, gap), resets: 'urgent' }
+  }
+
+  /**
+   * One window in a segment's tooltip (b:jaz6): "Weekly limit: 51% left · resets in 1 d 21 h · Thu 03:00", the same
+   * spaced units as the Usage page; "limit reached" once spent, and no reset part without a known reset.
+   */
+  static windowTooltipLine = (window: Pick<UsageWindow, 'label' | 'percentRemaining' | 'resetsAt'>, now: number): string => {
+    const left = UsageOverviewModel.isExhausted(window.percentRemaining) ? 'limit reached' : `${String(Math.round(window.percentRemaining))}% left`
+    const reset = UsageOverviewModel.resetLine(window.resetsAt, now)
+    return `${window.label}: ${left}${reset === null ? '' : ` · ${reset.charAt(0).toLowerCase()}${reset.slice(1)}`}`
+  }
+
+  /** Pin or unpin one account for the status strip; pins filter which accounts it shows (no cap). */
+  static togglePinned = (pinned: readonly string[], id: string): string[] => (pinned.includes(id) ? pinned.filter(entry => entry !== id) : [...pinned, id])
+
+  /**
+   * The popover's order from the status strip (b:4v6p): accounts grouped by provider, the provider with the most
+   * constrained account first, and inside a group the least remaining first; accounts that are off or report no
+   * quota close each group.
+   */
+  static byRemaining = (cards: readonly OverviewCard[]): OverviewCard[] => {
+    const remaining = (card: OverviewCard): number => {
+      if (!card.enabled) return Number.POSITIVE_INFINITY
+      return UsageOverviewModel.bindingWindow(card)?.percentRemaining ?? Number.MAX_VALUE
+    }
+    const groupLow = new Map<string, number>()
+    for (const card of cards) groupLow.set(card.kind, Math.min(groupLow.get(card.kind) ?? Number.POSITIVE_INFINITY, remaining(card)))
+    const groups = [...groupLow.entries()].sort((left, right) => left[1] - right[1]).map(([kind]) => kind)
+    return groups.flatMap(kind => cards.filter(card => card.kind === kind).sort((left, right) => remaining(left) - remaining(right)))
+  }
+
+  /** "Resets in 1 h 11 min", "Resets in 5 d 20 h", or a plain fallback. */
   static formatResetIn = (resetsAt: number | null, now: number): string => {
-    const short = UsageOverviewModel.formatResetShort(resetsAt, now)
-    if (short === null) return 'Reset time unavailable'
-    return short === 'now' ? 'Resetting now' : `Resets in ${short}`
+    const spaced = UsageOverviewModel.formatResetSpaced(resetsAt, now)
+    if (spaced === null) return 'Reset time unavailable'
+    return spaced === 'now' ? 'Resetting now' : `Resets in ${spaced}`
   }
 
   /** How long ago a reading was taken: "just now", "9m ago", "1h 11m ago", "2d ago". */

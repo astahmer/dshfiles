@@ -2,10 +2,11 @@ import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
 import { finishJourneyAssertions, recordAssertion, browserDiagnosticsFor } from '../steps.js'
+import { chooseComposerMore } from '../composer-more.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
-const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 const sideChat = (page: Page) => page.locator('[data-dshfiles-btw]')
 const sideChatTab = (page: Page) => page.locator('[data-dockkit-tab]').filter({ hasText: 'btw ·' })
 const questionDialog = (page: Page) => page.getByRole('dialog', { name: 'Ask a side question', exact: true })
@@ -60,7 +61,8 @@ When('the side question is opened with its shortcut', async ({ page }: { page: P
 })
 
 When('the side question is opened from the composer chip', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: ASK_LABEL, exact: true }).click()
+  // The side-question button is a row of the composer's More menu unless the user pins it back into the bar.
+  await chooseComposerMore(page, ASK_LABEL)
 })
 
 Then('the side question dialog from the {word} is about the thread and cancels without a fork', async ({ page }: { page: Page }, entry: string) => {
