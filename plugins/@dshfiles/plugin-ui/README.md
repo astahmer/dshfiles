@@ -159,6 +159,7 @@ the screen named; when a screen needs a prop the component lacks, add it here ra
 | `PipelineRun`                                      | project-checks receipts                                                         |
 | `CheckpointGraph`, `CostWaterfall`, `PresenceList` | session-undo rewind preview, usage thread Cost facet, agent-plan activity strip |
 | `Page`, `PageSection`, `EmptyState`, `EntityList`  | most owned pages                                                                |
+| `ComposerRow`                                      | background-jobs, jujutsu, queue-reorder, rich-composer: the state rows above the composer |
 
 Deleted rather than adopted: `MergeChecklist` (overlapped `MergeChecks`), `TestRunResults` (a streaming view, while
 test-runs shows finished runs and its counts would be wrong for Vitest's default reporter), `QuotaMeter`, `Typewriter`
