@@ -6,37 +6,19 @@
       "id": "activity-feed",
       "title": "Unified agent activity feed",
       "summary": "Normalizes session, communication, and jj integration events into one durable chronological feed with deduplication, bounded retention, cursor pagination, filtering, search, and provenance.",
-      "reach": [
-        "click tab \"Observe\"",
-        "click button \"Activity\"",
-        "expect textbox \"Search activity\""
-      ],
+      "reach": ["click tab \"Observe\"", "click button \"Activity\"", "expect textbox \"Search activity\""],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
         "click button \"Activity\"",
         "expect textbox \"Search activity\""
       ],
-      "surfaces": [
-        "host",
-        "tool",
-        "storage",
-        "client",
-        "integration"
-      ],
+      "surfaces": ["host", "tool", "storage", "client", "integration"],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Activity Timeline: Activity",
       "configuration": [],
-      "states": [
-        "empty",
-        "live",
-        "paged",
-        "filtered",
-        "searched",
-        "reconnected",
-        "attention"
-      ],
+      "states": ["empty", "live", "paged", "filtered", "searched", "reconnected", "attention"],
       "failureModes": [
         "A duplicate delivery is deduplicated by event id instead of appended twice.",
         "Out-of-order timestamps are re-sorted on ingest.",
@@ -139,22 +121,12 @@
       "id": "activity-condensation",
       "title": "Deterministic condensation and attention visibility",
       "summary": "Collapses routine runs and correlated events into traceable groups while keeping errors, blocked integrations, and attention-required events individually visible; a detailed mode expands every retained event.",
-      "surfaces": [
-        "host",
-        "tool",
-        "client"
-      ],
+      "surfaces": ["host", "tool", "client"],
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "left-nav: Activity Timeline: Activity › attention filter",
       "configuration": [],
-      "states": [
-        "condensed",
-        "detailed",
-        "grouped",
-        "attention-visible",
-        "correlation-grouped"
-      ],
+      "states": ["condensed", "detailed", "grouped", "attention-visible", "correlation-grouped"],
       "failureModes": [
         "A summary always carries the ids of its underlying events so it stays traceable.",
         "Attention events are never folded into a routine group.",
@@ -227,25 +199,12 @@
         "click button \"Agent started work*\"",
         "expect button \"Open Session\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "integration",
-        "storage"
-      ],
+      "surfaces": ["client", "host", "integration", "storage"],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Activity Timeline: Activity › receipt detail",
       "configuration": [],
-      "states": [
-        "passed",
-        "failed",
-        "timed-out",
-        "cancelled",
-        "backfilled",
-        "deduplicated",
-        "session-opened"
-      ],
+      "states": ["passed", "failed", "timed-out", "cancelled", "backfilled", "deduplicated", "session-opened"],
       "failureModes": [
         "Unknown schema versions and extra payload fields are rejected before the timeline stores an event.",
         "A v1 receipt's sshTarget, workspace and failure message are dropped before storage; v2 rejects those keys.",
@@ -328,24 +287,9 @@
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "Host contract: attention-api module and attention_* agent tools",
-      "surfaces": [
-        "host",
-        "tool",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["host", "tool", "storage", "integration"],
       "configuration": [],
-      "states": [
-        "needs-you",
-        "other",
-        "snoozed",
-        "closed",
-        "muted",
-        "resolved",
-        "reopened",
-        "deduplicated",
-        "info-to-activity-log"
-      ],
+      "states": ["needs-you", "other", "snoozed", "closed", "muted", "resolved", "reopened", "deduplicated", "info-to-activity-log"],
       "failureModes": [
         "A repeat with the same source and dedupe key merges into one item instead of stacking; an unchanged repeat writes nothing.",
         "A changed repeat lifts a snooze-until-change and a Done; a timed snooze holds until its time.",
@@ -440,34 +384,11 @@
       "surface": "destinationSection",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox",
-      "reach": [
-        "click tab \"Inbox\"",
-        "click button \"Needs you\"",
-        "expect heading \"Inbox\"",
-        "expect tab \"Needs you*\""
-      ],
-      "reachNarrow": [
-        "click button \"Inbox\"",
-        "click button \"Needs you\"",
-        "expect heading \"Inbox\"",
-        "expect tab \"Needs you*\""
-      ],
-      "surfaces": [
-        "client"
-      ],
+      "reach": ["click tab \"Inbox\"", "click button \"Needs you\"", "expect heading \"Inbox\"", "expect tab \"Needs you*\""],
+      "reachNarrow": ["click button \"Inbox\"", "click button \"Needs you\"", "expect heading \"Inbox\"", "expect tab \"Needs you*\""],
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "empty",
-        "needs-you",
-        "other",
-        "snoozed",
-        "closed",
-        "muted",
-        "answered-in-place",
-        "action-refused",
-        "alerts-opt-in",
-        "compact"
-      ],
+      "states": ["empty", "needs-you", "other", "snoozed", "closed", "muted", "answered-in-place", "action-refused", "alerts-opt-in", "compact"],
       "failureModes": [
         "An archived or missing thread is reported unavailable with a recovery hint instead of being reopened.",
         "A refused action (resolved item, no provider loaded) shows the provider message with what to do instead.",
@@ -518,29 +439,14 @@
       "id": "inbox-opens-subject",
       "title": "Open an Inbox item's source in one click",
       "summary": "Every Inbox row whose subject another page owns offers its own direct action: Review thread for a finished turn, Open thread for a thread subject (an archived one says so), and Open <subject> for a page such as a backlog item, which opens that item in the Backlog page. Any text naming a thread gets an Open thread link. The page that owns a subject kind registers an opener, so the inbox shows that action only where something can actually open it.",
-      "reach": [
-        "click tab \"Inbox\"",
-        "expect text \"Needs you\""
-      ],
-      "reachNarrow": [
-        "click button \"Inbox\"",
-        "expect text \"Needs you\""
-      ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "reach": ["click tab \"Inbox\"", "expect text \"Needs you\""],
+      "reachNarrow": ["click button \"Inbox\"", "expect text \"Needs you\""],
+      "surfaces": ["client", "integration"],
       "surface": "rowAction",
       "destination": "inbox",
       "currentSurface": "Inbox: Open on an item's subject",
       "configuration": [],
-      "states": [
-        "thread-subject",
-        "provider-subject",
-        "no-opener",
-        "archived-thread",
-        "referenced-thread"
-      ],
+      "states": ["thread-subject", "provider-subject", "no-opener", "archived-thread", "referenced-thread"],
       "failureModes": [
         "A subject kind nobody contributed an opener for shows no Open button, so the row never promises a page that does not exist.",
         "An archived or missing thread reports that it is unavailable and how to bring it back instead of reviving it silently.",

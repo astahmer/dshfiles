@@ -71,7 +71,14 @@ const storedLog = async (messages = MESSAGES) => {
   disposers.push(() => fiber.dispose())
   const persistence = ctx.sessionPersistence
   const id = SessionId('session-replay')
-  const handle = await persistence.create({ version: SESSION_FORMAT_VERSION, id, createdAt: 1_760_000_000_000, cwd: '/tmp/replay', isSeeded: false, delegationDepth: 0 })
+  const handle = await persistence.create({
+    version: SESSION_FORMAT_VERSION,
+    id,
+    createdAt: 1_760_000_000_000,
+    cwd: '/tmp/replay',
+    isSeeded: false,
+    delegationDepth: 0,
+  })
   for (let index = 0; index < messages; index += 1) await handle.append(turn(index))
   await handle.close()
   return { persistence, id }

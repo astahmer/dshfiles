@@ -215,10 +215,7 @@ it('serves the cached corpus while a slow store probe finishes in the background
   await store.store('project-b', 'slow-behind')
   vi.setSystemTime(Date.now() + 2_000)
 
-  const served = await Promise.race([
-    listedIds(list),
-    new Promise<'blocked'>(resolve => setTimeout(resolve, 1_000, 'blocked')),
-  ])
+  const served = await Promise.race([listedIds(list), new Promise<'blocked'>(resolve => setTimeout(resolve, 1_000, 'blocked'))])
   expect(served).toEqual(['cold-first'])
   expect(recorder.named('session list read').at(-1)?.attributes).toMatchObject({ 'dshx.session-controller.revalidation': 'background' })
 

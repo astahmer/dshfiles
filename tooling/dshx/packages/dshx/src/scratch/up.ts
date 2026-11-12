@@ -98,8 +98,7 @@ export class ScratchBootModel {
     }
     if (packageIds.includes('@dshfiles/phone-access'))
       rows.push(`- id: dshfiles-phone-access\n  config:\n    proxyPort: ${String(await freePort())}\n    autoServe: false`)
-    if (packageIds.includes('@dshfiles/phone-pairing'))
-      rows.push(`- id: dshfiles-phone-pairing\n  config:\n    gatewayPort: ${String(await freePort())}`)
+    if (packageIds.includes('@dshfiles/phone-pairing')) rows.push(`- id: dshfiles-phone-pairing\n  config:\n    gatewayPort: ${String(await freePort())}`)
     return rows.length === 0 ? {} : { cordisPatch: rows.join('\n') }
   }
 }

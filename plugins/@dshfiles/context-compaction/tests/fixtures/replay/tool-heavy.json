@@ -1,1 +1,3781 @@
-{"name":"tool-heavy","kind":"long tool-heavy coding thread","source":"session-284fe9d9-7f37-4937-9dd6-6b4974729e3f","route":{"provider":"codex-alex2","model":"gpt-6-luna","contextWindow":272000},"systemChars":8363,"tools":[["activity_timeline_attention",373],["activity_timeline_event",286],["activity_timeline_page",1250],["activity_timeline_related",334],["activity_timeline_stats",216],["agents_get",235],["agents_list",181],["agents_remove",315],["agents_save",1082],["agents_threads",256],["ai_accounts",230],["ai_accounts_begin_copilot_login",382],["ai_accounts_begin_login",670],["ai_accounts_cancel_copilot_login",372],["ai_accounts_cancel_login",482],["ai_accounts_catalog",235],["ai_accounts_collect_usage",267],["ai_accounts_complete_connection",303],["ai_accounts_configure_connection",686],["ai_accounts_connection",247],["ai_accounts_continuations",259],["ai_accounts_copilot_login_status",256],["ai_accounts_create_setup_account",467],["ai_accounts_discard_connection",409],["ai_accounts_dismiss_continuation",402],["ai_accounts_fast_mode_history",315],["ai_accounts_fast_mode_status",459],["ai_accounts_history",288],["ai_accounts_identity",335],["ai_accounts_import_connection_key",517],["ai_accounts_login_status",321],["ai_accounts_move_account",330],["ai_accounts_native_providers",199],["ai_accounts_prepare_connection",534],["ai_accounts_preview_thread_switch",515],["ai_accounts_pricing_status",199],["ai_accounts_quota",264],["ai_accounts_refresh_pricing",242],["ai_accounts_refresh_quota",224],["ai_accounts_remove_custom_model",441],["ai_accounts_reorder_account",525],["ai_accounts_resume_continuation",488],["ai_accounts_save_account",1373],["ai_accounts_serving_account",546],["ai_accounts_set_auto_retry",365],["ai_accounts_set_distribution",374],["ai_accounts_set_fast_mode",498],["ai_accounts_set_native_provider",365],["ai_accounts_sign_out",527],["ai_accounts_sign_out_capability",353],["ai_accounts_snooze_continuation",419],["ai_accounts_switch_thread",861],["annotations_ack",348],["annotations_dismiss",372],["annotations_intake",290],["annotations_list",467],["annotations_reply",409],["annotations_resolve",448],["annotations_source",353],["answer_parent_question",607],["answer_thread_question",968],["apply_patch",1140],["ask_parent_question",1433],["ask_user_question",1705],["background_jobs_board",1034],["background_jobs_kill",513],["background_jobs_output",509],["background_jobs_refresh",259],["background_jobs_wait",812],["backlog_accept_proposal",410],["backlog_attach_file",713],["backlog_capture",1431],["backlog_comment",1037],["backlog_delete",543],["backlog_dismiss_proposal",355],["backlog_enrich_tweet",439],["backlog_get",303],["backlog_get_many",509],["backlog_link",866],["backlog_list",1742],["backlog_projects",222],["backlog_read_file",488],["backlog_referencing",621],["backlog_remove_file",384],["backlog_start_thread",1685],["backlog_triage",347],["backlog_triage_backfill",773],["backlog_triage_backfill_status",253],["backlog_update",1111],["bash",2280],["cancel_parent_feedback",274],["chat_resume_interrupted",305],["chat_retry_failed_turn",423],["chat_stopped_turn_status",363],["complete_blocked_goal",589],["create_goal",577],["dsh_release_status",298],["dshx_capabilities",501],["dshx_comm_ack",238],["dshx_comm_agents",475],["dshx_comm_browse",419],["dshx_comm_diagnostics",303],["dshx_comm_history",914],["dshx_comm_inbox",392],["dshx_comm_publish",1131],["dshx_comm_recipients",257],["dshx_comm_send",1058],["dshx_comm_subscribe",347],["dshx_comm_topics",207],["dshx_comm_unsubscribe",313],["dshx_comm_workspace",472],["edit",1151],["editor_write",732],["exit_plan_mode",472],["extend_goal_budget",996],["find_threads",1867],["get_goal",170],["get_parent_feedback",352],["git_thread_worktree_remove",525],["git_thread_worktrees",263],["glob",593],["grep",749],["hmr_gate_status",205],["html_preview",1058],["html_render",1357],["html_render_screenshot",945],["interrupt_agent",514],["jj_confirm_action",352],["jj_details",246],["jj_edit_times",408],["jj_graph_navigation",236],["jj_graph_page",334],["jj_graph_slice",364],["jj_load",286],["jj_open_repository",398],["jj_prepare_action",3944],["jj_reference_graph",367],["jj_register_repository",243],["jj_revision_files",322],["jj_revision_relationship",373],["jj_thread_cleanup",1576],["jj_thread_cleanup_jobs",303],["jj_thread_destination",426],["jj_thread_discard",420],["jj_thread_discard_many",724],["jj_thread_isolate",621],["jj_thread_projects",313],["jj_thread_rebase",812],["jj_thread_refresh_repositories",277],["jj_thread_repositories",397],["jj_thread_review_history",284],["jj_thread_status",471],["jj_thread_workspace_sync",304],["jj_working_diff",226],["jj_workspaces",261],["job_kill",370],["job_list",168],["job_output",615],["list_agents",661],["list_subagent_models",756],["list_thread_questions",1291],["loopback_access_status",219],["mcp_endpoint_revoke_token",341],["mcp_endpoint_set_lan_access",300],["mcp_endpoint_status",250],["mcp_list_servers",243],["mcp_refresh_servers",287],["mcp_remove_server",258],["mcp_save_server",1438],["mcp_search_registry",261],["mcp_set_connection",348],["mcp_set_preferences",620],["mcp_set_server_enabled",308],["mcp_sign_out_server",269],["memory_archive_note",320],["memory_citations",468],["memory_edit_note",540],["memory_forget_note",332],["memory_note",1712],["memory_note_counts",283],["memory_note_history",265],["memory_notes",566],["memory_projects",186],["memory_read",612],["memory_restore_note",255],["memory_review_notes",494],["memory_search",794],["memory_start_block",355],["memory_thread_detail",251],["memory_threads",436],["memory_usage",525],["model_fallback_state",408],["model_handoff_context_window",347],["multi_host_browse",325],["multi_host_checkout_sync",467],["multi_host_clone_project",698],["multi_host_create_thread",362],["multi_host_doctor",494],["multi_host_exec",429],["multi_host_find_homes",302],["multi_host_forget_thread",378],["multi_host_identity",156],["multi_host_list",252],["multi_host_local_project_files",412],["multi_host_mkdir",329],["multi_host_models",342],["multi_host_open_folder",380],["multi_host_provision",990],["multi_host_reconnect",285],["multi_host_remove_host",368],["multi_host_remove_runtime",271],["multi_host_reorder_hosts",341],["multi_host_resource_pool",207],["multi_host_resource_snapshot",169],["multi_host_runtime_control",560],["multi_host_runtime_logs",332],["multi_host_runtime_status",329],["multi_host_save_ssh_host",425],["multi_host_set_host_hidden",376],["multi_host_ssh_hosts",203],["multi_host_start_thread",617],["multi_host_status",390],["multi_host_test",393],["multi_host_thread_reply",463],["multi_host_thread_stop",379],["multi_host_thread_transcript",390],["multi_host_threads",194],["network_access_save",597],["network_access_settings",234],["policies_list",227],["policy_check",275],["present",777],["preview_click",740],["preview_close",547],["preview_evaluate",695],["preview_list",296],["preview_navigate",650],["preview_open",776],["preview_reveal",470],["preview_screenshot",478],["preview_snapshot",670],["preview_type",846],["project_checks_actions",283],["project_checks_cancel",372],["project_checks_dispatch",496],["project_checks_hook_events",276],["project_checks_receipts",314],["project_checks_retry",499],["project_checks_run",480],["project_checks_tasks",278],["project_clone",565],["project_clone_cancel",415],["project_clone_jobs",244],["project_create",682],["project_delete",326],["project_list",203],["project_register",300],["project_rename",308],["project_reorder",362],["project_tools_status",255],["prompt_stash_state",161],["pulls_review",803],["queue_describe",257],["queue_move",560],["read",438],["read_image",389],["reference_attach",451],["reference_detach",379],["reference_remove",397],["reference_save",610],["references_list",340],["related_threads",812],["resolve_parent_feedback",547],["return_to_selected_model",319],["schedule_create",3143],["schedule_delete",295],["schedule_list",137],["schedule_update",2403],["secret_get",512],["secret_list",280],["secret_reference_status",1016],["send_message",527],["session_redo",388],["session_search_health",512],["session_undo",528],["session_undo_history",337],["session_warming_status",322],["set_model_fallback_chain",630],["set_model_fallback_return",402],["settings_list",474],["settings_set",468],["settings_unset",403],["skill",332],["subagent",2117],["subagent_fork",1268],["submit_markdown_feedback",700],["thread_archive",731],["thread_attention_state",194],["thread_auto_settle_status",332],["thread_continue_in",862],["thread_create",889],["thread_dev_server_stop",782],["thread_dev_servers",451],["thread_fork",370],["thread_list",476],["thread_local_model_state",329],["thread_move",471],["thread_pin",306],["thread_prompt",590],["thread_queue_edit",455],["thread_queue_remove",349],["thread_queue_steer",373],["thread_references",456],["thread_rename",303],["thread_select_local_model",798],["thread_select_model",441],["thread_settle",467],["thread_stop",345],["thread_unarchive",278],["thread_unpin",234],["thread_unsettle",271],["thread_view_create",728],["thread_view_delete",333],["thread_view_get",242],["thread_view_move",344],["thread_view_select",381],["thread_view_update",707],["thread_views_list",213],["todo_write",856],["traces_alert_delete",475],["traces_alert_mute",441],["traces_alert_save",2740],["traces_alerts",554],["traces_alerts_evaluate",303],["traces_breakdown",2072],["traces_clear",417],["traces_error_groups",471],["traces_get",387],["traces_get_metric",636],["traces_list_metrics",605],["traces_list_services",619],["traces_search",1566],["traces_search_logs",1713],["traces_service_map",466],["traces_session_summary",725],["traces_status",394],["tweet_context",1183],["update_goal",984],["usage_activity_report",2035],["usage_jev_report",518],["usage_otel_metrics",744],["usage_reindex",247],["usage_report",1197],["usage_requests",1107],["usage_status",209],["web_fetch",242],["web_search",323],["workflow",3389],["working_directory",360],["workspace_folder_browser_create_directory",327],["workspace_folder_browser_list",252],["worktree_memory_pressure",240],["worktree_memory_snapshot",407],["worktree_memory_stop",1005],["write",854]],"events":[["u",38,0,"user"],["u",49527,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13932,0,"skill-catalog"],["u",260,0,"time-context"],["a",0,0,[["skill",23,12575,0,0,"jj-linearize"]]],["a",0,28,[["create_goal",163,288,0,0,null]]],["a",0,0,[["bash",175,413,0,0,null]]],["a",0,29,[["skill",21,9537,0,0,"jj-recover"]]],["a",0,30,[["bash",354,5279,0,0,null]]],["u",94,0,"user"],["a",0,65,[["bash",464,2321,0,0,null]]],["a",0,28,[["read",76,14047,0,0,null]]],["a",0,28,[["bash",533,2987,0,0,null],["thread_list",13,10749,0,0,null],["jj_load",32,102,0,1,null]]],["a",0,31,[["bash",380,1528,0,0,null]]],["a",0,0,[["glob",88,72,0,0,null]]],["a",0,0,[["read",104,10668,0,0,null]]],["a",0,66,[["bash",381,2616,0,0,null]]],["a",0,291,[["ask_user_question",896,116,0,0,null]]],["a",614,150,[]],["u",694,0,"goal"],["a",0,66,[["get_goal",2,288,0,0,null]]],["a",0,31,[["update_goal",86,76,0,1,null]]],["a",0,29,[["bash",561,3076,0,0,null]]],["a",0,61,[["bash",342,535,0,0,null]]],["a",0,72,[["bash",868,2289,0,0,null],["thread_list",32,532,0,0,null],["thread_list",31,4787,0,0,null]]],["a",0,147,[["read",80,1329,0,0,null]]],["a",0,152,[["bash",484,178,0,0,null]]],["a",0,71,[["bash",390,2601,0,0,null]]],["a",538,159,[]],["u",694,0,"goal"],["a",0,37,[["bash",392,2601,0,0,null],["thread_list",31,4787,0,0,null],["bash",286,2412,0,0,null]]],["a",495,186,[]],["u",694,0,"goal"],["a",0,26,[["bash",417,4817,0,0,null]]],["a",0,50,[["update_goal",350,590,0,0,null]]],["u",959,0,"tool-goal"],["a",669,33,[]],["u",354,0,"user"],["a",0,32,[["get_goal",2,590,0,0,null]]],["a",0,0,[["update_goal",86,288,0,0,null]]],["a",0,81,[["skill",23,4973,0,0,"dsh-sessions"]]],["a",0,133,[["todo_write",404,57,0,0,null]]],["a",0,0,[["working_directory",2,50,0,0,null]]],["a",0,30,[["bash",428,2894,0,0,null],["thread_list",31,4796,0,0,null],["glob",92,15,0,0,null],["glob",83,23,0,0,null]]],["a",0,69,[["read",76,29539,0,0,null],["read",68,14038,0,0,null],["bash",353,1503,0,0,null]]],["u",251,0,"time-context"],["a",0,55,[["bash",411,11131,0,0,null]]],["a",0,236,[["glob",65,49,0,0,null],["glob",77,15,0,0,null],["glob",76,15,0,0,null],["thread_list",32,532,0,0,null]]],["a",0,25,[["read",70,17874,0,0,null],["grep",131,1076,0,0,null],["jj_thread_status",2,383,0,0,null],["jj_graph_navigation",49,75,0,0,null]]],["a",0,159,[["read",112,3137,0,0,null]]],["a",0,167,[["dshx_comm_agents",2,1864,0,0,null],["jj_register_repository",39,67,0,0,null],["bash",147,2551,0,0,null],["read",116,2320,0,0,null]]],["a",0,160,[["bash",254,241,0,0,null],["bash",266,241,0,0,null],["bash",267,417,0,0,null]]],["a",0,316,[["bash",511,4040,0,0,null]]],["a",0,131,[["bash",209,2991,0,0,null]]],["a",0,54,[["bash",382,350,0,0,null]]],["a",0,209,[["todo_write",406,57,0,0,null]]],["u",82,0,"user"],["a",0,110,[["bash",378,2341,0,0,null]]],["a",0,25,[["bash",343,3888,0,0,null]]],["a",0,39,[["bash",505,4183,0,0,null]]],["a",0,125,[["bash",156,178,0,0,null],["bash",157,464,0,0,null],["bash",156,301,0,0,null],["bash",160,388,0,0,null],["bash",165,170,0,0,null],["bash",157,166,0,0,null],["bash",164,235,0,0,null],["bash",160,174,0,0,null],["bash",160,356,0,0,null],["bash",158,318,0,0,null],["bash",152,513,0,0,null],["bash",152,166,0,0,null],["bash",151,325,0,0,null],["bash",155,176,0,0,null],["bash",155,193,0,0,null],["bash",158,191,0,0,null],["bash",139,191,0,0,null]]],["a",0,249,[["read",77,501,0,0,null]]],["a",0,147,[["bash",519,3622,0,0,null]]],["a",0,157,[["bash",631,814,0,0,null]]],["a",0,26,[["bash",627,651,0,0,null]]],["a",0,36,[["bash",630,833,0,0,null]]],["a",0,59,[["bash",312,200,0,0,null],["bash",233,53,0,0,null]]],["a",0,37,[["jj_register_repository",61,89,0,0,null]]],["a",0,0,[["jj_details",103,124,0,0,null]]],["a",0,31,[["jj_revision_files",106,220,0,0,null]]],["a",0,72,[["bash",196,49930,0,0,null]]],["a",0,155,[["bash",319,651,0,0,null]]],["a",0,56,[["grep",187,457,0,0,null]]],["a",0,25,[["read",155,4427,0,0,null]]],["a",0,131,[["bash",473,3989,0,0,null]]],["a",0,26,[["grep",166,484,0,0,null]]],["a",0,0,[["read",134,2619,0,0,null]]],["a",0,31,[["apply_patch",3967,165,0,0,null]]],["a",0,78,[["bash",520,895,0,0,null]]],["a",0,58,[["bash",355,862,0,0,null],["bash",165,602,0,0,null]]],["a",0,26,[["bash",380,350,0,0,null]]],["a",0,49,[["bash",622,520,0,0,null]]],["a",0,54,[["bash",612,516,0,0,null]]],["a",0,23,[["bash",625,585,0,0,null]]],["a",0,28,[["bash",624,628,0,0,null]]],["a",0,27,[["bash",313,331,0,0,null]]],["a",0,28,[["bash",159,670,0,0,null]]],["a",0,67,[["bash",582,922,0,0,null]]],["a",0,19,[["grep",170,473,0,0,null]]],["a",0,0,[["read",139,5398,0,0,null]]],["a",0,26,[["apply_patch",7636,217,0,1,null]]],["a",0,68,[["apply_patch",504,169,0,0,null]]],["a",0,29,[["bash",497,915,0,0,null]]],["a",0,27,[["bash",380,350,0,0,null]]],["a",0,29,[["bash",622,707,0,0,null]]],["a",0,29,[["bash",614,669,0,0,null]]],["a",0,33,[["bash",622,864,0,0,null]]],["a",0,27,[["bash",622,517,0,0,null]]],["a",0,63,[["bash",621,676,0,0,null]]],["u",247,0,"time-context"],["a",0,20,[["bash",625,527,0,0,null]]],["a",0,138,[["bash",565,527,0,0,null]]],["a",0,25,[["bash",618,544,0,0,null]]],["a",0,64,[["bash",632,542,0,0,null]]],["a",0,24,[["bash",607,542,0,0,null]]],["a",0,93,[["read",106,4640,0,0,null]]],["a",0,262,[["glob",59,36,0,0,null],["bash",271,1904,0,0,null],["bash",424,564,0,0,null]]],["a",0,337,[["jj_register_repository",37,65,0,0,null]]],["a",0,29,[["glob",74,15,0,0,null],["read",76,2691,0,0,null],["bash",269,1006,0,0,null]]],["a",0,32,[["grep",116,217,0,0,null]]],["a",0,267,[["bash",298,518,0,0,null],["bash",295,502,0,0,null],["bash",279,2654,0,0,null]]],["a",0,62,[["bash",587,535,0,0,null]]],["a",0,122,[["read",75,1363,0,0,null]]],["a",0,187,[["bash",340,537,0,0,null]]],["a",0,33,[["read",95,1383,0,0,null]]],["a",0,18,[["apply_patch",913,119,0,0,null]]],["a",0,29,[["bash",515,546,0,0,null]]],["a",0,245,[["bash",449,2144,0,0,null],["read",90,6762,0,0,null],["read",91,5026,0,0,null]]],["a",0,57,[["grep",143,201,0,0,null]]],["a",0,22,[["read",100,3106,0,0,null]]],["a",0,63,[["bash",145,271,0,0,null]]],["a",0,28,[["apply_patch",1485,123,0,0,null]]],["u",27779,0,"agent-instructions"],["a",0,31,[["bash",305,529,0,0,null]]],["a",0,0,[["read",132,1652,0,0,null]]],["a",0,67,[["apply_patch",2088,155,0,0,null]]],["a",0,405,[["bash",220,44,0,0,null],["bash",225,44,0,0,null]]],["a",0,64,[["bash",528,3673,0,0,null]]],["u",206,0,"tool-jobs"],["a",0,46,[["job_output",34,3183,0,0,null]]],["a",0,28,[["job_output",34,149,0,0,null],["bash",410,430,0,0,null],["thread_list",31,3677,0,0,null]]],["a",0,158,[["jj_register_repository",61,89,0,0,null]]],["a",0,0,[["jj_prepare_action",160,195,0,0,null]]],["a",0,31,[["jj_confirm_action",100,25,0,0,null]]],["a",0,355,[["bash",440,200,0,0,null]]],["a",0,30,[["background_jobs_wait",73,300,0,0,null]]],["u",202,0,"tool-jobs"],["a",0,26,[["job_output",34,7405,0,0,null]]],["a",0,458,[["bash",315,7086,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["a",0,69,[["skill",23,12575,0,0,"jj-linearize"],["skill",28,1353,0,0,"bug-investigation"],["skill",29,1848,0,0,"focused-validation"]]],["a",0,425,[["bash",660,602,0,0,null]]],["a",0,327,[["bash",147,510,0,0,null],["bash",146,282,0,0,null],["bash",150,194,0,0,null],["bash",147,315,0,0,null],["bash",148,320,0,0,null],["bash",150,384,0,0,null],["bash",141,1074,0,0,null]]],["a",0,56,[["skill",33,7064,0,0,"afk-thread-supervision"],["skill",23,4973,0,0,"dsh-sessions"]]],["a",0,92,[["get_goal",2,288,0,0,null],["activity_timeline_attention",12,17970,0,0,null],["dshx_comm_agents",2,1861,0,0,null],["dshx_comm_inbox",12,27,0,0,null]]],["a",0,59,[["bash",508,12754,0,0,null]]],["a",0,605,[["bash",455,2334,0,0,null]]],["u",249,0,"time-context"],["a",0,338,[["jj_prepare_action",160,196,0,0,null]]],["a",0,32,[["jj_revision_relationship",163,2196,0,0,null]]],["a",0,19,[["jj_confirm_action",100,25,0,0,null]]],["a",0,318,[["bash",623,1115,0,0,null]]],["a",0,75,[["bash",503,303,0,0,null]]],["a",0,352,[["todo_write",355,57,0,0,null]]],["a",0,25,[["update_goal",88,293,0,0,null]]],["a",0,761,[["bash",315,3645,0,0,null]]],["a",0,216,[["bash",235,325,0,0,null]]],["a",1289,258,[]],["u",725,0,"user"],["a",0,52,[["skill",33,7064,0,0,"afk-thread-supervision"],["skill",23,4973,0,0,"dsh-sessions"],["skill",23,12575,0,0,"jj-linearize"]]],["a",0,84,[["create_goal",597,722,0,0,null],["todo_write",496,57,0,0,null]]],["a",0,27,[["glob",85,96,0,0,null],["grep",145,3535,0,0,null],["memory_search",71,2749,0,0,null],["ai_accounts",2,978,0,0,null]]],["a",0,59,[["read",121,25928,0,0,null],["ai_accounts_refresh_quota",2,2623,0,0,null],["ai_accounts_catalog",28,798,0,0,null],["ai_accounts_catalog",30,725,0,0,null],["working_directory",2,50,0,0,null]]],["a",0,119,[["read",122,10596,0,0,null]]],["a",0,767,[["project_list",2,1169,0,0,null],["grep",147,102,0,0,null],["jj_thread_status",2,383,0,0,null]]],["a",0,33,[["read",136,9863,0,0,null]]],["a",0,186,[["skill",35,1613,0,0,"add-reference-repository"]]],["a",0,74,[["thread_create",90,96,0,0,null]]],["a",0,0,[["thread_select_model",133,101,0,0,null]]],["a",0,58,[["thread_prompt",1117,73,0,0,null]]],["a",0,87,[["glob",108,3514,0,0,null],["grep",133,17,0,0,null],["glob",97,45,0,0,null],["thread_list",39,95,0,0,null]]],["a",0,49,[["read",136,775,0,0,null]]],["a",0,28,[["grep",124,17,0,0,null]]],["a",0,61,[["grep",113,26396,0,0,null]]],["a",0,39,[["grep",128,17,0,0,null]]],["a",0,31,[["grep",126,160,0,0,null]]],["a",0,65,[["todo_write",616,57,0,0,null]]],["a",0,28,[["read",122,18909,0,0,null]]],["a",0,64,[["grep",101,7360,0,0,null]]],["a",0,124,[["grep",125,6884,0,0,null]]],["a",0,660,[["thread_create",96,102,0,0,null],["thread_create",96,102,0,0,null]]],["a",0,31,[["thread_select_model",131,99,0,0,null],["thread_select_model",133,101,0,0,null]]],["a",0,77,[["thread_prompt",871,73,0,0,null],["thread_prompt",869,73,0,0,null]]],["a",0,478,[["thread_list",39,299,0,0,null],["thread_local_model_state",60,54,0,1,null],["thread_local_model_state",60,54,0,1,null],["thread_local_model_state",60,54,0,1,null],["dshx_comm_agents",2,2077,0,0,null]]],["a",0,0,[["dshx_comm_workspace",60,22,0,0,null],["dshx_comm_workspace",60,22,0,0,null],["dshx_comm_workspace",60,22,0,0,null]]],["a",0,66,[["jj_thread_repositories",2,5211,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",252,0,"time-context"],["a",0,155,[["thread_list",39,296,0,0,null],["jj_thread_repositories",2,5211,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null]]],["a",0,90,[["bash",734,10228,0,0,null],["jj_thread_refresh_repositories",2,31,0,0,null]]],["a",0,157,[["read",121,7158,0,0,null]]],["a",0,246,[["schedule_create",738,888,0,0,null]]],["a",0,150,[["bash",314,547,0,0,null],["bash",314,485,0,0,null]]],["a",0,357,[["read",133,127,0,1,null],["read",110,9387,0,0,null],["grep",109,17,0,0,null]]],["a",0,634,[["glob",91,1265,0,0,null],["grep",110,17,0,0,null],["glob",105,3009,0,0,null]]],["a",0,508,[["todo_write",655,57,0,0,null]]],["a",0,566,[["todo_write",676,57,0,0,null]]],["a",1026,248,[]],["u",1128,0,"goal"],["a",0,59,[["get_goal",2,722,0,0,null],["thread_list",39,293,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32305,0,0,null]]],["a",0,246,[["bash",329,49931,0,0,null],["bash",329,49931,0,0,null]]],["a",0,257,[["ai_accounts_refresh_quota",2,2623,0,0,null]]],["a",811,120,[]],["u",1128,0,"goal"],["a",0,24,[["get_goal",2,722,0,0,null],["thread_list",39,293,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32305,0,0,null]]],["a",0,32,[["bash",304,6552,0,0,null]]],["a",0,217,[["todo_write",785,57,0,0,null]]],["a",0,29,[["read",121,10286,0,0,null],["read",122,6840,0,0,null],["skill",28,5786,0,0,"dsh-plugin-verify"]]],["a",0,199,[["jj_register_repository",39,67,0,0,null]]],["a",0,0,[["jj_workspaces",49,310,0,0,null]]],["u",251,0,"time-context"],["a",0,27,[["bash",371,330,0,0,null]]],["a",0,29,[["bash",369,475,0,0,null]]],["a",0,51,[["bash",305,18,0,0,null]]],["a",0,250,[["thread_create",94,100,0,0,null]]],["a",0,21,[["thread_select_model",131,99,0,0,null]]],["a",0,33,[["thread_prompt",730,73,0,0,null]]],["a",0,60,[["thread_list",39,393,0,0,null],["list_thread_questions",71,362,0,0,null],["schedule_list",2,890,0,0,null]]],["a",0,67,[["todo_write",836,57,0,0,null]]],["a",718,165,[]],["u",1128,0,"goal"],["a",0,28,[["get_goal",2,722,0,0,null],["thread_list",39,393,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,40,[["bash",311,5654,0,0,null],["bash",301,2226,0,0,null]]],["a",0,383,[["ai_accounts_refresh_quota",2,2623,0,0,null]]],["a",651,63,[]],["u",233,0,"user"],["a",0,296,[["get_goal",2,722,0,0,null],["skill",19,3910,0,0,"antislop"],["skill",36,1583,0,0,"read-reference-repository"],["project_list",2,1169,0,0,null],["memory_search",84,2477,0,0,null]]],["u",13795,0,"skill-catalog"],["a",0,150,[["skill",33,7064,0,0,"afk-thread-supervision"],["skill",23,4973,0,0,"dsh-sessions"],["read",88,3515,0,0,null],["get_goal",2,722,0,0,null]]],["a",0,30,[["update_goal",1035,1098,0,0,null]]],["a",0,129,[["glob",61,38,0,0,null],["glob",60,37,0,0,null],["glob",61,38,0,0,null],["glob",60,15,0,0,null]]],["a",0,24,[["read",77,17874,0,0,null],["read",76,17196,0,0,null],["read",77,356,0,0,null]]],["a",0,179,[["todo_write",999,57,0,0,null]]],["a",0,25,[["skill",22,3029,0,0,"ast-outline"]]],["a",0,63,[["glob",63,15,0,0,null],["glob",62,1288,0,0,null],["glob",63,231,0,0,null],["glob",65,15,0,0,null],["glob",64,141,0,0,null],["glob",65,44,0,0,null],["grep",152,702,0,0,null],["grep",151,34058,0,0,null],["grep",152,4021,0,0,null]]],["a",0,144,[["glob",92,15,0,0,null],["glob",63,4106,0,0,null],["glob",70,2328,0,0,null],["glob",65,88,0,0,null],["glob",63,231,0,0,null],["glob",64,237,0,0,null],["glob",63,15,0,0,null]]],["a",0,100,[["bash",366,3752,0,0,null]]],["a",0,290,[["bash",410,6989,0,0,null],["read",81,7890,0,0,null],["glob",69,2328,0,0,null],["glob",84,69,0,0,null],["read",101,805,0,0,null]]],["a",0,267,[["glob",59,36,0,0,null],["glob",63,15,0,0,null],["glob",55,156,0,1,null],["glob",72,1521,0,0,null],["glob",93,96,0,0,null],["grep",126,612,0,0,null],["grep",75,3681,0,0,null]]],["a",0,468,[["read",75,10261,0,0,null],["glob",61,1658,0,0,null],["read",86,3692,0,0,null],["read",79,1308,0,0,null],["bash",356,3917,0,0,null]]],["a",0,583,[["glob",84,28,0,0,null],["grep",136,2899,0,0,null],["glob",90,397,0,0,null],["bash",621,3130,0,0,null],["read",85,1883,0,0,null]]],["a",0,155,[["read",104,4222,0,0,null],["read",101,4518,0,0,null],["glob",93,927,0,0,null],["read",114,1070,0,0,null],["grep",143,1917,0,0,null]]],["a",0,255,[["thread_list",39,390,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null]]],["a",0,63,[["bash",305,5001,0,0,null],["bash",297,2931,0,0,null]]],["a",0,118,[["bash",263,1710,0,0,null]]],["a",0,35,[["bash",322,88,0,0,null]]],["a",0,26,[["bash",322,49931,0,0,null]]],["a",0,144,[["thread_prompt",1039,60,0,0,null]]],["a",0,112,[["todo_write",1032,57,0,0,null]]],["a",1168,306,[]],["u",79,0,"user"],["a",0,88,[["get_goal",2,1098,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["schedule_list",2,890,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,31,[["bash",308,6300,0,0,null]]],["a",377,313,[]],["u",1504,0,"goal"],["u",252,0,"time-context"],["a",0,30,[["get_goal",2,1098,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["schedule_list",2,890,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,26,[["bash",304,6538,0,0,null]]],["a",0,52,[["bash",333,1142,0,0,null]]],["a",0,648,[["subagent",810,53,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["a",0,34,[["skill",33,7064,0,0,"afk-thread-supervision"]]],["a",0,61,[["skill",23,4973,0,0,"dsh-sessions"],["skill",23,12575,0,0,"jj-linearize"]]],["a",0,217,[["ai_accounts_refresh_quota",2,2623,0,0,null],["bash",267,402,0,0,null],["list_agents",20,78,0,0,null]]],["u",3817,0,"agent-message"],["a",0,304,[["skill",22,3029,0,0,"ast-outline"]]],["u",447,0,"subagent-settled"],["a",0,30,[["bash",232,910,0,0,null]]],["a",0,27,[["bash",334,20994,0,0,null]]],["a",0,776,[["glob",108,3514,0,0,null],["grep",135,17,0,0,null],["glob",110,549,0,0,null],["glob",105,3009,0,0,null]]],["a",0,38,[["grep",171,17,0,0,null],["bash",451,243,0,0,null],["list_agents",20,79,0,0,null]]],["a",0,28,[["read",136,775,0,0,null],["read",134,653,0,0,null],["read",136,1131,0,0,null]]],["a",0,66,[["grep",139,221,0,0,null]]],["a",0,25,[["grep",124,17,0,0,null]]],["a",0,109,[["todo_write",1174,57,0,0,null]]],["a",0,207,[["grep",97,28757,0,0,null]]],["a",0,154,[["bash",725,6503,0,0,null]]],["a",750,612,[]],["u",1504,0,"goal"],["a",0,33,[["get_goal",2,1098,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,665,0,0,null]]],["a",0,63,[["bash",304,5820,0,0,null]]],["a",561,247,[]],["u",1504,0,"goal"],["a",0,35,[["get_goal",2,1098,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,22,[["bash",306,6193,0,0,null]]],["a",0,154,[["bash",329,1337,0,0,null]]],["a",380,94,[]],["u",1504,0,"goal"],["a",0,27,[["get_goal",2,1098,0,0,null],["thread_list",39,390,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,30,[["bash",312,5894,0,0,null]]],["a",0,111,[["skill",19,3910,0,0,"antislop"]]],["a",0,59,[["read",104,4708,0,0,null],["read",137,529,0,0,null],["bash",319,577,0,0,null],["grep",151,2191,0,0,null]]],["a",0,309,[["read",122,1201,0,0,null]]],["a",492,402,[]],["u",1504,0,"goal"],["a",0,26,[["get_goal",2,1098,0,0,null],["thread_list",39,390,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,22,[["bash",313,6053,0,0,null]]],["a",350,314,[]],["u",1504,0,"goal"],["a",0,30,[["get_goal",2,1098,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,24,[["bash",306,6311,0,0,null]]],["u",252,0,"time-context"],["a",0,109,[["jj_thread_status",61,1036,0,0,null],["bash",331,2514,0,0,null]]],["a",386,254,[]],["u",1505,0,"goal"],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["a",0,56,[["skill",33,7064,0,0,"afk-thread-supervision"],["skill",23,4973,0,0,"dsh-sessions"],["skill",29,1848,0,0,"focused-validation"]]],["a",0,60,[["bash",299,6240,0,0,null],["jj_thread_status",61,1078,0,0,null]]],["a",0,210,[["skill",23,12575,0,0,"jj-linearize"]]],["a",0,118,[["jj_details",103,3714,0,0,null],["jj_details",103,126,0,0,null],["jj_details",103,122,0,0,null],["jj_details",103,125,0,0,null]]],["a",0,324,[["thread_dev_servers",60,31,0,0,null]]],["a",0,66,[["bash",243,1597,0,0,null]]],["a",0,114,[["jj_thread_status",61,1270,0,0,null]]],["a",316,393,[]],["u",1505,0,"goal"],["a",0,31,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,31,[["bash",313,6201,0,0,null]]],["a",0,262,[["jj_thread_status",61,1270,0,0,null]]],["a",435,145,[]],["u",1505,0,"goal"],["a",0,26,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2371,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,0,[["bash",309,6403,0,0,null]]],["a",0,78,[["bash",211,1697,0,0,null]]],["a",359,154,[]],["u",1505,0,"goal"],["a",0,29,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2371,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,665,0,0,null]]],["a",0,21,[["bash",313,6388,0,0,null]]],["a",0,207,[["todo_write",1257,57,0,0,null]]],["a",408,97,[]],["u",1505,0,"goal"],["a",0,30,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2371,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,665,0,0,null]]],["a",0,0,[["bash",311,6327,0,0,null]]],["a",0,127,[["bash",240,3658,0,0,null]]],["a",361,163,[]],["u",1505,0,"goal"],["a",0,25,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2371,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,666,0,0,null]]],["a",0,24,[["bash",312,6452,0,0,null]]],["a",302,119,[]],["u",1505,0,"goal"],["a",0,23,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,666,0,0,null]]],["a",0,0,[["bash",311,6549,0,0,null]]],["a",331,246,[]],["u",1505,0,"goal"],["a",0,22,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,666,0,0,null]]],["a",0,24,[["bash",310,7021,0,0,null]]],["a",0,125,[["background_jobs_board",30,32230,0,0,null]]],["a",0,148,[["jj_thread_status",61,1270,0,0,null]]],["a",305,55,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,666,0,0,null]]],["a",0,0,[["bash",305,7673,0,0,null]]],["a",343,85,[]],["u",1505,0,"goal"],["a",0,32,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,666,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["u",252,0,"time-context"],["a",0,62,[["skill",33,7064,0,0,"afk-thread-supervision"],["skill",23,4973,0,0,"dsh-sessions"],["skill",23,12575,0,0,"jj-linearize"]]],["a",0,63,[["bash",308,7720,0,0,null]]],["a",301,165,[]],["u",1505,0,"goal"],["a",0,30,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,28,[["bash",320,8130,0,0,null]]],["a",272,64,[]],["u",1505,0,"goal"],["a",0,26,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,28,[["bash",313,8346,0,0,null]]],["a",326,149,[]],["u",1505,0,"goal"],["a",0,30,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_repositories",2,2371,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,0,[["bash",318,9107,0,0,null]]],["a",0,119,[["thread_prompt",605,60,0,0,null]]],["a",304,57,[]],["u",1505,0,"goal"],["a",0,32,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,33,[["bash",318,8219,0,0,null]]],["a",275,166,[]],["u",1505,0,"goal"],["a",0,20,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,0,[["bash",311,8163,0,0,null]]],["a",260,57,[]],["u",1505,0,"goal"],["a",0,33,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,27,[["bash",298,7904,0,0,null]]],["a",291,57,[]],["u",1505,0,"goal"],["a",0,28,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,23,[["bash",306,8378,0,0,null]]],["a",320,27,[]],["u",1505,0,"goal"],["a",0,27,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,13,[["bash",303,7963,0,0,null]]],["a",277,32,[]],["u",1505,0,"goal"],["a",0,27,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,22,[["bash",304,8190,0,0,null]]],["a",307,57,[]],["u",1505,0,"goal"],["a",0,18,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,13,[["bash",309,8391,0,0,null]]],["a",319,28,[]],["u",1505,0,"goal"],["a",0,33,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,0,[["bash",317,9092,0,0,null]]],["a",0,28,[["skill",23,5701,0,0,"traces-first"]]],["a",0,27,[["traces_status",2,899,0,0,null],["traces_session_summary",60,741,0,0,null],["traces_search",88,613,0,0,null]]],["a",0,55,[["traces_get",46,49930,0,0,null],["traces_get",46,41,0,1,null],["traces_error_groups",32,7593,0,0,null]]],["a",0,156,[["traces_search",89,31,0,0,null],["traces_search",94,31,0,0,null],["traces_search",109,31,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["a",0,69,[["grep",210,669,0,0,null]]],["a",0,119,[["bash",716,5978,0,0,null]]],["a",0,195,[["bash",317,7474,0,0,null]]],["a",0,59,[["traces_session_summary",60,748,0,0,null],["traces_search",88,614,0,0,null],["traces_search",112,31,0,0,null]]],["a",313,193,[]],["u",1505,0,"goal"],["a",0,32,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,28,[["bash",311,8811,0,0,null]]],["a",0,112,[["thread_prompt",476,60,0,0,null]]],["a",226,44,[]],["u",1505,0,"goal"],["u",252,0,"time-context"],["a",0,26,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,13,[["bash",296,8109,0,0,null]]],["a",236,80,[]],["u",1505,0,"goal"],["a",0,26,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,16,[["bash",313,8127,0,0,null]]],["a",0,122,[["thread_prompt",479,60,0,0,null]]],["a",277,25,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,0,[["bash",306,7553,0,0,null]]],["a",0,55,[["skill",23,5701,0,0,"traces-first"]]],["a",0,27,[["traces_status",2,898,0,0,null],["traces_session_summary",60,750,0,0,null],["traces_search",88,615,0,0,null],["traces_search",92,31,0,0,null]]],["a",0,63,[["bash",320,7684,0,0,null]]],["a",0,66,[["thread_prompt",495,60,0,0,null]]],["a",309,38,[]],["u",1505,0,"goal"],["a",0,22,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,21,[["bash",315,8414,0,0,null]]],["a",310,95,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,0,[["bash",308,8510,0,0,null]]],["a",297,66,[]],["u",1505,0,"goal"],["a",0,25,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,0,[["bash",322,9214,0,0,null]]],["a",0,60,[["skill",23,5701,0,0,"traces-first"]]],["a",0,26,[["traces_status",2,898,0,0,null],["traces_session_summary",60,758,0,0,null],["traces_search",88,614,0,0,null],["traces_search",87,331,0,0,null]]],["a",0,31,[["traces_get",46,49930,0,0,null]]],["a",0,27,[["bash",665,1302,0,0,null]]],["a",0,25,[["bash",303,7018,0,0,null]]],["a",248,62,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,24,[["bash",321,8841,0,0,null]]],["a",0,85,[["dshx_comm_agents",2,2141,0,0,null]]],["a",308,54,[]],["u",1505,0,"goal"],["a",0,30,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,154,[["bash",311,7744,0,0,null]]],["a",317,58,[]],["u",1505,0,"goal"],["a",0,33,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["jj_thread_repositories",2,2311,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,61,[["bash",311,9384,0,0,null]]],["a",238,33,[]],["u",1505,0,"goal"],["a",0,18,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32230,0,0,null]]],["a",0,23,[["bash",300,8652,0,0,null]]],["a",279,0,[]],["u",1505,0,"goal"],["a",0,30,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32611,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["a",0,0,[["skill",33,7064,0,0,"afk-thread-supervision"],["skill",23,4973,0,0,"dsh-sessions"],["skill",38,1550,0,0,"generated-artifact-workflow"]]],["a",0,52,[["bash",312,9617,0,0,null]]],["a",0,26,[["skill",23,5701,0,0,"traces-first"]]],["a",0,24,[["traces_status",2,899,0,0,null],["traces_session_summary",60,751,0,0,null],["traces_search",88,616,0,0,null]]],["a",250,61,[]],["u",1505,0,"goal"],["a",0,21,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,634,0,0,null]]],["a",0,20,[["bash",305,10118,0,0,null]]],["a",0,59,[["skill",23,5701,0,0,"traces-first"]]],["a",0,29,[["traces_status",2,898,0,0,null],["traces_session_summary",60,750,0,0,null],["traces_search",88,616,0,0,null]]],["a",0,65,[["bash",334,3651,0,0,null]]],["a",0,76,[["background_jobs_board",113,1671,0,0,null]]],["a",0,29,[["background_jobs_output",33,1599,0,0,null]]],["a",0,89,[["thread_prompt",421,60,0,0,null]]],["a",256,62,[]],["u",1505,0,"goal"],["a",0,32,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,9416,0,0,null]]],["a",0,0,[["background_jobs_output",33,1694,0,0,null]]],["a",0,26,[["bash",309,6785,0,0,null]]],["a",0,79,[["ai_accounts",2,978,0,0,null],["ai_accounts_quota",2,4454,0,0,null],["ai_accounts_continuations",2,911,0,0,null]]],["u",252,0,"time-context"],["a",0,135,[["background_jobs_board",113,2194,0,0,null]]],["a",0,114,[["thread_prompt",390,60,0,0,null]]],["a",308,53,[]],["u",1505,0,"goal"],["a",0,24,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,9332,0,0,null]]],["a",0,31,[["bash",313,7421,0,0,null]]],["a",286,84,[]],["u",876,0,"schedule"],["a",0,59,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,634,0,0,null],["jj_thread_status",61,1270,0,0,null]]],["a",0,26,[["bash",309,8016,0,0,null]]],["a",0,60,[["background_jobs_board",120,7158,0,0,null]]],["a",0,61,[["skill",23,5701,0,0,"traces-first"]]],["a",0,15,[["traces_status",2,899,0,0,null],["traces_session_summary",60,749,0,0,null],["traces_search",88,615,0,0,null]]],["a",0,22,[["background_jobs_output",33,2140,0,0,null]]],["a",0,85,[["bash",310,6384,0,0,null]]],["a",0,28,[["thread_prompt",436,60,0,0,null]]],["a",396,58,[]],["u",1505,0,"goal"],["a",0,27,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,634,0,0,null]]],["a",0,0,[["bash",311,8576,0,0,null]]],["a",0,62,[["skill",23,5701,0,0,"traces-first"]]],["a",0,15,[["traces_status",2,898,0,0,null],["traces_session_summary",60,749,0,0,null],["traces_search",88,616,0,0,null]]],["a",0,22,[["background_jobs_output",33,1886,0,0,null]]],["a",0,34,[["bash",315,6903,0,0,null]]],["a",325,199,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,634,0,0,null]]],["a",0,0,[["bash",310,8822,0,0,null]]],["a",302,120,[]],["u",1505,0,"goal"],["a",0,29,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,634,0,0,null]]],["a",0,0,[["bash",315,8295,0,0,null]]],["a",325,171,[]],["u",1505,0,"goal"],["a",0,28,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,9241,0,0,null]]],["a",0,65,[["skill",23,5701,0,0,"traces-first"]]],["a",0,0,[["traces_status",2,899,0,0,null],["traces_session_summary",60,750,0,0,null],["traces_search",88,617,0,0,null]]],["a",0,28,[["background_jobs_output",33,1998,0,0,null]]],["a",0,93,[["bash",320,6046,0,0,null]]],["a",274,56,[]],["u",1505,0,"goal"],["a",0,29,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,634,0,0,null]]],["a",0,23,[["bash",313,8166,0,0,null]]],["a",0,104,[["todo_write",485,57,0,0,null]]],["a",283,27,[]],["u",1505,0,"goal"],["a",0,27,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,9100,0,0,null]]],["a",0,31,[["bash",310,7064,0,0,null]]],["a",0,28,[["skill",23,5701,0,0,"traces-first"]]],["a",0,0,[["traces_status",2,898,0,0,null],["traces_session_summary",60,755,0,0,null],["traces_search",88,615,0,0,null]]],["a",0,0,[["background_jobs_output",33,1858,0,0,null]]],["a",0,26,[["bash",311,6447,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["a",0,61,[["skill",33,7064,0,0,"afk-thread-supervision"]]],["a",0,0,[["skill",23,4973,0,0,"dsh-sessions"]]],["a",0,67,[["skill",38,1550,0,0,"generated-artifact-workflow"]]],["a",0,0,[["skill",28,1353,0,0,"bug-investigation"]]],["a",0,57,[["bash",313,7396,0,0,null]]],["a",0,188,[["thread_prompt",577,60,0,0,null]]],["a",335,60,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,5162,0,0,null]]],["a",0,25,[["bash",305,6760,0,0,null]]],["a",259,121,[]],["u",1505,0,"goal"],["a",0,28,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,5148,0,0,null]]],["a",0,31,[["bash",310,8563,0,0,null]]],["a",265,65,[]],["u",1505,0,"goal"],["a",0,23,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,970,0,0,null]]],["a",0,24,[["bash",304,7367,0,0,null]]],["a",260,55,[]],["u",1505,0,"goal"],["u",252,0,"time-context"],["a",0,27,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,635,0,0,null]]],["a",0,19,[["bash",304,7323,0,0,null]]],["a",0,62,[["background_jobs_board",111,481,0,0,null]]],["a",0,35,[["background_jobs_board",90,5133,0,0,null]]],["a",0,23,[["background_jobs_output",33,18485,0,0,null]]],["a",265,193,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,5133,0,0,null]]],["a",0,0,[["bash",306,6975,0,0,null]]],["a",247,58,[]],["u",1505,0,"goal"],["a",0,27,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,635,0,0,null]]],["a",0,28,[["bash",297,6920,0,0,null]]],["a",0,59,[["read",62,1203,0,0,null]]],["a",0,169,[["thread_prompt",501,60,0,0,null]]],["a",336,58,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,4978,0,0,null]]],["a",0,34,[["bash",308,6841,0,0,null]]],["a",250,59,[]],["u",1505,0,"goal"],["a",0,24,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,5003,0,0,null]]],["a",0,25,[["bash",314,6171,0,0,null]]],["a",0,26,[["read",62,317,0,0,null]]],["a",0,95,[["thread_prompt",405,60,0,0,null]]],["a",240,28,[]],["u",1505,0,"goal"],["a",0,29,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,4894,0,0,null]]],["a",0,18,[["bash",311,6693,0,0,null]]],["a",237,64,[]],["u",1505,0,"goal"],["a",0,27,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,4894,0,0,null]]],["a",0,28,[["bash",312,6751,0,0,null]]],["a",0,58,[["bash",333,32,0,0,null]]],["a",278,62,[]],["u",1505,0,"goal"],["a",0,29,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,5658,0,0,null]]],["a",0,32,[["bash",311,6363,0,0,null]]],["a",0,26,[["read",63,323,0,0,null]]],["a",320,265,[]],["u",1505,0,"goal"],["a",0,25,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,4940,0,0,null]]],["a",0,0,[["bash",306,6883,0,0,null]]],["a",332,60,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,7330,0,0,null]]],["a",0,28,[["bash",306,6466,0,0,null]]],["a",0,28,[["read",64,620,0,0,null]]],["a",0,115,[["thread_prompt",414,60,0,0,null]]],["a",301,56,[]],["u",1505,0,"goal"],["a",0,24,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,5130,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["a",0,0,[["skill",33,7064,0,0,"afk-thread-supervision"],["skill",23,4973,0,0,"dsh-sessions"],["skill",38,1550,0,0,"generated-artifact-workflow"]]],["a",0,57,[["bash",323,6484,0,0,null]]],["a",0,30,[["read",65,621,0,0,null]]],["a",297,89,[]],["u",1505,0,"goal"],["a",0,27,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,5153,0,0,null]]],["a",0,19,[["bash",316,6826,0,0,null]]],["a",293,24,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,6038,0,0,null]]],["a",0,0,[["bash",313,6336,0,0,null]]],["u",252,0,"time-context"],["a",258,244,[]],["u",1505,0,"goal"],["a",0,27,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,635,0,0,null]]],["a",0,0,[["bash",314,6733,0,0,null]]],["a",0,28,[["read",60,513,0,0,null]]],["a",0,45,[["read",72,780,0,0,null]]],["a",0,64,[["thread_prompt",378,60,0,0,null]]],["a",326,89,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,6251,0,0,null]]],["a",0,31,[["read",69,522,0,0,null]]],["a",0,0,[["read",81,401,0,0,null]]],["a",0,23,[["bash",316,6811,0,0,null]]],["a",0,32,[["bash",339,32,0,0,null]]],["a",0,191,[["thread_prompt",523,60,0,0,null]]],["a",373,58,[]],["u",1505,0,"goal"],["a",0,28,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",85,5439,0,0,null]]],["a",0,19,[["bash",316,6404,0,0,null]]],["a",0,90,[["ai_accounts_quota",2,4455,0,0,null],["ai_accounts",2,978,0,0,null]]],["a",307,261,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",12,321,0,0,null],["background_jobs_board",85,5439,0,0,null]]],["a",0,19,[["bash",318,6852,0,0,null]]],["a",0,66,[["read",110,33616,0,0,null]]],["a",0,148,[["thread_prompt",543,60,0,0,null]]],["a",292,56,[]],["u",1505,0,"goal"],["a",0,30,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",12,321,0,0,null],["background_jobs_board",85,5571,0,0,null]]],["a",0,36,[["bash",305,6935,0,0,null]]],["a",0,55,[["read",59,512,0,0,null]]],["a",276,183,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",12,321,0,0,null],["background_jobs_board",85,8501,0,0,null]]],["a",0,31,[["bash",302,6855,0,0,null]]],["a",267,148,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",12,321,0,0,null],["background_jobs_board",85,8613,0,0,null]]],["a",0,58,[["background_jobs_wait",78,735,0,0,null]]],["a",0,25,[["bash",318,7189,0,0,null]]],["a",0,26,[["read",60,513,0,0,null],["read",61,514,0,0,null]]],["a",0,29,[["read",72,516,0,0,null],["read",73,498,0,0,null]]],["a",0,72,[["read",73,476,0,0,null]]],["a",0,24,[["read",73,588,0,0,null]]],["a",0,25,[["read",73,632,0,0,null]]],["a",0,29,[["read",73,635,0,0,null]]],["a",0,21,[["read",73,629,0,0,null]]],["a",0,156,[["glob",108,4806,0,0,null]]],["a",0,34,[["bash",298,7242,0,0,null]]],["a",0,245,[["thread_prompt",451,60,0,0,null]]],["a",0,31,[["thread_prompt",316,60,0,0,null]]],["a",0,60,[["background_jobs_output",33,17298,0,0,null],["background_jobs_output",33,17629,0,0,null]]],["a",0,58,[["bash",1099,271,0,0,null]]],["a",0,247,[["bash",317,7243,0,0,null]]],["a",0,92,[["thread_prompt",447,60,0,0,null]]],["a",347,35,[]],["u",1505,0,"goal"],["a",0,32,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",12,321,0,0,null],["background_jobs_board",85,13714,0,0,null]]],["a",0,37,[["bash",316,7629,0,0,null]]],["a",0,90,[["read",121,6702,0,0,null]]],["a",0,133,[["read",121,3042,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["u",252,0,"time-context"],["a",0,62,[["skill",33,7064,0,0,"afk-thread-supervision"],["skill",23,4973,0,0,"dsh-sessions"],["skill",38,1550,0,0,"generated-artifact-workflow"],["skill",29,1848,0,0,"focused-validation"]]],["a",0,60,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,635,0,0,null]]],["a",0,30,[["bash",306,7321,0,0,null]]],["a",0,126,[["bash",338,2128,0,0,null]]],["a",0,198,[["thread_prompt",528,60,0,0,null]]],["a",278,101,[]],["u",1505,0,"goal"],["a",0,69,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",30,32151,0,0,null],["ai_accounts_quota",2,4454,0,0,null]]],["a",0,64,[["todo_write",456,57,0,0,null]]],["a",0,25,[["bash",315,7133,0,0,null]]],["a",295,186,[]],["u",1505,0,"goal"],["a",0,23,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,635,0,0,null]]],["a",0,27,[["bash",314,7101,0,0,null]]],["a",0,184,[["read",122,11212,0,0,null]]],["a",295,101,[]],["u",1505,0,"goal"],["a",0,27,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,635,0,0,null]]],["a",0,27,[["bash",306,6962,0,0,null]]],["a",0,93,[["bash",229,796,0,0,null]]],["a",0,37,[["bash",263,6085,0,0,null]]],["a",0,146,[["thread_prompt",460,60,0,0,null]]],["a",0,169,[["thread_local_model_state",60,54,0,1,null],["thread_local_model_state",60,54,0,1,null],["thread_local_model_state",60,54,0,1,null]]],["a",303,115,[]],["u",1505,0,"goal"],["a",0,26,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,635,0,0,null]]],["a",0,22,[["bash",311,6395,0,0,null]]],["a",0,33,[["read",120,5448,0,0,null]]],["a",258,65,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,1191,0,0,null]]],["a",0,114,[["bash",323,6579,0,0,null]]],["a",0,28,[["background_jobs_board",113,5989,0,0,null],["background_jobs_board",112,634,0,0,null]]],["a",0,64,[["background_jobs_output",33,190,0,0,null],["background_jobs_output",33,190,0,0,null],["background_jobs_output",33,190,0,0,null]]],["a",0,31,[["bash",316,7158,0,0,null]]],["a",0,63,[["background_jobs_board",140,3270,0,0,null],["background_jobs_board",139,2866,0,0,null],["background_jobs_board",137,2453,0,0,null]]],["a",0,71,[["bash",339,1586,0,0,null]]],["a",0,48,[["bash",323,6989,0,0,null]]],["a",327,180,[]],["u",1505,0,"goal"],["a",0,32,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1270,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,635,0,0,null]]],["a",0,0,[["bash",311,7100,0,0,null]]],["a",0,208,[["ai_accounts_quota",2,4454,0,0,null]]],["a",0,59,[["bash",301,5980,0,0,null],["bash",299,7773,0,0,null],["bash",299,6556,0,0,null]]],["a",277,186,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,390,0,0,null],["jj_thread_status",61,1274,0,0,null],["list_thread_questions",71,362,0,0,null],["background_jobs_board",89,1181,0,0,null]]],["a",0,26,[["bash",308,7568,0,0,null]]],["a",0,27,[["background_jobs_wait",54,478,0,0,null]]],["a",0,30,[["background_jobs_output",33,190,0,0,null]]],["a",0,28,[["bash",323,702,0,0,null]]],["a",0,67,[["jj_thread_status",61,1274,0,0,null],["thread_list",39,390,0,0,null],["get_goal",2,1099,0,0,null],["ai_accounts_quota",2,4454,0,0,null]]],["a",0,122,[["bash",357,955,0,0,null]]],["a",0,58,[["thread_list",50,92,0,0,null],["jj_thread_status",61,1274,0,0,null],["ai_accounts_serving_account",60,48,0,1,null]]],["a",0,168,[["jj_thread_rebase",79,1061,0,0,null]]],["a",0,130,[["jj_thread_repositories",2,2480,0,0,null],["jj_thread_status",61,536,0,0,null],["jj_graph_navigation",49,3148,0,0,null],["thread_list",39,387,0,0,null]]],["u",253,0,"time-context"],["a",0,637,[["jj_thread_workspace_sync",2,7230,0,0,null],["jj_workspaces",49,381,0,0,null],["jj_load",59,114,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["a",0,560,[["skill",23,4973,0,0,"dsh-sessions"]]],["a",0,66,[["bash",683,1091,0,0,null]]],["a",0,97,[["bash",259,737,0,0,null]]],["a",0,30,[["bash",333,10270,0,0,null]]],["a",0,617,[["project_list",2,1169,0,0,null],["thread_local_model_state",2,246,0,0,null]]],["a",0,226,[["thread_prompt",783,73,0,0,null],["thread_create",807,137,0,0,null],["thread_create",762,139,0,0,null]]],["a",0,25,[["thread_list",39,602,0,0,null],["jj_thread_repositories",2,2505,0,0,null],["list_thread_questions",12,321,0,0,null],["background_jobs_board",30,32105,0,0,null]]],["a",0,91,[["jj_thread_refresh_repositories",2,44,0,0,null]]],["a",0,28,[["bash",452,10470,0,0,null]]],["a",0,169,[["bash",592,8409,0,0,null]]],["a",0,290,[["jj_thread_status",61,367,0,0,null],["jj_thread_status",61,367,0,0,null],["jj_thread_status",61,367,0,0,null]]],["a",0,254,[["read",113,1280,0,0,null],["read",115,1148,0,0,null],["read",117,1196,0,0,null]]],["a",0,240,[["read",129,3985,0,0,null],["read",136,8069,0,0,null]]],["a",0,29,[["read",137,4047,0,0,null]]],["a",0,359,[["activity_timeline_attention",12,8611,0,0,null]]],["a",0,150,[["activity_timeline_page",76,112,0,0,null]]],["a",0,539,[["jj_details",103,18,0,0,null]]],["a",0,30,[["ask_user_question",720,429,0,0,null]]],["u",249,0,"time-context"],["a",0,118,[["list_thread_questions",12,1584,0,0,null],["thread_list",39,593,0,0,null],["jj_thread_status",61,559,0,0,null],["jj_thread_status",61,549,0,0,null],["jj_thread_status",61,562,0,0,null],["background_jobs_board",89,632,0,0,null]]],["a",0,168,[["bash",596,14314,0,0,null]]],["a",0,203,[["bash",504,1815,0,0,null]]],["a",0,144,[["bash",688,3941,0,0,null]]],["a",0,99,[["skill",28,5786,0,0,"dsh-plugin-verify"]]],["a",0,125,[["jj_details",103,49,0,0,null],["jj_details",103,49,0,0,null],["jj_details",103,49,0,0,null]]],["a",0,0,[["jj_register_repository",61,89,0,0,null],["jj_register_repository",61,89,0,0,null],["jj_register_repository",61,89,0,0,null]]],["a",0,20,[["jj_details",103,124,0,0,null],["jj_details",103,7528,0,0,null],["jj_details",103,4924,0,0,null]]],["a",0,190,[["bash",333,1605,0,0,null]]],["a",0,733,[["read",113,1459,0,0,null],["bash",468,4552,0,0,null]]],["a",0,114,[["bash",960,1551,0,0,null]]],["a",0,274,[["bash",285,145,0,0,null]]],["a",0,67,[["bash",344,2184,0,0,null]]],["a",0,324,[["grep",187,17,0,0,null]]],["a",0,115,[["grep",84,23365,0,0,null]]],["a",0,36,[["grep",123,17,0,0,null]]],["a",0,61,[["grep",73,3353,0,0,null],["grep",75,1233,0,0,null],["grep",77,1439,0,0,null]]],["a",0,288,[["bash",1228,5971,0,0,null]]],["a",0,394,[["bash",814,6117,0,0,null]]],["a",0,159,[["bash",298,41,0,0,null]]],["a",0,307,[["bash",1199,3701,0,0,null]]],["a",0,357,[["bash",289,41,0,0,null]]],["a",0,63,[["grep",67,5582,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["a",0,464,[["thread_prompt",1000,73,0,0,null]]],["a",0,71,[["bash",526,382,0,0,null]]],["a",0,104,[["thread_prompt",681,73,0,0,null]]],["a",0,27,[["bash",403,557,0,0,null]]],["u",248,0,"time-context"],["a",0,85,[["todo_write",651,57,0,0,null]]],["a",0,175,[["bash",840,19350,0,0,null]]],["a",0,95,[["read",122,6536,0,0,null]]],["a",0,516,[["ai_accounts_quota",2,4454,0,0,null]]],["a",0,331,[["thread_create",1008,135,0,0,null]]],["a",0,152,[["get_goal",2,1099,0,0,null],["thread_list",39,699,0,0,null],["list_thread_questions",71,1625,0,0,null],["jj_thread_status",61,536,0,0,null],["jj_thread_status",61,559,0,0,null],["jj_thread_status",63,48,0,1,null]]],["a",0,168,[["bash",621,12567,0,0,null]]],["a",0,129,[["bash",229,283,0,0,null]]],["a",0,130,[["todo_write",769,57,0,0,null]]],["a",0,23,[["bash",564,58,0,0,null]]],["a",0,58,[["bash",413,292,0,0,null]]],["a",0,283,[["thread_create",1012,134,0,0,null]]],["a",0,25,[["todo_write",841,57,0,0,null]]],["a",0,185,[["bash",461,6150,0,0,null]]],["a",0,165,[["thread_create",937,131,0,0,null]]],["a",0,58,[["todo_write",920,57,0,0,null]]],["a",0,87,[["list_thread_questions",71,362,0,0,null],["list_thread_questions",71,362,0,0,null],["thread_local_model_state",60,54,0,1,null],["thread_local_model_state",60,54,0,1,null],["thread_local_model_state",60,54,0,1,null]]],["a",0,94,[["bash",324,2227,0,0,null]]],["a",0,156,[["send_message",722,96,0,1,null]]],["a",0,93,[["thread_prompt",720,60,0,0,null]]],["a",1097,410,[]],["u",876,0,"schedule"],["a",0,376,[["answer_thread_question",256,254,0,0,null]]],["u",979,0,"user-question-reply"],["a",0,546,[["get_goal",2,1099,0,0,null],["list_thread_questions",71,362,0,0,null],["thread_list",39,900,0,0,null],["background_jobs_board",104,32763,0,0,null]]],["a",0,97,[["list_thread_questions",13,322,0,0,null]]],["a",0,35,[["bash",490,10031,0,0,null]]],["a",0,501,[["thread_prompt",248,60,0,0,null]]],["a",0,58,[["bash",465,3971,0,0,null]]],["a",0,102,[["bash",309,1016,0,0,null]]],["a",0,172,[["todo_write",903,57,0,0,null]]],["a",0,22,[["todo_write",1032,57,0,0,null]]],["a",0,109,[["background_jobs_output",33,4835,0,0,null],["background_jobs_output",33,190,0,0,null]]],["u",253,0,"time-context"],["a",0,164,[["skill",29,1848,0,0,"focused-validation"]]],["a",0,130,[["read",115,3762,0,0,null],["read",130,4568,0,0,null],["read",136,2023,0,0,null]]],["a",0,57,[["thread_prompt",632,60,0,0,null]]],["a",0,138,[["bash",503,15477,0,0,null]]],["a",0,256,[["background_jobs_board",89,635,0,0,null],["background_jobs_board",89,631,0,0,null],["list_thread_questions",13,322,0,0,null],["thread_list",39,900,0,0,null]]],["u",13795,0,"skill-catalog"],["a",0,69,[["skill",23,4973,0,0,"dsh-sessions"]]],["a",0,242,[["thread_list",39,894,0,0,null],["list_thread_questions",13,322,0,0,null],["background_jobs_board",104,32016,0,0,null],["thread_attention_state",2,49929,0,0,null]]],["a",0,125,[["bash",468,13252,0,0,null]]],["a",0,228,[["bash",489,6639,0,0,null]]],["a",0,51,[["read",136,2228,0,0,null],["read",143,989,0,0,null],["jj_thread_status",61,552,0,0,null]]],["a",0,160,[["skill",28,5786,0,0,"dsh-plugin-verify"],["skill",28,1353,0,0,"bug-investigation"]]],["a",0,56,[["bash",233,1034,0,0,null]]],["a",0,240,[["jj_thread_status",61,716,0,0,null]]],["a",0,61,[["jj_details",103,2544,0,0,null],["read",134,4769,0,0,null],["read",137,5994,0,0,null]]],["a",0,650,[["bash",1210,2254,0,0,null]]],["a",0,254,[["bash",344,21,0,0,null]]],["a",0,250,[["todo_write",1109,57,0,0,null]]],["a",0,153,[["bash",220,686,0,0,null]]],["a",0,195,[["bash",400,9320,0,0,null]]],["u",249,0,"time-context"],["a",0,1125,[["thread_references",71,300,0,0,null],["thread_references",71,211,0,0,null],["thread_references",71,391,0,0,null],["thread_references",71,211,0,0,null]]],["a",0,65,[["bash",316,106,0,0,null]]],["a",0,109,[["bash",220,283,0,0,null]]],["a",1383,523,[]],["u",1505,0,"goal"],["a",0,32,[["get_goal",2,1099,0,0,null],["thread_list",39,894,0,0,null],["list_thread_questions",13,322,0,0,null],["background_jobs_board",104,31849,0,0,null],["jj_thread_repositories",2,3274,0,0,null]]],["a",0,73,[["bash",410,9932,0,0,null]]],["a",0,421,[["ai_accounts_quota",2,4454,0,0,null]]],["a",0,77,[["thread_list",38,19,0,0,null]]],["a",0,67,[["thread_create",920,135,0,0,null]]],["a",0,26,[["todo_write",1103,57,0,0,null]]],["a",0,60,[["background_jobs_board",133,11582,0,0,null]]],["a",0,159,[["bash",332,2207,0,0,null]]],["a",0,64,[["bash",317,2588,0,0,null]]],["a",860,295,[]],["u",1505,0,"goal"],["a",0,29,[["get_goal",2,1099,0,0,null],["thread_list",39,997,0,0,null],["list_thread_questions",13,322,0,0,null],["background_jobs_board",104,31855,0,0,null],["jj_thread_repositories",2,3423,0,0,null]]],["a",0,35,[["bash",446,12956,0,0,null]]],["a",0,164,[["bash",318,5019,0,0,null]]],["a",0,61,[["thread_prompt",556,60,0,0,null]]],["a",846,371,[]],["u",1505,0,"goal"],["a",0,28,[["get_goal",2,1099,0,0,null],["thread_list",39,997,0,0,null],["list_thread_questions",13,322,0,0,null],["jj_thread_repositories",2,3423,0,0,null]]],["a",0,27,[["bash",439,12015,0,0,null]]],["a",0,62,[["background_jobs_board",116,3269,0,0,null]]],["a",0,26,[["bash",340,1733,0,0,null]]],["a",0,225,[["background_jobs_board",89,983,0,0,null],["background_jobs_board",89,632,0,0,null],["background_jobs_board",89,635,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["a",0,236,[["background_jobs_output",33,190,0,0,null]]],["a",0,169,[["bash",238,6451,0,0,null]]],["u",252,0,"time-context"],["a",0,329,[["background_jobs_wait",73,277,0,0,null]]],["a",542,141,[]],["u",1505,0,"goal"],["a",0,29,[["get_goal",2,1099,0,0,null],["thread_list",39,997,0,0,null],["list_thread_questions",13,322,0,0,null],["background_jobs_board",104,32598,0,0,null],["jj_thread_repositories",2,3412,0,0,null]]],["a",0,61,[["bash",450,12611,0,0,null]]],["a",0,216,[["background_jobs_board",89,955,0,0,null],["background_jobs_board",89,633,0,0,null],["background_jobs_board",89,1267,0,0,null]]],["a",0,272,[["jj_graph_navigation",49,3134,0,0,null],["jj_load",59,92,0,0,null]]],["a",0,267,[["read",98,10529,0,0,null],["read",101,6017,0,0,null],["jj_working_diff",49,0,0,0,null]]],["a",0,416,[["apply_patch",3326,123,0,0,null]]],["a",0,114,[["bash",305,1815,0,0,null]]],["a",0,436,[["read",120,2419,0,0,null],["bash",270,4476,0,0,null]]],["a",0,584,[["apply_patch",3326,123,0,0,null]]],["a",0,29,[["bash",207,723,0,0,null]]],["a",0,312,[["background_jobs_wait",100,695,0,0,null]]],["a",0,24,[["background_jobs_output",33,190,0,0,null],["background_jobs_output",33,190,0,0,null]]],["a",0,31,[["bash",453,13935,0,0,null]]],["a",0,243,[["bash",484,2033,0,0,null],["ai_accounts_quota",2,4454,0,0,null],["jj_thread_status",61,553,0,0,null],["jj_thread_status",61,561,0,0,null]]],["a",0,169,[["ai_accounts",2,978,0,0,null],["agents_list",2,2534,0,0,null],["jj_thread_projects",2,1009,0,0,null]]],["a",0,155,[["thread_list",52,19,0,0,null],["thread_list",51,19,0,0,null]]],["a",0,54,[["thread_create",867,32,0,1,null],["thread_create",865,32,0,1,null]]],["a",0,124,[["thread_list",39,991,0,0,null]]],["a",0,157,[["thread_create",94,100,0,0,null]]],["a",0,31,[["thread_select_model",133,101,0,0,null]]],["a",0,24,[["thread_prompt",813,73,0,0,null]]],["a",0,25,[["thread_create",93,99,0,0,null]]],["a",0,21,[["thread_select_model",133,101,0,0,null]]],["a",0,22,[["thread_prompt",812,73,0,0,null]]],["a",0,271,[["thread_list",39,1190,0,0,null],["list_thread_questions",13,322,0,0,null],["thread_dev_servers",60,31,0,0,null],["thread_dev_servers",60,31,0,0,null],["thread_dev_servers",60,31,0,0,null]]],["a",0,164,[["bash",426,49931,0,0,null]]],["a",0,186,[["background_jobs_board",143,12900,0,0,null],["background_jobs_board",143,10813,0,0,null],["jj_thread_status",61,549,0,0,null],["jj_thread_status",61,553,0,0,null],["jj_thread_status",61,561,0,0,null]]],["a",0,108,[["jj_details",103,125,0,0,null],["jj_details",103,126,0,0,null]]],["a",0,25,[["jj_revision_files",106,290,0,0,null],["jj_revision_files",106,416,0,0,null]]],["a",0,222,[["bash",407,1812,0,0,null]]],["a",0,395,[["bash",446,10625,0,0,null]]],["u",253,0,"time-context"],["a",0,73,[["bash",398,7294,0,0,null]]],["a",0,159,[["list_thread_questions",13,322,0,0,null],["background_jobs_board",110,31831,0,0,null],["jj_thread_repositories",2,3716,0,0,null]]],["u",13795,0,"skill-catalog"],["a",0,28,[["skill",23,4973,0,0,"dsh-sessions"]]],["a",0,34,[["skill",28,5786,0,0,"dsh-plugin-verify"]]],["a",1058,344,[]],["u",1505,0,"goal"],["a",0,33,[["get_goal",2,1099,0,0,null],["thread_list",39,1187,0,0,null],["list_thread_questions",13,322,0,0,null],["ai_accounts_quota",2,4454,0,0,null],["jj_thread_repositories",2,3708,0,0,null],["background_jobs_board",110,32165,0,0,null]]],["a",0,188,[["dshx_comm_agents",2,2769,0,0,null]]],["a",0,374,[["todo_write",848,57,0,0,null]]],["a",0,58,[["background_jobs_wait",72,309,0,0,null]]],["a",0,0,[["bash",311,3587,0,0,null]]],["a",0,259,[["background_jobs_board",89,631,0,0,null],["background_jobs_board",89,632,0,0,null],["background_jobs_board",89,633,0,0,null]]],["a",676,166,[]],["u",1505,0,"goal"],["a",0,33,[["get_goal",2,1099,0,0,null],["thread_list",39,1187,0,0,null],["list_thread_questions",13,322,0,0,null],["jj_thread_repositories",2,3697,0,0,null],["background_jobs_board",110,31732,0,0,null]]],["a",0,282,[["bash",400,7555,0,0,null]]],["a",0,221,[["background_jobs_board",89,630,0,0,null]]],["a",0,61,[["dshx_comm_agents",2,2772,0,0,null]]],["a",626,141,[]],["u",1505,0,"goal"],["a",0,32,[["get_goal",2,1099,0,0,null],["thread_list",39,1190,0,0,null],["list_thread_questions",13,322,0,0,null],["jj_thread_repositories",2,3697,0,0,null],["background_jobs_board",110,31732,0,0,null]]],["a",0,28,[["bash",447,12975,0,0,null]]],["a",0,155,[["background_jobs_board",143,8258,0,0,null],["jj_thread_status",61,549,0,0,null],["ai_accounts_quota",2,4454,0,0,null],["thread_list",57,19,0,0,null]]],["a",0,70,[["thread_create",99,105,0,0,null]]],["a",0,30,[["thread_select_model",133,101,0,0,null]]],["a",0,0,[["thread_prompt",818,73,0,0,null]]],["a",0,48,[["todo_write",980,57,0,0,null]]],["a",0,95,[["jj_graph_navigation",49,3134,0,0,null]]],["a",0,244,[["thread_list",39,1292,0,0,null],["thread_local_model_state",60,54,0,1,null],["list_thread_questions",13,322,0,0,null]]],["a",619,128,[]],["u",1505,0,"goal"],["a",0,29,[["get_goal",2,1099,0,0,null],["thread_list",39,1292,0,0,null],["list_thread_questions",13,322,0,0,null],["jj_thread_repositories",2,3846,0,0,null],["background_jobs_board",110,31732,0,0,null]]],["a",0,28,[["bash",448,11952,0,0,null]]],["a",722,1269,[]],["u",1505,0,"goal"],["a",0,0,[["get_goal",2,1099,0,0,null],["thread_list",39,1292,0,0,null],["list_thread_questions",13,322,0,0,null],["background_jobs_board",110,31686,0,0,null],["jj_thread_repositories",2,3846,0,0,null]]],["u",253,0,"time-context"],["a",0,64,[["bash",445,11390,0,0,null]]],["a",0,235,[["thread_prompt",575,60,0,0,null]]],["a",0,313,[["thread_prompt",460,60,0,0,null]]],["a",588,134,[]],["u",1505,0,"goal"],["a",0,20,[["get_goal",2,1099,0,0,null],["thread_list",39,1292,0,0,null],["list_thread_questions",13,322,0,0,null],["jj_thread_repositories",2,3846,0,0,null],["background_jobs_board",110,31618,0,0,null]]],["a",0,20,[["bash",442,11907,0,0,null]]],["a",0,29,[["bash",409,8825,0,0,null]]],["u",49871,0,"agent-instructions"],["u",800,0,"runtime-context"],["u",13795,0,"skill-catalog"],["a",0,22,[["skill",23,4973,0,0,"dsh-sessions"]]],["a",0,0,[["skill",28,5786,0,0,"dsh-plugin-verify"]]],["a",0,89,[["background_jobs_board",133,6128,0,0,null],["background_jobs_board",133,7684,0,0,null],["background_jobs_board",133,4709,0,0,null],["jj_thread_status",61,549,0,0,null],["jj_thread_status",61,550,0,0,null],["jj_thread_status",61,505,0,0,null]]],["a",851,277,[]],["u",1505,0,"goal"],["a",0,28,[["get_goal",2,0,0,0,null],["thread_list",39,0,0,0,null],["list_thread_questions",13,0,0,0,null],["jj_thread_repositories",2,0,0,0,null],["background_jobs_board",110,0,0,0,null]]]]}
+{
+  "name": "tool-heavy",
+  "kind": "long tool-heavy coding thread",
+  "source": "session-284fe9d9-7f37-4937-9dd6-6b4974729e3f",
+  "route": { "provider": "codex-alex2", "model": "gpt-6-luna", "contextWindow": 272000 },
+  "systemChars": 8363,
+  "tools": [
+    ["activity_timeline_attention", 373],
+    ["activity_timeline_event", 286],
+    ["activity_timeline_page", 1250],
+    ["activity_timeline_related", 334],
+    ["activity_timeline_stats", 216],
+    ["agents_get", 235],
+    ["agents_list", 181],
+    ["agents_remove", 315],
+    ["agents_save", 1082],
+    ["agents_threads", 256],
+    ["ai_accounts", 230],
+    ["ai_accounts_begin_copilot_login", 382],
+    ["ai_accounts_begin_login", 670],
+    ["ai_accounts_cancel_copilot_login", 372],
+    ["ai_accounts_cancel_login", 482],
+    ["ai_accounts_catalog", 235],
+    ["ai_accounts_collect_usage", 267],
+    ["ai_accounts_complete_connection", 303],
+    ["ai_accounts_configure_connection", 686],
+    ["ai_accounts_connection", 247],
+    ["ai_accounts_continuations", 259],
+    ["ai_accounts_copilot_login_status", 256],
+    ["ai_accounts_create_setup_account", 467],
+    ["ai_accounts_discard_connection", 409],
+    ["ai_accounts_dismiss_continuation", 402],
+    ["ai_accounts_fast_mode_history", 315],
+    ["ai_accounts_fast_mode_status", 459],
+    ["ai_accounts_history", 288],
+    ["ai_accounts_identity", 335],
+    ["ai_accounts_import_connection_key", 517],
+    ["ai_accounts_login_status", 321],
+    ["ai_accounts_move_account", 330],
+    ["ai_accounts_native_providers", 199],
+    ["ai_accounts_prepare_connection", 534],
+    ["ai_accounts_preview_thread_switch", 515],
+    ["ai_accounts_pricing_status", 199],
+    ["ai_accounts_quota", 264],
+    ["ai_accounts_refresh_pricing", 242],
+    ["ai_accounts_refresh_quota", 224],
+    ["ai_accounts_remove_custom_model", 441],
+    ["ai_accounts_reorder_account", 525],
+    ["ai_accounts_resume_continuation", 488],
+    ["ai_accounts_save_account", 1373],
+    ["ai_accounts_serving_account", 546],
+    ["ai_accounts_set_auto_retry", 365],
+    ["ai_accounts_set_distribution", 374],
+    ["ai_accounts_set_fast_mode", 498],
+    ["ai_accounts_set_native_provider", 365],
+    ["ai_accounts_sign_out", 527],
+    ["ai_accounts_sign_out_capability", 353],
+    ["ai_accounts_snooze_continuation", 419],
+    ["ai_accounts_switch_thread", 861],
+    ["annotations_ack", 348],
+    ["annotations_dismiss", 372],
+    ["annotations_intake", 290],
+    ["annotations_list", 467],
+    ["annotations_reply", 409],
+    ["annotations_resolve", 448],
+    ["annotations_source", 353],
+    ["answer_parent_question", 607],
+    ["answer_thread_question", 968],
+    ["apply_patch", 1140],
+    ["ask_parent_question", 1433],
+    ["ask_user_question", 1705],
+    ["background_jobs_board", 1034],
+    ["background_jobs_kill", 513],
+    ["background_jobs_output", 509],
+    ["background_jobs_refresh", 259],
+    ["background_jobs_wait", 812],
+    ["backlog_accept_proposal", 410],
+    ["backlog_attach_file", 713],
+    ["backlog_capture", 1431],
+    ["backlog_comment", 1037],
+    ["backlog_delete", 543],
+    ["backlog_dismiss_proposal", 355],
+    ["backlog_enrich_tweet", 439],
+    ["backlog_get", 303],
+    ["backlog_get_many", 509],
+    ["backlog_link", 866],
+    ["backlog_list", 1742],
+    ["backlog_projects", 222],
+    ["backlog_read_file", 488],
+    ["backlog_referencing", 621],
+    ["backlog_remove_file", 384],
+    ["backlog_start_thread", 1685],
+    ["backlog_triage", 347],
+    ["backlog_triage_backfill", 773],
+    ["backlog_triage_backfill_status", 253],
+    ["backlog_update", 1111],
+    ["bash", 2280],
+    ["cancel_parent_feedback", 274],
+    ["chat_resume_interrupted", 305],
+    ["chat_retry_failed_turn", 423],
+    ["chat_stopped_turn_status", 363],
+    ["complete_blocked_goal", 589],
+    ["create_goal", 577],
+    ["dsh_release_status", 298],
+    ["dshx_capabilities", 501],
+    ["dshx_comm_ack", 238],
+    ["dshx_comm_agents", 475],
+    ["dshx_comm_browse", 419],
+    ["dshx_comm_diagnostics", 303],
+    ["dshx_comm_history", 914],
+    ["dshx_comm_inbox", 392],
+    ["dshx_comm_publish", 1131],
+    ["dshx_comm_recipients", 257],
+    ["dshx_comm_send", 1058],
+    ["dshx_comm_subscribe", 347],
+    ["dshx_comm_topics", 207],
+    ["dshx_comm_unsubscribe", 313],
+    ["dshx_comm_workspace", 472],
+    ["edit", 1151],
+    ["editor_write", 732],
+    ["exit_plan_mode", 472],
+    ["extend_goal_budget", 996],
+    ["find_threads", 1867],
+    ["get_goal", 170],
+    ["get_parent_feedback", 352],
+    ["git_thread_worktree_remove", 525],
+    ["git_thread_worktrees", 263],
+    ["glob", 593],
+    ["grep", 749],
+    ["hmr_gate_status", 205],
+    ["html_preview", 1058],
+    ["html_render", 1357],
+    ["html_render_screenshot", 945],
+    ["interrupt_agent", 514],
+    ["jj_confirm_action", 352],
+    ["jj_details", 246],
+    ["jj_edit_times", 408],
+    ["jj_graph_navigation", 236],
+    ["jj_graph_page", 334],
+    ["jj_graph_slice", 364],
+    ["jj_load", 286],
+    ["jj_open_repository", 398],
+    ["jj_prepare_action", 3944],
+    ["jj_reference_graph", 367],
+    ["jj_register_repository", 243],
+    ["jj_revision_files", 322],
+    ["jj_revision_relationship", 373],
+    ["jj_thread_cleanup", 1576],
+    ["jj_thread_cleanup_jobs", 303],
+    ["jj_thread_destination", 426],
+    ["jj_thread_discard", 420],
+    ["jj_thread_discard_many", 724],
+    ["jj_thread_isolate", 621],
+    ["jj_thread_projects", 313],
+    ["jj_thread_rebase", 812],
+    ["jj_thread_refresh_repositories", 277],
+    ["jj_thread_repositories", 397],
+    ["jj_thread_review_history", 284],
+    ["jj_thread_status", 471],
+    ["jj_thread_workspace_sync", 304],
+    ["jj_working_diff", 226],
+    ["jj_workspaces", 261],
+    ["job_kill", 370],
+    ["job_list", 168],
+    ["job_output", 615],
+    ["list_agents", 661],
+    ["list_subagent_models", 756],
+    ["list_thread_questions", 1291],
+    ["loopback_access_status", 219],
+    ["mcp_endpoint_revoke_token", 341],
+    ["mcp_endpoint_set_lan_access", 300],
+    ["mcp_endpoint_status", 250],
+    ["mcp_list_servers", 243],
+    ["mcp_refresh_servers", 287],
+    ["mcp_remove_server", 258],
+    ["mcp_save_server", 1438],
+    ["mcp_search_registry", 261],
+    ["mcp_set_connection", 348],
+    ["mcp_set_preferences", 620],
+    ["mcp_set_server_enabled", 308],
+    ["mcp_sign_out_server", 269],
+    ["memory_archive_note", 320],
+    ["memory_citations", 468],
+    ["memory_edit_note", 540],
+    ["memory_forget_note", 332],
+    ["memory_note", 1712],
+    ["memory_note_counts", 283],
+    ["memory_note_history", 265],
+    ["memory_notes", 566],
+    ["memory_projects", 186],
+    ["memory_read", 612],
+    ["memory_restore_note", 255],
+    ["memory_review_notes", 494],
+    ["memory_search", 794],
+    ["memory_start_block", 355],
+    ["memory_thread_detail", 251],
+    ["memory_threads", 436],
+    ["memory_usage", 525],
+    ["model_fallback_state", 408],
+    ["model_handoff_context_window", 347],
+    ["multi_host_browse", 325],
+    ["multi_host_checkout_sync", 467],
+    ["multi_host_clone_project", 698],
+    ["multi_host_create_thread", 362],
+    ["multi_host_doctor", 494],
+    ["multi_host_exec", 429],
+    ["multi_host_find_homes", 302],
+    ["multi_host_forget_thread", 378],
+    ["multi_host_identity", 156],
+    ["multi_host_list", 252],
+    ["multi_host_local_project_files", 412],
+    ["multi_host_mkdir", 329],
+    ["multi_host_models", 342],
+    ["multi_host_open_folder", 380],
+    ["multi_host_provision", 990],
+    ["multi_host_reconnect", 285],
+    ["multi_host_remove_host", 368],
+    ["multi_host_remove_runtime", 271],
+    ["multi_host_reorder_hosts", 341],
+    ["multi_host_resource_pool", 207],
+    ["multi_host_resource_snapshot", 169],
+    ["multi_host_runtime_control", 560],
+    ["multi_host_runtime_logs", 332],
+    ["multi_host_runtime_status", 329],
+    ["multi_host_save_ssh_host", 425],
+    ["multi_host_set_host_hidden", 376],
+    ["multi_host_ssh_hosts", 203],
+    ["multi_host_start_thread", 617],
+    ["multi_host_status", 390],
+    ["multi_host_test", 393],
+    ["multi_host_thread_reply", 463],
+    ["multi_host_thread_stop", 379],
+    ["multi_host_thread_transcript", 390],
+    ["multi_host_threads", 194],
+    ["network_access_save", 597],
+    ["network_access_settings", 234],
+    ["policies_list", 227],
+    ["policy_check", 275],
+    ["present", 777],
+    ["preview_click", 740],
+    ["preview_close", 547],
+    ["preview_evaluate", 695],
+    ["preview_list", 296],
+    ["preview_navigate", 650],
+    ["preview_open", 776],
+    ["preview_reveal", 470],
+    ["preview_screenshot", 478],
+    ["preview_snapshot", 670],
+    ["preview_type", 846],
+    ["project_checks_actions", 283],
+    ["project_checks_cancel", 372],
+    ["project_checks_dispatch", 496],
+    ["project_checks_hook_events", 276],
+    ["project_checks_receipts", 314],
+    ["project_checks_retry", 499],
+    ["project_checks_run", 480],
+    ["project_checks_tasks", 278],
+    ["project_clone", 565],
+    ["project_clone_cancel", 415],
+    ["project_clone_jobs", 244],
+    ["project_create", 682],
+    ["project_delete", 326],
+    ["project_list", 203],
+    ["project_register", 300],
+    ["project_rename", 308],
+    ["project_reorder", 362],
+    ["project_tools_status", 255],
+    ["prompt_stash_state", 161],
+    ["pulls_review", 803],
+    ["queue_describe", 257],
+    ["queue_move", 560],
+    ["read", 438],
+    ["read_image", 389],
+    ["reference_attach", 451],
+    ["reference_detach", 379],
+    ["reference_remove", 397],
+    ["reference_save", 610],
+    ["references_list", 340],
+    ["related_threads", 812],
+    ["resolve_parent_feedback", 547],
+    ["return_to_selected_model", 319],
+    ["schedule_create", 3143],
+    ["schedule_delete", 295],
+    ["schedule_list", 137],
+    ["schedule_update", 2403],
+    ["secret_get", 512],
+    ["secret_list", 280],
+    ["secret_reference_status", 1016],
+    ["send_message", 527],
+    ["session_redo", 388],
+    ["session_search_health", 512],
+    ["session_undo", 528],
+    ["session_undo_history", 337],
+    ["session_warming_status", 322],
+    ["set_model_fallback_chain", 630],
+    ["set_model_fallback_return", 402],
+    ["settings_list", 474],
+    ["settings_set", 468],
+    ["settings_unset", 403],
+    ["skill", 332],
+    ["subagent", 2117],
+    ["subagent_fork", 1268],
+    ["submit_markdown_feedback", 700],
+    ["thread_archive", 731],
+    ["thread_attention_state", 194],
+    ["thread_auto_settle_status", 332],
+    ["thread_continue_in", 862],
+    ["thread_create", 889],
+    ["thread_dev_server_stop", 782],
+    ["thread_dev_servers", 451],
+    ["thread_fork", 370],
+    ["thread_list", 476],
+    ["thread_local_model_state", 329],
+    ["thread_move", 471],
+    ["thread_pin", 306],
+    ["thread_prompt", 590],
+    ["thread_queue_edit", 455],
+    ["thread_queue_remove", 349],
+    ["thread_queue_steer", 373],
+    ["thread_references", 456],
+    ["thread_rename", 303],
+    ["thread_select_local_model", 798],
+    ["thread_select_model", 441],
+    ["thread_settle", 467],
+    ["thread_stop", 345],
+    ["thread_unarchive", 278],
+    ["thread_unpin", 234],
+    ["thread_unsettle", 271],
+    ["thread_view_create", 728],
+    ["thread_view_delete", 333],
+    ["thread_view_get", 242],
+    ["thread_view_move", 344],
+    ["thread_view_select", 381],
+    ["thread_view_update", 707],
+    ["thread_views_list", 213],
+    ["todo_write", 856],
+    ["traces_alert_delete", 475],
+    ["traces_alert_mute", 441],
+    ["traces_alert_save", 2740],
+    ["traces_alerts", 554],
+    ["traces_alerts_evaluate", 303],
+    ["traces_breakdown", 2072],
+    ["traces_clear", 417],
+    ["traces_error_groups", 471],
+    ["traces_get", 387],
+    ["traces_get_metric", 636],
+    ["traces_list_metrics", 605],
+    ["traces_list_services", 619],
+    ["traces_search", 1566],
+    ["traces_search_logs", 1713],
+    ["traces_service_map", 466],
+    ["traces_session_summary", 725],
+    ["traces_status", 394],
+    ["tweet_context", 1183],
+    ["update_goal", 984],
+    ["usage_activity_report", 2035],
+    ["usage_jev_report", 518],
+    ["usage_otel_metrics", 744],
+    ["usage_reindex", 247],
+    ["usage_report", 1197],
+    ["usage_requests", 1107],
+    ["usage_status", 209],
+    ["web_fetch", 242],
+    ["web_search", 323],
+    ["workflow", 3389],
+    ["working_directory", 360],
+    ["workspace_folder_browser_create_directory", 327],
+    ["workspace_folder_browser_list", 252],
+    ["worktree_memory_pressure", 240],
+    ["worktree_memory_snapshot", 407],
+    ["worktree_memory_stop", 1005],
+    ["write", 854]
+  ],
+  "events": [
+    ["u", 38, 0, "user"],
+    ["u", 49527, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13932, 0, "skill-catalog"],
+    ["u", 260, 0, "time-context"],
+    ["a", 0, 0, [["skill", 23, 12575, 0, 0, "jj-linearize"]]],
+    ["a", 0, 28, [["create_goal", 163, 288, 0, 0, null]]],
+    ["a", 0, 0, [["bash", 175, 413, 0, 0, null]]],
+    ["a", 0, 29, [["skill", 21, 9537, 0, 0, "jj-recover"]]],
+    ["a", 0, 30, [["bash", 354, 5279, 0, 0, null]]],
+    ["u", 94, 0, "user"],
+    ["a", 0, 65, [["bash", 464, 2321, 0, 0, null]]],
+    ["a", 0, 28, [["read", 76, 14047, 0, 0, null]]],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["bash", 533, 2987, 0, 0, null],
+        ["thread_list", 13, 10749, 0, 0, null],
+        ["jj_load", 32, 102, 0, 1, null]
+      ]
+    ],
+    ["a", 0, 31, [["bash", 380, 1528, 0, 0, null]]],
+    ["a", 0, 0, [["glob", 88, 72, 0, 0, null]]],
+    ["a", 0, 0, [["read", 104, 10668, 0, 0, null]]],
+    ["a", 0, 66, [["bash", 381, 2616, 0, 0, null]]],
+    ["a", 0, 291, [["ask_user_question", 896, 116, 0, 0, null]]],
+    ["a", 614, 150, []],
+    ["u", 694, 0, "goal"],
+    ["a", 0, 66, [["get_goal", 2, 288, 0, 0, null]]],
+    ["a", 0, 31, [["update_goal", 86, 76, 0, 1, null]]],
+    ["a", 0, 29, [["bash", 561, 3076, 0, 0, null]]],
+    ["a", 0, 61, [["bash", 342, 535, 0, 0, null]]],
+    [
+      "a",
+      0,
+      72,
+      [
+        ["bash", 868, 2289, 0, 0, null],
+        ["thread_list", 32, 532, 0, 0, null],
+        ["thread_list", 31, 4787, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 147, [["read", 80, 1329, 0, 0, null]]],
+    ["a", 0, 152, [["bash", 484, 178, 0, 0, null]]],
+    ["a", 0, 71, [["bash", 390, 2601, 0, 0, null]]],
+    ["a", 538, 159, []],
+    ["u", 694, 0, "goal"],
+    [
+      "a",
+      0,
+      37,
+      [
+        ["bash", 392, 2601, 0, 0, null],
+        ["thread_list", 31, 4787, 0, 0, null],
+        ["bash", 286, 2412, 0, 0, null]
+      ]
+    ],
+    ["a", 495, 186, []],
+    ["u", 694, 0, "goal"],
+    ["a", 0, 26, [["bash", 417, 4817, 0, 0, null]]],
+    ["a", 0, 50, [["update_goal", 350, 590, 0, 0, null]]],
+    ["u", 959, 0, "tool-goal"],
+    ["a", 669, 33, []],
+    ["u", 354, 0, "user"],
+    ["a", 0, 32, [["get_goal", 2, 590, 0, 0, null]]],
+    ["a", 0, 0, [["update_goal", 86, 288, 0, 0, null]]],
+    ["a", 0, 81, [["skill", 23, 4973, 0, 0, "dsh-sessions"]]],
+    ["a", 0, 133, [["todo_write", 404, 57, 0, 0, null]]],
+    ["a", 0, 0, [["working_directory", 2, 50, 0, 0, null]]],
+    [
+      "a",
+      0,
+      30,
+      [
+        ["bash", 428, 2894, 0, 0, null],
+        ["thread_list", 31, 4796, 0, 0, null],
+        ["glob", 92, 15, 0, 0, null],
+        ["glob", 83, 23, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      69,
+      [
+        ["read", 76, 29539, 0, 0, null],
+        ["read", 68, 14038, 0, 0, null],
+        ["bash", 353, 1503, 0, 0, null]
+      ]
+    ],
+    ["u", 251, 0, "time-context"],
+    ["a", 0, 55, [["bash", 411, 11131, 0, 0, null]]],
+    [
+      "a",
+      0,
+      236,
+      [
+        ["glob", 65, 49, 0, 0, null],
+        ["glob", 77, 15, 0, 0, null],
+        ["glob", 76, 15, 0, 0, null],
+        ["thread_list", 32, 532, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      25,
+      [
+        ["read", 70, 17874, 0, 0, null],
+        ["grep", 131, 1076, 0, 0, null],
+        ["jj_thread_status", 2, 383, 0, 0, null],
+        ["jj_graph_navigation", 49, 75, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 159, [["read", 112, 3137, 0, 0, null]]],
+    [
+      "a",
+      0,
+      167,
+      [
+        ["dshx_comm_agents", 2, 1864, 0, 0, null],
+        ["jj_register_repository", 39, 67, 0, 0, null],
+        ["bash", 147, 2551, 0, 0, null],
+        ["read", 116, 2320, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      160,
+      [
+        ["bash", 254, 241, 0, 0, null],
+        ["bash", 266, 241, 0, 0, null],
+        ["bash", 267, 417, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 316, [["bash", 511, 4040, 0, 0, null]]],
+    ["a", 0, 131, [["bash", 209, 2991, 0, 0, null]]],
+    ["a", 0, 54, [["bash", 382, 350, 0, 0, null]]],
+    ["a", 0, 209, [["todo_write", 406, 57, 0, 0, null]]],
+    ["u", 82, 0, "user"],
+    ["a", 0, 110, [["bash", 378, 2341, 0, 0, null]]],
+    ["a", 0, 25, [["bash", 343, 3888, 0, 0, null]]],
+    ["a", 0, 39, [["bash", 505, 4183, 0, 0, null]]],
+    [
+      "a",
+      0,
+      125,
+      [
+        ["bash", 156, 178, 0, 0, null],
+        ["bash", 157, 464, 0, 0, null],
+        ["bash", 156, 301, 0, 0, null],
+        ["bash", 160, 388, 0, 0, null],
+        ["bash", 165, 170, 0, 0, null],
+        ["bash", 157, 166, 0, 0, null],
+        ["bash", 164, 235, 0, 0, null],
+        ["bash", 160, 174, 0, 0, null],
+        ["bash", 160, 356, 0, 0, null],
+        ["bash", 158, 318, 0, 0, null],
+        ["bash", 152, 513, 0, 0, null],
+        ["bash", 152, 166, 0, 0, null],
+        ["bash", 151, 325, 0, 0, null],
+        ["bash", 155, 176, 0, 0, null],
+        ["bash", 155, 193, 0, 0, null],
+        ["bash", 158, 191, 0, 0, null],
+        ["bash", 139, 191, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 249, [["read", 77, 501, 0, 0, null]]],
+    ["a", 0, 147, [["bash", 519, 3622, 0, 0, null]]],
+    ["a", 0, 157, [["bash", 631, 814, 0, 0, null]]],
+    ["a", 0, 26, [["bash", 627, 651, 0, 0, null]]],
+    ["a", 0, 36, [["bash", 630, 833, 0, 0, null]]],
+    [
+      "a",
+      0,
+      59,
+      [
+        ["bash", 312, 200, 0, 0, null],
+        ["bash", 233, 53, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 37, [["jj_register_repository", 61, 89, 0, 0, null]]],
+    ["a", 0, 0, [["jj_details", 103, 124, 0, 0, null]]],
+    ["a", 0, 31, [["jj_revision_files", 106, 220, 0, 0, null]]],
+    ["a", 0, 72, [["bash", 196, 49930, 0, 0, null]]],
+    ["a", 0, 155, [["bash", 319, 651, 0, 0, null]]],
+    ["a", 0, 56, [["grep", 187, 457, 0, 0, null]]],
+    ["a", 0, 25, [["read", 155, 4427, 0, 0, null]]],
+    ["a", 0, 131, [["bash", 473, 3989, 0, 0, null]]],
+    ["a", 0, 26, [["grep", 166, 484, 0, 0, null]]],
+    ["a", 0, 0, [["read", 134, 2619, 0, 0, null]]],
+    ["a", 0, 31, [["apply_patch", 3967, 165, 0, 0, null]]],
+    ["a", 0, 78, [["bash", 520, 895, 0, 0, null]]],
+    [
+      "a",
+      0,
+      58,
+      [
+        ["bash", 355, 862, 0, 0, null],
+        ["bash", 165, 602, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 26, [["bash", 380, 350, 0, 0, null]]],
+    ["a", 0, 49, [["bash", 622, 520, 0, 0, null]]],
+    ["a", 0, 54, [["bash", 612, 516, 0, 0, null]]],
+    ["a", 0, 23, [["bash", 625, 585, 0, 0, null]]],
+    ["a", 0, 28, [["bash", 624, 628, 0, 0, null]]],
+    ["a", 0, 27, [["bash", 313, 331, 0, 0, null]]],
+    ["a", 0, 28, [["bash", 159, 670, 0, 0, null]]],
+    ["a", 0, 67, [["bash", 582, 922, 0, 0, null]]],
+    ["a", 0, 19, [["grep", 170, 473, 0, 0, null]]],
+    ["a", 0, 0, [["read", 139, 5398, 0, 0, null]]],
+    ["a", 0, 26, [["apply_patch", 7636, 217, 0, 1, null]]],
+    ["a", 0, 68, [["apply_patch", 504, 169, 0, 0, null]]],
+    ["a", 0, 29, [["bash", 497, 915, 0, 0, null]]],
+    ["a", 0, 27, [["bash", 380, 350, 0, 0, null]]],
+    ["a", 0, 29, [["bash", 622, 707, 0, 0, null]]],
+    ["a", 0, 29, [["bash", 614, 669, 0, 0, null]]],
+    ["a", 0, 33, [["bash", 622, 864, 0, 0, null]]],
+    ["a", 0, 27, [["bash", 622, 517, 0, 0, null]]],
+    ["a", 0, 63, [["bash", 621, 676, 0, 0, null]]],
+    ["u", 247, 0, "time-context"],
+    ["a", 0, 20, [["bash", 625, 527, 0, 0, null]]],
+    ["a", 0, 138, [["bash", 565, 527, 0, 0, null]]],
+    ["a", 0, 25, [["bash", 618, 544, 0, 0, null]]],
+    ["a", 0, 64, [["bash", 632, 542, 0, 0, null]]],
+    ["a", 0, 24, [["bash", 607, 542, 0, 0, null]]],
+    ["a", 0, 93, [["read", 106, 4640, 0, 0, null]]],
+    [
+      "a",
+      0,
+      262,
+      [
+        ["glob", 59, 36, 0, 0, null],
+        ["bash", 271, 1904, 0, 0, null],
+        ["bash", 424, 564, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 337, [["jj_register_repository", 37, 65, 0, 0, null]]],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["glob", 74, 15, 0, 0, null],
+        ["read", 76, 2691, 0, 0, null],
+        ["bash", 269, 1006, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 32, [["grep", 116, 217, 0, 0, null]]],
+    [
+      "a",
+      0,
+      267,
+      [
+        ["bash", 298, 518, 0, 0, null],
+        ["bash", 295, 502, 0, 0, null],
+        ["bash", 279, 2654, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 62, [["bash", 587, 535, 0, 0, null]]],
+    ["a", 0, 122, [["read", 75, 1363, 0, 0, null]]],
+    ["a", 0, 187, [["bash", 340, 537, 0, 0, null]]],
+    ["a", 0, 33, [["read", 95, 1383, 0, 0, null]]],
+    ["a", 0, 18, [["apply_patch", 913, 119, 0, 0, null]]],
+    ["a", 0, 29, [["bash", 515, 546, 0, 0, null]]],
+    [
+      "a",
+      0,
+      245,
+      [
+        ["bash", 449, 2144, 0, 0, null],
+        ["read", 90, 6762, 0, 0, null],
+        ["read", 91, 5026, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 57, [["grep", 143, 201, 0, 0, null]]],
+    ["a", 0, 22, [["read", 100, 3106, 0, 0, null]]],
+    ["a", 0, 63, [["bash", 145, 271, 0, 0, null]]],
+    ["a", 0, 28, [["apply_patch", 1485, 123, 0, 0, null]]],
+    ["u", 27779, 0, "agent-instructions"],
+    ["a", 0, 31, [["bash", 305, 529, 0, 0, null]]],
+    ["a", 0, 0, [["read", 132, 1652, 0, 0, null]]],
+    ["a", 0, 67, [["apply_patch", 2088, 155, 0, 0, null]]],
+    [
+      "a",
+      0,
+      405,
+      [
+        ["bash", 220, 44, 0, 0, null],
+        ["bash", 225, 44, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 64, [["bash", 528, 3673, 0, 0, null]]],
+    ["u", 206, 0, "tool-jobs"],
+    ["a", 0, 46, [["job_output", 34, 3183, 0, 0, null]]],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["job_output", 34, 149, 0, 0, null],
+        ["bash", 410, 430, 0, 0, null],
+        ["thread_list", 31, 3677, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 158, [["jj_register_repository", 61, 89, 0, 0, null]]],
+    ["a", 0, 0, [["jj_prepare_action", 160, 195, 0, 0, null]]],
+    ["a", 0, 31, [["jj_confirm_action", 100, 25, 0, 0, null]]],
+    ["a", 0, 355, [["bash", 440, 200, 0, 0, null]]],
+    ["a", 0, 30, [["background_jobs_wait", 73, 300, 0, 0, null]]],
+    ["u", 202, 0, "tool-jobs"],
+    ["a", 0, 26, [["job_output", 34, 7405, 0, 0, null]]],
+    ["a", 0, 458, [["bash", 315, 7086, 0, 0, null]]],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    [
+      "a",
+      0,
+      69,
+      [
+        ["skill", 23, 12575, 0, 0, "jj-linearize"],
+        ["skill", 28, 1353, 0, 0, "bug-investigation"],
+        ["skill", 29, 1848, 0, 0, "focused-validation"]
+      ]
+    ],
+    ["a", 0, 425, [["bash", 660, 602, 0, 0, null]]],
+    [
+      "a",
+      0,
+      327,
+      [
+        ["bash", 147, 510, 0, 0, null],
+        ["bash", 146, 282, 0, 0, null],
+        ["bash", 150, 194, 0, 0, null],
+        ["bash", 147, 315, 0, 0, null],
+        ["bash", 148, 320, 0, 0, null],
+        ["bash", 150, 384, 0, 0, null],
+        ["bash", 141, 1074, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      56,
+      [
+        ["skill", 33, 7064, 0, 0, "afk-thread-supervision"],
+        ["skill", 23, 4973, 0, 0, "dsh-sessions"]
+      ]
+    ],
+    [
+      "a",
+      0,
+      92,
+      [
+        ["get_goal", 2, 288, 0, 0, null],
+        ["activity_timeline_attention", 12, 17970, 0, 0, null],
+        ["dshx_comm_agents", 2, 1861, 0, 0, null],
+        ["dshx_comm_inbox", 12, 27, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 59, [["bash", 508, 12754, 0, 0, null]]],
+    ["a", 0, 605, [["bash", 455, 2334, 0, 0, null]]],
+    ["u", 249, 0, "time-context"],
+    ["a", 0, 338, [["jj_prepare_action", 160, 196, 0, 0, null]]],
+    ["a", 0, 32, [["jj_revision_relationship", 163, 2196, 0, 0, null]]],
+    ["a", 0, 19, [["jj_confirm_action", 100, 25, 0, 0, null]]],
+    ["a", 0, 318, [["bash", 623, 1115, 0, 0, null]]],
+    ["a", 0, 75, [["bash", 503, 303, 0, 0, null]]],
+    ["a", 0, 352, [["todo_write", 355, 57, 0, 0, null]]],
+    ["a", 0, 25, [["update_goal", 88, 293, 0, 0, null]]],
+    ["a", 0, 761, [["bash", 315, 3645, 0, 0, null]]],
+    ["a", 0, 216, [["bash", 235, 325, 0, 0, null]]],
+    ["a", 1289, 258, []],
+    ["u", 725, 0, "user"],
+    [
+      "a",
+      0,
+      52,
+      [
+        ["skill", 33, 7064, 0, 0, "afk-thread-supervision"],
+        ["skill", 23, 4973, 0, 0, "dsh-sessions"],
+        ["skill", 23, 12575, 0, 0, "jj-linearize"]
+      ]
+    ],
+    [
+      "a",
+      0,
+      84,
+      [
+        ["create_goal", 597, 722, 0, 0, null],
+        ["todo_write", 496, 57, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["glob", 85, 96, 0, 0, null],
+        ["grep", 145, 3535, 0, 0, null],
+        ["memory_search", 71, 2749, 0, 0, null],
+        ["ai_accounts", 2, 978, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      59,
+      [
+        ["read", 121, 25928, 0, 0, null],
+        ["ai_accounts_refresh_quota", 2, 2623, 0, 0, null],
+        ["ai_accounts_catalog", 28, 798, 0, 0, null],
+        ["ai_accounts_catalog", 30, 725, 0, 0, null],
+        ["working_directory", 2, 50, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 119, [["read", 122, 10596, 0, 0, null]]],
+    [
+      "a",
+      0,
+      767,
+      [
+        ["project_list", 2, 1169, 0, 0, null],
+        ["grep", 147, 102, 0, 0, null],
+        ["jj_thread_status", 2, 383, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 33, [["read", 136, 9863, 0, 0, null]]],
+    ["a", 0, 186, [["skill", 35, 1613, 0, 0, "add-reference-repository"]]],
+    ["a", 0, 74, [["thread_create", 90, 96, 0, 0, null]]],
+    ["a", 0, 0, [["thread_select_model", 133, 101, 0, 0, null]]],
+    ["a", 0, 58, [["thread_prompt", 1117, 73, 0, 0, null]]],
+    [
+      "a",
+      0,
+      87,
+      [
+        ["glob", 108, 3514, 0, 0, null],
+        ["grep", 133, 17, 0, 0, null],
+        ["glob", 97, 45, 0, 0, null],
+        ["thread_list", 39, 95, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 49, [["read", 136, 775, 0, 0, null]]],
+    ["a", 0, 28, [["grep", 124, 17, 0, 0, null]]],
+    ["a", 0, 61, [["grep", 113, 26396, 0, 0, null]]],
+    ["a", 0, 39, [["grep", 128, 17, 0, 0, null]]],
+    ["a", 0, 31, [["grep", 126, 160, 0, 0, null]]],
+    ["a", 0, 65, [["todo_write", 616, 57, 0, 0, null]]],
+    ["a", 0, 28, [["read", 122, 18909, 0, 0, null]]],
+    ["a", 0, 64, [["grep", 101, 7360, 0, 0, null]]],
+    ["a", 0, 124, [["grep", 125, 6884, 0, 0, null]]],
+    [
+      "a",
+      0,
+      660,
+      [
+        ["thread_create", 96, 102, 0, 0, null],
+        ["thread_create", 96, 102, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      31,
+      [
+        ["thread_select_model", 131, 99, 0, 0, null],
+        ["thread_select_model", 133, 101, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      77,
+      [
+        ["thread_prompt", 871, 73, 0, 0, null],
+        ["thread_prompt", 869, 73, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      478,
+      [
+        ["thread_list", 39, 299, 0, 0, null],
+        ["thread_local_model_state", 60, 54, 0, 1, null],
+        ["thread_local_model_state", 60, 54, 0, 1, null],
+        ["thread_local_model_state", 60, 54, 0, 1, null],
+        ["dshx_comm_agents", 2, 2077, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["dshx_comm_workspace", 60, 22, 0, 0, null],
+        ["dshx_comm_workspace", 60, 22, 0, 0, null],
+        ["dshx_comm_workspace", 60, 22, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 66, [["jj_thread_repositories", 2, 5211, 0, 0, null]]],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 252, 0, "time-context"],
+    [
+      "a",
+      0,
+      155,
+      [
+        ["thread_list", 39, 296, 0, 0, null],
+        ["jj_thread_repositories", 2, 5211, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      90,
+      [
+        ["bash", 734, 10228, 0, 0, null],
+        ["jj_thread_refresh_repositories", 2, 31, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 157, [["read", 121, 7158, 0, 0, null]]],
+    ["a", 0, 246, [["schedule_create", 738, 888, 0, 0, null]]],
+    [
+      "a",
+      0,
+      150,
+      [
+        ["bash", 314, 547, 0, 0, null],
+        ["bash", 314, 485, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      357,
+      [
+        ["read", 133, 127, 0, 1, null],
+        ["read", 110, 9387, 0, 0, null],
+        ["grep", 109, 17, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      634,
+      [
+        ["glob", 91, 1265, 0, 0, null],
+        ["grep", 110, 17, 0, 0, null],
+        ["glob", 105, 3009, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 508, [["todo_write", 655, 57, 0, 0, null]]],
+    ["a", 0, 566, [["todo_write", 676, 57, 0, 0, null]]],
+    ["a", 1026, 248, []],
+    ["u", 1128, 0, "goal"],
+    [
+      "a",
+      0,
+      59,
+      [
+        ["get_goal", 2, 722, 0, 0, null],
+        ["thread_list", 39, 293, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32305, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      246,
+      [
+        ["bash", 329, 49931, 0, 0, null],
+        ["bash", 329, 49931, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 257, [["ai_accounts_refresh_quota", 2, 2623, 0, 0, null]]],
+    ["a", 811, 120, []],
+    ["u", 1128, 0, "goal"],
+    [
+      "a",
+      0,
+      24,
+      [
+        ["get_goal", 2, 722, 0, 0, null],
+        ["thread_list", 39, 293, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32305, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 32, [["bash", 304, 6552, 0, 0, null]]],
+    ["a", 0, 217, [["todo_write", 785, 57, 0, 0, null]]],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["read", 121, 10286, 0, 0, null],
+        ["read", 122, 6840, 0, 0, null],
+        ["skill", 28, 5786, 0, 0, "dsh-plugin-verify"]
+      ]
+    ],
+    ["a", 0, 199, [["jj_register_repository", 39, 67, 0, 0, null]]],
+    ["a", 0, 0, [["jj_workspaces", 49, 310, 0, 0, null]]],
+    ["u", 251, 0, "time-context"],
+    ["a", 0, 27, [["bash", 371, 330, 0, 0, null]]],
+    ["a", 0, 29, [["bash", 369, 475, 0, 0, null]]],
+    ["a", 0, 51, [["bash", 305, 18, 0, 0, null]]],
+    ["a", 0, 250, [["thread_create", 94, 100, 0, 0, null]]],
+    ["a", 0, 21, [["thread_select_model", 131, 99, 0, 0, null]]],
+    ["a", 0, 33, [["thread_prompt", 730, 73, 0, 0, null]]],
+    [
+      "a",
+      0,
+      60,
+      [
+        ["thread_list", 39, 393, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["schedule_list", 2, 890, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 67, [["todo_write", 836, 57, 0, 0, null]]],
+    ["a", 718, 165, []],
+    ["u", 1128, 0, "goal"],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["get_goal", 2, 722, 0, 0, null],
+        ["thread_list", 39, 393, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      40,
+      [
+        ["bash", 311, 5654, 0, 0, null],
+        ["bash", 301, 2226, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 383, [["ai_accounts_refresh_quota", 2, 2623, 0, 0, null]]],
+    ["a", 651, 63, []],
+    ["u", 233, 0, "user"],
+    [
+      "a",
+      0,
+      296,
+      [
+        ["get_goal", 2, 722, 0, 0, null],
+        ["skill", 19, 3910, 0, 0, "antislop"],
+        ["skill", 36, 1583, 0, 0, "read-reference-repository"],
+        ["project_list", 2, 1169, 0, 0, null],
+        ["memory_search", 84, 2477, 0, 0, null]
+      ]
+    ],
+    ["u", 13795, 0, "skill-catalog"],
+    [
+      "a",
+      0,
+      150,
+      [
+        ["skill", 33, 7064, 0, 0, "afk-thread-supervision"],
+        ["skill", 23, 4973, 0, 0, "dsh-sessions"],
+        ["read", 88, 3515, 0, 0, null],
+        ["get_goal", 2, 722, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 30, [["update_goal", 1035, 1098, 0, 0, null]]],
+    [
+      "a",
+      0,
+      129,
+      [
+        ["glob", 61, 38, 0, 0, null],
+        ["glob", 60, 37, 0, 0, null],
+        ["glob", 61, 38, 0, 0, null],
+        ["glob", 60, 15, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      24,
+      [
+        ["read", 77, 17874, 0, 0, null],
+        ["read", 76, 17196, 0, 0, null],
+        ["read", 77, 356, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 179, [["todo_write", 999, 57, 0, 0, null]]],
+    ["a", 0, 25, [["skill", 22, 3029, 0, 0, "ast-outline"]]],
+    [
+      "a",
+      0,
+      63,
+      [
+        ["glob", 63, 15, 0, 0, null],
+        ["glob", 62, 1288, 0, 0, null],
+        ["glob", 63, 231, 0, 0, null],
+        ["glob", 65, 15, 0, 0, null],
+        ["glob", 64, 141, 0, 0, null],
+        ["glob", 65, 44, 0, 0, null],
+        ["grep", 152, 702, 0, 0, null],
+        ["grep", 151, 34058, 0, 0, null],
+        ["grep", 152, 4021, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      144,
+      [
+        ["glob", 92, 15, 0, 0, null],
+        ["glob", 63, 4106, 0, 0, null],
+        ["glob", 70, 2328, 0, 0, null],
+        ["glob", 65, 88, 0, 0, null],
+        ["glob", 63, 231, 0, 0, null],
+        ["glob", 64, 237, 0, 0, null],
+        ["glob", 63, 15, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 100, [["bash", 366, 3752, 0, 0, null]]],
+    [
+      "a",
+      0,
+      290,
+      [
+        ["bash", 410, 6989, 0, 0, null],
+        ["read", 81, 7890, 0, 0, null],
+        ["glob", 69, 2328, 0, 0, null],
+        ["glob", 84, 69, 0, 0, null],
+        ["read", 101, 805, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      267,
+      [
+        ["glob", 59, 36, 0, 0, null],
+        ["glob", 63, 15, 0, 0, null],
+        ["glob", 55, 156, 0, 1, null],
+        ["glob", 72, 1521, 0, 0, null],
+        ["glob", 93, 96, 0, 0, null],
+        ["grep", 126, 612, 0, 0, null],
+        ["grep", 75, 3681, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      468,
+      [
+        ["read", 75, 10261, 0, 0, null],
+        ["glob", 61, 1658, 0, 0, null],
+        ["read", 86, 3692, 0, 0, null],
+        ["read", 79, 1308, 0, 0, null],
+        ["bash", 356, 3917, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      583,
+      [
+        ["glob", 84, 28, 0, 0, null],
+        ["grep", 136, 2899, 0, 0, null],
+        ["glob", 90, 397, 0, 0, null],
+        ["bash", 621, 3130, 0, 0, null],
+        ["read", 85, 1883, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      155,
+      [
+        ["read", 104, 4222, 0, 0, null],
+        ["read", 101, 4518, 0, 0, null],
+        ["glob", 93, 927, 0, 0, null],
+        ["read", 114, 1070, 0, 0, null],
+        ["grep", 143, 1917, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      255,
+      [
+        ["thread_list", 39, 390, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      63,
+      [
+        ["bash", 305, 5001, 0, 0, null],
+        ["bash", 297, 2931, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 118, [["bash", 263, 1710, 0, 0, null]]],
+    ["a", 0, 35, [["bash", 322, 88, 0, 0, null]]],
+    ["a", 0, 26, [["bash", 322, 49931, 0, 0, null]]],
+    ["a", 0, 144, [["thread_prompt", 1039, 60, 0, 0, null]]],
+    ["a", 0, 112, [["todo_write", 1032, 57, 0, 0, null]]],
+    ["a", 1168, 306, []],
+    ["u", 79, 0, "user"],
+    [
+      "a",
+      0,
+      88,
+      [
+        ["get_goal", 2, 1098, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["schedule_list", 2, 890, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 31, [["bash", 308, 6300, 0, 0, null]]],
+    ["a", 377, 313, []],
+    ["u", 1504, 0, "goal"],
+    ["u", 252, 0, "time-context"],
+    [
+      "a",
+      0,
+      30,
+      [
+        ["get_goal", 2, 1098, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["schedule_list", 2, 890, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 26, [["bash", 304, 6538, 0, 0, null]]],
+    ["a", 0, 52, [["bash", 333, 1142, 0, 0, null]]],
+    ["a", 0, 648, [["subagent", 810, 53, 0, 0, null]]],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    ["a", 0, 34, [["skill", 33, 7064, 0, 0, "afk-thread-supervision"]]],
+    [
+      "a",
+      0,
+      61,
+      [
+        ["skill", 23, 4973, 0, 0, "dsh-sessions"],
+        ["skill", 23, 12575, 0, 0, "jj-linearize"]
+      ]
+    ],
+    [
+      "a",
+      0,
+      217,
+      [
+        ["ai_accounts_refresh_quota", 2, 2623, 0, 0, null],
+        ["bash", 267, 402, 0, 0, null],
+        ["list_agents", 20, 78, 0, 0, null]
+      ]
+    ],
+    ["u", 3817, 0, "agent-message"],
+    ["a", 0, 304, [["skill", 22, 3029, 0, 0, "ast-outline"]]],
+    ["u", 447, 0, "subagent-settled"],
+    ["a", 0, 30, [["bash", 232, 910, 0, 0, null]]],
+    ["a", 0, 27, [["bash", 334, 20994, 0, 0, null]]],
+    [
+      "a",
+      0,
+      776,
+      [
+        ["glob", 108, 3514, 0, 0, null],
+        ["grep", 135, 17, 0, 0, null],
+        ["glob", 110, 549, 0, 0, null],
+        ["glob", 105, 3009, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      38,
+      [
+        ["grep", 171, 17, 0, 0, null],
+        ["bash", 451, 243, 0, 0, null],
+        ["list_agents", 20, 79, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["read", 136, 775, 0, 0, null],
+        ["read", 134, 653, 0, 0, null],
+        ["read", 136, 1131, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 66, [["grep", 139, 221, 0, 0, null]]],
+    ["a", 0, 25, [["grep", 124, 17, 0, 0, null]]],
+    ["a", 0, 109, [["todo_write", 1174, 57, 0, 0, null]]],
+    ["a", 0, 207, [["grep", 97, 28757, 0, 0, null]]],
+    ["a", 0, 154, [["bash", 725, 6503, 0, 0, null]]],
+    ["a", 750, 612, []],
+    ["u", 1504, 0, "goal"],
+    [
+      "a",
+      0,
+      33,
+      [
+        ["get_goal", 2, 1098, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 665, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 63, [["bash", 304, 5820, 0, 0, null]]],
+    ["a", 561, 247, []],
+    ["u", 1504, 0, "goal"],
+    [
+      "a",
+      0,
+      35,
+      [
+        ["get_goal", 2, 1098, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 22, [["bash", 306, 6193, 0, 0, null]]],
+    ["a", 0, 154, [["bash", 329, 1337, 0, 0, null]]],
+    ["a", 380, 94, []],
+    ["u", 1504, 0, "goal"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1098, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 30, [["bash", 312, 5894, 0, 0, null]]],
+    ["a", 0, 111, [["skill", 19, 3910, 0, 0, "antislop"]]],
+    [
+      "a",
+      0,
+      59,
+      [
+        ["read", 104, 4708, 0, 0, null],
+        ["read", 137, 529, 0, 0, null],
+        ["bash", 319, 577, 0, 0, null],
+        ["grep", 151, 2191, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 309, [["read", 122, 1201, 0, 0, null]]],
+    ["a", 492, 402, []],
+    ["u", 1504, 0, "goal"],
+    [
+      "a",
+      0,
+      26,
+      [
+        ["get_goal", 2, 1098, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 22, [["bash", 313, 6053, 0, 0, null]]],
+    ["a", 350, 314, []],
+    ["u", 1504, 0, "goal"],
+    [
+      "a",
+      0,
+      30,
+      [
+        ["get_goal", 2, 1098, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 24, [["bash", 306, 6311, 0, 0, null]]],
+    ["u", 252, 0, "time-context"],
+    [
+      "a",
+      0,
+      109,
+      [
+        ["jj_thread_status", 61, 1036, 0, 0, null],
+        ["bash", 331, 2514, 0, 0, null]
+      ]
+    ],
+    ["a", 386, 254, []],
+    ["u", 1505, 0, "goal"],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    [
+      "a",
+      0,
+      56,
+      [
+        ["skill", 33, 7064, 0, 0, "afk-thread-supervision"],
+        ["skill", 23, 4973, 0, 0, "dsh-sessions"],
+        ["skill", 29, 1848, 0, 0, "focused-validation"]
+      ]
+    ],
+    [
+      "a",
+      0,
+      60,
+      [
+        ["bash", 299, 6240, 0, 0, null],
+        ["jj_thread_status", 61, 1078, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 210, [["skill", 23, 12575, 0, 0, "jj-linearize"]]],
+    [
+      "a",
+      0,
+      118,
+      [
+        ["jj_details", 103, 3714, 0, 0, null],
+        ["jj_details", 103, 126, 0, 0, null],
+        ["jj_details", 103, 122, 0, 0, null],
+        ["jj_details", 103, 125, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 324, [["thread_dev_servers", 60, 31, 0, 0, null]]],
+    ["a", 0, 66, [["bash", 243, 1597, 0, 0, null]]],
+    ["a", 0, 114, [["jj_thread_status", 61, 1270, 0, 0, null]]],
+    ["a", 316, 393, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      31,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 31, [["bash", 313, 6201, 0, 0, null]]],
+    ["a", 0, 262, [["jj_thread_status", 61, 1270, 0, 0, null]]],
+    ["a", 435, 145, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      26,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2371, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 309, 6403, 0, 0, null]]],
+    ["a", 0, 78, [["bash", 211, 1697, 0, 0, null]]],
+    ["a", 359, 154, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2371, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 665, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 21, [["bash", 313, 6388, 0, 0, null]]],
+    ["a", 0, 207, [["todo_write", 1257, 57, 0, 0, null]]],
+    ["a", 408, 97, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      30,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2371, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 665, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 311, 6327, 0, 0, null]]],
+    ["a", 0, 127, [["bash", 240, 3658, 0, 0, null]]],
+    ["a", 361, 163, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      25,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2371, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 666, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 24, [["bash", 312, 6452, 0, 0, null]]],
+    ["a", 302, 119, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      23,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 666, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 311, 6549, 0, 0, null]]],
+    ["a", 331, 246, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      22,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 666, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 24, [["bash", 310, 7021, 0, 0, null]]],
+    ["a", 0, 125, [["background_jobs_board", 30, 32230, 0, 0, null]]],
+    ["a", 0, 148, [["jj_thread_status", 61, 1270, 0, 0, null]]],
+    ["a", 305, 55, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 666, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 305, 7673, 0, 0, null]]],
+    ["a", 343, 85, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      32,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 666, 0, 0, null]
+      ]
+    ],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    ["u", 252, 0, "time-context"],
+    [
+      "a",
+      0,
+      62,
+      [
+        ["skill", 33, 7064, 0, 0, "afk-thread-supervision"],
+        ["skill", 23, 4973, 0, 0, "dsh-sessions"],
+        ["skill", 23, 12575, 0, 0, "jj-linearize"]
+      ]
+    ],
+    ["a", 0, 63, [["bash", 308, 7720, 0, 0, null]]],
+    ["a", 301, 165, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      30,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 28, [["bash", 320, 8130, 0, 0, null]]],
+    ["a", 272, 64, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      26,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 28, [["bash", 313, 8346, 0, 0, null]]],
+    ["a", 326, 149, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      30,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_repositories", 2, 2371, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 318, 9107, 0, 0, null]]],
+    ["a", 0, 119, [["thread_prompt", 605, 60, 0, 0, null]]],
+    ["a", 304, 57, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      32,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 33, [["bash", 318, 8219, 0, 0, null]]],
+    ["a", 275, 166, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      20,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 311, 8163, 0, 0, null]]],
+    ["a", 260, 57, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      33,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 27, [["bash", 298, 7904, 0, 0, null]]],
+    ["a", 291, 57, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 23, [["bash", 306, 8378, 0, 0, null]]],
+    ["a", 320, 27, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 13, [["bash", 303, 7963, 0, 0, null]]],
+    ["a", 277, 32, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 22, [["bash", 304, 8190, 0, 0, null]]],
+    ["a", 307, 57, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      18,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 13, [["bash", 309, 8391, 0, 0, null]]],
+    ["a", 319, 28, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      33,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 317, 9092, 0, 0, null]]],
+    ["a", 0, 28, [["skill", 23, 5701, 0, 0, "traces-first"]]],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["traces_status", 2, 899, 0, 0, null],
+        ["traces_session_summary", 60, 741, 0, 0, null],
+        ["traces_search", 88, 613, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      55,
+      [
+        ["traces_get", 46, 49930, 0, 0, null],
+        ["traces_get", 46, 41, 0, 1, null],
+        ["traces_error_groups", 32, 7593, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      156,
+      [
+        ["traces_search", 89, 31, 0, 0, null],
+        ["traces_search", 94, 31, 0, 0, null],
+        ["traces_search", 109, 31, 0, 0, null]
+      ]
+    ],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    ["a", 0, 69, [["grep", 210, 669, 0, 0, null]]],
+    ["a", 0, 119, [["bash", 716, 5978, 0, 0, null]]],
+    ["a", 0, 195, [["bash", 317, 7474, 0, 0, null]]],
+    [
+      "a",
+      0,
+      59,
+      [
+        ["traces_session_summary", 60, 748, 0, 0, null],
+        ["traces_search", 88, 614, 0, 0, null],
+        ["traces_search", 112, 31, 0, 0, null]
+      ]
+    ],
+    ["a", 313, 193, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      32,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 28, [["bash", 311, 8811, 0, 0, null]]],
+    ["a", 0, 112, [["thread_prompt", 476, 60, 0, 0, null]]],
+    ["a", 226, 44, []],
+    ["u", 1505, 0, "goal"],
+    ["u", 252, 0, "time-context"],
+    [
+      "a",
+      0,
+      26,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 13, [["bash", 296, 8109, 0, 0, null]]],
+    ["a", 236, 80, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      26,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 16, [["bash", 313, 8127, 0, 0, null]]],
+    ["a", 0, 122, [["thread_prompt", 479, 60, 0, 0, null]]],
+    ["a", 277, 25, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 306, 7553, 0, 0, null]]],
+    ["a", 0, 55, [["skill", 23, 5701, 0, 0, "traces-first"]]],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["traces_status", 2, 898, 0, 0, null],
+        ["traces_session_summary", 60, 750, 0, 0, null],
+        ["traces_search", 88, 615, 0, 0, null],
+        ["traces_search", 92, 31, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 63, [["bash", 320, 7684, 0, 0, null]]],
+    ["a", 0, 66, [["thread_prompt", 495, 60, 0, 0, null]]],
+    ["a", 309, 38, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      22,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 21, [["bash", 315, 8414, 0, 0, null]]],
+    ["a", 310, 95, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 308, 8510, 0, 0, null]]],
+    ["a", 297, 66, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      25,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 322, 9214, 0, 0, null]]],
+    ["a", 0, 60, [["skill", 23, 5701, 0, 0, "traces-first"]]],
+    [
+      "a",
+      0,
+      26,
+      [
+        ["traces_status", 2, 898, 0, 0, null],
+        ["traces_session_summary", 60, 758, 0, 0, null],
+        ["traces_search", 88, 614, 0, 0, null],
+        ["traces_search", 87, 331, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 31, [["traces_get", 46, 49930, 0, 0, null]]],
+    ["a", 0, 27, [["bash", 665, 1302, 0, 0, null]]],
+    ["a", 0, 25, [["bash", 303, 7018, 0, 0, null]]],
+    ["a", 248, 62, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 24, [["bash", 321, 8841, 0, 0, null]]],
+    ["a", 0, 85, [["dshx_comm_agents", 2, 2141, 0, 0, null]]],
+    ["a", 308, 54, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      30,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 154, [["bash", 311, 7744, 0, 0, null]]],
+    ["a", 317, 58, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      33,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["jj_thread_repositories", 2, 2311, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 61, [["bash", 311, 9384, 0, 0, null]]],
+    ["a", 238, 33, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      18,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32230, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 23, [["bash", 300, 8652, 0, 0, null]]],
+    ["a", 279, 0, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      30,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32611, 0, 0, null]
+      ]
+    ],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["skill", 33, 7064, 0, 0, "afk-thread-supervision"],
+        ["skill", 23, 4973, 0, 0, "dsh-sessions"],
+        ["skill", 38, 1550, 0, 0, "generated-artifact-workflow"]
+      ]
+    ],
+    ["a", 0, 52, [["bash", 312, 9617, 0, 0, null]]],
+    ["a", 0, 26, [["skill", 23, 5701, 0, 0, "traces-first"]]],
+    [
+      "a",
+      0,
+      24,
+      [
+        ["traces_status", 2, 899, 0, 0, null],
+        ["traces_session_summary", 60, 751, 0, 0, null],
+        ["traces_search", 88, 616, 0, 0, null]
+      ]
+    ],
+    ["a", 250, 61, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      21,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 634, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 20, [["bash", 305, 10118, 0, 0, null]]],
+    ["a", 0, 59, [["skill", 23, 5701, 0, 0, "traces-first"]]],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["traces_status", 2, 898, 0, 0, null],
+        ["traces_session_summary", 60, 750, 0, 0, null],
+        ["traces_search", 88, 616, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 65, [["bash", 334, 3651, 0, 0, null]]],
+    ["a", 0, 76, [["background_jobs_board", 113, 1671, 0, 0, null]]],
+    ["a", 0, 29, [["background_jobs_output", 33, 1599, 0, 0, null]]],
+    ["a", 0, 89, [["thread_prompt", 421, 60, 0, 0, null]]],
+    ["a", 256, 62, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      32,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 9416, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["background_jobs_output", 33, 1694, 0, 0, null]]],
+    ["a", 0, 26, [["bash", 309, 6785, 0, 0, null]]],
+    [
+      "a",
+      0,
+      79,
+      [
+        ["ai_accounts", 2, 978, 0, 0, null],
+        ["ai_accounts_quota", 2, 4454, 0, 0, null],
+        ["ai_accounts_continuations", 2, 911, 0, 0, null]
+      ]
+    ],
+    ["u", 252, 0, "time-context"],
+    ["a", 0, 135, [["background_jobs_board", 113, 2194, 0, 0, null]]],
+    ["a", 0, 114, [["thread_prompt", 390, 60, 0, 0, null]]],
+    ["a", 308, 53, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      24,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 9332, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 31, [["bash", 313, 7421, 0, 0, null]]],
+    ["a", 286, 84, []],
+    ["u", 876, 0, "schedule"],
+    [
+      "a",
+      0,
+      59,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 634, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 26, [["bash", 309, 8016, 0, 0, null]]],
+    ["a", 0, 60, [["background_jobs_board", 120, 7158, 0, 0, null]]],
+    ["a", 0, 61, [["skill", 23, 5701, 0, 0, "traces-first"]]],
+    [
+      "a",
+      0,
+      15,
+      [
+        ["traces_status", 2, 899, 0, 0, null],
+        ["traces_session_summary", 60, 749, 0, 0, null],
+        ["traces_search", 88, 615, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 22, [["background_jobs_output", 33, 2140, 0, 0, null]]],
+    ["a", 0, 85, [["bash", 310, 6384, 0, 0, null]]],
+    ["a", 0, 28, [["thread_prompt", 436, 60, 0, 0, null]]],
+    ["a", 396, 58, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 634, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 311, 8576, 0, 0, null]]],
+    ["a", 0, 62, [["skill", 23, 5701, 0, 0, "traces-first"]]],
+    [
+      "a",
+      0,
+      15,
+      [
+        ["traces_status", 2, 898, 0, 0, null],
+        ["traces_session_summary", 60, 749, 0, 0, null],
+        ["traces_search", 88, 616, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 22, [["background_jobs_output", 33, 1886, 0, 0, null]]],
+    ["a", 0, 34, [["bash", 315, 6903, 0, 0, null]]],
+    ["a", 325, 199, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 634, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 310, 8822, 0, 0, null]]],
+    ["a", 302, 120, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 634, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 315, 8295, 0, 0, null]]],
+    ["a", 325, 171, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 9241, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 65, [["skill", 23, 5701, 0, 0, "traces-first"]]],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["traces_status", 2, 899, 0, 0, null],
+        ["traces_session_summary", 60, 750, 0, 0, null],
+        ["traces_search", 88, 617, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 28, [["background_jobs_output", 33, 1998, 0, 0, null]]],
+    ["a", 0, 93, [["bash", 320, 6046, 0, 0, null]]],
+    ["a", 274, 56, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 634, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 23, [["bash", 313, 8166, 0, 0, null]]],
+    ["a", 0, 104, [["todo_write", 485, 57, 0, 0, null]]],
+    ["a", 283, 27, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 9100, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 31, [["bash", 310, 7064, 0, 0, null]]],
+    ["a", 0, 28, [["skill", 23, 5701, 0, 0, "traces-first"]]],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["traces_status", 2, 898, 0, 0, null],
+        ["traces_session_summary", 60, 755, 0, 0, null],
+        ["traces_search", 88, 615, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["background_jobs_output", 33, 1858, 0, 0, null]]],
+    ["a", 0, 26, [["bash", 311, 6447, 0, 0, null]]],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    ["a", 0, 61, [["skill", 33, 7064, 0, 0, "afk-thread-supervision"]]],
+    ["a", 0, 0, [["skill", 23, 4973, 0, 0, "dsh-sessions"]]],
+    ["a", 0, 67, [["skill", 38, 1550, 0, 0, "generated-artifact-workflow"]]],
+    ["a", 0, 0, [["skill", 28, 1353, 0, 0, "bug-investigation"]]],
+    ["a", 0, 57, [["bash", 313, 7396, 0, 0, null]]],
+    ["a", 0, 188, [["thread_prompt", 577, 60, 0, 0, null]]],
+    ["a", 335, 60, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 5162, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 25, [["bash", 305, 6760, 0, 0, null]]],
+    ["a", 259, 121, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 5148, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 31, [["bash", 310, 8563, 0, 0, null]]],
+    ["a", 265, 65, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      23,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 970, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 24, [["bash", 304, 7367, 0, 0, null]]],
+    ["a", 260, 55, []],
+    ["u", 1505, 0, "goal"],
+    ["u", 252, 0, "time-context"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 635, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 19, [["bash", 304, 7323, 0, 0, null]]],
+    ["a", 0, 62, [["background_jobs_board", 111, 481, 0, 0, null]]],
+    ["a", 0, 35, [["background_jobs_board", 90, 5133, 0, 0, null]]],
+    ["a", 0, 23, [["background_jobs_output", 33, 18485, 0, 0, null]]],
+    ["a", 265, 193, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 5133, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 306, 6975, 0, 0, null]]],
+    ["a", 247, 58, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 635, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 28, [["bash", 297, 6920, 0, 0, null]]],
+    ["a", 0, 59, [["read", 62, 1203, 0, 0, null]]],
+    ["a", 0, 169, [["thread_prompt", 501, 60, 0, 0, null]]],
+    ["a", 336, 58, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 4978, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 34, [["bash", 308, 6841, 0, 0, null]]],
+    ["a", 250, 59, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      24,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 5003, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 25, [["bash", 314, 6171, 0, 0, null]]],
+    ["a", 0, 26, [["read", 62, 317, 0, 0, null]]],
+    ["a", 0, 95, [["thread_prompt", 405, 60, 0, 0, null]]],
+    ["a", 240, 28, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 4894, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 18, [["bash", 311, 6693, 0, 0, null]]],
+    ["a", 237, 64, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 4894, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 28, [["bash", 312, 6751, 0, 0, null]]],
+    ["a", 0, 58, [["bash", 333, 32, 0, 0, null]]],
+    ["a", 278, 62, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 5658, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 32, [["bash", 311, 6363, 0, 0, null]]],
+    ["a", 0, 26, [["read", 63, 323, 0, 0, null]]],
+    ["a", 320, 265, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      25,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 4940, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 306, 6883, 0, 0, null]]],
+    ["a", 332, 60, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 7330, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 28, [["bash", 306, 6466, 0, 0, null]]],
+    ["a", 0, 28, [["read", 64, 620, 0, 0, null]]],
+    ["a", 0, 115, [["thread_prompt", 414, 60, 0, 0, null]]],
+    ["a", 301, 56, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      24,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 5130, 0, 0, null]
+      ]
+    ],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["skill", 33, 7064, 0, 0, "afk-thread-supervision"],
+        ["skill", 23, 4973, 0, 0, "dsh-sessions"],
+        ["skill", 38, 1550, 0, 0, "generated-artifact-workflow"]
+      ]
+    ],
+    ["a", 0, 57, [["bash", 323, 6484, 0, 0, null]]],
+    ["a", 0, 30, [["read", 65, 621, 0, 0, null]]],
+    ["a", 297, 89, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 5153, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 19, [["bash", 316, 6826, 0, 0, null]]],
+    ["a", 293, 24, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 6038, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 313, 6336, 0, 0, null]]],
+    ["u", 252, 0, "time-context"],
+    ["a", 258, 244, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 635, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 314, 6733, 0, 0, null]]],
+    ["a", 0, 28, [["read", 60, 513, 0, 0, null]]],
+    ["a", 0, 45, [["read", 72, 780, 0, 0, null]]],
+    ["a", 0, 64, [["thread_prompt", 378, 60, 0, 0, null]]],
+    ["a", 326, 89, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 6251, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 31, [["read", 69, 522, 0, 0, null]]],
+    ["a", 0, 0, [["read", 81, 401, 0, 0, null]]],
+    ["a", 0, 23, [["bash", 316, 6811, 0, 0, null]]],
+    ["a", 0, 32, [["bash", 339, 32, 0, 0, null]]],
+    ["a", 0, 191, [["thread_prompt", 523, 60, 0, 0, null]]],
+    ["a", 373, 58, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 85, 5439, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 19, [["bash", 316, 6404, 0, 0, null]]],
+    [
+      "a",
+      0,
+      90,
+      [
+        ["ai_accounts_quota", 2, 4455, 0, 0, null],
+        ["ai_accounts", 2, 978, 0, 0, null]
+      ]
+    ],
+    ["a", 307, 261, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 12, 321, 0, 0, null],
+        ["background_jobs_board", 85, 5439, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 19, [["bash", 318, 6852, 0, 0, null]]],
+    ["a", 0, 66, [["read", 110, 33616, 0, 0, null]]],
+    ["a", 0, 148, [["thread_prompt", 543, 60, 0, 0, null]]],
+    ["a", 292, 56, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      30,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 12, 321, 0, 0, null],
+        ["background_jobs_board", 85, 5571, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 36, [["bash", 305, 6935, 0, 0, null]]],
+    ["a", 0, 55, [["read", 59, 512, 0, 0, null]]],
+    ["a", 276, 183, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 12, 321, 0, 0, null],
+        ["background_jobs_board", 85, 8501, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 31, [["bash", 302, 6855, 0, 0, null]]],
+    ["a", 267, 148, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 12, 321, 0, 0, null],
+        ["background_jobs_board", 85, 8613, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 58, [["background_jobs_wait", 78, 735, 0, 0, null]]],
+    ["a", 0, 25, [["bash", 318, 7189, 0, 0, null]]],
+    [
+      "a",
+      0,
+      26,
+      [
+        ["read", 60, 513, 0, 0, null],
+        ["read", 61, 514, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["read", 72, 516, 0, 0, null],
+        ["read", 73, 498, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 72, [["read", 73, 476, 0, 0, null]]],
+    ["a", 0, 24, [["read", 73, 588, 0, 0, null]]],
+    ["a", 0, 25, [["read", 73, 632, 0, 0, null]]],
+    ["a", 0, 29, [["read", 73, 635, 0, 0, null]]],
+    ["a", 0, 21, [["read", 73, 629, 0, 0, null]]],
+    ["a", 0, 156, [["glob", 108, 4806, 0, 0, null]]],
+    ["a", 0, 34, [["bash", 298, 7242, 0, 0, null]]],
+    ["a", 0, 245, [["thread_prompt", 451, 60, 0, 0, null]]],
+    ["a", 0, 31, [["thread_prompt", 316, 60, 0, 0, null]]],
+    [
+      "a",
+      0,
+      60,
+      [
+        ["background_jobs_output", 33, 17298, 0, 0, null],
+        ["background_jobs_output", 33, 17629, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 58, [["bash", 1099, 271, 0, 0, null]]],
+    ["a", 0, 247, [["bash", 317, 7243, 0, 0, null]]],
+    ["a", 0, 92, [["thread_prompt", 447, 60, 0, 0, null]]],
+    ["a", 347, 35, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      32,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 12, 321, 0, 0, null],
+        ["background_jobs_board", 85, 13714, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 37, [["bash", 316, 7629, 0, 0, null]]],
+    ["a", 0, 90, [["read", 121, 6702, 0, 0, null]]],
+    ["a", 0, 133, [["read", 121, 3042, 0, 0, null]]],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    ["u", 252, 0, "time-context"],
+    [
+      "a",
+      0,
+      62,
+      [
+        ["skill", 33, 7064, 0, 0, "afk-thread-supervision"],
+        ["skill", 23, 4973, 0, 0, "dsh-sessions"],
+        ["skill", 38, 1550, 0, 0, "generated-artifact-workflow"],
+        ["skill", 29, 1848, 0, 0, "focused-validation"]
+      ]
+    ],
+    [
+      "a",
+      0,
+      60,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 635, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 30, [["bash", 306, 7321, 0, 0, null]]],
+    ["a", 0, 126, [["bash", 338, 2128, 0, 0, null]]],
+    ["a", 0, 198, [["thread_prompt", 528, 60, 0, 0, null]]],
+    ["a", 278, 101, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      69,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 30, 32151, 0, 0, null],
+        ["ai_accounts_quota", 2, 4454, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 64, [["todo_write", 456, 57, 0, 0, null]]],
+    ["a", 0, 25, [["bash", 315, 7133, 0, 0, null]]],
+    ["a", 295, 186, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      23,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 635, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 27, [["bash", 314, 7101, 0, 0, null]]],
+    ["a", 0, 184, [["read", 122, 11212, 0, 0, null]]],
+    ["a", 295, 101, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      27,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 635, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 27, [["bash", 306, 6962, 0, 0, null]]],
+    ["a", 0, 93, [["bash", 229, 796, 0, 0, null]]],
+    ["a", 0, 37, [["bash", 263, 6085, 0, 0, null]]],
+    ["a", 0, 146, [["thread_prompt", 460, 60, 0, 0, null]]],
+    [
+      "a",
+      0,
+      169,
+      [
+        ["thread_local_model_state", 60, 54, 0, 1, null],
+        ["thread_local_model_state", 60, 54, 0, 1, null],
+        ["thread_local_model_state", 60, 54, 0, 1, null]
+      ]
+    ],
+    ["a", 303, 115, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      26,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 635, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 22, [["bash", 311, 6395, 0, 0, null]]],
+    ["a", 0, 33, [["read", 120, 5448, 0, 0, null]]],
+    ["a", 258, 65, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 1191, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 114, [["bash", 323, 6579, 0, 0, null]]],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["background_jobs_board", 113, 5989, 0, 0, null],
+        ["background_jobs_board", 112, 634, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      64,
+      [
+        ["background_jobs_output", 33, 190, 0, 0, null],
+        ["background_jobs_output", 33, 190, 0, 0, null],
+        ["background_jobs_output", 33, 190, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 31, [["bash", 316, 7158, 0, 0, null]]],
+    [
+      "a",
+      0,
+      63,
+      [
+        ["background_jobs_board", 140, 3270, 0, 0, null],
+        ["background_jobs_board", 139, 2866, 0, 0, null],
+        ["background_jobs_board", 137, 2453, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 71, [["bash", 339, 1586, 0, 0, null]]],
+    ["a", 0, 48, [["bash", 323, 6989, 0, 0, null]]],
+    ["a", 327, 180, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      32,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1270, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 635, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 0, [["bash", 311, 7100, 0, 0, null]]],
+    ["a", 0, 208, [["ai_accounts_quota", 2, 4454, 0, 0, null]]],
+    [
+      "a",
+      0,
+      59,
+      [
+        ["bash", 301, 5980, 0, 0, null],
+        ["bash", 299, 7773, 0, 0, null],
+        ["bash", 299, 6556, 0, 0, null]
+      ]
+    ],
+    ["a", 277, 186, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["jj_thread_status", 61, 1274, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["background_jobs_board", 89, 1181, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 26, [["bash", 308, 7568, 0, 0, null]]],
+    ["a", 0, 27, [["background_jobs_wait", 54, 478, 0, 0, null]]],
+    ["a", 0, 30, [["background_jobs_output", 33, 190, 0, 0, null]]],
+    ["a", 0, 28, [["bash", 323, 702, 0, 0, null]]],
+    [
+      "a",
+      0,
+      67,
+      [
+        ["jj_thread_status", 61, 1274, 0, 0, null],
+        ["thread_list", 39, 390, 0, 0, null],
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["ai_accounts_quota", 2, 4454, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 122, [["bash", 357, 955, 0, 0, null]]],
+    [
+      "a",
+      0,
+      58,
+      [
+        ["thread_list", 50, 92, 0, 0, null],
+        ["jj_thread_status", 61, 1274, 0, 0, null],
+        ["ai_accounts_serving_account", 60, 48, 0, 1, null]
+      ]
+    ],
+    ["a", 0, 168, [["jj_thread_rebase", 79, 1061, 0, 0, null]]],
+    [
+      "a",
+      0,
+      130,
+      [
+        ["jj_thread_repositories", 2, 2480, 0, 0, null],
+        ["jj_thread_status", 61, 536, 0, 0, null],
+        ["jj_graph_navigation", 49, 3148, 0, 0, null],
+        ["thread_list", 39, 387, 0, 0, null]
+      ]
+    ],
+    ["u", 253, 0, "time-context"],
+    [
+      "a",
+      0,
+      637,
+      [
+        ["jj_thread_workspace_sync", 2, 7230, 0, 0, null],
+        ["jj_workspaces", 49, 381, 0, 0, null],
+        ["jj_load", 59, 114, 0, 0, null]
+      ]
+    ],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    ["a", 0, 560, [["skill", 23, 4973, 0, 0, "dsh-sessions"]]],
+    ["a", 0, 66, [["bash", 683, 1091, 0, 0, null]]],
+    ["a", 0, 97, [["bash", 259, 737, 0, 0, null]]],
+    ["a", 0, 30, [["bash", 333, 10270, 0, 0, null]]],
+    [
+      "a",
+      0,
+      617,
+      [
+        ["project_list", 2, 1169, 0, 0, null],
+        ["thread_local_model_state", 2, 246, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      226,
+      [
+        ["thread_prompt", 783, 73, 0, 0, null],
+        ["thread_create", 807, 137, 0, 0, null],
+        ["thread_create", 762, 139, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      25,
+      [
+        ["thread_list", 39, 602, 0, 0, null],
+        ["jj_thread_repositories", 2, 2505, 0, 0, null],
+        ["list_thread_questions", 12, 321, 0, 0, null],
+        ["background_jobs_board", 30, 32105, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 91, [["jj_thread_refresh_repositories", 2, 44, 0, 0, null]]],
+    ["a", 0, 28, [["bash", 452, 10470, 0, 0, null]]],
+    ["a", 0, 169, [["bash", 592, 8409, 0, 0, null]]],
+    [
+      "a",
+      0,
+      290,
+      [
+        ["jj_thread_status", 61, 367, 0, 0, null],
+        ["jj_thread_status", 61, 367, 0, 0, null],
+        ["jj_thread_status", 61, 367, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      254,
+      [
+        ["read", 113, 1280, 0, 0, null],
+        ["read", 115, 1148, 0, 0, null],
+        ["read", 117, 1196, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      240,
+      [
+        ["read", 129, 3985, 0, 0, null],
+        ["read", 136, 8069, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 29, [["read", 137, 4047, 0, 0, null]]],
+    ["a", 0, 359, [["activity_timeline_attention", 12, 8611, 0, 0, null]]],
+    ["a", 0, 150, [["activity_timeline_page", 76, 112, 0, 0, null]]],
+    ["a", 0, 539, [["jj_details", 103, 18, 0, 0, null]]],
+    ["a", 0, 30, [["ask_user_question", 720, 429, 0, 0, null]]],
+    ["u", 249, 0, "time-context"],
+    [
+      "a",
+      0,
+      118,
+      [
+        ["list_thread_questions", 12, 1584, 0, 0, null],
+        ["thread_list", 39, 593, 0, 0, null],
+        ["jj_thread_status", 61, 559, 0, 0, null],
+        ["jj_thread_status", 61, 549, 0, 0, null],
+        ["jj_thread_status", 61, 562, 0, 0, null],
+        ["background_jobs_board", 89, 632, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 168, [["bash", 596, 14314, 0, 0, null]]],
+    ["a", 0, 203, [["bash", 504, 1815, 0, 0, null]]],
+    ["a", 0, 144, [["bash", 688, 3941, 0, 0, null]]],
+    ["a", 0, 99, [["skill", 28, 5786, 0, 0, "dsh-plugin-verify"]]],
+    [
+      "a",
+      0,
+      125,
+      [
+        ["jj_details", 103, 49, 0, 0, null],
+        ["jj_details", 103, 49, 0, 0, null],
+        ["jj_details", 103, 49, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["jj_register_repository", 61, 89, 0, 0, null],
+        ["jj_register_repository", 61, 89, 0, 0, null],
+        ["jj_register_repository", 61, 89, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      20,
+      [
+        ["jj_details", 103, 124, 0, 0, null],
+        ["jj_details", 103, 7528, 0, 0, null],
+        ["jj_details", 103, 4924, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 190, [["bash", 333, 1605, 0, 0, null]]],
+    [
+      "a",
+      0,
+      733,
+      [
+        ["read", 113, 1459, 0, 0, null],
+        ["bash", 468, 4552, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 114, [["bash", 960, 1551, 0, 0, null]]],
+    ["a", 0, 274, [["bash", 285, 145, 0, 0, null]]],
+    ["a", 0, 67, [["bash", 344, 2184, 0, 0, null]]],
+    ["a", 0, 324, [["grep", 187, 17, 0, 0, null]]],
+    ["a", 0, 115, [["grep", 84, 23365, 0, 0, null]]],
+    ["a", 0, 36, [["grep", 123, 17, 0, 0, null]]],
+    [
+      "a",
+      0,
+      61,
+      [
+        ["grep", 73, 3353, 0, 0, null],
+        ["grep", 75, 1233, 0, 0, null],
+        ["grep", 77, 1439, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 288, [["bash", 1228, 5971, 0, 0, null]]],
+    ["a", 0, 394, [["bash", 814, 6117, 0, 0, null]]],
+    ["a", 0, 159, [["bash", 298, 41, 0, 0, null]]],
+    ["a", 0, 307, [["bash", 1199, 3701, 0, 0, null]]],
+    ["a", 0, 357, [["bash", 289, 41, 0, 0, null]]],
+    ["a", 0, 63, [["grep", 67, 5582, 0, 0, null]]],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["a", 0, 464, [["thread_prompt", 1000, 73, 0, 0, null]]],
+    ["a", 0, 71, [["bash", 526, 382, 0, 0, null]]],
+    ["a", 0, 104, [["thread_prompt", 681, 73, 0, 0, null]]],
+    ["a", 0, 27, [["bash", 403, 557, 0, 0, null]]],
+    ["u", 248, 0, "time-context"],
+    ["a", 0, 85, [["todo_write", 651, 57, 0, 0, null]]],
+    ["a", 0, 175, [["bash", 840, 19350, 0, 0, null]]],
+    ["a", 0, 95, [["read", 122, 6536, 0, 0, null]]],
+    ["a", 0, 516, [["ai_accounts_quota", 2, 4454, 0, 0, null]]],
+    ["a", 0, 331, [["thread_create", 1008, 135, 0, 0, null]]],
+    [
+      "a",
+      0,
+      152,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 699, 0, 0, null],
+        ["list_thread_questions", 71, 1625, 0, 0, null],
+        ["jj_thread_status", 61, 536, 0, 0, null],
+        ["jj_thread_status", 61, 559, 0, 0, null],
+        ["jj_thread_status", 63, 48, 0, 1, null]
+      ]
+    ],
+    ["a", 0, 168, [["bash", 621, 12567, 0, 0, null]]],
+    ["a", 0, 129, [["bash", 229, 283, 0, 0, null]]],
+    ["a", 0, 130, [["todo_write", 769, 57, 0, 0, null]]],
+    ["a", 0, 23, [["bash", 564, 58, 0, 0, null]]],
+    ["a", 0, 58, [["bash", 413, 292, 0, 0, null]]],
+    ["a", 0, 283, [["thread_create", 1012, 134, 0, 0, null]]],
+    ["a", 0, 25, [["todo_write", 841, 57, 0, 0, null]]],
+    ["a", 0, 185, [["bash", 461, 6150, 0, 0, null]]],
+    ["a", 0, 165, [["thread_create", 937, 131, 0, 0, null]]],
+    ["a", 0, 58, [["todo_write", 920, 57, 0, 0, null]]],
+    [
+      "a",
+      0,
+      87,
+      [
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["thread_local_model_state", 60, 54, 0, 1, null],
+        ["thread_local_model_state", 60, 54, 0, 1, null],
+        ["thread_local_model_state", 60, 54, 0, 1, null]
+      ]
+    ],
+    ["a", 0, 94, [["bash", 324, 2227, 0, 0, null]]],
+    ["a", 0, 156, [["send_message", 722, 96, 0, 1, null]]],
+    ["a", 0, 93, [["thread_prompt", 720, 60, 0, 0, null]]],
+    ["a", 1097, 410, []],
+    ["u", 876, 0, "schedule"],
+    ["a", 0, 376, [["answer_thread_question", 256, 254, 0, 0, null]]],
+    ["u", 979, 0, "user-question-reply"],
+    [
+      "a",
+      0,
+      546,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["list_thread_questions", 71, 362, 0, 0, null],
+        ["thread_list", 39, 900, 0, 0, null],
+        ["background_jobs_board", 104, 32763, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 97, [["list_thread_questions", 13, 322, 0, 0, null]]],
+    ["a", 0, 35, [["bash", 490, 10031, 0, 0, null]]],
+    ["a", 0, 501, [["thread_prompt", 248, 60, 0, 0, null]]],
+    ["a", 0, 58, [["bash", 465, 3971, 0, 0, null]]],
+    ["a", 0, 102, [["bash", 309, 1016, 0, 0, null]]],
+    ["a", 0, 172, [["todo_write", 903, 57, 0, 0, null]]],
+    ["a", 0, 22, [["todo_write", 1032, 57, 0, 0, null]]],
+    [
+      "a",
+      0,
+      109,
+      [
+        ["background_jobs_output", 33, 4835, 0, 0, null],
+        ["background_jobs_output", 33, 190, 0, 0, null]
+      ]
+    ],
+    ["u", 253, 0, "time-context"],
+    ["a", 0, 164, [["skill", 29, 1848, 0, 0, "focused-validation"]]],
+    [
+      "a",
+      0,
+      130,
+      [
+        ["read", 115, 3762, 0, 0, null],
+        ["read", 130, 4568, 0, 0, null],
+        ["read", 136, 2023, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 57, [["thread_prompt", 632, 60, 0, 0, null]]],
+    ["a", 0, 138, [["bash", 503, 15477, 0, 0, null]]],
+    [
+      "a",
+      0,
+      256,
+      [
+        ["background_jobs_board", 89, 635, 0, 0, null],
+        ["background_jobs_board", 89, 631, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["thread_list", 39, 900, 0, 0, null]
+      ]
+    ],
+    ["u", 13795, 0, "skill-catalog"],
+    ["a", 0, 69, [["skill", 23, 4973, 0, 0, "dsh-sessions"]]],
+    [
+      "a",
+      0,
+      242,
+      [
+        ["thread_list", 39, 894, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["background_jobs_board", 104, 32016, 0, 0, null],
+        ["thread_attention_state", 2, 49929, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 125, [["bash", 468, 13252, 0, 0, null]]],
+    ["a", 0, 228, [["bash", 489, 6639, 0, 0, null]]],
+    [
+      "a",
+      0,
+      51,
+      [
+        ["read", 136, 2228, 0, 0, null],
+        ["read", 143, 989, 0, 0, null],
+        ["jj_thread_status", 61, 552, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      160,
+      [
+        ["skill", 28, 5786, 0, 0, "dsh-plugin-verify"],
+        ["skill", 28, 1353, 0, 0, "bug-investigation"]
+      ]
+    ],
+    ["a", 0, 56, [["bash", 233, 1034, 0, 0, null]]],
+    ["a", 0, 240, [["jj_thread_status", 61, 716, 0, 0, null]]],
+    [
+      "a",
+      0,
+      61,
+      [
+        ["jj_details", 103, 2544, 0, 0, null],
+        ["read", 134, 4769, 0, 0, null],
+        ["read", 137, 5994, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 650, [["bash", 1210, 2254, 0, 0, null]]],
+    ["a", 0, 254, [["bash", 344, 21, 0, 0, null]]],
+    ["a", 0, 250, [["todo_write", 1109, 57, 0, 0, null]]],
+    ["a", 0, 153, [["bash", 220, 686, 0, 0, null]]],
+    ["a", 0, 195, [["bash", 400, 9320, 0, 0, null]]],
+    ["u", 249, 0, "time-context"],
+    [
+      "a",
+      0,
+      1125,
+      [
+        ["thread_references", 71, 300, 0, 0, null],
+        ["thread_references", 71, 211, 0, 0, null],
+        ["thread_references", 71, 391, 0, 0, null],
+        ["thread_references", 71, 211, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 65, [["bash", 316, 106, 0, 0, null]]],
+    ["a", 0, 109, [["bash", 220, 283, 0, 0, null]]],
+    ["a", 1383, 523, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      32,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 894, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["background_jobs_board", 104, 31849, 0, 0, null],
+        ["jj_thread_repositories", 2, 3274, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 73, [["bash", 410, 9932, 0, 0, null]]],
+    ["a", 0, 421, [["ai_accounts_quota", 2, 4454, 0, 0, null]]],
+    ["a", 0, 77, [["thread_list", 38, 19, 0, 0, null]]],
+    ["a", 0, 67, [["thread_create", 920, 135, 0, 0, null]]],
+    ["a", 0, 26, [["todo_write", 1103, 57, 0, 0, null]]],
+    ["a", 0, 60, [["background_jobs_board", 133, 11582, 0, 0, null]]],
+    ["a", 0, 159, [["bash", 332, 2207, 0, 0, null]]],
+    ["a", 0, 64, [["bash", 317, 2588, 0, 0, null]]],
+    ["a", 860, 295, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 997, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["background_jobs_board", 104, 31855, 0, 0, null],
+        ["jj_thread_repositories", 2, 3423, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 35, [["bash", 446, 12956, 0, 0, null]]],
+    ["a", 0, 164, [["bash", 318, 5019, 0, 0, null]]],
+    ["a", 0, 61, [["thread_prompt", 556, 60, 0, 0, null]]],
+    ["a", 846, 371, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 997, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["jj_thread_repositories", 2, 3423, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 27, [["bash", 439, 12015, 0, 0, null]]],
+    ["a", 0, 62, [["background_jobs_board", 116, 3269, 0, 0, null]]],
+    ["a", 0, 26, [["bash", 340, 1733, 0, 0, null]]],
+    [
+      "a",
+      0,
+      225,
+      [
+        ["background_jobs_board", 89, 983, 0, 0, null],
+        ["background_jobs_board", 89, 632, 0, 0, null],
+        ["background_jobs_board", 89, 635, 0, 0, null]
+      ]
+    ],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["a", 0, 236, [["background_jobs_output", 33, 190, 0, 0, null]]],
+    ["a", 0, 169, [["bash", 238, 6451, 0, 0, null]]],
+    ["u", 252, 0, "time-context"],
+    ["a", 0, 329, [["background_jobs_wait", 73, 277, 0, 0, null]]],
+    ["a", 542, 141, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 997, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["background_jobs_board", 104, 32598, 0, 0, null],
+        ["jj_thread_repositories", 2, 3412, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 61, [["bash", 450, 12611, 0, 0, null]]],
+    [
+      "a",
+      0,
+      216,
+      [
+        ["background_jobs_board", 89, 955, 0, 0, null],
+        ["background_jobs_board", 89, 633, 0, 0, null],
+        ["background_jobs_board", 89, 1267, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      272,
+      [
+        ["jj_graph_navigation", 49, 3134, 0, 0, null],
+        ["jj_load", 59, 92, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      267,
+      [
+        ["read", 98, 10529, 0, 0, null],
+        ["read", 101, 6017, 0, 0, null],
+        ["jj_working_diff", 49, 0, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 416, [["apply_patch", 3326, 123, 0, 0, null]]],
+    ["a", 0, 114, [["bash", 305, 1815, 0, 0, null]]],
+    [
+      "a",
+      0,
+      436,
+      [
+        ["read", 120, 2419, 0, 0, null],
+        ["bash", 270, 4476, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 584, [["apply_patch", 3326, 123, 0, 0, null]]],
+    ["a", 0, 29, [["bash", 207, 723, 0, 0, null]]],
+    ["a", 0, 312, [["background_jobs_wait", 100, 695, 0, 0, null]]],
+    [
+      "a",
+      0,
+      24,
+      [
+        ["background_jobs_output", 33, 190, 0, 0, null],
+        ["background_jobs_output", 33, 190, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 31, [["bash", 453, 13935, 0, 0, null]]],
+    [
+      "a",
+      0,
+      243,
+      [
+        ["bash", 484, 2033, 0, 0, null],
+        ["ai_accounts_quota", 2, 4454, 0, 0, null],
+        ["jj_thread_status", 61, 553, 0, 0, null],
+        ["jj_thread_status", 61, 561, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      169,
+      [
+        ["ai_accounts", 2, 978, 0, 0, null],
+        ["agents_list", 2, 2534, 0, 0, null],
+        ["jj_thread_projects", 2, 1009, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      155,
+      [
+        ["thread_list", 52, 19, 0, 0, null],
+        ["thread_list", 51, 19, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      54,
+      [
+        ["thread_create", 867, 32, 0, 1, null],
+        ["thread_create", 865, 32, 0, 1, null]
+      ]
+    ],
+    ["a", 0, 124, [["thread_list", 39, 991, 0, 0, null]]],
+    ["a", 0, 157, [["thread_create", 94, 100, 0, 0, null]]],
+    ["a", 0, 31, [["thread_select_model", 133, 101, 0, 0, null]]],
+    ["a", 0, 24, [["thread_prompt", 813, 73, 0, 0, null]]],
+    ["a", 0, 25, [["thread_create", 93, 99, 0, 0, null]]],
+    ["a", 0, 21, [["thread_select_model", 133, 101, 0, 0, null]]],
+    ["a", 0, 22, [["thread_prompt", 812, 73, 0, 0, null]]],
+    [
+      "a",
+      0,
+      271,
+      [
+        ["thread_list", 39, 1190, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["thread_dev_servers", 60, 31, 0, 0, null],
+        ["thread_dev_servers", 60, 31, 0, 0, null],
+        ["thread_dev_servers", 60, 31, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 164, [["bash", 426, 49931, 0, 0, null]]],
+    [
+      "a",
+      0,
+      186,
+      [
+        ["background_jobs_board", 143, 12900, 0, 0, null],
+        ["background_jobs_board", 143, 10813, 0, 0, null],
+        ["jj_thread_status", 61, 549, 0, 0, null],
+        ["jj_thread_status", 61, 553, 0, 0, null],
+        ["jj_thread_status", 61, 561, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      108,
+      [
+        ["jj_details", 103, 125, 0, 0, null],
+        ["jj_details", 103, 126, 0, 0, null]
+      ]
+    ],
+    [
+      "a",
+      0,
+      25,
+      [
+        ["jj_revision_files", 106, 290, 0, 0, null],
+        ["jj_revision_files", 106, 416, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 222, [["bash", 407, 1812, 0, 0, null]]],
+    ["a", 0, 395, [["bash", 446, 10625, 0, 0, null]]],
+    ["u", 253, 0, "time-context"],
+    ["a", 0, 73, [["bash", 398, 7294, 0, 0, null]]],
+    [
+      "a",
+      0,
+      159,
+      [
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["background_jobs_board", 110, 31831, 0, 0, null],
+        ["jj_thread_repositories", 2, 3716, 0, 0, null]
+      ]
+    ],
+    ["u", 13795, 0, "skill-catalog"],
+    ["a", 0, 28, [["skill", 23, 4973, 0, 0, "dsh-sessions"]]],
+    ["a", 0, 34, [["skill", 28, 5786, 0, 0, "dsh-plugin-verify"]]],
+    ["a", 1058, 344, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      33,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 1187, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["ai_accounts_quota", 2, 4454, 0, 0, null],
+        ["jj_thread_repositories", 2, 3708, 0, 0, null],
+        ["background_jobs_board", 110, 32165, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 188, [["dshx_comm_agents", 2, 2769, 0, 0, null]]],
+    ["a", 0, 374, [["todo_write", 848, 57, 0, 0, null]]],
+    ["a", 0, 58, [["background_jobs_wait", 72, 309, 0, 0, null]]],
+    ["a", 0, 0, [["bash", 311, 3587, 0, 0, null]]],
+    [
+      "a",
+      0,
+      259,
+      [
+        ["background_jobs_board", 89, 631, 0, 0, null],
+        ["background_jobs_board", 89, 632, 0, 0, null],
+        ["background_jobs_board", 89, 633, 0, 0, null]
+      ]
+    ],
+    ["a", 676, 166, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      33,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 1187, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["jj_thread_repositories", 2, 3697, 0, 0, null],
+        ["background_jobs_board", 110, 31732, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 282, [["bash", 400, 7555, 0, 0, null]]],
+    ["a", 0, 221, [["background_jobs_board", 89, 630, 0, 0, null]]],
+    ["a", 0, 61, [["dshx_comm_agents", 2, 2772, 0, 0, null]]],
+    ["a", 626, 141, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      32,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 1190, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["jj_thread_repositories", 2, 3697, 0, 0, null],
+        ["background_jobs_board", 110, 31732, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 28, [["bash", 447, 12975, 0, 0, null]]],
+    [
+      "a",
+      0,
+      155,
+      [
+        ["background_jobs_board", 143, 8258, 0, 0, null],
+        ["jj_thread_status", 61, 549, 0, 0, null],
+        ["ai_accounts_quota", 2, 4454, 0, 0, null],
+        ["thread_list", 57, 19, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 70, [["thread_create", 99, 105, 0, 0, null]]],
+    ["a", 0, 30, [["thread_select_model", 133, 101, 0, 0, null]]],
+    ["a", 0, 0, [["thread_prompt", 818, 73, 0, 0, null]]],
+    ["a", 0, 48, [["todo_write", 980, 57, 0, 0, null]]],
+    ["a", 0, 95, [["jj_graph_navigation", 49, 3134, 0, 0, null]]],
+    [
+      "a",
+      0,
+      244,
+      [
+        ["thread_list", 39, 1292, 0, 0, null],
+        ["thread_local_model_state", 60, 54, 0, 1, null],
+        ["list_thread_questions", 13, 322, 0, 0, null]
+      ]
+    ],
+    ["a", 619, 128, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      29,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 1292, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["jj_thread_repositories", 2, 3846, 0, 0, null],
+        ["background_jobs_board", 110, 31732, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 28, [["bash", 448, 11952, 0, 0, null]]],
+    ["a", 722, 1269, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      0,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 1292, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["background_jobs_board", 110, 31686, 0, 0, null],
+        ["jj_thread_repositories", 2, 3846, 0, 0, null]
+      ]
+    ],
+    ["u", 253, 0, "time-context"],
+    ["a", 0, 64, [["bash", 445, 11390, 0, 0, null]]],
+    ["a", 0, 235, [["thread_prompt", 575, 60, 0, 0, null]]],
+    ["a", 0, 313, [["thread_prompt", 460, 60, 0, 0, null]]],
+    ["a", 588, 134, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      20,
+      [
+        ["get_goal", 2, 1099, 0, 0, null],
+        ["thread_list", 39, 1292, 0, 0, null],
+        ["list_thread_questions", 13, 322, 0, 0, null],
+        ["jj_thread_repositories", 2, 3846, 0, 0, null],
+        ["background_jobs_board", 110, 31618, 0, 0, null]
+      ]
+    ],
+    ["a", 0, 20, [["bash", 442, 11907, 0, 0, null]]],
+    ["a", 0, 29, [["bash", 409, 8825, 0, 0, null]]],
+    ["u", 49871, 0, "agent-instructions"],
+    ["u", 800, 0, "runtime-context"],
+    ["u", 13795, 0, "skill-catalog"],
+    ["a", 0, 22, [["skill", 23, 4973, 0, 0, "dsh-sessions"]]],
+    ["a", 0, 0, [["skill", 28, 5786, 0, 0, "dsh-plugin-verify"]]],
+    [
+      "a",
+      0,
+      89,
+      [
+        ["background_jobs_board", 133, 6128, 0, 0, null],
+        ["background_jobs_board", 133, 7684, 0, 0, null],
+        ["background_jobs_board", 133, 4709, 0, 0, null],
+        ["jj_thread_status", 61, 549, 0, 0, null],
+        ["jj_thread_status", 61, 550, 0, 0, null],
+        ["jj_thread_status", 61, 505, 0, 0, null]
+      ]
+    ],
+    ["a", 851, 277, []],
+    ["u", 1505, 0, "goal"],
+    [
+      "a",
+      0,
+      28,
+      [
+        ["get_goal", 2, 0, 0, 0, null],
+        ["thread_list", 39, 0, 0, 0, null],
+        ["list_thread_questions", 13, 0, 0, 0, null],
+        ["jj_thread_repositories", 2, 0, 0, 0, null],
+        ["background_jobs_board", 110, 0, 0, 0, null]
+      ]
+    ]
+  ]
+}

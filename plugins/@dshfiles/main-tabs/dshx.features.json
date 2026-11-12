@@ -648,16 +648,16 @@
       "failureModes": ["A default another command already owns leaves that tab command listed but unbound."],
       "externalDependencies": [],
       "verification": [
-            {
-      "kind": "gherkin",
-      "id": "main-tabs.keyboard",
-      "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
-    },
-    {
-      "kind": "gherkin",
-      "id": "main-tabs.pwa-shortcuts",
-      "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
-    },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.keyboard",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.pwa-shortcuts",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
         {
           "kind": "unit-test",
           "id": "main-tabs.machine-unit-jump-and-cycle",

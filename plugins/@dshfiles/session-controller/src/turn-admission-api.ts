@@ -44,8 +44,7 @@ export const turnAdmissionApi = defineApi({
   events: {
     changed: event({
       schema: Schema.Struct({ running: Schema.Number, waiting: Schema.Number }),
-      description:
-        'The running-thread limit, its waiting turns, or the running count while turns wait changed; read the snapshot again.',
+      description: 'The running-thread limit, its waiting turns, or the running count while turns wait changed; read the snapshot again.',
       invalidates: ['turn-admission'],
     }),
   },
