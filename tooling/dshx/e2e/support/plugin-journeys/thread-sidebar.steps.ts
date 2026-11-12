@@ -291,7 +291,8 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
     expect(transientNoticeLayout.position).toBe('absolute')
     expect(transientNoticeLayout.bottom).toBeGreaterThan(0)
     expect(noticeStyle.display).toBe('flex')
-    expect(noticeStyle.backgroundColor).toMatch(/^rgb\(/)
+    // An opaque fill: the theme writes oklch() since the visual refresh; no alpha component either way.
+    expect(noticeStyle.backgroundColor).toMatch(/^(?:rgb|oklch)\([^/]*\)$/u)
     expect(undoButtonBounds.x).toBeGreaterThan(archivedMessageBounds.x + archivedMessageBounds.width)
     expect(sidebarPosition).toBe('relative')
     expect(noticeBounds.x).toBeGreaterThanOrEqual(sidebarBounds.x)
@@ -1535,7 +1536,8 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
     const tabs = await ThreadListFilter.openViews(page, threadSidebar(page))
     const doneTab = tabs.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })
     await expect(doneTab).toBeVisible()
-    await expect(doneTab.getByTestId('thread-view-attention-dot')).toHaveClass(/bg-success/)
+    // A finished turn's default colour is ink since the visual refresh (P1: only waiting on you is coloured).
+    await expect(doneTab.getByTestId('thread-view-attention-dot')).toHaveClass(/bg-muted-foreground/)
     await expect(tabs.getByRole('menuitemradio', { name: 'All threads', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
     await ThreadListFilter.close(page)
   })
@@ -1617,7 +1619,8 @@ Then('the per-thread override survives reload without changing the global settin
 
 When('an attention status color is changed in Thread list settings', async ({ page }: { page: Page }) => {
   await openSidebarSettings(page)
-  await sidebarSettings(page).getByRole('button', { name: 'Approval needed: Color Warning', exact: true }).click()
+  // Approval needed starts in the Needs you indigo (Info) since the visual refresh; the step picks Danger from it.
+  await sidebarSettings(page).getByRole('button', { name: 'Approval needed: Color Info', exact: true }).click()
   await page.getByRole('menuitemradio', { name: 'Danger', exact: true }).click()
   await page.reload()
   await expect(threadSidebar(page)).toBeVisible()
@@ -2868,11 +2871,15 @@ Then('every view tab shows its full name', async ({ page }: { page: Page }) => {
 Then('every view tab fits without scrolling and keeps its full name as tooltip and accessible name', async ({ page }: { page: Page }) => {
   // Productivity pass Q5 (T5.3): the views are the Filter menu's view submenu, so every view keeps its full name at any
   // list width and the trigger shows the active one.
-  await ThreadListFilter.openViews(page, threadSidebar(page))
-  const views = page.getByRole('menuitemradio')
   await recordAssertion(page, 'thread-sidebar-compact-view-tabs-fit', async () => {
-    const names = await views.evaluateAll(items => items.map(item => item.getAttribute('aria-label') ?? ''))
-    expect(names).toEqual(expect.arrayContaining(['All threads', 'Working', 'Done']))
+    // The trigger that replaced the tab row stays inside the narrowed list.
+    const sidebarBox = await threadSidebar(page).boundingBox()
+    const triggerBox = await ThreadListFilter.trigger(threadSidebar(page)).boundingBox()
+    if (sidebarBox === null || triggerBox === null) throw new Error('The thread sidebar or its Filter trigger has no layout box.')
+    expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(sidebarBox.x + sidebarBox.width + 1)
+    const views = await ThreadListFilter.openViews(page, threadSidebar(page))
+    // Each view keeps its name; the accessible name may add the former tab's count and attention ("Working (0)").
+    for (const name of ['All threads', 'Working', 'Done']) await expect(views.getByRole('menuitemradio', { name: ThreadListFilter.viewName(name) })).toBeVisible()
   })
   await recordAssertion(page, 'thread-sidebar-compact-view-tabs-names', async () => {
     await page.getByRole('menuitemradio', { name: 'Done', exact: true }).click()

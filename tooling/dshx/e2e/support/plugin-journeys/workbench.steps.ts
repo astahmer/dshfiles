@@ -524,7 +524,8 @@ const assertTabPlusAlignment = async (page: Page): Promise<void> => {
         const strips = await page.locator('[data-workbench-region] .dv-tabs-and-actions-container').evaluateAll(rows =>
           rows.flatMap(row => {
             const viewport = row.querySelector(':scope > .dv-scrollable')
-            const plus = row.querySelector('button[aria-label="New tab"]')
+            // The plus is named by its own (screen-reader) text since the visual refresh, not by an aria-label.
+            const plus = [...row.querySelectorAll('button')].find(button => (button.getAttribute('aria-label') ?? button.textContent?.trim()) === 'New tab') ?? null
             const tabs = [...row.querySelectorAll('[role="tab"]')]
             const last = tabs.at(-1)
             const box = row.getBoundingClientRect()
@@ -620,7 +621,13 @@ const createWorkbenchWorkspace = async (page: Page): Promise<string> => {
   if (bootThreadId !== null) await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBe(bootThreadId)
   // The fresh no-project hero deliberately has a disabled composer. Choose the project before waiting for its
   // enabled textbox name; the project chip is already a real usable control.
-  await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toBeVisible()
+  const projectChip = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
+  // A narrow composer bar (a split main pane) folds the project, host and workspace pickers into one "Where this thread
+  // runs" chip (b:4qjm); open it to reach the project chip.
+  const placeSummary = page.getByRole('button', { name: /^Where this thread runs: /u })
+  await expect(projectChip.or(placeSummary).first()).toBeVisible()
+  if (!(await projectChip.isVisible())) await placeSummary.click()
+  await expect(projectChip).toBeVisible()
   await mkdir(workspace)
   await writeFile(join(workspace, 'preview.txt'), 'Workbench native preview content\n')
   const add = page.getByRole('button', { name: 'Add workspace', exact: true })
@@ -1724,6 +1731,8 @@ Then('the reusable view picker offers plugins without per-thread trajectories', 
 // One sidebar layout (b:952m): Reset layout restores the default left region, the Sidebar pane (the rail and its list,
 // tab row hidden), not the former docking groups. The fixed chrome around it and the gear's owner are unchanged.
 Then('Reset layout restores the default Sidebar pane between fixed chrome', async ({ page }: { page: Page }) => {
+  // The scenario starts from the former Free docking panes; Reset layout is what brings the default left region back.
+  await paneAction(page, mainPane(page), 'Reset layout')
   await recordAssertion(page, acceptanceId(page, 'tabbed-left-pane'), async () => {
     const left = page.locator('[data-workbench-region="left"]')
     const sidebarPane = left.locator('[data-workbench-panel-id="dshfiles-thread-sidebar.workbench-sidebar"]')
@@ -2008,6 +2017,28 @@ Then('the same right pane view and draft are restored without remounting', async
 Then('the quiet pane tab strips fit at 360 480 768 and 1024 pixels', async ({ page }: { page: Page }) => {
   for (const width of [360, 480, 768, 1024]) {
     await page.setViewportSize({ width, height: 900 })
+    if (width < 640) {
+      // Under 640px the phone shell's stack replaces the main tab rows (plans/ade-ux §8 phase 6): its top bar goes back to
+      // the list and the bottom bar reaches every destination, so those are the controls that must stay reachable.
+      await recordAssertion(page, acceptanceId(page, `phone-${width}`), async () => {
+        await expect(page.locator('html[data-shell-phone-nav]')).toHaveCount(1)
+        await expect(mainPane(page).locator('.dv-tabs-and-actions-container').first()).toBeHidden()
+        const back = page.getByRole('button', { name: 'Back to Threads', exact: true })
+        await expect(back).toBeVisible()
+        const destinations = page.getByRole('navigation', { name: 'Destinations', exact: true })
+        for (const label of ['Threads', 'Inbox', 'Land', 'More']) {
+          const button = destinations.getByRole('button', { name: label, exact: true })
+          await expect(button).toBeVisible()
+          const box = await button.boundingBox()
+          if (box === null) throw new Error(`Missing phone destination: ${label}`)
+          expect(box.x).toBeGreaterThanOrEqual(0)
+          expect(box.x + box.width).toBeLessThanOrEqual(width + 1)
+        }
+        await page.screenshot({ path: test.info().outputPath(`workbench-main-${width}.png`), animations: 'disabled' })
+        await expect(page.locator('[data-slot-error]')).toHaveCount(0)
+      })
+      continue
+    }
     await assertTabPlusAlignment(page)
     await recordAssertion(page, acceptanceId(page, `header-${width}`), async () => {
       const strips = mainPane(page).locator('.dv-tabs-and-actions-container')

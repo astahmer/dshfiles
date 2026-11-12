@@ -52,8 +52,12 @@ const close = async (page: Page): Promise<void> => {
 
 /** An item of the Filter menu: Board, Thread list settings, Sidebar settings. */
 const clickItem = async (page: Page, scope: Locator, name: string): Promise<void> => {
-  await open(scope)
-  await page.getByRole('menuitem', { name, exact: true }).click()
+  // A Host dialog that opens late (the provider setup notice after a reload) takes focus and closes the menu under the
+  // click; the item is then detached for good, so open the menu again rather than wait on it.
+  await expect(async () => {
+    if ((await page.getByRole('menu').filter({ visible: true }).count()) === 0) await open(scope)
+    await page.getByRole('menuitem', { name, exact: true }).click({ timeout: 3_000 })
+  }).toPass({ timeout: 30_000 })
 }
 
 const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')

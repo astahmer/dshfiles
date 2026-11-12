@@ -98,15 +98,21 @@ When('a disposable terminal workspace has a selected real conversation', async (
   await picker.getByRole('button', { name: 'Register project', exact: true }).first().click()
   await expect(picker).toBeHidden()
   await confirmFolderSetupStep(page, workspace)
-  await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBeNull()
+  // Choosing the project moves the blank thread to a Session in that project a moment later (the URL follows it); until
+  // then the unowned thread's composer stays disabled. Read the id once the main pane's composer for it is editable.
+  const composerOf = (id: string) =>
+    pane(page, 'main')
+      .locator(`[data-conversation-session=${JSON.stringify(id)}]`)
+      .getByRole('textbox', {
+        name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/,
+      })
+  await expect(async () => {
+    const current = new URL(page.url()).searchParams.get('thread')
+    expect(current).not.toBeNull()
+    await expect(composerOf(current ?? '')).toBeEditable({ timeout: 1_000 })
+  }).toPass({ timeout: 30_000 })
   const sessionId = new URL(page.url()).searchParams.get('thread')
   if (sessionId === null) throw new Error('The actual terminal Session was not created')
-  const composer = pane(page, 'main')
-    .locator(`[data-conversation-session=${JSON.stringify(sessionId)}]`)
-    .getByRole('textbox', {
-      name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/,
-    })
-  await expect(composer).toBeEditable()
   journeys.set(page, { root, workspace, sessionId, terminals: new Map() })
 })
 
