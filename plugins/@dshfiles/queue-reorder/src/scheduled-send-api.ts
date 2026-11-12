@@ -1,4 +1,4 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, event, method } from '@dshfiles/dshx/api'
 import { Schema } from 'effect'
 
 /** The longest message a scheduled send holds; the session controller's prompt takes as much. */
@@ -104,6 +104,12 @@ export const scheduledSendApi = defineApi({
       output: scheduledSendSchema,
       description: 'Send one scheduled message now instead of at its time. Call only when the user asked to send it now.',
       tool: { name: 'scheduled_send_now', render: send => `Sending now: ${renderSend(send)}` },
+    }),
+  },
+  events: {
+    changed: event({
+      schema: Schema.Struct({}),
+      description: 'A message was scheduled, edited, sent or cancelled. Read list again.',
     }),
   },
 })

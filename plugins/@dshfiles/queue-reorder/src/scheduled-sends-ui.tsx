@@ -1,5 +1,5 @@
 import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
-import { Composer, useApi, useContract, useSettings } from '@dshfiles/dshx/client'
+import { Composer, useApi, useApiEvent, useContract, useSettings } from '@dshfiles/dshx/client'
 import { ComposerBar, type ComposerBarPlacement } from '@dshfiles/rich-composer/composer-more'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -39,19 +39,27 @@ const sendsKey = (sessionId: string) => ['queue-reorder', 'scheduled-sends', ses
 type ScheduledSendClient = typeof scheduledSendApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
 
 /**
- * Polls so a send the Host delivered (or another tab scheduled) leaves or joins the list. Main tabs keep every visited
- * thread's dock mounted, so only the thread the main view shows polls; the others read once when they mount.
+ * The `changed` event reads the list again when a send the Host delivered (or another tab scheduled) leaves or joins
+ * it. Without that stream it polls, and only for the thread the main view shows: main tabs keep every visited thread's
+ * dock mounted, and the others read once when they mount.
  */
-export const scheduledSendsQuery = (input: { readonly api: Pick<ScheduledSendClient, 'list'>; readonly sessionId: string; readonly onScreen: boolean }) =>
+export const scheduledSendsQuery = (input: {
+  readonly api: Pick<ScheduledSendClient, 'list'>
+  readonly sessionId: string
+  readonly onScreen: boolean
+  readonly eventsLive: boolean
+}) =>
   queryOptions({
     queryKey: sendsKey(input.sessionId),
     queryFn: ({ signal }) => input.api.list({ sessionId: input.sessionId }, { signal }),
-    refetchInterval: input.onScreen ? 15_000 : false,
+    refetchInterval: input.onScreen && !input.eventsLive ? 15_000 : false,
   })
 
 const useScheduledSends = (sessionId: string) => {
   const api = useApi(scheduledSendApi)
-  return useQuery(scheduledSendsQuery({ api, sessionId, onScreen: useSessionOnScreen(sessionId) }))
+  const queryClient = useQueryClient()
+  const events = useApiEvent(scheduledSendApi, 'changed', () => void queryClient.invalidateQueries({ queryKey: sendsKey(sessionId) }))
+  return useQuery(scheduledSendsQuery({ api, sessionId, onScreen: useSessionOnScreen(sessionId), eventsLive: events === 'live' }))
 }
 
 const useNow = (): Date => {

@@ -2,7 +2,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { Api, DshxPlugin, HostContext, Tool } from '@dshfiles/dshx/effect'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
-import { Effect, Layer, Schema } from 'effect'
+import { Effect, Layer, Schema, Stream } from 'effect'
 import { moveDirectionSchema, queueApi, queuePositionSchema } from './api.js'
 import { QueueOrder } from './queue-order-service.js'
 import { QueuedFiles } from './queued-files-promise.js'
@@ -53,7 +53,24 @@ const reachableSend = (id: string, caller: ApiCaller) =>
     if (send !== undefined && !allowed(send.sessionId)) return yield* ScheduledSendRefused.notFound(id)
   })
 
-const ScheduledSendsLive = ScheduledSends.layer.pipe(
+/** Tell browsers to read their scheduled sends again; a burst of writes becomes one read. */
+const ScheduledSendEvents = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const store = yield* ScheduledSendStore
+    yield* store.changes.pipe(
+      Stream.groupedWithin(Number.MAX_SAFE_INTEGER, '100 millis'),
+      Stream.runForEach(() =>
+        Api.publish({ contract: scheduledSendApi, event: 'changed', payload: {} }).pipe(
+          Effect.catchTag('PublishEventError', error => Effect.logWarning('queue-reorder: scheduled send change event refused', error.message)),
+        ),
+      ),
+      DshxPlugin.detached,
+      Effect.forkScoped,
+    )
+  }),
+)
+
+const ScheduledSendsLive = Layer.mergeAll(ScheduledSends.layer, ScheduledSendEvents).pipe(
   Layer.provideMerge(Layer.mergeAll(ScheduledSendStore.layer, ScheduledSendDeliveryLive.pipe(Layer.provide(HostApis.layer)))),
 )
 

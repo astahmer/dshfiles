@@ -106,7 +106,28 @@ const mountedQueue = Effect.gen(function* () {
   const agentTool = (sessionId: string, name: string, args: ToolArguments) =>
     // SAFETY: the dshx tool edge reads only the Agent's id and its session header's cwd to name the caller.
     Effect.promise(() => host.runTool({ name, arguments: args, agent: { id: sessionId, session: { header: {} } } as never }))
-  return { inbox, call, runTool, sendsCall, agentTool }
+  /** The page event stream, read until an event frame with an empty payload: plugin storage announces its own writes with one. */
+  const nextEvent = Effect.promise(async () => {
+    const response = await host.connection.fetch('http://dshx.test/api/dshx-events')
+    const reader = response.body?.getReader()
+    if (reader === undefined) throw new Error('The event route sent no body.')
+    return {
+      read: async (): Promise<string> => {
+        const decoder = new TextDecoder()
+        for (;;) {
+          const chunk = await reader.read()
+          if (chunk.done) throw new Error('The event stream ended.')
+          const frame = decoder
+            .decode(chunk.value)
+            .split('\n\n')
+            .find(candidate => candidate.includes('"type":"event"') && candidate.includes('"data":{}'))
+          if (frame !== undefined) return frame
+        }
+      },
+      close: () => reader.cancel(),
+    }
+  })
+  return { inbox, call, runTool, sendsCall, agentTool, nextEvent }
 })
 
 const attachment = (attachmentId: string, bytes: number) => ({ attachmentId, name: `${attachmentId}.txt`, bytes })
@@ -207,6 +228,20 @@ describe('queue-reorder Host', () => {
         expect(yield* queue.call('readFile', { sessionId: 'live', attachment: attachment('grows', 3) })).toEqual(tooLarge)
         queue.inbox.nextTurn.push({ id: 'd', content: [fileBlock('huge-declared', MAX_QUEUE_FILE_BYTES + 1)] })
         expect(yield* queue.call('readFile', { sessionId: 'live', attachment: attachment('huge-declared', 3) })).toEqual(tooLarge)
+      }),
+    ),
+  )
+
+  it.effect('announces a scheduled send change, so an open dock reads its list again instead of polling it', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const queue = yield* mountedQueue
+        const events = yield* queue.nextEvent
+        const announced = events.read()
+        const created = yield* queue.sendsCall('create', { sessionId: 'mine', text: 'later', sendAt: Date.now() + 60 * 60 * 1000 })
+        expect(created.ok).toBe(true)
+        expect(yield* Effect.promise(() => announced)).toMatch(/"key":"[^"]+\/changed"/)
+        yield* Effect.promise(() => events.close())
       }),
     ),
   )
