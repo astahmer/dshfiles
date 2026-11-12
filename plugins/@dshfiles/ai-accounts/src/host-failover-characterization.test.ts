@@ -1,6 +1,7 @@
 import { AccountsHostFixture, type AccountsHost } from './accounts-host.fixture.js'
 import { accountDraftSchema, accountsFileSchema, type AccountDraft } from './api.js'
 import * as Schema from 'effect/Schema'
+import { modelFallbackSnapshotSchema } from './model-fallback-api.js'
 import { servingAccountSnapshotSchema } from './serving-account-api.js'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
@@ -149,6 +150,42 @@ describe('agent/request-error fail-over', { timeout: 30_000 }, () => {
 
     await host.ask(agent, 'again')
     expect(host.chats.map(chat => chat.account)).toEqual(['cc_a', 'cc_b', 'cc_b'])
+  })
+
+  it('under the next-turn policy, continues a chain hop on the fallback and returns to the selection only after that continuation', async () => {
+    const turnsEndedAtSelection: number[] = []
+    let turnsEnded = 0
+    const host = await start({
+      accounts: [{ id: 'cc_a' }, { id: 'cc_b' }],
+      distribution: 'priority',
+      replies: [rateLimited],
+      beforeMount: host => {
+        host.ctx.on('session/event', (_session, event) => {
+          if (event.type === 'turn/end') turnsEnded += 1
+        })
+      },
+      onSelectModel: () => {
+        turnsEndedAtSelection.push(turnsEnded)
+      },
+    })
+    await AccountsHostFixture.callApi({
+      host: host.host,
+      apiId: 'ai-accounts-model-fallback',
+      method: 'setReturnPolicy',
+      payload: { returnPolicy: 'next-turn' },
+      output: modelFallbackSnapshotSchema,
+    })
+    const agent = await host.startThread({ sessionId: 'thread-1', provider: 'cc_a' })
+    await askThroughFailover(host, agent, 'hello')
+
+    expect(turnEnds(agent)).toEqual([
+      { turn: 1, reason: { kind: 'error', error: expect.objectContaining({ code: 'RATE_LIMIT' }) } },
+      { turn: 2, reason: { kind: 'completed' } },
+    ])
+    expect(host.chats.map(chat => chat.account)).toEqual(['cc_a', 'cc_b'])
+    // DSH emits no agent/turn-stopping for the failed turn, so the selection returns only after the continuation ends.
+    await until(() => turnsEndedAtSelection.length > 0)
+    expect(turnsEndedAtSelection).toEqual([2])
   })
 
   it('waits out a rate limit with no sibling for the delay the provider asked, then opens the retry', async () => {

@@ -164,6 +164,8 @@ interface StartInput {
    * header, so without this a rate limit with no sibling waits the full policy minute.
    */
   readonly retryAfterMs?: number
+  /** Runs when ai-accounts asks the session controller to select a model, after the request is recorded. */
+  readonly onSelectModel?: (request: SelectionRequest) => void
   /** Runs on the Host context after the native services exist and before ai-accounts mounts. */
   readonly beforeMount?: (host: TestHost) => void | Promise<void>
 }
@@ -228,6 +230,7 @@ const start = async (input: StartInput): Promise<AccountsHost> => {
   ctx.provide('sessionController', {
     selectModel: async (request: SelectionRequest) => {
       selected.push(request)
+      input.onSelectModel?.(request)
     },
   })
   if (input.userSelections === true) await ctx.sessionProjections.register(userSelectionProjection)
