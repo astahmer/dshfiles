@@ -3,6 +3,19 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Folder locations expire spread out (2026-11-12)
+
+The live traces showed bursts of 70–80 `jj root` spawns in one repository scan: every registered folder's location is
+cached for 30 minutes, and one scan fills them all, so they all expired together. Each folder's entry now lives
+30 minutes plus its own offset in a 15-minute window (a hash of its path). Regression check:
+`repository-views.test.ts` "spreads the re-locates of folders cached by one scan instead of re-locating them all in one
+later scan" (80 folders: 80 re-located in the scan at 31 minutes before, under 20 after, all 80 by 46 minutes).
+
+| 80 folders located by one scan     | Before                  | After                              |
+| ---------------------------------- | ----------------------- | ---------------------------------- |
+| `jj root` in the scan at 30 min    | 80                      | the few whose offset passed        |
+| spread of the re-locates           | one scan                | 30–45 min, at most 6 in any minute |
+
 ## Thread workspace scans pinned to commits (2026-11-12)
 
 Same live window: `thread workspaces list` spawned 74 `jj log` reads at about 2.1 s each, 88 s of jj in 39 minutes. One

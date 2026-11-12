@@ -19,6 +19,11 @@ import type { ThreadLocation } from './thread-workspace-model.js'
  * folder's repository and workspace identity never change, so it outlives the statuses that do.
  */
 const LOCATION_TTL = Duration.minutes(30)
+/**
+ * Locations filled by one scan would all expire together, and the scan after that pays one `jj root` per registered
+ * folder at once (70-80 live); each folder's own offset in this window spreads them out.
+ */
+const LOCATION_TTL_SPREAD_SECONDS = 15 * 60
 const THREAD_STATUS_TTL = Duration.seconds(30)
 const REPOSITORY_VIEW_TTL_MS = 60_000
 /** A few `jj` reads per repository, so repositories are scanned a bounded few at a time. */
@@ -27,6 +32,14 @@ const REPOSITORY_SCAN_CONCURRENCY = 4
 const LOCATE_CONCURRENCY = 8
 const MAX_LOCATIONS = 4_096
 const MAX_STATUS_REPOSITORIES = 256
+
+/** FNV-1a with a final mix: sibling folders (`thread-a…`, `thread-b…`) land far apart in the window. */
+const locationOffsetSeconds = (target: string): number => {
+  let hash = 0x81_1c_9d_c5
+  for (const character of target) hash = Math.imul(hash ^ (character.codePointAt(0) ?? 0), 0x01_00_01_93) >>> 0
+  hash = Math.imul(hash ^ (hash >>> 16), 0x85_eb_ca_6b) >>> 0
+  return ((hash ^ (hash >>> 13)) >>> 0) % LOCATION_TTL_SPREAD_SECONDS
+}
 
 export interface ThreadCaller {
   readonly fromAgent: boolean
@@ -123,7 +136,10 @@ export class RepositoryViews extends Context.Service<
             Effect.map(Option.some),
             Effect.catchTag('NotARepository', () => Effect.succeed(Option.none<ThreadLocation>())),
           ),
-        { capacity: MAX_LOCATIONS, timeToLive: exit => (Exit.isSuccess(exit) ? LOCATION_TTL : Duration.zero) },
+        {
+          capacity: MAX_LOCATIONS,
+          timeToLive: (exit, target) => (Exit.isSuccess(exit) ? Duration.sum(LOCATION_TTL, Duration.seconds(locationOffsetSeconds(target))) : Duration.zero),
+        },
       )
       /**
        * Keyed on the store's operation heads as well: an operation that lands is read at once instead of up to the TTL

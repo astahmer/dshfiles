@@ -4,7 +4,9 @@ import { join } from 'node:path'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { NodeServices } from '@effect/platform-node'
 import { describe, expect, it } from '@effect/vitest'
-import { Deferred, Effect, Layer, References, Ref } from 'effect'
+import { Deferred, Duration, Effect, Layer, References, Ref } from 'effect'
+import { TestClock } from 'effect/testing'
+import { NotARepository } from './errors.js'
 import { SessionReads, WorkspaceRegistry } from './host-edges-promise.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
 import { ProjectBookmarks } from './project-bookmarks.js'
@@ -106,6 +108,57 @@ describe('RepositoryViews thread statuses', () => {
         yield* views.list
         expect(yield* Ref.get(lists)).toBe(2)
       }).pipe(Effect.provide(layer), Effect.ensuring(Effect.promise(() => rm(repoRoot, { recursive: true, force: true }))))
+    }),
+  )
+})
+
+describe('RepositoryViews folder locations', () => {
+  it.effect('spreads the re-locates of folders cached by one scan instead of re-locating them all in one later scan', () =>
+    Effect.gen(function* () {
+      const root = yield* Effect.promise(() => mkdtemp(join(tmpdir(), 'jj-views-locations-')))
+      const paths = Array.from({ length: 80 }, (_, index) => join(root, `project-${String(index)}`))
+      yield* Effect.promise(() => Promise.all(paths.map(folder => mkdir(folder))))
+      const locates = yield* Ref.make(0)
+      const workspaces = paths.map((folder, index): Workspace => ({
+        id: WorkspaceId(`workspace-${String(index)}`),
+        path: folder,
+        title: `project ${String(index)}`,
+        createdAt: '2026-11-12T00:00:00.000Z',
+        updatedAt: '2026-11-12T00:00:00.000Z',
+        sessionIds: [],
+        setTitle: () => Promise.resolve(),
+        attachSession: () => Promise.resolve(),
+        insertSessionBefore: () => Promise.resolve(),
+        detachSession: () => Promise.resolve(),
+        status: () => Promise.resolve('ok'),
+      }))
+      const layer = RepositoryViews.layer.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.mock(WorkspaceRegistry, { list: Effect.succeed(workspaces), archivedSessionIds: Effect.succeed(new Set<string>()) }),
+            Layer.mock(ThreadWorkspaces, {
+              locate: () => Ref.update(locates, count => count + 1).pipe(Effect.andThen(Effect.fail(new NotARepository({ detail: 'not jj' })))),
+            }),
+            Layer.mock(ProjectBookmarks, {}),
+            Layer.mock(SessionReads, {}),
+            Layer.mock(SessionActivity, { display: Effect.succeed(undefined) }),
+            Layer.mock(IntegrationRequests, {}),
+            Layer.mock(IsolatedSessions, {}),
+            NodeServices.layer,
+          ),
+        ),
+      )
+      yield* Effect.gen(function* () {
+        const views = yield* RepositoryViews
+        yield* views.list
+        expect(yield* Ref.get(locates)).toBe(80)
+        yield* TestClock.adjust(Duration.minutes(31))
+        yield* views.list
+        expect((yield* Ref.get(locates)) - 80).toBeLessThan(20)
+        yield* TestClock.adjust(Duration.minutes(15))
+        yield* views.list
+        expect(yield* Ref.get(locates)).toBe(160)
+      }).pipe(Effect.provide(layer), Effect.ensuring(Effect.promise(() => rm(root, { recursive: true, force: true }))))
     }),
   )
 })
