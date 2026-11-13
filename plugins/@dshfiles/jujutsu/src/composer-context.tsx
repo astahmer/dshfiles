@@ -272,7 +272,7 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
     <TooltipProvider delayDuration={500}>
       <div className="dshx-root dshx:flex dshx:items-center dshx:text-xs dshx:text-muted-foreground" data-composer-meta="location" ref={context.ref}>
         <Chip onClick={toggle} tooltip={title}>
-          <span>{label}</span>
+          <span className="dshx:min-w-0 dshx:truncate">{label}</span>
           {repository.conflict && <span className="dshx:shrink-0 dshx:text-destructive">conflict</span>}
         </Chip>
       </div>

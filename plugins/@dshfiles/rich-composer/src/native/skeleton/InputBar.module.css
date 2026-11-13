@@ -104,8 +104,26 @@
   display: none;
 }
 
-/* A narrow bar keeps the location line whole and moves the readings behind ⋯ (shown only when there are some). */
+/* A narrow bar keeps the location on one line, truncating it before ⋯ (shown only when there are readings), and moves
+   the readings behind ⋯. A phone wrapped "project / Own workspace · ahead of <bookmark> / ⋯" onto three lines. */
 @container (max-width: 560px) {
+  .dock:not([data-meter-expanded]) {
+    flex-wrap: nowrap;
+  }
+
+  .dock:not([data-meter-expanded]) > :global([data-run-summary]),
+  .dock:not([data-meter-expanded]) :global([data-composer-meta='location']) {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* The project name is short and names the thread's place; the location gives up its width first. */
+  .dock:not([data-meter-expanded]) > :global([data-run-summary]) {
+    flex-shrink: 0;
+    max-width: 45%;
+  }
+
   .dock:not([data-meter-expanded]) :global([data-composer-stat]) {
     display: none;
   }
