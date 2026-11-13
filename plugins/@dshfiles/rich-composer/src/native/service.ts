@@ -34,7 +34,8 @@ import type {
   DraftAttachmentId, DraftAttachmentSerializationResult, SessionInputResolver, SubmitAttachment, SubmitOutcome,
 } from './contract/input.ts'
 import type { InputSubmitMode } from './contract/composer-submission.ts'
-import { startInteraction } from '@dshfiles/dshx/tracing/client'
+import { startInteraction, startSpan } from '@dshfiles/dshx/tracing/client'
+import type { BrowserSpan } from '@dshfiles/dshx/tracing/client'
 import { TaskQueue } from '../file-upload-queue.ts'
 import { isImageMediaType } from './canonical-image-type.ts'
 import { jpegCopy, sniffImageType } from './image-bytes.ts'
@@ -480,6 +481,19 @@ export class ConversationController extends Service implements IConversation {
     void done.then(() => { this.pendingFileUploads.delete(done) })
     const name = attachment.file.name === '' ? undefined : attachment.file.name
     const start = async (): Promise<void> => {
+      // One span per upload, so a failure on a phone names its stage and cause (no file name or bytes).
+      const span = startSpan('composer upload', {
+        parent: null,
+        attributes: {
+          'dshx.upload.kind': attachment.kind,
+          'dshx.upload.bytes': attachment.file.size,
+          'dshx.upload.declared_type': attachment.file.type,
+        },
+      })
+      const fail = (message: string, reason?: string): void => {
+        span.setStatus('error', message.slice(0, 200))
+        span.setAttributes({ 'dshx.upload.outcome': 'error', 'dshx.upload.error': message.slice(0, 200), ...(reason === undefined ? {} : { 'dshx.upload.reason': reason }) })
+      }
       try {
         if (this.fileUploadOperations.get(attachment.id)?.controller !== controller) return
         this.fileUploads.update((draft) => {
@@ -501,6 +515,7 @@ export class ConversationController extends Service implements IConversation {
         // A New thread stays a local draft until its first content creates it on the Host; an upload sent before
         // that finds no Session (the Host answers before reading the body, so the browser sees a reset).
         await this.ctx.get('sessionDrafts')?.whenCreated(sessionId, controller.signal)
+        span.addEvent('session ready')
         const ownership = await this.multiHost.sessionRuntime({ sessionId }, { signal: controller.signal })
         if (!ownership.ok) throw new Error(`${ownership.message} (${ownership.code})`)
         if (ownership.runtimeId !== null && attachment.kind === 'image') {
@@ -510,7 +525,7 @@ export class ConversationController extends Service implements IConversation {
         }
         const result = ownership.runtimeId === null
           ? attachment.kind === 'image'
-            ? await this.uploadImageBytes({ sessionId, file: attachment.file, name, signal: controller.signal, onProgress })
+            ? await this.uploadImageBytes({ sessionId, file: attachment.file, name, signal: controller.signal, onProgress, span })
             : await this.ctx.fileUpload.upload(
                 sessionId, await uploadBody(attachment.file), name, controller.signal, onProgress,
               )
@@ -530,6 +545,8 @@ export class ConversationController extends Service implements IConversation {
               onProgress({ loaded: attachment.file.size, total: attachment.file.size })
               return { ok: true as const, value: uploaded.value }
             })(ownership.runtimeId)
+        if (result.ok) span.setAttribute('dshx.upload.outcome', 'ready')
+        else fail(`${result.error.message} (${result.error.code})`, result.error.code === 'session/attachment-invalid' || result.error.code === 'subagent/attachment-invalid' ? result.error.details.reason : undefined)
         if (this.fileUploadOperations.get(attachment.id)?.controller !== controller) return
         this.fileUploads.update((draft) => {
           if (!(attachment.id in draft)) return
@@ -546,6 +563,8 @@ export class ConversationController extends Service implements IConversation {
             : { status: 'error', message: error.message }
         })
       } catch (error) {
+        if (controller.signal.aborted) span.setAttribute('dshx.upload.outcome', 'aborted')
+        else fail(error instanceof Error ? `${error.name}: ${error.message}` : String(error))
         if (this.fileUploadOperations.get(attachment.id)?.controller !== controller) return
         this.fileUploads.update((draft) => {
           if (!(attachment.id in draft)) return
@@ -555,6 +574,7 @@ export class ConversationController extends Service implements IConversation {
           }
         })
       } finally {
+        span.end()
         if (this.fileUploadOperations.get(attachment.id)?.controller === controller) {
           this.fileUploadOperations.delete(attachment.id)
         }
@@ -573,17 +593,21 @@ export class ConversationController extends Service implements IConversation {
     readonly name: string | undefined
     readonly signal: AbortSignal
     readonly onProgress: (progress: { readonly loaded: number; readonly total?: number }) => void
+    readonly span: BrowserSpan
   }) {
     const upload = (body: Blob, mediaType: ImageMediaType) =>
       this.ctx.fileUpload.uploadImage(request.sessionId, body, mediaType, request.name, request.signal, request.onProgress)
     const body = await uploadBody(request.file)
     const sniffed = sniffImageType(new Uint8Array(await body.slice(0, 12).arrayBuffer()))
+    request.span.setAttribute('dshx.upload.sniffed_type', sniffed ?? 'unknown')
     request.signal.throwIfAborted()
     if (sniffed !== undefined) {
       const result = await upload(body, sniffed)
       if (result.ok || !isUndecodableImage(result.error)) return result
+      request.span.addEvent('host refused original', { 'dshx.upload.error_code': result.error.code })
     }
     const jpeg = await jpegCopy(request.file)
+    request.span.setAttributes({ 'dshx.upload.jpeg_retry': true, 'dshx.upload.jpeg_bytes': jpeg?.size ?? -1 })
     request.signal.throwIfAborted()
     // Undecodable here too: the Host's refusal names the problem.
     if (jpeg === undefined) return upload(body, sniffed ?? imageMediaType(request.file.type))
