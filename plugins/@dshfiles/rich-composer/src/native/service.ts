@@ -138,7 +138,7 @@ function nextPaint(): Promise<void> {
 }
 
 /** Native canonical base64 of one browser image (FileReader data-URL encode; no main-thread byte loop). */
-function base64ImageOf(file: File): Promise<string> {
+function base64ImageOf(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
@@ -366,7 +366,7 @@ export class ConversationController extends Service implements IConversation {
         if (attachment.kind === 'file') return { type: 'file' as const, receiptId: uploadFor(attachment).receiptId }
         const receiptId = imageReceipts.get(attachment.id)
         return receiptId === undefined
-          ? { type: 'image' as const, ...await this.encodeImage(attachment.file) }
+          ? { type: 'image' as const, ...await this.encodeImage(attachment) }
           : { type: 'file' as const, receiptId }
       }),
     )
@@ -656,7 +656,7 @@ export class ConversationController extends Service implements IConversation {
     const uploads = this.fileUploads.getSnapshot()
     return {
       attachments: await Promise.all(attachments.map(async (attachment) => {
-        if (attachment.kind === 'image') return { type: 'image' as const, ...await this.encodeImage(attachment.file) }
+        if (attachment.kind === 'image') return { type: 'image' as const, ...await this.encodeImage(attachment) }
         const upload = uploads[attachment.id]
         if (upload === undefined || upload.status !== 'ready') {
           throw new Error('conversation.serializeDraftAttachments: one or more files have not finished uploading')
@@ -782,13 +782,22 @@ export class ConversationController extends Service implements IConversation {
     }
   }
 
-  /** Canonical base64 wire form of one browser image file. */
-  private async encodeImage(file: File): Promise<Omit<Extract<SubmitAttachment, { type: 'image' }>, 'type'>> {
-    return {
-      mediaType: imageMediaType(file.type),
-      data: await base64ImageOf(file),
-      ...(file.name === '' ? {} : { name: file.name }),
+  /**
+   * Canonical base64 wire form of one image sent inline (a remote runtime's thread, a subagent continuation). Inline
+   * bytes get no staged retry, so bytes no Host admits (unknown format, a JPEG cut short) travel as the JPEG the
+   * thumbnail decodes instead.
+   */
+  private async encodeImage(attachment: ComposerImageAttachment): Promise<Omit<Extract<SubmitAttachment, { type: 'image' }>, 'type'>> {
+    const { file } = attachment
+    const name = file.name === '' ? {} : { name: file.name }
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const sniffed = sniffImageType(bytes)
+    if (sniffed !== undefined && (sniffed !== 'image/jpeg' || jpegComplete(bytes))) {
+      return { mediaType: sniffed, data: await base64ImageOf(new Blob([bytes], { type: sniffed })), ...name }
     }
+    const jpeg = await jpegCopy({ file, previewUrl: attachment.previewUrl })
+    if (jpeg.ok) return { mediaType: 'image/jpeg', data: await base64ImageOf(jpeg.blob), ...name }
+    return { mediaType: sniffed ?? imageMediaType(file.type), data: await base64ImageOf(file), ...name }
   }
 }
 
