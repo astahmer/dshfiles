@@ -189,6 +189,7 @@ import { usageLimitRefetchInterval } from './usage-limit-poll.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, pageLoadThreadRoute, readThreadUrl } from './thread-url.js'
+import { PHONE_HISTORY_SELF_POP_EVENT } from '@dshfiles/workbench/phone-history'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import {
   EMPTY_THREAD_SELECTION,
@@ -2655,15 +2656,30 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   useEffect(() => {
     if (!isPrimarySurface) return
+    // The phone history layers announce the `history.back()` they run for their own bookkeeping (closing a level the app
+    // already closed). That popstate lands on an entry without the thread and is not a navigation: reading it dropped a
+    // page-load link while the list was still loading.
+    let selfPops = 0
+    const onSelfPop = (): void => {
+      selfPops += 1
+    }
     const onPopState = (): void => {
+      if (selfPops > 0) {
+        selfPops -= 1
+        return
+      }
       dispatchRoute({
         type: 'navigate',
         sessionId: readThreadUrl(window.location.href)?.sessionId ?? null,
         selectedSessionId: selectedSession?.id ?? null,
       })
     }
+    window.addEventListener(PHONE_HISTORY_SELF_POP_EVENT, onSelfPop)
     window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
+    return () => {
+      window.removeEventListener(PHONE_HISTORY_SELF_POP_EVENT, onSelfPop)
+      window.removeEventListener('popstate', onPopState)
+    }
   }, [isPrimarySurface, selectedSession?.id])
 
   useEffect(() => {

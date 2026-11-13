@@ -45,7 +45,7 @@ import { SidebarTrees, type ResolvedEntry } from './sidebar-tree.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar } from './phone-shell.js'
 import { useEdgeSwipe } from './edge-swipe.js'
 import { runStackMotion } from './stack-motion.js'
-import { clearThreadUrl } from './thread-url.js'
+import { clearThreadUrl, pageLoadThreadRoute } from './thread-url.js'
 import { PhoneRailActions, RailActionGroup, type RailAction } from './rail-actions.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
@@ -898,6 +898,17 @@ const PhoneNavigation = (
       root.style.removeProperty('--dsh-phone-top-height')
       if (meta !== null && previous !== null) meta.setAttribute('content', previous)
     }
+  }, [])
+  // Only the Threads list resolves a page loaded on a thread link, and it is unmounted while the stage covers it: a
+  // reload inside a thread restored the previous stage (often a New thread) and ignored the link. Show the list first;
+  // resolving the link selects the thread, which pushes the stage like a tap.
+  useLayoutEffect(() => {
+    const linked = pageLoadThreadRoute.pending(window.location.href)
+    if (linked === null || linked === props.selectedThreadId) return
+    if (props.destination.id !== 'threads') props.setDestination('threads')
+    if (listOpenRef.current) return
+    listOpenRef.current = true
+    toggleSidebar()
   }, [])
   useSoftwareKeyboard()
   useStandaloneStatusBar()
