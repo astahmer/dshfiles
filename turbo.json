@@ -31,7 +31,7 @@
       "outputs": ["dist/**", "build/**", ".cache/*.tsbuildinfo"]
     },
     "@dshfiles/setup-ui#build": {
-      "dependsOn": [],
+      "dependsOn": ["create-dshx#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/src/**",

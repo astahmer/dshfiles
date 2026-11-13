@@ -138,7 +138,6 @@ html body {
   --dsw-alias-code-diff-added: var(--dshx-tone-success-bg);
   --dsw-alias-code-diff-deleted: var(--dshx-tone-danger-bg);
   --dsw-specific-sidebar-fill: var(--dshx-tone-1);
-  --dsw-specific-sidebar-nav-item-hover: var(--dshx-tone-2);
   --dsw-specific-sidebar-nav-item-active: var(--dshx-tone-3);
   --dsw-specific-sidebar-nav-item-active-accent: var(--dshx-tone-accent-bg);
   --dsw-specific-bubble: var(--dshx-tone-2);
@@ -286,7 +285,6 @@ body[data-ds-dark-theme][data-ds-dark-theme] {
   --dsw-alias-code-diff-added: var(--dshx-tone-success-bg);
   --dsw-alias-code-diff-deleted: var(--dshx-tone-danger-bg);
   --dsw-specific-sidebar-fill: var(--dshx-tone-1);
-  --dsw-specific-sidebar-nav-item-hover: var(--dshx-tone-2);
   --dsw-specific-sidebar-nav-item-active: var(--dshx-tone-3);
   --dsw-specific-sidebar-nav-item-active-accent: var(--dshx-tone-accent-bg);
   --dsw-specific-bubble: var(--dshx-tone-2);

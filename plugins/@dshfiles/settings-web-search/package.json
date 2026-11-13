@@ -44,6 +44,7 @@
     "@deepseek-ai/dsh-client-ui-renderer": "catalog:",
     "@deepseek-ai/dsh-client-ui-settings": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
+    "@deepseek-ai/dsh-web": "0.2.2-rc.2",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

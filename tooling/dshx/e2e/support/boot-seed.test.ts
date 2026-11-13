@@ -133,8 +133,11 @@ describe('deterministic boot seeds', () => {
     const accounts = await bootPluginProfile('@dshfiles/ai-accounts')
     profiles.push(accounts)
     expect(await readFile(join(accounts.homeRoot, 'storages/workspace.json'), 'utf8')).toContain('ai-accounts-project')
+    // Every isolated boot seeds its own scratch Workspace (b:kk6n); an unrelated profile gets that one, never AI Accounts'.
     const unrelated = await boot()
-    await expect(readFile(join(unrelated.homeRoot, 'storages/workspace.json'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+    const unrelatedStore = await readFile(join(unrelated.homeRoot, 'storages/workspace.json'), 'utf8')
+    expect(unrelatedStore).not.toContain('ai-accounts-project')
+    expect(unrelatedStore).toContain('"title": "workspace"')
   })
 
   it('disposes a prepared home when its seed fails, without launching a Host', async () => {

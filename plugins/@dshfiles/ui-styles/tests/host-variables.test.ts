@@ -19,12 +19,16 @@ const { version } = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct
   readFileSync(join(themeRoot, 'package.json'), 'utf8'),
 )
 
-/** Declarations of one top-level CSS block, for every block whose selector is exactly `selector`. */
+/**
+ * Declarations of one top-level CSS block, for every block whose selector is exactly `selector`. The bundle embeds each
+ * sheet in a JS string: a double-quoted one up to 0.2.1, a template literal (`` var base_css_default=`:root{ ``) since
+ * 0.2.2, so strip the JS up to either opening quote before comparing the selector.
+ */
 function declared(selector: string): Set<string> {
   const names = new Set<string>()
   const pattern = /([^{}"]*)\{([^{}]*)\}/gu
   for (const match of sheet.matchAll(pattern)) {
-    if ((match[1] ?? '').trim().replace(/^.*"/u, '') !== selector) continue
+    if ((match[1] ?? '').trim().replace(/^.*["`]/u, '') !== selector) continue
     for (const decl of (match[2] ?? '').split(';')) {
       const name = decl.split(':')[0]?.trim()
       if (name?.startsWith('--')) names.add(name)
