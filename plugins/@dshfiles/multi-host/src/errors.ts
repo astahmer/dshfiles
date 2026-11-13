@@ -598,6 +598,86 @@ export class FolderUnavailable extends Schema.TaggedError<FolderUnavailable>()(
 /** What ssh's own stderr says went wrong with the connection, before the remote command ran. */
 export type SshConnectionError = SshHostKeyRejected | SshAuthenticationFailed | SshHostUnresolved | SshUnreachable
 
+export class LinkStoreFailed extends Schema.TaggedError<LinkStoreFailed>()(
+  'LinkStoreFailed',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'link-store-failed' },
+) {
+  override get message(): string {
+    return 'The link store under plugins/multi-host could not be read or written. Check that the DSH home is writable, then try again.'
+  }
+}
+
+export class LinkGatewayOff extends Schema.TaggedError<LinkGatewayOff>()('LinkGatewayOff', {}, { dshxWireCode: 'link-gateway-off' }) {
+  override get message(): string {
+    return 'Linking is off on this machine. Turn it on under Hosts → Link this machine, or with multi_host_link_configure { enabled: true }.'
+  }
+}
+
+export class LinkGatewayUnavailable extends Schema.TaggedError<LinkGatewayUnavailable>()(
+  'LinkGatewayUnavailable',
+  { reason: Schema.Literals(['no-tailscale', 'port-busy', 'no-runtime', 'listen-failed']), detail: Schema.optional(Schema.String) },
+  { dshxWireCode: 'link-gateway-unavailable' },
+) {
+  override get message(): string {
+    if (this.reason === 'no-tailscale')
+      return 'No Tailscale address on this machine. Start Tailscale, or choose another listen mode under Hosts → Link this machine.'
+    if (this.reason === 'port-busy')
+      return `The link port is taken${this.detail === undefined ? '' : ` (${this.detail})`}. Pick another port under Hosts → Link this machine.`
+    if (this.reason === 'no-runtime') return 'This DSH has no web server yet, so there is nothing to link to. Open DSH in a browser, then try again.'
+    return `The link gateway could not listen${this.detail === undefined ? '' : `: ${this.detail}`}. Pick another listen mode or port.`
+  }
+}
+
+export class LinkPairRefused extends Schema.TaggedError<LinkPairRefused>()(
+  'LinkPairRefused',
+  { reason: Schema.Literals(['invalid', 'expired', 'used', 'unknown', 'rate-limited', 'too-many-peers', 'insecure-url', 'unreachable', 'protocol']) },
+  { dshxWireCode: 'link-pair-refused' },
+) {
+  override get message(): string {
+    switch (this.reason) {
+      case 'expired':
+        return 'That pairing code expired. Make a new one on the other machine under Hosts → Link this machine.'
+      case 'used':
+        return 'That pairing code was already used. Make a new one on the other machine.'
+      case 'unknown':
+        return 'The other machine does not know that pairing code. Check it, or make a new one there.'
+      case 'rate-limited':
+        return 'Too many pairing attempts in the last minute. Wait a minute, then try again with a fresh code.'
+      case 'too-many-peers':
+        return 'The other machine already has the maximum number of linked machines. Unlink one there, then pair again.'
+      case 'insecure-url':
+        return 'That link URL is plain HTTP outside Tailscale and loopback, so the credential would cross the network unencrypted. Use an https:// or Tailscale address, or allow plain HTTP explicitly.'
+      case 'unreachable':
+        return 'The link URL did not answer. Check that the other machine is online, linking is on there, and this machine can reach its address.'
+      case 'protocol':
+        return 'The link URL did not answer as a DSH link gateway. Check the address and port the other machine shows.'
+      default:
+        return 'The pairing request was malformed. Paste the pairing link the other machine shows.'
+    }
+  }
+}
+
+export class LinkCredentialMissing extends Schema.TaggedError<LinkCredentialMissing>()(
+  'LinkCredentialMissing',
+  {},
+  { dshxWireCode: 'link-credential-missing' },
+) {
+  override get message(): string {
+    return 'This machine holds no link credential for that host. Pair it again from Hosts → Pair a machine.'
+  }
+}
+
+export class LinkPeerNotFound extends Schema.TaggedError<LinkPeerNotFound>()(
+  'LinkPeerNotFound',
+  { peerId: Schema.String },
+  { dshxWireCode: 'link-peer-not-found' },
+) {
+  override get message(): string {
+    return `No linked machine ${this.peerId}. List them with multi_host_link_peers.`
+  }
+}
+
 export type SshRunError = SshTargetInvalid | SshUnavailable | SshInputTooLarge
 
 export type SshExecError = SshRunError | SshOutputTooLarge | SshTimedOut | SshConnectionError | SshCommandFailed

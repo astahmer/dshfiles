@@ -260,7 +260,8 @@ export const readProjectOrigins = Effect.fn('multi-host project origins')(functi
     const remoteHosts = new Map<string, RemoteHostGroup>()
 
     for (const target of targets) {
-      if (target.host === undefined) {
+      // A paired host has no shell here to read its remotes with, so its project origins stay unknown.
+      if (target.host === undefined || target.host.connector.kind === 'direct') {
         for (const path of target.paths) cacheOrigin({ request: { kind: 'remote', runtimeId: target.runtimeId, path }, origin: null, now: startedAt })
         continue
       }

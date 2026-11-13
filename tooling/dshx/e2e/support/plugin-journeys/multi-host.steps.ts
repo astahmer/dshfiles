@@ -1760,3 +1760,120 @@ After(async ({ page }: { readonly page: Page }) => {
   const remainingScratchRoots = [pair.manager.homeRoot, pair.remote.homeRoot, pair.sshd.scratchRoot].filter(existsSync)
   expect(remainingScratchRoots).toEqual([])
 })
+
+const linkedRemoteName = 'Linked remote'
+const linkStatusSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), status: withUnknownProperties({ listening: Schema.Boolean, urls: Schema.Array(Schema.String) }) }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
+])
+const linkOfferSchema = Schema.Union([
+  withUnknownProperties({ ok: Schema.Literal(true), code: Schema.String, pairingLinks: Schema.Array(Schema.String) }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
+])
+const linkPairSchema = Schema.Union([
+  withUnknownProperties({
+    ok: Schema.Literal(true),
+    runtime: withUnknownProperties({ id: Schema.String }),
+    linkBack: Schema.optional(withUnknownProperties({ ok: Schema.Boolean, message: Schema.optional(Schema.String) })),
+  }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
+])
+const linkPeersSchema = Schema.Struct({
+  ok: Schema.Literal(true),
+  peers: Schema.Array(withUnknownProperties({ id: Schema.String, runtimeId: Schema.optional(Schema.String) })),
+})
+const directHostsSchema = withUnknownProperties({
+  hosts: Schema.Array(
+    withUnknownProperties({
+      id: Schema.String,
+      name: Schema.String,
+      connector: withUnknownProperties({ kind: Schema.String, url: Schema.optional(Schema.String) }),
+    }),
+  ),
+  runtimes: Schema.Array(withUnknownProperties({ id: Schema.String, hostId: Schema.String })),
+})
+
+const linkedRuntimes = new WeakMap<Page, { readonly managerRuntimeOnRemote: string; readonly remoteRuntimeOnManager: string }>()
+
+/** The runtime one machine registered for the other through a link: its direct host's only runtime. */
+const directRuntimeOf = async (profile: BootedProfile, url: string): Promise<string> => {
+  const directory = Schema.decodeUnknownSync(directHostsSchema)(await (await hostApi(profile))('list'))
+  const host = directory.hosts.find(item => item.connector.kind === 'direct' && item.connector.url === url)
+  const runtime = directory.runtimes.find(item => item.hostId === host?.id)
+  if (runtime === undefined) throw new Error(`No direct host for ${url}.`)
+  return runtime.id
+}
+
+When('linking is turned on for both machines on loopback', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  for (const profile of [pair.remote, pair.manager]) {
+    const port = Number(await reserveLoopbackPort())
+    const status = Schema.decodeUnknownSync(linkStatusSchema)(await (await hostApi(profile))('linkConfigure', { enabled: true, listen: 'loopback', port }))
+    if (!status.ok) throw new Error(`Linking did not turn on: ${status.message}`)
+    if (!status.status.listening) throw new Error(`Linking is on but not listening: ${JSON.stringify(status.status)}`)
+    expect(status.status).toMatchObject({ listening: true, urls: [`http://127.0.0.1:${port}`] })
+  }
+})
+
+When('the manager pairs with the remote code and links back', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const offer = Schema.decodeUnknownSync(linkOfferSchema)(await (await hostApi(pair.remote))('linkOffer'))
+  if (!offer.ok) throw new Error(`The remote made no pairing code: ${offer.message}`)
+  const [link] = offer.pairingLinks
+  if (link === undefined) throw new Error('The remote offered no pairing link.')
+  const paired = Schema.decodeUnknownSync(linkPairSchema)(await (await hostApi(pair.manager))('linkPair', { link, name: linkedRemoteName, linkBack: true }))
+  if (!paired.ok) throw new Error(`Pairing failed: ${paired.message}`)
+  expect(paired.linkBack).toMatchObject({ ok: true })
+  const remoteUrl = new URL(link).origin
+  const managerStatus = Schema.decodeUnknownSync(linkStatusSchema)(await (await hostApi(pair.manager))('linkStatus'))
+  if (!managerStatus.ok) throw new Error(managerStatus.message)
+  const [managerUrl] = managerStatus.status.urls
+  if (managerUrl === undefined) throw new Error('The manager has no link URL.')
+  linkedRuntimes.set(page, {
+    remoteRuntimeOnManager: await directRuntimeOf(pair.manager, remoteUrl),
+    managerRuntimeOnRemote: await directRuntimeOf(pair.remote, managerUrl),
+  })
+  // A spent code is refused, with the reason.
+  const again = Schema.decodeUnknownSync(linkPairSchema)(await (await hostApi(pair.manager))('linkPair', { link }))
+  expect(again).toMatchObject({ ok: false, code: 'link-pair-refused' })
+})
+
+Then('each machine reaches the other through the link', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const linked = linkedRuntimes.get(page)
+  if (linked === undefined) throw new Error('The machines are not linked.')
+  const there = Schema.decodeUnknownSync(runtimePingSchema)(await (await hostApi(pair.manager))('runtimePing', { runtimeId: linked.remoteRuntimeOnManager }))
+  expect(there).toMatchObject({ ok: true })
+  const back = Schema.decodeUnknownSync(runtimePingSchema)(await (await hostApi(pair.remote))('runtimePing', { runtimeId: linked.managerRuntimeOnRemote }))
+  expect(back).toMatchObject({ ok: true })
+  await openGlobalPanel(page, 'Multi-host: Hosts')
+  const hostsPage = page.getByTestId('dshfiles-hosts-page')
+  await expect(hostsPage.getByText(linkedRemoteName, { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+})
+
+When('the manager unlinks the remote', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const linked = linkedRuntimes.get(page)
+  const peers = Schema.decodeUnknownSync(linkPeersSchema)(await (await hostApi(pair.manager))('linkPeers')).peers
+  // The remote linked back, so it is a peer of the manager under the same runtime id the manager reaches it by.
+  const peer = peers.find(item => item.runtimeId === linked?.remoteRuntimeOnManager)
+  if (peer === undefined) throw new Error('The manager lists no linked machine.')
+  const revoked = Schema.decodeUnknownSync(withUnknownProperties({ ok: Schema.Boolean }))(
+    await (
+      await hostApi(pair.manager)
+    )('linkRevoke', { peerId: peer.id, confirm: true }),
+  )
+  expect(revoked.ok).toBe(true)
+})
+
+Then('the remote can no longer reach the manager', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const linked = linkedRuntimes.get(page)
+  if (linked === undefined) throw new Error('The machines are not linked.')
+  const reconnect = Schema.decodeUnknownSync(runtimeReconnectSchema)(
+    await (
+      await hostApi(pair.remote)
+    )('runtimeReconnect', { runtimeId: linked.managerRuntimeOnRemote }),
+  )
+  expect(reconnect).toMatchObject({ ok: false, code: 'authentication-failed' })
+})

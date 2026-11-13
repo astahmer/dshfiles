@@ -2,7 +2,8 @@
 
 Run new threads on other machines. Each machine runs its own stock DSH 0.2
 runtime with this plugin installed; this machine reaches it over SSH and keeps
-one tunnel open per host. Works on stock DSH 0.2.0-rc.2, no core patch.
+one tunnel open per host, or over a pairing-code link with no SSH at all
+([Linking machines without SSH](#linking-machines-without-ssh)). Works on stock DSH 0.2.0-rc.2, no core patch.
 
 ![A remote thread open in this client's own chat and composer](docs/screenshots/remote-thread-native.png)
 
@@ -206,6 +207,55 @@ host is named, waits for the turn and returns its final answer. A question on th
 host, a failed turn or a wait that runs out comes back with the thread id to
 follow; cancelling the call stops the remote turn.
 
+## Linking machines without SSH
+
+Two machines that both run DSH with this plugin can link with a pairing code
+instead of SSH, and link both ways, so an agent on either one can start threads
+and `multi_host_delegate` work on the other while both are online.
+
+![Link this machine on the Hosts page, with Pair a machine and a Link back row action](docs/screenshots/linked-machines.png)
+
+1. On the machine to reach, open **Hosts → Link this machine** and turn
+   linking on (`multi_host_link_configure { enabled: true }`). It is off by
+   default. The link gateway listens on this machine's Tailscale address, port 3459.
+2. Make a pairing code there: **New pairing code** (`multi_host_link_offer`).
+   It works once, for ten minutes, and comes with a pairing link
+   `http://<address>:3459/link#code=ABCD-EFGH-JKMN`.
+3. On the other machine, **Hosts → Pair a machine**: paste the link
+   (`multi_host_link_pair { link }`). The first machine becomes a host there.
+   **Link back** (on by default; `linkBack: true`) has it pair the other way
+   at once, which needs linking on here too and one of these addresses reachable
+   from there. An existing SSH or paired host can link back later from its row
+   (`multi_host_link_back`).
+
+| Listen mode | Binds                     | Use it when                                                                                           |
+| ----------- | ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `tailscale` | the 100.64.0.0/10 address | both machines are on one tailnet (default). WireGuard encrypts the traffic; no port faces the LAN.    |
+| `loopback`  | `127.0.0.1`               | `tailscale serve`, a reverse proxy or an SSH `-R` forward fronts it; set **Advertise URL** to that.   |
+| `all`       | every interface           | a trusted LAN without Tailscale. Plain HTTP: pairing from another machine needs **Allow plain HTTP**. |
+
+What a link grants and how it is kept:
+
+- A linked machine gets what this DSH's own browser gets: it can start, read
+  and steer threads, run tools in them and browse folders. Link only machines
+  you would hand this DSH's launch URL.
+- Pairing trades the code for a random 256-bit credential. This machine stores
+  only its SHA-256 (`plugins/multi-host/links.json`, 0600); the paired machine
+  stores the credential in its own `links.json`, never in the host directory.
+  Codes live in memory only; ten failed or successful redeems a minute are the
+  most the gateway accepts.
+- The gateway proxies to the loopback-only native listener with the native
+  session cookie it mints itself. The peer's cookies never reach DSH, and DSH's
+  cookies never leave the machine.
+- **Unlink** (`multi_host_link_revoke`) removes the credential and closes that
+  machine's open requests and sockets at once. It pairs again with a new code.
+- A pairing link over plain HTTP outside Tailscale (`100.64.0.0/10`, `*.ts.net`)
+  and loopback is refused unless **Allow plain HTTP** is set, since the
+  credential would cross the network in clear.
+- A paired host has no shell here: Doctor, provisioning, Update hosts, Sync
+  checkout, clone and project origins stay SSH-only. An HTTPS front that routes by
+  `Host` header does not work, because the paired machine sends `127.0.0.1`.
+
 Provisioning never installs a package manager or edits the machine's own setup:
 a missing fnm or a stale nixfiles is reported, not patched. It also never
 rewrites another machine's checkout without `apply`.
@@ -285,7 +335,7 @@ title}` for threads started here, so the sidebar and view can list them.
 | Sidebar                           | "By machine" grouping                                   | machine icon on foreign threads                            | Remote section with host badges                                       |
 | Offline send                      | queued                                                  | blocked with toast                                         | blocked with Reconnect                                                |
 | Credentials                       | hostKey file 0600                                       | system ssh + askpass, safeStorage                          | system ssh agent/keys only; no password prompt                        |
-| Pairing without SSH               | —                                                       | `t3 pair` token/QR, Tailscale routes, T3 Connect relay     | none                                                                  |
+| Pairing without SSH               | —                                                       | `t3 pair` token/QR, Tailscale routes, T3 Connect relay     | pairing code over Tailscale, loopback or LAN; link back both ways     |
 | Automatic placement               | —                                                       | Auto balance (cpu × free memory, 15 s freshness)           | Auto: lowest max(load/cores, memory used)                             |
 | Terminals                         | Open on the host                                        | **Open terminal on host** in the terminal tab              |
 | Fleet update                      | —                                                       | Update Everything dialog, version-mismatch banner          | Update hosts dialog (sync + rebuild, restart left to you), drift line |
@@ -301,6 +351,8 @@ title}` for threads started here, so the sidebar and view can list them.
   [docs/remote-thread-architecture.md](docs/remote-thread-architecture.md).
 - The agent preset chip of the New thread row does not apply to remote
   threads; the model is picked in the remote composer.
+- No relay: a paired machine must reach the other's link gateway directly
+  (Tailscale, LAN or a front you run).
 - No password or keyboard-interactive SSH (BatchMode only). Provisioning runs
   over that key only and leaves fnm, Home Manager and other machine setup to
   whoever manages the machine.

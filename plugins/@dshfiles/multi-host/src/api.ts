@@ -6,7 +6,16 @@ import { defineApi, event, method as defineMethod, zodSchemaFromEffect } from '@
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'
 import type { NativeRpcRequest as DshxNativeRpcRequest } from '@dshfiles/dshx/platform/native-rpc'
-import { hostConnectorSchema, hostWeightSchema, runtimeIdentitySchema, runtimeLocatorSchema } from './records.js'
+import {
+  hostConnectorSchema,
+  hostWeightSchema,
+  linkListenSchema,
+  linkPortSchema,
+  linkSettingsSchema,
+  linkUrlSchema,
+  runtimeIdentitySchema,
+  runtimeLocatorSchema,
+} from './records.js'
 import { SchemaFields } from './schema.js'
 
 const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
@@ -152,6 +161,22 @@ const resourcePoolSchema = Schema.Struct({
 
 const failedSchema = Schema.Struct({ ...failureSchema.fields, ok: Schema.Literal(false) })
 const runtimeRegistrationSchema = Schema.Union([Schema.Struct({ ok: Schema.Literal(true), runtime: runtimeSummarySchema }), failedSchema])
+const linkStatusSchema = Schema.Struct({
+  settings: linkSettingsSchema,
+  listening: Schema.Boolean,
+  urls: Schema.Array(Schema.String),
+  peerCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  error: Schema.optional(failureSchema),
+})
+const linkPeerSummarySchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  runtimeId: Schema.optional(Schema.String),
+  createdAt: SchemaFields.dateTimeString,
+  /** The host this machine holds for the same runtime, when the link goes both ways. */
+  hostId: Schema.optional(idSchema),
+})
+const linkBackSchema = Schema.Union([Schema.Struct({ ok: Schema.Literal(true), url: Schema.String }), failedSchema])
 const remoteHomeSchema = Schema.Trim.check(Schema.isMinLength(2), Schema.isMaxLength(1024), Schema.isPattern(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/))
 const sshTargetSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(255), Schema.isPattern(/^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9][A-Za-z0-9._-]*$/))
 const connectionTestStepSchema = Schema.Struct({
@@ -817,6 +842,80 @@ const effectMultiHostApi = defineApi({
       description:
         'Add or edit an SSH host: its name, ssh target and the remote DSH home to register. Call only when the user asked to add or change that host.',
       tool: { name: 'multi_host_save_ssh_host', render: compactJson },
+    }),
+    linkStatus: method({
+      input: Schema.Void,
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), status: linkStatusSchema }), failedSchema]),
+      description:
+        "This machine's link gateway: whether linking is on, where it listens, the URLs another machine pairs with, how many machines are linked, and why it is not listening. Read-only.",
+      tool: { name: 'multi_host_link_status', readOnly: true, render: compactJson },
+    }),
+    linkConfigure: method({
+      input: Schema.Struct({
+        enabled: Schema.optional(Schema.Boolean),
+        listen: Schema.optional(linkListenSchema),
+        port: Schema.optional(linkPortSchema),
+        advertiseUrl: Schema.optional(Schema.NullOr(linkUrlSchema)),
+      }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), status: linkStatusSchema }), failedSchema]),
+      description:
+        "Turn this machine's link gateway on or off and choose where it listens: 'tailscale' (this machine's Tailscale address, the default), 'loopback' (behind tailscale serve or a reverse proxy, with advertiseUrl naming the public origin) or 'all' (every interface; plain HTTP on a LAN). advertiseUrl null clears it. Linked machines can run threads here. Call only when the user asked to change linking.",
+      tool: { name: 'multi_host_link_configure', render: compactJson },
+    }),
+    linkOffer: method({
+      input: Schema.Void,
+      output: Schema.Union([
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          code: Schema.String,
+          expiresAt: SchemaFields.dateTimeString,
+          urls: Schema.Array(Schema.String),
+          pairingLinks: Schema.Array(Schema.String),
+        }),
+        failedSchema,
+      ]),
+      description:
+        'Make a single-use pairing code (valid ten minutes) another machine redeems to link to this one, with the pairing links that carry it. Anyone holding the code can link a machine until it expires. Call only when the user asked to pair or link a machine.',
+      tool: { name: 'multi_host_link_offer', render: compactJson },
+    }),
+    linkPeers: method({
+      input: Schema.Void,
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), peers: Schema.Array(linkPeerSummarySchema) }), failedSchema]),
+      description: 'The machines linked to this one: each may run threads here until it is unlinked. Read-only.',
+      tool: { name: 'multi_host_link_peers', readOnly: true, render: compactJson },
+    }),
+    linkRevoke: method({
+      input: Schema.Struct({ peerId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)), confirm: Schema.Literal(true) }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), peer: linkPeerSummarySchema }), failedSchema]),
+      description:
+        'Unlink one machine: its credential stops working and its open connections close at once. It must pair again with a new code to come back. Pass confirm: true. Call only when the user asked to unlink that machine.',
+      tool: { name: 'multi_host_link_revoke', render: compactJson },
+    }),
+    linkPair: method({
+      input: Schema.Struct({
+        /** A pairing link `<origin>/link#code=…`, or an origin with `code`. */
+        link: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(600)),
+        code: Schema.optional(Schema.String.check(Schema.isMaxLength(64))),
+        name: Schema.optional(Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120))),
+        /** Ask the other machine to pair back, so its agents can run threads here too. */
+        linkBack: Schema.optional(Schema.Boolean),
+        /** Accept a plain-HTTP link outside Tailscale and loopback, where the credential crosses the network unencrypted. */
+        allowPlainHttp: Schema.optional(Schema.Boolean),
+      }),
+      output: Schema.Union([
+        Schema.Struct({ ok: Schema.Literal(true), runtime: runtimeSummarySchema, linkBack: Schema.optional(linkBackSchema) }),
+        failedSchema,
+      ]),
+      description:
+        "Pair with another machine using the pairing link or URL and code it shows (Hosts → Link this machine, or multi_host_link_offer there), without SSH. The machine becomes a host here, so threads and multi_host_delegate can run on it. linkBack: true also asks it to pair with this machine, so its agents can run threads here; this machine's linking must be on. Call only when the user asked to pair or link machines.",
+      tool: { name: 'multi_host_link_pair', render: compactJson },
+    }),
+    linkBack: method({
+      input: Schema.Struct({ runtimeId: idSchema, allowPlainHttp: Schema.optional(Schema.Boolean) }),
+      output: linkBackSchema,
+      description:
+        "Link an existing host back to this machine, SSH or paired: this machine makes a pairing code and the host redeems it, so the host's agents can run threads here. This machine's linking must be on and its link URL reachable from the host. Call only when the user asked to link that host back.",
+      tool: { name: 'multi_host_link_back', render: compactJson },
     }),
     runtimeUpsert: method({
       input: Schema.Struct({

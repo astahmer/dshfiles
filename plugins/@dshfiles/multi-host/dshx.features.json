@@ -481,6 +481,113 @@
       "currentSurface": "agent tool: multi_host_delegate"
     },
     {
+      "id": "linked-machines",
+      "title": "Link machines without SSH, both ways",
+      "summary": "Linking turns on a gateway in front of this DSH, on its Tailscale address by default. It makes single-use pairing codes (ten minutes) that another machine redeems for its own revocable credential. A paired machine becomes a direct host there: threads, remote views and multi_host_delegate run on it with no SSH. Link back asks the other machine to pair with this one, so agents on either side can start threads on the other while both are online. Unlinking a machine closes its open connections at once.",
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [
+        {
+          "key": "enabled",
+          "defaultValue": "false",
+          "constraints": "Stored in plugins/multi-host/links.json; multi_host_link_configure or Hosts › Link this machine.",
+          "coveredBy": ["multi-host.link-pair-roundtrip"]
+        },
+        {
+          "key": "listen",
+          "defaultValue": "tailscale",
+          "constraints": "tailscale | loopback | all; tailscale binds the 100.64.0.0/10 address only.",
+          "coveredBy": ["multi-host.link-plain-http"]
+        },
+        {
+          "key": "port",
+          "defaultValue": "3459",
+          "constraints": "1024 to 65535.",
+          "coveredBy": ["multi-host.link-pair-roundtrip"]
+        },
+        {
+          "key": "advertiseUrl",
+          "defaultValue": "unset",
+          "constraints": "An http(s) origin shown first, for tailscale serve or a reverse proxy.",
+          "coveredBy": ["multi-host.link-plain-http"]
+        }
+      ],
+      "states": ["off", "listening", "no-tailscale", "port-busy", "paired", "linked-back", "unlinked"],
+      "failureModes": [
+        "No Tailscale address with listen tailscale: the gateway stays closed and the status names Start Tailscale or another listen mode.",
+        "A busy port: the status names the address and asks for another port.",
+        "An expired, used, unknown or rate-limited code is refused with the reason and asks for a fresh code.",
+        "Plain HTTP outside Tailscale and loopback is refused unless allowPlainHttp is set.",
+        "Link back needs this machine's linking on and one of its URLs reachable from the other machine; otherwise the pairing still succeeds and the link-back result says why.",
+        "A revoked or missing credential fails the connection with Pair it again."
+      ],
+      "externalDependencies": [
+        {
+          "id": "tailscale",
+          "boundary": "The default listen mode binds this machine's 100.64.0.0/10 interface address; the plugin never runs the tailscale CLI.",
+          "deterministicFake": "listenPlan takes the interface addresses as input; tests/link-pairing.test.ts covers the tailnet, loopback and missing-Tailscale plans."
+        }
+      ],
+      "reach": [
+        "seed multi-host-hosts",
+        "click tab \"Observe\"",
+        "click button \"Hosts\"",
+        "expect heading \"Hosts\"",
+        "expect heading \"Link this machine\"",
+        "click button \"Pair a machine\"",
+        "expect dialog \"Pair a machine\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "multi-host.link-pair-roundtrip",
+          "file": "plugins/@dshfiles/multi-host/tests/link-pairing.test.ts",
+          "testName": "a pairing code buys a credential that reaches the native runtime with its own cookie and authority"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.link-single-use",
+          "file": "plugins/@dshfiles/multi-host/tests/link-pairing.test.ts",
+          "testName": "a code works once, and an unknown code is refused"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.link-revoke",
+          "file": "plugins/@dshfiles/multi-host/tests/link-pairing.test.ts",
+          "testName": "unlinking a machine closes it out at once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.link-plain-http",
+          "file": "plugins/@dshfiles/multi-host/tests/link-pairing.test.ts",
+          "testName": "plain HTTP outside Tailscale and loopback needs explicit consent"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.linked-machines",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "multi-host link pair",
+          "file": "plugins/@dshfiles/multi-host/tests/link-pairing.test.ts",
+          "testName": "records one pairing span with the transport kind, never the code or the credential"
+        }
+      ],
+      "surface": "detail",
+      "destination": "observe",
+      "currentSurface": "left-nav: Hosts › Link this machine, Pair a machine"
+    },
+    {
       "id": "ssh-runtime-connection",
       "title": "Connect to an SSH-managed runtime",
       "summary": "Discover a remote DSH through its launch file over SSH, verify pinned identity/capabilities, keep one pooled tunnel per runtime, and never accept unknown host keys or forward the agent.",
@@ -984,5 +1091,10 @@
     }
   ],
   "kind": "bundle",
-  "ioDelegation": []
+  "ioDelegation": [
+    {
+      "file": "src/link-server.ts",
+      "reason": "The peer-facing proxy server: LinkGateway opens it under its listen span, and each proxied request belongs to the remote caller whose gateway span (namespace/method) records it."
+    }
+  ]
 }

@@ -17,6 +17,9 @@ export const multiHostKeys = {
   transcript: (runtimeId: string, sessionId: string) => ['multi-host', 'transcript', runtimeId, sessionId] as const,
   threads: ['multi-host', 'threads'] as const,
   sshHosts: ['multi-host', 'ssh-hosts'] as const,
+  link: ['multi-host', 'link'] as const,
+  linkStatus: ['multi-host', 'link', 'status'] as const,
+  linkPeers: ['multi-host', 'link', 'peers'] as const,
 }
 
 export const multiHostQueries = {
@@ -56,6 +59,28 @@ export const multiHostQueries = {
           available: status === undefined ? undefined : status.ok === false && status.refreshing !== true ? false : true,
         })
       },
+      retry: false,
+    }),
+  linkStatus: (api: MultiHostClient, refetchInterval: number | false = false) =>
+    queryOptions({
+      queryKey: multiHostKeys.linkStatus,
+      queryFn: async ({ signal }) => {
+        const result = await runHostRequest({ signal, request: hostSignal => api.linkStatus(undefined, { signal: hostSignal }) })
+        if (!result.ok) throw new Error(result.message)
+        return result.status
+      },
+      refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : refetchInterval),
+      retry: false,
+    }),
+  linkPeers: (api: MultiHostClient, refetchInterval: number | false = false) =>
+    queryOptions({
+      queryKey: multiHostKeys.linkPeers,
+      queryFn: async ({ signal }) => {
+        const result = await runHostRequest({ signal, request: hostSignal => api.linkPeers(undefined, { signal: hostSignal }) })
+        if (!result.ok) throw new Error(result.message)
+        return result.peers
+      },
+      refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : refetchInterval),
       retry: false,
     }),
   models: (api: MultiHostClient, runtimeId: string) =>

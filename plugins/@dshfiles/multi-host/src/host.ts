@@ -10,7 +10,7 @@ import { Cause, Clock, ConfigProvider, Effect, Exit, Layer, Option, Ref, Schedul
 import { FetchHttpClient } from 'effect/http'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
-import { homedir } from 'node:os'
+import { homedir, hostname } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import { Api, DshxPlugin, HostContext, hostServiceChanges } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
@@ -39,6 +39,7 @@ import {
   GatewayUnreachable,
   HostNotFound,
   IdentityMismatch,
+  LinkPairRefused,
   LocalProjectFailed,
   NoOfficialNode,
   OriginPortExhausted,
@@ -52,6 +53,9 @@ import {
 import { HostDirectory } from './host-directory.js'
 import { RuntimeIdentity } from './identity.js'
 import { LaunchFile } from './launch-file.js'
+import { LinkGateway, LinkPlan } from './link-gateway.js'
+import { redeemPairingCode } from './link-pairing.js'
+import { LinkStore, linkOrigin } from './link-store.js'
 import { LocalProjectFiles } from './local-project-files.js'
 import { readProjectOrigins } from './project-origins.js'
 import { redactSecrets } from './redact.js'
@@ -384,6 +388,98 @@ const register = Effect.fn('multi-host runtime register')(function* (input: {
     createdAt: existing?.createdAt ?? new Date().toISOString(),
     lastSeenAt: new Date().toISOString(),
   })
+})
+
+/** This machine as a peer sees it: the host name without the mDNS suffix. */
+const machineName = (): string =>
+  hostname()
+    .replace(/\.local$/, '')
+    .slice(0, 120) || 'DSH machine'
+
+const linkHostId = (input: { readonly name: string; readonly taken: ReadonlySet<string> }): string => {
+  const base = `link-${sshHostId(input.name)}`.slice(0, 60)
+  if (!input.taken.has(base)) return base
+  for (let suffix = 2; suffix < 1000; suffix += 1) if (!input.taken.has(`${base}-${suffix}`)) return `${base}-${suffix}`
+  return `link-${randomUUID().slice(0, 8)}`
+}
+
+const remoteLinkPairSchema = Schema.Struct({ ok: Schema.Boolean, code: Schema.optional(Schema.String), message: Schema.optional(Schema.String) })
+const decodeRemoteLinkPair = Schema.decodeUnknownEffect(remoteLinkPairSchema)
+
+/**
+ * Make a pairing code here and have `runtimeId` redeem it, trying each URL this machine listens on until one reaches
+ * it. A code is spent only by a redeem that worked, so a URL the host cannot reach costs nothing.
+ */
+const linkBackTo = Effect.fn('multi-host link back')(function* (input: { readonly runtimeId: string; readonly allowPlainHttp: boolean }) {
+  const gateway = yield* LinkGateway
+  const offer = yield* gateway.offer
+  const failures: Array<{ readonly code: string; readonly message: string }> = []
+  // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- one code: the first URL the host redeems spends it, so the rest must not run.
+  for (const link of offer.pairingLinks) {
+    const answer = yield* withRuntime(
+      input.runtimeId,
+      remote =>
+        Effect.flatMap(remote.api('linkPair', { link, name: machineName(), linkBack: false, allowPlainHttp: input.allowPlainHttp }), decodeRemoteLinkPair),
+      { mutation: true },
+    )
+    if (answer.ok) return { ok: true as const, url: new URL(link).origin }
+    failures.push({ code: answer.code ?? 'link-pair-refused', message: answer.message ?? 'The host refused to link back.' })
+  }
+  const last = failures.at(-1) ?? { code: 'link-gateway-unavailable', message: 'This machine has no link URL to offer.' }
+  return { ok: false as const, ...last }
+})
+
+/** Redeem a pairing code at a peer, then register it as a direct host here; a failed registration leaves nothing behind. */
+const pairWith = Effect.fn('multi-host link pair with')(function* (input: {
+  readonly link: string
+  readonly code?: string | undefined
+  readonly name?: string | undefined
+  readonly allowPlainHttp: boolean
+}) {
+  const parsed = LinkPlan.parsePairingLink({ link: input.link, code: input.code })
+  if (parsed === undefined) return yield* new LinkPairRefused({ reason: 'invalid' })
+  const url = linkOrigin(parsed.url)
+  const self = yield* (yield* RuntimeIdentity).current
+  const store = yield* LinkStore
+  const directory = yield* HostDirectory
+  const pool = yield* RuntimePool
+  const redeemed = yield* redeemPairingCode({
+    url,
+    code: parsed.code,
+    name: machineName(),
+    runtimeId: self.runtimeId,
+    allowPlainHttp: input.allowPlainHttp,
+  }).pipe(Effect.provide(FetchHttpClient.layer))
+  yield* store.saveCredential({ url, credential: redeemed.credential })
+  const current = yield* directory.read
+  // Already a host here through another connector (an SSH host that linked back): keep it; the credential is spare.
+  const known = current.runtimes.find(runtime => runtime.id === redeemed.runtimeId)
+  const knownHost = known === undefined ? undefined : current.hosts.find(host => host.id === known.hostId)
+  if (known !== undefined && knownHost !== undefined && knownHost.connector.kind !== 'direct') return yield* runtimeSummaryOf(known, pool)
+  const previous = current.hosts.find(host => host.connector.kind === 'direct' && host.connector.url === url) ?? knownHost
+  const name = (input.name ?? redeemed.name).trim().slice(0, 120) || url
+  const host: HostRecord = {
+    schemaVersion: 2,
+    id: previous?.id ?? linkHostId({ name, taken: new Set(current.hosts.map(item => item.id)) }),
+    name: previous?.name ?? name,
+    connector: { kind: 'direct', url },
+    hidden: previous?.hidden ?? false,
+    ...(previous?.position !== undefined && { position: previous.position }),
+    createdAt: previous?.createdAt ?? new Date().toISOString(),
+  }
+  yield* directory.upsertHost(host)
+  const runtime = yield* register({ host, locator: { kind: 'direct', url }, name: host.name }).pipe(
+    Effect.tapError(() =>
+      Effect.ignore(
+        Effect.gen(function* () {
+          yield* store.removeCredential(url)
+          if (previous === undefined) yield* directory.removeHost({ id: host.id, removeDirectory: true })
+        }),
+      ),
+    ),
+  )
+  if (runtime.id !== redeemed.runtimeId) return yield* new IdentityMismatch({ reason: 'other-host' })
+  return yield* runtimeSummaryOf(runtime, pool)
 })
 
 /** One runtime row with its live pooled state. */
@@ -843,6 +939,81 @@ const handlers = Api.handlers(multiHostApi, {
       }
     }
     return { removed }
+  }),
+  linkStatus: Effect.fn('multi-host link status')(function* () {
+    const gateway = yield* LinkGateway
+    return yield* gateway.status.pipe(
+      Effect.map(status => ({ ok: true as const, status })),
+      Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+    )
+  }),
+  linkConfigure: Effect.fn('multi-host link configure')(function* (input) {
+    const store = yield* LinkStore
+    const gateway = yield* LinkGateway
+    return yield* Effect.gen(function* () {
+      yield* store.setSettings({
+        ...(input.enabled !== undefined && { enabled: input.enabled }),
+        ...(input.listen !== undefined && { listen: input.listen }),
+        ...(input.port !== undefined && { port: input.port }),
+        ...(typeof input.advertiseUrl === 'string' && { advertiseUrl: linkOrigin(input.advertiseUrl) }),
+        ...(input.advertiseUrl === null && { clearAdvertiseUrl: true }),
+      })
+      return { ok: true as const, status: yield* gateway.apply }
+    }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
+  }),
+  linkOffer: Effect.fn('multi-host link offer')(function* () {
+    const gateway = yield* LinkGateway
+    return yield* gateway.offer.pipe(
+      Effect.map(offer => ({ ok: true as const, ...offer })),
+      Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+    )
+  }),
+  linkPeers: Effect.fn('multi-host link peers')(function* () {
+    const store = yield* LinkStore
+    const directory = yield* HostDirectory
+    return yield* Effect.gen(function* () {
+      const peers = yield* store.peers
+      const runtimes = yield* directory.listRuntimes()
+      return {
+        ok: true as const,
+        peers: peers.map(peer => {
+          const hostId = runtimes.find(runtime => runtime.id === peer.runtimeId)?.hostId
+          return {
+            id: peer.id,
+            name: peer.name,
+            createdAt: peer.createdAt,
+            ...(peer.runtimeId !== undefined && { runtimeId: peer.runtimeId }),
+            ...(hostId !== undefined && { hostId }),
+          }
+        }),
+      }
+    }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
+  }),
+  linkRevoke: Effect.fn('multi-host link revoke')(function* (input) {
+    const store = yield* LinkStore
+    return yield* store.revoke(input.peerId).pipe(
+      Effect.map(peer => ({
+        ok: true as const,
+        peer: { id: peer.id, name: peer.name, createdAt: peer.createdAt, ...(peer.runtimeId !== undefined && { runtimeId: peer.runtimeId }) },
+      })),
+      Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+    )
+  }),
+  linkPair: Effect.fn('multi-host link pair handler')(function* (input) {
+    const allowPlainHttp = input.allowPlainHttp === true
+    return yield* Effect.gen(function* () {
+      const runtime = yield* pairWith({ link: input.link, code: input.code, name: input.name, allowPlainHttp })
+      if (input.linkBack !== true) return { ok: true as const, runtime }
+      const linkBack = yield* linkBackTo({ runtimeId: runtime.id, allowPlainHttp }).pipe(
+        Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+      )
+      return { ok: true as const, runtime, linkBack }
+    }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
+  }),
+  linkBack: Effect.fn('multi-host link back handler')(function* (input) {
+    return yield* linkBackTo({ runtimeId: input.runtimeId, allowPlainHttp: input.allowPlainHttp === true }).pipe(
+      Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+    )
   }),
   runtimeUpsert: Effect.fn('multi-host runtime upsert')(function* (input) {
     return yield* Effect.gen(function* () {
@@ -1669,14 +1840,26 @@ const InventoryEvents = Layer.effectDiscard(
   }),
 )
 
+/** Open the link gateway once DSH serves, and move it when the native listener does. */
+const LinkGatewayRefresh = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const gateway = yield* LinkGateway
+    yield* Stream.runForEach(yield* hostServiceChanges('webServer'), () => Effect.ignore(gateway.apply)).pipe(DshxPlugin.detached, Effect.forkScoped)
+  }),
+)
+
 /** The reference middleware is optional: a Host without the Session controller still serves the tools. */
 const referenceMiddlewareLayer = Layer.effectDiscard(referenceMiddleware)
 
 /** The domain services every consumer shares: registries, identity and the launch file. */
 const domainLayer = (input: { readonly configuredProfile: string | undefined }) =>
-  Layer.mergeAll(HostDirectory.layer, RemoteThreads.layer, RuntimeIdentity.layer({ configuredProfile: input.configuredProfile }), LaunchFile.layer).pipe(
-    Layer.provideMerge(MultiHostPaths.layer),
-  )
+  Layer.mergeAll(
+    HostDirectory.layer,
+    RemoteThreads.layer,
+    RuntimeIdentity.layer({ configuredProfile: input.configuredProfile }),
+    LaunchFile.layer,
+    LinkStore.layer,
+  ).pipe(Layer.provideMerge(MultiHostPaths.layer))
 
 /** The pooled runtimes and the services above them; `RemoteSessionsLive` registers the Session source built from them. */
 const runtimeLayer = Layer.mergeAll(RuntimeStatus.layer, ResourcePool.layer, ViewLeases.layer, RemoteSessions.layer).pipe(
@@ -1686,8 +1869,9 @@ const runtimeLayer = Layer.mergeAll(RuntimeStatus.layer, ResourcePool.layer, Vie
 )
 
 const pluginLayer = (config: Schema.Schema.Type<typeof configSchema>) =>
-  Layer.mergeAll(RemoteSessionsLive, LaunchFilePublisher, InteractionEvents, InventoryEvents, referenceMiddlewareLayer).pipe(
+  Layer.mergeAll(RemoteSessionsLive, LaunchFilePublisher, InteractionEvents, InventoryEvents, LinkGatewayRefresh, referenceMiddlewareLayer).pipe(
     Layer.provideMerge(runtimeLayer),
+    Layer.provideMerge(LinkGateway.layer({ nativeLaunchUrl: launchUrlOf }).pipe(Layer.provide(FetchHttpClient.layer))),
     Layer.provideMerge(SessionOwners.layer),
     Layer.provideMerge(domainLayer({ configuredProfile: config?.profile })),
     Layer.provideMerge(NodeServices.layer),

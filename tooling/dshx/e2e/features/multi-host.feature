@@ -222,3 +222,12 @@ Feature: Multi-host loopback SSH lifecycle
     When the scratch remote is added from the host UI
     And a thread is started directly on the scratch remote
     Then the manager lists it as started on the host
+
+  @scenario:multi-host.linked-machines
+  Scenario: Two machines link with a pairing code, both ways, without SSH
+    Given a loopback SSH DSH pair is booted
+    When linking is turned on for both machines on loopback
+    And the manager pairs with the remote code and links back
+    Then each machine reaches the other through the link
+    When the manager unlinks the remote
+    Then the remote can no longer reach the manager

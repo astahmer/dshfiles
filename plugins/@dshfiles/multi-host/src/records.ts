@@ -36,9 +36,39 @@ const localLaunchUrlSchema = Schema.String.check(Schema.isMinLength(1), Schema.i
   }),
 )
 
+/** A peer's link gateway origin: HTTP(S), no credentials, path, query or fragment. */
+export const linkUrlSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(512)).check(
+  Schema.makeFilter(value => {
+    let url: URL
+    try {
+      url = new URL(value)
+    } catch {
+      return 'The link URL is invalid.'
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return 'A link URL uses http or https.'
+    if (url.username !== '' || url.password !== '') return 'A link URL carries no user information.'
+    if ((url.pathname !== '/' && url.pathname !== '') || url.search !== '' || url.hash !== '') return 'A link URL is an origin, without a path or query.'
+    return undefined
+  }),
+)
+
+/** Where the link gateway listens: Tailscale's own address, loopback (behind `tailscale serve` or a proxy), or every interface. */
+export const linkListenSchema = Schema.Literals(['tailscale', 'loopback', 'all'])
+export const linkPortSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1024), Schema.isLessThanOrEqualTo(65_535))
+
+export const linkSettingsSchema = Schema.Struct({
+  enabled: Schema.Boolean,
+  listen: linkListenSchema,
+  port: linkPortSchema,
+  /** The origin peers should use when the bound address is not it (a `tailscale serve` HTTPS name, a reverse proxy). */
+  advertiseUrl: Schema.optional(linkUrlSchema),
+})
+
 export const hostConnectorSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('local') }),
   Schema.Struct({ kind: Schema.Literal('ssh'), sshTarget: sshTargetSchema }),
+  /** A paired machine reached over its link gateway, without SSH. */
+  Schema.Struct({ kind: Schema.Literal('direct'), url: linkUrlSchema }),
 ])
 
 export const runtimeLocatorSchema = Schema.Union([
@@ -49,6 +79,8 @@ export const runtimeLocatorSchema = Schema.Union([
     unit: Schema.optional(Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(128), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9_.@-]*$/))),
     remoteHome: Schema.Trim.check(Schema.isMinLength(2), Schema.isMaxLength(1024), Schema.isPattern(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/)),
   }),
+  /** The credential lives in the private link store, keyed by this URL; the directory never holds it. */
+  Schema.Struct({ kind: Schema.Literal('direct'), url: linkUrlSchema }),
 ])
 
 export const runtimeIdentitySchema = Schema.Struct({
@@ -139,6 +171,7 @@ export const runtimeOriginPort = (runtimeId: string, occupied: readonly number[]
   throw new Error('The runtime browser origin port range is exhausted.')
 }
 
+export type LinkSettings = Schema.Schema.Type<typeof linkSettingsSchema>
 export type HostConnector = Schema.Schema.Type<typeof hostConnectorSchema>
 export type RuntimeLocator = Schema.Schema.Type<typeof runtimeLocatorSchema>
 export type RuntimeIdentity = Schema.Schema.Type<typeof runtimeIdentitySchema>

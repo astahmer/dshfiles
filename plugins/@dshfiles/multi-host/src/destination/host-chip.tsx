@@ -12,6 +12,7 @@ import { CloneProjectDialog } from './clone-project-dialog.js'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { runtimePingRefetchInterval } from '../runtime-status-refresh-policy.js'
 import { DisconnectGrace } from './disconnect-grace.js'
+import { hostTargetLabel } from './host-target.js'
 import { InventoryPoll } from './inventory-poll.js'
 import { multiHostQueries, type MultiHostClient } from './queries.js'
 import { hostDestination, openHostsPage, setHostDestination } from './state.js'
@@ -32,7 +33,7 @@ const HostMenuRow = (props: {
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
         <span className="dshx:truncate">{props.host?.name ?? props.runtime.name}</span>
         <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground" title={state.label}>
-          {props.host?.connector.kind === 'ssh' ? props.host.connector.sshTarget : 'this machine'} · {state.label}
+          {props.host === undefined ? 'this machine' : hostTargetLabel(props.host)} · {state.label}
         </span>
       </span>
       <StatusDot tone={state.tone} />

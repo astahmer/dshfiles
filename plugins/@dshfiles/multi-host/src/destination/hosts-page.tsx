@@ -17,6 +17,7 @@ import {
   EyeIcon,
   EyeOffIcon,
   GripVerticalIcon,
+  LinkIcon,
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -35,6 +36,8 @@ import { CloneProjectDialog } from './clone-project-dialog.js'
 import { ConnectionDiagnostics } from './connection-diagnostics.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
 import { FleetUpdateDialog } from './fleet-update-dialog.js'
+import { hostTargetLabel } from './host-target.js'
+import { LinkThisMachine, PairMachineDialog } from './link-machines.js'
 import { DisconnectGrace } from './disconnect-grace.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 
@@ -168,6 +171,15 @@ const HostRow = (props: {
     },
     onError: (_error, variables) => variables.tab?.close(),
   })
+  const linkBack = useMutation({
+    mutationFn: async () => {
+      if (runtime === undefined) throw new Error('This host has no runtime. Edit the host to set its remote DSH home, then reconnect.')
+      const result = await api.linkBack({ runtimeId: runtime.id })
+      if (!result.ok) throw failure(result)
+      return result
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: multiHostKeys.link }),
+  })
   const diagnose = useMutation({
     mutationFn: async () => {
       if (host.connector.kind !== 'ssh') throw new Error('Only SSH hosts can be diagnosed.')
@@ -206,7 +218,7 @@ const HostRow = (props: {
   }
   const target = (
     <Badge variant="outline" className="dshx:shrink-0 dshx:font-mono dshx:text-2xs">
-      {host.connector.kind === 'ssh' ? host.connector.sshTarget : 'this machine'}
+      {hostTargetLabel(host)}
     </Badge>
   )
   return (
@@ -337,6 +349,19 @@ const HostRow = (props: {
               </Button>
             </span>
           ) : null}
+          {linkBack.isError ? (
+            <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-destructive">
+              {errorMessage(linkBack.error, 'Link back failed.')}
+              <Button size="xs" variant="outline" onClick={() => linkBack.mutate()} disabled={linkBack.isPending}>
+                Try again
+              </Button>
+            </span>
+          ) : null}
+          {linkBack.isSuccess ? (
+            <span role="status" className="dshx:text-success">
+              Linked back: {host.name} can run threads here.
+            </span>
+          ) : null}
           {remoteView.data === 'copied' ? (
             <span role="status" className="dshx:text-success">
               Remote host link copied.
@@ -388,10 +413,6 @@ const HostRow = (props: {
                   Diagnose
                 </Button>
               )}
-              <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
-                <PlusIcon className="dshx:size-3.5" />
-                Add folder
-              </Button>
               <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onCloneProject}>
                 <PlusIcon className="dshx:size-3.5" />
                 Clone project
@@ -402,6 +423,18 @@ const HostRow = (props: {
               </Button>
             </>
           ) : null}
+          {host.connector.kind === 'local' ? null : (
+            <>
+              <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
+                <PlusIcon className="dshx:size-3.5" />
+                Add folder
+              </Button>
+              <Button size="sm" variant="outline" disabled={runtime === undefined || linkBack.isPending} onClick={() => linkBack.mutate()}>
+                {linkBack.isPending ? <Spinner className="dshx:size-3.5" /> : <LinkIcon className="dshx:size-3.5" />}
+                Link back
+              </Button>
+            </>
+          )}
           <IconAction
             label={`Reconnect ${host.name}`}
             hint="Reconnect"
@@ -445,6 +478,7 @@ export const HostsPage = () => {
   const [cloneRuntimeId, setCloneRuntimeId] = useState<string | null>(null)
   const [syncHostId, setSyncHostId] = useState<string | null>(null)
   const [fleetOpen, setFleetOpen] = useState(false)
+  const [pairOpen, setPairOpen] = useState(false)
   const [updateRequest, setUpdateRequest] = useState(0)
   const projectRuntime = directory.data?.runtimes.find(runtime => runtime.id === projectRuntimeId)
   const projectHost = projectRuntime === undefined ? undefined : hosts.find(host => host.id === projectRuntime.hostId)
@@ -586,6 +620,7 @@ export const HostsPage = () => {
               },
             })
           : null}
+        <LinkThisMachine api={api} onPair={() => setPairOpen(true)} />
         {directory.isPending ? <Spinner aria-label="Loading hosts" /> : null}
         {!directory.isPending && ordered.length === 0 ? (
           <EntityList aria-label="Registered hosts">
@@ -667,6 +702,7 @@ export const HostsPage = () => {
         ) : null}
         <CheckoutSyncDialog api={api} host={hosts.find(host => host.id === syncHostId)} onClose={() => setSyncHostId(null)} />
         <HostDialog api={api} draft={form} onOpenChange={open => (open ? undefined : setForm(null))} />
+        <PairMachineDialog api={api} open={pairOpen} onOpenChange={setPairOpen} />
         <FleetUpdateDialog
           api={api}
           hosts={ordered}

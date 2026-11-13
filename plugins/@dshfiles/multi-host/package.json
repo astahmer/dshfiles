@@ -2,7 +2,7 @@
   "name": "@dshfiles/multi-host",
   "version": "0.1.0",
   "private": true,
-  "description": "Run new threads on other machines over SSH: host directory, pooled tunnels, host chip and remote thread view.",
+  "description": "Run new threads on other machines over SSH or a pairing-code link: host directory, pooled tunnels, link gateway, host chip and remote thread view.",
   "files": [
     "dist",
     "cordis.patch.yml",
