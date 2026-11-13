@@ -183,7 +183,9 @@ export const InputBar = memo(function InputBar({
   const failedUpload = attachments.map(attachment => uploads[attachment.id]).find(upload => upload?.status === 'error')
   const uploadsHeldText = failedUpload?.status !== 'error'
     ? t('file.stillUploading')
-    : failedUpload.reason === undefined ? t('file.uploadFailed') : attachmentErrorText(t, failedUpload.reason, imageLimits)
+    : failedUpload.reason === undefined
+      ? `${t('file.uploadFailed')} (${failedUpload.message})`
+      : attachmentErrorText(t, failedUpload.reason, imageLimits)
   // Prompt failures are ordinary failures (no create/attach transaction exists
   // anymore): the toast announces promptError, the draft stays in the machine,
   // and the user resubmits. A remount over a session whose machine still holds

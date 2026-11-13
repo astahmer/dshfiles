@@ -150,6 +150,18 @@ function base64ImageOf(file: File): Promise<string> {
   })
 }
 
+const IN_MEMORY_UPLOAD_LIMIT = 64 * 1024 * 1024
+
+/**
+ * The bytes to upload: an in-memory copy of a picked file up to 64 MiB. Android Chrome refuses to upload some
+ * gallery picks straight from their file handle (net::ERR_UPLOAD_FILE_CHANGED) while it still reads them, so the
+ * preview shows and every retry fails. Larger files keep streaming from disk.
+ */
+async function uploadBody(file: File): Promise<Blob> {
+  if (file.size > IN_MEMORY_UPLOAD_LIMIT) return file
+  return new Blob([await file.arrayBuffer()], { type: file.type })
+}
+
 /** Unsupported browser-declared image type, localized by the UI boundary. */
 export class UnsupportedImageMediaTypeError extends Error {
   /** Browser-declared MIME value, possibly empty. */
@@ -484,12 +496,14 @@ export class ConversationController extends Service implements IConversation {
           if (this.fileUploadOperations.get(attachment.id)?.controller === controller) this.forgetUpload(attachment.id)
           return
         }
+        const body = ownership.runtimeId === null ? await uploadBody(attachment.file) : attachment.file
+        controller.signal.throwIfAborted()
         const result = ownership.runtimeId === null
           ? attachment.kind === 'image'
             ? await this.ctx.fileUpload.uploadImage(
-                sessionId, attachment.file, imageMediaType(attachment.file.type), name, controller.signal, onProgress,
+                sessionId, body, imageMediaType(attachment.file.type), name, controller.signal, onProgress,
               )
-            : await this.ctx.fileUpload.upload(sessionId, attachment.file, name, controller.signal, onProgress)
+            : await this.ctx.fileUpload.upload(sessionId, body, name, controller.signal, onProgress)
           : await (async (runtimeId: string) => {
               const bytes = new Uint8Array(await attachment.file.arrayBuffer())
               controller.signal.throwIfAborted()
