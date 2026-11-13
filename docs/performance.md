@@ -3,6 +3,48 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Phone list → thread → Back (2026-11-13)
+
+Complaint: on an Android PWA (Tailscale → phone-access → phone-pairing → Host) opening a thread from the Threads list
+is not snappy, and the top bar says "New thread" for seconds before the real title. Probe:
+`RTT=100 CPU=4 ROWS=6 node .agents/skills/live-performance-audit/scripts/phone-switch-probe.mjs` (393 × 851, Android
+UA, touch, 100 ms added latency, 4× CPU throttle; taps a row, then Back).
+
+The real phone's stored `thread switch` trace (18:26, `browser.mobile`, source `main-tabs`): 3.9 s, five long tasks
+totalling 2.4 s, 50 dshx calls. Each call's Host span took 1–70 ms (`jujutsu-composer/context` 0.5 s,
+`secret-catalog-setup/referenceStatus` 0.64 s), while the browser waited 0.8–1.5 s for each: the phone's main thread
+and the link, not the Host. Four mounted thread bodies each re-read `scheduled-sends/list`, `annotations/list` and
+`session-undo/history`; `multi-host/sessionRuntime` ran eight times.
+
+Live, before (main build, emulated phone): tap → title p50 1037 ms, tap → first message 1573 ms, 1.95 s of long tasks
+per open; Back → list 1126 ms with 2.4 s of long tasks and 13 requests. Unthrottled, the first open after a load showed
+"New thread" for 190–235 ms: the bar named the stage Session, which follows a tap only once the thread opens (a draft
+until then, or the previous thread).
+
+Fix: the list records each pick (`pickThread`) and the bar shows the picked thread's known title until the stage
+Session moves (`PendingPick`, thread-sidebar `phone-shell.ts`). Scratch, 45 threads (19 rows mounted), two runs of six
+taps each:
+
+| Scratch phone probe            | Before    | After     |
+| ------------------------------ | --------- | --------- |
+| tap → title p50                | 594 / 604 | 313 / 299 |
+| opens that showed "New thread" | 1 / 1     | 0 / 0     |
+| tap → first message p50        | 722 / 767 | 837 / 777 |
+| Back → list p50                | 642 / 672 | 641 / 625 |
+
+Regression checks: thread-sidebar `phone-shell.test.ts` ("PendingPick", "names a thread picked in the list at once")
+and `destination-shell.client.test.tsx` ("names a thread picked in the list before the stage opens it").
+
+Measured and rejected: keeping the phone list mounted behind the stage. Back no longer re-read the list's Host state
+(7 → 4–5 requests), but Back → list stayed 685–723 ms and tap → first message rose to 934–1297 ms, because the hidden
+list still re-renders on every pick (`display: none` also makes the virtual rows re-measure on Back). A Back profile
+puts the cost in layout forced by the virtual rows' `measureElement` and the Workbench's `_scrollTabIntoView`, paid by
+any frame that lays the page out.
+
+Found, not fixed: each list mount (load and every Back) asks the Host to auto-archive two settled threads that no
+longer exist; the Host answers `session/not-found` inside HTTP 200 and the auto-archive retries on the next mount
+(`thread-sidebar` `dueArchiveSessionIds` keeps them due while their rows stay listed).
+
 ## Idle polls replaced by Host change events (2026-11-12, issue #142)
 
 Same scratch workload as the next section (`har-capture.mjs --seconds 90 --switches 12 --switch-every 5 --visit

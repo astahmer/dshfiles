@@ -15,6 +15,7 @@ plugins, "core fork needed"). Start from the live GUI, attribute every milliseco
 S=.agents/skills/live-performance-audit/scripts
 node $S/host-lag.mjs 60                       # is the Host event loop itself blocked?
 node $S/switch-probe.mjs 10                   # per sidebar click: composer, history, long tasks, DOM, bytes, requests
+RTT=100 CPU=4 ROWS=6 node $S/phone-switch-probe.mjs   # phone: list tap -> title, first message; Back -> list; PROFILE_DIR=… adds profiles
 REQUESTS=1 node $S/switch-probe.mjs 5         # every request a click fires, with its time
 MATCH='^Exact thread title' DUMP=snap.json node $S/switch-probe.mjs 1 && node $S/snapshot-bytes.mjs snap.json
 # Resolve and verify exactly one Host PID from the current runtime first:
