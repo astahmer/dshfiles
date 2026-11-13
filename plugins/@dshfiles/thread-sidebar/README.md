@@ -215,6 +215,13 @@ Each stack level is one browser history entry, so Android's back gesture (or the
 Back does, closing an open thread-panel sheet first. The in-app Back consumes the entry it pushed, so history never
 grows; a push drops the thread from the entry it leaves below, so going back never switches to another thread. Desktop keeps replacing one entry.
 The history layers come from `@dshfiles/workbench/phone-history`.
+
+**Edge swipes.** A swipe in from the left screen edge is Back. Settings › Thread sidebar › `phoneEdgeSwipePanels` (off
+by default) adds a swipe in from the right edge, inside a thread, that opens the thread panel sheet. Android's back
+gesture claims a strip at both edges, so that band is 24px wide and starts 12px inside the edge; leave it off if the
+system gesture keeps winning. Both swipes lock to an axis after 10px, need 1.5x more sideways than vertical travel and
+commit at 64px. They ignore touches that start in a thread row, a dialog, a menu or any horizontally scrollable
+element (even one scrolled to its start), and start nothing while a modal such as the sheet is open.
 Pushing a thread or page over the list, and Back, slide through a View Transition (`data-phone-stack-motion`, rules in
 the kit stylesheet); without the API or with reduced motion they are instant. A turn that finishes while a page or the
 full-screen list covers the thread is not "watched": it stays in the Inbox until the thread is opened.

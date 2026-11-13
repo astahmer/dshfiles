@@ -132,6 +132,7 @@ const preferencesInputFields = {
   layoutMerge: SchemaHelpers.withDecodedDefault(Schema.NullOr(Schema.Literals(['fixed', 'docking'])), () => DEFAULT_PREFERENCES.layoutMerge),
   headerMode: Schema.Literals(['compact', 'expanded']),
   hideBrandLogo: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.hideBrandLogo),
+  phoneEdgeSwipePanels: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.phoneEdgeSwipePanels),
   showFooter: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.showFooter),
   showRailActions: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.showRailActions),
   headerRegionHeight: SchemaHelpers.withDecodedDefault(

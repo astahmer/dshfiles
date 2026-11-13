@@ -117,6 +117,8 @@ export interface SidebarPreferences {
   headerMode: 'compact' | 'expanded'
   /** Drop the Host brand mark and name from the header; the collapse button stays. */
   hideBrandLogo: boolean
+  /** On a phone, a swipe in from the right edge inside a thread opens the thread panel sheet. Off by default: Android's back gesture shares that edge. */
+  phoneEdgeSwipePanels: boolean
   /**
    * The foot row under the list (b:4v6p). Fixed layout hides it by default: its Settings, page links and More are the
    * rail's and ⌘K's, Restart and Copy URL are ⌘K commands, and a pending restart or page reload still shows it.
@@ -227,6 +229,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   layoutMerge: null,
   headerMode: 'compact',
   hideBrandLogo: false,
+  phoneEdgeSwipePanels: false,
   showFooter: false,
   showRailActions: true,
   headerRegionHeight: null,

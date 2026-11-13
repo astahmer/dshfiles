@@ -43,7 +43,7 @@ import { ListHeaderExtras } from './list-header-extras.js'
 import { AddPanelButton, EntryMenu, FolderDialog, FolderGlyph, FolderMenu, FolderNotice, ViewGlyph, viewDrag, type SidebarFolderUi } from './sidebar-folders.js'
 import { SidebarTrees, type ResolvedEntry } from './sidebar-tree.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar } from './phone-shell.js'
-import { useEdgeSwipeBack } from './edge-swipe.js'
+import { useEdgeSwipe } from './edge-swipe.js'
 import { runStackMotion } from './stack-motion.js'
 import { clearThreadUrl } from './thread-url.js'
 import { PhoneRailActions, RailActionGroup, type RailAction } from './rail-actions.js'
@@ -174,6 +174,8 @@ export interface DestinationShellProps {
   readonly stageTitle?: string | undefined
   /** Opens or closes the thread panel (a bottom sheet on a phone); null when no owner serves it. */
   readonly togglePanels?: (() => void) | null
+  /** A swipe in from the right edge, inside a thread, opens the thread panel (Settings › phoneEdgeSwipePanels). */
+  readonly edgeSwipePanels?: boolean
   readonly toggleSidebar: () => void
   readonly record: (record: NavigationRecord) => void
   /** Sidebar folders (b:952m): the rail's folders and their verbs; absent, the rail lists the eight destinations. */
@@ -1039,7 +1041,7 @@ const PhoneNavigation = (
     })
   }
   // The iOS back swipe (T5.3): a left-edge swipe is Back wherever the bar offers one.
-  useEdgeSwipeBack(bar.back !== null, back)
+  useEdgeSwipe({ side: 'left', enabled: bar.back !== null, onSwipe: back })
   // Android's back gesture (and a browser Back) pops the same stack: each level is one history entry. A push drops the
   // thread from the entry it leaves below, so going back never switches to another thread through the URL route.
   usePhoneHistoryLayer({ key: 'dshfilesPhoneStack', depth: PhoneTopBarModel.depth(stack), enabled: true, pop: back, baseUrl: clearThreadUrl })
@@ -1052,6 +1054,8 @@ const PhoneNavigation = (
     return () => root.removeAttribute('data-phone-in-thread')
   }, [inThread])
   const togglePanels = props.togglePanels ?? null
+  // The thread panel from the right edge (opt-in); an open sheet is modal, so the swipe never closes it again.
+  useEdgeSwipe({ side: 'right', enabled: inThread && props.edgeSwipePanels === true && togglePanels !== null, onSwipe: () => togglePanels?.() })
   // Tapping the row of the thread (or the page) already on the stage changes no selection, so the effect above would
   // leave the list open: close it after the click, unless the selection change already did.
   const closeAfterPick = (event: React.MouseEvent<HTMLElement>): void => {

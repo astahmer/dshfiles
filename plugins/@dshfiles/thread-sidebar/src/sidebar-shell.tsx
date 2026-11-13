@@ -1347,6 +1347,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             stageTitle={stageTitle}
             // The Workbench's thread panel (a bottom sheet on a phone) through its registered command; none without it.
             togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}
+            edgeSwipePanels={preferences.phoneEdgeSwipePanels}
             railActions={railActions}
           />,
           columnElement,

@@ -65,6 +65,11 @@ export const threadSidebarSettings = defineSettings({
     hideBrandLogo: Schema.boolean()
       .default(DEFAULT_PREFERENCES.hideBrandLogo)
       .description('Hide the brand logo and name in the sidebar header to make room; the collapse button stays.'),
+    phoneEdgeSwipePanels: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.phoneEdgeSwipePanels)
+      .description(
+        "On a phone, inside a thread, a swipe in from the right screen edge opens the thread panel. Off by default because Android's back gesture also uses that edge; the swipe starts slightly inside it.",
+      ),
     showFooter: Schema.boolean()
       .default(DEFAULT_PREFERENCES.showFooter)
       .description(
