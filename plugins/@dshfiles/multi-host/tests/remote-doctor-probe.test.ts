@@ -25,19 +25,22 @@ const writeExecutable = async ({ path, script }: { readonly path: string; readon
 const runProbe = ({
   checkoutPath,
   revision,
+  dshHome,
   extraPath = [],
 }: {
   readonly checkoutPath: string | undefined
   readonly revision?: string | undefined
+  readonly dshHome?: string | undefined
   readonly extraPath?: readonly string[]
 }) =>
   RemoteDoctor.parseFacts({
-    output: execFileSync('sh', ['-c', RemoteDoctor.probeScript({ profile: 'web', checkoutPath, revision })], {
+    output: execFileSync('sh', ['-c', RemoteDoctor.probeScript({ profile: 'web', checkoutPath, revision, dshHome })], {
       env: { HOME: home, PATH: [...extraPath, '/usr/bin', '/bin'].join(':'), JJ_CONFIG: join(home, 'jj.toml') },
       encoding: 'utf8',
     }),
     profile: 'web',
     checkoutPath,
+    dshHome,
   })
 
 describe('remote probe', () => {
@@ -54,13 +57,27 @@ describe('remote probe', () => {
     expect(facts.dsh.version).toBe('0.2.2-rc.2')
   })
 
+  test('reads the profile and launch file from the requested DSH home', async () => {
+    const dshHome = join(home, 'dsh-mh')
+    await mkdir(join(dshHome, 'profiles', 'web'), { recursive: true })
+    await mkdir(join(dshHome, 'plugins', 'multi-host'), { recursive: true })
+    await writeFile(join(dshHome, 'plugins', 'multi-host', 'launch.json'), '{"url":"http://127.0.0.1:4100","pid":42}')
+    const facts = runProbe({ checkoutPath: undefined, dshHome })
+    expect(facts.profile).toMatchObject({ path: join(dshHome, 'profiles', 'web'), exists: true })
+    expect(facts.launch).toEqual({ files: [join(dshHome, 'plugins', 'multi-host', 'launch.json')], port: 4100, pid: 42 })
+  })
+
   test('resolves the requested revision to the commit the checkout sits on', async () => {
     const jjDirectory = dirname(execFileSync('sh', ['-c', 'command -v jj'], { encoding: 'utf8' }).trim())
     const checkout = join(home, 'dev', 'dshfiles')
     await mkdir(checkout, { recursive: true })
     await writeFile(join(home, 'jj.toml'), 'user.name = "Tester"\nuser.email = "tester@example.com"\n')
     const jj = (...args: string[]) =>
-      execFileSync('jj', ['--color=never', ...args], { cwd: checkout, env: { HOME: home, PATH: process.env.PATH, JJ_CONFIG: join(home, 'jj.toml') }, encoding: 'utf8' })
+      execFileSync('jj', ['--color=never', ...args], {
+        cwd: checkout,
+        env: { HOME: home, PATH: process.env.PATH, JJ_CONFIG: join(home, 'jj.toml') },
+        encoding: 'utf8',
+      })
     jj('git', 'init')
     await writeFile(join(checkout, 'README.md'), 'x\n')
     jj('commit', '-m', 'first')

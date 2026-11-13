@@ -151,6 +151,13 @@ describe('provision planning', () => {
     ])
   })
 
+  test('profile sync and the runtime start both target the requested DSH home', () => {
+    const facts: RemoteFacts = { ...readyFacts(), profile: { ...readyFacts().profile, exists: false }, launch: { files: [], port: undefined, pid: undefined } }
+    const plan = RemoteProvision.plan({ facts, options: { ...options, remoteHome: '/Users/me/dsh-mh' } })
+    expect(plan.find(step => step.id === 'profile')?.commands[0]).toContain("DSH_HOME='/Users/me/dsh-mh' node scripts/profile-sync.ts")
+    expect(plan.find(step => step.id === 'runtime')?.commands[0]).toContain("DSH_HOME='/Users/me/dsh-mh' ")
+  })
+
   test('a stale profile core plans a resync even when the profile exists', () => {
     const facts: RemoteFacts = { ...readyFacts(), profile: { path: '~/.dsh/profiles/web', exists: true, pluginLinks: 52, coreVersion: '0.2.0-rc.2' } }
     const profile = RemoteProvision.plan({ facts, options }).find(step => step.id === 'profile')
@@ -227,9 +234,7 @@ describe('provision runs over ssh', () => {
 
   test('a step whose output overflows the ssh limit says so instead of an unknown exit', async () => {
     process.env.FAKE_SSH_FORCE_STDOUT_BYTES = String(200 * 1024)
-    const run = await runEffect(
-      RemoteProvision.run({ sshTarget: 'example', facts: factsOf(), options, steps: ['node'], confirm: 'next', dryRun: false }),
-    )
+    const run = await runEffect(RemoteProvision.run({ sshTarget: 'example', facts: factsOf(), options, steps: ['node'], confirm: 'next', dryRun: false }))
     delete process.env.FAKE_SSH_FORCE_STDOUT_BYTES
     expect(run.executed.map(result => [result.id, result.ok, result.state])).toEqual([['node', false, 'failed']])
     expect(run.executed[0]?.detail).toContain('output limit')

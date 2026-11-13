@@ -762,6 +762,7 @@ const handlers = Api.handlers(multiHostApi, {
         profile: input.profile,
         checkoutPath: input.checkoutPath,
         revision: input.revision,
+        dshHome: input.remoteHome,
       })
       const options = {
         remoteHome: input.remoteHome,

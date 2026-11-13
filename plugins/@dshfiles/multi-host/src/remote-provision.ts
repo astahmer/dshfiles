@@ -77,8 +77,7 @@ const inCheckout = ({
 
 const logTailBytes = 12_000
 
-const stepLogPath = ({ remoteHome, id }: { readonly remoteHome: string; readonly id: ProvisionStepId }): string =>
-  `${remoteHome}/logs/provision-${id}.log`
+const stepLogPath = ({ remoteHome, id }: { readonly remoteHome: string; readonly id: ProvisionStepId }): string => `${remoteHome}/logs/provision-${id}.log`
 
 /**
  * A long step writes its output to a remote log and returns only the tail, so a chatty build never passes the SSH
@@ -185,7 +184,11 @@ const planBuild = ({
     state: 'pending',
     reason: 'built bundles missing',
     commands: [
-      logged({ remoteHome: options.remoteHome, id: 'build', command: inCheckout({ facts, nodePath, checkoutPath: options.checkoutPath, command: 'pnpm run build' }) }),
+      logged({
+        remoteHome: options.remoteHome,
+        id: 'build',
+        command: inCheckout({ facts, nodePath, checkoutPath: options.checkoutPath, command: 'pnpm run build' }),
+      }),
     ],
   })
 }
@@ -238,7 +241,12 @@ const planProfile = ({
       logged({
         remoteHome: options.remoteHome,
         id: 'profile',
-        command: inCheckout({ facts, nodePath, checkoutPath: options.checkoutPath, command: `node scripts/profile-sync.ts --profile ${shellQuote(options.profile)}` }),
+        command: inCheckout({
+          facts,
+          nodePath,
+          checkoutPath: options.checkoutPath,
+          command: `DSH_HOME=${shellQuote(options.remoteHome)} node scripts/profile-sync.ts --profile ${shellQuote(options.profile)}`,
+        }),
       }),
     ],
   })

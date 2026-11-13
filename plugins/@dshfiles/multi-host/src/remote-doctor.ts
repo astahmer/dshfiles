@@ -48,10 +48,13 @@ const probeScript = ({
   profile,
   checkoutPath,
   revision,
+  dshHome,
 }: {
   readonly profile: string
   readonly checkoutPath: string | undefined
   readonly revision?: string | undefined
+  /** The DSH home the runtime uses (`DSH_HOME`); `~/.dsh` when omitted, like the DSH CLI. */
+  readonly dshHome?: string | undefined
 }): string =>
   [
     'v() { printf \'%s=%s\\n\' "$1" "$2"; }',
@@ -60,7 +63,9 @@ const probeScript = ({
     `checkout=${shellQuote(checkoutPath ?? '')}`,
     'if [ -z "$checkout" ]; then checkout="$HOME/dev/dshfiles"; fi',
     'v checkout_path "$checkout"',
-    'profile_dir="$HOME/.dsh/profiles/$profile"',
+    `dsh_home=${shellQuote(dshHome ?? '')}`,
+    'if [ -z "$dsh_home" ]; then dsh_home="$HOME/.dsh"; fi',
+    'profile_dir="$dsh_home/profiles/$profile"',
     'v uname "$(uname -srm 2>/dev/null)"',
     'v os "$(sw_vers -productVersion 2>/dev/null)"',
     'v user "$(id -un 2>/dev/null)"',
@@ -93,7 +98,7 @@ const probeScript = ({
     'done',
     'if [ -z "$dsh_version" ] && [ -n "$dsh_path" ]; then dsh_version=$("$dsh_path" --version 2>/dev/null | head -1); fi',
     'v dsh_version "$dsh_version"',
-    'for file in "$HOME/.dsh/plugins/multi-host/launch.json" "$HOME/.dsh/runtime/web-url"; do',
+    'for file in "$dsh_home/plugins/multi-host/launch.json" "$dsh_home/runtime/web-url"; do',
     '  [ -f "$file" ] || continue',
     '  v launch_file "$file"',
     '  v launch_port "$(grep -oE \'127\\.0\\.0\\.1:[0-9]+\' "$file" 2>/dev/null | head -1 | cut -d: -f2)"',
@@ -134,10 +139,12 @@ const parseRemoteFacts = ({
   output,
   profile,
   checkoutPath,
+  dshHome,
 }: {
   readonly output: string
   readonly profile: string
   readonly checkoutPath: string | undefined
+  readonly dshHome?: string | undefined
 }): RemoteFacts => {
   const values = new Map<string, string[]>()
   const fnmNodes: Schema.Schema.Type<typeof fnmNodeSchema>[] = []
@@ -178,7 +185,7 @@ const parseRemoteFacts = ({
       pid: numberOrUndefined(valueOf(values, 'launch_pid')),
     },
     profile: {
-      path: `~/.dsh/profiles/${profile}`,
+      path: `${dshHome ?? '~/.dsh'}/profiles/${profile}`,
       exists: valueOf(values, 'profile_exists') === '1',
       pluginLinks: numberOrUndefined(valueOf(values, 'profile_plugin_links')) ?? 0,
       coreVersion: valueOf(values, 'profile_core_version') || undefined,
@@ -315,16 +322,17 @@ const readRemoteFacts = Effect.fn('remote facts read')(function* (input: {
   readonly profile: string
   readonly checkoutPath?: string | undefined
   readonly revision?: string | undefined
+  readonly dshHome?: string | undefined
 }) {
   const ssh = yield* Ssh
   const result = yield* ssh.run({
     sshTarget: input.sshTarget,
-    command: probeScript({ profile: input.profile, checkoutPath: input.checkoutPath, revision: input.revision }),
+    command: probeScript({ profile: input.profile, checkoutPath: input.checkoutPath, revision: input.revision, dshHome: input.dshHome }),
     timeout: probeTimeoutMs,
   })
   if (result.timedOut) return yield* new SshTimedOut({ timeoutMs: probeTimeoutMs })
   if (result.code !== 0) return yield* new SshCommandFailed({ exitCode: result.code, stderrTail: result.stderr.trim() || 'The remote probe failed.' })
-  return parseRemoteFacts({ output: result.stdout, profile: input.profile, checkoutPath: input.checkoutPath })
+  return parseRemoteFacts({ output: result.stdout, profile: input.profile, checkoutPath: input.checkoutPath, dshHome: input.dshHome })
 })
 
 export class RemoteDoctor {

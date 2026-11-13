@@ -28,6 +28,18 @@ describe('remote runtime', () => {
     expect(command).toContain("DSHFILES_DIR='/Users/me/dev/dshfiles'")
   })
 
+  test('starts the runtime in the requested DSH home, not the default ~/.dsh', () => {
+    const command = RemoteRuntime.startCommand({
+      remoteHome: '/srv/dsh-mh',
+      checkoutPath: '/srv/dshfiles',
+      profile: 'web',
+      dshPath: '/home/pi/.local/share/pnpm/bin/dsh',
+      platform: undefined,
+      pathDirectories: [],
+    })
+    expect(command).toContain("DSH_HOME='/srv/dsh-mh' ")
+  })
+
   test('keeps the log tail bounded and reads the launched pid and port', () => {
     expect(RemoteRuntime.logsCommand({ logFile: '/tmp/a b.log', lines: 10_000 })).toBe("tail -n 400 -- '/tmp/a b.log' 2>/dev/null || true")
     const status = RemoteRuntime.parseStatus({

@@ -45,7 +45,7 @@ const startRuntimeCommand = ({
   return [
     `mkdir -p ${shellQuote(`${remoteHome}/logs`)}`,
     'umask 077',
-    `nohup env PATH=${pathValue({ directories: pathDirectories })} DSHFILES_DIR=${shellQuote(checkoutPath)} ${keepAwake}${shellQuote(dshPath)} --profile ${shellQuote(profile)} --no-open --host 127.0.0.1 --port 0 >> ${shellQuote(logPath)} 2>&1 &`,
+    `nohup env PATH=${pathValue({ directories: pathDirectories })} DSH_HOME=${shellQuote(remoteHome)} DSHFILES_DIR=${shellQuote(checkoutPath)} ${keepAwake}${shellQuote(dshPath)} --profile ${shellQuote(profile)} --no-open --host 127.0.0.1 --port 0 >> ${shellQuote(logPath)} 2>&1 &`,
     'echo "started_pid=$!"',
   ].join('\n')
 }
