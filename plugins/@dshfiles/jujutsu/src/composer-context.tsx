@@ -174,7 +174,7 @@ const ChangesPillContent = (props: ComposerSlotProps): JSX.Element | null => {
             <FileDiffIcon />
             {/* b:czs9: in a header row under 26rem the pill keeps its icon; the counts stay in its name and tooltip. */}
             {fileCount === 0 || repository.totals === null ? (
-              <span className="dshx:@max-[26rem]:hidden">{fileCount === 0 ? 'No changes' : files}</span>
+              <span className={cn('dshx:@max-[26rem]:hidden', fileCount === 0 && 'dshx:max-sm:hidden')}>{fileCount === 0 ? 'No changes' : files}</span>
             ) : (
               <span className="dshx:font-mono! dshx:flex dshx:gap-1 dshx:@max-[26rem]:hidden">
                 <span>+{repository.totals.additions}</span>

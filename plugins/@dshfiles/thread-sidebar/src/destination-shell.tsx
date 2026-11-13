@@ -1101,7 +1101,8 @@ const PhoneNavigation = (
               className="dshx:flex dshx:h-11 dshx:min-w-11 dshx:max-w-[40%] dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:pr-2 dshx:pl-1 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
             >
               <ChevronLeftIcon className="dshx:size-5 dshx:shrink-0" aria-hidden="true" />
-              <span className="dshx:min-w-0 dshx:truncate">{bar.back.label}</span>
+              {/* On a thread the title needs the width: the chevron alone goes back, as in other chat apps. */}
+              <span className={cn('dshx:min-w-0 dshx:truncate', bar.thread && 'dshx:sr-only')}>{bar.back.label}</span>
             </button>
           )}
           <h1
