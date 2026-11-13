@@ -6,6 +6,12 @@ export const MISSING_THREAD_GRACE_MS = 3_000
  * briefly lose a stored thread (a Host unload reported as a removal, a reconnect's refetch), and closing the tab on that
  * snapshot lost the tab for good. A Session counts as gone once it stayed missing for the whole grace period.
  */
+/** One look at the missing thread tabs: which are gone for good, and when to look again (null: nothing to wait for). */
+export interface MissingThreadsCheck {
+  readonly gone: readonly string[]
+  readonly recheckInMs: number | null
+}
+
 export const createMissingThreads = (graceMs: number = MISSING_THREAD_GRACE_MS) => {
   const since = new Map<string, number>()
   return {
@@ -14,7 +20,7 @@ export const createMissingThreads = (graceMs: number = MISSING_THREAD_GRACE_MS) 
      * @param now - the current time in milliseconds.
      * @returns the ids missing for the whole grace period, and in how many milliseconds to look again (null: no wait).
      */
-    observe(missing: readonly string[], now: number): { readonly gone: readonly string[]; readonly recheckInMs: number | null } {
+    observe(missing: readonly string[], now: number): MissingThreadsCheck {
       const current = new Set(missing)
       for (const id of since.keys()) if (!current.has(id)) since.delete(id)
       const gone: string[] = []
