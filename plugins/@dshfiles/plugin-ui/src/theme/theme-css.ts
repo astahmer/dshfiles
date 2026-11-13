@@ -133,7 +133,6 @@ export const HOST_ALIASES: readonly AliasRow[] = [
   ['--dsw-alias-code-diff-added', 'var(--dshx-tone-success-bg)', 'var(--dshx-tone-success-bg)'],
   ['--dsw-alias-code-diff-deleted', 'var(--dshx-tone-danger-bg)', 'var(--dshx-tone-danger-bg)'],
   ['--dsw-specific-sidebar-fill', 1, 1],
-  ['--dsw-specific-sidebar-nav-item-hover', 2, 2],
   ['--dsw-specific-sidebar-nav-item-active', 3, 3],
   ['--dsw-specific-sidebar-nav-item-active-accent', 'var(--dshx-tone-accent-bg)', 'var(--dshx-tone-accent-bg)'],
   ['--dsw-specific-bubble', 2, 2],

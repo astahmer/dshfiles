@@ -29,6 +29,8 @@ const sameKeys = (left: readonly string[] | undefined, right: readonly string[] 
  */
 const createCommandRows = (): ((commands: readonly CommandItem[], keys: ReadonlyMap<string, readonly string[]>) => readonly PaletteAction[]) => {
   let previous = new Map<CommandItem, { readonly keys: readonly string[] | undefined; readonly action: PaletteAction }>()
+  // An unlisted command is rebuilt on every change, so its warning would repeat with each one; say it once per id.
+  const warned = new Set<string>()
   return (commands, keys) => {
     const next = new Map<CommandItem, { readonly keys: readonly string[] | undefined; readonly action: PaletteAction }>()
     const rows = commands.flatMap(command => {
@@ -40,8 +42,10 @@ const createCommandRows = (): ((commands: readonly CommandItem[], keys: Readonly
       }
       const action = toPaletteAction(command, commandKeys)
       if (action === undefined) {
-        if (command.hidden !== true)
+        if (command.hidden !== true && !warned.has(command.id)) {
+          warned.add(command.id)
           console.warn(`command-palette: ${command.id} is not listed; command ids start with the package scope, e.g. @acme/plugin.open.`)
+        }
         return []
       }
       next.set(command, { keys: commandKeys, action })

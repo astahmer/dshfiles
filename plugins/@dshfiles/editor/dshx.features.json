@@ -26,7 +26,7 @@
         "firstAction": "Run Editor: Artifacts from the command palette in a thread and create a document.",
         "doneWhen": "The document is saved with the thread and opens again later.",
         "open": {
-          "command": "dshfiles-editor.artifacts"
+          "command": "@dshfiles/editor.artifacts"
         }
       },
       "verification": [

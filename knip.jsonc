@@ -32,6 +32,10 @@
     "tooling/antislop/tests/oxlint/**",
     "tooling/antislop/effect/repo-rules/fixtures/**",
     "plugins/@dshfiles/multi-host/tests/fixtures/**",
+    // Loaded by path: opencode-compat's runtime test imports each fixture through `fixture(name)`.
+    "plugins/@dshfiles/opencode-compat/tests/fixtures/**",
+    // Command-line tools the context-compaction README documents (`node scripts/replay-*.mjs`), not imported modules.
+    "plugins/@dshfiles/context-compaction/scripts/replay-*.mjs",
     "plugins/@dshfiles/thread-sidebar/src/restart-controller.ts",
     // Vendored upstream test helper (src/native/testing/generation.ts) kept for byte-parity
     // with the pinned package; `native-fork-diff` reports it missing if it is deleted.

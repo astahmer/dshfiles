@@ -31,6 +31,14 @@ describe('contributed commands', () => {
     expect(PaletteApi.getSnapshot().actions).toEqual([])
   })
 
+  it('warns about an unscoped command once, however often the rows are rebuilt', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const rows = ContributedCommandsModel.createCommandRows()
+    const unscoped: CommandItem = { id: 'unscoped.open', title: 'Unscoped', run: () => {} }
+    for (let rebuild = 0; rebuild < 5; rebuild += 1) rows([unscoped], new Map())
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
   it('shows the keys a command answers to now and marks a suggested one', () => {
     const dispose = list(
       [

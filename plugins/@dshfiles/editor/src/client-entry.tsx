@@ -155,7 +155,7 @@ export default defineClient({
       'dshfiles-editor: artifacts workbench panel',
     )
     plugin?.add(Command, {
-      id: 'dshfiles-editor.artifacts',
+      id: '@dshfiles/editor.artifacts',
       title: 'Artifacts',
       keywords: ['artifact', 'document'],
       run: () => {

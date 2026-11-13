@@ -5,7 +5,7 @@ import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import AgentDefaultModel from '@deepseek-ai/dsh-agent-default-model'
 import { LlmAdapter, LlmRuntime, createUserMessage, type StreamChunk } from '@deepseek-ai/dsh-llm'
-import SessionStore, { type SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import * as JsonlPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
@@ -113,6 +113,20 @@ it('disposes an Agent idle past the threshold and keeps one that is not', async 
   await expect(sweep()).resolves.toBe(1)
   expect(ctx.agents.get(agent.id)).toBeUndefined()
   expect(ctx.sessions.get(agent.id)).toBeUndefined()
+})
+
+it('reports a detached thread as gone only when persistence no longer holds it', async () => {
+  const { ctx, list, agent, sweep } = await fixture()
+  // Attached: an unload that raced a re-attach is not a removal.
+  await expect(list.leftStore(agent.id)).resolves.toBe(false)
+
+  await expect(sweep()).resolves.toBe(1)
+  expect(ctx.sessions.get(agent.id)).toBeUndefined()
+  // Detached but stored: the thread stays listed, so Clients must keep it.
+  await expect(list.leftStore(agent.id)).resolves.toBe(false)
+
+  // Never stored (an abandoned blank New thread): this one really left.
+  await expect(list.leftStore(SessionId('session-never-stored'))).resolves.toBe(true)
 })
 
 it('keeps an Agent inside a turn, which is where an approval or a question waits', async () => {
