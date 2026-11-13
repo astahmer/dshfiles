@@ -263,7 +263,12 @@ export class SessionController extends TypertRemoteService {
     ctx.on('session/disposed', (session) => {
       // An idle-evicted Session stays stored and listed; its `agent/disposed` row already says it is cold.
       if (this.agents.isEvicting(session.id)) return
-      ctx.emit('api-session/removed', session.id)
+      // dshfiles: any other detach is also an unload unless persistence lost the Session (an abandoned blank New
+      // thread). Reporting a stored thread as removed made every Client drop it, and its tab, until a reload.
+      const sessionId = session.id
+      void this.listState.leftStore(sessionId).then((left) => {
+        if (left) ctx.emit('api-session/removed', sessionId)
+      })
     })
     const publishAgentAvailability = ({ agent }: { agent: Agent }): undefined => {
       if (ctx.sessions.get(agent.id) === agent.session) {

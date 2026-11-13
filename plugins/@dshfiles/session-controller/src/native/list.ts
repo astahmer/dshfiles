@@ -445,6 +445,26 @@ export class ApiSessionList {
     if (reason === 'disposed') void this.settleDisposed(records, session.id)
   }
 
+  /**
+   * dshfiles: whether a detached Session really left the store. Detaching only unloads a Session (a superseded or
+   * cancelled resume, a released reader); announcing every detach as `api-session/removed` made Clients drop a stored
+   * thread, and its tab, until the page reloaded.
+   * @param id - the detached Session.
+   * @returns true when persistence no longer holds it and nothing attached it again; false when it is still stored,
+   * attached again, or persistence could not answer.
+   */
+  async leftStore(id: SessionId): Promise<boolean> {
+    const persistence = this.ctx.get('sessionPersistence')
+    if (persistence === undefined) return this.ctx.sessions.get(id) === undefined
+    let stored
+    try {
+      stored = await persistence.stat(id, { signal: this.lifetime.signal })
+    } catch {
+      return false
+    }
+    return stored === undefined && this.ctx.sessions.get(id) === undefined
+  }
+
   private async settleDisposed(records: Map<string, SessionRecord>, id: SessionId): Promise<void> {
     const persistence = this.ctx.get('sessionPersistence')
     if (persistence === undefined) return
