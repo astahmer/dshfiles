@@ -66,6 +66,9 @@ export const writeClipboard = async (text: string): Promise<boolean> => {
   }
 }
 
+/** Same user-agent rule as the Host's primitive, uncached so a test can change the user agent. */
+export const isMobileDevice = (): boolean => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
 export const StateDot = (props: { state: string }): JSX.Element => <span aria-hidden data-state={props.state} />
 
 export const Tooltip = (props: { content?: ReactNode; label?: ReactNode; children?: ReactNode }): JSX.Element => <>{props.children}</>
