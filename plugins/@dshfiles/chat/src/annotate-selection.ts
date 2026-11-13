@@ -4,6 +4,8 @@ const blockSelector = 'p, li, blockquote, h1, h2, h3, h4, h5, h6, td, th, pre'
 export interface AssistantSelection {
   readonly text: string
   readonly rect: DOMRect
+  /** The selection's last line, where its end handle sits. */
+  readonly end: DOMRect
   /** Locator of the selection: its assistant step's flow key and the index of the block it sits in, as URL search params. */
   readonly source: string
 }
@@ -31,7 +33,8 @@ export class SelectionAnnotation {
     const endBlock = elementOf(range.endContainer)?.closest(blockSelector) ?? null
     const block = startBlock !== null && startBlock === endBlock ? [...step.querySelectorAll(blockSelector)].indexOf(startBlock) : -1
     const source = new URLSearchParams({ step: step.getAttribute('data-chat-flow-key') ?? '', block: String(block) }).toString()
-    return { text, rect: range.getBoundingClientRect(), source }
+    const rect = range.getBoundingClientRect()
+    return { text, rect, end: [...range.getClientRects()].at(-1) ?? rect, source }
   }
 
   /**

@@ -4,6 +4,7 @@ import { SelectionAnnotation } from '../src/annotate-selection.ts'
 
 // jsdom has no layout, so a Range has no rectangle; the browser supplies a real one.
 Range.prototype.getBoundingClientRect ??= () => DOMRect.fromRect()
+Range.prototype.getClientRects ??= () => document.createElement('div').getClientRects()
 
 const cleanups: (() => void)[] = []
 afterEach(() => {

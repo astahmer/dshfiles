@@ -81,7 +81,8 @@
     "src/native/chat/TurnNavigator.tsx",
     "src/native/chat/use-chat-scroll.ts",
     "src/native/conversation-nodes/register.ts",
-    "src/native/chat/TurnUsagePanel.module.css"
+    "src/native/chat/TurnUsagePanel.module.css",
+    "src/native/chat/text-interaction.ts"
   ],
   "added": [
     "src/native/chat/AnnotateSelection.module.css",
@@ -91,6 +92,9 @@
     "src/native/chat/RouteChangeRow.tsx",
     "src/native/chat/RunFold.module.css",
     "src/native/chat/RunFold.tsx",
+    "src/native/chat/selection-action-placement.test.ts",
+    "src/native/chat/selection-action-placement.ts",
+    "src/native/chat/touch-input.ts",
     "src/native/chat/SinceYouLeftCard.module.css",
     "src/native/chat/SinceYouLeftCard.tsx",
     "src/native/chat/ThreadFindBar.module.css",

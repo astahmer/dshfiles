@@ -1,13 +1,14 @@
-import { useEffect, useState, type CSSProperties, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Composer, useContract } from '@dshfiles/dshx/client'
 import { SelectionAnnotation, type AssistantSelection } from '../../annotate-selection.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
+import { annotatePlacement } from './selection-action-placement.ts'
+import { isTouchInput } from './touch-input.ts'
 import css from './AnnotateSelection.module.css'
 
 /** The composer's annotation pill asks for its passage with this event; the detail is `text` and `source` as URL search params. */
 const REVEAL_EVENT = 'dshfiles:reveal-annotation'
-const EDGE_MARGIN_PX = 72
 
 /**
  * Floats an Annotate action over a finished assistant selection and adds it to the composer's annotation pill;
@@ -22,33 +23,62 @@ export const AnnotateSelection = ({ sessionId, containerRef, t }: {
 }) => {
   const composer = useContract(Composer)
   const [selected, setSelected] = useState<AssistantSelection | undefined>(undefined)
+  const [touch, setTouch] = useState(false)
+  const [buttonWidth, setButtonWidth] = useState(0)
+  const [quoteAction, setQuoteAction] = useState<DOMRect | undefined>(undefined)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  // A press on this button or on the Quote action beside it freezes the button until the click lands: otherwise
+  // it vanishes (collapsed selection) or moves (Quote dismissed) under the finger, or re-renders over Quote.
+  // Set from a window capture listener, ahead of the chat's document listeners; cleared after the click.
+  const pressed = useRef(false)
 
   useEffect(() => {
     let dragging = false
+    let lastPointerType = ''
     const refresh = (): void => {
+      if (pressed.current) return
       const container = containerRef.current
+      setTouch(isTouchInput(lastPointerType))
       setSelected(dragging || container === null ? undefined : SelectionAnnotation.selected({ container, selection: window.getSelection() }))
     }
     const onPointerDown = (event: PointerEvent): void => {
-      if (event.target instanceof Element && event.target.closest('[data-annotate-selection]') !== null) return
-      dragging = true
+      pressed.current = event.target instanceof Element
+        && event.target.closest('[data-annotate-selection], [data-text-interaction-surface]') !== null
+      if (pressed.current) return
+      lastPointerType = event.pointerType
+      // A touch long-press selects with pointercancel and no pointerup; selectionchange carries the result.
+      dragging = event.pointerType !== 'touch'
       setSelected(undefined)
     }
     const onPointerUp = (): void => {
       dragging = false
+      if (pressed.current) return
       refresh()
     }
-    document.addEventListener('pointerdown', onPointerDown, true)
+    const onClick = (): void => {
+      if (!pressed.current) return
+      pressed.current = false
+      refresh()
+    }
+    window.addEventListener('pointerdown', onPointerDown, true)
+    window.addEventListener('click', onClick)
     document.addEventListener('pointerup', onPointerUp, true)
+    document.addEventListener('pointercancel', onPointerUp, true)
     document.addEventListener('selectionchange', refresh)
     document.addEventListener('scroll', refresh, true)
     window.addEventListener('resize', refresh)
+    window.visualViewport?.addEventListener('resize', refresh)
+    window.visualViewport?.addEventListener('scroll', refresh)
     return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('click', onClick)
       document.removeEventListener('pointerup', onPointerUp, true)
+      document.removeEventListener('pointercancel', onPointerUp, true)
       document.removeEventListener('selectionchange', refresh)
       document.removeEventListener('scroll', refresh, true)
       window.removeEventListener('resize', refresh)
+      window.visualViewport?.removeEventListener('resize', refresh)
+      window.visualViewport?.removeEventListener('scroll', refresh)
     }
   }, [containerRef])
 
@@ -75,8 +105,28 @@ export const AnnotateSelection = ({ sessionId, containerRef, t }: {
     return () => window.removeEventListener(REVEAL_EVENT, reveal)
   }, [containerRef])
 
+  useLayoutEffect(() => {
+    setButtonWidth(buttonRef.current?.offsetWidth ?? 0)
+  }, [selected, touch])
+
+  // On touch the chat's text-interaction surface (Quote text) also sits under the selection end; follow it.
+  useEffect(() => {
+    pressed.current = false
+    const surface = containerRef.current?.querySelector<HTMLElement>('[data-text-interaction-surface]') ?? null
+    if (selected === undefined || !touch || surface === null) { setQuoteAction(undefined); return }
+    const read = (): void => {
+      if (pressed.current) return
+      setQuoteAction(surface.style.visibility === 'visible' && surface.hasAttribute('data-touch') ? surface.getBoundingClientRect() : undefined)
+    }
+    read()
+    const observer = new MutationObserver(read)
+    observer.observe(surface, { attributes: true, attributeFilter: ['style', 'data-touch'] })
+    return () => observer.disconnect()
+  }, [containerRef, selected, touch])
+
   if (selected === undefined || composer.status !== 'active') return null
-  const left = Math.min(Math.max(selected.rect.left + selected.rect.width / 2, EDGE_MARGIN_PX), window.innerWidth - EDGE_MARGIN_PX)
+  const viewport = window.visualViewport ?? { offsetLeft: 0, offsetTop: 0, width: window.innerWidth, height: window.innerHeight }
+  const placement = annotatePlacement({ selection: selected.rect, end: selected.end, windowWidth: window.innerWidth, viewport, touch, buttonWidth, avoid: quoteAction })
   const add = (): void => {
     if (!composer.value.attach({ sessionId, attachment: { kind: 'annotation', text: selected.text, source: selected.source } })) return
     window.getSelection()?.removeAllRanges()
@@ -86,10 +136,13 @@ export const AnnotateSelection = ({ sessionId, containerRef, t }: {
   return createPortal(
     <button
       type="button"
+      ref={buttonRef}
       data-annotate-selection
+      data-side={placement.side}
       className={css.annotate}
-      // --annotate-bottom serves touch, where the button sits under the selection (b:ysaj).
-      style={{ left, '--annotate-top': `${String(selected.rect.top)}px`, '--annotate-bottom': `${String(selected.rect.bottom)}px` } as CSSProperties}
+      style={{ left: placement.left, top: placement.top }}
+      onPointerDown={event => event.preventDefault()}
+      onPointerCancel={() => { pressed.current = false }}
       onMouseDown={event => event.preventDefault()}
       onClick={add}
     >

@@ -445,3 +445,14 @@
   margin: 0;
   width: max-content;
 }
+
+/* dshfiles: touch placement puts the action under the selection, which can pass the transcript's end (the
+   last reply), so the root stops clipping it meanwhile; placement keeps it above the composer. 44px targets. */
+.root:has(.textInteraction[data-touch]) {
+  overflow-y: visible;
+}
+
+.column > .textInteraction[data-touch] :is(button, [role='button']) {
+  min-width: 44px;
+  min-height: 44px;
+}

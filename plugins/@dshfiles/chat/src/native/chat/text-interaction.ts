@@ -3,6 +3,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { RefObject } from 'react'
 import { readTextSelection, selectedText } from './text-selection.ts'
 import type { TextSelection } from './text-selection.ts'
+import { touchActionPlacement, withinViewport } from './selection-action-placement.ts'
+import { isTouchInput } from './touch-input.ts'
 
 import type {
   TextInteractionGesture, TextInteractionSurface, TextInteractionTrigger,
@@ -92,6 +94,7 @@ export function useTextInteraction(
   registeredIds: readonly string[],
 ): TextInteractionBinding {
   const target = useRef<Target | null>(null)
+  const lastPointerType = useRef('')
   const [active, setActive] = useState<TextInteractionBinding['active']>(null)
   const dismiss = useCallback(() => {
     target.current = null
@@ -131,6 +134,9 @@ export function useTextInteraction(
       return
     }
     const gap = 8
+    // dshfiles: on touch the native selection toolbar covers the space above, so the action goes under the end.
+    const touch = current.point === null && isTouchInput(lastPointerType.current)
+    surface.toggleAttribute('data-touch', touch)
     surface.style.maxWidth = `${visible.right - visible.left}px`
     surface.style.maxHeight = `${visible.bottom - visible.top}px`
     const size = surface.getBoundingClientRect()
@@ -140,8 +146,15 @@ export function useTextInteraction(
     const above = anchor.top - gap - size.height
     const below = anchor.bottom + gap
     const preferredY = current.point === null && above >= visible.top ? above : below
-    const left = Math.max(visible.left, Math.min(x, visible.right - size.width))
-    const top = Math.max(visible.top, Math.min(preferredY, visible.bottom - size.height))
+    const end = rects.at(-1)
+    const scroller = root.closest<HTMLElement>('[data-conversation-scroll]') ?? root
+    const viewport = view.visualViewport ?? { offsetLeft: 0, offsetTop: 0, width: view.innerWidth, height: view.innerHeight }
+    const touchPlacement = touch && end !== undefined
+      // The transcript stops clipping a touch action (ChatView.module.css), so the scroller and the composer bound it.
+      ? touchActionPlacement({ end: rectBounds(end), width: size.width, height: size.height, bounds: withinViewport({ bounds: visibleBounds(scroller, scroller, view), viewport }) })
+      : undefined
+    const left = touchPlacement?.left ?? Math.max(visible.left, Math.min(x, visible.right - size.width))
+    const top = touchPlacement?.top ?? Math.max(visible.top, Math.min(preferredY, visible.bottom - size.height))
     const rootRect = root.getBoundingClientRect()
     const scaleX = root.offsetWidth === 0 ? 1 : rootRect.width / root.offsetWidth
     const scaleY = root.offsetHeight === 0 ? 1 : rootRect.height / root.offsetHeight
@@ -163,6 +176,8 @@ export function useTextInteraction(
     let pointerSelecting = false
     let keyboardSelecting = false
     let selectionChangedDuringGesture = false
+    // A tap on the action may collapse the selection before its click lands; keep the action until then.
+    let pressingSurface = false
     let previousRange: Range | null = null
     let frame: number | undefined
     const schedulePlacement = (): void => {
@@ -181,6 +196,7 @@ export function useTextInteraction(
       setActive({ id, trigger })
     }
     const updateSelection = (event: Event): void => {
+      if (pressingSurface) return
       if (pointerSelecting || keyboardSelecting) { selectionChangedDuringGesture = true; return }
       if (target.current !== null && target.current.point !== null) return
       if (target.current !== null && surface.contains(document.activeElement)) return
@@ -197,19 +213,27 @@ export function useTextInteraction(
     }
     const insideSurface = (event: Event): boolean => event.composedPath().includes(surface)
     const pointerDown = (event: PointerEvent): void => {
-      if (insideSurface(event)) return
+      pressingSurface = insideSurface(event)
+      if (pressingSurface) return
       const selection = document.getSelection()
       previousRange = selection?.rangeCount === 1 ? selection.getRangeAt(0).cloneRange() : null
       dismiss()
       selectionChangedDuringGesture = false
-      pointerSelecting = event.button === 0 && event.target instanceof Node && root.contains(event.target)
+      lastPointerType.current = event.pointerType
+      // A touch long-press selects, then ends in pointercancel without pointerup; selectionchange carries it.
+      pointerSelecting = event.pointerType !== 'touch' && event.button === 0 && event.target instanceof Node && root.contains(event.target)
     }
     const pointerUp = (event: PointerEvent): void => {
+      pressingSurface = false
       if (!pointerSelecting) return
       pointerSelecting = false
       updateSelection(event)
     }
-    const cancel = (): void => { pointerSelecting = false; keyboardSelecting = false; dismiss() }
+    const cancel = (): void => { pointerSelecting = false; keyboardSelecting = false; pressingSurface = false; dismiss() }
+    const pointerCancel = (event: PointerEvent): void => {
+      if (event.pointerType !== 'touch') { cancel(); return }
+      pressingSurface = false
+    }
     const keyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') { cancel(); return }
       if (insideSurface(event) || !(event.target instanceof Node) || !root.contains(event.target)) return
@@ -246,23 +270,27 @@ export function useTextInteraction(
     document.addEventListener('selectionchange', updateSelection)
     document.addEventListener('pointerdown', pointerDown, true)
     document.addEventListener('pointerup', pointerUp)
-    document.addEventListener('pointercancel', cancel)
+    document.addEventListener('pointercancel', pointerCancel)
     document.addEventListener('keydown', keyDown)
     document.addEventListener('keyup', keyUp)
     document.addEventListener('scroll', schedulePlacement, true)
     root.addEventListener('contextmenu', contextMenu)
     view.addEventListener('resize', schedulePlacement)
+    view.visualViewport?.addEventListener('resize', schedulePlacement)
+    view.visualViewport?.addEventListener('scroll', schedulePlacement)
     view.addEventListener('blur', cancel)
     return () => {
       document.removeEventListener('selectionchange', updateSelection)
       document.removeEventListener('pointerdown', pointerDown, true)
       document.removeEventListener('pointerup', pointerUp)
-      document.removeEventListener('pointercancel', cancel)
+      document.removeEventListener('pointercancel', pointerCancel)
       document.removeEventListener('keydown', keyDown)
       document.removeEventListener('keyup', keyUp)
       document.removeEventListener('scroll', schedulePlacement, true)
       root.removeEventListener('contextmenu', contextMenu)
       view.removeEventListener('resize', schedulePlacement)
+      view.visualViewport?.removeEventListener('resize', schedulePlacement)
+      view.visualViewport?.removeEventListener('scroll', schedulePlacement)
       view.removeEventListener('blur', cancel)
       if (frame !== undefined) view.cancelAnimationFrame(frame)
     }

@@ -1,10 +1,10 @@
 /* Floating action above an assistant selection, on the menu surface. dshfiles (b:ysaj): kit radius (12, menus),
-   the s2 shadow token and the one enter curve (no overshoot); on touch it sits below the selection, so the iOS
-   selection callout keeps the space above it, at a 44pt target. */
+   the s2 shadow token and the one enter curve (no overshoot); on touch it sits below the selection's end, so the
+   native selection toolbar (iOS callout, Android Copy/Share) keeps the space above it, at a 44px target. The
+   component sets left/top and data-side; touch is detected in script since some Android phones report a fine pointer. */
 .annotate {
   position: fixed;
   z-index: 1100;
-  top: var(--annotate-top);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -34,21 +34,18 @@
   }
 }
 
-@media (pointer: coarse) {
-  .annotate {
-    top: var(--annotate-bottom);
-    height: 44px;
-    padding: 0 16px 0 14px;
-    font-size: 15px;
-    transform: translate(-50%, 12px);
-    animation-name: pop-in-below;
-  }
+.annotate[data-side='below'] {
+  height: 44px;
+  padding: 0 16px 0 14px;
+  font-size: 15px;
+  transform: translateX(-50%);
+  animation-name: pop-in-below;
 }
 
 @keyframes pop-in-below {
   from {
     opacity: 0;
-    transform: translate(-50%, 8px);
+    transform: translate(-50%, -4px);
   }
 }
 
