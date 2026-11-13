@@ -42,12 +42,12 @@ export interface RemoteFacts {
 
 const probeScript = ({ profile, checkoutPath }: { readonly profile: string; readonly checkoutPath: string | undefined }): string =>
   [
+    'v() { printf \'%s=%s\\n\' "$1" "$2"; }',
     `profile=${shellQuote(profile)}`,
     `checkout=${shellQuote(checkoutPath ?? '')}`,
     'if [ -z "$checkout" ]; then checkout="$HOME/dev/dshfiles"; fi',
     'v checkout_path "$checkout"',
     'profile_dir="$HOME/.dsh/profiles/$profile"',
-    'v() { printf \'%s=%s\\n\' "$1" "$2"; }',
     'v uname "$(uname -srm 2>/dev/null)"',
     'v os "$(sw_vers -productVersion 2>/dev/null)"',
     'v user "$(id -un 2>/dev/null)"',
@@ -304,6 +304,7 @@ const readRemoteFacts = Effect.fn('remote facts read')(function* (input: {
 export class RemoteDoctor {
   static readonly readFacts = readRemoteFacts
   static readonly parseFacts = parseRemoteFacts
+  static readonly probeScript = probeScript
   static readonly diagnose = diagnoseRemote
   static readonly officialNodePath = officialNodePath
 }

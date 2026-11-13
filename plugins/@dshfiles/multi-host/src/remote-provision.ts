@@ -101,6 +101,8 @@ const planNode = ({ facts, options }: { readonly facts: RemoteFacts; readonly op
 }
 
 const planCheckout = ({ facts, options }: { readonly facts: RemoteFacts; readonly options: ProvisionOptions }): ProvisionPlanStep => {
+  if (options.checkoutPath.trim() === '')
+    return stepOf({ id: 'checkout', state: 'blocked', reason: 'the remote checkout path is unknown; pass checkoutPath (an absolute path on that machine)' })
   if (facts.jj.path === undefined) return stepOf({ id: 'checkout', state: 'blocked', reason: 'no jj on the remote machine' })
   const clone = `${shellQuote(facts.jj.path)} git clone ${shellQuote(options.repository)} ${shellQuote(options.checkoutPath)}`
   if (!facts.checkout.exists) return stepOf({ id: 'checkout', state: 'pending', reason: `no checkout at ${options.checkoutPath}`, commands: [clone] })

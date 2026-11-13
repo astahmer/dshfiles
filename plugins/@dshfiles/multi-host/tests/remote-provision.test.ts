@@ -87,6 +87,14 @@ describe('provision planning', () => {
     expect(plan[1]?.commands[0]).toBe("'/nix/store/jj/bin/jj' git clone 'git@github.com:me/dshfiles.git' '/Users/me/dev/dshfiles'")
   })
 
+  test('an unknown checkout path blocks the checkout instead of cloning into an empty target', () => {
+    const plan = RemoteProvision.plan({ facts: factsOf(), options: { ...options, checkoutPath: '' } })
+    const checkout = plan.find(step => step.id === 'checkout')
+    expect(checkout?.state).toBe('blocked')
+    expect(checkout?.commands).toEqual([])
+    expect(checkout?.reason).toContain('checkoutPath')
+  })
+
   test('a ready machine plans nothing to do', () => {
     const plan = RemoteProvision.plan({ facts: readyFacts(), options })
     expect(plan.every(step => step.state === 'done')).toBe(true)
