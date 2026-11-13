@@ -1,7 +1,7 @@
 import { posix } from 'node:path'
 import { shellQuote } from './ssh.js'
 import { Effect } from 'effect'
-import { RemoteExec } from './remote-exec.js'
+import { RemoteExec, type RemoteExecResult } from './remote-exec.js'
 import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
 import { RemoteRuntime } from './remote-runtime.js'
 
@@ -75,6 +75,20 @@ const inCheckout = ({
   readonly command: string
 }): string => `cd ${shellQuote(checkoutPath)} && ${withEnvironment({ facts, nodePath, command })}`
 
+const logTailBytes = 12_000
+
+const stepLogPath = ({ remoteHome, id }: { readonly remoteHome: string; readonly id: ProvisionStepId }): string =>
+  `${remoteHome}/logs/provision-${id}.log`
+
+/**
+ * A long step writes its output to a remote log and returns only the tail, so a chatty build never passes the SSH
+ * output limit (which stops reading before the exit status arrives and leaves the remote command orphaned).
+ */
+const logged = ({ remoteHome, id, command }: { readonly remoteHome: string; readonly id: ProvisionStepId; readonly command: string }): string => {
+  const logPath = shellQuote(stepLogPath({ remoteHome, id }))
+  return `mkdir -p ${shellQuote(`${remoteHome}/logs`)} && ( ${command} ) > ${logPath} 2>&1; status=$?; tail -c ${logTailBytes} ${logPath}; exit "$status"`
+}
+
 const stepOf = ({
   id,
   state,
@@ -96,7 +110,7 @@ const planNode = ({ facts, options }: { readonly facts: RemoteFacts; readonly op
     id: 'node',
     state: 'pending',
     reason: `no official Node ${options.nodeVersion} build found`,
-    commands: [`${shellQuote(facts.fnm.path)} install ${shellQuote(options.nodeVersion)}`],
+    commands: [logged({ remoteHome: options.remoteHome, id: 'node', command: `${shellQuote(facts.fnm.path)} install ${shellQuote(options.nodeVersion)}` })],
   })
 }
 
@@ -142,7 +156,13 @@ const planInstall = ({
     id: 'install',
     state: 'pending',
     reason: 'node_modules missing',
-    commands: [inCheckout({ facts, nodePath, checkoutPath: options.checkoutPath, command: 'pnpm install --frozen-lockfile' })],
+    commands: [
+      logged({
+        remoteHome: options.remoteHome,
+        id: 'install',
+        command: inCheckout({ facts, nodePath, checkoutPath: options.checkoutPath, command: 'pnpm install --frozen-lockfile' }),
+      }),
+    ],
   })
 }
 
@@ -162,7 +182,9 @@ const planBuild = ({
     id: 'build',
     state: 'pending',
     reason: 'built bundles missing',
-    commands: [inCheckout({ facts, nodePath, checkoutPath: options.checkoutPath, command: 'pnpm run build' })],
+    commands: [
+      logged({ remoteHome: options.remoteHome, id: 'build', command: inCheckout({ facts, nodePath, checkoutPath: options.checkoutPath, command: 'pnpm run build' }) }),
+    ],
   })
 }
 
@@ -182,7 +204,13 @@ const planCli = ({
     id: 'cli',
     state: 'pending',
     reason: `installed dsh is ${facts.dsh.version ?? 'absent'}`,
-    commands: [withEnvironment({ facts, nodePath, command: `pnpm add -g ${shellQuote(`@deepseek-ai/dsh@${options.dshVersion}`)}` })],
+    commands: [
+      logged({
+        remoteHome: options.remoteHome,
+        id: 'cli',
+        command: withEnvironment({ facts, nodePath, command: `pnpm add -g ${shellQuote(`@deepseek-ai/dsh@${options.dshVersion}`)}` }),
+      }),
+    ],
   })
 }
 
@@ -205,7 +233,11 @@ const planProfile = ({
     state: 'pending',
     reason: facts.profile.exists ? 'the profile pins a different core version or has no links' : 'no profile',
     commands: [
-      inCheckout({ facts, nodePath, checkoutPath: options.checkoutPath, command: `node scripts/profile-sync.ts --profile ${shellQuote(options.profile)}` }),
+      logged({
+        remoteHome: options.remoteHome,
+        id: 'profile',
+        command: inCheckout({ facts, nodePath, checkoutPath: options.checkoutPath, command: `node scripts/profile-sync.ts --profile ${shellQuote(options.profile)}` }),
+      }),
     ],
   })
 }
@@ -287,6 +319,12 @@ const stepTimeouts: Record<ProvisionStepId, number> = {
   runtime: 180_000,
 }
 
+const failureDetail = ({ id, result }: { readonly id: ProvisionStepId; readonly result: RemoteExecResult }): string => {
+  if (result.timedOut) return `${id} timed out`
+  if (result.outputExceeded) return `${id} printed more than the SSH output limit, so its exit status is unknown and it may still run on that machine`
+  return `${id} exited ${result.code ?? 'unknown'}`
+}
+
 const runStep = Effect.fnUntraced(function* ({ sshTarget, step }: { readonly sshTarget: string; readonly step: ProvisionPlanStep }) {
   let stdout = ''
   let stderr = ''
@@ -299,7 +337,7 @@ const runStep = Effect.fnUntraced(function* ({ sshTarget, step }: { readonly ssh
         id: step.id,
         ok: false,
         state: 'failed',
-        detail: result.timedOut ? `${step.id} timed out` : `${step.id} exited ${result.code ?? 'unknown'}`,
+        detail: failureDetail({ id: step.id, result }),
         stdout,
         stderr,
       } satisfies ProvisionStepRun

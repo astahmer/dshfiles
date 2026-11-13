@@ -7,6 +7,8 @@ export interface RemoteExecResult {
   readonly stdout: string
   readonly stderr: string
   readonly timedOut: boolean
+  /** The remote output passed the SSH output limit, so ssh stopped reading and the exit status is unknown. */
+  readonly outputExceeded: boolean
   readonly durationMs: number
 }
 
@@ -27,11 +29,12 @@ const runRemoteExec = Effect.fnUntraced(function* (input: {
     timeout: input.timeoutMs ?? 30_000,
   })
   return {
-    ok: result.code === 0 && !result.timedOut,
+    ok: result.code === 0 && !result.timedOut && !result.outputExceeded,
     code: result.code,
     stdout: result.stdout.slice(-64_000),
     stderr: result.stderr.slice(-16_000),
     timedOut: result.timedOut,
+    outputExceeded: result.outputExceeded,
     durationMs: result.durationMs,
   } satisfies RemoteExecResult
 })

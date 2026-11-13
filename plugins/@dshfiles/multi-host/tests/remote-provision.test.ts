@@ -1,5 +1,9 @@
+import { chmod, cp, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Effect } from 'effect'
-import { describe, expect, test } from 'vitest'
+import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { sshLayer } from './fixtures/ssh-runtime.js'
 import type { RemoteFacts } from '../src/remote-doctor.js'
 import { RemoteProvision, type ProvisionOptions } from '../src/remote-provision.js'
@@ -83,7 +87,7 @@ describe('provision planning', () => {
       ['profile', 'blocked'],
       ['runtime', 'blocked'],
     ])
-    expect(plan[0]?.commands[0]).toBe("'/opt/homebrew/bin/fnm' install '22.23.3'")
+    expect(plan[0]?.commands[0]).toContain("( '/opt/homebrew/bin/fnm' install '22.23.3' )")
     expect(plan[1]?.commands[0]).toBe("'/nix/store/jj/bin/jj' git clone 'git@github.com:me/dshfiles.git' '/Users/me/dev/dshfiles'")
   })
 
@@ -112,6 +116,15 @@ describe('provision planning', () => {
     expect(install?.commands[0]).toContain("cd '/Users/me/dev/dshfiles'")
     expect(install?.commands[0]).toContain('pnpm install --frozen-lockfile')
     expect(install?.commands[0]).toContain("PATH='/Users/me/fnm/v22.23.3/bin'")
+  })
+
+  test('a build writes its output to a remote log and returns only the tail with the exit status', () => {
+    const facts: RemoteFacts = { ...readyFacts(), checkout: { ...readyFacts().checkout, built: false } }
+    const build = RemoteProvision.plan({ facts, options }).find(step => step.id === 'build')
+    expect(build?.state).toBe('pending')
+    expect(build?.commands[0]).toContain("> '/Users/me/.dsh/logs/provision-build.log' 2>&1")
+    expect(build?.commands[0]).toContain("tail -c 12000 '/Users/me/.dsh/logs/provision-build.log'")
+    expect(build?.commands[0]).toMatch(/exit "\$status"$/u)
   })
 
   test('a stale profile core plans a resync even when the profile exists', () => {
@@ -166,5 +179,35 @@ describe('provision runs', () => {
     )
     expect(run.executed.map(result => result.state)).toEqual(['blocked'])
     expect(run.executed[0]?.detail).toBe('the checkout is missing')
+  })
+})
+
+describe('provision runs over ssh', () => {
+  const originalPath = process.env.PATH
+  let root = ''
+
+  beforeAll(async () => {
+    root = await realpath(await mkdtemp(join(tmpdir(), 'multi-host-provision-')))
+    const fixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fake-ssh.mjs')
+    await cp(fixture, join(root, 'fake-ssh.mjs'))
+    await writeFile(join(root, 'ssh'), `#!/bin/sh\nexec "${process.execPath}" "${join(root, 'fake-ssh.mjs')}" "$@"\n`)
+    await chmod(join(root, 'ssh'), 0o755)
+    process.env.PATH = `${root}:${originalPath ?? ''}`
+  })
+
+  afterAll(async () => {
+    process.env.PATH = originalPath
+    delete process.env.FAKE_SSH_FORCE_STDOUT_BYTES
+    await rm(root, { recursive: true, force: true })
+  })
+
+  test('a step whose output overflows the ssh limit says so instead of an unknown exit', async () => {
+    process.env.FAKE_SSH_FORCE_STDOUT_BYTES = String(200 * 1024)
+    const run = await runEffect(
+      RemoteProvision.run({ sshTarget: 'example', facts: factsOf(), options, steps: ['node'], confirm: 'next', dryRun: false }),
+    )
+    delete process.env.FAKE_SSH_FORCE_STDOUT_BYTES
+    expect(run.executed.map(result => [result.id, result.ok, result.state])).toEqual([['node', false, 'failed']])
+    expect(run.executed[0]?.detail).toContain('output limit')
   })
 })
