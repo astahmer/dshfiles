@@ -44,6 +44,7 @@ import { MainTabs } from './tabs-contract.js'
 import { requestThreadAside } from './thread-aside.js'
 import { requestPanelAside } from './panel-aside.js'
 import { saveTabs, storedTabs } from './tabs-storage.js'
+import { createMissingThreads } from './missing-threads.js'
 import './client.css'
 
 const THREAD_TAB_KEEP_EVENT = 'dshfiles:main-tabs:keep-thread'
@@ -257,8 +258,14 @@ export default defineClient({
         const missing = Object.values(actor.getSnapshot().context.sets)
           .flatMap(set => set.tabs)
           .flatMap(tab => (tab.target.kind === 'thread' && !Object.hasOwn(sessions.byId, tab.target.sessionId) ? [tab.target.sessionId] : []))
-        if (missing.length > 0) actor.send({ type: 'threads.missing', sessionIds: [...new Set(missing)] })
+        // A tab closes only when its thread stays out of the list; one snapshot without it is not proof it is gone.
+        const { gone, recheckInMs } = missingThreads.observe([...new Set(missing)], Date.now())
+        if (gone.length > 0) actor.send({ type: 'threads.missing', sessionIds: gone })
+        if (recheck !== undefined) window.clearTimeout(recheck)
+        recheck = recheckInMs === null ? undefined : window.setTimeout(report, recheckInMs)
       }
+      const missingThreads = createMissingThreads()
+      let recheck: number | undefined
       const disposers = [
         ctx.layout.panelInfo.subscribe(report),
         ctx.sessions.list.subscribe(report),
@@ -268,6 +275,7 @@ export default defineClient({
       report()
       return () => {
         if (directoriesRequest !== undefined) Effect.runFork(Fiber.interrupt(directoriesRequest))
+        if (recheck !== undefined) window.clearTimeout(recheck)
         disposers.forEach(dispose => dispose())
       }
     }, 'main-tabs: follow the main view')
