@@ -2,6 +2,7 @@ import type { DockPaneActions } from '@dshfiles/frame-layout/regions'
 import { useDialogFocus } from '@dshfiles/plugin-ui/hooks/dialog-focus'
 import { XIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
+import { useSheetDrag } from './sheet-drag.js'
 
 /** The frame's phone rule (`@dshfiles/frame-layout` AppFrame.module.css): below it the right column has no width. */
 const PHONE_QUERY = '(max-width: 639.98px)'
@@ -61,7 +62,7 @@ export const phoneAwareDockActions = (desktop: DockPaneActions, phone: () => boo
 /**
  * The thread panel on a phone (prior-art §3.2 rule 5: supporting panes become sheets, never a split under ~840px). The
  * same dock surface, with its facet tabs and Choose a view, rises from above the tab bar; the scrim and Close put it
- * away, and so does Escape. Geometry comes from the phone shell's published bar heights, with no-shell fallbacks.
+ * away, and so does Escape or dragging its header down. Geometry comes from the phone shell's published bar heights, with no-shell fallbacks.
  */
 export const PhoneSheet = (props: {
   readonly shown: boolean
@@ -72,6 +73,7 @@ export const PhoneSheet = (props: {
   const { shown, onClose } = props
   const sheetRef = useRef<HTMLElement>(null)
   useDialogFocus({ open: shown, container: sheetRef, trap: true })
+  const dragHandlers = useSheetDrag({ sheet: sheetRef, onClose })
   useEffect(() => {
     if (!shown) return
     const onKey = (event: KeyboardEvent): void => {
@@ -107,7 +109,13 @@ export const PhoneSheet = (props: {
           height: 'min(80dvh, calc(100dvh - var(--dsh-phone-top-height, 44px) - var(--dsh-phone-nav-height, 0px) - 16px))',
         }}
       >
-        <header className="dshx:relative dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:pl-4">
+        <header
+          data-phone-sheet-handle=""
+          {...dragHandlers}
+          className="dshx:relative dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:pl-4"
+          // The header drags the sheet: the browser must not claim the pull as a scroll or a page refresh.
+          style={{ touchAction: 'none' }}
+        >
           <span
             aria-hidden="true"
             className="dshx:absolute dshx:top-1.5 dshx:left-1/2 dshx:h-1 dshx:w-9 dshx:-translate-x-1/2 dshx:rounded-full dshx:bg-muted-foreground/30"

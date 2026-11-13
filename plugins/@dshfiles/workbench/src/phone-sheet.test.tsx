@@ -48,6 +48,53 @@ describe('PhoneSheet', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
+  it('follows a header drag down, closes on a long pull and springs back from one that returns', () => {
+    // jsdom has neither PointerEvent nor pointer capture; browsers do.
+    HTMLElement.prototype.setPointerCapture ??= () => {}
+    if (typeof window.PointerEvent !== 'function')
+      Object.defineProperty(window, 'PointerEvent', {
+        configurable: true,
+        value: class extends MouseEvent {
+        readonly pointerId: number
+        readonly isPrimary: boolean
+        constructor(type: string, init: PointerEventInit = {}) {
+          super(type, init)
+          this.pointerId = init.pointerId ?? 0
+          this.isPrimary = init.isPrimary ?? false
+        }
+        },
+      })
+    const onClose = vi.fn()
+    const { container } = render(
+      <PhoneSheet shown heading="Thread panel" onClose={onClose}>
+        <p>Body</p>
+      </PhoneSheet>,
+    )
+    const sheet = container.ownerDocument.querySelector<HTMLElement>('[data-phone-sheet]')
+    const handle = container.ownerDocument.querySelector<HTMLElement>('[data-phone-sheet-handle]')
+    if (sheet === null || handle === null) throw new Error('sheet not rendered')
+    expect(handle.style.touchAction).toBe('none')
+    // jsdom lays nothing out: give the sheet a phone sheet's height, so a 200px pull is past 30% of it.
+    sheet.getBoundingClientRect = () => new DOMRect(0, 0, 390, 600)
+    const pointer = { pointerId: 1, isPrimary: true, button: 0 }
+    fireEvent.pointerDown(handle, { ...pointer, clientY: 100 })
+    fireEvent.pointerMove(handle, { ...pointer, clientY: 110 })
+    expect(sheet.style.transform).toBe('translateY(10px)')
+    fireEvent.pointerMove(handle, { ...pointer, clientY: 60 })
+    expect(sheet.style.transform).toBe('')
+    fireEvent.pointerUp(handle, { ...pointer, clientY: 60 })
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.pointerDown(handle, { ...pointer, clientY: 100 })
+    fireEvent.pointerMove(handle, { ...pointer, clientY: 300 })
+    fireEvent.pointerUp(handle, { ...pointer, clientY: 300 })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(sheet.style.transform).toBe('')
+    // The header's Close keeps its tap: pressing it starts no drag.
+    fireEvent.pointerDown(screen.getAllByRole('button', { name: 'Close Thread panel' })[1] ?? handle, { ...pointer, clientY: 100 })
+    fireEvent.pointerMove(handle, { ...pointer, clientY: 300 })
+    expect(sheet.style.transform).toBe('')
+  })
+
   it('keeps the surface mounted but hidden, with no scrim, while closed', () => {
     const onClose = vi.fn()
     const { container } = render(
