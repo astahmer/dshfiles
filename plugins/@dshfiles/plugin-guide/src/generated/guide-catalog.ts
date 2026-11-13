@@ -3034,6 +3034,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/workbench/phone-history",
+      "kind": "module",
+      "title": "@dshfiles/workbench/phone-history",
+      "summary": "Phone back navigation (Android back gesture, a browser Back): every phone level that has an in-app way back — a stack screen with Back, the thread-panel sheet — is one history layer. A layer keeps the current history entry tagged with its depth: going deeper pushes one entry, a browser Back onto a shallower entry pops…",
+      "publicSymbol": "PHONE_HISTORY_SELF_POP_EVENT, PhoneHistoryEntry, PhoneHistoryStep, PhoneHistoryModel, usePhoneHistoryLayer",
+      "importFrom": "@dshfiles/workbench/phone-history",
+      "owner": "@dshfiles/workbench",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workbench/src/phone-history.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "workspaceFolderBrowserApi",
       "importFrom": "@dshfiles/workspace-folder-picker/directory-browser-api",
       "owner": "@dshfiles/workspace-folder-picker",
@@ -3328,7 +3348,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › secret-link-reveal"
       ],
       "details": [
-        "Used by 16 catalog feature(s)",
+        "Used by 17 catalog feature(s)",
         "Destinations in use: knowledge, land, observe, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

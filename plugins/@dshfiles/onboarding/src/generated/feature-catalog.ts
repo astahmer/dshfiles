@@ -346,9 +346,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "multi-host",
-      "description": "Run new threads on other machines over SSH: host directory, pooled tunnels, host chip and remote thread view.",
+      "description": "Run new threads on other machines over SSH or a pairing-code link: host directory, pooled tunnels, link gateway, host chip and remote thread view.",
       "ui": true,
-      "features": 16
+      "features": 17
     },
     {
       "name": "onboarding",
@@ -18365,6 +18365,68 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "multi-host#linked-machines",
+      "plugin": "multi-host",
+      "id": "linked-machines",
+      "title": "Link machines without SSH, both ways",
+      "summary": "Linking turns on a gateway in front of this DSH, on its Tailscale address by default. It makes single-use pairing codes (ten minutes) that another machine redeems for its own revocable credential. A paired machine becomes a direct host there: threads, remote views and multi_host…",
+      "destination": "observe",
+      "currentSurface": "left-nav: Hosts › Link this machine, Pair a machine",
+      "reach": [
+        {
+          "text": "seed multi-host-hosts",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "multi-host-hosts"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Hosts\"",
+          "action": "click",
+          "by": "button",
+          "name": "Hosts",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Hosts\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Hosts",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Link this machine\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Link this machine",
+          "value": null
+        },
+        {
+          "text": "click button \"Pair a machine\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pair a machine",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Pair a machine\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Pair a machine",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "multi-host#ssh-runtime-connection",
       "plugin": "multi-host",
       "id": "ssh-runtime-connection",
@@ -28872,7 +28934,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "phone-thread-panel-sheet",
       "title": "Open the thread panel as a bottom sheet on a phone",
-      "summary": "Below 640px the frame gives the right column no width, so the Workbench dock (the thread panel: Changes, Cost, Jobs, Context and the other facets) rises as a bottom sheet above the tab bar instead of a cramped column: same surface, same facet tabs and Choose a view, with a grab…",
+      "summary": "Below 640px the frame gives the right column no width, so the Workbench dock (the thread panel: Changes, Cost, Jobs, Context and the other facets) rises as a bottom sheet above the tab bar instead of a cramped column: same surface, same facet tabs and Choose a view, with Close,…",
       "destination": "thread-panel",
       "currentSurface": "workbench: right pane as a narrow column; phone reached facets only through the main pane's New tab",
       "reach": [],
