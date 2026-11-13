@@ -156,6 +156,23 @@
   line-height: 18px;
 }
 
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  border: 0;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+}
+
+.alert > svg {
+  flex-shrink: 0;
+  color: var(--dsw-alias-state-warn-primary);
+}
+
 .largePaste {
   display: flex;
   align-items: center;

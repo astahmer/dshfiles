@@ -31,8 +31,8 @@ import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import { DraftEditor } from '../input/editor/DraftEditor.tsx'
 import {
-  focusDraftEditor, installDraftFilePicker, installDraftKeyboardDismissal, installDraftKeymap, installDraftWheel,
-  keepDraftFocus, revealDraftSelection,
+  focusDraftEditor, hasTouchKeyboard, installDraftFilePicker, installDraftKeyboardDismissal, installDraftKeymap,
+  installDraftWheel, keepDraftFocus, revealDraftSelection,
 } from '../input/editor/view-binding.ts'
 import { resolveSubmitMode } from '../input/submission-policy.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
@@ -60,6 +60,22 @@ export const START_NEW_THREAD_EVENT = 'dshfiles:start-new-thread'
 const FRESH_DRAFT_WAIT_MS = 15_000
 /** The platform's primary modifier as the send tooltip spells it (composer redesign b:v9yh). */
 const MOD = typeof navigator !== 'undefined' && /mac|iphone|ipad/iu.test(navigator.userAgent) ? '⌘' : 'Ctrl+'
+
+const COMPOSER_ALERT_MS = 5000
+
+/** A composer warning in the line above the card; it leaves after a few seconds or on a tap. */
+const ComposerAlert = ({ text, onDone }: { readonly text: string; readonly onDone: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onDone, COMPOSER_ALERT_MS)
+    return () => { clearTimeout(timer) }
+  }, [onDone])
+  return (
+    <button type="button" className={clsx(css.notice, css.alert)} role="alert" onMouseDown={event => { event.preventDefault() }} onClick={onDone}>
+      <IconWarningOutlineRegular />
+      <span>{text}</span>
+    </button>
+  )
+}
 
 /**
  * The send button's glyph for what a click does now (visual refresh T3.3). Keyed by mode at the call site, so a
@@ -185,7 +201,7 @@ export const InputBar = memo(function InputBar({
     ? t('file.stillUploading')
     : failedUpload.reason === undefined
       ? `${t('file.uploadFailed')} (${failedUpload.message})`
-      : attachmentErrorText(t, failedUpload.reason, imageLimits)
+      : `${attachmentErrorText(t, failedUpload.reason, imageLimits)} (${failedUpload.reason})`
   // Prompt failures are ordinary failures (no create/attach transaction exists
   // anymore): the toast announces promptError, the draft stays in the machine,
   // and the user resubmits. A remount over a session whose machine still holds
@@ -636,7 +652,11 @@ export const InputBar = memo(function InputBar({
       data-shortcut-scope="composer"
       style={placeholderHint === undefined ? undefined : { '--dsh-composer-placeholder-hint': placeholderHint } as CSSProperties}
     >
-      {toast !== null && (
+      {toast !== null && hasTouchKeyboard() && (
+        // The top-center Toast sits off screen while a phone keyboard pans the page; the line above the card stays seen.
+        <ComposerAlert key={toast.seq} text={toast.text} onDone={dismissToast} />
+      )}
+      {toast !== null && !hasTouchKeyboard() && (
         <Toast
           key={toast.seq}
           text={toast.text}
