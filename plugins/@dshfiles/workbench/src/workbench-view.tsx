@@ -1,7 +1,7 @@
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { PlusIcon, SquareSplitHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { EllipsisIcon, PlusIcon, SquareSplitHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
   DockviewReact,
@@ -35,6 +35,7 @@ import { TabRows } from './tab-row-visibility.js'
 import { TabReveal } from './tab-reveal.js'
 import { HiddenTabRowRestore, TabRowVoidMenu, type TabRowMenuTarget } from './tab-row-controls.js'
 import { PanelChromeContext, type PanelChrome } from './header-seat.js'
+import { usePhoneWidth } from './phone-sheet.js'
 
 /** Variables live in the injected dockview sheet (`dockview-theme.css`), mapped to the Host `--dsw-*` tokens. */
 const workbenchTheme: DockviewTheme = { name: 'dshfiles', className: 'dshfiles-workbench-theme' }
@@ -550,6 +551,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
       function GroupActions(groupProps: IDockviewHeaderActionsProps): JSX.Element {
         return (
           <SurfaceAction
+            className="dshx:max-sm:size-11"
             label="New tab"
             icon={<PlusIcon aria-hidden />}
             iconOnly
@@ -574,10 +576,14 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
           },
           () => (permanentCentre ? MainSurfaceGuard.groups(groupProps.containerApi).length : groupProps.containerApi.groups.length),
         )
+        // A phone shows the dock as one sheet: no split to make, and the sheet's own Close already puts it away.
+        const phone = usePhoneWidth()
         const current = actions.current
-        const canClose = permanentCentre
-          ? MainSurfaceGuard.groups(groupProps.containerApi).some(group => group !== groupProps.group)
-          : current.props.onClose !== undefined || groupCount > 1
+        const canClose = phone
+          ? false
+          : permanentCentre
+            ? MainSurfaceGuard.groups(groupProps.containerApi).some(group => group !== groupProps.group)
+            : current.props.onClose !== undefined || groupCount > 1
         return (
           <div className="dshx-root dshx:flex dshx:items-center dshx:gap-0.5">
             <DropdownMenu
@@ -590,16 +596,21 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
             >
               <DropdownMenuTrigger asChild>
                 <SurfaceAction
+                  className={cn(phone && 'dshx:size-11')}
                   label="Pane options"
-                  icon={<SquareSplitHorizontalIcon aria-hidden />}
+                  icon={phone ? <EllipsisIcon aria-hidden /> : <SquareSplitHorizontalIcon aria-hidden />}
                   iconOnly
                   onPointerDown={event => event.stopPropagation()}
                 />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {current.props.headerActions?.({ api: current.api, openIds: current.openIds, menu: true })}
-                <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'right')}>Split right</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'below')}>Split down</DropdownMenuItem>
+                {!phone && (
+                  <>
+                    <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'right')}>Split right</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'below')}>Split down</DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuItem
                   onSelect={() => {
                     if (current.props.onResetLayout !== undefined) current.props.onResetLayout()

@@ -58,7 +58,8 @@ function AddressableTab({ props, tab }: { readonly props: ResourceSeatProps; rea
       data-sidebar-right-occurrence={occurrence.id}
       tabIndex={-1}
     >
-      <header className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-2">
+      {/* The phone sheet already names the page in its tab strip; this second title row only cost content height there. */}
+      <header className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-2 dshx:max-sm:hidden">
         <div className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
           <TabSlot {...shared} seat="sidebar.right.pane.tab.title" fallback={tab.title} />
         </div>

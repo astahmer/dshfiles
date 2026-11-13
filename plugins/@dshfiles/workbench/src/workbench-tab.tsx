@@ -98,7 +98,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
         type="button"
         aria-label={channel.label?.('closeTab', title) || `Close ${title}`}
         data-workbench-tab-close=""
-        className="dshx:flex dshx:size-5 dshx:flex-none dshx:items-center dshx:justify-center dshx:rounded dshx:hover:bg-accent"
+        className="dshx:relative dshx:flex dshx:size-5 dshx:flex-none dshx:items-center dshx:justify-center dshx:rounded dshx:hover:bg-accent dshx:max-sm:after:absolute dshx:max-sm:after:-inset-3 dshx:max-sm:after:content-['']"
         onPointerDown={event => event.stopPropagation()}
         onClick={event => {
           event.stopPropagation()
