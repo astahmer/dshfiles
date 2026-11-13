@@ -42,6 +42,8 @@ const factsOf = ({ overrides = {} }: { readonly overrides?: Partial<RemoteFacts>
     conflicts: 0,
     conflictedBookmarks: [],
     mainOrigin: undefined,
+    parentCommitId: undefined,
+    revisionCommitId: undefined,
   },
   ...overrides,
 })
@@ -125,6 +127,28 @@ describe('provision planning', () => {
     expect(build?.commands[0]).toContain("> '/Users/me/.dsh/logs/provision-build.log' 2>&1")
     expect(build?.commands[0]).toContain("tail -c 12000 '/Users/me/.dsh/logs/provision-build.log'")
     expect(build?.commands[0]).toMatch(/exit "\$status"$/u)
+  })
+
+  test('a checkout on top of the requested bookmark is done once the bookmark resolves to its parent commit', () => {
+    const facts: RemoteFacts = {
+      ...readyFacts(),
+      checkout: { ...readyFacts().checkout, commitId: 'aaa111', parentCommitId: 'def456', revisionCommitId: 'def456', mainOrigin: 'def456' },
+    }
+    const checkout = RemoteProvision.plan({ facts, options: { ...options, revision: 'main' } }).find(step => step.id === 'checkout')
+    expect(checkout?.state).toBe('done')
+  })
+
+  test('a checkout behind the requested bookmark fetches and moves onto it', () => {
+    const facts: RemoteFacts = {
+      ...readyFacts(),
+      checkout: { ...readyFacts().checkout, commitId: 'aaa111', parentCommitId: 'old000', revisionCommitId: 'def456' },
+    }
+    const checkout = RemoteProvision.plan({ facts, options: { ...options, revision: 'main' } }).find(step => step.id === 'checkout')
+    expect(checkout?.state).toBe('pending')
+    expect(checkout?.commands).toEqual([
+      "'/nix/store/jj/bin/jj' -R '/Users/me/dev/dshfiles' git fetch",
+      "'/nix/store/jj/bin/jj' -R '/Users/me/dev/dshfiles' new 'main'",
+    ])
   })
 
   test('a stale profile core plans a resync even when the profile exists', () => {

@@ -37,13 +37,26 @@ export interface RemoteFacts {
     /** Bookmarks with several local targets, which a sync refuses to move past. */
     readonly conflictedBookmarks: readonly string[]
     readonly mainOrigin: string | undefined
+    /** The working copy's first parent, where a fresh `jj new <revision>` leaves the requested revision. */
+    readonly parentCommitId: string | undefined
+    /** The requested revision (a bookmark, change or commit id) resolved on that machine, in the short commit-id form. */
+    readonly revisionCommitId: string | undefined
   }
 }
 
-const probeScript = ({ profile, checkoutPath }: { readonly profile: string; readonly checkoutPath: string | undefined }): string =>
+const probeScript = ({
+  profile,
+  checkoutPath,
+  revision,
+}: {
+  readonly profile: string
+  readonly checkoutPath: string | undefined
+  readonly revision?: string | undefined
+}): string =>
   [
     'v() { printf \'%s=%s\\n\' "$1" "$2"; }',
     `profile=${shellQuote(profile)}`,
+    `revision=${shellQuote(revision ?? '')}`,
     `checkout=${shellQuote(checkoutPath ?? '')}`,
     'if [ -z "$checkout" ]; then checkout="$HOME/dev/dshfiles"; fi',
     'v checkout_path "$checkout"',
@@ -89,6 +102,8 @@ const probeScript = ({ profile, checkoutPath }: { readonly profile: string; read
     `  v checkout_conflicts "$(jj -R "$checkout" --ignore-working-copy log -r 'conflicts()' --no-graph -T 'commit_id ++ "\\n"' 2>/dev/null | wc -l | tr -d ' ')"`,
     `  v checkout_conflicted_bookmarks "$(jj -R "$checkout" --ignore-working-copy bookmark list --conflicted -T 'if(!remote, name ++ ",")' 2>/dev/null)"`,
     `  v checkout_main_origin "$(jj -R "$checkout" --ignore-working-copy log -r 'main@origin' --no-graph -T 'commit_id.short()' 2>/dev/null | head -1)"`,
+    `  v checkout_parent "$(jj -R "$checkout" --ignore-working-copy log -r '@-' --limit 1 --no-graph -T 'commit_id.short()' 2>/dev/null | head -1)"`,
+    `  if [ -n "$revision" ]; then v checkout_revision "$(jj -R "$checkout" --ignore-working-copy log -r "$revision" --limit 1 --no-graph -T 'commit_id.short()' 2>/dev/null | head -1)"; fi`,
     'fi',
     'v disk_available "$(df -h "$HOME" 2>/dev/null | tail -1 | tr -s " " | cut -d " " -f4)"',
     'v disk_used "$(df -h "$HOME" 2>/dev/null | tail -1 | tr -s " " | cut -d " " -f5)"',
@@ -171,6 +186,8 @@ const parseRemoteFacts = ({
       conflicts: numberOrUndefined(valueOf(values, 'checkout_conflicts')) ?? 0,
       conflictedBookmarks: (valueOf(values, 'checkout_conflicted_bookmarks') ?? '').split(',').filter(name => name.length > 0),
       mainOrigin: valueOf(values, 'checkout_main_origin') || undefined,
+      parentCommitId: valueOf(values, 'checkout_parent') || undefined,
+      revisionCommitId: valueOf(values, 'checkout_revision') || undefined,
     },
   }
 }
@@ -289,11 +306,12 @@ const readRemoteFacts = Effect.fn('remote facts read')(function* (input: {
   readonly sshTarget: string
   readonly profile: string
   readonly checkoutPath?: string | undefined
+  readonly revision?: string | undefined
 }) {
   const ssh = yield* Ssh
   const result = yield* ssh.run({
     sshTarget: input.sshTarget,
-    command: probeScript({ profile: input.profile, checkoutPath: input.checkoutPath }),
+    command: probeScript({ profile: input.profile, checkoutPath: input.checkoutPath, revision: input.revision }),
     timeout: probeTimeoutMs,
   })
   if (result.timedOut) return yield* new SshTimedOut({ timeoutMs: probeTimeoutMs })

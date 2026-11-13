@@ -122,14 +122,16 @@ const planCheckout = ({ facts, options }: { readonly facts: RemoteFacts; readonl
   if (!facts.checkout.exists) return stepOf({ id: 'checkout', state: 'pending', reason: `no checkout at ${options.checkoutPath}`, commands: [clone] })
   if (options.revision === undefined)
     return stepOf({ id: 'checkout', state: 'done', reason: `checkout at ${facts.checkout.commitId ?? 'unknown'}`, commands: [] })
-  if (facts.checkout.commitId === options.revision || facts.checkout.mainOrigin === options.revision) {
-    return stepOf({ id: 'checkout', state: 'done', reason: `checkout already at ${options.revision}` })
+  const wanted = facts.checkout.revisionCommitId
+  if (wanted !== undefined && (facts.checkout.commitId === wanted || facts.checkout.parentCommitId === wanted)) {
+    return stepOf({ id: 'checkout', state: 'done', reason: `checkout already at ${options.revision} (${wanted})` })
   }
+  const jj = `${shellQuote(facts.jj.path)} -R ${shellQuote(options.checkoutPath)}`
   return stepOf({
     id: 'checkout',
     state: 'pending',
-    reason: `checkout at ${facts.checkout.commitId ?? 'unknown'} wants ${options.revision}`,
-    commands: [`${shellQuote(facts.jj.path)} -R ${shellQuote(options.checkoutPath)} git fetch`],
+    reason: `checkout at ${facts.checkout.commitId ?? 'unknown'} wants ${options.revision} (${wanted ?? 'not resolved on that machine yet'})`,
+    commands: [`${jj} git fetch`, `${jj} new ${shellQuote(options.revision)}`],
   })
 }
 

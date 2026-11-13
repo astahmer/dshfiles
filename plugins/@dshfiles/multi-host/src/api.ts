@@ -570,6 +570,8 @@ const remoteFactsSchema = Schema.Struct({
     conflicts: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
     conflictedBookmarks: Schema.Array(Schema.String),
     mainOrigin: Schema.optional(Schema.String),
+    parentCommitId: Schema.optional(Schema.String),
+    revisionCommitId: Schema.optional(Schema.String),
   }),
 })
 

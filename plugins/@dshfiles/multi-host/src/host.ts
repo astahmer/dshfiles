@@ -757,7 +757,12 @@ const handlers = Api.handlers(multiHostApi, {
   }),
   provision: Effect.fn('multi-host provision')(function* (input) {
     return yield* Effect.gen(function* () {
-      const facts = yield* RemoteDoctor.readFacts({ sshTarget: input.sshTarget, profile: input.profile, checkoutPath: input.checkoutPath })
+      const facts = yield* RemoteDoctor.readFacts({
+        sshTarget: input.sshTarget,
+        profile: input.profile,
+        checkoutPath: input.checkoutPath,
+        revision: input.revision,
+      })
       const options = {
         remoteHome: input.remoteHome,
         checkoutPath: input.checkoutPath ?? facts.checkout.path,

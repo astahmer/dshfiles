@@ -25,6 +25,8 @@ const readyFacts = (checkout: Partial<RemoteFacts['checkout']> = {}): RemoteFact
     conflicts: 0,
     conflictedBookmarks: [],
     mainOrigin: 'def',
+    parentCommitId: undefined,
+    revisionCommitId: undefined,
     ...checkout,
   },
 })
