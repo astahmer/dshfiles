@@ -498,6 +498,9 @@ export class ConversationController extends Service implements IConversation {
             }
           })
         }
+        // A New thread stays a local draft until its first content creates it on the Host; an upload sent before
+        // that finds no Session (the Host answers before reading the body, so the browser sees a reset).
+        await this.ctx.get('sessionDrafts')?.whenCreated(sessionId, controller.signal)
         const ownership = await this.multiHost.sessionRuntime({ sessionId }, { signal: controller.signal })
         if (!ownership.ok) throw new Error(`${ownership.message} (${ownership.code})`)
         if (ownership.runtimeId !== null && attachment.kind === 'image') {
