@@ -397,6 +397,27 @@ describe('RemoteSessions', () => {
     }).pipe(Effect.provide(services(test)))
   })
 
+  it.effect('passes the runtime reason through when it refuses an inline image', () => {
+    const test = fixture()
+    test.setPromptFailure(new RemoteRequestFailed({ code: 'session/attachment-invalid', detail: 'Unsupported or malformed image data.' }))
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      yield* sessions.source.list({})
+      const exit = yield* Effect.exit(
+        sessions.source.prompt?.({
+          requestId: 'request-1',
+          sessionId: 'session-remote',
+          mode: 'queue',
+          content: [{ type: 'image', mediaType: 'image/jpeg', data: '/9j/' }],
+        } as never) ?? Effect.void,
+      )
+      expect(Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined).toMatchObject({
+        _tag: 'SessionPromptRefused',
+        reason: expect.stringMatching(/^(?!.*uploaded to another machine).*Unsupported or malformed image data\./u),
+      })
+    }).pipe(Effect.provide(services(test)))
+  })
+
   it.effect('applies the same rule to a queued message edit', () => {
     const test = fixture()
     return Effect.gen(function* () {

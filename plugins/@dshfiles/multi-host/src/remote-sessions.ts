@@ -329,11 +329,17 @@ export class RemoteSessions extends Context.Service<
           })
           if (foreignUpload !== undefined) return yield* new SessionPromptRefused({ reason: foreignUpload })
           return yield* forward({ sessionId: request.sessionId, method: 'prompt', request, mutation: true, decode: SessionPayload.prompt }).pipe(
-            Effect.mapError(error =>
-              error instanceof RemoteRequestFailed && error.code === 'session/attachment-invalid'
-                ? new SessionPromptRefused({ reason: RemotePromptGuard.attachmentNotStagedMessage(runtime.label) })
-                : error,
-            ),
+            Effect.mapError(error => {
+              if (!(error instanceof RemoteRequestFailed) || error.code !== 'session/attachment-invalid') return error
+              // Only a cited file receipt can be missing over there; an inline image the runtime refused names its own
+              // reason (an undecodable photo), which the not-staged message used to hide.
+              const citesFiles = request.content.some(part => part.type === 'file')
+              return new SessionPromptRefused({
+                reason: citesFiles
+                  ? RemotePromptGuard.attachmentNotStagedMessage(runtime.label)
+                  : `${runtime.label} refused the attachment: ${error.detail}`,
+              })
+            }),
           )
         })
 
