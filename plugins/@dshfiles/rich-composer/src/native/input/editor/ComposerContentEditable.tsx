@@ -9,7 +9,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, MutableRefObject, ReactNode } from 'react'
 import type { LexicalEditor } from 'lexical'
-import { hasTouchKeyboard } from './view-binding.ts'
+import { hasTouchKeyboard } from './touch-keyboard.ts'
 
 // One shell editor has one physical root. During legacy-view retirement, return
 // that root to its previous mounted host instead of leaving the canonical view

@@ -78,6 +78,7 @@
     "src/native/input/editor/reference-chip-excerpt.test.tsx",
     "src/native/input/editor/restore-draft-references.test.ts",
     "src/native/input/editor/touch-keyboard.test.ts",
+    "src/native/input/editor/touch-keyboard.ts",
     "src/native/input/machine.test.ts",
     "src/native/input/retained-send.test.ts",
     "src/native/input/retained-send.ts",

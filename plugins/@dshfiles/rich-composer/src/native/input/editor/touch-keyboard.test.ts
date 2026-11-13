@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it } from 'vitest'
 
-import { hasTouchKeyboard } from './view-binding.ts'
+import { hasTouchKeyboard } from './touch-keyboard.ts'
 
 const desktopAgent = navigator.userAgent
 afterEach(() => {

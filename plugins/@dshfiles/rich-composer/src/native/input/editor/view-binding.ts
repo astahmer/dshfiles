@@ -9,6 +9,9 @@ import { resolveSubmitMode } from '../submission-policy.ts'
 import { registerComposerKeymap } from './keymap.ts'
 import { PromptRecallModel } from '../../../prompt-recall.ts'
 import { DRAFT_SUBMITTED_TAG } from './runtime.ts'
+import { hasTouchKeyboard } from './touch-keyboard.ts'
+
+export { hasTouchKeyboard }
 
 /**
  * Transfer mobile editor focus after a submission empties the draft.
@@ -142,15 +145,6 @@ export function installDraftFilePicker(
     available: () => gate.current.canAcceptDrop && fileInputRef.current !== null && !fileInputRef.current.disabled,
     open: () => { fileInputRef.current?.click() },
   })
-}
-
-/**
- * Whether the draft is typed on a touch keyboard, whose return key has no Shift companion. Some Android phones
- * (Redmi Chrome) report a hover-capable pointer, so the media query alone misses them.
- * @returns true on a recognized phone or tablet, or a touch-only pointer.
- */
-export function hasTouchKeyboard(): boolean {
-  return isMobileDevice() || (typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches)
 }
 
 /**
