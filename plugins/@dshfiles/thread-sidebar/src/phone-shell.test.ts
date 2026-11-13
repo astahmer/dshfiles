@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Destinations } from './destinations.js'
-import { PhoneTopBarModel, SETTINGS_PANEL_ID } from './phone-shell.js'
+import { PendingPick, PhoneTopBarModel, SETTINGS_PANEL_ID } from './phone-shell.js'
 
 const destinations = Destinations.resolve([
   { id: 'attention-inbox', label: 'Inbox', order: 1 },
@@ -15,6 +15,18 @@ const find = (id: string) => {
   return found
 }
 const base = { listOpen: false, moreOpen: false, destination: find('threads'), destinations, activePanelId: null, selectedThreadId: null } as const
+
+describe('PendingPick', () => {
+  it('stays pending until the stage Session moves, whatever it moves to', () => {
+    expect(PendingPick.threadId({ pickedId: 'session-b', stageAtPick: 'session-a', stageSession: 'session-a' })).toBe('session-b')
+    expect(PendingPick.threadId({ pickedId: 'session-b', stageAtPick: undefined, stageSession: undefined })).toBe('session-b')
+    expect(PendingPick.threadId({ pickedId: 'session-b', stageAtPick: 'session-a', stageSession: 'session-b' })).toBeUndefined()
+    // A new thread started after the pick moves the stage elsewhere: the pick no longer names it.
+    expect(PendingPick.threadId({ pickedId: 'session-b', stageAtPick: 'session-a', stageSession: 'session-draft' })).toBeUndefined()
+    expect(PendingPick.threadId({ pickedId: 'session-a', stageAtPick: 'session-a', stageSession: 'session-a' })).toBeUndefined()
+    expect(PendingPick.threadId({ pickedId: undefined, stageAtPick: 'session-a', stageSession: 'session-a' })).toBeUndefined()
+  })
+})
 
 describe('PhoneTopBarModel', () => {
   it('names a thread on the stage and goes back to Threads, offering its panels', () => {
@@ -41,6 +53,18 @@ describe('PhoneTopBarModel', () => {
   it('calls a draft New thread and offers no panels until it is a thread', () => {
     expect(PhoneTopBarModel.resolve(base)).toEqual({ title: 'New thread', back: { to: 'threads', label: 'Threads' }, thread: false })
     expect(PhoneTopBarModel.resolve({ ...base, selectedThreadId: 'session-1', stageTitle: '  ' }).title).toBe('Thread')
+  })
+
+  it('names a thread picked in the list at once, over the draft or the previous thread still on the stage', () => {
+    expect(PhoneTopBarModel.resolve({ ...base, pendingTitle: 'Fix the login race' })).toEqual({
+      title: 'Fix the login race',
+      back: { to: 'threads', label: 'Threads' },
+      thread: true,
+    })
+    expect(PhoneTopBarModel.resolve({ ...base, selectedThreadId: 'session-1', stageTitle: 'Older thread', pendingTitle: 'Fix the login race' }).title).toBe(
+      'Fix the login race',
+    )
+    expect(PhoneTopBarModel.resolve({ ...base, pendingTitle: '  ' }).title).toBe('New thread')
   })
 
   it('returns from a page to its destination list, named after the section', () => {

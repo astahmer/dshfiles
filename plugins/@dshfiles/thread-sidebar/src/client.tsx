@@ -1895,7 +1895,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const threadDirectories = useThreadDirectories(workspaceItems)
   const archivedIdList = useStableValue(workspaceState.archivedSessionIds, HostSnapshotsModel.sameIds)
   const pinnedIdList = useStableValue(workspaceState.pinnedSessionIds, HostSnapshotsModel.sameIds)
-  const { preferences, updatePreferences, storageWarning, boardViewOnHost, setSelectedThreadId, threadTitle } = useSidebarState()
+  const { preferences, updatePreferences, storageWarning, boardViewOnHost, setSelectedThreadId, pickThread, threadTitle } = useSidebarState()
   // Read by a preset delete's Undo, which may run after other preset writes.
   const preferencesRef = useRef(preferences)
   preferencesRef.current = preferences
@@ -2618,6 +2618,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const selectThread = (sessionId: SessionSummary['id'], options: { readonly linked?: boolean } = {}): void => {
     if (sessionId !== selectedSessionId) startInteraction('thread switch', { attributes: { 'dshx.thread.source': 'sidebar' } })
+    pickThread(sessionId)
     const opened = attention.records.get(sessionId)
     // A phone's Threads list unmounts as the thread opens, so the selection effect never sees it: hand the unseen range
     // to Chat here, on the tap itself (the effect hands the same record over again on a desktop; that is harmless).

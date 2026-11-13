@@ -200,6 +200,14 @@ describe('DestinationShell', () => {
     )
     expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
   })
+
+  it('on a phone, names a thread picked in the list before the stage opens it', () => {
+    setPhone(true)
+    // The stage still shows a blank draft: without the pick the bar says New thread.
+    renderShell({ collapsed: true, selectedThreadId: null, stageThreadId: null, stageSessionId: 'session-draft', pendingTitle: 'Fix the login race' })
+    expect(document.querySelector('[data-phone-title]')?.textContent).toBe('Fix the login race')
+    expect(document.querySelector('header[data-phone-top-bar]')?.getAttribute('data-phone-stage')).toBe('thread')
+  })
 })
 
 describe('DSH actions on the rail (b:kgcc)', () => {

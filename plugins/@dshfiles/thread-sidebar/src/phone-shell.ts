@@ -27,8 +27,23 @@ export interface PhoneStackInput {
   readonly activePanelId: string | null
   readonly selectedThreadId: string | null
   readonly stageTitle?: string | undefined
+  /** The title of a thread picked in the list that the stage has not opened yet ({@link PendingPick}). */
+  readonly pendingTitle?: string | undefined
   readonly origin?: PhoneStageOrigin | undefined
 }
+
+/**
+ * A tap in the list names its thread before the stage Session follows it (over a slow link that takes seconds): the
+ * pick stays pending while the stage still shows what it showed at the pick, and any stage move settles it.
+ */
+export const PendingPick = {
+  threadId: (input: {
+    readonly pickedId: string | undefined
+    readonly stageAtPick: string | undefined
+    readonly stageSession: string | undefined
+  }): string | undefined =>
+    input.pickedId !== undefined && input.pickedId !== input.stageSession && input.stageAtPick === input.stageSession ? input.pickedId : undefined,
+} as const
 
 /** A visual viewport this much shorter than the layout viewport means the software keyboard is open. */
 const KEYBOARD_THRESHOLD = 120
@@ -56,12 +71,13 @@ export const PhoneTopBarModel = {
       Destinations.owning(input.destinations, input.activePanelId) ??
       (input.activePanelId === SETTINGS_PANEL_ID ? input.destinations.find(candidate => candidate.id === 'settings') : undefined)
     if (owner === undefined) {
-      const title = input.selectedThreadId === null ? 'New thread' : input.stageTitle?.trim() || 'Thread'
+      const pending = input.pendingTitle?.trim() || undefined
+      const title = pending ?? (input.selectedThreadId === null ? 'New thread' : input.stageTitle?.trim() || 'Thread')
+      const thread = pending !== undefined || input.selectedThreadId !== null
       const from = input.origin === undefined ? undefined : PhoneTopBarModel.pageLabel(input.destinations, input.origin.panelId)
-      if (from !== undefined && input.origin !== undefined)
-        return { title, back: { to: 'page', panelId: input.origin.panelId, label: from }, thread: input.selectedThreadId !== null }
+      if (from !== undefined && input.origin !== undefined) return { title, back: { to: 'page', panelId: input.origin.panelId, label: from }, thread }
       const threads = input.destinations.find(candidate => candidate.id === 'threads')
-      return { title, back: { to: 'threads', label: threads?.label ?? 'Threads' }, thread: input.selectedThreadId !== null }
+      return { title, back: { to: 'threads', label: threads?.label ?? 'Threads' }, thread }
     }
     const section = owner.sections.find(candidate => candidate.panelId === input.activePanelId)
     // The Inbox page is the Inbox tab's root: it is named after the tab, not its first section ("Needs you").

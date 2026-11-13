@@ -172,6 +172,8 @@ export interface DestinationShellProps {
   readonly openSettings: (() => void) | null
   /** The thread the stage shows, as its title (the phone top bar names the stage). */
   readonly stageTitle?: string | undefined
+  /** A thread picked in the list that the stage has not opened yet: the phone bar names it at once. */
+  readonly pendingTitle?: string | undefined
   /** Opens or closes the thread panel (a bottom sheet on a phone); null when no owner serves it. */
   readonly togglePanels?: (() => void) | null
   /** A swipe in from the right edge, inside a thread, opens the thread panel (Settings › phoneEdgeSwipePanels). */
@@ -1026,6 +1028,7 @@ const PhoneNavigation = (
     activePanelId: props.activePanelId,
     selectedThreadId: props.stageThreadId === undefined ? props.selectedThreadId : props.stageThreadId,
     stageTitle: props.stageTitle,
+    pendingTitle: props.pendingTitle,
     origin,
   }
   const bar = PhoneTopBarModel.resolve(stack)

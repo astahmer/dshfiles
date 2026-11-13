@@ -154,6 +154,9 @@ interface SidebarState {
   /** The thread shown in the main view, reported by the thread list for navigation history. */
   selectedThreadId: SessionSummary['id'] | null
   setSelectedThreadId: (sessionId: SessionSummary['id'] | null) => void
+  /** The thread last picked in the list, before the main view opens it; each pick is a new object. */
+  pickedThread: { readonly id: SessionSummary['id'] } | null
+  pickThread: (sessionId: SessionSummary['id']) => void
   /** Thread titles for the history menu, kept current by the thread list without re-rendering the shell. */
   threadTitle: MutableRefObject<(sessionId: SessionSummary['id']) => string | undefined>
 }
@@ -171,6 +174,8 @@ export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX
     usePreferences()
   const [selectedThreadId, setSelectedThreadId] = useState<SessionSummary['id'] | null>(null)
   const threadTitle = useRef<(sessionId: SessionSummary['id']) => string | undefined>(() => undefined)
+  const [pickedThread, setPickedThread] = useState<{ readonly id: SessionSummary['id'] } | null>(null)
+  const pickThread = useCallback((id: SessionSummary['id']) => setPickedThread({ id }), [])
 
   const state = useMemo(
     () => ({
@@ -186,9 +191,23 @@ export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX
       closePalette: PaletteBridge.close,
       selectedThreadId,
       setSelectedThreadId,
+      pickedThread,
+      pickThread,
       threadTitle,
     }),
-    [preferences, updatePreferences, storageWarning, hostBacked, boardViewOnHost, layoutMergeOnHost, settingsSettled, threadViewWritePending, selectedThreadId],
+    [
+      preferences,
+      updatePreferences,
+      storageWarning,
+      hostBacked,
+      boardViewOnHost,
+      layoutMergeOnHost,
+      settingsSettled,
+      threadViewWritePending,
+      selectedThreadId,
+      pickedThread,
+      pickThread,
+    ],
   )
 
   return <SidebarStateContext.Provider value={state}>{children}</SidebarStateContext.Provider>

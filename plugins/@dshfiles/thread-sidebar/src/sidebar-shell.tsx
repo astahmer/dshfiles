@@ -68,7 +68,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
-import { SETTINGS_PANEL_ID } from './phone-shell.js'
+import { PendingPick, SETTINGS_PANEL_ID } from './phone-shell.js'
 import { StageCover } from './stage-cover.js'
 import { SidebarOrganization, type OrderedSidebarEntry, type SidebarPreferences, type ThreadRowAction } from './organization.js'
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
@@ -273,7 +273,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const panels = props.usePanels(items => items)
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
-  const { preferences, updatePreferences, openPalette, selectedThreadId, threadTitle, hostBacked, layoutMergeOnHost, settingsSettled } = useSidebarState()
+  const { preferences, updatePreferences, openPalette, selectedThreadId, pickedThread, threadTitle, hostBacked, layoutMergeOnHost, settingsSettled } =
+    useSidebarState()
   // The phone top bar names the thread on the stage. The live stage Session wins over the list selection, which a
   // draft that became a thread does not update; read reactively so a rename (a first turn's title) shows at once.
   const stageSession = useSyncExternalStore(props.subscribeStageSession ?? NO_SUBSCRIPTION, props.readStageSession ?? NO_STAGE_SESSION, NO_STAGE_SESSION)
@@ -286,6 +287,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const stageTitle = props.useSessions(state =>
     stageThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === stageThread)?.displayTitle,
   )
+  // The stage Session follows a tap only once the thread opens; until then the bar names the pick from the list.
+  const [pickSeen, setPickSeen] = useState({ pick: pickedThread, stage: stageSession })
+  if (pickSeen.pick !== pickedThread) setPickSeen({ pick: pickedThread, stage: stageSession })
+  const pendingThread = PendingPick.threadId({ pickedId: pickedThread?.id, stageAtPick: pickSeen.stage, stageSession })
+  const pendingTitle = props.useSessions(state => {
+    const picked = pendingThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === pendingThread)
+    return picked === undefined || picked.blank ? undefined : picked.displayTitle
+  })
   // One sidebar layout (b:952m): the Workbench's left docking region is always mounted behind the rail; its default is
   // the old Fixed column as one Sidebar pane. The merge from the two former layouts runs once (sidebar-dock-host.ts).
   const contentOverridden = props.contentOverridden
@@ -1345,6 +1354,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             record={recordNavigation}
             folderUi={folderUi}
             stageTitle={stageTitle}
+            pendingTitle={pendingTitle}
             // The Workbench's thread panel (a bottom sheet on a phone) through its registered command; none without it.
             togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}
             edgeSwipePanels={preferences.phoneEdgeSwipePanels}
