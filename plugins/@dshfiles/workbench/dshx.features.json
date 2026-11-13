@@ -722,7 +722,7 @@
     {
       "id": "phone-thread-panel-sheet",
       "title": "Open the thread panel as a bottom sheet on a phone",
-      "summary": "Below 640px the frame gives the right column no width, so the Workbench dock (the thread panel: Changes, Cost, Jobs, Context and the other facets) rises as a bottom sheet above the tab bar instead of a cramped column: same surface, same facet tabs and Choose a view, with Close, a scrim and Escape to put it away; dragging its header (the grab handle) down follows the finger and closes the sheet past 30% of its height or on a downward flick faster than 0.5 px/ms, else it springs back (no spring animation under reduced motion). The phone top bar's Thread menu contains the Open right sidebar control; it and the existing toggle open the sheet. On a phone the main region's tab rows are hidden (the stack, Back and the sheet navigate instead), the sheet's facet tabs get 40px rows, and Choose a view does not autofocus its search so the software keyboard stays down. The sheet's open state belongs to the page (every phone load starts closed) and the dock controls drive it on a phone, so the remembered desktop right pane is neither opened over a phone nor changed from one. Desktop keeps the right pane and tab rows.",
+      "summary": "Below 640px the frame gives the right column no width, so the Workbench dock (the thread panel: Changes, Cost, Jobs, Context and the other facets) rises as a bottom sheet above the tab bar instead of a cramped column: same surface, same facet tabs and Choose a view, with Close, a scrim, Escape and the browser Back (the Android back gesture; the open sheet is one history entry, consumed again when another control closes it) to put it away; dragging its header (the grab handle) down follows the finger and closes the sheet past 30% of its height or on a downward flick faster than 0.5 px/ms, else it springs back (no spring animation under reduced motion). The phone top bar's Thread menu contains the Open right sidebar control; it and the existing toggle open the sheet. On a phone the main region's tab rows are hidden (the stack, Back and the sheet navigate instead), the sheet's facet tabs get 40px rows, and Choose a view does not autofocus its search so the software keyboard stays down. The sheet's open state belongs to the page (every phone load starts closed) and the dock controls drive it on a phone, so the remembered desktop right pane is neither opened over a phone nor changed from one. Desktop keeps the right pane and tab rows.",
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -752,6 +752,12 @@
           "id": "workbench.phone-sheet-drag",
           "file": "plugins/@dshfiles/workbench/src/phone-sheet.test.tsx",
           "testName": "follows a header drag down, closes on a long pull and springs back from one that returns"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.phone-sheet-history",
+          "file": "plugins/@dshfiles/workbench/src/phone-sheet.test.tsx",
+          "testName": "is one history entry while shown: the browser Back closes it, and closing it consumes the entry"
         },
         {
           "kind": "unit-test",

@@ -18,6 +18,18 @@ export interface PhoneTopBar {
   readonly thread: boolean
 }
 
+/** What the phone stack shows: the list (and which), or the stage (and what it came from). */
+export interface PhoneStackInput {
+  readonly listOpen: boolean
+  readonly moreOpen: boolean
+  readonly destination: ResolvedDestination
+  readonly destinations: readonly ResolvedDestination[]
+  readonly activePanelId: string | null
+  readonly selectedThreadId: string | null
+  readonly stageTitle?: string | undefined
+  readonly origin?: PhoneStageOrigin | undefined
+}
+
 /** A visual viewport this much shorter than the layout viewport means the software keyboard is open. */
 const KEYBOARD_THRESHOLD = 120
 
@@ -33,16 +45,7 @@ const ROOTS: ReadonlySet<DestinationId> = new Set(['threads', 'inbox'])
  * destination opened from More to More. The Inbox page is the Inbox tab's root, so it has no Back.
  */
 export const PhoneTopBarModel = {
-  resolve(input: {
-    readonly listOpen: boolean
-    readonly moreOpen: boolean
-    readonly destination: ResolvedDestination
-    readonly destinations: readonly ResolvedDestination[]
-    readonly activePanelId: string | null
-    readonly selectedThreadId: string | null
-    readonly stageTitle?: string | undefined
-    readonly origin?: PhoneStageOrigin | undefined
-  }): PhoneTopBar {
+  resolve(input: PhoneStackInput): PhoneTopBar {
     if (input.listOpen) {
       if (input.moreOpen) return { title: 'More', back: null, thread: false }
       const back = ROOTS.has(input.destination.id) ? null : { to: 'more' as const, label: 'More' }
@@ -67,6 +70,19 @@ export const PhoneTopBarModel = {
     // A destination with one page (or Settings, one page in the stage) has no list of its own to return to.
     const single = owner.id === 'settings' || owner.sections.length <= 1
     return { title, back: single ? { to: 'more', label: 'More' } : { to: owner.id, label: owner.label }, thread: false }
+  },
+
+  /**
+   * How many Backs the screen on show is above its tab root: one history entry per level (Android's back gesture pops
+   * them one at a time). A thread opened from a page counts that page's own level.
+   */
+  depth(input: PhoneStackInput): number {
+    const back = PhoneTopBarModel.resolve(input).back
+    if (back === null) return 0
+    if (back.to === 'more') return 1
+    if (back.to === 'page')
+      return 1 + PhoneTopBarModel.depth({ ...input, listOpen: false, moreOpen: false, activePanelId: back.panelId, selectedThreadId: null, origin: undefined })
+    return ROOTS.has(back.to) ? 1 : 2
   },
 
   /** A page's name as Back shows it: the Inbox by its tab name, any other page by its section label. */

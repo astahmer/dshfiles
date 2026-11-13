@@ -211,6 +211,10 @@ screen and opening a thread closes it again (the stage is pushed); a second tap 
 the other folders, yours included, each expanding in place to its rows. The sidebar marks the document with `data-shell-phone-nav`, and frame-layout then gives the
 stage the full width and reserves the bar's height. Inside a thread the tab bar steps aside (`data-phone-in-thread`;
 the stage keeps only the home-indicator inset) and Back, or a swipe from the left screen edge, returns to the list.
+Each stack level is one browser history entry, so Android's back gesture (or the browser's Back) pops one level as
+Back does, closing an open thread-panel sheet first. The in-app Back consumes the entry it pushed, so history never
+grows; a push drops the thread from the entry it leaves below, so going back never switches to another thread. Desktop keeps replacing one entry.
+The history layers come from `@dshfiles/workbench/phone-history`.
 Pushing a thread or page over the list, and Back, slide through a View Transition (`data-phone-stack-motion`, rules in
 the kit stylesheet); without the API or with reduced motion they are instant. A turn that finishes while a page or the
 full-screen list covers the thread is not "watched": it stays in the Inbox until the thread is opened.

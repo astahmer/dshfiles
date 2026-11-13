@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createDockPaneActions } from './right-panel-mode.js'
 import { PhoneSheet, PhoneSheetState, phoneAwareDockActions } from './phone-sheet.js'
@@ -55,13 +55,13 @@ describe('PhoneSheet', () => {
       Object.defineProperty(window, 'PointerEvent', {
         configurable: true,
         value: class extends MouseEvent {
-        readonly pointerId: number
-        readonly isPrimary: boolean
-        constructor(type: string, init: PointerEventInit = {}) {
-          super(type, init)
-          this.pointerId = init.pointerId ?? 0
-          this.isPrimary = init.isPrimary ?? false
-        }
+          readonly pointerId: number
+          readonly isPrimary: boolean
+          constructor(type: string, init: PointerEventInit = {}) {
+            super(type, init)
+            this.pointerId = init.pointerId ?? 0
+            this.isPrimary = init.isPrimary ?? false
+          }
         },
       })
     const onClose = vi.fn()
@@ -93,6 +93,39 @@ describe('PhoneSheet', () => {
     fireEvent.pointerDown(screen.getAllByRole('button', { name: 'Close Thread panel' })[1] ?? handle, { ...pointer, clientY: 100 })
     fireEvent.pointerMove(handle, { ...pointer, clientY: 300 })
     expect(sheet.style.transform).toBe('')
+  })
+
+  it('is one history entry while shown: the browser Back closes it, and closing it consumes the entry', async () => {
+    // Earlier sheets in this file left their entry tagged; start from an untagged one.
+    window.history.replaceState(null, '', '/')
+    const onClose = vi.fn()
+    const start = window.history.length
+    const view = render(
+      <PhoneSheet shown heading="Thread panel" onClose={onClose}>
+        <p>Body</p>
+      </PhoneSheet>,
+    )
+    expect(window.history.length).toBe(start + 1)
+    window.history.back()
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    view.rerender(
+      <PhoneSheet shown={false} heading="Thread panel" onClose={onClose}>
+        <p>Body</p>
+      </PhoneSheet>,
+    )
+    view.rerender(
+      <PhoneSheet shown heading="Thread panel" onClose={onClose}>
+        <p>Body</p>
+      </PhoneSheet>,
+    )
+    // Closed from its own control: the entry it pushed is consumed, so the next Back leaves the screen below.
+    view.rerender(
+      <PhoneSheet shown={false} heading="Thread panel" onClose={onClose}>
+        <p>Body</p>
+      </PhoneSheet>,
+    )
+    await waitFor(() => expect(window.history.state?.dshfilesPhoneHistory?.depths?.dshfilesPhoneSheet ?? 0).toBe(0))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the surface mounted but hidden, with no scrim, while closed', () => {

@@ -13,6 +13,7 @@ export default defineConfig({
     'conversation-header': 'src/conversation-header.ts',
     'thread-on-screen': 'src/thread-on-screen.ts',
     'shell-merge': 'src/shell-merge.ts',
+    'phone-history': 'src/phone-history.ts',
   },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: { entry: 'src/client.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite(), dockviewCssVite()] } },

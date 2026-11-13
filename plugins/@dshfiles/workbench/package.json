@@ -39,6 +39,10 @@
       "types": "./src/conversation-header.ts",
       "default": "./dist/conversation-header.js"
     },
+    "./phone-history": {
+      "types": "./src/phone-history.ts",
+      "default": "./dist/phone-history.js"
+    },
     "./thread-on-screen": {
       "types": "./src/thread-on-screen.ts",
       "default": "./dist/thread-on-screen.js"

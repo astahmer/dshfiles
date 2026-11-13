@@ -3762,7 +3762,7 @@
     {
       "id": "phone-stack-navigation",
       "title": "Navigate the phone as a stack",
-      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers Thread panels, which opens the thread panel as a bottom sheet. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
+      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers Thread panels, which opens the thread panel as a bottom sheet. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Each stack level is one browser history entry (tagged with its depth in history.state), so the Android back gesture or a browser Back pops one level like the Back button, after first closing an open thread-panel sheet; the in-app Back consumes the entry it pushed, so history never grows, and a push drops the thread from the entry it leaves below, so going back never switches to another thread. Desktop is unchanged and keeps replacing its single entry.",
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3792,6 +3792,18 @@
           "id": "thread-sidebar.phone-stack-lists",
           "file": "plugins/@dshfiles/thread-sidebar/src/phone-shell.test.ts",
           "testName": "shows the open list: tab roots have no Back, a destination opened from More goes back to More"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.phone-stack-depth",
+          "file": "plugins/@dshfiles/thread-sidebar/src/phone-shell.test.ts",
+          "testName": "counts one history level per Back between the screen and its tab root"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.phone-stack-history",
+          "file": "plugins/@dshfiles/workbench/src/phone-history.test.tsx",
+          "testName": "pushes one entry per level, pops the stack on browser Back and consumes the entry on in-app Back"
         },
         {
           "kind": "not-applicable",

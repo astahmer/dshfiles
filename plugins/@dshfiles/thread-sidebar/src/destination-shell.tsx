@@ -1,4 +1,5 @@
 import { WorkbenchPorts } from '@dshfiles/workbench/shell-merge'
+import { usePhoneHistoryLayer } from '@dshfiles/workbench/phone-history'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -44,6 +45,7 @@ import { SidebarTrees, type ResolvedEntry } from './sidebar-tree.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar } from './phone-shell.js'
 import { useEdgeSwipeBack } from './edge-swipe.js'
 import { runStackMotion } from './stack-motion.js'
+import { clearThreadUrl } from './thread-url.js'
 import { PhoneRailActions, RailActionGroup, type RailAction } from './rail-actions.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
@@ -1003,7 +1005,7 @@ const PhoneNavigation = (
   const others = props.railFolders.filter(candidate => !TABBED_DESTINATIONS.some(tabbed => tabbed === candidate.id))
   // New thread sits in the Threads list header (E8); ⌘⇧O and `c` keep starting one on a keyboard.
   const showNew = listOpen && !moreOpen && props.destination.id === 'threads'
-  const bar = PhoneTopBarModel.resolve({
+  const stack = {
     listOpen,
     moreOpen,
     destination: props.destination,
@@ -1012,7 +1014,8 @@ const PhoneNavigation = (
     selectedThreadId: props.stageThreadId === undefined ? props.selectedThreadId : props.stageThreadId,
     stageTitle: props.stageTitle,
     origin,
-  })
+  }
+  const bar = PhoneTopBarModel.resolve(stack)
   // Back pops one level of the stack: the stage returns to the list it came from, a destination list to More.
   const back = (): void => {
     const target = bar.back
@@ -1037,6 +1040,9 @@ const PhoneNavigation = (
   }
   // The iOS back swipe (T5.3): a left-edge swipe is Back wherever the bar offers one.
   useEdgeSwipeBack(bar.back !== null, back)
+  // Android's back gesture (and a browser Back) pops the same stack: each level is one history entry. A push drops the
+  // thread from the entry it leaves below, so going back never switches to another thread through the URL route.
+  usePhoneHistoryLayer({ key: 'dshfilesPhoneStack', depth: PhoneTopBarModel.depth(stack), enabled: true, pop: back, baseUrl: clearThreadUrl })
   // Inside a thread the stage owns the bottom edge (plan phone rules): no tab bar, Back returns to the list.
   const inThread = !listOpen && bar.thread
   useLayoutEffect(() => {
