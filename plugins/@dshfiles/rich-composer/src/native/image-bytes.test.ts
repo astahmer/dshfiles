@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { sniffImageType } from './image-bytes.ts'
+import { jpegComplete, sniffImageType } from './image-bytes.ts'
 
 const bytes = (...values: readonly (number | string)[]): Uint8Array =>
   Uint8Array.from(values.flatMap(value => typeof value === 'string' ? [...value].map(character => character.charCodeAt(0)) : [value]))
@@ -21,5 +21,15 @@ describe('sniffImageType', () => {
 
   it('names nothing for truncated data', () => {
     expect(sniffImageType(bytes(0xff, 0xd8))).toBeUndefined()
+  })
+})
+
+describe('jpegComplete', () => {
+  it('accepts a JPEG ending with its end-of-image marker', () => {
+    expect(jpegComplete(bytes(0xff, 0xd8, 0xff, 0xe0, 0, 0xff, 0xd9))).toBe(true)
+  })
+
+  it('flags a JPEG cut short while it was read', () => {
+    expect(jpegComplete(bytes(0xff, 0xd8, 0xff, 0xe0, 0, 0x12, 0x34))).toBe(false)
   })
 })

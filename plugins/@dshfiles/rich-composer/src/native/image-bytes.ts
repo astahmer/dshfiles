@@ -23,25 +23,67 @@ export const sniffImageType = (bytes: Uint8Array): ImageMediaType | undefined =>
 const JPEG_QUALITY = 0.9
 
 /**
- * Re-encode an image the browser can decode as a JPEG, upright per its EXIF orientation.
- * @param file - the picked image.
- * @returns the JPEG bytes, or undefined when this browser cannot decode the file.
+ * Whether JPEG bytes end with the end-of-image marker; a JPEG without it was cut short while it was read.
+ * @param bytes - the complete file bytes.
+ * @returns true when the last two bytes are FF D9.
  */
-export const jpegCopy = async (file: Blob): Promise<Blob | undefined> => {
-  if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') return undefined
-  try {
-    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-    const canvas = document.createElement('canvas')
-    canvas.width = bitmap.width
-    canvas.height = bitmap.height
-    const context = canvas.getContext('2d')
-    if (context === null) return undefined
-    context.drawImage(bitmap, 0, 0)
-    bitmap.close()
-    return await new Promise<Blob | undefined>((resolve) => {
-      canvas.toBlob(blob => { resolve(blob ?? undefined) }, 'image/jpeg', JPEG_QUALITY)
-    })
-  } catch {
-    return undefined
+export const jpegComplete = (bytes: Uint8Array): boolean => bytes.at(-2) === 0xff && bytes.at(-1) === 0xd9
+
+type Drawable = { readonly source: CanvasImageSource; readonly width: number; readonly height: number; readonly release: () => void }
+
+const bitmapOf = async (file: Blob): Promise<Drawable> => {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => { bitmap.close() } }
+}
+
+/** The thumbnail's own decode: an <img> renders a JPEG createImageBitmap and the Host's strict decoder refuse. */
+const imageOf = async (url: string): Promise<Drawable> => {
+  const image = new Image()
+  image.src = url
+  await image.decode()
+  return { source: image, width: image.naturalWidth, height: image.naturalHeight, release: () => undefined }
+}
+
+const encodeJpeg = async (drawable: Drawable): Promise<Blob> => {
+  const canvas = document.createElement('canvas')
+  canvas.width = drawable.width
+  canvas.height = drawable.height
+  const context = canvas.getContext('2d')
+  if (context === null) throw new Error('no 2d canvas')
+  context.drawImage(drawable.source, 0, 0)
+  drawable.release()
+  const blob = await new Promise<Blob | null>((resolve) => { canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY) })
+  if (blob === null) throw new Error('canvas encode failed')
+  return blob
+}
+
+const failureName = (error: unknown): string => (error instanceof Error ? error.name : 'Error')
+
+/**
+ * Re-encode an image the browser can show as a JPEG, upright per its EXIF orientation. The file's bitmap decode comes
+ * first; the thumbnail's <img> decode is the fallback, since it tolerates bytes the stricter decoders refuse.
+ * @param request.file - the picked image.
+ * @param request.previewUrl - the object URL the composer thumbnail renders, when there is one.
+ * @returns the JPEG, or why neither decode produced one.
+ */
+export const jpegCopy = async (request: { readonly file: Blob; readonly previewUrl?: string }): Promise<
+  { readonly ok: true; readonly blob: Blob; readonly via: 'bitmap' | 'image' } | { readonly ok: false; readonly failure: string }
+> => {
+  if (typeof document === 'undefined') return { ok: false, failure: 'no document' }
+  const failures: string[] = []
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return { ok: true, blob: await encodeJpeg(await bitmapOf(request.file)), via: 'bitmap' }
+    } catch (error) {
+      failures.push(`bitmap:${failureName(error)}`)
+    }
   }
+  if (request.previewUrl !== undefined && typeof Image === 'function') {
+    try {
+      return { ok: true, blob: await encodeJpeg(await imageOf(request.previewUrl)), via: 'image' }
+    } catch (error) {
+      failures.push(`image:${failureName(error)}`)
+    }
+  }
+  return { ok: false, failure: failures.join(',') || 'no decoder' }
 }

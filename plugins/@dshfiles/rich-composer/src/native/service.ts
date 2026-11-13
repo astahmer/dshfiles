@@ -38,7 +38,7 @@ import { startInteraction, startSpan } from '@dshfiles/dshx/tracing/client'
 import type { BrowserSpan } from '@dshfiles/dshx/tracing/client'
 import { TaskQueue } from '../file-upload-queue.ts'
 import { isImageMediaType } from './canonical-image-type.ts'
-import { jpegCopy, sniffImageType } from './image-bytes.ts'
+import { jpegComplete, jpegCopy, sniffImageType } from './image-bytes.ts'
 
 const encodeBase64 = (bytes: Uint8Array): string => {
   let binary = ''
@@ -525,7 +525,9 @@ export class ConversationController extends Service implements IConversation {
         }
         const result = ownership.runtimeId === null
           ? attachment.kind === 'image'
-            ? await this.uploadImageBytes({ sessionId, file: attachment.file, name, signal: controller.signal, onProgress, span })
+            ? await this.uploadImageBytes({
+                sessionId, file: attachment.file, previewUrl: attachment.previewUrl, name, signal: controller.signal, onProgress, span,
+              })
             : await this.ctx.fileUpload.upload(
                 sessionId, await uploadBody(attachment.file), name, controller.signal, onProgress,
               )
@@ -594,24 +596,32 @@ export class ConversationController extends Service implements IConversation {
     readonly signal: AbortSignal
     readonly onProgress: (progress: { readonly loaded: number; readonly total?: number }) => void
     readonly span: BrowserSpan
+    readonly previewUrl: string
   }) {
     const upload = (body: Blob, mediaType: ImageMediaType) =>
       this.ctx.fileUpload.uploadImage(request.sessionId, body, mediaType, request.name, request.signal, request.onProgress)
     const body = await uploadBody(request.file)
-    const sniffed = sniffImageType(new Uint8Array(await body.slice(0, 12).arrayBuffer()))
-    request.span.setAttribute('dshx.upload.sniffed_type', sniffed ?? 'unknown')
+    const bytes = new Uint8Array(await body.arrayBuffer())
+    const sniffed = sniffImageType(bytes)
+    request.span.setAttributes({
+      'dshx.upload.sniffed_type': sniffed ?? 'unknown',
+      'dshx.upload.read_bytes': bytes.byteLength,
+      ...(sniffed === 'image/jpeg' ? { 'dshx.upload.jpeg_complete': jpegComplete(bytes) } : {}),
+    })
     request.signal.throwIfAborted()
     if (sniffed !== undefined) {
       const result = await upload(body, sniffed)
       if (result.ok || !isUndecodableImage(result.error)) return result
       request.span.addEvent('host refused original', { 'dshx.upload.error_code': result.error.code })
     }
-    const jpeg = await jpegCopy(request.file)
-    request.span.setAttributes({ 'dshx.upload.jpeg_retry': true, 'dshx.upload.jpeg_bytes': jpeg?.size ?? -1 })
+    const jpeg = await jpegCopy({ file: request.file, previewUrl: request.previewUrl })
+    request.span.setAttributes(jpeg.ok
+      ? { 'dshx.upload.jpeg_retry': true, 'dshx.upload.jpeg_bytes': jpeg.blob.size, 'dshx.upload.jpeg_via': jpeg.via }
+      : { 'dshx.upload.jpeg_retry': true, 'dshx.upload.jpeg_failure': jpeg.failure })
     request.signal.throwIfAborted()
     // Undecodable here too: the Host's refusal names the problem.
-    if (jpeg === undefined) return upload(body, sniffed ?? imageMediaType(request.file.type))
-    return upload(jpeg, 'image/jpeg')
+    if (!jpeg.ok) return upload(body, sniffed ?? imageMediaType(request.file.type))
+    return upload(jpeg.blob, 'image/jpeg')
   }
 
   /**
