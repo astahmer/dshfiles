@@ -145,6 +145,15 @@ export function installDraftFilePicker(
 }
 
 /**
+ * Whether the draft is typed on a touch keyboard, whose return key has no Shift companion. Some Android phones
+ * (Redmi Chrome) report a hover-capable pointer, so the media query alone misses them.
+ * @returns true on a recognized phone or tablet, or a touch-only pointer.
+ */
+export function hasTouchKeyboard(): boolean {
+  return isMobileDevice() || (typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches)
+}
+
+/**
  * Bind editor gestures to the view's live guards and Session operations.
  * @param editor - the borrowed Session-owned editor.
  * @param keyboard - the existing composer keyboard operations.
@@ -206,7 +215,7 @@ export function installDraftKeymap(
       keyboard.submit(resolveSubmitMode(g.busyEnter, g.running, 'enter', g.steeringAvailable), 'enter')
       g.requestFreshDraft()
     },
-    enterBreaksLine: () => typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches,
+    enterBreaksLine: hasTouchKeyboard,
     intakeFiles: (files, directories) => { gate.current.intakeFiles(files, directories) },
     pasteText: (text) => {
       if (gate.current.machineBusy || gate.current.locked) return
