@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -16,6 +16,12 @@ afterEach(async () => {
 })
 
 /** The probe as the remote shell runs it, against a scratch home and a minimal PATH. */
+const writeExecutable = async ({ path, script }: { readonly path: string; readonly script: string }) => {
+  await mkdir(dirname(path), { recursive: true })
+  await writeFile(path, `#!/bin/sh\n${script}\n`)
+  await chmod(path, 0o755)
+}
+
 const runProbe = ({
   checkoutPath,
   revision,
@@ -38,6 +44,14 @@ describe('remote probe', () => {
   test('reports the default checkout under the remote home when no checkoutPath is given', () => {
     const facts = runProbe({ checkoutPath: undefined })
     expect(facts.checkout.path).toBe(`${home}/dev/dshfiles`)
+  })
+
+  test('finds dsh in the pnpm global bin and reads its version with the official Node first on PATH', async () => {
+    await writeExecutable({ path: join(home, '.local/share/fnm/node-versions/v22.23.3/installation/bin/node'), script: 'echo official' })
+    await writeExecutable({ path: join(home, '.local/share/pnpm/bin/dsh'), script: '[ "$(node)" = official ] && echo 0.2.2-rc.2' })
+    const facts = runProbe({ checkoutPath: undefined })
+    expect(facts.dsh.path).toBe(join(home, '.local/share/pnpm/bin/dsh'))
+    expect(facts.dsh.version).toBe('0.2.2-rc.2')
   })
 
   test('resolves the requested revision to the commit the checkout sits on', async () => {
