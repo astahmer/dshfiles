@@ -37,6 +37,7 @@ import type { InputSubmitMode } from './contract/composer-submission.ts'
 import { startInteraction } from '@dshfiles/dshx/tracing/client'
 import { TaskQueue } from '../file-upload-queue.ts'
 import { isImageMediaType } from './canonical-image-type.ts'
+import { jpegCopy, sniffImageType } from './image-bytes.ts'
 
 const encodeBase64 = (bytes: Uint8Array): string => {
   let binary = ''
@@ -160,6 +161,14 @@ const IN_MEMORY_UPLOAD_LIMIT = 64 * 1024 * 1024
 async function uploadBody(file: File): Promise<Blob> {
   if (file.size > IN_MEMORY_UPLOAD_LIMIT) return file
   return new Blob([await file.arrayBuffer()], { type: file.type })
+}
+
+/** A Host refusal of the image bytes themselves, which a re-encode can cure. */
+const isUndecodableImage = (error: { readonly code: string; readonly details: unknown }): boolean => {
+  if (error.code !== 'session/attachment-invalid' && error.code !== 'subagent/attachment-invalid') return false
+  const details = error.details
+  const reason = typeof details === 'object' && details !== null && 'reason' in details ? details.reason : undefined
+  return reason === 'INVALID_IMAGE' || reason === 'IMAGE_TYPE_MISMATCH'
 }
 
 /** Unsupported browser-declared image type, localized by the UI boundary. */
@@ -496,14 +505,12 @@ export class ConversationController extends Service implements IConversation {
           if (this.fileUploadOperations.get(attachment.id)?.controller === controller) this.forgetUpload(attachment.id)
           return
         }
-        const body = ownership.runtimeId === null ? await uploadBody(attachment.file) : attachment.file
-        controller.signal.throwIfAborted()
         const result = ownership.runtimeId === null
           ? attachment.kind === 'image'
-            ? await this.ctx.fileUpload.uploadImage(
-                sessionId, body, imageMediaType(attachment.file.type), name, controller.signal, onProgress,
+            ? await this.uploadImageBytes({ sessionId, file: attachment.file, name, signal: controller.signal, onProgress })
+            : await this.ctx.fileUpload.upload(
+                sessionId, await uploadBody(attachment.file), name, controller.signal, onProgress,
               )
-            : await this.ctx.fileUpload.upload(sessionId, body, name, controller.signal, onProgress)
           : await (async (runtimeId: string) => {
               const bytes = new Uint8Array(await attachment.file.arrayBuffer())
               controller.signal.throwIfAborted()
@@ -551,6 +558,33 @@ export class ConversationController extends Service implements IConversation {
       }
     }
     this.fileUploadQueue.push({ start, settle })
+  }
+
+  /**
+   * Stage one image under the format its bytes really have. A phone gallery can label a HEIF photo as JPEG, and the
+   * Host decodes strictly, so bytes it cannot admit travel as a JPEG this browser re-encodes instead.
+   */
+  private async uploadImageBytes(request: {
+    readonly sessionId: SessionId
+    readonly file: File
+    readonly name: string | undefined
+    readonly signal: AbortSignal
+    readonly onProgress: (progress: { readonly loaded: number; readonly total?: number }) => void
+  }) {
+    const upload = (body: Blob, mediaType: ImageMediaType) =>
+      this.ctx.fileUpload.uploadImage(request.sessionId, body, mediaType, request.name, request.signal, request.onProgress)
+    const body = await uploadBody(request.file)
+    const sniffed = sniffImageType(new Uint8Array(await body.slice(0, 12).arrayBuffer()))
+    request.signal.throwIfAborted()
+    if (sniffed !== undefined) {
+      const result = await upload(body, sniffed)
+      if (result.ok || !isUndecodableImage(result.error)) return result
+    }
+    const jpeg = await jpegCopy(request.file)
+    request.signal.throwIfAborted()
+    // Undecodable here too: the Host's refusal names the problem.
+    if (jpeg === undefined) return upload(body, sniffed ?? imageMediaType(request.file.type))
+    return upload(jpeg, 'image/jpeg')
   }
 
   /**
