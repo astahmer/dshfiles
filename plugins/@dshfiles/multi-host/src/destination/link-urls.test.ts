@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { needsPlainHttpConsent } from './link-urls.js'
+import { linkBackNeedsPlainHttpConsent, needsPlainHttpConsent } from './link-urls.js'
 
 describe('needsPlainHttpConsent', () => {
   it.each([
@@ -16,5 +16,17 @@ describe('needsPlainHttpConsent', () => {
     ['not a url', false],
   ])('%s → %s', (link, expected) => {
     expect(needsPlainHttpConsent(link)).toBe(expected)
+  })
+})
+
+describe('linkBackNeedsPlainHttpConsent', () => {
+  it.each([
+    [['http://192.168.1.44:3459'], true],
+    [['http://192.168.1.44:3459', 'http://10.0.0.2:3459'], true],
+    [['http://100.101.2.3:3459', 'http://192.168.1.44:3459'], false],
+    [['https://box.example.com', 'http://192.168.1.44:3459'], false],
+    [[], false],
+  ])('%j → %s', (urls, expected) => {
+    expect(linkBackNeedsPlainHttpConsent(urls)).toBe(expected)
   })
 })

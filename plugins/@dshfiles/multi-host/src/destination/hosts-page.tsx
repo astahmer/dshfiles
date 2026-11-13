@@ -2,6 +2,16 @@ import { useApi } from '@dshfiles/dshx/client'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ProjectFolderPicker, type ProjectFolderSelection } from '@dshfiles/workspace-folder-picker/picker'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
@@ -38,6 +48,7 @@ import { ConnectionTestSteps } from './connection-test-steps.js'
 import { FleetUpdateDialog } from './fleet-update-dialog.js'
 import { hostTargetLabel } from './host-target.js'
 import { LinkThisMachine, PairMachineDialog } from './link-machines.js'
+import { linkBackNeedsPlainHttpConsent } from './link-urls.js'
 import { DisconnectGrace } from './disconnect-grace.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 
@@ -171,15 +182,22 @@ const HostRow = (props: {
     },
     onError: (_error, variables) => variables.tab?.close(),
   })
+  const linkStatus = useQuery(multiHostQueries.linkStatus(api))
+  const [plainHttpConsent, setPlainHttpConsent] = useState(false)
   const linkBack = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (input: { readonly allowPlainHttp: boolean }) => {
       if (runtime === undefined) throw new Error('This host has no runtime. Edit the host to set its remote DSH home, then reconnect.')
-      const result = await api.linkBack({ runtimeId: runtime.id })
+      const result = await api.linkBack({ runtimeId: runtime.id, allowPlainHttp: input.allowPlainHttp })
       if (!result.ok) throw failure(result)
       return result
     },
-    onSettled: () => void queryClient.invalidateQueries({ queryKey: multiHostKeys.link }),
+    onSettled: () => {
+      setPlainHttpConsent(false)
+      void queryClient.invalidateQueries({ queryKey: multiHostKeys.link })
+    },
   })
+  const startLinkBack = () =>
+    linkBackNeedsPlainHttpConsent(linkStatus.data?.urls ?? []) ? setPlainHttpConsent(true) : linkBack.mutate({ allowPlainHttp: false })
   const diagnose = useMutation({
     mutationFn: async () => {
       if (host.connector.kind !== 'ssh') throw new Error('Only SSH hosts can be diagnosed.')
@@ -352,7 +370,7 @@ const HostRow = (props: {
           {linkBack.isError ? (
             <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-destructive">
               {errorMessage(linkBack.error, 'Link back failed.')}
-              <Button size="xs" variant="outline" onClick={() => linkBack.mutate()} disabled={linkBack.isPending}>
+              <Button size="xs" variant="outline" onClick={startLinkBack} disabled={linkBack.isPending}>
                 Try again
               </Button>
             </span>
@@ -429,10 +447,34 @@ const HostRow = (props: {
                 <PlusIcon className="dshx:size-3.5" />
                 Add folder
               </Button>
-              <Button size="sm" variant="outline" disabled={runtime === undefined || linkBack.isPending} onClick={() => linkBack.mutate()}>
+              <Button size="sm" variant="outline" disabled={runtime === undefined || linkBack.isPending} onClick={startLinkBack}>
                 {linkBack.isPending ? <Spinner className="dshx:size-3.5" /> : <LinkIcon className="dshx:size-3.5" />}
                 Link back
               </Button>
+              <AlertDialog open={plainHttpConsent} onOpenChange={open => (open ? undefined : setPlainHttpConsent(false))}>
+                <AlertDialogContent className="dshx-root">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Link back over plain HTTP?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This machine listens only on unencrypted addresses, so {host.name} would receive its link credential in clear. Use a Tailscale or https://
+                      address under Link this machine instead, or allow it on a network you trust.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={linkBack.isPending}
+                      onClick={event => {
+                        event.preventDefault()
+                        linkBack.mutate({ allowPlainHttp: true })
+                      }}
+                    >
+                      {linkBack.isPending ? <Spinner className="dshx:size-3.5" /> : null}
+                      Allow plain HTTP
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           )}
           <IconAction

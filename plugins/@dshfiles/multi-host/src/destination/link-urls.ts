@@ -22,3 +22,6 @@ export const needsPlainHttpConsent = (link: string): boolean => {
   const hostname = url.hostname.toLowerCase()
   return !(tailscaleCgnat(hostname) || hostname.endsWith('.ts.net') || loopback(hostname))
 }
+
+/** Link back tries each URL this machine listens on; it needs consent only when none of them is protected. */
+export const linkBackNeedsPlainHttpConsent = (urls: readonly string[]): boolean => urls.length > 0 && urls.every(needsPlainHttpConsent)
