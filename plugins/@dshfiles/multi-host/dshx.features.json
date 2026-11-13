@@ -710,6 +710,12 @@
           "id": "multi-host.foreign-upload-refusal",
           "file": "plugins/@dshfiles/multi-host/tests/remote-sessions.test.ts",
           "testName": "refuses an upload staged for another thread before it reaches the runtime"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.remote-image-read",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-sessions.test.ts",
+          "testName": "reads an image of a remote thread from the runtime that stored it"
         }
       ],
       "telemetry": [

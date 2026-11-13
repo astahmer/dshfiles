@@ -1,5 +1,6 @@
 import type {
   SessionAddress,
+  SessionAttachmentRequest,
   SessionCancelRequest,
   SessionCancelValue,
   SessionFollowFrame,
@@ -410,6 +411,14 @@ export class RemoteSessions extends Context.Service<
         return created
       })
 
+      /** A mirrored thread's images live in its runtime's attachment store; this Host's store never saw them. */
+      const attachment = Effect.fn('multi-host remote session attachment')(function* (request: SessionAttachmentRequest) {
+        const read = yield* forward({ sessionId: request.sessionId, method: 'attachment', request, mutation: false, decode: SessionPayload.attachment })
+        if (read.attachment.attachmentId !== request.attachment.attachmentId)
+          return yield* new RemoteRequestFailed({ code: 'session/attachment-invalid', detail: 'The host answered with a different image.' })
+        return read
+      })
+
       const source: EffectSessionSource = {
         id: 'multi-host',
         label: 'Remote hosts',
@@ -439,6 +448,7 @@ export class RemoteSessions extends Context.Service<
           forward({ sessionId: request.sessionId, method: 'rename', request, mutation: true, decode: SessionPayload.renamed }),
         selectModel: (request: SessionSelectModelRequest): Effect.Effect<SessionSelectModelValue, unknown> =>
           forward({ sessionId: request.sessionId, method: 'selectModel', request, mutation: true, decode: SessionPayload.selectedModel }),
+        attachment,
       }
 
       const threadFolder = (sessionId: string) => Effect.flatMap(requireRuntime(sessionId), runtime => cwdFor(sessionId, runtime))

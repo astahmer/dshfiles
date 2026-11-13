@@ -286,6 +286,35 @@ describe('mirrored sessions', () => {
     })
   })
 
+  it('reads a mirrored Session’s image from its source, and a local image from this Host', async () => {
+    const { mirrored, source } = await fixture()
+    const stored = SessionSourcePayload.attachment({
+      attachment: { attachmentId: 'attachment-on-pi', mediaType: 'image/png', bytes: 3, width: 1, height: 1 },
+      data: 'AAAA',
+    })
+    const asked: unknown[] = []
+    mirrored.registry.register(
+      source({
+        rows: [summary('session-remote', 100)],
+        attachment: async request => {
+          asked.push(request)
+          return stored
+        },
+      }),
+    )
+    await mirrored.merge([summary('session-local', 50)], {}, new AbortController().signal)
+    const remote = { sessionId: SessionId('session-remote'), attachment: stored.attachment }
+    await expect(
+      mirrored.attachment(remote, async () => {
+        throw new Error('ATTACHMENT_NOT_FOUND: this Host never stored that image')
+      }),
+    ).resolves.toEqual(stored)
+    expect(asked).toEqual([remote])
+    const local = { sessionId: SessionId('session-local'), attachment: stored.attachment }
+    await expect(mirrored.attachment(local, async () => ({ attachment: stored.attachment, data: 'BBBB' }))).resolves.toMatchObject({ data: 'BBBB' })
+    expect(asked).toHaveLength(1)
+  })
+
   it('refuses model selection for a mirrored Session whose source cannot select', async () => {
     const { mirrored, source } = await fixture()
     mirrored.registry.register(source({ rows: [summary('session-remote', 100)] }))

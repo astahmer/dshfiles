@@ -17,7 +17,7 @@ const aborted = (signal: AbortSignal) =>
 export const fromEffect = <R>(source: EffectSessionSource<R>): Effect.Effect<MirroredSessionSource, never, R> =>
   Effect.map(Effect.context<R>(), context => {
     const run = Effect.runPromiseWith(context)
-    const { follow, runtimeIdForSession, page, prompt, cancel, updateQueue, projections, fork, rename, selectModel } = source
+    const { follow, runtimeIdForSession, page, prompt, cancel, updateQueue, projections, fork, rename, selectModel, attachment } = source
     return {
       id: source.id,
       label: source.label,
@@ -37,5 +37,6 @@ export const fromEffect = <R>(source: EffectSessionSource<R>): Effect.Effect<Mir
       ...(selectModel !== undefined && { selectModel: request => run(selectModel(request)) }),
       ...(fork !== undefined && { fork: request => run(fork(request)) }),
       ...(rename !== undefined && { rename: request => run(rename(request)) }),
+      ...(attachment !== undefined && { attachment: request => run(attachment(request)) }),
     } satisfies MirroredSessionSource
   })

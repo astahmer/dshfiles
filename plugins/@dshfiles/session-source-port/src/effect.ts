@@ -1,4 +1,6 @@
 import type {
+  SessionAttachmentRequest,
+  SessionAttachmentValue,
   SessionCancelRequest,
   SessionCancelValue,
   SessionFollowFrame,
@@ -125,4 +127,5 @@ export interface EffectSessionSource<R = never> {
   readonly fork?: (request: SessionForkRequest) => Effect.Effect<SessionForkValue, unknown, R>
   readonly rename?: (request: SessionRenameRequest) => Effect.Effect<SessionRenameValue, unknown, R>
   readonly selectModel?: (request: SessionSelectModelRequest) => Effect.Effect<SessionSelectModelValue, unknown, R>
+  readonly attachment?: (request: SessionAttachmentRequest) => Effect.Effect<SessionAttachmentValue, unknown, R>
 }

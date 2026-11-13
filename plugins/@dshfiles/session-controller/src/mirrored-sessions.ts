@@ -11,6 +11,8 @@ import {
 } from '@dshfiles/session-source-port'
 import type {
   SessionAddress,
+  SessionAttachmentRequest,
+  SessionAttachmentValue,
   SessionCancelRequest,
   SessionCancelValue,
   SessionForkRequest,
@@ -326,6 +328,28 @@ export class MirroredSessions {
       return await source.selectModel(request)
     } catch (error) {
       throw MirroredSessions.failure('session/selectModel', error)
+    }
+  }
+
+  /**
+   * Read a mirrored Session's image from the runtime that stored it: this Host's attachment store never held it.
+   * @param request - the Session scope and image reference, forwarded unchanged.
+   * @param local - this Host's own attachment store.
+   * @returns the owning runtime's verified reference and base64 bytes.
+   */
+  async attachment(
+    request: SessionAttachmentRequest,
+    local: (request: SessionAttachmentRequest) => Promise<SessionAttachmentValue>,
+  ): Promise<SessionAttachmentValue> {
+    const source = await this.resolve(request.sessionId)
+    if (source === undefined) return local(request)
+    if (source.attachment === undefined) {
+      throw new RemoteError('gateway/bad-request', 'This host cannot send images of that Session. Update DSH here, or open the thread on its host.', {})
+    }
+    try {
+      return await source.attachment(request)
+    } catch (error) {
+      throw MirroredSessions.failure('session/attachment', error)
     }
   }
 

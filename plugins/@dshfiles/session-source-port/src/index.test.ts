@@ -148,6 +148,13 @@ describe('SessionPayload', () => {
     expect(() => SessionSourcePayload.cancel({ accepted: false })).toThrow(SessionPayloadError)
     expect(SessionSourcePayload.projections(null)).toBeNull()
   })
+
+  test('an image read must carry exactly the base64 its byte length names', () => {
+    const attachment = { attachmentId: 'attachment-a', mediaType: 'image/png', bytes: 4, width: 1, height: 1 }
+    expect(SessionSourcePayload.attachment({ attachment, data: 'iVBORw==' })).toEqual({ attachment, data: 'iVBORw==' })
+    expect(() => SessionSourcePayload.attachment({ attachment, data: 'iVBORw==AAAA' })).toThrow(SessionPayloadError)
+    expect(() => SessionSourcePayload.attachment({ attachment: { ...attachment, bytes: 64 * 1024 * 1024 }, data: '' })).toThrow(SessionPayloadError)
+  })
 })
 
 describe('fromEffect', () => {

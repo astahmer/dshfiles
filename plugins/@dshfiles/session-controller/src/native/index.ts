@@ -644,7 +644,7 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('attachment')
   attachment(request: SessionAttachmentRequest): Promise<SessionAttachmentValue> {
-    return this.commands.attachment(request)
+    return this.mirrored.attachment(request, value => this.commands.attachment(value))
   }
 
   /**

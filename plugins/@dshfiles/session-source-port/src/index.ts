@@ -1,5 +1,7 @@
 import type {} from '@deepseek-ai/cordis'
 import type {
+  SessionAttachmentRequest,
+  SessionAttachmentValue,
   SessionCancelRequest,
   SessionCancelValue,
   SessionForkRequest,
@@ -65,6 +67,8 @@ export interface MirroredSessionSource {
   selectModel?(request: SessionSelectModelRequest): Promise<SessionSelectModelValue>
   fork?(request: SessionForkRequest): Promise<SessionForkValue>
   rename?(request: SessionRenameRequest): Promise<SessionRenameValue>
+  /** One stored image of a mirrored Session: its bytes live in the owning runtime's attachment store, not this Host's. */
+  attachment?(request: SessionAttachmentRequest): Promise<SessionAttachmentValue>
 }
 
 /** The registry the Session controller provides as `sessionSources`. */
@@ -180,6 +184,10 @@ export class SessionSourcePayload {
 
   static queue(value: unknown): SessionUpdateQueueValue {
     return SessionPayload.queue.sync(value)
+  }
+
+  static attachment(value: unknown): SessionAttachmentValue {
+    return SessionPayload.attachment.sync(value)
   }
 }
 

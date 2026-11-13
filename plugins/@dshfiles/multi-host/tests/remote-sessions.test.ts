@@ -2,6 +2,7 @@ import { mkdtempSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionPayload } from '@dshfiles/session-source-port'
 import { describe, expect, it } from '@effect/vitest'
 import { Cause, Effect, Exit, Fiber, Layer, Stream } from 'effect'
 import { TestClock } from 'effect/testing'
@@ -30,6 +31,9 @@ const row = (sessionId: string, extra: Record<string, unknown> = {}) => ({
   projections: { values: { title: 'remote thread' } },
   ...extra,
 })
+
+const storedImage = { attachmentId: 'attachment-on-pi', mediaType: 'image/png', bytes: 4, width: 1, height: 1, name: 'photo.png' }
+const storedImageData = Buffer.from([137, 80, 78, 71]).toString('base64')
 
 interface Fixture {
   readonly calls: { readonly method: string; readonly args: unknown }[]
@@ -74,6 +78,7 @@ const fixture = (transport: 'up' | 'unreachable' | 'hanging' = 'up'): Fixture =>
       if (request.method === 'create') return Effect.succeed({ sessionId: 'session-created' })
       if (request.method === 'fork') return Effect.succeed({ sessionId: 'session-forked' })
       if (request.method === 'rename') return Effect.succeed({ title: 'Renamed', seq: 9 })
+      if (request.method === 'attachment') return Effect.succeed({ attachment: storedImage, data: storedImageData })
       if (request.method === 'prompt' && promptFailure !== undefined) return Effect.fail(promptFailure)
       return Effect.succeed({ accepted: true })
     },
@@ -320,6 +325,23 @@ describe('RemoteSessions', () => {
       yield* sessions.source.prompt?.(request) ?? Effect.void
       expect(test.calls.at(-1)).toEqual({ method: 'prompt', args: { request } })
     }).pipe(Effect.provide(services(test)))
+  })
+
+  it.effect('reads an image of a remote thread from the runtime that stored it', () => {
+    const test = fixture()
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      const read = sessions.source.attachment
+      if (read === undefined) throw new Error('The source reads remote images.')
+      const cited = yield* SessionPayload.attachment({ attachment: storedImage, data: storedImageData })
+      const request = { sessionId: SessionId('session-remote'), attachment: cited.attachment }
+      const image = yield* read(request)
+      expect(image).toEqual({ attachment: storedImage, data: storedImageData })
+      expect(test.calls.at(-1)).toEqual({ method: 'attachment', args: { request } })
+      const elsewhere = yield* SessionPayload.attachment({ attachment: { ...storedImage, attachmentId: 'attachment-elsewhere' }, data: storedImageData })
+      const other = yield* Effect.exit(read({ sessionId: SessionId('session-remote'), attachment: elsewhere.attachment }))
+      expect(Exit.isFailure(other) ? Cause.squash(other.cause) : undefined).toMatchObject({ _tag: 'RemoteRequestFailed', code: 'session/attachment-invalid' })
+    }).pipe(Effect.provide(services(test, [{ sessionId: 'session-remote', runtimeId }])))
   })
 
   const prompted = (test: Fixture) => test.calls.some(call => call.method === 'prompt')

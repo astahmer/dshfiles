@@ -1,4 +1,5 @@
 import type {
+  SessionAttachmentValue,
   SessionCancelValue,
   SessionFollowFrame,
   SessionForkValue,
@@ -12,7 +13,19 @@ import type {
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import { Effect, Result, Schema } from 'effect'
 
-const payloadKinds = ['summaries', 'follow-frame', 'page', 'projections', 'prompt', 'cancel', 'selected-model', 'forked', 'renamed', 'queue'] as const
+const payloadKinds = [
+  'summaries',
+  'follow-frame',
+  'page',
+  'projections',
+  'prompt',
+  'cancel',
+  'selected-model',
+  'forked',
+  'renamed',
+  'queue',
+  'attachment',
+] as const
 
 /** A remote runtime answered with a payload this Host cannot read; `cause` holds the schema issue. */
 export class SessionPayloadError extends Schema.TaggedError<SessionPayloadError>()('SessionPayloadError', {
@@ -53,6 +66,23 @@ const modelSelectionSchema = passthrough(Schema.Struct({ provider: Schema.String
 export const sessionSelectModelSchema = passthrough(Schema.Struct({ selected: modelSelectionSchema }))
 export const sessionForkSchema = passthrough(Schema.Struct({ sessionId: Schema.String }))
 export const sessionRenameSchema = passthrough(Schema.Struct({ title: Schema.String, seq: Schema.Number }))
+/** The gateway caps one native answer at 32 MiB; an image whose base64 cannot fit is not one a runtime can send. */
+const maxAttachmentBytes = 24 * 1024 * 1024
+const base64Length = (bytes: number) => Math.ceil(bytes / 3) * 4
+export const sessionAttachmentSchema = passthrough(
+  Schema.Struct({
+    attachment: passthrough(
+      Schema.Struct({
+        attachmentId: boundedString(1, 256),
+        mediaType: boundedString(1, 64),
+        bytes: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: maxAttachmentBytes })),
+        width: Schema.Int.check(Schema.isGreaterThan(0)),
+        height: Schema.Int.check(Schema.isGreaterThan(0)),
+      }),
+    ),
+    data: Schema.String.check(Schema.isMaxLength(base64Length(maxAttachmentBytes))),
+  }),
+).check(Schema.makeFilter(value => (value.data.length === base64Length(value.attachment.bytes) ? true : 'The image data does not match its byte length.')))
 export const sessionProjectionsSchema = Schema.Union([
   Schema.Null,
   passthrough(Schema.Struct({ kind: Schema.Literal('sequenced'), asOfSeq: Schema.Number })),
@@ -98,5 +128,7 @@ export const forked = decoder<SessionForkValue, typeof sessionForkSchema>('forke
 export const renamed = decoder<SessionRenameValue, typeof sessionRenameSchema>('renamed', sessionRenameSchema)
 /** The model a remote Session's runtime selected. */
 export const selectedModel = decoder<SessionSelectModelValue, typeof sessionSelectModelSchema>('selected-model', sessionSelectModelSchema)
+/** One stored image a runtime read from its own attachment store, base64-encoded. */
+export const attachment = decoder<SessionAttachmentValue, typeof sessionAttachmentSchema>('attachment', sessionAttachmentSchema)
 /** An applied queue mutation receipt. */
 export const queue = decoder<SessionUpdateQueueValue, typeof acceptedSchema>('queue', acceptedSchema)
