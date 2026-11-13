@@ -1,5 +1,6 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -54,6 +55,45 @@ export const LandmarkControls = ({ navigation, onLocate }: LandmarkControlsProps
       </span>
     )}
   </div>
+)
+
+/** The landmarks as one menu, for a phone row that cannot fit a button per landmark at a 44 px tap size. */
+export const LandmarkMenu = ({ navigation, onLocate }: LandmarkControlsProps): JSX.Element => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button aria-label="Locate a landmark" className="dshx:h-11 dshx:min-w-0 dshx:shrink" size="sm" type="button" variant="outline">
+        <LocateFixedIcon />
+        <span className="dshx:truncate">Jump to</span>
+        <ChevronDownIcon className="dshx:text-muted-foreground" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="start" className="dshx-root dshx:min-w-48">
+      {navigation.landmarks.length === 0 && (
+        <DropdownMenuItem disabled>{navigation.landmarksQuery.isFetching ? 'Loading landmarks…' : 'Landmarks unavailable'}</DropdownMenuItem>
+      )}
+      {navigation.landmarks.map(landmark => {
+        const revision = landmark.status === 'resolved' ? landmark.revisions[0] : undefined
+        return (
+          <DropdownMenuItem
+            className="dshx:min-h-11"
+            disabled={revision === undefined}
+            key={landmark.kind}
+            onSelect={() => {
+              if (revision !== undefined) onLocate(revision)
+            }}
+          >
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{landmark.label}</span>
+            {revision !== undefined && <span className="dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{revision.shortestChangeId}</span>}
+          </DropdownMenuItem>
+        )
+      })}
+      {navigation.landmarksQuery.error !== null && (
+        <DropdownMenuItem className="dshx:text-destructive" disabled>
+          {errorMessage(navigation.landmarksQuery.error, 'Landmark reads require the updated Host.')}
+        </DropdownMenuItem>
+      )}
+    </DropdownMenuContent>
+  </DropdownMenu>
 )
 
 interface RelationshipInspectorProps {

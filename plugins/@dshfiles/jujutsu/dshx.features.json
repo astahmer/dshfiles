@@ -22,14 +22,13 @@
         "expect combobox \"Search loaded revisions\""
       ],
       "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"Land\"",
         "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
         "press Enter",
-        "expect button \"Locate Current\"",
+        "expect button \"Locate a landmark\"",
         "click button \"Compare\"",
         "expect region \"Revision comparison\"",
         "click combobox \"Comparison target\"",
@@ -244,8 +243,7 @@
         "expect button \"Full diff\""
       ],
       "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"Land\"",
         "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
@@ -443,8 +441,7 @@
         "expect group \"Confirm new change\""
       ],
       "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"Land\"",
         "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
@@ -557,8 +554,7 @@
         "expect group \"Create workspace at this revision\""
       ],
       "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"Land\"",
         "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
@@ -754,8 +750,7 @@
         "expect text \"0 empty revisions will be abandoned.\""
       ],
       "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"Land\"",
         "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
@@ -893,8 +888,7 @@
         "expect button \"Repository actions\""
       ],
       "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"Land\"",
         "click button \"Source control\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
