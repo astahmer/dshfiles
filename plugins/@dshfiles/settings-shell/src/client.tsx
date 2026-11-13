@@ -41,6 +41,12 @@ import { OpenConfigAction, type ConfigFileOpeners } from './open-config-action.j
 import { CloseLabel, CurrentVersionRow, DeveloperToolsRow, GeneralSection, HeaderContent, TriggerContent } from './native/general-section.js'
 import { HostReleasePrompt } from './native/host-release-prompt.js'
 import { SHELL_LOCALE_NAMESPACE, shellLocale, type ShellTranslate } from './native/locales.js'
+import { ConnectionBanner } from './native/connection-banner.js'
+import { probeHost, ReachabilityModel, type ReachabilityState } from './native/reachability.js'
+import { isMobileDevice } from '@deepseek-ai/dsh-client-ui-primitives'
+
+const REACHABILITY_PROBE_MS = 20_000
+const REACHABILITY_CONFIRM_MS = 5_000
 import { ShellRoot, type OnboardingStep, type ShellRootDeps } from './native/shell-root.js'
 import { SHELL_CHILDREN, type ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
@@ -795,6 +801,53 @@ export default defineClient({
         ),
       )
     }
+
+    // Reachability: probe on resume, on `online`, and every 20 s while a phone page is visible (the socket alone misses a
+    // tunnel that silently drops packets). A probe that finds the Host again after an outage reconnects the stale socket.
+    const reachability = createSnapshotStore<ReachabilityState>(ReachabilityModel.initial)
+    const probeNow = (): void => {
+      if (reachability.getSnapshot().probing) return
+      reachability.set(ReachabilityModel.started(reachability.getSnapshot()))
+      void probeHost().then((reachable) => {
+        const next = ReachabilityModel.settled(reachability.getSnapshot(), reachable)
+        reachability.set(next.state)
+        if (next.recovered) connection.reconnect()
+        // One miss is not an outage yet (a phone just woke); confirm it soon instead of a full interval later.
+        if (!reachable && next.state.probe !== 'unreachable') setTimeout(probeNow, REACHABILITY_CONFIRM_MS)
+      })
+    }
+    ctx.effect(() => {
+      const visible = (): boolean => document.visibilityState === 'visible'
+      const onVisibility = (): void => {
+        if (visible()) probeNow()
+      }
+      const interval = setInterval(() => {
+        if (visible() && (isMobileDevice() || reachability.getSnapshot().probe === 'unreachable')) probeNow()
+      }, REACHABILITY_PROBE_MS)
+      document.addEventListener('visibilitychange', onVisibility)
+      window.addEventListener('online', probeNow)
+      return () => {
+        clearInterval(interval)
+        document.removeEventListener('visibilitychange', onVisibility)
+        window.removeEventListener('online', probeNow)
+      }
+    }, 'dshfiles-settings-shell: host reachability')
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register(
+        { name: 'shell.overlay', id: 'dshfiles-connection-banner', order: 10, locale: SHELL_LOCALE_NAMESPACE },
+        (props: { readonly t: ShellTranslate }) => (
+          <ConnectionBanner
+            t={props.t}
+            reachability={reachability}
+            connectionState={connection.state}
+            retry={() => {
+              probeNow()
+              connection.reconnect()
+            }}
+          />
+        ),
+      ),
+    )
 
     // A page that reconnected to another Host release pauses plugin updates until the user reloads.
     ctx.slots.inject('shell.overlay', () =>

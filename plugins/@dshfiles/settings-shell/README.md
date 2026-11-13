@@ -223,6 +223,15 @@ window.dispatchEvent(
 `dispatchEvent` returns false when the shell took the request, the contract of `dshfiles:open-file`. Settings sections receive `close`, as natively, and `target` when opened at one of their
 search entries.
 
+### Connection banner (phone)
+
+The socket alone misses a tunnel that silently drops packets (Tailscale switched off on the phone): the page keeps
+showing stored threads as if it were live. The shell probes the Host with a HEAD of `/manifest.webmanifest` when the
+page becomes visible, on `online`, and every 20 s while a phone page is visible; a first miss is confirmed 5 s later.
+Two misses, or a disconnected socket, show one slim line under the phone top bar, "Not connected to `<host>`" with
+Retry. A probe that reaches the Host again after an outage reconnects the stale socket. Desktop keeps the sidebar
+connection pill and probes only on resume and `online`.
+
 ## Port
 
 This bundle is a **port** of `@deepseek-ai/dsh-client-ui-settings-general` **0.2.2-rc.2** (MIT, © DeepSeek), the
