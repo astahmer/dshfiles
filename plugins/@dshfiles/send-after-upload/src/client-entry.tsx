@@ -56,6 +56,8 @@ export default defineClient({
         return
       }
       if (event.key !== 'Enter' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return
+      // A touch keyboard's bare return breaks the line (rich-composer marks its editor).
+      if (event.target instanceof Element && event.target.closest('[data-enter-newline]') !== null) return
       requestSend(event, target.sessionId, target.root)
     }
 

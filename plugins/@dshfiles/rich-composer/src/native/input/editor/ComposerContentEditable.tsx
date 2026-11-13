@@ -9,6 +9,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, MutableRefObject, ReactNode } from 'react'
 import type { LexicalEditor } from 'lexical'
+import { hasTouchKeyboard } from './view-binding.ts'
 
 // One shell editor has one physical root. During legacy-view retirement, return
 // that root to its previous mounted host instead of leaving the canonical view
@@ -75,6 +76,8 @@ export function ComposerContentEditable({ editor, editable, elementRef, ...rest 
       // A touch keyboard's return key breaks the line there (keymap `enterBreaksLine`): label it so.
       enterKeyHint="enter"
       data-composer-input
+      // Capture-phase Enter interceptors in other plugins (jj-integration, send-after-upload) leave a bare return here.
+      data-enter-newline={hasTouchKeyboard() ? '' : undefined}
       {...rest}
     />
   )

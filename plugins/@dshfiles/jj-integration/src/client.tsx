@@ -1103,6 +1103,8 @@ export default defineClient({
       }
       if (event.key !== 'Enter' || event.shiftKey || event.altKey || event.isComposing) return
       if (target.root.querySelector('[role="listbox"]') !== null) return
+      // A touch keyboard's bare return breaks the line (rich-composer marks its editor); only Ctrl/Cmd+Enter sends there.
+      if (!event.ctrlKey && !event.metaKey && event.target instanceof Element && event.target.closest('[data-enter-newline]') !== null) return
       deferSubmit(event, target.sessionId, 'enter')
     }
     const onSubmitClick = (event: MouseEvent): void => {
