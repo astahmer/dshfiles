@@ -106,7 +106,11 @@ const run = (argv, options = {}) => {
   return { status: result.status ?? 1, stdout: result.stdout ?? '', stderr: result.stderr ?? '' }
 }
 
+const DARWIN = process.platform === 'darwin'
+
 const supportsClone = () => {
+  // GNU cp reads -c as --preserve=context (SELinux), not a clone: Linux copies with --reflink=auto instead.
+  if (!DARWIN) return false
   const probe = join(process.env.TMPDIR ?? '/tmp', `dsh-lkg-clone-${randomUUID()}`)
   try {
     mkdirSync(probe)
@@ -123,21 +127,43 @@ const supportsClone = () => {
 /** Copy a tree, preferring APFS clones and preserving symlinks. */
 const cloneTree = (from, to, { dereference = false } = {}) => {
   mkdirSync(dirname(to), { recursive: true })
-  const flags = ['-R', ...(dereference ? ['-L'] : []), ...(supportsClone() ? ['-c'] : [])]
+  const flags = ['-R', ...(dereference ? ['-L'] : []), ...(supportsClone() ? ['-c'] : []), ...(DARWIN ? [] : ['--reflink=auto'])]
   const copied = run(['cp', ...flags, from, to])
   if (copied.status !== 0) fail(`could not copy ${from}: ${copied.stderr.trim() || copied.status}`)
 }
 
+/**
+ * Freeze a promoted payload. macOS sets the user-immutable flag; Linux has no unprivileged equivalent (`chattr +i`
+ * needs root), so it removes every write bit: weaker, but a stray write still fails.
+ */
 const frozen = path => {
-  const result = run(['chflags', '-R', 'uchg', path])
+  if (!existsSync(path)) return false
+  const result = DARWIN ? run(['chflags', '-R', 'uchg', path]) : run(['chmod', '-R', 'a-w', path])
   return result.status === 0
 }
 
 const thawed = path => {
-  run(['chflags', '-R', 'nouchg', path])
+  if (!existsSync(path) && !isSymlink(path)) return
+  if (DARWIN) run(['chflags', '-R', 'nouchg', path])
+  else run(['chmod', '-R', 'u+w', path])
 }
 
-const isFrozen = path => run(['ls', '-lO', path]).stdout.includes('uchg')
+const isSymlink = path => {
+  try {
+    return lstatSync(path).isSymbolicLink()
+  } catch {
+    return false
+  }
+}
+
+const isFrozen = path => {
+  if (DARWIN) return run(['ls', '-lO', path]).stdout.includes('uchg')
+  try {
+    return (statSync(path).mode & 0o222) === 0
+  } catch {
+    return false
+  }
+}
 
 const readJson = path => {
   try {

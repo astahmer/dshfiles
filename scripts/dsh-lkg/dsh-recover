@@ -58,7 +58,7 @@ LIVE_HOME="${DSH_LKG_LIVE_HOME:-$HOME/.dsh}"
 # work done during a recovery survives the next start.
 rm -rf "$HOME_DIR.prev"
 if [ -d "$HOME_DIR" ]; then
-  chflags -R nouchg "$HOME_DIR" 2>/dev/null || true
+  chflags -R nouchg "$HOME_DIR" 2>/dev/null || chmod -R u+w "$HOME_DIR" 2>/dev/null || true
   mv "$HOME_DIR" "$HOME_DIR.prev"
 fi
 mkdir -p "$HOME_DIR/profiles"
@@ -77,12 +77,14 @@ fi
 # from must be writable, or the Host cannot maintain its own profile. `cp -R`
 # carries uchg over and then fails to set times on the locked copies, so copy
 # without flags through the system bsdtar: a dev shell may put GNU tar first, and
-# GNU tar has no --no-fflags. Linux has no uchg, so a plain copy is enough there.
+# GNU tar has no --no-fflags. On Linux the snapshot is frozen by removing write bits instead, which a copy keeps:
+# give the copy back its owner's write bit.
 mkdir "$HOME_DIR/profiles/web"
 if [ "$(uname -s)" = Darwin ]; then
   /usr/bin/tar -cf - -C "$VERSION/profile" . | /usr/bin/tar -xf - --no-fflags -C "$HOME_DIR/profiles/web"
 else
   cp -R "$VERSION/profile/." "$HOME_DIR/profiles/web"
+  chmod -R u+w "$HOME_DIR/profiles/web"
 fi
 
 echo "dsh-recover: last known good $(basename "$VERSION")"

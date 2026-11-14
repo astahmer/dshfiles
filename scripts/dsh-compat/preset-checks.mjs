@@ -167,7 +167,11 @@ const probeComposer = async (page, { origin, sessionId, rpc, workspace, submit =
       () => undefined,
     )
     const composer = page.getByRole('textbox', { name: COMPOSER }).filter({ visible: true }).first()
-    const needsWorkspace = page.getByRole('textbox', { name: 'Choose workspace', exact: true }).filter({ visible: true }).first()
+    // Stock DSH names the workspace-less composer "Choose workspace"; dshfiles' rich composer "Choose project".
+    const needsWorkspace = page
+      .locator('[role="textbox"][aria-label="Choose workspace"], [role="textbox"][aria-label="Choose project"]')
+      .filter({ visible: true })
+      .first()
     await composer.or(needsWorkspace).first().waitFor({ state: 'visible', timeout: timeoutMs })
     let target = sessionId
     if (sessionId !== undefined) {
@@ -178,11 +182,21 @@ const probeComposer = async (page, { origin, sessionId, rpc, workspace, submit =
         .catch(() => null)
       if (shown !== sessionId) target = undefined
     }
-    if (target === undefined && (await needsWorkspace.isVisible())) {
+    // Even an opened thread can ask for one: a thread created outside any registered project.
+    if (await needsWorkspace.isVisible()) {
       if (workspace === undefined) return { name, ok: false, detail: 'the new-thread composer asks for a workspace and none was given' }
-      await page.getByRole('button', { name: 'Choose workspace' }).filter({ visible: true }).first().click()
+      const rich = (await needsWorkspace.getAttribute('aria-label')) === 'Choose project'
+      await page
+        .getByRole('button', { name: rich ? 'Choose project' : 'Choose workspace', exact: true })
+        .filter({ visible: true })
+        .first()
+        .click()
       const picker = page.getByRole('dialog')
-      if (workspace.startsWith('/')) {
+      if (rich) {
+        // The rich composer's picker always offers "No folder" (~/.dsh/no-folder): enough to prove the composer, and it
+        // needs no registered project in the throwaway state.
+        await page.getByText('No folder', { exact: true }).filter({ visible: true }).first().click()
+      } else if (workspace.startsWith('/')) {
         // An absolute path goes through the picker's own path field; Open then opens that folder.
         await picker.getByRole('button', { name: 'Edit path', exact: true }).click()
         const path = picker.getByRole('textbox', { name: 'Edit path', exact: true })
@@ -195,7 +209,7 @@ const probeComposer = async (page, { origin, sessionId, rpc, workspace, submit =
       } else {
         await picker.getByRole('button', { name: workspace, exact: true }).click()
       }
-      await picker.getByRole('button', { name: 'Open', exact: true }).click()
+      if (!rich) await picker.getByRole('button', { name: 'Open', exact: true }).click()
       await composer.waitFor({ state: 'visible', timeout: timeoutMs })
     }
     if (!(await composer.isEditable())) return { name, ok: false, detail: 'the composer is not editable' }
@@ -226,7 +240,10 @@ const probeComposer = async (page, { origin, sessionId, rpc, workspace, submit =
     }
     return { name, ok: false, detail: `the Host never recorded the message sent from ${where}` }
   } catch (error) {
-    return { name, ok: false, detail: String(error).replace(/\s+/g, ' ').slice(0, 400) }
+    // Keep what the page showed: a timeout alone does not say which overlay or route was in the way.
+    const shot = process.env.DSH_LKG_EVIDENCE?.trim() ? `${process.env.DSH_LKG_EVIDENCE.trim()}/composer-failure.png` : undefined
+    if (shot !== undefined) await page.screenshot({ path: shot, fullPage: true }).catch(() => undefined)
+    return { name, ok: false, detail: `${String(error).replace(/\s+/g, ' ').slice(0, 400)}${shot === undefined ? '' : ` (screenshot: ${shot})`}` }
   }
 }
 
