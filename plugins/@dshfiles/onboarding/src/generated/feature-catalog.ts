@@ -12491,7 +12491,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "fff-search",
       "id": "resident-grep-glob",
       "title": "Answer agent grep and glob from a resident fff index",
-      "summary": "On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a worker thread.",
+      "summary": "On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a child process DSH's subprocess service starts on the first search.",
       "destination": "none",
       "currentSurface": "agent tool: grep / glob",
       "reach": [],
@@ -14666,17 +14666,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"More\"",
+          "text": "click button \"Land\"",
           "action": "click",
           "by": "button",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
-          "action": "click",
-          "by": "button",
-          "name": "Land Workspaces ready to land, and repository history.",
+          "name": "Land",
           "value": null
         },
         {
@@ -14715,10 +14708,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "expect button \"Locate Current\"",
+          "text": "expect button \"Locate a landmark\"",
           "action": "expect",
           "by": "button",
-          "name": "Locate Current",
+          "name": "Locate a landmark",
           "value": null
         },
         {
@@ -14997,17 +14990,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"More\"",
+          "text": "click button \"Land\"",
           "action": "click",
           "by": "button",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
-          "action": "click",
-          "by": "button",
-          "name": "Land Workspaces ready to land, and repository history.",
+          "name": "Land",
           "value": null
         },
         {
@@ -15197,17 +15183,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"More\"",
+          "text": "click button \"Land\"",
           "action": "click",
           "by": "button",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
-          "action": "click",
-          "by": "button",
-          "name": "Land Workspaces ready to land, and repository history.",
+          "name": "Land",
           "value": null
         },
         {
@@ -15434,17 +15413,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"More\"",
+          "text": "click button \"Land\"",
           "action": "click",
           "by": "button",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
-          "action": "click",
-          "by": "button",
-          "name": "Land Workspaces ready to land, and repository history.",
+          "name": "Land",
           "value": null
         },
         {
@@ -15755,17 +15727,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"More\"",
+          "text": "click button \"Land\"",
           "action": "click",
           "by": "button",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
-          "action": "click",
-          "by": "button",
-          "name": "Land Workspaces ready to land, and repository history.",
+          "name": "Land",
           "value": null
         },
         {
@@ -16013,17 +15978,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"More\"",
+          "text": "click button \"Land\"",
           "action": "click",
           "by": "button",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
-          "action": "click",
-          "by": "button",
-          "name": "Land Workspaces ready to land, and repository history.",
+          "name": "Land",
           "value": null
         },
         {

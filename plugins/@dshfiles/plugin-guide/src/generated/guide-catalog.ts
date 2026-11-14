@@ -1261,7 +1261,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "key": "module:@dshfiles/fff-search/fff-worker",
       "kind": "module",
       "title": "@dshfiles/fff-search/fff-worker",
-      "summary": "Worker half of fff-search. fff-node's queries are synchronous FFI calls that take from milliseconds to seconds, so every index lives here and the Host's event loop only posts messages.",
+      "summary": "The fff index process. fff-node's queries are synchronous FFI calls that take from milliseconds to seconds, and its native library runs threads of its own that crash the whole process when a worker thread holding it is torn down (any terminate or exit of such a worker segfaulted the Host on every restart). So every in…",
       "publicSymbol": "(side-effect module)",
       "importFrom": "@dshfiles/fff-search/fff-worker",
       "owner": "@dshfiles/fff-search",
