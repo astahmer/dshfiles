@@ -346,6 +346,8 @@ Only public status links already present on the item are accepted. Private, dele
 
 ## Starting a thread from an item
 
+![Choose where a thread from an item works](docs/screenshots/start-thread-workspace-choice.png)
+
 Right-click a feed entry, an Items row or a board card (or press **Start thread** in the peek header) to open
 the start-thread dialog. It prefills the item's own project when that path is a registered project, offers the
 other projects plus a bare folder for a project path the registry does not know, and lists every routable
