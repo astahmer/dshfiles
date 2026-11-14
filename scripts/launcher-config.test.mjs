@@ -113,7 +113,7 @@ test('without a configured nodeBinary the Host runs on the fnm build of the chec
   writeFileSync(node, '')
   const config = LauncherConfig.load(env)
   assert.equal(config.nodeBinary, node)
-  assert.equal(LauncherConfig.environment(config, env).PATH, `${dirname(node)}:/usr/bin`)
+  assert.equal(LauncherConfig.environment(config, env).PATH, `${join(f.home, '.cache/dshfiles/corepack-bin')}:${dirname(node)}:/usr/bin`)
   // FNM_DIR wins, and an explicit choice is never replaced.
   const custom = join(f.home, 'fnm-custom/node-versions/v24.11.1/installation/bin/node')
   mkdirSync(dirname(custom), { recursive: true })
@@ -122,4 +122,19 @@ test('without a configured nodeBinary the Host runs on the fnm build of the chec
   assert.equal(LauncherConfig.load({ ...env, DSHFILES_NODE_BINARY: '/opt/node/bin/node' }).nodeBinary, '/opt/node/bin/node')
   writeFileSync(f.file, JSON.stringify({ path: '/explicit/bin' }))
   assert.equal(LauncherConfig.environment(LauncherConfig.load(env), env).PATH, '/explicit/bin')
+})
+
+test('preparation runs the pnpm on PATH, falls back to corepack, and refuses with neither', t => {
+  const f = fixture(t)
+  const nodeDir = join(f.home, 'node/bin')
+  const pathDir = join(f.home, 'path-bin')
+  mkdirSync(nodeDir, { recursive: true })
+  mkdirSync(pathDir, { recursive: true })
+  const config = { nodeBinary: join(nodeDir, 'node') }
+  assert.throws(() => LauncherConfig.pnpm(config, { PATH: pathDir }), /No pnpm: install it/)
+  writeFileSync(join(nodeDir, 'corepack'), '')
+  const fallback = LauncherConfig.pnpm(config, { PATH: pathDir })
+  assert.deepEqual([fallback.command, fallback.prefix, fallback.shim], [join(nodeDir, 'corepack'), ['pnpm'], join(nodeDir, 'corepack')])
+  writeFileSync(join(pathDir, 'pnpm'), '')
+  assert.deepEqual(LauncherConfig.pnpm(config, { PATH: pathDir }), { command: join(pathDir, 'pnpm'), prefix: [], env: {} })
 })

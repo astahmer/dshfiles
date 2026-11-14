@@ -2,6 +2,7 @@
 // Keep its confirmed-request protocol; local differences are documented in supervise-dsh.UPSTREAM.md.
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { mkdirSync } from 'node:fs'
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { constants } from 'node:os'
 import { LauncherConfig } from './launcher-config.mjs'
@@ -137,7 +138,11 @@ async function main() {
   const home = config.dshHome
   const core = LauncherConfig.requireCoreEntry(config)
   const pnpm = LauncherConfig.pnpm(config)
+  const shims = LauncherConfig.pnpmShimDirectory()
+  if (pnpm.shim !== undefined) mkdirSync(shims, { recursive: true })
   const fullPreparation = [
+    // Corepack fallback only: put its pnpm shim on PATH for tools that look pnpm up themselves (turbo).
+    ...(pnpm.shim === undefined ? [] : [{ command: pnpm.shim, args: ['enable', '--install-directory', shims, 'pnpm'] }]),
     { command: pnpm.command, env: pnpm.env, args: [...pnpm.prefix, '--dir', root, 'install', '--frozen-lockfile', '--prefer-offline'] },
     {
       command: pnpm.command,

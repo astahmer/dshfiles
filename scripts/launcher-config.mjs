@@ -109,12 +109,27 @@ export class LauncherConfig {
     return roots.map(root => join(root, 'node-versions', `v${version}`, 'installation', 'bin', 'node')).find(candidate => existsSync(candidate))
   }
 
-  /** The pnpm the checkout pins (packageManager), through the Host Node's own corepack; else the pnpm on PATH. */
-  static pnpm(config) {
+  /**
+   * How preparation runs pnpm. A pnpm on PATH comes first: pnpm 10+ switches itself to the checkout's `packageManager`
+   * version. Corepack is only a fallback, because Node stops bundling it from v25. `shim` is set when turbo, which
+   * looks `pnpm` up on PATH itself, needs corepack's shim installed first (2026-11: "Unable to find package manager
+   * binary" on an fnm Node without `corepack enable`).
+   */
+  static pnpm(config, env = process.env) {
+    const onPath = (env.PATH ?? '')
+      .split(delimiter)
+      .filter(Boolean)
+      .map(directory => join(directory, 'pnpm'))
+      .find(candidate => existsSync(candidate))
+    if (onPath !== undefined) return { command: onPath, prefix: [], env: {} }
     const corepack = join(dirname(config.nodeBinary), 'corepack')
-    return existsSync(corepack)
-      ? { command: corepack, prefix: ['pnpm'], env: { COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' } }
-      : { command: 'pnpm', prefix: [], env: {} }
+    if (existsSync(corepack)) return { command: corepack, prefix: ['pnpm'], env: { COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' }, shim: corepack }
+    throw new Error(`No pnpm: install it (https://pnpm.io/installation) so \`pnpm\` is on PATH; the checkout pins its version. Nothing started`)
+  }
+
+  /** Where the corepack fallback installs its `pnpm` shim; the launcher puts it first on PATH. */
+  static pnpmShimDirectory(env = process.env) {
+    return join(env.XDG_CACHE_HOME || join(env.HOME || homedir(), '.cache'), 'dshfiles', 'corepack-bin')
   }
 
   static environment(config, env = process.env) {
@@ -127,7 +142,8 @@ export class LauncherConfig {
     }
     // Preparation runs `pnpm` and `node` from PATH: put the Host's Node first so they match it.
     if (config.path !== undefined) result.PATH = config.path
-    else if (config.nodeBinary !== undefined) result.PATH = [dirname(config.nodeBinary), result.PATH].filter(Boolean).join(delimiter)
+    else if (config.nodeBinary !== undefined)
+      result.PATH = [LauncherConfig.pnpmShimDirectory(result), dirname(config.nodeBinary), result.PATH].filter(Boolean).join(delimiter)
     if (config.nodePath !== undefined) result.NODE_PATH = config.nodePath
     // Reusing compiled modules across Host starts halves boot (5-6 s to about 2.5 s measured with the web profile).
     if (result.NODE_COMPILE_CACHE === undefined || result.NODE_COMPILE_CACHE === '')
