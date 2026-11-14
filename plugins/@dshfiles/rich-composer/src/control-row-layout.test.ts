@@ -89,3 +89,52 @@ describe('an item on a line of its own (b:4qjm)', () => {
     stop()
   })
 })
+
+describe('a resize the collapse caused itself', () => {
+  const observeWithResizes = (row: HTMLElement) => {
+    const callbacks: (() => void)[] = []
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          callbacks.push(callback)
+        }
+        observe(): void {}
+        disconnect(): void {}
+      },
+    )
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0)
+      return 1
+    })
+    vi.stubGlobal('cancelAnimationFrame', () => undefined)
+    const stop = observeControlRow(row)
+    return { resized: () => callbacks.forEach(callback => callback()), stop }
+  }
+
+  it('keeps the collapsed controls instead of expanding and collapsing them again, which shook the composer', () => {
+    const row = rowOf({ available: 260, expanded: [28, 90, 28, 140, 32], compact: [28, 28, 28, 90, 32], icon: [28, 28, 28, 28, 32] })
+    const { resized, stop } = observeWithResizes(row)
+    expect(row.hasAttribute('data-model-compact')).toBe(true)
+    const removed = vi.spyOn(row, 'removeAttribute')
+    // The collapse changed a wrapping row's height, so the observer reports the row: nothing it measures has changed.
+    resized()
+    resized()
+    expect(removed).not.toHaveBeenCalled()
+    expect(row.hasAttribute('data-model-compact')).toBe(true)
+    stop()
+  })
+
+  it('still measures again when the row really changes width', () => {
+    const row = rowOf({ available: 260, expanded: [28, 90, 28, 140, 32], compact: [28, 28, 28, 90, 32], icon: [28, 28, 28, 28, 32] })
+    const { resized, stop } = observeWithResizes(row)
+    expect(row.hasAttribute('data-model-compact')).toBe(true)
+    row.getBoundingClientRect = () => new DOMRect(0, 0, 600, 0)
+    resized()
+    expect(row.hasAttribute('data-model-compact')).toBe(false)
+    row.getBoundingClientRect = () => new DOMRect(0, 0, 170, 0)
+    resized()
+    expect(row.hasAttribute('data-model-icon')).toBe(true)
+    stop()
+  })
+})

@@ -33,24 +33,33 @@ export function observeControlRow(row: HTMLElement, options: { readonly iconStep
       + Math.max(0, widths.length - 1) * parseFloat(style.columnGap)
     return needed > available
   }
+  // Ignore notifications caused by our own collapse. Re-expanding unchanged controls can
+  // change a wrapping row's height again and feed its ResizeObserver indefinitely.
+  const widths = (): number[] => [row.getBoundingClientRect().width, ...flowItems(row).map(item => item.getBoundingClientRect().width)]
+  let measured: number[] = []
   const measure = (): void => {
     // Always measure expanded demand, including text changed while collapsed.
     row.removeAttribute('data-model-compact')
     row.removeAttribute('data-model-icon')
-    if (!overflows()) return
+    if (!overflows()) {
+      measured = widths()
+      return
+    }
     // First step: labels beside icons go (the effort, the mode chip's words).
     row.setAttribute('data-model-compact', '')
     // Second step (composer follow-up b:gyk7): a bar that still overflows, such as a docked pane under ~220px, shows
     // the model as an icon too (its name stays in the accessible name and tooltip) instead of running past Send.
     // The new-thread bar has room below: it wraps instead (its words are choices to read before the first message).
     row.toggleAttribute('data-model-icon', (options.iconStep?.() ?? true) && overflows())
+    measured = widths()
   }
   let frame: number | undefined
   const resize = new ResizeObserver(() => {
     if (frame !== undefined) cancelAnimationFrame(frame)
     frame = requestAnimationFrame(() => {
       frame = undefined
-      measure()
+      const current = widths()
+      if (current.length !== measured.length || current.some((width, index) => width !== measured[index])) measure()
     })
   })
   resize.observe(row)
