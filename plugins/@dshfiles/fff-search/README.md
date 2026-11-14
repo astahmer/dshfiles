@@ -23,9 +23,15 @@ their next start.
 ## Behavior
 
 - fff-node queries are synchronous FFI calls, so every index lives in one
-  worker thread (`dist/fff-worker.js`); the Host only posts messages and never
-  blocks on a search. A crashed worker fails its pending calls and the next
-  search starts a fresh one.
+  child process (`dist/fff-worker.js`) that DSH's subprocess service starts on
+  the first search, in the same managed range as any other command. The Host
+  talks to it with `effect/rpc` over the process's private control pipe and
+  never blocks on a search. It is a process, not a worker thread, because fff's
+  native threads segfaulted the whole Host whenever a worker thread holding them
+  was torn down (every restart). A crashed index process fails its pending calls
+  and the next search starts a fresh one. Closing the plugin closes the pipe,
+  which asks the process to exit; DSH terminates it if it is still there 5 s
+  later. A Host that dies closes the pipe too, so the process never outlives it.
 - One index per search root, built when an Agent starts (so the first search is
   usually warm) and dropped after 30 minutes without a search. Every jj thread
   workspace is its own root. A search that arrives before the content index is

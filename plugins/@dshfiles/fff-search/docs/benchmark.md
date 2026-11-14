@@ -87,7 +87,7 @@ fff's first call pays the index build (4–8 s here).
   native tools cuts search time per session from 5.5 s to 0.3–0.7 s.
 - **The plugin matches the MCP once warm.** v1 (fff on the Host thread, every
   pattern wrapped in a regex group) measured 0.9 s per call. v3 moved the index
-  into a worker thread, sends plain literals in fff's plain mode, wraps only
+  into a separate index process (a worker thread until 2026-11-14), sends plain literals in fff's plain mode, wraps only
   constraint-shaped patterns and makes `glob` wait only for the file scan. A
   fresh index still costs 5–15 s before the first content search; the plugin
   warms it when an Agent starts. Rep 0 of v2 ran against a cold index and was

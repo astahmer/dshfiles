@@ -41,23 +41,6 @@ export class FffSearch {
     totalIsLowerBound: Schema.Boolean,
   })
   static readonly globOutcome = Schema.Struct({ paths: Schema.Array(Schema.String), total: Schema.Number })
-  /** Host → worker. `warm` builds a root's index ahead of the first search. */
-  static readonly workerRequest = Schema.Union([
-    Schema.Struct({ id: Schema.Number, kind: Schema.Literal('warm'), root: Schema.String }),
-    Schema.Struct({
-      id: Schema.Number,
-      kind: Schema.Literal('grep'),
-      scope: FffSearch.searchScope,
-      pattern: Schema.String,
-      include: Schema.optionalKey(Schema.String),
-      workingDirectory: Schema.String,
-    }),
-    Schema.Struct({ id: Schema.Number, kind: Schema.Literal('glob'), scope: FffSearch.searchScope, pattern: Schema.String, workingDirectory: Schema.String }),
-  ])
-  static readonly workerReply = Schema.Union([
-    Schema.Struct({ id: Schema.Number, ok: Schema.Literal(true), value: Schema.Unknown }),
-    Schema.Struct({ id: Schema.Number, ok: Schema.Literal(false), error: Schema.String }),
-  ])
 
   /** Resolve the tool's optional `path` to the absolute target the Host stats, expanding `~` as the model means it. */
   static target(options: { workingDirectory: string; path: string | undefined; homeDirectory?: string }): string {

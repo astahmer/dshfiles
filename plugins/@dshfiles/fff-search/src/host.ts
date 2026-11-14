@@ -12,8 +12,6 @@ import { FffIndexWorker } from './fff-index-worker-promise.js'
 import { FffSearch, FffSearchError } from './fff-search.js'
 import { WorkingDirectories } from './working-directory-promise.js'
 
-const decodeGrepOutcome = Schema.decodeUnknownEffect(FffSearch.grepOutcome)
-const decodeGlobOutcome = Schema.decodeUnknownEffect(FffSearch.globOutcome)
 const isFffSearchError = Schema.is(FffSearchError)
 
 const pathDescription = (what: string) => `${what} Defaults to the session workspace; a relative path resolves against it.`
@@ -57,14 +55,13 @@ const grepTool = Tool.make({
   execute: (input, call) =>
     Effect.gen(function* () {
       const { workingDirectory, scope } = yield* searchScope(call, 'grep', input.path)
-      const reply = yield* FffIndexWorker.use(worker =>
-        worker.ask(
+      return yield* FffIndexWorker.use(worker =>
+        worker.grep(
           input.include === undefined
-            ? { kind: 'grep', scope, pattern: input.pattern, workingDirectory }
-            : { kind: 'grep', scope, pattern: input.pattern, include: input.include, workingDirectory },
+            ? { scope, pattern: input.pattern, workingDirectory }
+            : { scope, pattern: input.pattern, include: input.include, workingDirectory },
         ),
       )
-      return yield* decodeGrepOutcome(reply).pipe(Effect.orDie)
     }),
 })
 
@@ -78,8 +75,7 @@ const globTool = Tool.make({
   execute: (input, call) =>
     Effect.gen(function* () {
       const { workingDirectory, scope } = yield* searchScope(call, 'glob', input.path)
-      const reply = yield* FffIndexWorker.use(worker => worker.ask({ kind: 'glob', scope, pattern: input.pattern, workingDirectory }))
-      return yield* decodeGlobOutcome(reply).pipe(Effect.orDie)
+      return yield* FffIndexWorker.use(worker => worker.glob({ scope, pattern: input.pattern, workingDirectory }))
     }),
 })
 
@@ -98,7 +94,7 @@ const agentTools = Layer.effectDiscard(
           yield* Tool.register(grepTool, { tools: agent.ctx.tools })
           yield* Tool.register(globTool, { tools: agent.ctx.tools })
           const root = yield* WorkingDirectories.use(directories => directories.ensure(agent))
-          yield* FffIndexWorker.use(worker => worker.ask({ kind: 'warm', root }))
+          yield* FffIndexWorker.use(worker => worker.warm(root))
         }).pipe(
           Effect.catch(error => Effect.logWarning('fff-search: index warm-up failed', error)),
           Effect.andThen(Effect.never),

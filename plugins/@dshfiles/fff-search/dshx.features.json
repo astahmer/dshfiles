@@ -5,7 +5,7 @@
     {
       "id": "resident-grep-glob",
       "title": "Answer agent grep and glob from a resident fff index",
-      "summary": "On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a worker thread.",
+      "summary": "On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a child process DSH's subprocess service starts on the first search.",
       "surfaces": ["host", "tool"],
       "surface": "agentToolOnly",
       "destination": "none",
@@ -16,11 +16,17 @@
         "An invalid regular expression is an error, not a literal search.",
         "A path that does not exist is answered as path does not exist: <path>, not by indexing it.",
         "A path outside the workspace that contains it is refused instead of indexing every checkout under it.",
-        "A crashed worker fails its pending calls and the next search starts a fresh one.",
+        "A crashed index process fails its pending calls and the next search starts a fresh one; it never takes the Host down with it.",
         "Agents created before the bundle loaded keep the stock tools until their next start."
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "unit-test",
+          "id": "fff-search.index-process-teardown",
+          "file": "plugins/@dshfiles/fff-search/tests/host.test.ts",
+          "testName": "closing the Host stops the index process and leaves the Host running"
+        },
         {
           "kind": "unit-test",
           "id": "fff-search.grep-matches",

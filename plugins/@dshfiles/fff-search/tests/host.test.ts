@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
@@ -8,6 +9,8 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import type { SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
+import { LocalSubprocessRuntime } from '@deepseek-ai/dsh-subprocess-local'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import WorkingDirectoryService from '@deepseek-ai/dsh-working-directory'
 import { createTestHost } from '@dshfiles/dshx/testing'
@@ -16,6 +19,15 @@ import { Effect } from 'effect'
 
 // The worker is a second bundle entry, so the Host half is exercised as it ships: `pnpm test` runs after the build.
 const builtHost = new URL('../dist/index.js', import.meta.url)
+
+/** The stock subprocess service, recording every spawn request it serves. */
+const spawned: SubprocessSpawnSpec[] = []
+class RecordingSubprocess extends LocalSubprocessRuntime {
+  override spawn(spec: SubprocessSpawnSpec) {
+    spawned.push(spec)
+    return super.spawn(spec)
+  }
+}
 
 /** A real Host with one Agent rooted in a temporary workspace, the built plugin mounted, and DSH_HOME isolated. */
 const mountedSearch = Effect.gen(function* () {
@@ -45,6 +57,7 @@ const mountedSearch = Effect.gen(function* () {
       const created = await createTestHost()
       await created.ctx.plugin(SessionStore)
       await created.ctx.plugin(SessionProjectionRegistry)
+      await created.ctx.plugin(RecordingSubprocess)
       await created.ctx.plugin(LocalFileSystem, { cwd: root })
       await created.ctx.plugin(WorkingDirectoryService)
       await created.ctx.plugin(LlmRuntime)
@@ -61,19 +74,23 @@ const mountedSearch = Effect.gen(function* () {
   )
   const run = (name: 'grep' | 'glob', args: { readonly pattern: string; readonly path?: string }) =>
     Effect.promise(() => host.runTool({ name, arguments: args, signal: AbortSignal.timeout(60_000), agent: handle.agent }))
-  return { run, workspace }
+  return { run, workspace, root }
 })
+
+/** The fff index processes serving this test's isolated home; DSH's runner, not this process, is their parent. */
+const indexProcesses = (root: string): readonly string[] =>
+  execFileSync('ps', ['-e', '-ww', '-o', 'args='], { encoding: 'utf8' })
+    .split('\n')
+    .filter(line => line.includes('fff-worker.js') && line.includes(root))
 
 const textOf = (content: readonly { readonly type: string; readonly text?: string }[]) => content.map(block => block.text ?? '').join('\n')
 
 /**
- * This suite mounts a real Host and executes grep/glob, which spawns the native index worker inside the test runner's
- * child process. On the CI Linux runner that child exits mid-run ("Worker exited unexpectedly") while the unit file and
- * the plugin's own boot gate pass, so the mount is skipped there and tracked separately; locally it still runs.
+ * This suite mounts a real Host and executes grep/glob, which forks the native index process. It used to be skipped on
+ * CI, where the test runner's child exited mid-run ("Worker exited unexpectedly"): that was the index worker thread's
+ * teardown segfaulting the whole process, which the index process now avoids.
  */
-const inCi = !['', '0', 'false'].includes(process.env.CI ?? '')
-
-describe.skipIf(!existsSync(builtHost) || inCi)('fff-search Host', () => {
+describe.skipIf(!existsSync(builtHost))('fff-search Host', () => {
   it.effect('serves grep and glob as Agent-scoped tools over the resident index', () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -84,6 +101,35 @@ describe.skipIf(!existsSync(builtHost) || inCi)('fff-search Host', () => {
 
         const glob = yield* search.run('glob', { pattern: '*.md' })
         expect(textOf(glob.content)).toBe('Found 1 files\nnotes.md')
+      }),
+    ),
+  )
+
+  // Tearing down a worker thread that held fff's native library segfaulted the whole process on every Host restart.
+  it.live.skipIf(process.platform !== 'linux')('closing the Host stops the index process and leaves the Host running', () =>
+    Effect.gen(function* () {
+      let root = ''
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const search = yield* mountedSearch
+          root = search.root
+          expect((yield* search.run('glob', { pattern: '*.md' })).isError).toBe(false)
+          expect(indexProcesses(root)).toHaveLength(1)
+        }),
+      )
+      expect(indexProcesses(root)).toEqual([])
+    }),
+  )
+
+  it.effect('starts the index process through the subprocess service with a control pipe', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        spawned.length = 0
+        const search = yield* mountedSearch
+        expect((yield* search.run('glob', { pattern: '*.md' })).isError).toBe(false)
+        const index = spawned.filter(spec => spec.argv.some(argument => argument.endsWith('fff-worker.js')))
+        expect(index).toHaveLength(1)
+        expect(index[0]?.stdio.control).toBe('pipe')
       }),
     ),
   )

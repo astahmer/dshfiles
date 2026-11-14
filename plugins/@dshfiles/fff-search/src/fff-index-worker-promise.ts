@@ -1,108 +1,121 @@
-import { Worker } from 'node:worker_threads'
+import { fileURLToPath } from 'node:url'
+import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
-import { HostContext } from '@dshfiles/dshx/effect'
-import { Context, Deferred, Duration, Effect, Layer, MutableRef, Option, Ref, Schema } from 'effect'
+import { hostService } from '@dshfiles/dshx/effect'
+import * as NodeSocket from '@effect/platform-node/NodeSocket'
+import { Context, Duration, Effect, Layer, RcRef, Schedule, Schema } from 'effect'
+import { Socket } from 'effect/socket'
+import { RpcClient, RpcSerialization, type RpcClientError } from 'effect/rpc'
+import { fffIndexConfig, FffIndexRpcs, type GlobRequest, type GrepRequest } from './fff-index-protocol.js'
 import { FffSearch, FffSearchError } from './fff-search.js'
 
 /** Matches the stock grep's cooperative timeout; a request still pending then is failed, not left hanging. */
 const REQUEST_TIMEOUT = Duration.seconds(30)
+/** How long a closing index process gets to exit on its own before DSH terminates its range. */
+const EXIT_GRACE = Duration.seconds(5)
+/** DSH's own TERM-to-KILL grace once it terminates the range. */
+const TERMINATE_GRACE_MS = 2_000
+/**
+ * fff queries are synchronous in the index process, so a long one delays its pong: probe rarely. A crash closes the
+ * control pipe, which fails pending calls at once without waiting for a ping.
+ */
+const PING_INTERVAL = Duration.minutes(1)
 
-type WorkerRequest = typeof FffSearch.workerRequest.Encoded
-type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never
-export type FffRequest = DistributiveOmit<WorkerRequest, 'id'>
-
-const decodeReply = Schema.decodeUnknownOption(FffSearch.workerReply)
-
-/** The worker script the Host spawns; built beside the Host bundle as `dist/fff-worker.js`. */
+/** The index process entry; built beside the Host bundle as `dist/fff-worker.js`. */
 export const FffWorkerEntry = Context.Reference<URL>('@dshfiles/fff-search/FffWorkerEntry', {
   defaultValue: () => new URL('./fff-worker.js', import.meta.url),
 })
 
+type Call<A> = Effect.Effect<A, FffSearchError>
+
+const spawnFailure = (cause: unknown) => new FffSearchError({ reason: 'fff-search could not start its index process; reload the plugin and retry.', cause })
+
+const transportFailure = (error: RpcClientError.RpcClientError) =>
+  new FffSearchError({ reason: `fff-search's index process failed: ${error.message}. The next search starts a new one.`, cause: error })
+
+/** The spawn request: Node on the index entry, with the RPC on the inherited control pipe and stdio left to the Host. */
+const indexSpec = Effect.gen(function* () {
+  const entry = fileURLToPath(yield* FffWorkerEntry)
+  // Read at each start: the DSH home is an environment fact, not a constant of this module.
+  const config = Schema.encodeSync(fffIndexConfig)({ stateRoot: dshHomePath('plugins', 'fff-search') })
+  return {
+    // The process only shuttles queries to the native index; a small heap keeps a runaway from growing large.
+    argv: [process.execPath, '--max-old-space-size=256', entry, config],
+    cwd: process.cwd(),
+    stdio: { stdin: 'ignore', stdout: 'inherit', stderr: 'inherit', control: 'pipe' },
+    graceMs: TERMINATE_GRACE_MS,
+  } satisfies SubprocessSpawnSpec
+})
+
 /**
- * The index worker thread: fff queries are synchronous FFI calls, so every index lives in the worker and the Host only
- * posts messages. A crashed worker takes its indexes with it; the next request spawns a fresh one.
+ * Close the control pipe, which asks the process to exit; terminate its range when it is still there after the grace.
+ * The RPC socket has already let go of the pipe, so destroying it leaves no listener-less error behind.
  */
-export class FffIndexWorker extends Context.Service<FffIndexWorker, { readonly ask: (request: FffRequest) => Effect.Effect<unknown, FffSearchError> }>()(
-  '@dshfiles/fff-search/FffIndexWorker',
-) {
+const stopIndex = (handle: SubprocessHandle) =>
+  Effect.sync(() => handle.control?.destroy()).pipe(
+    Effect.andThen(Effect.tryPromise(signal => handle.waitForExit(signal))),
+    Effect.timeout(EXIT_GRACE),
+    Effect.catch(() =>
+      Effect.tryPromise(signal => {
+        handle.terminate()
+        return handle.waitForExit(signal)
+      }),
+    ),
+    Effect.ignore({ log: 'Warn', message: 'fff-search: the index process did not stop cleanly' }),
+  )
+
+/** One index process and the RPC client on its control pipe; closing the scope stops both. */
+const startIndex = Effect.gen(function* () {
+  const subprocess = yield* hostService('subprocess').pipe(Effect.mapError(spawnFailure))
+  const spec = yield* indexSpec
+  const handle = yield* Effect.acquireRelease(Effect.try({ try: () => subprocess.spawn(spec), catch: spawnFailure }), stopIndex)
+  const control = handle.control
+  if (control === undefined)
+    return yield* new FffSearchError({ reason: 'fff-search started its index process without a control pipe; reload the plugin and retry.' })
+  const socket = yield* NodeSocket.fromDuplex(Effect.succeed(control))
+  const protocol = yield* RpcClient.makeProtocolSocket({ pingInterval: PING_INTERVAL, retryPolicy: Schedule.recurs(0) }).pipe(
+    Effect.provideService(Socket.Socket, socket),
+    Effect.provide(RpcSerialization.layerNdjson),
+  )
+  return yield* RpcClient.make(FffIndexRpcs).pipe(Effect.provideService(RpcClient.Protocol, protocol))
+})
+
+/**
+ * The index process: every fff index lives in a child process DSH's subprocess service starts on the first search, so
+ * neither its synchronous FFI calls nor its native threads can stop or crash the Host, and it runs in the same managed
+ * range as every other command. The RPC runs on the process's private control pipe. A failed call drops the process; the
+ * next search starts a new one. Closing the layer closes the pipe, which asks the process to exit, and terminates it
+ * after 5 s.
+ */
+export class FffIndexWorker extends Context.Service<
+  FffIndexWorker,
+  {
+    readonly warm: (root: string) => Call<void>
+    readonly grep: (request: GrepRequest) => Call<typeof FffSearch.grepOutcome.Type>
+    readonly glob: (request: GlobRequest) => Call<typeof FffSearch.globOutcome.Type>
+  }
+>()('@dshfiles/fff-search/FffIndexWorker') {
   static readonly layer = Layer.effect(
     FffIndexWorker,
     Effect.gen(function* () {
-      const host = yield* HostContext
-      const entry = yield* FffWorkerEntry
-      const logger = host.ctx.logger('fff-search')
-      // The worker callbacks read and write these synchronously.
-      const current = MutableRef.make(Option.none<Worker>())
-      const pending = MutableRef.make(new Map<number, Deferred.Deferred<unknown, FffSearchError>>())
-      const nextId = yield* Ref.make(1)
-
-      const failPending = (reason: string) => {
-        for (const deferred of MutableRef.get(pending).values()) Deferred.doneUnsafe(deferred, Effect.fail(new FffSearchError({ reason })))
-        MutableRef.set(pending, new Map())
-      }
-
-      const spawn = () => {
-        // The index itself is the native finder; the worker's own JS only shuttles queries, so a small isolate is enough
-        // and a runaway cannot grow to the Host's default limit.
-        const spawned = new Worker(entry, {
-          workerData: { stateRoot: dshHomePath('plugins', 'fff-search') },
-          resourceLimits: { maxOldGenerationSizeMb: 256, maxYoungGenerationSizeMb: 32 },
-        })
-        // oxlint-disable-next-line antislop/no-unknown-parameters -- The worker message boundary; `workerReply` decoding runs on the next line.
-        spawned.on('message', (raw: unknown) => {
-          const reply = decodeReply(raw)
-          if (Option.isNone(reply)) return
-          const deferred = MutableRef.get(pending).get(reply.value.id)
-          if (deferred === undefined) return
-          Deferred.doneUnsafe(deferred, reply.value.ok ? Effect.succeed(reply.value.value) : Effect.fail(new FffSearchError({ reason: reply.value.error })))
-        })
-        spawned.on('error', error => logger.warn(`fff-search: worker failed: ${error.message}`))
-        spawned.on('exit', code => {
-          if (Option.contains(MutableRef.get(current), spawned)) MutableRef.set(current, Option.none())
-          failPending(`fff-search worker exited with code ${String(code)}`)
-        })
-        spawned.unref()
-        MutableRef.set(current, Option.some(spawned))
-        return spawned
-      }
-
-      yield* Effect.addFinalizer(() =>
-        Effect.gen(function* () {
-          const worker = MutableRef.getAndSet(current, Option.none())
-          failPending('fff-search is unloading')
-          if (Option.isSome(worker)) yield* Effect.promise(() => worker.value.terminate())
-        }),
-      )
-
-      const ask = Effect.fn('fff-search ask')(function* (request: FffRequest) {
-        yield* Effect.annotateCurrentSpan({ 'fff_search.request': request.kind })
-        const id = yield* Ref.getAndUpdate(nextId, value => value + 1)
-        const deferred = yield* Deferred.make<unknown, FffSearchError>()
-        MutableRef.update(pending, map => new Map(map).set(id, deferred))
-        const worker = yield* Effect.try({
-          try: () => Option.getOrElse(MutableRef.get(current), spawn),
-          catch: cause => new FffSearchError({ reason: 'fff-search could not start its index worker; reload the plugin and retry.', cause }),
-        })
-        worker.postMessage({ ...request, id })
-        return yield* Deferred.await(deferred).pipe(
+      // Started on first use and kept while the plugin lives: the indexes are the point of the process.
+      const index = yield* RcRef.make({ acquire: startIndex, idleTimeToLive: Duration.infinity })
+      const call = <A>(request: (client: Effect.Success<typeof startIndex>) => Effect.Effect<A, FffSearchError | RpcClientError.RpcClientError>): Call<A> =>
+        Effect.scoped(
+          Effect.flatMap(RcRef.get(index), client =>
+            request(client).pipe(Effect.catchTag('RpcClientError', error => Effect.andThen(RcRef.invalidate(index), Effect.fail(transportFailure(error))))),
+          ),
+        ).pipe(
           Effect.timeoutOrElse({
             duration: REQUEST_TIMEOUT,
-            orElse: () =>
-              Effect.fail(new FffSearchError({ reason: `fff-search ${request.kind} did not answer within ${Duration.toSeconds(REQUEST_TIMEOUT)} s` })),
+            orElse: () => Effect.fail(new FffSearchError({ reason: `fff-search did not answer within ${Duration.toSeconds(REQUEST_TIMEOUT)} s` })),
           }),
-          Effect.ensuring(
-            Effect.sync(() =>
-              MutableRef.update(pending, map => {
-                const next = new Map(map)
-                next.delete(id)
-                return next
-              }),
-            ),
-          ),
         )
+      return FffIndexWorker.of({
+        warm: root => call(client => client.Warm({ root })),
+        grep: request => call(client => client.Grep(request)),
+        glob: request => call(client => client.Glob(request)),
       })
-
-      return FffIndexWorker.of({ ask })
     }),
   )
 }
