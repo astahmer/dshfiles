@@ -152,6 +152,20 @@ const factory = () => {
 }
 
 describe('fixed Conversation native hero policy', () => {
+  it('recovers when the conversation hook is installed or withdrawn during replacement', () => {
+    const native = factory()
+    const ready = conversationSources(emptySession())
+    const unavailable = { useSession: ready.useSession, useSessions: ready.useSessions }
+    const view = render(<WorkbenchThreadConversation {...unavailable} renderFactorySlot={native.renderFactorySlot} />)
+    expect(screen.queryByLabelText('Native content')).toBeNull()
+    view.rerender(<WorkbenchThreadConversation {...ready} renderFactorySlot={native.renderFactorySlot} />)
+    expect(screen.getByLabelText('Native content')).toBeTruthy()
+    view.rerender(<WorkbenchThreadConversation {...unavailable} renderFactorySlot={native.renderFactorySlot} />)
+    expect(screen.queryByLabelText('Native content')).toBeNull()
+    view.rerender(<WorkbenchThreadConversation {...ready} renderFactorySlot={native.renderFactorySlot} />)
+    expect(screen.getByLabelText('Native content')).toBeTruthy()
+  })
+
   it('shares an optional producer scope across the resident header and composer, and withdraws it on unload', async () => {
     const client = await createTestClient()
     const native = factory()

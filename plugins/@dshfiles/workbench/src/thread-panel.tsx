@@ -48,7 +48,15 @@ class HeroPolicy {
 type ConversationSources = Pick<PropsRuntime<typeof WORKBENCH_CONVERSATION_SLOT>, 'useSession' | 'useConversation' | 'useSessions'>
 
 /** Register this child once; each occurrence binds the SessionProvider surrounding its own panel. */
-export const WorkbenchThreadConversation = (props: ConversationSources & PropsRenderFactories): ReactNode => {
+export const WorkbenchThreadConversation = (props: Partial<ConversationSources> & PropsRenderFactories): ReactNode => {
+  // A producer replacement withdraws its session hooks before installing the new roster. Render nothing in that gap,
+  // outside the child that calls them, so the panel recovers once they return without changing its hook order.
+  const { useSession, useConversation, useSessions } = props
+  if (useSession === undefined || useConversation === undefined || useSessions === undefined) return null
+  return <ReadyWorkbenchThreadConversation {...props} useSession={useSession} useConversation={useConversation} useSessions={useSessions} />
+}
+
+const ReadyWorkbenchThreadConversation = (props: ConversationSources & PropsRenderFactories): ReactNode => {
   const presentation = useContract(ConversationScope)
   const Scope = presentation.status === 'active' ? presentation.value.Scope : Fragment
   const session = props.useSession(snapshot => snapshot)
