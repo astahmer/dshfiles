@@ -198,3 +198,34 @@ test('refuses to push every owned bundle into a dsh-superagent profile, but allo
   assert.equal(named.status, 0, named.stderr)
   assert.match(named.stdout, /^ {2}\+ @dshfiles\/memory$/m)
 })
+
+const stockHeader = '# Your patch layer for this dsh profile, applied after every bundle layer:\n[]\n'
+
+test("appends the managed region to DSH's stock empty patch without leaving two documents", () => {
+  // DSH writes `[]` on first start, before the seed can be copied; block rows after it are a second YAML document.
+  writeJson(join(profileDirectory(), 'package.json'), { dependencies: {}, dsh: { profile: { bundles: [] } } })
+  write(join(profileDirectory(), 'cordis.patch.yml'), stockHeader)
+  const result = sync()
+  assert.equal(result.status, 0, result.output)
+  const patch = readFileSync(join(profileDirectory(), 'cordis.patch.yml'), 'utf8')
+  assert.doesNotMatch(patch, /^\[\]/m)
+  assert.equal(patch, `# Your patch layer for this dsh profile, applied after every bundle layer:\n\n${patchRegion}`)
+})
+
+test('repairs a profile an earlier sync left with the stock empty root above its region', () => {
+  writeJson(join(profileDirectory(), 'package.json'), { dependencies: {}, dsh: { profile: { bundles: [] } } })
+  write(join(profileDirectory(), 'cordis.patch.yml'), `${stockHeader}\n${patchRegion}`)
+  const result = sync()
+  assert.equal(result.status, 0, result.output)
+  const patch = readFileSync(join(profileDirectory(), 'cordis.patch.yml'), 'utf8')
+  assert.doesNotMatch(patch, /^\[\]/m)
+  assert.match(patch, /# BEGIN NIX-MANAGED DSH PLUGINS\n- id: managed\n/)
+})
+
+test('keeps an empty root when nothing follows it', () => {
+  writeJson(join(profileDirectory(), 'package.json'), { dependencies: {}, dsh: { profile: { bundles: [] } } })
+  write(join(seedDirectory, 'cordis.patch.yml'), '[]\n')
+  write(join(profileDirectory(), 'cordis.patch.yml'), stockHeader)
+  assert.equal(sync().status, 0)
+  assert.equal(readFileSync(join(profileDirectory(), 'cordis.patch.yml'), 'utf8'), stockHeader)
+})

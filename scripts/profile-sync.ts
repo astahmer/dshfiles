@@ -26,6 +26,7 @@ import * as Schema from 'effect/Schema'
 import { BundleFreshness } from '../tooling/dshx/packages/dshx/src/repository/bundle-freshness.ts'
 import { BundleSuppliers } from '../tooling/dshx/packages/dshx/src/project/bundle-suppliers.ts'
 import { ScriptJson } from './json.ts'
+import { Preflight } from './dsh-compat/preflight.mjs'
 
 /**
  * Link owned bundles into a DSH profile and install it. The single reconciler for profiles: `pnpm profile:sync`, the
@@ -259,8 +260,17 @@ const installProfile = async (): Promise<void> => {
 
 const countOccurrences = (text: string, needle: string): number => text.split(needle).length - 1
 
+/**
+ * DSH creates a new profile's patch as an empty flow sequence (`[]`), before the seed can be copied. Block rows after
+ * that root are a second YAML document to js-yaml, so the profile cannot load (2026-11: `end of the stream or a document
+ * separator is expected`). Once the file holds block rows, the empty root carries nothing: drop it.
+ */
+const withoutEmptyRoot = (text: string): string => (/^- /m.test(text) && /^\[\][ \t]*$/m.test(text) ? text.replace(/^\[\][ \t]*\n?/gm, '') : text)
+
 /** The Cordis region between the markers is the seed's; everything around it stays local. */
-const reconciledPatch = (target: string, source: string): string => {
+const reconciledPatch = (target: string, source: string): string => withoutEmptyRoot(reconciledRegion(target, source))
+
+const reconciledRegion = (target: string, source: string): string => {
   if (countOccurrences(source, patchStart) !== 1 || countOccurrences(source, patchEnd) !== 1) return target
   const sourceStart = source.indexOf(patchStart)
   const region = source.slice(sourceStart, source.indexOf(patchEnd, sourceStart) + patchEnd.length)
@@ -444,6 +454,22 @@ try {
   if (stale.length > 0) {
     console.warn(`profile-sync: warning: ${stale.length} plugin bundles are older than their sources and DSH will load the old code: ${stale.join(', ')}`)
     console.warn(`profile-sync: run \`pnpm build --continue\` in ${repositoryRoot}, then restart DSH.`)
+  }
+  // Rows outside the managed region (a restated preset, a user's own rows) are never reconciled. Say now when the
+  // checkout's core cannot start them, rather than at the next Host start.
+  const core = Preflight.checkoutCoreEntry(repositoryRoot)
+  if (existsSync(core) && existsSync(manifestPath)) {
+    const check = Preflight.run({
+      sourceRoot: repositoryRoot,
+      dshHome,
+      profile: values.profile,
+      coreEntry: core,
+      nodeBinary: process.execPath,
+      coreEntrySource: 'this checkout',
+    })
+    for (const { check: name, message } of check.problems) console.warn(`profile-sync: warning: [${name}] ${message}`)
+    if (!check.ok)
+      console.warn(`profile-sync: \`node ${join(repositoryRoot, 'scripts/dsh-preflight.mjs')} --apply\` migrates recorded preset changes while DSH is stopped.`)
   }
 } catch (error) {
   console.error(`profile-sync: ${error instanceof Error ? error.message : String(error)}`)
