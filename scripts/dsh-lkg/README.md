@@ -57,7 +57,9 @@ moves:
 the shell boots, not that the Host works: they call the same authenticated RPC
 the client does, and `thread-load` creates a thread in the throwaway verify
 state and loads it back, so a snapshot that serves a page but cannot answer its
-own sessions API is refused rather than promoted.
+own sessions API is refused rather than promoted. A Host that refuses that new
+thread (for one, `agent-preset/invalid` when the default preset is broken) fails
+`thread-load`; it used to pass on the list endpoint alone.
 
 `client-boot` exists because the Host can boot cleanly while every client entry
 waits on a service nobody provides: that is the "Failed to load plugins" card,
@@ -143,6 +145,83 @@ from that event's `reason`:
 The provider list is `PROVIDER_FAILURE_CODES` in `cli.mjs`; it fails closed, so
 a new provider code needs adding there. `verify --turn` runs the same check on
 an existing snapshot; it costs one small model request.
+
+## Saved agent presets
+
+A user's agent presets are `@deepseek-ai/dsh-agent-preset` rows: the Web preset
+editor saved them into the profile's `cordis.patch.yml` (an `insert`, or an
+override keyed by a shipped row's `preset-<id>`), and Creator mode installs them
+as bundles. Each row names child modules by specifier, so a core upgrade that
+removes or renames one leaves the preset `broken`: every new thread on it then
+fails with `agent-preset/invalid`, while the shell, the build and the New thread
+button all look fine. 0.2.1 → 0.2.2 did exactly that (`list-agents`).
+
+`upgrade` handles them before it touches anything
+([presets.mjs](presets.mjs)):
+
+1. **Plan** against the candidate core: every preset in the profile patch and in
+   each non-official bundle the profile lists, plus which ones something
+   selects (registry `default`/`selectedDefault`, each configured Agent's
+   `preset` in `storages/agents.json`).
+2. **Known changes** are rules in `PRESET_RULES`, each with the version that
+   introduced it, applied only when the upgrade crosses it:
+
+   | rule                             | 0.2.1 row                                            | becomes                                                                                                                                                            |
+   | -------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | `list-agents-merged`             | `@deepseek-ai/dsh-tool-subagent-control/list-agents` | removed when the preset loads `tool-subagent-control` (it registers `list_agents` now); else renamed to it with `interrupt: false`, which also adds `send_message` |
+   | `subagent-model-selection-split` | `tool-subagent` `modelSelectionSettings: <v>`        | `modelSelection: <v>` + `modelDiscovery: <v>`                                                                                                                      |
+   | `tool-presentation-executors`    | `dsh-agent-tool-presentation` `mode: ptc\|native`    | `dsh-tool-executor-ptc` / `dsh-tool-executor-native`, other options kept                                                                                           |
+
+   Edits are spliced into the file at the parsed node ranges, so comments,
+   `!!js` expressions, quoting and every custom setting stay byte for byte.
+
+3. **Validate** every remaining child reference with Node's ESM resolver from
+   the declaring file, the profile and the new core, then check compatibility:
+   an official `@deepseek-ai/dsh*` module must match the core version, and
+   `engines.dsh` and the `@deepseek-ai/cordis` peer range must admit it. Any
+   reference no rule explains is an error naming the preset, file, row path and
+   the fix; `upgrade` refuses and changes nothing. A literally `disabled: true`
+   row is only a warning. A linked (source-checkout) bundle is never written:
+   its error names the file to fix there.
+4. The **candidate** boots the migrated copy of the profile, and its health check
+   adds `agent-presets` (every saved preset mounts, none `broken`),
+   `preset-threads` (a new thread on each saved and selected preset binds to it
+   and loads) and `composer` (that thread opens in headless Chromium, the
+   composer is editable, keeps typed text and enables Send). Every snapshot runs
+   these three for the profile's saved presets.
+5. The **live** profile is written only after the new core is installed (the old
+   core still needs the old names): each changed file is first copied to
+   `<file>.before-presets-<from>-to-<to>-<stamp>`, then replaced atomically.
+
+Inspect or repair a profile by hand:
+
+```sh
+node scripts/dsh-lkg/cli.mjs presets                                  # validate against the installed core
+node scripts/dsh-lkg/cli.mjs presets --core <global root> --from 0.2.1-rc.2           # dry-run migration
+DSH_LKG_ADMIN=1 node scripts/dsh-lkg/cli.mjs presets --core <global root> --from 0.2.1-rc.2 --apply
+```
+
+The browser checks use Playwright's Chromium, or a system Chrome on PATH
+(`google-chrome-stable`, `chromium`) where that cannot run, as on NixOS;
+`DSH_LKG_CHROMIUM` names one explicitly.
+
+### Upgrade regression test
+
+```sh
+fnm exec --using="$(cat .node-version)" pnpm test:preset-upgrade
+```
+
+[preset-upgrade.e2e.mjs](preset-upgrade.e2e.mjs) runs both stock cores on one
+throwaway home, with a local fake Anthropic endpoint as the model (no account
+state). The custom preset in [fixtures/preset-0.2.1.patch.yml](fixtures/preset-0.2.1.patch.yml)
+is the default; the test proves it works on 0.2.1, that 0.2.2 refuses it
+unmigrated (the regression), migrates it, restarts on 0.2.2, then creates new
+threads on it from the API and from the New session button, types and sends in
+each composer, waits for the turn to complete and reads the model request: it
+carries the preset's custom persona and its `list_agents`, `subagent` and
+`list_subagent_models` tools. Cores are installed once into
+`~/.cache/dshfiles/preset-upgrade-e2e` (`DSH_PRESET_E2E_CACHE`);
+`DSH_PRESET_E2E_KEEP=1` keeps the home, screenshots and Host log.
 
 ## Recovery
 

@@ -1,0 +1,54 @@
+# A user's profile patch as dsh 0.2.1-rc.2 left it: the preset editor saved a
+# custom "reviewer" preset and made it the default. It restates 0.2.1 module
+# names and options, so 0.2.2 cannot load it unmigrated: the list-agents module
+# is gone and tool-subagent renamed modelSelectionSettings.
+- id: agent-preset-registry
+  config:
+    default: reviewer
+- insert:
+    - id: preset-reviewer
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: reviewer
+        name: Reviewer
+        description: Reads and reviews; delegates checks to subagents.
+        order: 5
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              # Custom wording the migration must keep.
+              prefix: You are a meticulous code reviewer powered by the {{model}} model.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 32768
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: true
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: false
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true

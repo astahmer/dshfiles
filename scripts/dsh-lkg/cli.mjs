@@ -35,6 +35,8 @@ import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { PresetChecks } from '../dsh-compat/preset-checks.mjs'
+import { PresetMigration } from '../dsh-compat/presets.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const STORE = resolve(process.env.DSH_LKG_ROOT?.trim() || join(homedir(), '.dsh-lkg'))
@@ -249,17 +251,22 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
  * real page in headless Chromium and refuse the snapshot when that card names
  * entries that did not activate. Playwright comes from dshx's own dependencies.
  */
-const clientBootCheck = async ({ origin, cookie }) => {
-  if (origin === undefined || cookie === undefined) return { name: 'client-boot', ok: false, detail: 'the page was never reachable' }
+const clientBootCheck = async ({ origin, cookie, composerThread, rpc, workspace }) => {
+  if (origin === undefined || cookie === undefined) return [{ name: 'client-boot', ok: false, detail: 'the page was never reachable' }]
   let chromium
   try {
     chromium = createRequire(join(HERE, '..', '..', 'tooling', 'dshx', 'packages', 'dshx', 'package.json'))('playwright').chromium
   } catch (error) {
-    return { name: 'client-boot', ok: false, detail: `playwright is unavailable: ${String(error).slice(0, 160)}` }
+    return [{ name: 'client-boot', ok: false, detail: `playwright is unavailable: ${String(error).slice(0, 160)}` }]
   }
   const [pair] = cookie.split(';')
   const separator = pair.indexOf('=')
-  const browser = await chromium.launch({ headless: true })
+  let browser
+  try {
+    browser = await PresetChecks.launchChromium(chromium)
+  } catch (error) {
+    return [{ name: 'client-boot', ok: false, detail: `no headless Chromium (set DSH_LKG_CHROMIUM): ${String(error).replace(/\s+/g, ' ').slice(0, 200)}` }]
+  }
   try {
     const context = await browser.newContext()
     await context.addCookies([{ name: pair.slice(0, separator), value: pair.slice(separator + 1), url: origin }])
@@ -283,11 +290,14 @@ const clientBootCheck = async ({ origin, cookie }) => {
       return { readiness, text: document.body.innerText }
     }, CLIENT_SETTLE_MS)
     const failure = /Failed to load plugins[\s\S]{0,3000}/.exec(outcome.text)?.[0]
-    if (failure !== undefined) return { name: 'client-boot', ok: false, detail: failure.replace(/\s+/g, ' ').slice(0, 3000) }
-    if (outcome.readiness !== 'resolved') return { name: 'client-boot', ok: false, detail: `DSH client readiness ${outcome.readiness}` }
-    return { name: 'client-boot', ok: true, detail: 'DSH client readiness resolved with no failed entries' }
+    if (failure !== undefined) return [{ name: 'client-boot', ok: false, detail: failure.replace(/\s+/g, ' ').slice(0, 3000) }]
+    if (outcome.readiness !== 'resolved') return [{ name: 'client-boot', ok: false, detail: `DSH client readiness ${outcome.readiness}` }]
+    const booted = { name: 'client-boot', ok: true, detail: 'DSH client readiness resolved with no failed entries' }
+    // A booted shell is not a usable thread: open the thread created on the selected preset and type into it.
+    if (composerThread === undefined) return [booted]
+    return [booted, await PresetChecks.composer(page, { origin, sessionId: composerThread, rpc, workspace })]
   } catch (error) {
-    return { name: 'client-boot', ok: false, detail: String(error).slice(0, 200) }
+    return [{ name: 'client-boot', ok: false, detail: String(error).slice(0, 200) }]
   } finally {
     await browser.close()
   }
@@ -382,7 +392,7 @@ const cloneLiveData = (liveHome, home) => {
  * activates cleanly and answers an authenticated request. Nothing is promoted
  * on a partial pass.
  */
-const healthCheck = async (root, { keepState = false, turn } = {}) => {
+const healthCheck = async (root, { keepState = false, turn, presets } = {}) => {
   const checks = []
   const entry = dshEntryOf(root)
   const nodePath = readFileSync(join(root, 'runtime', 'node-path'), 'utf8').trim()
@@ -494,19 +504,23 @@ const healthCheck = async (root, { keepState = false, turn } = {}) => {
     // what proves the load path rather than only the list endpoint.
     let threadId = listed?.[0]?.id ?? listed?.[0]?.sessionId
     let created = false
+    let refusal
     if (threadId === undefined) {
       try {
         const response = await rpc('session', 'create', { request: {} })
         const parsed = response.status === 200 ? JSON.parse(response.body) : undefined
+        if (parsed?.result?.ok === false) refusal = `${String(parsed.result.error?.code)}: ${String(parsed.result.error?.message).slice(0, 300)}`
         const result = parsed?.result?.value ?? parsed?.result ?? parsed
         threadId = result?.session?.id ?? result?.id ?? result?.sessionId
         created = threadId !== undefined
-      } catch {
-        threadId = undefined
+        if (threadId === undefined) refusal ??= `HTTP ${String(response.status)}: ${response.body.slice(0, 200)}`
+      } catch (error) {
+        refusal = String(error).slice(0, 200)
       }
     }
     if (threadId === undefined) {
-      checks.push({ name: 'thread-load', ok: true, detail: 'no thread to load and this Host would not create one; the list endpoint answered instead' })
+      // A Host that refuses a new thread on its default preset is exactly the broken upgrade a user cannot work in.
+      checks.push({ name: 'thread-load', ok: false, detail: `no thread to load and a new thread was refused: ${refusal ?? 'no session id returned'}` })
     } else {
       try {
         const projections = await rpc('session', 'projections', { request: { sessionId: threadId } })
@@ -527,6 +541,26 @@ const healthCheck = async (root, { keepState = false, turn } = {}) => {
     }
   }
 
+  /**
+   * Saved agent presets: every one must mount, and a new thread must bind to
+   * each one. The default (selected) preset's thread then goes through the
+   * composer check in the browser.
+   */
+  let composerThread
+  const presetCwd = join(home, 'preset-cwd')
+  if (presets !== undefined) {
+    const ids = [...new Set([...presets.selected, ...presets.saved])]
+    if (origin === undefined || cookie === undefined || !answered) {
+      checks.push({ name: 'agent-presets', ok: false, detail: 'the API was never reached' })
+    } else {
+      checks.push(await PresetChecks.roster({ rpc, presets: presets.saved }))
+      mkdirSync(presetCwd, { recursive: true })
+      const created = await PresetChecks.threads({ rpc, presets: ids, cwd: presetCwd })
+      checks.push(created.check)
+      composerThread = created.threads[0]?.sessionId
+    }
+  }
+
   if (turn !== undefined) {
     if (origin === undefined || cookie === undefined || !answered) checks.push({ name: 'turn', ok: false, detail: 'the API was never reached' })
     else {
@@ -536,7 +570,7 @@ const healthCheck = async (root, { keepState = false, turn } = {}) => {
     }
   }
 
-  checks.push(await clientBootCheck({ origin, cookie }))
+  checks.push(...(await clientBootCheck({ origin, cookie, composerThread, rpc, workspace: presetCwd })))
 
   child.kill('SIGTERM')
   await sleep(1500)
@@ -562,7 +596,10 @@ const writeLauncher = () => {
  * builds a throwaway candidate from that core install, checks it and removes it
  * again: nothing is frozen, promoted, or left under `versions/`.
  */
-const snapshot = async ({ label, ifChanged = false, candidateGlobal, turn } = {}) => {
+const liveProfile = () => resolve(process.env.DSH_LKG_PROFILE?.trim() || join(homedir(), '.dsh', 'profiles', 'web'))
+const liveHome = () => resolve(process.env.DSH_LKG_LIVE_HOME?.trim() || join(homedir(), '.dsh'))
+
+const snapshot = async ({ label, ifChanged = false, candidateGlobal, turn, presetPlan } = {}) => {
   requireOperator()
   const candidate = candidateGlobal !== undefined
   mkdirSync(VERSIONS, { recursive: true })
@@ -579,7 +616,7 @@ const snapshot = async ({ label, ifChanged = false, candidateGlobal, turn } = {}
   const final = join(VERSIONS, candidate ? `.${id}.candidate` : id)
   rmSync(staging, { recursive: true, force: true })
 
-  const profileSource = resolve(process.env.DSH_LKG_PROFILE?.trim() || join(homedir(), '.dsh', 'profiles', 'web'))
+  const profileSource = liveProfile()
   const globalRoot = resolve(candidateGlobal ?? (process.env.DSH_LKG_GLOBAL?.trim() || installedGlobalRoot()))
   if (!existsSync(globalRoot)) fail(`global install not found: ${globalRoot}`)
   if (!existsSync(profileSource)) fail(`web profile not found: ${profileSource}`)
@@ -696,6 +733,14 @@ const snapshot = async ({ label, ifChanged = false, candidateGlobal, turn } = {}
     }
     writeFileSync(profileManifest, `${JSON.stringify(parsed, null, 2)}\n`)
   }
+  // A candidate core runs the profile as the upgrade will leave it: its saved presets migrated, the live file untouched.
+  if (presetPlan !== undefined) {
+    for (const { file } of PresetMigration.write(PresetMigration.rebase(presetPlan, profileSource, join(staging, 'profile')), { backup: false })) {
+      log(`dsh-lkg: candidate profile carries migrated presets (${relative(staging, file)})`)
+    }
+  }
+  // Read from the source profile: the staged copy's bundle links target the final path, which does not exist yet.
+  const presets = PresetMigration.savedIds({ profileDir: profileSource, home: liveHome() })
 
   const manifest = {
     schema: 'dsh-lkg/version/v1',
@@ -724,7 +769,7 @@ const snapshot = async ({ label, ifChanged = false, candidateGlobal, turn } = {}
   //    `current` still names the previous snapshot until the check passes.
   renameSync(staging, final)
   log(`dsh-lkg: health check (own port, own state${turn === undefined ? '' : ', live data, one real turn'})`)
-  const health = await healthCheck(final, { turn })
+  const health = await healthCheck(final, { turn, presets })
   for (const check of health.checks) log(`  ${check.ok ? 'ok  ' : 'FAIL'} ${check.name}: ${check.detail}`)
   manifest.health = { healthy: health.healthy, checkedAt: new Date().toISOString(), checks: health.checks, url: health.url ?? null }
   if (candidate) {
@@ -835,8 +880,14 @@ const upgrade = async (version, { turnModel, dropPatches = false } = {}) => {
   const candidateVersion = dshVersionAt(candidateGlobal)
   if (candidateVersion !== version) abort(`pnpm installed ${candidateVersion ?? 'nothing'} instead of ${version}`)
 
+  // Saved agent presets name modules and options of the old core. Migrate the known changes, and refuse while any
+  // reference stays unresolvable or incompatible: a broken preset fails every new thread that selects it.
+  const presetPlan = PresetMigration.plan({ profileDir: liveProfile(), coreRoot: candidateGlobal, from: liveVersion, to: version, home: liveHome() })
+  for (const line of PresetMigration.format(presetPlan)) log(`dsh-lkg: ${line}`)
+  if (presetPlan.errors.length > 0) abort(`${String(presetPlan.errors.length)} saved agent preset reference(s) cannot load on dsh ${version} (listed above)`)
+
   log(`dsh-lkg: checking dsh ${version} against the live profile, plugins and data`)
-  const candidate = await snapshot({ label: `candidate dsh ${version}`, candidateGlobal, turn: { model: turnModel } })
+  const candidate = await snapshot({ label: `candidate dsh ${version}`, candidateGlobal, turn: { model: turnModel }, presetPlan })
   if (!candidate.health.healthy) {
     const failed = candidate.health.checks.filter(check => !check.ok).map(check => check.name)
     abort(`dsh ${version} failed ${failed.join(', ')} (host log: ${candidate.health.log})`)
@@ -848,6 +899,12 @@ const upgrade = async (version, { turnModel, dropPatches = false } = {}) => {
     log(`dsh-lkg: dsh ${version} passed; installing it globally (was ${liveVersion ?? 'unknown'})`)
     const live = spawnSync(plan.argv[0], plan.argv.slice(1), { cwd: homedir(), stdio: 'inherit' })
     if (live.status !== 0) fail(`the global install of ${version} failed; dsh-recover still starts ${before.id}`)
+  }
+  // Only now: the old core still needs the old names, so the live profile changes once the new core is installed.
+  try {
+    for (const { file, backup } of PresetMigration.write(presetPlan)) log(`dsh-lkg: migrated saved presets in ${file} (backup: ${backup})`)
+  } catch (error) {
+    fail(`dsh ${version} is installed but the saved presets were not migrated: ${String(error.message ?? error)}; rerun \`presets --apply\``)
   }
   const after = await snapshot({ label: `dsh ${version}`, ifChanged: true })
   log(`dsh-lkg: dsh ${version} is live and ${after.id} is current; restart \`dsh web\` when it suits you`)
@@ -1076,6 +1133,11 @@ const usage = () => {
                               after an isolated candidate passes every check,
                               including --turn; refuses while the live install
                               carries pnpm patches unless --drop-patches
+  presets [--core <dir>] [--from <version>] [--apply]
+                              check the live profile's saved agent presets
+                              against a core (default: the installed one);
+                              --from migrates the references that core version
+                              changed; --apply writes them, backing up each file
   reap [--keep <n>]           drop old versions (default ${DEFAULT_KEEP})
   unlock <id>                 clear immutable flags for maintenance
   remove <id>                 drop one version (never the current one)
@@ -1085,7 +1147,7 @@ const usage = () => {
                               state.prev) that the live home lacks; --apply
                               copies them and their attachments into it
 
-Operator commands (snapshot, upgrade, reap, unlock, import-sessions --apply) refuse to run from a DSH agent
+Operator commands (snapshot, upgrade, presets --apply, reap, unlock, import-sessions --apply) refuse to run from a DSH agent
 session unless DSH_LKG_ADMIN=1 is set.`)
 }
 
@@ -1095,7 +1157,9 @@ const main = async () => {
     const index = rest.indexOf(name)
     return index === -1 ? undefined : rest[index + 1]
   }
-  const flagValues = new Set(['--label', '--keep', '--turn-model', '--since'].flatMap(name => (flag(name) === undefined ? [] : [flag(name)])))
+  const flagValues = new Set(
+    ['--label', '--keep', '--turn-model', '--since', '--core', '--from'].flatMap(name => (flag(name) === undefined ? [] : [flag(name)])),
+  )
   const positional = () => rest.find(value => !value.startsWith('--') && !flagValues.has(value))
   const turnModel = () => {
     const model = flag('--turn-model')
@@ -1115,6 +1179,23 @@ const main = async () => {
     case 'upgrade':
       await upgrade(positional(), { turnModel: turnModel(), dropPatches: rest.includes('--drop-patches') })
       return
+    case 'presets': {
+      if (rest.includes('--apply')) requireOperator()
+      const plan = PresetMigration.plan({
+        profileDir: liveProfile(),
+        coreRoot: resolve(flag('--core') ?? (process.env.DSH_LKG_GLOBAL?.trim() || installedGlobalRoot())),
+        from: flag('--from'),
+        home: liveHome(),
+      })
+      for (const line of PresetMigration.format(plan)) log(line)
+      if (plan.errors.length > 0) {
+        process.exitCode = 1
+        return
+      }
+      if (rest.includes('--apply')) for (const { file, backup } of PresetMigration.write(plan)) log(`migrated ${file} (backup: ${backup})`)
+      else if (plan.changes.length > 0) log('dry run: rerun with --apply to write these migrations')
+      return
+    }
     case 'reap':
       reap(Number.parseInt(flag('--keep') ?? String(DEFAULT_KEEP), 10))
       return

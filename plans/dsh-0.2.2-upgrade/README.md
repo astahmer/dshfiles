@@ -60,3 +60,10 @@ alpha.3, rc.1.
    (outside the managed region): apply the same edits as the seed.
 3. `dsh-lkg` picks the candidate's Node from `process.execPath`: run it with
    Node 24 (`fnm exec --using=24.11.1 node scripts/dsh-lkg/cli.mjs …`).
+4. Saved agent presets: `upgrade` now migrates the 0.2.1 → 0.2.2 preset breaks
+   (`list-agents`, `modelSelectionSettings`, tool-presentation mode), refuses
+   unknown invalid references, and proves a new thread on each saved preset
+   ([dsh-lkg README](../../scripts/dsh-lkg/README.md#saved-agent-presets)).
+   Preview with `node scripts/dsh-lkg/cli.mjs presets --core <global root> --from 0.2.1-rc.2`.
+   The `manuel` profile validates clean today; `web` is invalid YAML
+   (managed region appended after `[]`) and must be repaired before it boots.
