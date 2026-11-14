@@ -229,3 +229,12 @@ test('keeps an empty root when nothing follows it', () => {
   assert.equal(sync().status, 0)
   assert.equal(readFileSync(join(profileDirectory(), 'cordis.patch.yml'), 'utf8'), stockHeader)
 })
+
+test('reinstalls when a linked dependency is missing from node_modules', () => {
+  assert.equal(sync().status, 0)
+  rmSync(join(profileDirectory(), 'node_modules/@dshfiles/alpha'), { recursive: true, force: true })
+  const result = sync()
+  assert.equal(result.status, 0, result.output)
+  assert.match(result.output, /pnpm install/)
+  assert.ok(existsSync(join(profileDirectory(), 'node_modules/@dshfiles/alpha/package.json')))
+})

@@ -361,7 +361,10 @@ const syncSeededProfile = async (): Promise<void> => {
     const added = bundles.filter(name => !manifest.dsh.profile.bundles.includes(name))
     const removed = manifest.dsh.profile.bundles.filter(name => !bundles.includes(name))
     const manifestChanged = nextText !== currentText
-    const installNeeded = manifestChanged || previous?.installedManifestHash !== nextHash || !existsSync(join(profileDirectory, 'node_modules/.modules.yaml'))
+    // Whether the install is still on disk: every dependency linked under node_modules. pnpm 10 writes no
+    // node_modules/.modules.yaml for a profile of links alone, so that file cannot stand for an install.
+    const installPresent = Object.keys(dependencies).every(name => existsSync(join(profileDirectory, 'node_modules', name)))
+    const installNeeded = manifestChanged || previous?.installedManifestHash !== nextHash || !installPresent
     const state: SyncState = { dependencies: desiredDependencies, bundles: desiredBundles, installedManifestHash: previous?.installedManifestHash }
     const stateText = (value: SyncState): string => `${JSON.stringify(value, null, 2)}\n`
     const statePath = join(profileDirectory, stateFilename)
