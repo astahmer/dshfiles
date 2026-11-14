@@ -4,16 +4,22 @@
  * links, yet should show a ```` ```mermaid ```` fence the way the answer does.
  */
 import { CodeBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useRegistry } from '@dshfiles/dshx/client'
 import { memo, type ComponentProps, type ReactNode } from 'react'
-import { CodeFenceModel } from './code-fence-transform.js'
+import { CodeFenceSeat } from './code-fence-seat.js'
+import { CodeFences } from './code-fences.js'
 import { MarkdownProse } from './markdown-prose.js'
 
-/** The native renderer's own function: calling it keeps its streaming cache, whose frozen blocks reach the fence cache. */
+/** The native renderer's own function: calling it keeps its streaming cache. */
 const renderMarkdownText = MarkdownText.type
 
 /** `MarkdownText` with fences a code-fence renderer claims handed to that renderer; the same props. */
 export const FencedMarkdown = memo(function FencedMarkdown(props: ComponentProps<typeof MarkdownText>): ReactNode {
-  const fences = CodeFenceModel.useState(CodeBlock)
+  const renderers = useRegistry(CodeFences)
   const prose = MarkdownProse.useState(CodeBlock)
-  return MarkdownProse.transform(CodeFenceModel.transform(renderMarkdownText(props), fences), prose, 'fenced')
+  return (
+    <CodeFenceSeat renderers={renderers} labels={props.labels.code}>
+      {MarkdownProse.transform(renderMarkdownText(props), prose, 'fenced')}
+    </CodeFenceSeat>
+  )
 })

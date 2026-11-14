@@ -8,8 +8,7 @@ A ` ```mermaid ` fence renders as a diagram card in the conversation, the way
 Chat's code-fence registry).
 
 - **While a fence is being written** it stays the native code card, so a half-written diagram never flashes an error.
-  It becomes a diagram as soon as it is complete: when another block follows it, or when the message settles, so a
-  long agent turn shows each diagram as it closes instead of at the end.
+  It becomes a diagram when the message settles.
 - **The card** keeps the code's height while pele loads and fades the diagram in. Its header has **Show code** /
   **Show diagram** (the highlighted source in the same card) and **Copy source**; clicking the diagram expands it full
   size in the image lightbox.
@@ -78,8 +77,8 @@ Models write ` ```mermaid ` fences on their own; the diagram is what the user se
 
 - Browser find (Ctrl+F) matches a drawn diagram's labels (pele draws them as SVG text) but not its Mermaid syntax;
   **Show code** shows the source. DSH has no in-app find to reveal hidden source, unlike t3code.
-- The fence a streaming message is still writing stays code until another block follows it or the message settles:
-  the native renderer does not say whether the last fence's closing line has arrived.
+- A fence in a streaming message stays code until the message settles, even once its closing line has arrived: since
+  DSH 0.2.2 the native fence seat reports only whether the whole message is streaming.
 - DSH's native Markdown surfaces do not consult the registry: the plan document tab (`@deepseek-ai/dsh-client-ui-plan`)
   and the native right-sidebar Markdown file preview render `MarkdownText` directly, so a diagram there stays a code
   card until DSH exposes a fence hook for them. The owned editor preview renders fences, and a Markdown file opened in
