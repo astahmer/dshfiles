@@ -37,6 +37,7 @@ import { revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionLogDownloadService } from './session-log-download.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadNotices, ThreadNoticeToast } from './thread-notices.js'
+import { isSendButton } from './submit-target.js'
 import { ThreadPreparation, ThreadWarmup } from './thread-warmup.js'
 import { awaitWorkspaceSetup, SETUP_WAIT_TIMEOUT_MS, setupWaitsForRun } from './workspace-setup-wait.js'
 import { WorkspaceSetupDock } from './workspace-setup-dock.js'
@@ -93,11 +94,6 @@ const composerSessionOf = (target: EventTarget | null): { readonly sessionId: Se
   const root = target.closest('[data-conversation-session]')
   const sessionId = root?.getAttribute('data-conversation-session') ?? ''
   return root !== null && root !== undefined && isSessionId(sessionId) ? { sessionId, root } : undefined
-}
-
-const isSendButton = (target: EventTarget | null): boolean => {
-  const button = target instanceof Element ? target.closest('button') : null
-  return button !== null && /(?:^|\s)\S*_primary(?:\s|$)/u.test(button.className)
 }
 
 /** The slice of `@dshfiles/session-controller`'s `ctx.sessionDrafts` this plugin reads, without depending on it. */
