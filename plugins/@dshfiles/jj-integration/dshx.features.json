@@ -178,6 +178,12 @@
           "span": "jj <verb>",
           "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
           "testName": "records one jj <verb> client span with value-free attributes and the exit code"
+        },
+        {
+          "kind": "custom",
+          "span": "thread workspaces await warming",
+          "file": "plugins/@dshfiles/jj-integration/src/provision-spans.integration.test.ts",
+          "testName": "names the wait for a warming spare and whether provisioning claimed one"
         }
       ]
     },

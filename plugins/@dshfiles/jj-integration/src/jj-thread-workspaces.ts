@@ -1063,11 +1063,18 @@ const make = Effect.gen(function* () {
    * A spare still being added for this base finishes first: its `jj workspace add` and a second one from `provision`
    * both export refs, and in a colocated repository git refuses the later packed-refs transaction (“Could not commit
    * packed-ref transaction”). Waiting also lets `provision` claim that spare instead of checking the tree out again.
-   * The spare takes only its own spare-record lock, never the repository lock `provision` holds.
+   * The spare takes only its own spare-record lock, never the repository lock `provision` holds. The wait has its own
+   * span: it runs no command, so without one a slow first send shows only an unexplained gap under `provision`.
    */
   const awaitWarming = (repoRoot: string, target: string) =>
     FiberMap.get(warming, warmingKey(repoRoot, target)).pipe(
-      Effect.flatMap(fiber => (Option.isSome(fiber) ? Effect.asVoid(Fiber.await(fiber.value)) : Effect.void)),
+      Effect.flatMap(fiber =>
+        Effect.andThen(
+          Effect.annotateCurrentSpan({ 'dshx.thread.warming_awaited': Option.isSome(fiber) }),
+          Option.isSome(fiber) ? Effect.asVoid(Fiber.await(fiber.value)) : Effect.void,
+        ),
+      ),
+      Effect.withSpan('thread workspaces await warming'),
     )
 
   /** Neither a folder nor a jj workspace may already carry the name: reusing either would put two threads in one checkout. */
@@ -1131,6 +1138,8 @@ const make = Effect.gen(function* () {
         const spare = yield* usableSpare(repoRoot, (yield* readSpares(repoRoot))[target])
         const claimed =
           spare === undefined ? undefined : yield* claimSpare(repoRoot, spare, { target, commitId, requestedName }).pipe(Effect.orElseSucceed(() => undefined))
+        // Whether the send reused a checked-out spare or pays for a full `jj workspace add` below.
+        yield* Effect.annotateCurrentSpan({ 'dshx.thread.spare_claimed': claimed !== undefined })
         const thread =
           claimed ??
           (yield* Effect.gen(function* () {
