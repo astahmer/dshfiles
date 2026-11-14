@@ -49,6 +49,7 @@
     "@dshfiles/mcp-servers": "link:../../plugins/@dshfiles/mcp-servers",
     "@dshfiles/memory": "link:../../plugins/@dshfiles/memory",
     "@dshfiles/mentions": "link:../../plugins/@dshfiles/mentions",
+    "@dshfiles/mermaid-diagrams": "link:../../plugins/@dshfiles/mermaid-diagrams",
     "@dshfiles/model-effort-picker": "link:../../plugins/@dshfiles/model-effort-picker",
     "@dshfiles/model-selection": "link:../../plugins/@dshfiles/model-selection",
     "@dshfiles/multi-host": "link:../../plugins/@dshfiles/multi-host",
@@ -219,7 +220,8 @@
         "@dshfiles/whiteboard",
         "@dshfiles/phone-access",
         "@dshfiles/phone-pairing",
-        "@dshfiles/onboarding"
+        "@dshfiles/onboarding",
+        "@dshfiles/mermaid-diagrams"
       ]
     }
   }
