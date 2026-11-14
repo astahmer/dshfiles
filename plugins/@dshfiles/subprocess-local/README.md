@@ -17,16 +17,22 @@ hours. One such group cost the live Host 9.6 s of CPU per 70 s, slowing every re
 is active, and it refreshed teardown evidence with a whole-table `/bin/ps` fork whose result it discarded (about 40 ms of
 blocked event loop on a loaded host).
 
+A forked process copies the forking process's page tables while it holds its memory map, so each `systemctl` the
+Host ran stalled its event loop: 17 ms per call at 2 GB RSS, 11 ms even from a worker thread (it shares the memory map),
+2 ms (the idle floor) from a small helper process that the Host forks once per burst. One session create spent about
+100 s of main-thread time in such calls.
+
 ## Local delta
 
 Every other vendored file is byte-identical to the pinned revision. The whole delta is:
 
-| File                                     | Change                                                                                                              |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `src/native/linux-scope.ts` + `index.ts` | systemd-run's identity is read once per PATH value instead of per launch; the manager is still confirmed per launch |
-| `src/native/spawn.ts`                    | the group-exit poll backs off from 15 ms to 500 ms; a short-lived tree is still seen at once                        |
-| `src/native/terminal.ts`                 | the readiness probe refreshes its descendant evidence at most once per second; teardown still scans fresh           |
-| `src/host.ts`                            | new: Loader entry that mounts the native Service unchanged                                                          |
+| File                                                                 | Change                                                                                                                                                                                                                                                                              |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/native/linux-scope.ts` + `index.ts`                             | systemd-run's identity is read once per PATH value instead of per launch; the manager is still confirmed per launch                                                                                                                                                                 |
+| `src/native/spawn.ts`                                                | the group-exit poll backs off from 15 ms to 500 ms; a short-lived tree is still seen at once                                                                                                                                                                                        |
+| `src/native/terminal.ts`                                             | the readiness probe refreshes its descendant evidence at most once per second; teardown still scans fresh                                                                                                                                                                           |
+| `src/host.ts`                                                        | new: Loader entry that mounts the native Service unchanged                                                                                                                                                                                                                          |
+| `src/native/systemctl-runner.ts` + `systemctl-promise.ts` (new), `linux-scope.ts`, `index.ts` | scope queries, signals and cleanup run `systemctl` in pooled helper processes (Effect `Pool` over `effect/process`), never by forking the Host; signals keep TERM-before-KILL order through an Effect semaphore; only Host exit still kills synchronously; teardown closes the pool |
 
 The runner process the service launches is still the stock package's `@deepseek-ai/dsh-subprocess-local/runner`.
 

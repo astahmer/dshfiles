@@ -44,6 +44,7 @@ import {
   memoizedSystemdRunIdentity,
 } from './linux-scope.ts'
 import { LinuxScopeSelector } from './linux-scope-selector.ts'
+import { closeSystemctlRunner } from './systemctl-promise.ts'
 import type { LinuxScopeDecision } from './linux-scope-selector.ts'
 import { launchWindowsJob, probeWindowsJob } from './windows-job.ts'
 import { targetEnvironment } from './runner-launch.ts'
@@ -106,7 +107,12 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       const onHostExit = (): void => { this.terminateForHostExit() }
       process.prependListener('exit', onHostExit)
       return async () => {
-        await this.disposeManagedProcesses()
+        try {
+          await this.disposeManagedProcesses()
+        } finally {
+          // dshfiles delta: teardown still asks the manager through the helpers; then they go.
+          await closeSystemctlRunner()
+        }
         process.off('exit', onHostExit)
       }
     }, 'local subprocess teardown')

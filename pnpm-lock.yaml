@@ -8684,6 +8684,12 @@ importers:
 
   plugins/@dshfiles/subprocess-local:
     dependencies:
+      '@effect/platform-node':
+        specifier: 'catalog:'
+        version: 4.1.2(effect@4.1.2)(redis@6.3.1)
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.2
       koffi:
         specifier: 3.1.1
         version: 3.1.1

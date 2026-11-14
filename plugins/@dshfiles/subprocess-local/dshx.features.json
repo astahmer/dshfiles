@@ -15,6 +15,7 @@
       "failureModes": [
         "A process group that outlives its leader is still awaited until empty, only probed less often.",
         "Readiness polls refresh terminal descendant evidence at most once per second; a teardown still scans fresh, so that evidence only ages for the host-exit fallback when the process table is unreadable.",
+        "systemd scope queries, signals and cleanup run systemctl in up to 4 helper processes the Host forks on demand and retires after 30 s unused; a helper that misses its reply is killed and the command reports failure. Only Host exit still kills a scope synchronously.",
         "Every other behaviour is the pinned upstream code; drift is checked with scripts/native-fork-diff.mjs."
       ],
       "externalDependencies": [],
@@ -30,6 +31,18 @@
           "id": "subprocess-local.group-poll-backoff",
           "file": "plugins/@dshfiles/subprocess-local/tests/group-exit-poll.test.ts",
           "testName": "waits for a backgrounded child without probing its group every 15 ms"
+        },
+        {
+          "kind": "unit-test",
+          "id": "subprocess-local.systemctl-helper-forks-once",
+          "file": "plugins/@dshfiles/subprocess-local/tests/systemctl-runner.test.ts",
+          "testName": "forks the Host once for a burst of sequential commands"
+        },
+        {
+          "kind": "unit-test",
+          "id": "subprocess-local.scope-signal-order",
+          "file": "plugins/@dshfiles/subprocess-local/tests/scope-signal-order.test.ts",
+          "testName": "delivers TERM before KILL and joins both before declaring the range gone"
         },
         {
           "kind": "not-applicable",
@@ -53,6 +66,14 @@
     {
       "file": "src/native/linux-scope.ts",
       "reason": "The subprocess runtime other plugins spawn through; each caller opens the span for its own command (jj, secret, project-checks run), so a runtime span would duplicate it."
+    },
+    {
+      "file": "src/native/systemctl-runner.ts",
+      "reason": "Runs the systemctl commands linux-scope.ts issues for one managed range; the caller command span (jj, secret, project-checks run) covers that range's lifetime."
+    },
+    {
+      "file": "src/native/systemctl-promise.ts",
+      "reason": "The Promise boundary of systemctl-runner.ts; the caller command span (jj, secret, project-checks run) covers the managed range it serves."
     },
     {
       "file": "src/native/process-inspector.ts",

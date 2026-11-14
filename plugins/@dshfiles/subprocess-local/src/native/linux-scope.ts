@@ -1,7 +1,7 @@
 /** Linux user-systemd scope launch and managed-range ownership. */
 
 import { controlPipe } from './control-spawn.ts'
-import { execFile, spawn, spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -28,6 +28,7 @@ import {
 } from './runner-launch.ts'
 import type { RunnerInvocation } from './runner-launch.ts'
 import { childEnv } from './spawn.ts'
+import { runSystemctl, SerialLane, type SystemctlResult } from './systemctl-promise.ts'
 
 /** Test seams for systemd command execution. */
 export interface LinuxScopeInternals {
@@ -43,13 +44,6 @@ export interface LinuxScopeInternals {
   sleep?: (delayMs: number, signal?: AbortSignal) => Promise<void>
   /** Kernel unix socket table read by the user-manager confirmation; defaults to /proc/net/unix. */
   unixSocketTable?: string
-}
-
-interface SystemctlResult {
-  status: number | null
-  stdout: string
-  stderr: string
-  error?: Error
 }
 
 const SYSTEMCTL_TIMEOUT_MS = 5_000
@@ -76,22 +70,9 @@ function quietSystemdEnvironment(): NodeJS.ProcessEnv {
   return childEnv({ LC_ALL: 'C', SYSTEMD_LOG_TARGET: 'null' })
 }
 
+/** dshfiles delta: manager commands run in pooled helper processes, never by forking the Host. */
 function querySystemctl(command: string, args: readonly string[]): Promise<SystemctlResult> {
-  return new Promise((resolveResult) => {
-    execFile(command, [...args], {
-      encoding: 'utf8',
-      env: managerEnvironment(),
-      timeout: SYSTEMCTL_TIMEOUT_MS,
-    }, (error, stdout, stderr) => {
-      const code = error === null ? 0 : (error as Error & { code?: string | number }).code
-      resolveResult({
-        status: typeof code === 'number' ? code : null,
-        stdout,
-        stderr,
-        ...error === null ? {} : { error },
-      })
-    })
-  })
+  return runSystemctl({ command, args, env: managerEnvironment(), timeoutMs: SYSTEMCTL_TIMEOUT_MS })
 }
 
 function unitStem(prefix: string): string {
@@ -297,6 +278,11 @@ class LinuxScopeStartup {
 
 class SystemdScopeOwner implements BoundProcessOwner {
   private establishment: 'pending' | 'established' = 'pending'
+  /**
+   * dshfiles delta: signals go to the manager asynchronously, one at a time and in call order,
+   * so a KILL never overtakes its TERM; observation joins them before judging the range.
+   */
+  private readonly signalDelivery = new SerialLane()
   private stopped = false
   private terminationRequested = false
   private observation: Promise<void> | undefined
@@ -330,16 +316,24 @@ class SystemdScopeOwner implements BoundProcessOwner {
     if (this.direct.running()) this.startup.terminationSignals.add(signal)
     this.observeRequestConsumption()
     const directFallbackRequired = this.establishment === 'pending'
-    let directSignalled = false
-    if (directFallbackRequired && this.direct.running()) directSignalled = this.direct.signal(signal)
-    const result = this.runSync(this.systemctl, [
-      '--user',
-      'kill',
-      KILL_ALL_MEMBERS,
-      `--signal=${signal}`,
-      this.unit,
-    ], { encoding: 'utf8', env: managerEnvironment(), timeout: SYSTEMCTL_TIMEOUT_MS })
+    const directSignalled = directFallbackRequired && this.direct.running() && this.direct.signal(signal)
     this.wakeObservation()
+    this.signalDelivery.submit(() => this.query(this.systemctl, [
+      '--user', 'kill', KILL_ALL_MEMBERS, `--signal=${signal}`, this.unit,
+    ])
+      .then((result) => { this.acknowledgeSignal(signal, result, directFallbackRequired, directSignalled) })
+      .catch((error: unknown) => { this.killFailure = error instanceof Error ? error : new Error(String(error)) })
+      .finally(() => { this.wakeObservation() }))
+  }
+
+  /** Act on the manager's answer to one signal, in the order the signals were requested. */
+  private acknowledgeSignal(
+    signal: 'SIGTERM' | 'SIGKILL',
+    result: SystemctlResult,
+    directFallbackRequired: boolean,
+    directSignalledBefore: boolean,
+  ): void {
+    let directSignalled = directSignalledBefore
     if (result.error === undefined && result.status === 0) {
       if (signal === 'SIGKILL') {
         this.killFailure = undefined
@@ -410,16 +404,9 @@ class SystemdScopeOwner implements BoundProcessOwner {
   }
 
   /** Release a leftover empty scope so the transient unit is collected and cannot accumulate. */
-  private releaseEmptyRange(): void {
-    try {
-      this.runSync(this.systemctl, ['--user', 'stop', this.unit], {
-        env: managerEnvironment(),
-        stdio: 'ignore',
-        timeout: SYSTEMCTL_TIMEOUT_MS,
-      })
-    } catch {
-      // The range is already empty; a failed cleanup leaves only the transient unit.
-    }
+  private async releaseEmptyRange(): Promise<void> {
+    // The range is already empty; a failed cleanup leaves only the transient unit.
+    await this.query(this.systemctl, ['--user', 'stop', this.unit]).catch(() => {})
   }
 
   private parseUnitState(stdout: string): { loadState: string; activeState: string; tasksCurrent: number | undefined } {
@@ -456,6 +443,8 @@ class SystemdScopeOwner implements BoundProcessOwner {
   }
 
   private async rangeActive(): Promise<boolean> {
+    // Join every signal requested so far: the range is not judged before the manager answered them.
+    await this.signalDelivery.drained()
     this.observeRequestConsumption()
     const generation = this.wakeGeneration
     const directRunning = this.direct.running()
@@ -484,7 +473,7 @@ class SystemdScopeOwner implements BoundProcessOwner {
         throw new Error(`systemctl returned unknown ActiveState for ${this.unit}: ${JSON.stringify(activeState)}`)
       }
       if (this.emptyRange(tasksCurrent)) {
-        this.releaseEmptyRange()
+        await this.releaseEmptyRange()
         return false
       }
       if (this.killFailure !== undefined) {
