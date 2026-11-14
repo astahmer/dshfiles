@@ -68,14 +68,6 @@
       "reason": "The subprocess runtime other plugins spawn through; each caller opens the span for its own command (jj, secret, project-checks run), so a runtime span would duplicate it."
     },
     {
-      "file": "src/native/systemctl-runner.ts",
-      "reason": "Runs the systemctl commands linux-scope.ts issues for one managed range; the caller command span (jj, secret, project-checks run) covers that range's lifetime."
-    },
-    {
-      "file": "src/native/systemctl-promise.ts",
-      "reason": "The Promise boundary of systemctl-runner.ts; the caller command span (jj, secret, project-checks run) covers the managed range it serves."
-    },
-    {
       "file": "src/native/process-inspector.ts",
       "reason": "The subprocess runtime other plugins spawn through; each caller opens the span for its own command (jj, secret, project-checks run), so a runtime span would duplicate it."
     },
