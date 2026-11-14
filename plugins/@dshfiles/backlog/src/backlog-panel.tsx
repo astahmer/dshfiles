@@ -75,7 +75,7 @@ import { SearchScopes, type SearchScope } from './search-scope.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { BacklogSyncControls } from './sync-controls.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
-import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, StartThreadOutcome, StartThreadProject, StartThreadRequest } from './start-thread.js'
+import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadDestination, StartThreadItem, StartThreadOutcome, StartThreadProject, StartThreadRequest } from './start-thread.js'
 import { FeedStatus } from './status-filter.js'
 import { BACKLOG_TRIAGE_MUTATION_KEY, BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { usePanelRequests } from './use-panel-requests.js'
@@ -327,6 +327,8 @@ export interface StartThreadPorts {
   readonly loadCatalog: () => Promise<StartThreadCatalog>
   /** Every enabled agent, so the dialog can start the thread as one. */
   readonly listAgents: () => Promise<readonly StartThreadAgentChoice[]>
+  /** The project's repository for the dialog's workspace picker: a new workspace from a bookmark, or the checkout. */
+  readonly loadDestination?: (projectId: string) => Promise<StartThreadDestination | null>
   readonly start: (request: StartThreadRequest) => Promise<StartThreadOutcome>
 }
 
@@ -1155,6 +1157,7 @@ export const BacklogPanel = (props: {
             projects={props.startThread.listProjects()}
             loadCatalog={props.startThread.loadCatalog}
             listAgents={props.startThread.listAgents}
+            loadDestination={props.startThread.loadDestination}
             openByDefault={settings.value?.startThreadOpensCreated ?? false}
             start={request => {
               // Creating the thread runs on in the background; the entry reports it in a toast wherever the user went.

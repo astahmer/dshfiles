@@ -44,3 +44,41 @@ describe('StartThreadPlacementPlan', () => {
     expect(StartThreadPlacementPlan.of({ registered: [], itemProjects: [null] })).toEqual({ workspaceId: undefined, cwd: undefined })
   })
 })
+
+describe('StartThreadPlacementPlan.checkout', () => {
+  const project = { workspaceId: 'ws-dshfiles', cwd: undefined }
+
+  it('cuts a new workspace from the main branch when the caller chose nothing, as before', () => {
+    expect(StartThreadPlacementPlan.checkout({ placement: project })).toEqual({ ok: true, checkout: { kind: 'own', base: undefined } })
+  })
+
+  it('starts the new workspace from the bookmark the caller chose, a remote one included', () => {
+    expect(StartThreadPlacementPlan.checkout({ placement: project, base: 'feature@origin' })).toEqual({
+      ok: true,
+      checkout: { kind: 'own', base: 'feature@origin' },
+    })
+  })
+
+  it('runs in the project checkout itself when the caller turned isolation off', () => {
+    expect(StartThreadPlacementPlan.checkout({ placement: project, isolate: false })).toEqual({ ok: true, checkout: { kind: 'in-place' } })
+  })
+
+  it('refuses a starting bookmark for a thread that stays in the project checkout', () => {
+    const planned = StartThreadPlacementPlan.checkout({ placement: project, isolate: false, base: 'main' })
+    expect(planned.ok).toBe(false)
+    expect(planned.ok ? '' : planned.reason).toMatch(/isolate: true/u)
+  })
+
+  it('refuses a starting bookmark when the thread has no project to cut a workspace from', () => {
+    const planned = StartThreadPlacementPlan.checkout({ placement: { workspaceId: undefined, cwd: '/tmp/folder' }, base: 'main' })
+    expect(planned.ok).toBe(false)
+    expect(planned.ok ? '' : planned.reason).toMatch(/registered project/u)
+  })
+
+  it('ignores isolation for a bare folder, which has no workspace to cut', () => {
+    expect(StartThreadPlacementPlan.checkout({ placement: { workspaceId: undefined, cwd: '/tmp/folder' }, isolate: true })).toEqual({
+      ok: true,
+      checkout: { kind: 'in-place' },
+    })
+  })
+})

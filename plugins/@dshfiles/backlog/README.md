@@ -368,9 +368,16 @@ project workspace or bare folder, an agent handle, an account/model, and the fir
 one Host verb, so a thread an agent starts is the thread the dialog starts. The tool itself does not
 navigate the calling thread.
 
-A thread started from an item always runs in its own workspace of the chosen project, whatever the
+By default a thread started from an item runs in its own workspace of the chosen project, whatever the
 isolate-by-default setting says: work captured in the backlog is independent, so it never shares a checkout
-another thread is editing. The version-control provider that claims the project
+another thread is editing. When the chosen project is a jj or git repository, the dialog's **Workspace** field offers
+the same choices as the New thread row: **New workspace** (from the project's main branch), **Project checkout** (the
+thread edits the project folder itself, nothing is created), or a new workspace that starts from any local bookmark
+(git: branch) or any fetched remote bookmark (`feature@origin`, git `origin/feature`), which the Host fetches again
+before it starts from it. With _One thread per item_ and no project picked, each item keeps its own project, so only
+the workspace-or-checkout choice carries over. Agents pass the same choice to `backlog_start_thread` as `isolate`
+(`false` for the checkout) and `base` (the starting bookmark; refused with `isolate: false` or without a project).
+The version-control provider that claims the project
 ([`@dshfiles/vcs-provider-port`](../vcs-provider-port/README.md)) creates that workspace: `@dshfiles/jj-integration`
 for a jj repository (one `thread-xxxxxx` beside the project), `@dshfiles/git-worktrees` for a plain git repository
 when its `isolate` setting is on. A project no provider claims, or one whose provider keeps isolation off, starts the
