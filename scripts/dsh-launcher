@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
-# Machine-local launcher choices live outside this checkout. Preserve caller HOME/XDG.
+# The `dsh` command for a source checkout. Install it on PATH with `node scripts/install-launcher.mjs --apply`.
+# Machine-local launcher choices live outside this checkout (docs/personal-configuration.md). Preserve caller HOME/XDG.
 set -euo pipefail
 launcher_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-exec "${DSHFILES_NODE_BINARY:-node}" "$launcher_dir/launch-dsh.mjs" "$@"
+# Bootstrap on the Node the checkout pins, as the dev shell does, so `dsh` works from any directory without direnv.
+node="${DSHFILES_NODE_BINARY:-}"
+if [[ -z "$node" ]]; then
+  version="$(tr -d '[:space:]' < "$launcher_dir/../.node-version" 2>/dev/null || true)"
+  version="${version#v}"
+  for root in "${FNM_DIR:-}" "${XDG_DATA_HOME:-$HOME/.local/share}/fnm" "$HOME/Library/Application Support/fnm" "$HOME/.fnm"; do
+    candidate="$root/node-versions/v$version/installation/bin/node"
+    if [[ -n "$root" && -n "$version" && -x "$candidate" ]]; then
+      node="$candidate"
+      break
+    fi
+  done
+fi
+if [[ -z "$node" ]]; then
+  node="$(command -v node || true)"
+fi
+if [[ -z "$node" ]]; then
+  printf 'dsh: no Node found. Install the pinned one: fnm install %s. Nothing started.\n' "${version:-<.node-version>}" >&2
+  exit 2
+fi
+exec "$node" "$launcher_dir/launch-dsh.mjs" "$@"

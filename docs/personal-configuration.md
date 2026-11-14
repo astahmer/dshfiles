@@ -20,8 +20,13 @@ mask project definitions, so it is not a substitute for an empty shared default.
 
 ## Launcher configuration
 
-[scripts/dsh-launcher](../scripts/dsh-launcher) uses an official Node available on
-`PATH` (or `DSHFILES_NODE_BINARY`) to read a machine-local JSON object:
+[scripts/dsh-launcher](../scripts/dsh-launcher) is the `dsh` command of a source checkout.
+Install it on `PATH` with `node scripts/install-launcher.mjs --apply` (a dry run without
+`--apply`): it writes a two-line `~/.local/bin/dsh` shim that runs this checkout's launcher,
+backing up any previous wrapper, and drops `launcher.json` pins the checkout now derives (an
+fnm `nodeBinary`/`path`, a `coreEntry` equal to the checkout's core). It boots on the fnm
+build of the checkout's `.node-version`, like the dev shell, with no direnv needed, and reads
+a machine-local JSON object:
 
 ```text
 ${XDG_CONFIG_HOME:-$HOME/.config}/dshfiles/launcher.json
@@ -45,19 +50,20 @@ inherited one. Run it from a plain terminal, or unset `DSH_HOME`.
 | ---------------------- | --------------------------------- | ------------------------------------------------------------------------------------- |
 | `sourceRoot`           | `DSHFILES_DIR`                    | Checkout containing the helper; absolute directory                                    |
 | `dshHome`              | `DSH_HOME`                        | `$HOME/.dsh`; absolute directory                                                      |
-| `nodeBinary`           | `DSHFILES_NODE_BINARY`            | Current Node executable; absolute filename                                            |
+| `nodeBinary`           | `DSHFILES_NODE_BINARY`            | fnm build of the checkout's `.node-version`, else the current Node; absolute filename |
 | `coreEntry`            | `DSH_CORE_ENTRY`                  | The core this checkout's lockfile installed; another core is kept and validated       |
 | `profile`              | `DSHFILES_PROFILE`                | `web`; starts with a letter/digit, then letters/digits/underscore/hyphen              |
 | `legacyPort`           | `DSHFILES_LEGACY_PORT`            | Absent; integer `0..65535`, only for explicit migration of an old wrapper's port      |
 | `homeVerificationFile` | `DSHFILES_HOME_VERIFICATION_FILE` | Absent; optional existing absolute marker filename                                    |
 | `browserExecutable`    | `DSHX_CHROMIUM_EXECUTABLE`        | Absent; candidate verifier uses bundled Playwright browser unless explicitly selected |
-| `path`                 | `DSHFILES_PATH`                   | Inherited `PATH`; optional nonempty search path                                       |
+| `path`                 | `DSHFILES_PATH`                   | Inherited `PATH` with the Host's Node first; optional nonempty search path            |
 | `nodePath`             | `DSHFILES_NODE_PATH`              | Inherited `NODE_PATH`; optional nonempty module search path                           |
 
 Every string must be nonempty and contain no NUL/newline. There is no arbitrary
 command/shell/environment-map setting. `HOME`, XDG directories and `GH_CONFIG_DIR`
-are inherited, never reset to another person or machine. The shell bootstrap must
-already find Node; a JSON `nodeBinary` choice takes effect after that bootstrap.
+are inherited, never reset to another person or machine. Preparation runs the pnpm the
+checkout pins (`packageManager`) through the Host Node's corepack. A hand-written wrapper
+that hardcodes a Node or core path drifts on the next `git pull`; prefer the installed shim.
 
 With arguments, the launcher passes them unchanged to the configured core (including
 native explicit `--profile` options). Without arguments, it prints the home, profile and
@@ -112,7 +118,8 @@ Node executable, source root, profile, optional home-verification marker, `PATH`
 `NODE_PATH` into the local JSON file. If it forced a port, record that migration choice
 as `legacyPort`. Keep the existing writable DSH home; do not copy another person's
 accounts, patches or aliases from a seed. Review inherited `HOME`/XDG values in the
-external wrapper as well. No repository script performs this external migration.
+external wrapper as well. `node scripts/install-launcher.mjs` replaces the wrapper and drops
+derived pins; it never copies accounts, patches or aliases.
 
 A fresh installation should seed its writable web profile with the existing profile
 reconciler, then configure accounts and explicitly select a model. The source-launch

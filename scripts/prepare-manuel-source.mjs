@@ -40,6 +40,7 @@ function main() {
   const config = LauncherConfig.load()
   const root = config.sourceRoot
   const home = config.dshHome
+  const pnpm = LauncherConfig.pnpm(config)
   const profile = join(home, 'profiles', config.profile)
   const path = join(profile, 'package.json')
   const originalText = readFileSync(path, 'utf8')
@@ -119,12 +120,16 @@ if source.exists():
   try {
     if (changed) atomicWrite(path, desiredText)
     if (patchChanged) atomicWrite(patch, desiredPatch)
-    if (changed) execFileSync('pnpm', ['--dir', profile, 'install', '--prefer-offline'], { stdio: 'inherit' })
+    if (changed)
+      execFileSync(pnpm.command, [...pnpm.prefix, '--dir', profile, 'install', '--prefer-offline'], { stdio: 'inherit', env: { ...process.env, ...pnpm.env } })
   } catch {
     if (patchChanged && existsSync(patch) && readFileSync(patch, 'utf8') === desiredPatch) atomicWrite(patch, originalPatch)
     if (changed && readFileSync(path, 'utf8') === desiredText) {
       atomicWrite(path, originalText)
-      const rollback = spawnSync('pnpm', ['--dir', profile, 'install', '--prefer-offline'], { stdio: 'inherit' })
+      const rollback = spawnSync(pnpm.command, [...pnpm.prefix, '--dir', profile, 'install', '--prefer-offline'], {
+        stdio: 'inherit',
+        env: { ...process.env, ...pnpm.env },
+      })
       if (rollback.status !== 0) throw new Error(`Profile install and rollback install failed; private backup: ${backup}`)
     }
     throw new Error(`Profile preparation failed; original files restored where unchanged. Private backup: ${backup}`)

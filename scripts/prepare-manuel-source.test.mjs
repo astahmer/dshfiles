@@ -71,6 +71,8 @@ test('real profile relink preserves user edits/accounts and never adds unselecte
     DSHFILES_DIR: root,
     DSHFILES_PROFILE: 'custom',
     DSH_CORE_ENTRY: join(home, 'fake-core.mjs'),
+    // A Node with no corepack beside it, so the fake pnpm on PATH runs.
+    DSHFILES_NODE_BINARY: join(bin, 'node'),
     PATH: `${bin}:${process.env.PATH}`,
   }
   delete env.DSHFILES_LAUNCHER_CONFIG
@@ -143,6 +145,7 @@ const leftoverFixture = (t, { bundles, dependencies }) => {
     DSHFILES_DIR: root,
     DSHFILES_PROFILE: 'custom',
     DSH_CORE_ENTRY: join(home, 'core.mjs'),
+    DSHFILES_NODE_BINARY: join(bin, 'node'),
     PATH: `${bin}:${process.env.PATH}`,
   }
   delete env.DSHFILES_LAUNCHER_CONFIG

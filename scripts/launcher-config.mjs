@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { isAbsolute, join, resolve } from 'node:path'
+import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const pathKeys = ['sourceRoot', 'dshHome', 'nodeBinary', 'coreEntry', 'homeVerificationFile', 'browserExecutable']
@@ -60,7 +60,6 @@ export class LauncherConfig {
     const config = {
       sourceRoot: resolve(fileURLToPath(new URL('..', import.meta.url))),
       dshHome: join(home, '.dsh'),
-      nodeBinary: process.execPath,
       profile: 'web',
       ...local,
     }
@@ -69,6 +68,9 @@ export class LauncherConfig {
       if (key === 'legacyPort' && !/^\d+$/.test(env[variable])) throw new Error('legacyPort environment override must be an integer')
       config[key] = key === 'legacyPort' ? Number(env[variable]) : env[variable]
     }
+    // Unconfigured, the Host runs on the Node the checkout pins, as the dev shell does: a `git pull` that bumps
+    // .node-version moves the launcher with it instead of leaving a hand-copied path behind.
+    config.nodeBinary ??= LauncherConfig.checkoutNode(config.sourceRoot, env) ?? process.execPath
     for (const [key, value] of Object.entries(config)) {
       if (key === 'legacyPort') {
         if (!Number.isInteger(value) || value < 0 || value > 65535) throw new Error('legacyPort must be an integer from 0 through 65535')
@@ -84,6 +86,37 @@ export class LauncherConfig {
     return config
   }
 
+  /**
+   * The official fnm build of the checkout's `.node-version`, where `fnm install` puts it (FNM_DIR, else the XDG data
+   * directory, else macOS Application Support). Undefined when the file or the build is missing: the startup preflight
+   * then names the version to install.
+   */
+  static checkoutNode(sourceRoot, env = process.env) {
+    let version
+    try {
+      version = readFileSync(join(sourceRoot, '.node-version'), 'utf8').trim().replace(/^v/, '')
+    } catch {
+      return undefined
+    }
+    if (!/^\d+\.\d+\.\d+$/.test(version)) return undefined
+    const home = env.HOME || homedir()
+    const roots = [
+      env.FNM_DIR,
+      join(env.XDG_DATA_HOME || join(home, '.local', 'share'), 'fnm'),
+      join(home, 'Library', 'Application Support', 'fnm'),
+      join(home, '.fnm'),
+    ].filter(root => root !== undefined && root !== '')
+    return roots.map(root => join(root, 'node-versions', `v${version}`, 'installation', 'bin', 'node')).find(candidate => existsSync(candidate))
+  }
+
+  /** The pnpm the checkout pins (packageManager), through the Host Node's own corepack; else the pnpm on PATH. */
+  static pnpm(config) {
+    const corepack = join(dirname(config.nodeBinary), 'corepack')
+    return existsSync(corepack)
+      ? { command: corepack, prefix: ['pnpm'], env: { COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' } }
+      : { command: 'pnpm', prefix: [], env: {} }
+  }
+
   static environment(config, env = process.env) {
     const result = { ...env }
     for (const key of ['DSH_PROFILE', 'DSH_PROFILE_DIR', 'DSH_SESSION_ID', 'DSH_WEB_URL', 'DSH_SHELL', 'DSH_RESTART_REQUEST_PATH', 'DSH_RESTART_RUN_ID'])
@@ -92,7 +125,9 @@ export class LauncherConfig {
     for (const [key, variable] of Object.entries(environmentKeys)) {
       if (config[key] !== undefined) result[variable] = String(config[key])
     }
+    // Preparation runs `pnpm` and `node` from PATH: put the Host's Node first so they match it.
     if (config.path !== undefined) result.PATH = config.path
+    else if (config.nodeBinary !== undefined) result.PATH = [dirname(config.nodeBinary), result.PATH].filter(Boolean).join(delimiter)
     if (config.nodePath !== undefined) result.NODE_PATH = config.nodePath
     // Reusing compiled modules across Host starts halves boot (5-6 s to about 2.5 s measured with the web profile).
     if (result.NODE_COMPILE_CACHE === undefined || result.NODE_COMPILE_CACHE === '')

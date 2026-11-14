@@ -121,11 +121,24 @@ async function main() {
   const root = config.sourceRoot
   const home = config.dshHome
   const core = LauncherConfig.requireCoreEntry(config)
+  const pnpm = LauncherConfig.pnpm(config)
   const fullPreparation = [
-    { command: 'pnpm', args: ['--dir', root, 'install', '--frozen-lockfile', '--prefer-offline'] },
+    { command: pnpm.command, env: pnpm.env, args: [...pnpm.prefix, '--dir', root, 'install', '--frozen-lockfile', '--prefer-offline'] },
     {
-      command: 'pnpm',
-      args: ['--dir', root, 'exec', 'node', join(root, 'scripts/turbo.mjs'), 'run', 'build', '--filter=./plugins/@dshfiles/*', '--output-logs=errors-only'],
+      command: pnpm.command,
+      env: pnpm.env,
+      args: [
+        ...pnpm.prefix,
+        '--dir',
+        root,
+        'exec',
+        'node',
+        join(root, 'scripts/turbo.mjs'),
+        'run',
+        'build',
+        '--filter=./plugins/@dshfiles/*',
+        '--output-logs=errors-only',
+      ],
     },
     { command: config.nodeBinary, args: [join(root, 'scripts/prepare-manuel-source.mjs')] },
     // A build that passes is not a start that works: compose the profile on the core that will run it, check Node and

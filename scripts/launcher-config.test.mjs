@@ -99,3 +99,27 @@ test('malformed configuration fails closed, including unknown keys and path/prof
   assert.throws(() => LauncherConfig.load({ ...f.env, DSHFILES_LEGACY_PORT: 'bad' }), /legacyPort/)
   assert.throws(() => LauncherConfig.load({ ...f.env, DSHFILES_LEGACY_PORT: '' }), /legacyPort/)
 })
+
+test('without a configured nodeBinary the Host runs on the fnm build of the checkout .node-version, first on PATH', t => {
+  const f = fixture(t)
+  const source = join(f.home, 'checkout')
+  mkdirSync(source)
+  writeFileSync(join(source, '.node-version'), '24.11.1\n')
+  const node = join(f.home, '.local/share/fnm/node-versions/v24.11.1/installation/bin/node')
+  const env = { ...f.env, DSHFILES_DIR: source, PATH: '/usr/bin' }
+  // Not installed yet: fall back to the running Node; the startup preflight names the version to install.
+  assert.equal(LauncherConfig.load(env).nodeBinary, process.execPath)
+  mkdirSync(dirname(node), { recursive: true })
+  writeFileSync(node, '')
+  const config = LauncherConfig.load(env)
+  assert.equal(config.nodeBinary, node)
+  assert.equal(LauncherConfig.environment(config, env).PATH, `${dirname(node)}:/usr/bin`)
+  // FNM_DIR wins, and an explicit choice is never replaced.
+  const custom = join(f.home, 'fnm-custom/node-versions/v24.11.1/installation/bin/node')
+  mkdirSync(dirname(custom), { recursive: true })
+  writeFileSync(custom, '')
+  assert.equal(LauncherConfig.load({ ...env, FNM_DIR: join(f.home, 'fnm-custom') }).nodeBinary, custom)
+  assert.equal(LauncherConfig.load({ ...env, DSHFILES_NODE_BINARY: '/opt/node/bin/node' }).nodeBinary, '/opt/node/bin/node')
+  writeFileSync(f.file, JSON.stringify({ path: '/explicit/bin' }))
+  assert.equal(LauncherConfig.environment(LauncherConfig.load(env), env).PATH, '/explicit/bin')
+})
