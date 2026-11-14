@@ -128,6 +128,9 @@ async function main() {
       args: ['--dir', root, 'exec', 'node', join(root, 'scripts/turbo.mjs'), 'run', 'build', '--filter=./plugins/@dshfiles/*', '--output-logs=errors-only'],
     },
     { command: config.nodeBinary, args: [join(root, 'scripts/prepare-manuel-source.mjs')] },
+    // A build that passes is not a start that works: compose the profile on the core that will run it, check Node and
+    // the saved agent presets, and migrate recorded preset changes, before any Host starts.
+    { command: config.nodeBinary, args: [join(root, 'scripts/dsh-preflight.mjs'), '--apply'] },
   ]
   // Safe mode boots its sibling profile without building or relinking: a broken plugin build must not block recovery.
   const plan = () => {

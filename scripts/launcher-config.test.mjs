@@ -25,7 +25,12 @@ test('missing optional local config has no personal account/runtime selection an
   assert.equal(config.nodeBinary, process.execPath)
   assert.equal(config.coreEntry, undefined)
   assert.equal(config.legacyPort, undefined)
-  assert.throws(() => LauncherConfig.requireCoreEntry(config), /Configure coreEntry/)
+  // Without a configured core, the checkout's own lockfile core runs; with neither, nothing starts.
+  const withCore = join(f.home, 'with-core')
+  mkdirSync(join(withCore, 'node_modules/@deepseek-ai/dsh/lib'), { recursive: true })
+  writeFileSync(join(withCore, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '')
+  assert.equal(LauncherConfig.requireCoreEntry({ ...config, sourceRoot: withCore }), join(withCore, 'node_modules/@deepseek-ai/dsh/lib/bin.js'))
+  assert.throws(() => LauncherConfig.requireCoreEntry({ ...config, sourceRoot: join(f.home, 'no-core') }), /No DSH core: configure coreEntry/)
   assert.throws(() => LauncherConfig.load({ ...f.env, DSHFILES_LAUNCHER_CONFIG: join(f.home, 'absent') }), /ENOENT/)
 })
 

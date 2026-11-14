@@ -46,7 +46,7 @@ inherited one. Run it from a plain terminal, or unset `DSH_HOME`.
 | `sourceRoot`           | `DSHFILES_DIR`                    | Checkout containing the helper; absolute directory                                    |
 | `dshHome`              | `DSH_HOME`                        | `$HOME/.dsh`; absolute directory                                                      |
 | `nodeBinary`           | `DSHFILES_NODE_BINARY`            | Current Node executable; absolute filename                                            |
-| `coreEntry`            | `DSH_CORE_ENTRY`                  | **Required before launching**; installed DSH core entry, absolute filename            |
+| `coreEntry`            | `DSH_CORE_ENTRY`                  | The core this checkout's lockfile installed; another core is kept and validated       |
 | `profile`              | `DSHFILES_PROFILE`                | `web`; starts with a letter/digit, then letters/digits/underscore/hyphen              |
 | `legacyPort`           | `DSHFILES_LEGACY_PORT`            | Absent; integer `0..65535`, only for explicit migration of an old wrapper's port      |
 | `homeVerificationFile` | `DSHFILES_HOME_VERIFICATION_FILE` | Absent; optional existing absolute marker filename                                    |
@@ -80,6 +80,31 @@ requests the compatibility fallback. Saved Network access preferences and native
 flags retain precedence. Private candidate-verification evidence goes under
 `dshHome/verification`; candidate execution uses an isolated scratch home.
 
+## Startup preflight
+
+A build that passes is not a start that works. Before every Host start, after building
+and relinking, the supervisor runs [scripts/dsh-preflight.mjs](../scripts/dsh-preflight.mjs)
+`--apply` against the core that will run ([details](../scripts/dsh-compat/preflight.mjs)):
+
+- **core**: which `@deepseek-ai/dsh` the entry belongs to. Leave `coreEntry` unset to run
+  the core this checkout installs, so plugins and core move together on `git pull`. A
+  configured other core (including a wrapper's `DSH_CORE_ENTRY`, which overrides the JSON)
+  is kept and named in the report with how to switch.
+- **node**: the Host's Node satisfies that core's `engines.node`.
+- **presets**: saved agent presets name modules that resolve and suit that core. Recorded
+  breaking changes (0.2.1 → 0.2.2: `list-agents`, `modelSelectionSettings`, tool-presentation
+  mode) are migrated, the file first copied to `<file>.before-presets-…`, only while no Host
+  serves the profile. Anything else stops the start with the preset, file, row and fix.
+- **composition**: `dsh --profile <p> --dump-config` on that core. A failure, a skipped
+  bundle or a disabled row stops the start; DSH itself would only print a line and start
+  without that bundle's services.
+
+Run it by hand, writing nothing, with `node scripts/dsh-preflight.mjs`. Before it, the
+source preparer applies recorded renames and removals of owned plugins
+([list](../scripts/dsh-compat/owned-plugins.mjs)) to the profile selection, with a backup;
+a selected plugin whose sources are gone for no recorded reason stops the start. A removed
+plugin's leftover `dist/` no longer counts as built.
+
 ## Moving an existing installation
 
 Before changing a canonical checkout or wrapper, copy the old wrapper's runtime entry,
@@ -96,7 +121,8 @@ preparer expects an existing profile; it does not silently create one or import 
 ## Focused verification
 
 ```sh
-node --experimental-strip-types --test scripts/running-hosts.test.mjs scripts/launcher-config.test.mjs scripts/launch-dsh.test.mjs scripts/prepare-manuel-source.test.mjs scripts/personal-configuration.test.mjs scripts/supervise-dsh.test.mjs scripts/network-startup-patch.test.mjs
+node --experimental-strip-types --test scripts/running-hosts.test.mjs scripts/launcher-config.test.mjs scripts/launch-dsh.test.mjs scripts/prepare-manuel-source.test.mjs scripts/personal-configuration.test.mjs scripts/supervise-dsh.test.mjs scripts/network-startup-patch.test.mjs scripts/dsh-compat/*.test.mjs
+pnpm test:preset-upgrade   # two real cores, a fake model and a browser; about 15 s once both cores are cached
 node --check scripts/verify-manuel-candidate.mjs
 bash -n scripts/dsh-launcher
 ```

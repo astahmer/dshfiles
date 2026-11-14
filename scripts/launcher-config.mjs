@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,9 +20,14 @@ const environmentKeys = {
 export class LauncherConfig {
   // Bootstrap must work before pnpm installs any schema library. Validate the full
   // JSON contract here, not just its representation; no arbitrary shell/env maps.
+  /** Where the machine-local launcher JSON lives for this environment. */
+  static configPath(env = process.env) {
+    return env.DSHFILES_LAUNCHER_CONFIG ?? join(env.XDG_CONFIG_HOME || join(env.HOME || homedir(), '.config'), 'dshfiles/launcher.json')
+  }
+
   static load(env = process.env) {
     const home = env.HOME || homedir()
-    const configPath = env.DSHFILES_LAUNCHER_CONFIG ?? join(env.XDG_CONFIG_HOME || join(home, '.config'), 'dshfiles/launcher.json')
+    const configPath = LauncherConfig.configPath(env)
     if (!isAbsolute(configPath)) throw new Error('Launcher config path must be absolute')
     let local = {}
     try {
@@ -95,8 +100,17 @@ export class LauncherConfig {
     return result
   }
 
+  /**
+   * The core to start: the configured one, else the core this checkout's lockfile installed. Defaulting to the
+   * checkout's core keeps it in step with the plugins built from the same checkout; an explicit choice is kept and the
+   * startup preflight validates it.
+   */
   static requireCoreEntry(config) {
-    if (!config.coreEntry) throw new Error('Configure coreEntry or DSH_CORE_ENTRY with the installed DSH core entry; nothing started')
-    return config.coreEntry
+    if (config.coreEntry) return config.coreEntry
+    const checkout = join(config.sourceRoot, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
+    if (existsSync(checkout)) return checkout
+    throw new Error(
+      `No DSH core: configure coreEntry or DSH_CORE_ENTRY, or run pnpm install in ${config.sourceRoot} to install its pinned core; nothing started`,
+    )
   }
 }

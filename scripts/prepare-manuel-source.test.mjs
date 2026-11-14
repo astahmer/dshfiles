@@ -48,6 +48,7 @@ test('real profile relink preserves user edits/accounts and never adds unselecte
   mkdirSync(profile, { recursive: true })
   mkdirSync(bin)
   mkdirSync(join(root, 'plugins/@dshfiles/home/dist'), { recursive: true })
+  writeFileSync(join(root, 'plugins/@dshfiles/home/package.json'), '{"name":"@dshfiles/home"}')
   writeFileSync(join(root, 'plugins/@dshfiles/home/dist/index.js'), '// fixture')
   const original = {
     dependencies: { '@dshfiles/home': 'link:/old', community: '1.0.0' },
@@ -109,4 +110,89 @@ test('source-link transformation is idempotent and validates selected packages',
   assert.deepEqual(sourceLinkedManifest(linked, '/canonical'), linked)
   assert.throws(() => sourceLinkedManifest({ dependencies: {}, dsh: { profile: { bundles: ['@dshfiles/../escape'] } } }, '/canonical'), /invalid/)
   assert.throws(() => sourceLinkedManifest({ dependencies: {}, dsh: { profile: { bundles: ['@dshfiles/missing'] } } }, '/canonical'), /lacks/)
+})
+
+/** A profile in a scratch home whose checkout keeps only build leftovers for the removed and renamed plugins. */
+const leftoverFixture = (t, { bundles, dependencies }) => {
+  const home = mkdtempSync(join(tmpdir(), 'dsh-prepare-leftover-'))
+  t.after(() => rmSync(home, { recursive: true, force: true }))
+  const dshHome = join(home, 'dsh')
+  const root = join(home, 'source')
+  const profile = join(dshHome, 'profiles/custom')
+  const bin = join(home, 'bin')
+  mkdirSync(profile, { recursive: true })
+  mkdirSync(bin)
+  const plugin = (name, { source }) => {
+    mkdirSync(join(root, 'plugins', name, 'dist'), { recursive: true })
+    writeFileSync(join(root, 'plugins', name, 'dist/index.js'), '// stale build')
+    if (source) writeFileSync(join(root, 'plugins', name, 'package.json'), JSON.stringify({ name }))
+  }
+  plugin('@dshfiles/chat', { source: true })
+  plugin('@dshfiles/diffs-review', { source: true })
+  for (const name of ['@dshfiles/pulls-review', '@dshfiles/plugin-marketplace', '@dshfiles/sidebar-commands', '@dshfiles/vanished'])
+    plugin(name, { source: false })
+  const original = { dependencies, dsh: { profile: { bundles } }, user: { keep: true } }
+  writeFileSync(join(profile, 'package.json'), JSON.stringify(original))
+  writeFileSync(join(bin, 'ps'), '#!/bin/sh\nexit 0\n', { mode: 0o700 })
+  writeFileSync(join(bin, 'pnpm'), '#!/bin/sh\nexit 0\n', { mode: 0o700 })
+  const env = {
+    ...process.env,
+    HOME: home,
+    XDG_CONFIG_HOME: join(home, 'config'),
+    DSH_HOME: dshHome,
+    DSHFILES_DIR: root,
+    DSHFILES_PROFILE: 'custom',
+    DSH_CORE_ENTRY: join(home, 'core.mjs'),
+    PATH: `${bin}:${process.env.PATH}`,
+  }
+  delete env.DSHFILES_LAUNCHER_CONFIG
+  const run = (...args) => spawnSync(process.execPath, [join(import.meta.dirname, 'prepare-manuel-source.mjs'), ...args], { env, encoding: 'utf8' })
+  return { root, dshHome, profile, original, run, read: () => JSON.parse(readFileSync(join(profile, 'package.json'), 'utf8')) }
+}
+
+test('a renamed plugin moves in place and removed plugins with stale builds leave the profile, with a backup', t => {
+  const link = name => `link:/old/plugins/${name}`
+  const bundles = ['@deepseek-ai/dsh-base', '@dshfiles/plugin-marketplace', '@dshfiles/pulls-review', '@dshfiles/chat', '@dshfiles/sidebar-commands']
+  const f = leftoverFixture(t, {
+    bundles,
+    dependencies: Object.fromEntries([...bundles.slice(1), 'community'].map(name => [name, name === 'community' ? '1.0.0' : link(name)])),
+  })
+  const check = f.run('--check')
+  assert.equal(check.status, 0, check.stderr)
+  assert.match(check.stdout, /Would migrate the profile: @dshfiles\/pulls-review was renamed @dshfiles\/diffs-review/)
+  assert.deepEqual(f.read(), f.original, '--check writes nothing')
+
+  const first = f.run()
+  assert.equal(first.status, 0, first.stderr)
+  const next = f.read()
+  assert.deepEqual(next.dsh.profile.bundles, ['@deepseek-ai/dsh-base', '@dshfiles/diffs-review', '@dshfiles/chat'])
+  assert.deepEqual(Object.keys(next.dependencies).sort(), ['@dshfiles/chat', '@dshfiles/diffs-review', 'community'])
+  assert.equal(next.dependencies['@dshfiles/diffs-review'], `link:${f.root}/plugins/@dshfiles/diffs-review`)
+  assert.deepEqual(next.user, f.original.user)
+  for (const name of ['plugin-marketplace', 'sidebar-commands']) assert.match(first.stdout, new RegExp(`@dshfiles/${name} was removed`))
+  const [backup] = readdirSync(join(f.dshHome, 'backups/source-link'))
+  assert.deepEqual(JSON.parse(readFileSync(join(f.dshHome, 'backups/source-link', backup, 'package.json'), 'utf8')), f.original)
+
+  const second = f.run()
+  assert.equal(second.status, 0, second.stderr)
+  assert.deepEqual(f.read(), next, 'the migration is idempotent')
+  assert.equal(readdirSync(join(f.dshHome, 'backups/source-link')).length, 1)
+})
+
+test('a selected plugin whose sources vanished for no recorded reason stops startup and changes nothing', t => {
+  const bundles = ['@dshfiles/chat', '@dshfiles/vanished']
+  const f = leftoverFixture(t, { bundles, dependencies: { '@dshfiles/chat': 'link:/old/chat', '@dshfiles/vanished': 'link:/old/vanished' } })
+  const result = f.run()
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /@dshfiles\/vanished is selected in .*package\.json, but .*has no package\.json/)
+  assert.match(result.stderr, /remove @dshfiles\/vanished from dsh\.profile\.bundles/)
+  assert.deepEqual(f.read(), f.original)
+  assert.throws(() => readdirSync(join(f.dshHome, 'backups')), /ENOENT/)
+})
+
+test('a rename never duplicates a target the profile already selects', t => {
+  const bundles = ['@dshfiles/diffs-review', '@dshfiles/pulls-review']
+  const f = leftoverFixture(t, { bundles, dependencies: { '@dshfiles/diffs-review': 'link:/a', '@dshfiles/pulls-review': 'link:/b' } })
+  assert.equal(f.run().status, 0)
+  assert.deepEqual(f.read().dsh.profile.bundles, ['@dshfiles/diffs-review'])
 })

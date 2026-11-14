@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { networkStartupPatch } from './network-startup-patch.mjs'
 import { LauncherConfig } from './launcher-config.mjs'
+import { OwnedPlugins } from './dsh-compat/owned-plugins.mjs'
 
 // Relink only an existing profile's selected packages. Never seed accounts or
 // apply the upstream web profile's personal defaults/new plugin selection.
@@ -43,7 +44,15 @@ function main() {
   const path = join(profile, 'package.json')
   const originalText = readFileSync(path, 'utf8')
   const original = JSON.parse(originalText)
-  const desired = sourceLinkedManifest(original, root)
+  // A removed plugin leaves its git-ignored dist/ behind: check for sources, not a build, and apply only recorded renames
+  // and removals. Anything else fails here instead of linking a stale build that DSH would skip at startup.
+  if (!Array.isArray(original.dsh?.profile?.bundles)) throw new Error('Invalid existing profile manifest')
+  const migration = OwnedPlugins.migrateSelection(original, name => existsSync(join(root, 'plugins', name, 'package.json')))
+  if (migration.unknown.length > 0) {
+    throw new Error(migration.unknown.map(name => OwnedPlugins.unknownMessage({ name, root, manifestPath: path })).join('\n'))
+  }
+  for (const change of migration.changes) console.log(`${checkOnly ? 'Would migrate' : 'Migrating'} the profile: ${change.message}.`)
+  const desired = sourceLinkedManifest(migration.manifest, root)
   const selected = desired.dsh.profile.bundles.filter(name => name.startsWith('@dshfiles/'))
   for (const name of selected) {
     if (!existsSync(join(root, 'plugins', name, 'dist/index.js'))) throw new Error(`Build the selected package before launch: ${name}`)
