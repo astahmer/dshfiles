@@ -997,7 +997,7 @@ export default defineClient({
         const files = DraftAttachmentCarry.filesOf(ctx.conversation, state.attachmentIds)
         // The destination this New thread prepared while it was being written: its provision, listing and blank Session
         // are already under way, so the send only copies the draft and submits instead of waiting for all three.
-        const warm = warmups.for({ sessionId, sourceWorkspaceId: source.workspaceId, name: move.name })
+        const warm = warmups.take({ sessionId, sourceWorkspaceId: source.workspaceId, name: move.name })
         let deliveredSessionId: SessionId | undefined
         let followed = false
         // Keep the source registered while the send runs, so its draft survives the user opening another thread.
@@ -1070,6 +1070,8 @@ export default defineClient({
           })
           .catch(() => source.input.notify('error', translate('workspaceSendFailed')))
           .finally(() => {
+            // A send that ends without consuming or abandoning the warm (cancelled, not ready) hands it back to expiry.
+            warm?.release()
             sourceHeld.release()
             settle()
           })

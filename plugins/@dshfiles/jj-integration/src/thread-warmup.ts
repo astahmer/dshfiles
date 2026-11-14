@@ -27,6 +27,12 @@ export interface PreparedWarm<Composer extends WarmComposer = WarmComposer> {
   readonly target: (signal: AbortSignal) => Promise<Composer>
 }
 
+/** A warm one send owns: the idle expiry stays off until the send consumes, abandons or releases it. */
+export interface TakenWarm<Composer extends WarmComposer = WarmComposer> extends PreparedWarm<Composer> {
+  /** The send ended without consuming or abandoning the warm (cancelled, not ready): hand it back to the idle expiry. */
+  readonly release: () => void
+}
+
 export type WarmSettled = 'pending' | 'ready' | 'kept' | 'failed'
 
 /**
@@ -85,6 +91,25 @@ const systemScheduler: WarmScheduler = {
 
 /** A warm destination stops being useful once its blank Session's retention has expired under it. */
 const WARM_EXPIRY_MS = 45_000
+
+/** Stop waiting when this send is cancelled, without aborting the warm itself: another send may still take it. */
+const awaitWarm = <T>(task: Promise<T>, signal: AbortSignal): Promise<T> => {
+  if (signal.aborted) return Promise.reject(signal.reason)
+  return new Promise<T>((resolve, reject) => {
+    const aborted = (): void => reject(signal.reason)
+    signal.addEventListener('abort', aborted, { once: true })
+    void task.then(
+      value => {
+        signal.removeEventListener('abort', aborted)
+        resolve(value)
+      },
+      (cause: unknown) => {
+        signal.removeEventListener('abort', aborted)
+        reject(cause)
+      },
+    )
+  })
+}
 
 /** The decisions around preparing a New thread's destination, without touching the Host or the DOM. */
 export class ThreadPreparation {
@@ -183,21 +208,33 @@ export class ThreadWarmup<Composer extends WarmComposer = WarmComposer> {
     // Nothing awaits a warm: whoever sends first receives the rejection, and a later prepare retries from scratch.
     record.destinationTask.catch(() => undefined)
     record.composerTask.catch(() => undefined)
-    record.cancelTimer = (this.options.scheduler ?? systemScheduler).after(this.options.expiryMs ?? WARM_EXPIRY_MS, () => this.abandon(input.sessionId))
     this.records.set(input.sessionId, record)
+    this.armExpiry(record)
   }
 
-  /** The warm a first send of that New thread takes, when it is still the one prepared for it. */
-  for(input: WarmInput): PreparedWarm<Composer> | undefined {
+  /**
+   * The first send of that New thread takes its warm, when it is still the one prepared for it. Taking it stops the
+   * idle expiry, which would otherwise abort a preparation the send is waiting on; the send must then consume, abandon
+   * or release it, and a release restarts the expiry.
+   */
+  take(input: WarmInput): TakenWarm<Composer> | undefined {
     const record = this.records.get(input.sessionId)
     if (record === undefined || record.phase._tag === 'failed') return undefined
     if (record.name !== input.name || record.sourceWorkspaceId !== input.sourceWorkspaceId) return undefined
+    record.cancelTimer()
+    record.cancelTimer = () => {}
+    let released = false
     return {
-      destination: async () => record.destinationTask,
-      target: async () => {
-        const composer = await record.composerTask
+      destination: signal => awaitWarm(record.destinationTask, signal),
+      target: async signal => {
+        const composer = await awaitWarm(record.composerTask, signal)
         if (composer === undefined) throw new Error('The prepared destination keeps the thread where it is.')
         return composer
+      },
+      release: () => {
+        if (released) return
+        released = true
+        if (this.records.get(input.sessionId) === record) this.armExpiry(record)
       },
     }
   }
@@ -228,6 +265,13 @@ export class ThreadWarmup<Composer extends WarmComposer = WarmComposer> {
   state(sessionId: string): { readonly settled: WarmSettled; readonly name: string } | undefined {
     const record = this.records.get(sessionId)
     return record === undefined ? undefined : { settled: settledOf(record.phase), name: record.name }
+  }
+
+  private armExpiry(record: WarmRecord<Composer>): void {
+    record.cancelTimer()
+    record.cancelTimer = (this.options.scheduler ?? systemScheduler).after(this.options.expiryMs ?? WARM_EXPIRY_MS, () => {
+      if (this.records.get(record.sessionId) === record) this.abandon(record.sessionId)
+    })
   }
 
   private fail(sessionId: string, record: WarmRecord<Composer>): void {
