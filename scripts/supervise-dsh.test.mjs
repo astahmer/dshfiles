@@ -38,6 +38,11 @@ if(previous.length===1){
   await writeFile(process.env.DSH_RESTART_REQUEST_PATH,'wrong-run-id');process.exit(75);
  } else if(mode==='no-marker'){process.exit(75)}
  else if(mode==='crash'){process.exit(9)}
+ else if(mode==='killed'){process.kill(process.pid,'SIGKILL')}
+ else if(mode==='killed-after-request'){
+  await writeFile(process.env.DSH_RESTART_REQUEST_PATH,process.env.DSH_RESTART_RUN_ID);
+  process.kill(process.pid,'SIGKILL');
+ }
  else if(mode==='url'){
   const {watchFile,unwatchFile}=await import('node:fs');
   const {stat}=await import('node:fs/promises');
@@ -105,7 +110,7 @@ for (const mode of ['wrong-marker', 'no-marker', 'crash']) {
 test('each restart re-reads the launch plan, so safe mode on or off applies to the next Host', async t => {
   const f = await fixture(t, 'native-request')
   const plans = []
-  const warnings = []
+  const warnings = captureStderr(t)
   const plan = () => {
     const safe = plans.length === 0
     plans.push(safe)
@@ -113,12 +118,6 @@ test('each restart re-reads the launch plan, so safe mode on or off applies to t
       ? { args: [...f.options.args, 'safe'], preparation: [], notice: 'Safe mode: booting web-safe' }
       : { args: f.options.args, preparation: [{ command: process.execPath, args: ['-e', 'require("node:fs").appendFileSync("prepared", "x")'] }] }
   }
-  // spawn needs a real stream for the child's stderr, so record the supervisor's own warnings on it.
-  const write = process.stderr.write
-  process.stderr.write = (chunk, ...rest) => (warnings.push(String(chunk)), write.call(process.stderr, chunk, ...rest))
-  t.after(() => {
-    process.stderr.write = write
-  })
   assert.equal(await superviseDsh({ ...f.options, args: undefined, stdout: process.stdout, plan }), 0)
   assert.deepEqual(plans, [true, false])
   assert.equal(await readFile(join(f.home, 'prepared'), 'utf8'), 'x')
@@ -132,8 +131,47 @@ test('startup preparation failure never launches a Host', async t => {
   await assert.rejects(f.runs(), /ENOENT/)
 })
 
+/** Record the supervisor's own warnings: spawn needs a real stream for the Host's stderr. */
+function captureStderr(t) {
+  const lines = []
+  const write = process.stderr.write
+  process.stderr.write = (chunk, ...rest) => (lines.push(String(chunk)), write.call(process.stderr, chunk, ...rest))
+  t.after(() => {
+    process.stderr.write = write
+  })
+  return lines
+}
+
+test('a Host killed by a signal reports that signal, not a blanket 143', async t => {
+  const f = await fixture(t, 'killed')
+  const warnings = captureStderr(t)
+  assert.equal(await superviseDsh(f.options), 137)
+  assert.equal((await f.runs()).length, 1)
+  assert.ok(warnings.some(line => /Host \d+ ended with signal SIGKILL \(status 137\); restart request absent\./.test(line)))
+})
+
+test('a Host that dies by a signal after asking for a restart is not restarted, and the supervisor says why', async t => {
+  const f = await fixture(t, 'killed-after-request')
+  const warnings = captureStderr(t)
+  assert.equal(await superviseDsh(f.options), 137)
+  assert.equal((await f.runs()).length, 1)
+  assert.ok(warnings.some(line => line.includes('restart request confirmed')))
+  assert.ok(warnings.some(line => line.includes('died by SIGKILL before exiting with 75, so DSH stays stopped')))
+  assert.ok(!warnings.some(line => line.includes('Supervisor received')))
+})
+
+test('a preparation step killed by a signal reports that signal', async t => {
+  const f = await fixture(t, 'native-request')
+  const warnings = captureStderr(t)
+  const preparation = [{ command: process.execPath, args: ['-e', 'process.kill(process.pid, "SIGKILL")'] }]
+  assert.equal(await superviseDsh({ ...f.options, stdout: process.stdout, preparation }), 137)
+  assert.ok(warnings.some(line => line.includes('Startup preparation failed (signal SIGKILL (status 137))')))
+  await assert.rejects(f.runs(), /ENOENT/)
+})
+
 test('termination stops only its child and suppresses restart', async t => {
   const f = await fixture(t, 'wait')
+  const warnings = captureStderr(t)
   let requested = false
   const stdout = {
     write: chunk => {
@@ -146,6 +184,7 @@ test('termination stops only its child and suppresses restart', async t => {
   }
   assert.equal(await superviseDsh({ ...f.options, stdout }), 143)
   assert.equal((await f.runs()).length, 1)
+  assert.ok(warnings.some(line => line.includes('Supervisor received SIGTERM; stopping the Host and not restarting it.')))
 })
 
 test('split launch URL is privately recorded during the run and removed at exit', async t => {

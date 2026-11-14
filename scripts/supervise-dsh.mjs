@@ -3,12 +3,17 @@
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
+import { constants } from 'node:os'
 import { LauncherConfig } from './launcher-config.mjs'
 import { activeSafeProfile } from './safe-mode.mjs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const RESTART_EXIT_CODE = 75
+
+/** The status a shell reports: the exit code, or 128 + the signal number (SIGSEGV is 139, SIGKILL 137, SIGTERM 143). */
+const exitStatus = (code, signal) => code ?? 128 + (constants.signals[signal] ?? constants.signals.SIGTERM)
+const describeExit = (code, signal) => (signal === null ? `exit code ${code}` : `signal ${signal} (status ${exitStatus(code, signal)})`)
 
 export async function superviseDsh({
   home,
@@ -38,6 +43,7 @@ export async function superviseDsh({
   }
   const stop = signal => {
     if (stopping) return
+    warn(`Supervisor received ${signal}; stopping the Host and not restarting it.`)
     stopping = true
     stopCode = signal === 'SIGINT' ? 130 : 143
     signalChild(signal)
@@ -55,14 +61,14 @@ export async function superviseDsh({
         const result = await new Promise((resolveStep, rejectStep) => {
           child = spawn(step.command, step.args, { cwd, env: { ...env, ...step.env }, detached: true, stdio: ['ignore', stdout, stderr] })
           child.once('error', rejectStep)
-          child.once('exit', (code, signal) => resolveStep(code ?? (signal === 'SIGINT' ? 130 : 143)))
+          child.once('exit', (code, signal) => resolveStep({ code, signal }))
         })
         child = undefined
         if (stopping) return stopCode
         // Fail closed: never launch a new core with a partially rebuilt/linked profile.
-        if (result !== 0) {
-          warn(`Startup preparation failed (${result}); nothing started.`)
-          return result
+        if (result.code !== 0) {
+          warn(`Startup preparation failed (${describeExit(result.code, result.signal)}); nothing started.`)
+          return exitStatus(result.code, result.signal)
         }
       }
       if (stopping) return stopCode
@@ -88,7 +94,7 @@ export async function superviseDsh({
           }
         })
         child.once('error', rejectRun)
-        child.once('exit', (code, signal) => resolveRun({ code: code ?? (signal === 'SIGINT' ? 130 : 143), signal }))
+        child.once('exit', (code, signal) => resolveRun({ code, signal, pid: child.pid }))
       })
       child = undefined
       await urlWrites
@@ -102,12 +108,21 @@ export async function superviseDsh({
       await unlink(requestPath).catch(error => {
         if (error.code !== 'ENOENT') throw error
       })
+      // Lifecycle facts only: never argv, environment, URLs or request contents.
+      const request = requestedRun === runId ? 'confirmed' : requestedRun === '' ? 'absent' : 'mismatched'
+      warn(`Host ${result.pid} ended with ${describeExit(result.code, result.signal)}; restart request ${request}.`)
       if (stopping) return stopCode
-      if (result.code === RESTART_EXIT_CODE && result.signal === null && requestedRun === runId) {
+      if (result.code === RESTART_EXIT_CODE && result.signal === null && request === 'confirmed') {
         warn('Restarting after a confirmed request; rebuilding/syncing before the next Host.')
         continue
       }
-      return result.code
+      if (result.signal !== null && request === 'confirmed') {
+        warn(
+          `The Host asked for a restart but died by ${result.signal} before exiting with ${RESTART_EXIT_CODE}, so DSH stays stopped. ` +
+            `Start it again with dsh; on Linux, coredumpctl info ${result.pid} shows where it crashed.`,
+        )
+      }
+      return exitStatus(result.code, result.signal)
     }
   } finally {
     process.off('SIGINT', onInterrupt)

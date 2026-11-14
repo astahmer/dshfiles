@@ -44,6 +44,12 @@ another sidebar, update mechanism or launcher command.
   required by the reload feature and were not approved here.
 - Output is buffered by complete lines so split launch-URL writes are handled;
   the request identity, URL mode and non-restart exits are tested.
+- A Host or preparation step that dies by a signal reports the shell status of
+  that signal (SIGSEGV 139, SIGKILL 137), not a blanket 143, and each Host end
+  is logged with its pid, exit code or signal and whether its restart request
+  was confirmed. A Host that asked for a restart and then crashed is still not
+  restarted (the protocol is unchanged); the supervisor says so and names the
+  core dump to inspect.
 
 ## Honest limits
 
