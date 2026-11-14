@@ -22,6 +22,10 @@ describe('TurnChangesModel.retryRead', () => {
     expect(await attempts(404)).toBe(1)
   })
 
+  it('takes a 204 as the same answer: the Host announced the turn but no longer holds it', async () => {
+    expect(await attempts(204)).toBe(1)
+  })
+
   it('retries another failed read once', async () => {
     expect(await attempts(500)).toBe(2)
   })

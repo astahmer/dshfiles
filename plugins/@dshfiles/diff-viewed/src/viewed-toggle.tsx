@@ -14,10 +14,7 @@ interface ViewedToggleProps {
 const useSummaryFiles = (summaryUrl: string | undefined): ChangesSummaryFiles | undefined =>
   useQuery({
     queryKey: ['diff-viewed', 'summary', summaryUrl],
-    queryFn: async ({ signal }) => {
-      const response = await fetch(summaryUrl ?? '', { signal })
-      return response.ok ? (ReviewFileModel.parseChangesSummaryFiles(await response.json()) ?? null) : null
-    },
+    queryFn: async ({ signal }) => (await ReviewFileModel.readChangesSummaryFiles(summaryUrl ?? '', signal)) ?? null,
     enabled: summaryUrl !== undefined,
     retry: false,
   }).data ?? undefined

@@ -127,14 +127,14 @@ async function handlePresentOpen(ctx: Context, request: Request): Promise<Respon
   }
 }
 
-/** The summary one `workspace/changes` event announced, without the Host working directory; 404 once the Host no longer serves it. */
-function handleChangesSummary(ctx: Context, request: Request): Response {
+/** The announced summary without the Host working directory; no content after its in-memory recorder expires. */
+export function handleChangesSummary(ctx: Pick<Context, 'workspaceChanges'>, request: Request): Response {
   const query = new URL(request.url).searchParams
   const id = query.get('sessionId')
   const seq = coordinate(query.get('seq'))
   if (!id || seq === undefined) return new Response('Invalid change summary coordinates.', { status: 400 })
   const summary = ctx.workspaceChanges.summary(id as SessionId, seq)
-  if (summary === undefined) return new Response('Change summary unavailable.', { status: 404 })
+  if (summary === undefined) return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
   const { turn, files, total, added, deleted } = summary
   return Response.json({ turn, files, total, added, deleted } satisfies ChangesSummary, { headers: { 'cache-control': 'no-store' } })
 }

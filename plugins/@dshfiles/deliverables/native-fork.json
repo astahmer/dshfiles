@@ -37,6 +37,6 @@
       "local": "locale"
     }
   ],
-  "delta": ["src/host.ts", "src/native/ChangedFiles.tsx", "src/native/FileDiff.tsx", "src/native/ReviewTab.tsx", "src/native/locales.ts"],
+  "delta": ["src/host.ts", "src/present-open.ts", "src/native/ChangedFiles.tsx", "src/native/FileDiff.tsx", "src/native/ReviewTab.tsx", "src/native/changes-summary.ts", "src/native/locales.ts"],
   "added": ["src/native/ChangedImage.module.css", "src/native/ChangedImage.tsx"]
 }

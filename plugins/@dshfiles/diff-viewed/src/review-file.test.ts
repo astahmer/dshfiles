@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ReviewFileModel } from './review-file.js'
 
 describe('parseReviewCoordinates', () => {
@@ -29,5 +29,23 @@ describe('parseChangesSummaryFiles', () => {
   it('refuses a body that is not a summary', () => {
     expect(ReviewFileModel.parseChangesSummaryFiles({ error: 'gone' })).toBeUndefined()
     expect(ReviewFileModel.parseChangesSummaryFiles(undefined)).toBeUndefined()
+  })
+})
+
+describe('readChangesSummaryFiles', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const read = () => ReviewFileModel.readChangesSummaryFiles('api/changes.summary?sessionId=s&seq=1', new AbortController().signal)
+
+  it('reads nothing from 204 No Content, which the Host answers once the turn expired', async () => {
+    vi.stubGlobal('fetch', async () => new Response(null, { status: 204 }))
+    expect(await read()).toBeUndefined()
+  })
+
+  it('reads nothing from a 404, which an older Host answers', async () => {
+    vi.stubGlobal('fetch', async () => new Response('Change summary unavailable.', { status: 404 }))
+    expect(await read()).toBeUndefined()
   })
 })

@@ -38,8 +38,19 @@ const parseChangesSummaryFiles = (value: unknown): ChangesSummaryFiles | undefin
   return Option.isSome(parsed) ? parsed.value.files : undefined
 }
 
+/**
+ * Read one turn's listed files; undefined once the Host no longer holds the turn (204 from the deliverables fork,
+ * 404 from the native row) or answers something unreadable.
+ */
+const readChangesSummaryFiles = async (url: string, signal: AbortSignal): Promise<ChangesSummaryFiles | undefined> => {
+  const response = await fetch(url, { signal })
+  if (!response.ok || response.status === 204) return undefined
+  return parseChangesSummaryFiles(await response.json())
+}
+
 export class ReviewFileModel {
   static readonly parseReviewCoordinates = parseReviewCoordinates
   static readonly changesSummaryUrl = changesSummaryUrl
   static readonly parseChangesSummaryFiles = parseChangesSummaryFiles
+  static readonly readChangesSummaryFiles = readChangesSummaryFiles
 }

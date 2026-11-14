@@ -22,10 +22,10 @@ export interface FacetDiff {
 
 type FetchJson = (url: string, signal: AbortSignal) => Promise<unknown>
 
-/** Fetch one document-relative Host route as JSON; a non-2xx answer is an error the facet can show. */
+/** Fetch one document-relative Host route as JSON; a non-2xx or empty (204) answer is an error the facet can show. */
 const fetchJson: FetchJson = async (url, signal) => {
   const response = await fetch(url, { signal })
-  if (!response.ok) throw new TurnChangesReadError(response.status)
+  if (!response.ok || response.status === 204) throw new TurnChangesReadError(response.status)
   return response.json()
 }
 
