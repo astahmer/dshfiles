@@ -145,14 +145,54 @@ Then('theme_set answered with the saved theme {string}', async ({ page }: { page
   await recordAssertion(page, 'ui-styles-gallery-theme-result', () => expect.poll(() => lastToolResult(page)).toContain(`"customTheme":"${id}"`))
 })
 
-Then('the runtime theme paints the scene of {string}', async ({ page }: { page: Page }, id: string) => {
-  await recordAssertion(page, 'ui-styles-gallery-scene-painted', async () => {
-    // The scene's SVG comes from the Host's scene method, then lands in the runtime sheet as a data URL.
-    await expect.poll(() => page.evaluate(() => document.getElementById('dshfiles-ui-styles-theme')?.textContent ?? '')).toContain('data:image/svg+xml')
-    // The client sampled the scene: the theme's readability veil is decided, and nothing filters the scene per frame.
+Then('the runtime theme paints its scene inline, stepped at the scene frame rate', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ui-styles-gallery-scene-stepped', async () => {
+    // The scene's SVG comes from the Host's scene method into a stage under the backdrop host; the page's scheme shows
+    // one of the theme's two scenes.
+    const shown = page.locator('[data-workbench-region="main"] .dshfiles-workbench-theme > [data-dshx-scene]').filter({ visible: true })
+    await expect(shown).toHaveCount(1)
+    // Only resting pictures are images (under the composer seat): an animated SVG image re-rasters whole every display
+    // frame. And nothing filters the scene per frame.
     const sheet = await page.evaluate(() => document.getElementById('dshfiles-ui-styles-theme')?.textContent ?? '')
+    expect(sheet).toContain('data:image/svg+xml')
+    expect(sheet).not.toContain(encodeURIComponent('@media (prefers-reduced-motion'))
     expect(sheet).not.toContain('backdrop-filter')
-    expect(id).not.toBe('')
+    // The scene's animations are paused between steps and still move forward: the client steps them.
+    const clock = () =>
+      shown.evaluate(stage => {
+        const animations = stage.shadowRoot?.getAnimations() ?? []
+        return {
+          paused: animations.every(animation => animation.playState === 'paused'),
+          count: animations.length,
+          time: Number(animations[0]?.currentTime ?? 0),
+        }
+      })
+    await expect.poll(async () => (await clock()).count).toBeGreaterThan(0)
+    const before = await clock()
+    expect(before.paused).toBe(true)
+    await expect.poll(async () => (await clock()).time - before.time).toBeGreaterThan(300)
+    expect((await clock()).paused).toBe(true)
+    // The picture covers the viewport, so it lines up with the scene's stills.
+    const box = await shown.evaluate(stage => stage.shadowRoot?.querySelector('svg')?.getBoundingClientRect().toJSON())
+    expect(box).toMatchObject({ x: 0, y: 0, width: page.viewportSize()?.width, height: page.viewportSize()?.height })
+    // Another window takes focus: this tab holds its frame (nothing to repaint) and pauses the theme's layers.
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false })
+      window.dispatchEvent(new Event('blur'))
+    })
+    await expect(page.locator('body[data-dshx-backdrop-paused]')).toHaveCount(1)
+    const held = await clock()
+    // A second at 12 fps would be 12 steps: the held scene takes none.
+    await page.waitForTimeout(1_000)
+    expect((await clock()).time).toBe(held.time)
+    // Focus is back: the scene moves on from the frame it held.
+    await page.evaluate(() => {
+      Reflect.deleteProperty(document, 'hasFocus')
+      window.dispatchEvent(new Event('focus'))
+    })
+    await expect(page.locator('body[data-dshx-backdrop-paused]')).toHaveCount(0)
+    await expect.poll(async () => (await clock()).time - held.time).toBeGreaterThan(300)
+    expect((await clock()).time - held.time).toBeLessThan(5_000)
   })
 })
 

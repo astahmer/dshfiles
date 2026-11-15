@@ -147,6 +147,12 @@
           "defaultValue": "0 / 0",
           "constraints": "0–24 px and 0–100 %; add to the theme's own readability veil; kept across theme changes, 0 after reset.",
           "coveredBy": ["ui-styles.reading-veil", "ui-styles.readability-veil"]
+        },
+        {
+          "key": "sceneFrameRate",
+          "defaultValue": "12",
+          "constraints": "0–30 whole frames per second a scene moves at; 0 shows its resting picture. Each frame repaints the whole scene, so CPU use grows with it. Only the focused tab moves its backdrop; other tabs hold their frame and pause animated layers. Kept across theme changes, 12 after reset.",
+          "coveredBy": ["ui-styles.scene-frame-rate", "ui-styles.scene-clock", "ui-styles.scene-held-tab"]
         }
       ],
       "states": ["preset", "saved-theme", "saved-theme-overridden", "saved-theme-missing", "gallery-theme", "scene-loading"],
@@ -221,6 +227,24 @@
           "id": "ui-styles.backdrop-one-scene",
           "file": "plugins/@dshfiles/plugin-ui/tests/backdrop-readability.test.ts",
           "testName": "draws one scene for the whole workbench: docked panes give up the transform that re-framed fixed backgrounds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ui-styles.scene-frame-rate",
+          "file": "plugins/@dshfiles/ui-styles/tests/appearance.test.ts",
+          "testName": "keeps the scene frame rate across theme changes, clamps it to whole frames, and restores the default on reset"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ui-styles.scene-clock",
+          "file": "plugins/@dshfiles/ui-styles/tests/scene-stage.test.ts",
+          "testName": "pauses each animation once and moves it to where it would have run freely"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ui-styles.scene-held-tab",
+          "file": "plugins/@dshfiles/ui-styles/tests/scene-stage.test.ts",
+          "testName": "leaves a held scene alone: no write, so the browser repaints nothing"
         },
         {
           "kind": "unit-test",

@@ -1,5 +1,5 @@
 import Schema from '@deepseek-ai/schemastery'
-import { APPEARANCE_BOUNDS } from '@dshfiles/plugin-ui/theme/appearance'
+import { APPEARANCE_BOUNDS, SCENE_FRAME_RATE } from '@dshfiles/plugin-ui/theme/appearance'
 import { defineSettings } from '@dshfiles/dshx/settings'
 import { UI_STYLES_SETTINGS_NAMESPACE } from './settings-namespace.js'
 
@@ -54,6 +54,13 @@ export const appearanceSettings = defineSettings({
       .default(0)
       .description(
         'Extra tint of the theme background under the conversation column while a backdrop shows, in percent (0–100). Each theme already lays the least tint its text needs to stay readable over its scene.',
+      ),
+    sceneFrameRate: Schema.natural()
+      .min(SCENE_FRAME_RATE.min)
+      .max(SCENE_FRAME_RATE.max)
+      .default(SCENE_FRAME_RATE.default)
+      .description(
+        `Frames per second an animated backdrop scene moves at (${SCENE_FRAME_RATE.min}–${SCENE_FRAME_RATE.max}, default ${SCENE_FRAME_RATE.default}). Each frame repaints the whole scene, so CPU use grows with it; 0 shows a still picture and costs nothing. The backdrop only moves in the focused tab; every other tab holds its frame.`,
       ),
     customTheme: Schema.string()
       .default('')

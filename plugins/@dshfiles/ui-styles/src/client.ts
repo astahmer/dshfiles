@@ -6,6 +6,7 @@ import { columnOfSample, GPU_ATTRIBUTE, SCENE_SAMPLE, type SceneSource } from '@
 import { themeApi } from './api.js'
 import './client.css'
 import { RuntimeTheme, RUNTIME_STYLE_ID } from './runtime-theme.js'
+import { SceneStage } from './scene-stage.js'
 import { UI_STYLES_SETTINGS_NAMESPACE } from './settings-namespace.js'
 
 /**
@@ -65,6 +66,8 @@ export default defineClient({
     const scenes = new Map<string, SceneSource>()
     const loading = new Set<string>()
     const failed = new Set<string>()
+    // The scenes themselves: inline and stepped at the chosen frame rate, never an animated image (scene-stage.ts).
+    const stage = new SceneStage(document)
     let applied = cached
     let disposed = false
     const sync = (): void => {
@@ -92,7 +95,12 @@ export default defineClient({
           },
         )
       }
-      // Keep the cached sheet (which holds the scene) until the scene arrives, instead of flashing a bare theme.
+      const painted = AppearanceModel.scenesNeeded(value).flatMap(id => {
+        const source = scenes.get(id)
+        return source === undefined ? [] : [{ id, svg: source.svg }]
+      })
+      stage.update(painted, AppearanceModel.sceneFrameRate(value))
+      // Keep the cached sheet (which holds the scene's stills) until the scene arrives, instead of flashing a bare theme.
       if (missing.length > 0 && applied !== '') return
       // `unavailable` is a Host that predates the Appearance settings (or has none): the static default applies.
       const css = value === undefined ? '' : AppearanceModel.runtimeThemeCss(value, scenes)
@@ -109,6 +117,7 @@ export default defineClient({
       return () => {
         disposed = true
         unsubscribe()
+        stage.dispose()
         document.body.removeAttribute(GPU_ATTRIBUTE)
         document.getElementById(RUNTIME_STYLE_ID)?.remove()
       }

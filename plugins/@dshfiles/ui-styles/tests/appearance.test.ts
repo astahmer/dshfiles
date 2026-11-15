@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULT_APPEARANCE, DEFAULT_FONT_STACKS, THEME_PRESETS } from '@dshfiles/plugin-ui/theme/appearance'
+import { DEFAULT_APPEARANCE, DEFAULT_FONT_STACKS, SCENE_FRAME_RATE, THEME_PRESETS } from '@dshfiles/plugin-ui/theme/appearance'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { Effect, Layer } from 'effect'
 import { describe, expect, it } from 'vitest'
@@ -12,7 +12,14 @@ import { InvalidThemeDefinition, ThemeStateModel } from '../src/theme-state.ts'
 const patch = readFileSync(join(process.cwd(), 'cordis.patch.yml'), 'utf8')
 const fonts = readFileSync(join(process.cwd(), 'src/fonts.css'), 'utf8')
 /** The defaults as normalised from storage: no saved theme in use, none saved. */
-const STORED_DEFAULT = { ...DEFAULT_APPEARANCE, readingBlur: 0, readingTint: 0, customTheme: '', customThemes: [] }
+const STORED_DEFAULT = {
+  ...DEFAULT_APPEARANCE,
+  readingBlur: 0,
+  readingTint: 0,
+  sceneFrameRate: SCENE_FRAME_RATE.default,
+  customTheme: '',
+  customThemes: [],
+}
 
 describe('Appearance settings', () => {
   it('lives in the namespace of the Loader row', () => {
@@ -172,6 +179,21 @@ describe('saved themes', () => {
     expect(() => appearanceSettings.schema({ readingTint: 140 })).toThrow()
     // The former readingPanel key stored by an earlier version does not break a Host that reads it.
     expect(() => appearanceSettings.schema({ readingPanel: 'soft' } as never)).not.toThrow()
+  })
+
+  it('keeps the scene frame rate across theme changes, clamps it to whole frames, and restores the default on reset', () => {
+    const slow = ThemeStateModel.nextAppearance(start, { sceneFrameRate: 4 })
+    const lagoon = ThemeStateModel.nextAppearance(slow, { customTheme: 'honu-lagoon' })
+    expect(ThemeStateModel.themeState(lagoon, 'light')).toMatchObject({ sceneFrameRate: 4, customTheme: 'honu-lagoon' })
+    expect(ThemeStateModel.defineTheme(slow, { theme: NORD })).toMatchObject({ sceneFrameRate: 4 })
+    expect(ThemeStateModel.nextAppearance(slow, { sceneFrameRate: 99 })).toMatchObject({ sceneFrameRate: SCENE_FRAME_RATE.max })
+    expect(ThemeStateModel.nextAppearance(slow, { sceneFrameRate: -1 })).toMatchObject({ sceneFrameRate: 0 })
+    expect(ThemeStateModel.nextAppearance(slow, { sceneFrameRate: 7.6 })).toMatchObject({ sceneFrameRate: 8 })
+    expect(ThemeStateModel.nextAppearance(lagoon, { reset: true })).toMatchObject({ sceneFrameRate: SCENE_FRAME_RATE.default })
+    // A stored value from before the setting existed, or a broken one, reads as the default.
+    expect(ThemeStateModel.normaliseAppearance({ sceneFrameRate: 'fast' })).toMatchObject({ sceneFrameRate: SCENE_FRAME_RATE.default })
+    expect(appearanceSettings.schema({ sceneFrameRate: 0 })).toMatchObject({ sceneFrameRate: 0 })
+    expect(() => appearanceSettings.schema({ sceneFrameRate: 31 })).toThrow()
   })
 
   it('removes a theme and falls back to the preset when it was in use', () => {

@@ -45,12 +45,24 @@ plugin's classes), and the owner of the theme.
   plugin (Honu Lagoon, Koi Mosaic, Night Reef, Snow Pines, Aurora, Blueprint…; the four drawn for both kinds of window
   are paired into one light-and-dark theme). The scene code is vendored unchanged under `src/vendor/theme-examples`
   (Apache-2.0, provenance and update policy in its `NOTICE.md`) and runs on the Host only: the client asks the `scene`
-  method of the theme API for the SVG it needs and paints it as a data URL, so the browser bundle never carries the
-  builders and nothing is fetched from the network. A scene sits under its own glass tint, strongest under the
-  conversation column. Each scene only shows in the scheme it is drawn for; the colours are the generated
-  palette retuned to the scene (WCAG AA). An SVG painted as an image cannot see `prefers-reduced-motion`, so the page
-  swaps in the scene's own resting picture under that query. `theme_set { customTheme: "night-reef" }` picks one;
-  `theme_get` lists them in `galleryThemes`. A saved theme can paint a scene too (`backdrop.scene`).
+  method of the theme API for the SVG it needs, so the browser bundle never carries the builders and nothing is
+  fetched from the network. A scene sits under its own glass tint, strongest under the conversation column. Each scene
+  only shows in the scheme it is drawn for; the colours are the generated palette retuned to the scene (WCAG AA).
+  `theme_set { customTheme: "night-reef" }` picks one; `theme_get` lists them in `galleryThemes`. A saved theme can
+  paint a scene too (`backdrop.scene`).
+- **Scene frame rate.** A scene is an inline SVG in the shadow root of a stage element the client mounts under the
+  backdrop host (`src/scene-stage.ts`), never an animated `background-image`: Chrome can neither composite nor slow the
+  animations inside an image, so it re-styled, re-painted and re-rasterised the whole viewport-sized picture at the
+  display's refresh rate. The client pauses the scene's CSS animations and moves them forward together
+  `sceneFrameRate` times a second (default 12, 0–30; 0 is the resting picture), so the browser repaints the scene only
+  then; Settings › Appearance or `theme_set { sceneFrameRate }`, kept across theme changes, 12 after `reset`. Only the
+  focused, shown tab moves its backdrop: the scene clock stops in every other tab, which holds the frame it is on and
+  paints nothing, and `data-dshx-backdrop-paused` on `<body>` pauses a theme's animated layers there too, so the cost
+  does not grow with the number of open tabs; focus resumes the scene where it stopped. Inline, the scene sees
+  `prefers-reduced-motion` itself and rests by its own rules. Chrome 157 on a 120 Hz screen, one
+  full-window tab, renderer + GPU process CPU per scene before (image) and after (12 fps): Snow Pines 152% → 56%,
+  Dither Dunes Night 119% → 13%, Night Reef 100% → 13%, Halftone Dusk 70% → 18%, Vector Range 60% → 9%,
+  Blueprint 42% → 5% (bench and per-theme table: [docs/performance.md](../../../docs/performance.md#backdrop-scenes-2026-11-15)).
 - **Reading veil and readability.** Under the conversation column, a theme with a backdrop lays a veil of its own
   background colour. Its opacity is the smallest that keeps the theme's text readable anywhere over that scene
   (`plugin-ui/src/theme/readability.ts`: primary text 4.5:1, and secondary and tertiary greys such as "5 other tool

@@ -3,6 +3,58 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Backdrop scenes (2026-11-15)
+
+Complaint: an animated theme (Snow Pines and others) drove the CPU very high.
+
+**Cause.** A gallery scene was an animated SVG painted as a CSS `background-image` (`background-attachment: fixed`,
+`cover`) over the whole workbench. Chrome can neither composite nor slow the animations inside an image: on every
+display frame it re-styled and re-laid out the image's own document (main thread), re-painted it, re-rasterised the
+whole viewport (raster workers) and uploaded it (GPU process). Chrome 157, Wayland, 120 Hz, DSH tab 1848 × 893, 10 s
+trace with Snow Pines: 4.4 s `RasterTask`, 2.3 s `UpdateLayoutTree` + `Layout`, 0.6 s `PaintImage`, 5.3 s `GPUTask`;
+~120 `BeginFrame`/s. The whole browser went from ~70% of a core (default theme, two DSH tabs, one thread running) to
+260%.
+
+**Fix** (`@dshfiles/ui-styles` `src/scene-stage.ts`, plugin-ui `SCENE_STAGE_ATTRIBUTE`): the client mounts each scene
+as an inline SVG in the shadow root of a stage element under the backdrop host, pauses its CSS animations and moves them
+forward together `sceneFrameRate` times a second (Appearance setting, default 12, 0–30, 0 = resting picture). Letting
+the inline SVG run freely is no better (Snow Pines 184%: Chrome does not composite animations inside SVG either); the
+step rate is the lever. Every open DSH tab used to pay the whole cost (two windows: both renderers busy, one GPU
+process carrying both): now the scene clock only runs in the focused, shown tab. The others hold their frame, write no
+animation time and so paint nothing, and `data-dshx-backdrop-paused` on `<body>` pauses a theme's animated layers there
+(Dracula's stars, a saved theme's layers). The cost of a moving backdrop is one tab's, however many are open.
+
+**Measured.** Isolated bench page in the user's Chrome (scene full-window 2053 × 992, nothing else on the page), CPU %
+of one core for the page's renderer + the GPU process, 7 s windows. Before = image, after = inline at 12 fps:
+
+| Scene (dark) | Before | After |   | Scene (light) | Before | After |
+| ------------------ | ---: | ---: | --- | ------------- | ---: | ---: |
+| Snow Pines         | 152 | 56 |   | Dither Dunes  | 123 | 12 |
+| Dither Dunes Night | 119 | 13 |   | Koi Mosaic    | 103 | 26 |
+| Night Reef         | 100 | 13 |   | Honu Lagoon   | 100 |  9 |
+| Halftone Dusk      |  70 | 18 |   | Halftone Dawn |  69 | 19 |
+| Vector Range       |  60 |  9 |   | Plotter Tide  |  58 | 10 |
+| Plotter Tide Night |  57 | 11 |   | Paper Garden  |  50 |  8 |
+| Paper Garden Kraft |  50 |  8 |   |               |     |    |
+| Blueprint          |  42 |  5 |   |               |     |    |
+| Braille Stars      |  39 |  9 |   |               |     |    |
+| Block Clouds       |  30 |  5 |   |               |     |    |
+| Deep Water         |  25 |  8 |   |               |     |    |
+| Aurora             |  19 |  7 |   |               |     |    |
+| Ember              |  17 |  5 |   |               |     |    |
+| Departure Board    |  11 |  5 |   |               |     |    |
+
+Snow Pines by step rate (its snow falls over the whole picture, so each step re-rasters most of it): 6 fps 27%, 8 fps
+35%, 12 fps 56%, 15 fps 68%, 24 fps 110%, 30 fps 123%, free-running inline 184%. In the live DSH tab the same switch
+(image → inline, 15 fps) took that tab's renderer from 117% to 56% over a ~27% floor. Proof in a real browser: the
+`ui-styles.gallery-theme-agent` journey asserts the stage is shown, its animations stay paused between steps and still
+advance, the picture covers the viewport, and on blur the body takes the paused attribute and the scene's time stops
+for a full second, then moves on from the held frame once focus is back.
+
+**Still open.** Snow Pines remains the heaviest scene at 12 fps; `sceneFrameRate` 6 halves it. An idle DSH tab also
+renders continuously while any thread runs (sidebar spinner and shimmer indicators, ~27% of a core here, one of them a
+`background-position` animation that repaints): separate from the scenes, not addressed here.
+
 ## Phone list → thread → Back (2026-11-13)
 
 Complaint: on an Android PWA (Tailscale → phone-access → phone-pairing → Host) opening a thread from the Threads list

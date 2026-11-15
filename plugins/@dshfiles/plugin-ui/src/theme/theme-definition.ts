@@ -346,6 +346,23 @@ export function columnOfSample(pixels: readonly Rgb[]): Rgb[] {
  */
 export const GPU_ATTRIBUTE = 'data-dshx-gpu'
 
+/**
+ * The attribute of the element the client mounts as the first child of `BACKDROP_HOST` to paint a built-in scene; its
+ * value is the scene id. The scene is an inline SVG in that element's shadow root, not a `background-image`: an animated
+ * SVG image can be neither composited nor slowed, so Chrome re-styled, re-painted and re-rasterised the whole
+ * viewport-sized picture at the display's refresh rate (2.6 CPU cores for Snow Pines on a 120 Hz screen). Inline, the
+ * client pauses the scene's animations and steps them at the Appearance `sceneFrameRate`. Hidden unless the active
+ * scheme's backdrop paints that scene (`backdropCss`).
+ */
+export const SCENE_STAGE_ATTRIBUTE = 'data-dshx-scene'
+
+/**
+ * Attribute the client sets on `<body>` while the backdrop holds still in this tab: the tab is not focused or not
+ * shown, or `sceneFrameRate` is 0. The scene's clock stops, and this pauses a theme's animated layers, so a tab the
+ * user is not in paints nothing and the cost of a moving backdrop does not grow with the number of open tabs.
+ */
+export const BACKDROP_PAUSED_ATTRIBUTE = 'data-dshx-backdrop-paused'
+
 /** Scene sources by id; a scene not loaded yet is left out until it arrives. */
 export type SceneSources = ReadonlyMap<string, SceneSource>
 
@@ -468,7 +485,11 @@ function chromeOpacity(theme: SchemeTheme, source: SceneSource | undefined, read
   if (source === undefined) return user
   const pixels = source.surround ?? source.sample
   if (pixels === undefined) return Math.max(UNSAMPLED_VEIL, user)
-  const need = ReadabilityModel.minimumVeil({ sample: pixels, veil: ReadabilityModel.hexToRgb(theme.colours.bg), texts: readabilityTargets(theme.colours, true) })
+  const need = ReadabilityModel.minimumVeil({
+    sample: pixels,
+    veil: ReadabilityModel.hexToRgb(theme.colours.bg),
+    texts: readabilityTargets(theme.colours, true),
+  })
   return Math.max(need, user)
 }
 
@@ -530,24 +551,24 @@ function readingVeilCss(host: string, gpuHost: string, source: SceneSource | und
   // A scene the theme's text already reads on, with no blur asked, needs no band: only the seat continues the scene.
   if (tint !== undefined || blurred !== undefined)
     blocks.push(
-    `${body(host)} {`,
-    '  isolation: isolate;',
-    '}',
-    `${body(host)}::before {`,
-    "  content: '';",
-    '  position: absolute;',
-    '  top: 0;',
-    '  bottom: 0;',
-    '  left: 0;',
-    '  right: 0;',
-    '  margin-inline: auto;',
-    `  width: ${VEIL_BAND};`,
-    '  z-index: -1;',
-    '  pointer-events: none;',
-    ...background,
-    `  mask-image: ${VEIL_FADE};`,
-    `  -webkit-mask-image: ${VEIL_FADE};`,
-    '}',
+      `${body(host)} {`,
+      '  isolation: isolate;',
+      '}',
+      `${body(host)}::before {`,
+      "  content: '';",
+      '  position: absolute;',
+      '  top: 0;',
+      '  bottom: 0;',
+      '  left: 0;',
+      '  right: 0;',
+      '  margin-inline: auto;',
+      `  width: ${VEIL_BAND};`,
+      '  z-index: -1;',
+      '  pointer-events: none;',
+      ...background,
+      `  mask-image: ${VEIL_FADE};`,
+      `  -webkit-mask-image: ${VEIL_FADE};`,
+      '}',
     )
   if (blurred !== undefined)
     blocks.push(
@@ -591,18 +612,10 @@ function backdropCss(scope: string, theme: SchemeTheme, backdrop: Backdrop, scen
   const host = `${scope} ${BACKDROP_HOST}`
   const gpuHost = `${scope}[${GPU_ATTRIBUTE}] ${BACKDROP_HOST}`
   // Four pseudo-elements host the items, back to front: two on the dockview between two on the shell, all under content.
-  const slots = [`${host}::before`, `${host} .dv-dockview::before`, `${host} .dv-dockview::after`, `${host}::after`]
+  const slotsOf = (on: string) => [`${on}::before`, `${on} .dv-dockview::before`, `${on} .dv-dockview::after`, `${on}::after`]
+  const slots = slotsOf(host)
   const source = backdrop.scene === undefined ? undefined : scenes.get(backdrop.scene)
   const items: string[][] = []
-  // Fixed to the viewport, so the blurred still in the reading veil lines up with it.
-  if (source !== undefined)
-    items.push([
-      '  background-image: ' + SceneCatalog.image(source.svg) + ';',
-      '  background-attachment: fixed;',
-      '  background-size: cover;',
-      '  background-position: center;',
-      '  background-repeat: no-repeat;',
-    ])
   for (const layer of backdrop.layers ?? []) items.push(declarationLines(layer))
   if (backdrop.glass !== undefined) items.push(glassDeclarations(backdrop.glass))
   const material = veilMaterial(theme, source, reading)
@@ -660,6 +673,22 @@ function backdropCss(scope: string, theme: SchemeTheme, backdrop: Backdrop, scen
       `  --dsw-alias-label-document-preview: ${material.greys.muted};`,
       '}',
     )
+  // The scene's stage, under every layer: the client keeps its picture aligned with the viewport, like the blurred still
+  // in the reading veil, and steps its animations (`SCENE_STAGE_ATTRIBUTE`).
+  if (source !== undefined && backdrop.scene !== undefined)
+    blocks.push(
+      [
+        `${host} > [${SCENE_STAGE_ATTRIBUTE}="${backdrop.scene}"] {`,
+        '  display: block;',
+        '  position: absolute;',
+        '  inset: 0;',
+        `  z-index: ${-MAX_BACKDROP_ITEMS - 1};`,
+        '  overflow: hidden;',
+        '  pointer-events: none;',
+        '  contain: strict;',
+        '}',
+      ].join('\n'),
+    )
   items.forEach((declarations, index) => {
     blocks.push(
       [
@@ -677,9 +706,14 @@ function backdropCss(scope: string, theme: SchemeTheme, backdrop: Backdrop, scen
   if (backdrop.keyframes !== undefined) blocks.push(backdrop.keyframes)
   const blur = Math.min(READING_BOUNDS.blur.max, Math.max(0, reading.blur))
   if (material.opacity > 0 || source !== undefined) blocks.push(readingVeilCss(host, gpuHost, source, material.opacity, blur, theme.colours.bg))
+  // The inline scene sees the query itself and rests by its own rules; the layers stop here. In a tab the user is not
+  // in they hold still, with the scene.
   const used = slots.slice(0, items.length).join(', ')
-  const resting = source === undefined ? [] : [`  ${slots[0]} { background-image: ${SceneCatalog.image(SceneCatalog.resting(source.svg))}; }`]
-  blocks.push('@media (prefers-reduced-motion: reduce) {', `  ${used} { animation: none !important; }`, ...resting, '}')
+  if (used !== '') {
+    const held = slotsOf(`${scope}[${BACKDROP_PAUSED_ATTRIBUTE}] ${BACKDROP_HOST}`).slice(0, items.length).join(', ')
+    blocks.push(`${held} {`, '  animation-play-state: paused !important;', '}')
+    blocks.push('@media (prefers-reduced-motion: reduce) {', `  ${used} { animation: none !important; }`, '}')
+  }
   return blocks.join('\n')
 }
 

@@ -49,6 +49,8 @@ const themeStateSchema = Schema.Struct({
   /** The reading veil the user asked for: blur (px, 0–24) and extra tint (percent, 0–100) under the conversation column. */
   readingBlur: finite,
   readingTint: finite,
+  /** Frames per second a backdrop scene moves at; 0 is a still picture. */
+  sceneFrameRate: finite,
   /** The Host's light/dark preference (Settings › Theme), read-only here; `unknown` when that row is absent. */
   scheme: Schema.String,
   /** True when every value is the default, so the static first-paint theme is the whole theme. */
@@ -98,6 +100,12 @@ const themeSetInputSchema = Schema.Struct({
     finite.annotate({
       description:
         'Extra tint of the theme background under the conversation column, in percent, 0–100 (0: only what the theme needs for readable text). Both are kept across theme changes; reset sets them to 0.',
+    }),
+  ),
+  sceneFrameRate: Schema.optional(
+    finite.annotate({
+      description:
+        'Frames per second an animated backdrop scene moves at, 0–30 (default 12; 0: a still picture). Each frame repaints the whole scene, so CPU use grows with it. Only the focused tab moves its backdrop. Kept across theme changes; reset restores 12.',
     }),
   ),
 })

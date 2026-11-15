@@ -3,6 +3,7 @@ import {
   DEFAULT_APPEARANCE,
   PRESET_IDS,
   RESERVED_THEME_IDS,
+  SCENE_FRAME_RATE,
   THEME_PRESETS,
   type AppearanceSettings,
   type ThemePresetId,
@@ -33,6 +34,7 @@ interface StoredAppearance {
   readonly readingFont?: unknown
   readonly readingBlur?: unknown
   readonly readingTint?: unknown
+  readonly sceneFrameRate?: unknown
   readonly customTheme?: unknown
   readonly customThemes?: unknown
 }
@@ -60,6 +62,7 @@ function normaliseAppearance(stored: StoredAppearance | undefined): AppearanceSe
     readingFont: stored?.readingFont === 'serif' ? 'serif' : 'sans',
     readingBlur: asNumber(stored?.readingBlur) ?? 0,
     readingTint: asNumber(stored?.readingTint) ?? 0,
+    sceneFrameRate: AppearanceModel.sceneFrameRate({ sceneFrameRate: asNumber(stored?.sceneFrameRate) }),
     customTheme: typeof stored?.customTheme === 'string' ? stored.customTheme : '',
     customThemes: Array.isArray(stored?.customThemes) ? stored.customThemes : [],
   }
@@ -68,7 +71,8 @@ function normaliseAppearance(stored: StoredAppearance | undefined): AppearanceSe
 /** The next stored settings for one `theme_set` call; `reset` restores the defaults and keeps the saved themes. */
 function nextAppearance(current: AppearanceSettings, input: ThemeSetInput): AppearanceSettings {
   const customThemes = current.customThemes ?? []
-  if (input.reset === true) return { ...DEFAULT_APPEARANCE, readingBlur: 0, readingTint: 0, customTheme: '', customThemes }
+  if (input.reset === true)
+    return { ...DEFAULT_APPEARANCE, readingBlur: 0, readingTint: 0, sceneFrameRate: SCENE_FRAME_RATE.default, customTheme: '', customThemes }
   // A new preset or saved theme starts from its own values: overrides only survive when the same call names them.
   const switching = input.preset !== undefined || input.customTheme !== undefined
   const base: Overrides = switching ? {} : pickOverrides(current)
@@ -91,6 +95,7 @@ function nextAppearance(current: AppearanceSettings, input: ThemeSetInput): Appe
     readingFont: input.readingFont ?? current.readingFont,
     readingBlur: clampTo(input.readingBlur ?? current.readingBlur ?? 0, 24),
     readingTint: clampTo(input.readingTint ?? current.readingTint ?? 0, 100),
+    sceneFrameRate: AppearanceModel.sceneFrameRate({ sceneFrameRate: input.sceneFrameRate ?? current.sceneFrameRate }),
     customTheme,
     customThemes,
   }
@@ -111,6 +116,7 @@ function defineTheme(current: AppearanceSettings, input: ThemeDefineInput): Appe
     readingFont: current.readingFont,
     readingBlur: current.readingBlur ?? 0,
     readingTint: current.readingTint ?? 0,
+    sceneFrameRate: AppearanceModel.sceneFrameRate(current),
     customTheme: definition.id,
     customThemes,
   }
@@ -165,6 +171,7 @@ function themeState(settings: AppearanceSettings, scheme: string): ThemeState {
     readingFont: settings.readingFont,
     readingBlur: settings.readingBlur ?? 0,
     readingTint: settings.readingTint ?? 0,
+    sceneFrameRate: AppearanceModel.sceneFrameRate(settings),
     scheme,
     isDefault:
       active === undefined &&

@@ -77,6 +77,11 @@ export interface AppearanceSettings {
    */
   readonly readingBlur?: number
   readonly readingTint?: number
+  /**
+   * Frames per second a backdrop scene moves at (0–30); 0 shows its resting picture. Each frame repaints the whole
+   * scene, so CPU use grows with it (`SCENE_FRAME_RATE`).
+   */
+  readonly sceneFrameRate?: number
   /** Id of a saved theme in `customThemes` or of a built-in gallery theme; when it names one, it replaces the preset. Empty: the preset. */
   readonly customTheme?: string
   /** Saved theme definitions, as stored: each is parsed on use and an invalid one is skipped. */
@@ -221,6 +226,20 @@ function runtimeThemeCss(settings: Partial<AppearanceSettings> | undefined, scen
 const bounded = (value: number | undefined, key: keyof typeof READING_BOUNDS): number =>
   typeof value === 'number' && Number.isFinite(value) ? clamp(value, READING_BOUNDS[key].min, READING_BOUNDS[key].max) : 0
 
+/**
+ * Bounds of `sceneFrameRate`. Each frame re-styles and re-rasterises the whole scene on the CPU and the GPU process; the
+ * default keeps the slow ambient motion of every scene readable at about a tenth of the cost of the display's own rate
+ * (measurements in ui-styles/README.md).
+ */
+export const SCENE_FRAME_RATE = { min: 0, max: 30, default: 12 } as const
+
+/** The scene frame rate in effect, inside its bounds: whole frames per second, 0 for the resting picture. */
+function sceneFrameRate(settings: { readonly sceneFrameRate?: number | undefined } | undefined): number {
+  const value = settings?.sceneFrameRate
+  if (value === undefined || !Number.isFinite(value)) return SCENE_FRAME_RATE.default
+  return Math.round(clamp(value, SCENE_FRAME_RATE.min, SCENE_FRAME_RATE.max))
+}
+
 /** The user's reading veil, inside its bounds. */
 function readingVeil(settings: Partial<AppearanceSettings> | undefined): ReadingVeil {
   return { blur: bounded(settings?.readingBlur, 'blur'), tint: bounded(settings?.readingTint, 'tint') }
@@ -247,5 +266,6 @@ export class AppearanceModel {
   static readonly isDefaultInput = isDefaultInput
   static readonly runtimeThemeCss = runtimeThemeCss
   static readonly scenesNeeded = scenesNeeded
+  static readonly sceneFrameRate = sceneFrameRate
   static readonly presetThemeCss = presetThemeCss
 }

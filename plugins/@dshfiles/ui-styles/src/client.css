@@ -19,6 +19,12 @@
 @source not '../../*/src/**/*.spec.tsx';
 @source not '../../*/**/*.md';
 
+/* A backdrop scene's stage (scene-stage.ts) stays hidden unless the active scheme's theme shows it: the runtime theme
+   CSS lays it out under its backdrop host. */
+[data-dshx-scene] {
+  display: none;
+}
+
 /* Touch platform baseline: the tells that make the page feel like a website on a phone. Rules gate by capability,
    never by width, so a touchscreen laptop and an iPad with a trackpad get what their input can do. It sits in
    `base` so every `dshx:` utility still overrides it; unlayered rules would beat `dshx:touch-none`. */

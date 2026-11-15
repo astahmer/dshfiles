@@ -3,7 +3,7 @@ import { AppearanceModel, DEFAULT_APPEARANCE, RESERVED_THEME_IDS } from '../src/
 import { GALLERY_THEMES } from '../src/theme/gallery.ts'
 import type { Rgb } from '../src/theme/readability.ts'
 import { SCENES } from '../src/theme/scene-catalog.ts'
-import { BACKDROP_HOST, ThemeDefinitionModel } from '../src/theme/theme-definition.ts'
+import { BACKDROP_HOST, BACKDROP_PAUSED_ATTRIBUTE, SCENE_STAGE_ATTRIBUTE, ThemeDefinitionModel } from '../src/theme/theme-definition.ts'
 
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000"><rect width="1600" height="1000"/></svg>'
 const DARK_PIXELS: Rgb[] = Array.from({ length: 40 }, () => [12, 14, 40])
@@ -31,28 +31,45 @@ describe('gallery themes', () => {
     }
   })
 
-  it('paints the scene under its glass once the client has its SVG, and asks for it until then', () => {
+  it('shows the scene stage under its glass once the client has its SVG, and asks for it until then', () => {
     const settings = { ...DEFAULT_APPEARANCE, customTheme: 'honu-lagoon' }
     expect(AppearanceModel.scenesNeeded(settings)).toEqual(['honu-lagoon'])
-    const bare = AppearanceModel.runtimeThemeCss(settings)
-    expect(bare).not.toContain('data:image/svg+xml')
-    const css = AppearanceModel.runtimeThemeCss(settings, scene('<svg xmlns="http://www.w3.org/2000/svg"/>', LIGHT_PIXELS))
+    const stage = `> [${SCENE_STAGE_ATTRIBUTE}="honu-lagoon"] {`
+    expect(AppearanceModel.runtimeThemeCss(settings)).not.toContain(stage)
+    // Like every vendored scene, it rests under reduced motion.
+    const animated =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>@keyframes a{to{opacity:0}}@media (prefers-reduced-motion: reduce){*{animation:none!important}}</style></svg>'
+    const css = AppearanceModel.runtimeThemeCss(settings, scene(animated, LIGHT_PIXELS))
     const host = `html:root body:not([data-ds-dark-theme]) ${BACKDROP_HOST}`
-    expect(css).toContain(`${host}::before {`)
-    expect(css).toContain('background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg')
-    expect(css).toContain('background-attachment: fixed;')
-    // The glass is a gradient tint: nothing in the backdrop filters or masks the moving scene per frame.
-    expect(css).toContain(`${host} .dv-dockview::before {\n  content: '';`)
+    // The moving scene is the client's inline stage, under every layer: never an animated image, which Chrome re-rasters
+    // whole at the display's refresh rate. Only its resting picture appears as an image, under the composer seat.
+    expect(css).toContain(`${host} ${stage}\n  display: block;\n  position: absolute;\n  inset: 0;\n  z-index: -5;`)
+    expect(css).not.toContain(encodeURIComponent('@media (prefers-reduced-motion'))
+    expect(css).toContain(encodeURIComponent('@media all{*{animation:none!important}}'))
+    // The glass is a gradient tint and takes the first slot: nothing filters or masks the moving scene per frame.
+    expect(css).toContain(`${host}::before {\n  content: '';`)
     expect(css).not.toContain('backdrop-filter')
     // A light scene never shows in dark.
     expect(css).not.toContain(`body[data-ds-dark-theme][data-ds-dark-theme][data-ds-dark-theme] ${BACKDROP_HOST}`)
-    // Under reduced motion the page swaps in the scene's resting picture: the image itself cannot see the query.
-    const still = AppearanceModel.runtimeThemeCss(
-      settings,
-      scene('<svg><style>@media (prefers-reduced-motion: reduce){*{animation:none}}</style></svg>', LIGHT_PIXELS),
-    )
-    expect(still).toContain(encodeURIComponent('@media all{*{animation:none}}'))
     expect(AppearanceModel.scenesNeeded({ ...settings, accentHue: 10 })).toEqual([])
+  })
+
+  it('holds animated layers still in a tab the user is not in', () => {
+    const theme = {
+      id: 'snowfall',
+      label: 'Snowfall',
+      dark: { colours: GALLERY_THEMES[0]!.light!.colours, backdrop: { layers: ['animation: fall 8s linear infinite'] } },
+    }
+    const css = ThemeDefinitionModel.css(theme, { light: 'html:root body', dark: 'body[data-ds-dark-theme]' })
+    expect(css).toContain(`body[data-ds-dark-theme][${BACKDROP_PAUSED_ATTRIBUTE}] ${BACKDROP_HOST}::before {\n  animation-play-state: paused !important;`)
+  })
+
+  it('moves a scene at 12 frames per second unless asked otherwise, whole frames within 0–30', () => {
+    expect(AppearanceModel.sceneFrameRate(DEFAULT_APPEARANCE)).toBe(12)
+    expect(AppearanceModel.sceneFrameRate({ sceneFrameRate: 0 })).toBe(0)
+    expect(AppearanceModel.sceneFrameRate({ sceneFrameRate: 99 })).toBe(30)
+    expect(AppearanceModel.sceneFrameRate({ sceneFrameRate: 7.4 })).toBe(7)
+    expect(AppearanceModel.sceneFrameRate({ sceneFrameRate: Number.NaN })).toBe(12)
   })
 
   it('keeps its text readable over its scene with a veil, whatever the user asks', () => {
