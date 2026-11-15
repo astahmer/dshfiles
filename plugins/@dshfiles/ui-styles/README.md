@@ -50,19 +50,24 @@ plugin's classes), and the owner of the theme.
   only shows in the scheme it is drawn for; the colours are the generated palette retuned to the scene (WCAG AA).
   `theme_set { customTheme: "night-reef" }` picks one; `theme_get` lists them in `galleryThemes`. A saved theme can
   paint a scene too (`backdrop.scene`).
-- **Scene frame rate.** A scene is an inline SVG in the shadow root of a stage element the client mounts under the
-  backdrop host (`src/scene-stage.ts`), never an animated `background-image`: Chrome can neither composite nor slow the
-  animations inside an image, so it re-styled, re-painted and re-rasterised the whole viewport-sized picture at the
-  display's refresh rate. The client pauses the scene's CSS animations and moves them forward together
-  `sceneFrameRate` times a second (default 12, 0–30; 0 is the resting picture), so the browser repaints the scene only
-  then; Settings › Appearance or `theme_set { sceneFrameRate }`, kept across theme changes, 12 after `reset`. Only the
-  focused, shown tab moves its backdrop: the scene clock stops in every other tab, which holds the frame it is on and
-  paints nothing, and `data-dshx-backdrop-paused` on `<body>` pauses a theme's animated layers there too, so the cost
-  does not grow with the number of open tabs; focus resumes the scene where it stopped. Inline, the scene sees
-  `prefers-reduced-motion` itself and rests by its own rules. Chrome 157 on a 120 Hz screen, one
-  full-window tab, renderer + GPU process CPU per scene before (image) and after (12 fps): Snow Pines 152% → 56%,
-  Dither Dunes Night 119% → 13%, Night Reef 100% → 13%, Halftone Dusk 70% → 18%, Vector Range 60% → 9%,
-  Blueprint 42% → 5% (bench and per-theme table: [docs/performance.md](../../../docs/performance.md#backdrop-scenes-2026-11-15)).
+- **Scenes on a canvas.** An animated SVG (as an image or inline) makes Chrome re-style, re-paint and re-rasterise the
+  whole viewport-sized picture on every display frame, on the CPU. So the client compiles each scene once
+  (`src/scene-canvas/compile.ts`): it mounts the SVG hidden, samples every CSS animation from the computed style (so
+  `var()`, `calc()` and every easing resolve as the browser would), and cuts the paint order into still pictures
+  rasterised once (runs of parts that move together, cropped to what their motion ever brings on screen), vectors for
+  what a picture cannot carry (a stroke that draws itself, dots that swell) and layers for groups whose opacity, clip,
+  mask or blend mode covers moving parts. A worker (`src/scene-canvas/worker.ts`) then draws those pictures on an
+  `OffscreenCanvas` in the stage the client mounts under the backdrop host: a frame is a few image draws, off the page's
+  main thread, and an unchanged frame is skipped. Each of the twenty scenes matches Chrome's own rendering of its SVG
+  to within antialiasing at sampled times. The scene's resting picture shows while it compiles (up to ~3 s for the
+  densest), with `sceneFrameRate` 0, under `prefers-reduced-motion`, or without `OffscreenCanvas`. `sceneFrameRate`
+  caps the frame rate (default 60, 0–120; Settings › Appearance or `theme_set { sceneFrameRate }`, 60 after `reset`).
+  Only the focused, shown tab moves its backdrop: every other tab holds the frame it is on and paints nothing, and
+  `data-dshx-backdrop-paused` on `<body>` pauses a theme's animated layers there, so the cost does not grow with the
+  number of open tabs. Chrome 157 on Wayland with a GPU, one 1848 × 893 window, renderer + GPU process CPU per scene
+  before (animated SVG image) and after (canvas, 60 fps): Snow Pines 155% → 15%, Dither Dunes 122% → 27%, Night Reef
+  118% → 18%, Koi Mosaic 102% → 29%, Honu Lagoon 94% → 16%, Halftone Dusk 83% → 17% (every scene:
+  [docs/performance.md](../../../docs/performance.md#backdrop-scenes-2026-11-15)).
 - **Reading veil and readability.** Under the conversation column, a theme with a backdrop lays a veil of its own
   background colour. Its opacity is the smallest that keeps the theme's text readable anywhere over that scene
   (`plugin-ui/src/theme/readability.ts`: primary text 4.5:1, and secondary and tertiary greys such as "5 other tool

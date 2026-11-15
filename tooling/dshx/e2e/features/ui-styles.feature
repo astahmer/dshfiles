@@ -49,7 +49,7 @@ Feature: One shared plugin stylesheet
     When a Command Code account backed by a local fake provider is added
     And a new thread on the fake model calls theme_set with the gallery theme "halftone"
     Then theme_set answered with the saved theme "halftone"
-    And the runtime theme paints its scene inline, stepped at the scene frame rate
+    And the runtime theme draws its scene on a canvas, moving only in the focused tab
     When the thread calls theme_set with reset
     Then theme_set answered with the default theme
     And the static default theme is the whole theme

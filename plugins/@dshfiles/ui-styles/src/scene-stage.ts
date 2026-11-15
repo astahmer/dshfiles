@@ -1,68 +1,26 @@
 import { SCENE_FRAME_RATE } from '@dshfiles/plugin-ui/theme/appearance'
 import { BACKDROP_HOST, BACKDROP_PAUSED_ATTRIBUTE, SCENE_STAGE_ATTRIBUTE } from '@dshfiles/plugin-ui/theme/definition'
+import { SceneCatalog } from '@dshfiles/plugin-ui/theme/scenes'
+import { planScene, rasterizePlan, SceneCompileError } from './scene-canvas/compile.js'
+import type { Rect, WorkerMessage } from './scene-canvas/model.js'
+import { SceneView } from './scene-canvas/view.js'
+import SceneWorker from './scene-canvas/worker.ts?worker&inline'
 
 /**
- * Moves the theme backdrop at a bounded frame rate, and only in the tab the user is in.
+ * Paints the theme backdrop scenes on a canvas, drawn by a worker.
  *
- * A scene used to be an animated SVG `background-image`. Chrome cannot composite or slow the animations inside an image,
- * so it re-styled, re-painted and re-rasterised the whole viewport-sized picture on every display frame, in every open
- * DSH tab: on a 120 Hz screen Snow Pines kept 2.6 CPU cores busy across the renderers, the raster workers and the GPU
- * process with two windows open.
+ * A scene is an animated SVG. Painted as an image (or inline), Chrome re-styles, re-paints and re-rasterises the whole
+ * viewport-sized picture on every display frame, on the CPU: Snow Pines alone kept 1.5 cores busy. Here the SVG is read
+ * once (`scene-canvas/compile.ts`): each moving part becomes a picture rasterised once, each CSS animation a track of
+ * sampled values. A worker then draws those pictures on an `OffscreenCanvas` where the tracks say, at the display's
+ * frame rate capped by `sceneFrameRate`; a frame is a few image draws, off the page's main thread.
  *
- * Here each scene is an inline SVG in the shadow root of a stage element, the first child of the backdrop host (the
- * shadow root keeps the scene's `<style>` and ids out of the page). Its CSS animations stay paused; a scene clock moves
- * them forward together `frameRate` times a second, so the browser repaints the scene only then. The clock runs only
- * while the tab has focus and is shown: every other tab holds the frame it is on and paints nothing, so the cost no
- * longer grows with the number of open tabs, and the scene resumes where it stopped. The same rule pauses a theme's
- * animated layers through `BACKDROP_PAUSED_ATTRIBUTE` on `<body>`. The theme CSS (plugin-ui `backdropCss`) shows the
- * stage of the active scheme's scene and hides the others.
+ * The scene moves only in the tab the user is in (focused and shown): every other tab holds its frame and paints
+ * nothing, and `BACKDROP_PAUSED_ATTRIBUTE` on `<body>` pauses a theme's animated layers with it. Until the scene is
+ * compiled, with `sceneFrameRate` 0, under reduced motion, or where the browser has no `OffscreenCanvas`, the stage
+ * shows the scene's resting picture as a still image. The theme CSS (plugin-ui `backdropCss`) shows the stage of the
+ * active scheme's scene and hides the others.
  */
-
-/** The part of a Web Animation the clock drives. */
-export interface SteppedAnimation {
-  currentTime: CSSNumberish | null
-  pause(): void
-}
-
-/** Where an animation stood, and the scene clock's time, when the clock first saw it. */
-interface Origin {
-  readonly time: number
-  readonly at: number
-}
-
-/**
- * Puts each animation where it would be had it run freely for the scene time elapsed since the clock first saw it; it
- * stays paused in between. An animation the clock has not seen (a scene just mounted, or one a style change restarted)
- * is paused where it stands. An animation already at its place is left alone, so a held scene costs nothing. Returns
- * how many animations it moved.
- */
-function stepAnimations(animations: Iterable<SteppedAnimation>, origins: WeakMap<SteppedAnimation, Origin>, clock: number): number {
-  let moved = 0
-  for (const animation of animations) {
-    let origin = origins.get(animation)
-    if (origin === undefined) {
-      animation.pause()
-      const current = animation.currentTime
-      origin = { time: typeof current === 'number' ? current : 0, at: clock }
-      origins.set(animation, origin)
-    }
-    const next = origin.time + (clock - origin.at)
-    if (animation.currentTime === next) continue
-    animation.currentTime = next
-    moved += 1
-  }
-  return moved
-}
-
-/** Milliseconds until the next tick: one frame while the backdrop moves, else a slow check of the mount. */
-function tickInterval(frameRate: number, moving: boolean): number {
-  return moving && frameRate > 0 ? 1000 / frameRate : 1000
-}
-
-/** Whether the backdrop moves in this tab: a frame rate above 0, and the tab shown and focused. */
-function isMoving(frameRate: number, visible: boolean, focused: boolean): boolean {
-  return frameRate > 0 && visible && focused
-}
 
 /** A scene to paint: its id and SVG. */
 export interface StageScene {
@@ -71,38 +29,46 @@ export interface StageScene {
 }
 
 interface Stage {
-  readonly element: HTMLElement
+  readonly id: string
   readonly svg: string
-  readonly picture: SVGSVGElement
-  readonly rest: HTMLStyleElement
-  readonly root: ShadowRoot
+  readonly element: HTMLElement
+  /** The resting picture as a CSS image, shown whenever the canvas does not draw. */
+  readonly resting: string
+  /** Set once the scene is compiled and its canvas handed to the worker. */
+  live?: { readonly worker: Worker; readonly canvas: HTMLCanvasElement; readonly viewBox: Rect; scale: number } | undefined
+  compiling: boolean
+  /** The worker has the pictures: the canvas shows the whole scene. */
+  drawn: boolean
+  failed: boolean
+  frame: string
 }
 
-/** Isolates the scene from the page's inherited fonts and colours, as an image was. */
-const HOST_RESET = ':host { all: initial; }'
-/** The resting picture: every animation off, as the scene's own reduced-motion rules do. */
-const RESTING = '* { animation: none !important; }'
+/** Rasterise again when the device scale drifts this far from the pictures', so they never look soft. */
+const RESCALE = 1.15
 
-/** The stages of the active theme's scenes, mounted in the backdrop host and stepped on one timer. */
+/** The stages of the active theme's scenes, mounted in the backdrop host. */
 export class SceneStage {
   readonly #doc: Document
   readonly #stages = new Map<string, Stage>()
-  readonly #origins = new WeakMap<SteppedAnimation, Origin>()
   #frameRate: number = SCENE_FRAME_RATE.default
-  #timer: ReturnType<typeof setTimeout> | undefined
-  #frame = ''
-  /** Scene time: it advances only while the backdrop moves in this tab. */
-  #clock = 0
-  #last: number | undefined
-  readonly #wake = (): void => this.#schedule(0)
+  #moving = false
+  #watch: ReturnType<typeof setInterval> | undefined
+  #resize: ResizeObserver | undefined
+  #observed: Element | null = null
+  readonly #motion: MediaQueryList | undefined
+  readonly #wake = (): void => this.#refresh()
 
   constructor(doc: Document) {
     this.#doc = doc
     const view = doc.defaultView
+    this.#motion = view?.matchMedia('(prefers-reduced-motion: reduce)')
     view?.addEventListener('focus', this.#wake)
     view?.addEventListener('blur', this.#wake)
+    view?.addEventListener('resize', this.#wake)
     doc.addEventListener('visibilitychange', this.#wake)
-    this.#schedule(0)
+    this.#motion?.addEventListener('change', this.#wake)
+    if (typeof ResizeObserver === 'function') this.#resize = new ResizeObserver(() => this.#refresh())
+    this.#refresh()
   }
 
   /** Paints exactly these scenes at this frame rate; a scene already painted with the same SVG keeps its motion. */
@@ -110,102 +76,182 @@ export class SceneStage {
     const wanted = new Map(scenes.map(scene => [scene.id, scene.svg]))
     for (const [id, stage] of this.#stages)
       if (wanted.get(id) !== stage.svg) {
-        stage.element.remove()
+        this.#drop(stage)
         this.#stages.delete(id)
       }
-    for (const [id, svg] of wanted) {
-      if (this.#stages.has(id)) continue
-      const stage = this.#create(id, svg)
-      if (stage !== undefined) this.#stages.set(id, stage)
-    }
+    for (const [id, svg] of wanted) if (!this.#stages.has(id)) this.#stages.set(id, this.#create(id, svg))
     this.#frameRate = frameRate
-    for (const stage of this.#stages.values()) stage.rest.textContent = frameRate > 0 ? '' : RESTING
-    this.#frame = ''
-    this.#schedule(0)
+    this.#refresh()
   }
 
   dispose(): void {
-    if (this.#timer !== undefined) clearTimeout(this.#timer)
-    this.#timer = undefined
     const view = this.#doc.defaultView
     view?.removeEventListener('focus', this.#wake)
     view?.removeEventListener('blur', this.#wake)
+    view?.removeEventListener('resize', this.#wake)
     this.#doc.removeEventListener('visibilitychange', this.#wake)
+    this.#motion?.removeEventListener('change', this.#wake)
+    this.#resize?.disconnect()
+    if (this.#watch !== undefined) clearInterval(this.#watch)
+    this.#watch = undefined
     this.#doc.body.removeAttribute(BACKDROP_PAUSED_ATTRIBUTE)
-    for (const stage of this.#stages.values()) stage.element.remove()
+    for (const stage of this.#stages.values()) this.#drop(stage)
     this.#stages.clear()
   }
 
-  #create(id: string, svg: string): Stage | undefined {
-    const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
-    const picture = this.#doc.importNode(parsed.documentElement, true)
-    if (!(picture instanceof SVGSVGElement) || parsed.getElementsByTagName('parsererror').length > 0) {
-      console.warn(`dshfiles-ui-styles: the backdrop scene "${id}" is not a valid SVG and is not painted; choose another theme or reload`)
-      return undefined
-    }
+  #create(id: string, svg: string): Stage {
     const element = this.#doc.createElement('div')
     element.setAttribute(SCENE_STAGE_ATTRIBUTE, id)
     element.setAttribute('aria-hidden', 'true')
-    const root = element.attachShadow({ mode: 'open' })
-    const reset = this.#doc.createElement('style')
-    reset.textContent = HOST_RESET
-    const rest = this.#doc.createElement('style')
-    // `background-size: cover` centred, as the scene was painted before.
-    picture.setAttribute('preserveAspectRatio', 'xMidYMid slice')
-    picture.style.position = 'absolute'
-    root.append(reset, rest, picture)
-    return { element, svg, picture, rest, root }
+    // The resting picture, fixed to the viewport like the scene and its stills: shown until the canvas draws.
+    const resting = SceneCatalog.image(SceneCatalog.resting(svg))
+    element.style.backgroundImage = resting
+    element.style.backgroundAttachment = 'fixed'
+    element.style.backgroundSize = 'cover'
+    element.style.backgroundPosition = 'center'
+    element.style.backgroundRepeat = 'no-repeat'
+    return { id, svg, element, resting, compiling: false, drawn: false, failed: false, frame: '' }
   }
 
-  #schedule(delay: number): void {
-    if (this.#timer !== undefined) clearTimeout(this.#timer)
-    this.#timer = setTimeout(this.#tick, delay)
+  #drop(stage: Stage): void {
+    stage.live?.worker.terminate()
+    stage.element.remove()
   }
 
-  readonly #tick = (): void => {
-    this.#timer = undefined
-    const moving = isMoving(this.#frameRate, !this.#doc.hidden, this.#doc.hasFocus())
+  /** Mounts the stages, follows the host's size, and starts or holds the scenes. */
+  #refresh(): void {
+    const reduced = this.#motion?.matches ?? false
+    const moving = SceneView.moving(this.#frameRate, !this.#doc.hidden, this.#doc.hasFocus(), reduced)
+    this.#moving = moving
     // A theme's animated layers hold still with the scene.
     this.#doc.body.toggleAttribute(BACKDROP_PAUSED_ATTRIBUTE, !moving)
-    const now = performance.now()
-    if (moving && this.#last !== undefined) this.#clock += now - this.#last
-    this.#last = moving ? now : undefined
-    if (this.#stages.size > 0 && !this.#doc.hidden) {
-      const host = this.#doc.querySelector<HTMLElement>(BACKDROP_HOST)
-      if (host !== null) {
-        // Read the layout before any animation moves, while it is still clean from the last frame.
-        this.#align(host)
-        for (const stage of this.#stages.values()) {
-          if (stage.element.parentElement !== host) host.prepend(stage.element)
-          // Also while held: an animation a style change just restarted is paused at once.
-          if (this.#frameRate > 0) stepAnimations(stage.root.getAnimations(), this.#origins, this.#clock)
-        }
+    // The host can be replaced by the workbench: a slow check keeps the stages in it while there are any.
+    if (this.#stages.size > 0 && this.#watch === undefined) this.#watch = setInterval(() => this.#mount(), 1000)
+    if (this.#stages.size === 0 && this.#watch !== undefined) {
+      clearInterval(this.#watch)
+      this.#watch = undefined
+    }
+    const host = this.#mount()
+    const animate = this.#frameRate > 0 && !reduced
+    for (const stage of this.#stages.values()) {
+      if (animate && stage.live === undefined && !stage.compiling && !stage.failed) void this.#compile(stage)
+      // The canvas draws the whole scene while it animates: the resting image under it would only be painted for nothing.
+      const drawn = stage.live !== undefined && stage.drawn && animate
+      stage.element.style.backgroundImage = drawn ? 'none' : stage.resting
+      if (stage.live !== undefined) {
+        stage.live.canvas.style.display = drawn ? 'block' : 'none'
+        if (host !== null) this.#view(stage, host)
+        this.#post(stage, { type: 'run', running: moving && animate, frameRate: this.#frameRate })
       }
     }
-    // Without a scene, or in a hidden tab, nothing needs a timer: focus and visibility changes wake the stage.
-    if (this.#stages.size > 0 && !this.#doc.hidden) this.#schedule(tickInterval(this.#frameRate, moving))
   }
 
-  /** Lays each picture over the whole viewport, so it lines up with the blurred still in the reading veil. */
-  #align(host: HTMLElement): void {
+  /** Puts every stage first in the backdrop host, and watches the host's size. */
+  #mount(): HTMLElement | null {
+    const host = this.#doc.querySelector<HTMLElement>(BACKDROP_HOST)
+    if (host === null) return null
+    for (const stage of this.#stages.values()) if (stage.element.parentElement !== host) host.prepend(stage.element)
+    if (this.#observed !== host) {
+      this.#resize?.disconnect()
+      this.#resize?.observe(host)
+      this.#observed = host
+      this.#refreshSoon()
+    }
+    return host
+  }
+
+  #soon: ReturnType<typeof setTimeout> | undefined
+  #refreshSoon(): void {
+    if (this.#soon !== undefined) return
+    this.#soon = setTimeout(() => {
+      this.#soon = undefined
+      this.#refresh()
+    }, 0)
+  }
+
+  /** Sizes the canvas to the host and tells the worker where the scene lies; rasterises again when the scale drifts. */
+  #view(stage: Stage, host: HTMLElement): void {
+    const live = stage.live
     const view = this.#doc.defaultView
-    if (view === null) return
+    if (live === undefined || view === null) return
+    const dpr = view.devicePixelRatio || 1
     const box = host.getBoundingClientRect()
-    const frame = `${-box.left}:${-box.top}:${view.innerWidth}:${view.innerHeight}`
-    if (frame === this.#frame) return
-    this.#frame = frame
-    for (const { picture } of this.#stages.values()) {
-      picture.style.left = `${-box.left}px`
-      picture.style.top = `${-box.top}px`
-      picture.style.width = `${view.innerWidth}px`
-      picture.style.height = `${view.innerHeight}px`
+    const viewport = { width: view.innerWidth, height: view.innerHeight }
+    const width = Math.max(1, Math.round(box.width * dpr))
+    const height = Math.max(1, Math.round(box.height * dpr))
+    const frame = `${width}:${height}:${box.left}:${box.top}:${viewport.width}:${viewport.height}:${dpr}`
+    if (frame === stage.frame) return
+    stage.frame = frame
+    this.#post(stage, { type: 'view', width, height, matrix: SceneView.view(live.viewBox, viewport, box, dpr) })
+    const scale = SceneView.scale(live.viewBox, viewport, dpr)
+    if (scale > live.scale * RESCALE || scale < live.scale / RESCALE) void this.#raster(stage, scale)
+  }
+
+  #post(stage: Stage, message: WorkerMessage, transfer: Transferable[] = []): void {
+    stage.live?.worker.postMessage(message, transfer)
+  }
+
+  #plans = new WeakMap<Stage, Awaited<ReturnType<typeof planScene>>>()
+
+  async #compile(stage: Stage): Promise<void> {
+    const view = this.#doc.defaultView
+    const canvas = this.#doc.createElement('canvas')
+    if (view === null || typeof canvas.transferControlToOffscreen !== 'function' || typeof Worker !== 'function') {
+      stage.failed = true
+      return
+    }
+    stage.compiling = true
+    try {
+      const plan = await planScene(stage.svg, this.#doc)
+      if (this.#stages.get(stage.id) !== stage) return
+      this.#plans.set(stage, plan)
+      canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'
+      const offscreen = canvas.transferControlToOffscreen()
+      const worker = new SceneWorker({ name: `dshfiles-scene-${stage.id}` })
+      stage.live = { worker, canvas, viewBox: plan.model.viewBox, scale: 0 }
+      this.#post(stage, { type: 'canvas', canvas: offscreen }, [offscreen])
+      stage.element.append(canvas)
+      const scale = SceneView.scale(plan.model.viewBox, { width: view.innerWidth, height: view.innerHeight }, view.devicePixelRatio || 1)
+      await this.#raster(stage, scale)
+      stage.drawn = true
+      stage.frame = ''
+      this.#refresh()
+    } catch (error) {
+      stage.failed = true
+      stage.live?.worker.terminate()
+      stage.live = undefined
+      canvas.remove()
+      const reason = error instanceof SceneCompileError ? error.message : String(error)
+      console.warn(
+        `dshfiles-ui-styles: the backdrop scene "${stage.id}" shows a still picture: it could not be animated on the canvas (${reason}). Choose another theme for motion.`,
+      )
+    } finally {
+      stage.compiling = false
     }
   }
-}
 
-/** The pure parts of the stage, for tests. */
-export class SceneClock {
-  static readonly step = stepAnimations
-  static readonly interval = tickInterval
-  static readonly moving = isMoving
+  #rasterizing = new WeakSet<Stage>()
+
+  async #raster(stage: Stage, scale: number): Promise<void> {
+    const plan = this.#plans.get(stage)
+    const live = stage.live
+    if (plan === undefined || live === undefined || this.#rasterizing.has(stage)) return
+    this.#rasterizing.add(stage)
+    try {
+      live.scale = scale
+      const bitmaps = await rasterizePlan(plan, scale)
+      if (this.#stages.get(stage.id) !== stage) {
+        for (const bitmap of bitmaps) bitmap.close()
+        return
+      }
+      this.#post(stage, { type: 'scene', model: plan.model, bitmaps }, bitmaps)
+    } finally {
+      this.#rasterizing.delete(stage)
+    }
+  }
+
+  /** Whether the scenes move in this tab right now. */
+  get moving(): boolean {
+    return this.#moving
+  }
 }

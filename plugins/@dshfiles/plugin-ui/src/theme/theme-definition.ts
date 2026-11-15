@@ -348,11 +348,10 @@ export const GPU_ATTRIBUTE = 'data-dshx-gpu'
 
 /**
  * The attribute of the element the client mounts as the first child of `BACKDROP_HOST` to paint a built-in scene; its
- * value is the scene id. The scene is an inline SVG in that element's shadow root, not a `background-image`: an animated
- * SVG image can be neither composited nor slowed, so Chrome re-styled, re-painted and re-rasterised the whole
- * viewport-sized picture at the display's refresh rate (2.6 CPU cores for Snow Pines on a 120 Hz screen). Inline, the
- * client pauses the scene's animations and steps them at the Appearance `sceneFrameRate`. Hidden unless the active
- * scheme's backdrop paints that scene (`backdropCss`).
+ * value is the scene id. The scene is drawn on a canvas in that element by a worker (ui-styles `scene-stage.ts`), never
+ * as an animated SVG: Chrome re-styles, re-paints and re-rasterises a whole animated SVG at the display's refresh rate
+ * (2.6 CPU cores for Snow Pines on a 120 Hz screen). Hidden unless the active scheme's backdrop paints that scene
+ * (`backdropCss`).
  */
 export const SCENE_STAGE_ATTRIBUTE = 'data-dshx-scene'
 

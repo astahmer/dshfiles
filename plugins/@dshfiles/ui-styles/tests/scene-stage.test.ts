@@ -1,85 +1,68 @@
 import { describe, expect, it } from 'vitest'
-import { SceneClock, type SteppedAnimation } from '../src/scene-stage.ts'
+import { Affine } from '../src/scene-canvas/matrix.ts'
+import type { Track } from '../src/scene-canvas/model.ts'
+import { SceneMath } from '../src/scene-canvas/render.ts'
+import { SceneView } from '../src/scene-canvas/view.ts'
 
-/** A Web Animation as the clock sees it: it records pauses and every time it is given. */
-class FakeAnimation implements SteppedAnimation {
-  paused = 0
-  writes = 0
-  #time: CSSNumberish | null
-  constructor(time: CSSNumberish | null) {
-    this.#time = time
-  }
-  get currentTime(): CSSNumberish | null {
-    return this.#time
-  }
-  set currentTime(value: CSSNumberish | null) {
-    this.writes += 1
-    this.#time = value
-  }
-  pause(): void {
-    this.paused += 1
-  }
+const track = (values: number[], options: Partial<Track> = {}): Track => ({
+  period: 1000,
+  count: values.length,
+  stride: 1,
+  hold: false,
+  loop: true,
+  values: Float32Array.from(values),
+  ...options,
+})
+
+const at = (value: Track, time: number): number => {
+  const out = new Float64Array(1)
+  SceneMath.sample(value, time, out)
+  return out[0] ?? Number.NaN
 }
 
-describe('scene clock', () => {
-  it('pauses each animation once and moves it to where it would have run freely', () => {
-    const origins = new WeakMap()
-    // A negative animation-delay starts a CSS animation part-way through: its time is already ahead.
-    const fall = new FakeAnimation(12_000)
-    const glow = new FakeAnimation(0)
-    SceneClock.step([fall, glow], origins, 1_000)
-    expect([fall.paused, glow.paused]).toEqual([1, 1])
-    expect([fall.currentTime, glow.currentTime]).toEqual([12_000, 0])
-    // One step later, both moved forward by the elapsed scene time, and nothing paused them again.
-    expect(SceneClock.step([fall, glow], origins, 1_083)).toBe(2)
-    expect([fall.currentTime, glow.currentTime]).toEqual([12_083, 83])
-    expect([fall.paused, glow.paused]).toEqual([1, 1])
+describe('scene canvas', () => {
+  it('plays a sampled animation track: loops, holds steps and stops a finite one on its last value', () => {
+    const ramp = track([0, 10, 20, 30])
+    // Between two samples it blends; past the period it starts over, back to the first sample after the last.
+    expect(at(ramp, 125)).toBeCloseTo(5)
+    expect(at(ramp, 1125)).toBeCloseTo(5)
+    expect(at(ramp, 875)).toBeCloseTo(15)
+    // A `steps()` animation holds each sample.
+    expect(at(track([0, 10, 20, 30], { hold: true }), 490)).toBe(10)
+    // A finite animation keeps its last value.
+    expect(at(track([0, 10, 20, 30], { loop: false }), 5000)).toBeCloseTo(30)
+    expect(at(ramp, -125)).toBeCloseTo(15)
   })
 
-  it('leaves a held scene alone: no write, so the browser repaints nothing', () => {
-    const origins = new WeakMap()
-    const fall = new FakeAnimation(500)
-    SceneClock.step([fall], origins, 0)
-    SceneClock.step([fall], origins, 100)
-    const writes = fall.writes
-    // The tab lost focus: the scene clock stops, the stage still ticks to catch restarted animations.
-    expect(SceneClock.step([fall], origins, 100)).toBe(0)
-    expect(SceneClock.step([fall], origins, 100)).toBe(0)
-    expect(fall.writes).toBe(writes)
-    // Focus is back: it resumes from the frame it held, not from the wall clock.
-    SceneClock.step([fall], origins, 183)
-    expect(fall.currentTime).toBe(683)
+  it('moves a part by its animated transform about its origin', () => {
+    const node = {
+      parent: -1,
+      origin: [100, 50] as const,
+      translate: [0, 0] as const,
+      rotate: track([0, 90], { period: 2000, hold: true }),
+      scale: [1, 1] as const,
+      transform: Affine.translate(0, 0),
+      moves: true,
+      before: Affine.translate(0, 0),
+      after: Affine.translate(0, 0),
+      alpha: [],
+    }
+    // A quarter turn about (100, 50) sends (110, 50) to (100, 60).
+    const [x, y] = Affine.apply(SceneMath.localAt(node, 1500), 110, 50)
+    expect(x).toBeCloseTo(100)
+    expect(y).toBeCloseTo(60)
   })
 
-  it('catches an animation a style change restarted, from where it stands', () => {
-    const origins = new WeakMap()
-    SceneClock.step([new FakeAnimation(500)], origins, 0)
-    // The scheme or the motion preference changed: the scene's animations are new objects running freely.
-    const restarted = new FakeAnimation(40)
-    SceneClock.step([restarted], origins, 2_000)
-    expect(restarted.paused).toBe(1)
-    SceneClock.step([restarted], origins, 2_100)
-    expect(restarted.currentTime).toBe(140)
-  })
-
-  it('treats an idle animation (no time yet) as starting now', () => {
-    const origins = new WeakMap()
-    const idle = new FakeAnimation(null)
-    SceneClock.step([idle], origins, 50)
-    SceneClock.step([idle], origins, 150)
-    expect(idle.currentTime).toBe(100)
-  })
-
-  it('moves only in the focused, shown tab, at the chosen frame rate', () => {
-    expect(SceneClock.moving(12, true, true)).toBe(true)
-    // Another window has focus, the tab is in the background, or the user chose a still picture.
-    expect(SceneClock.moving(12, true, false)).toBe(false)
-    expect(SceneClock.moving(12, false, true)).toBe(false)
-    expect(SceneClock.moving(0, true, true)).toBe(false)
-    expect(SceneClock.interval(12, true)).toBeCloseTo(83.33, 1)
-    expect(SceneClock.interval(30, true)).toBeCloseTo(33.33, 1)
-    // Held: only a slow check that the stage is still mounted.
-    expect(SceneClock.interval(12, false)).toBe(1000)
-    expect(SceneClock.interval(0, true)).toBe(1000)
+  it('lays the scene over the viewport as cover did, and moves only in the focused, shown tab', () => {
+    // A 1600 × 1000 scene on a 2000 × 1000 viewport: scaled 1.25, centred vertically, the host at (300, 40).
+    const view = SceneView.view([0, 0, 1600, 1000], { width: 2000, height: 1000 }, { left: 300, top: 40 }, 2)
+    expect(view.map(value => Math.round(value * 100) / 100)).toEqual([2.5, 0, 0, 2.5, -600, -330])
+    expect(SceneView.scale([0, 0, 1600, 1000], { width: 2000, height: 1000 }, 2)).toBe(2.5)
+    expect(SceneView.moving(60, true, true, false)).toBe(true)
+    // Another window has focus, the tab is in the background, reduced motion, or a still picture.
+    expect(SceneView.moving(60, true, false, false)).toBe(false)
+    expect(SceneView.moving(60, false, true, false)).toBe(false)
+    expect(SceneView.moving(60, true, true, true)).toBe(false)
+    expect(SceneView.moving(0, true, true, false)).toBe(false)
   })
 })

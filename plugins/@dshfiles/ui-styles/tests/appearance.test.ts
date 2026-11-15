@@ -186,14 +186,14 @@ describe('saved themes', () => {
     const lagoon = ThemeStateModel.nextAppearance(slow, { customTheme: 'honu-lagoon' })
     expect(ThemeStateModel.themeState(lagoon, 'light')).toMatchObject({ sceneFrameRate: 4, customTheme: 'honu-lagoon' })
     expect(ThemeStateModel.defineTheme(slow, { theme: NORD })).toMatchObject({ sceneFrameRate: 4 })
-    expect(ThemeStateModel.nextAppearance(slow, { sceneFrameRate: 99 })).toMatchObject({ sceneFrameRate: SCENE_FRAME_RATE.max })
+    expect(ThemeStateModel.nextAppearance(slow, { sceneFrameRate: 999 })).toMatchObject({ sceneFrameRate: SCENE_FRAME_RATE.max })
     expect(ThemeStateModel.nextAppearance(slow, { sceneFrameRate: -1 })).toMatchObject({ sceneFrameRate: 0 })
     expect(ThemeStateModel.nextAppearance(slow, { sceneFrameRate: 7.6 })).toMatchObject({ sceneFrameRate: 8 })
     expect(ThemeStateModel.nextAppearance(lagoon, { reset: true })).toMatchObject({ sceneFrameRate: SCENE_FRAME_RATE.default })
     // A stored value from before the setting existed, or a broken one, reads as the default.
     expect(ThemeStateModel.normaliseAppearance({ sceneFrameRate: 'fast' })).toMatchObject({ sceneFrameRate: SCENE_FRAME_RATE.default })
     expect(appearanceSettings.schema({ sceneFrameRate: 0 })).toMatchObject({ sceneFrameRate: 0 })
-    expect(() => appearanceSettings.schema({ sceneFrameRate: 31 })).toThrow()
+    expect(() => appearanceSettings.schema({ sceneFrameRate: 121 })).toThrow()
   })
 
   it('removes a theme and falls back to the preset when it was in use', () => {

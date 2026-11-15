@@ -105,7 +105,7 @@ const themeSetInputSchema = Schema.Struct({
   sceneFrameRate: Schema.optional(
     finite.annotate({
       description:
-        'Frames per second an animated backdrop scene moves at, 0–30 (default 12; 0: a still picture). Each frame repaints the whole scene, so CPU use grows with it. Only the focused tab moves its backdrop. Kept across theme changes; reset restores 12.',
+        'Most frames per second an animated backdrop scene is drawn at, 0–120 (default 60; the display caps it; 0: a still picture). Only the focused tab moves its backdrop. Kept across theme changes; reset restores 60.',
     }),
   ),
 })

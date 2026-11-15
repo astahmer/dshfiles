@@ -64,12 +64,12 @@ describe('gallery themes', () => {
     expect(css).toContain(`body[data-ds-dark-theme][${BACKDROP_PAUSED_ATTRIBUTE}] ${BACKDROP_HOST}::before {\n  animation-play-state: paused !important;`)
   })
 
-  it('moves a scene at 12 frames per second unless asked otherwise, whole frames within 0–30', () => {
-    expect(AppearanceModel.sceneFrameRate(DEFAULT_APPEARANCE)).toBe(12)
+  it('draws a scene at up to 60 frames per second unless asked otherwise, whole frames within 0–120', () => {
+    expect(AppearanceModel.sceneFrameRate(DEFAULT_APPEARANCE)).toBe(60)
     expect(AppearanceModel.sceneFrameRate({ sceneFrameRate: 0 })).toBe(0)
-    expect(AppearanceModel.sceneFrameRate({ sceneFrameRate: 99 })).toBe(30)
+    expect(AppearanceModel.sceneFrameRate({ sceneFrameRate: 999 })).toBe(120)
     expect(AppearanceModel.sceneFrameRate({ sceneFrameRate: 7.4 })).toBe(7)
-    expect(AppearanceModel.sceneFrameRate({ sceneFrameRate: Number.NaN })).toBe(12)
+    expect(AppearanceModel.sceneFrameRate({ sceneFrameRate: Number.NaN })).toBe(60)
   })
 
   it('keeps its text readable over its scene with a veil, whatever the user asks', () => {

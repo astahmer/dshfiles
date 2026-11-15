@@ -60,7 +60,7 @@ export const appearanceSettings = defineSettings({
       .max(SCENE_FRAME_RATE.max)
       .default(SCENE_FRAME_RATE.default)
       .description(
-        `Frames per second an animated backdrop scene moves at (${SCENE_FRAME_RATE.min}–${SCENE_FRAME_RATE.max}, default ${SCENE_FRAME_RATE.default}). Each frame repaints the whole scene, so CPU use grows with it; 0 shows a still picture and costs nothing. The backdrop only moves in the focused tab; every other tab holds its frame.`,
+        `Most frames per second an animated backdrop scene is drawn at (${SCENE_FRAME_RATE.min}–${SCENE_FRAME_RATE.max}, default ${SCENE_FRAME_RATE.default}; the display's rate caps it). The scene is drawn on a canvas off the page's main thread; 0 shows a still picture. The backdrop only moves in the focused tab; every other tab holds its frame.`,
       ),
     customTheme: Schema.string()
       .default('')

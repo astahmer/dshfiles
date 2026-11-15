@@ -78,8 +78,8 @@ export interface AppearanceSettings {
   readonly readingBlur?: number
   readonly readingTint?: number
   /**
-   * Frames per second a backdrop scene moves at (0–30); 0 shows its resting picture. Each frame repaints the whole
-   * scene, so CPU use grows with it (`SCENE_FRAME_RATE`).
+   * Most frames per second a backdrop scene is drawn at (0–120); 0 shows its resting picture. The display's own rate
+   * caps it (`SCENE_FRAME_RATE`).
    */
   readonly sceneFrameRate?: number
   /** Id of a saved theme in `customThemes` or of a built-in gallery theme; when it names one, it replaces the preset. Empty: the preset. */
@@ -227,11 +227,11 @@ const bounded = (value: number | undefined, key: keyof typeof READING_BOUNDS): n
   typeof value === 'number' && Number.isFinite(value) ? clamp(value, READING_BOUNDS[key].min, READING_BOUNDS[key].max) : 0
 
 /**
- * Bounds of `sceneFrameRate`. Each frame re-styles and re-rasterises the whole scene on the CPU and the GPU process; the
- * default keeps the slow ambient motion of every scene readable at about a tenth of the cost of the display's own rate
- * (measurements in ui-styles/README.md).
+ * Bounds of `sceneFrameRate`. A scene is drawn on a canvas from pictures rasterised once, so a frame costs a few image
+ * draws: the default is smooth on any display, and lower values only save a little more (measurements in
+ * docs/performance.md).
  */
-export const SCENE_FRAME_RATE = { min: 0, max: 30, default: 12 } as const
+export const SCENE_FRAME_RATE = { min: 0, max: 120, default: 60 } as const
 
 /** The scene frame rate in effect, inside its bounds: whole frames per second, 0 for the resting picture. */
 function sceneFrameRate(settings: { readonly sceneFrameRate?: number | undefined } | undefined): number {

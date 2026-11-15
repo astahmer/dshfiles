@@ -15,45 +15,52 @@ trace with Snow Pines: 4.4 s `RasterTask`, 2.3 s `UpdateLayoutTree` + `Layout`, 
 ~120 `BeginFrame`/s. The whole browser went from ~70% of a core (default theme, two DSH tabs, one thread running) to
 260%.
 
-**Fix** (`@dshfiles/ui-styles` `src/scene-stage.ts`, plugin-ui `SCENE_STAGE_ATTRIBUTE`): the client mounts each scene
-as an inline SVG in the shadow root of a stage element under the backdrop host, pauses its CSS animations and moves them
-forward together `sceneFrameRate` times a second (Appearance setting, default 12, 0–30, 0 = resting picture). Letting
-the inline SVG run freely is no better (Snow Pines 184%: Chrome does not composite animations inside SVG either); the
-step rate is the lever. Every open DSH tab used to pay the whole cost (two windows: both renderers busy, one GPU
-process carrying both): now the scene clock only runs in the focused, shown tab. The others hold their frame, write no
-animation time and so paint nothing, and `data-dshx-backdrop-paused` on `<body>` pauses a theme's animated layers there
-(Dracula's stars, a saved theme's layers). The cost of a moving backdrop is one tab's, however many are open.
+**First fix, replaced the same day.** Inline SVG with its animations paused and stepped at 12 fps cut Snow Pines from
+152% to 56% (isolated bench), but the motion visibly stuttered, and the cost still grew with the step rate (30 fps:
+123%; free-running inline: 184%): Chrome composites no animation inside an SVG, inline or not.
 
-**Measured.** Isolated bench page in the user's Chrome (scene full-window 2053 × 992, nothing else on the page), CPU %
-of one core for the page's renderer + the GPU process, 7 s windows. Before = image, after = inline at 12 fps:
+**Fix** (`@dshfiles/ui-styles` `src/scene-canvas/`, `src/scene-stage.ts`): the scene runs on a canvas. The client
+compiles it once in the page (`compile.ts`, 0.1–3.5 s per scene, in slices of 24 ms): it mounts the SVG hidden, samples
+each CSS animation from the computed style at 24 samples per second (so `var()`, `calc()` and easings resolve as Chrome
+would) and cuts the paint order into still pictures rasterised once (runs of parts that move together, cropped to what
+their motion ever brings on screen), vectors for what a picture cannot carry (Plotter Tide's and Vector Range's strokes
+that draw themselves, Halftone's swelling dots) and layers for groups whose opacity, clip, mask or blend mode covers
+moving parts. A worker draws them on an `OffscreenCanvas` (`worker.ts`, `render.ts`): a frame is a few image draws,
+off the main thread, and an unchanged frame is skipped. `sceneFrameRate` is now a cap (default 60, 0–120). Only the
+focused, shown tab runs its worker; other tabs hold their frame, and `data-dshx-backdrop-paused` on `<body>` pauses a
+theme's animated layers there, so the cost is one tab's however many are open.
 
-| Scene (dark) | Before | After |   | Scene (light) | Before | After |
+**Correctness.** For each of the 20 scenes, Chrome's own render of the SVG (animations paused at 0, 4.3, 23.5 and
+61.1 s) against the canvas at the same times, 1600 × 1000: at most 1.6% of pixels differ by more than 32/255 (Koi
+Mosaic, antialiasing on rotated tiles), 15 scenes under 0.3%.
+
+**Measured.** Isolated headed Chrome 157 on Wayland with the GPU (no other page), one 1848 × 893 window, CPU % of one
+core for its renderer + GPU process + browser, 4 s windows. Before = animated SVG image (the old code), after = canvas
+at the display's 60 fps (JS per frame in the worker 0.07–1.7 ms):
+
+| Scene | Before | After |   | Scene | Before | After |
 | ------------------ | ---: | ---: | --- | ------------- | ---: | ---: |
-| Snow Pines         | 152 | 56 |   | Dither Dunes  | 123 | 12 |
-| Dither Dunes Night | 119 | 13 |   | Koi Mosaic    | 103 | 26 |
-| Night Reef         | 100 | 13 |   | Honu Lagoon   | 100 |  9 |
-| Halftone Dusk      |  70 | 18 |   | Halftone Dawn |  69 | 19 |
-| Vector Range       |  60 |  9 |   | Plotter Tide  |  58 | 10 |
-| Plotter Tide Night |  57 | 11 |   | Paper Garden  |  50 |  8 |
-| Paper Garden Kraft |  50 |  8 |   |               |     |    |
-| Blueprint          |  42 |  5 |   |               |     |    |
-| Braille Stars      |  39 |  9 |   |               |     |    |
-| Block Clouds       |  30 |  5 |   |               |     |    |
-| Deep Water         |  25 |  8 |   |               |     |    |
-| Aurora             |  19 |  7 |   |               |     |    |
-| Ember              |  17 |  5 |   |               |     |    |
-| Departure Board    |  11 |  5 |   |               |     |    |
+| Snow Pines         | 155 | 15 |   | Dither Dunes  | 122 | 27 |
+| Dither Dunes Night | 119 | 25 |   | Koi Mosaic    | 102 | 29 |
+| Night Reef         | 118 | 18 |   | Honu Lagoon   |  94 | 16 |
+| Halftone Dusk      |  83 | 17 |   | Halftone Dawn |  78 | 16 |
+| Vector Range       |  61 | 15 |   | Plotter Tide  |  57 | 20 |
+| Plotter Tide Night |  56 | 21 |   | Paper Garden  |  51 | 19 |
+| Paper Garden Kraft |  50 | 19 |   | Ember         |  18 | 14 |
+| Blueprint          |  42 | 14 |   | Aurora        |  19 | 13 |
+| Teletext Clouds    |  29 | 16 |   | Deep Water    |  24 | 14 |
+| Braille Stars      |  20 |  7 |   | Departure Board | 10 | 6 |
 
-Snow Pines by step rate (its snow falls over the whole picture, so each step re-rasters most of it): 6 fps 27%, 8 fps
-35%, 12 fps 56%, 15 fps 68%, 24 fps 110%, 30 fps 123%, free-running inline 184%. In the live DSH tab the same switch
-(image → inline, 15 fps) took that tab's renderer from 117% to 56% over a ~27% floor. Proof in a real browser: the
-`ui-styles.gallery-theme-agent` journey asserts the stage is shown, its animations stay paused between steps and still
-advance, the picture covers the viewport, and on blur the body takes the paused attribute and the scene's time stops
-for a full second, then moves on from the held frame once focus is back.
+Proof in a real browser: the `ui-styles.gallery-theme-agent` journey waits for the canvas, checks it fills the stage
+and the resting image is gone, then compares screenshots of the scene: it changes while focused, holds for 1.5 s once
+the window loses focus (and the body takes the paused attribute), and moves again once focus is back.
 
-**Still open.** Snow Pines remains the heaviest scene at 12 fps; `sceneFrameRate` 6 halves it. An idle DSH tab also
-renders continuously while any thread runs (sidebar spinner and shimmer indicators, ~27% of a core here, one of them a
-`background-position` animation that repaints): separate from the scenes, not addressed here.
+**Costs and limits.** The pictures are held in memory: 1.7–24 M pixels per scene at scale 1 (Dither Dunes, with four
+clipped dunes, the most; Snow Pines 17 M), so tens of MB of GPU memory for the active scene. The resting picture shows
+while a scene compiles, with `sceneFrameRate` 0, under reduced motion, or without `OffscreenCanvas`. A scene the
+compiler cannot read (an animated property other than transform, opacities, stroke width and dash offset) falls back to
+its resting picture with a console warning naming the scene. An idle DSH tab also renders continuously while any thread
+runs (sidebar spinner and shimmer indicators, ~27% of a core): separate from the scenes, not addressed here.
 
 ## Phone list → thread → Back (2026-11-13)
 

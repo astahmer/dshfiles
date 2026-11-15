@@ -151,8 +151,8 @@
         {
           "key": "sceneFrameRate",
           "defaultValue": "12",
-          "constraints": "0–30 whole frames per second a scene moves at; 0 shows its resting picture. Each frame repaints the whole scene, so CPU use grows with it. Only the focused tab moves its backdrop; other tabs hold their frame and pause animated layers. Kept across theme changes, 12 after reset.",
-          "coveredBy": ["ui-styles.scene-frame-rate", "ui-styles.scene-clock", "ui-styles.scene-held-tab"]
+          "constraints": "0–120 most frames per second a scene is drawn at on its canvas (the display caps it); 0 shows its resting picture. Only the focused tab moves its backdrop; other tabs hold their frame and pause animated layers. Kept across theme changes, 60 after reset.",
+          "coveredBy": ["ui-styles.scene-frame-rate", "ui-styles.scene-canvas-track", "ui-styles.scene-canvas-view"]
         }
       ],
       "states": ["preset", "saved-theme", "saved-theme-overridden", "saved-theme-missing", "gallery-theme", "scene-loading"],
@@ -236,15 +236,15 @@
         },
         {
           "kind": "unit-test",
-          "id": "ui-styles.scene-clock",
+          "id": "ui-styles.scene-canvas-track",
           "file": "plugins/@dshfiles/ui-styles/tests/scene-stage.test.ts",
-          "testName": "pauses each animation once and moves it to where it would have run freely"
+          "testName": "plays a sampled animation track: loops, holds steps and stops a finite one on its last value"
         },
         {
           "kind": "unit-test",
-          "id": "ui-styles.scene-held-tab",
+          "id": "ui-styles.scene-canvas-view",
           "file": "plugins/@dshfiles/ui-styles/tests/scene-stage.test.ts",
-          "testName": "leaves a held scene alone: no write, so the browser repaints nothing"
+          "testName": "lays the scene over the viewport as cover did, and moves only in the focused, shown tab"
         },
         {
           "kind": "unit-test",

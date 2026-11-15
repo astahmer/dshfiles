@@ -145,8 +145,8 @@ Then('theme_set answered with the saved theme {string}', async ({ page }: { page
   await recordAssertion(page, 'ui-styles-gallery-theme-result', () => expect.poll(() => lastToolResult(page)).toContain(`"customTheme":"${id}"`))
 })
 
-Then('the runtime theme paints its scene inline, stepped at the scene frame rate', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'ui-styles-gallery-scene-stepped', async () => {
+Then('the runtime theme draws its scene on a canvas, moving only in the focused tab', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ui-styles-gallery-scene-canvas', async () => {
     // The scene's SVG comes from the Host's scene method into a stage under the backdrop host; the page's scheme shows
     // one of the theme's two scenes.
     const shown = page.locator('[data-workbench-region="main"] .dshfiles-workbench-theme > [data-dshx-scene]').filter({ visible: true })
@@ -157,42 +157,41 @@ Then('the runtime theme paints its scene inline, stepped at the scene frame rate
     expect(sheet).toContain('data:image/svg+xml')
     expect(sheet).not.toContain(encodeURIComponent('@media (prefers-reduced-motion'))
     expect(sheet).not.toContain('backdrop-filter')
-    // The scene's animations are paused between steps and still move forward: the client steps them.
-    const clock = () =>
-      shown.evaluate(stage => {
-        const animations = stage.shadowRoot?.getAnimations() ?? []
-        return {
-          paused: animations.every(animation => animation.playState === 'paused'),
-          count: animations.length,
-          time: Number(animations[0]?.currentTime ?? 0),
-        }
-      })
-    await expect.poll(async () => (await clock()).count).toBeGreaterThan(0)
-    const before = await clock()
-    expect(before.paused).toBe(true)
-    await expect.poll(async () => (await clock()).time - before.time).toBeGreaterThan(300)
-    expect((await clock()).paused).toBe(true)
-    // The picture covers the viewport, so it lines up with the scene's stills.
-    const box = await shown.evaluate(stage => stage.shadowRoot?.querySelector('svg')?.getBoundingClientRect().toJSON())
-    expect(box).toMatchObject({ x: 0, y: 0, width: page.viewportSize()?.width, height: page.viewportSize()?.height })
-    // Another window takes focus: this tab holds its frame (nothing to repaint) and pauses the theme's layers.
+    // The scene is compiled once, then a worker draws it on a canvas that fills the stage; the resting image under it
+    // goes away.
+    const canvas = shown.locator('canvas')
+    await expect(canvas).toHaveCount(1, { timeout: 20_000 })
+    await expect.poll(() => shown.evaluate(stage => (stage as HTMLElement).style.backgroundImage), { timeout: 20_000 }).toBe('none')
+    const [stageBox, canvasBox] = await Promise.all([shown.boundingBox(), canvas.boundingBox()])
+    expect(canvasBox).toEqual(stageBox)
+    // Only the scene is compared: the UI over it (a blinking caret) is hidden, its layout untouched.
+    const hide = await page.addStyleTag({
+      content: '[data-workbench-region="main"] .dshfiles-workbench-theme > :not([data-dshx-scene]) { visibility: hidden !important; }',
+    })
+    const frame = () => shown.screenshot({ animations: 'allow' })
+    const changes = async (from: Buffer) => !(await frame()).equals(from)
+    // In the focused tab the scene moves.
+    const first = await frame()
+    await expect.poll(() => changes(first), { timeout: 10_000 }).toBe(true)
+    // Another window takes focus: this tab holds its frame and pauses the theme's layers.
     await page.evaluate(() => {
       Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false })
       window.dispatchEvent(new Event('blur'))
     })
     await expect(page.locator('body[data-dshx-backdrop-paused]')).toHaveCount(1)
-    const held = await clock()
-    // A second at 12 fps would be 12 steps: the held scene takes none.
-    await page.waitForTimeout(1_000)
-    expect((await clock()).time).toBe(held.time)
-    // Focus is back: the scene moves on from the frame it held.
+    await page.waitForTimeout(300)
+    const held = await frame()
+    // Halftone's dots change several times a second while it moves: held, none does.
+    await page.waitForTimeout(1_500)
+    expect(await changes(held)).toBe(false)
+    // Focus is back: the scene moves on.
     await page.evaluate(() => {
       Reflect.deleteProperty(document, 'hasFocus')
       window.dispatchEvent(new Event('focus'))
     })
     await expect(page.locator('body[data-dshx-backdrop-paused]')).toHaveCount(0)
-    await expect.poll(async () => (await clock()).time - held.time).toBeGreaterThan(300)
-    expect((await clock()).time - held.time).toBeLessThan(5_000)
+    await expect.poll(() => changes(held), { timeout: 10_000 }).toBe(true)
+    await hide.evaluate(style => style.remove())
   })
 })
 
