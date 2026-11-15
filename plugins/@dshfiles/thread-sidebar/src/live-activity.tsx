@@ -2,7 +2,7 @@ import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { threadSidebarLiveTurnsApi } from './live-turns-api.js'
 
 /**
@@ -101,16 +101,14 @@ const shimmerDelay = (): string => `-${String(Math.round(('performance' in globa
  */
 export const LiveActivityLine = memo(
   (props: { readonly step: string; readonly startedAt: number | undefined; readonly active: boolean; readonly className?: string }): JSX.Element => {
-    const delay = useMemo(() => shimmerDelay(), [])
+    const phase = useMemo((): CSSProperties & { readonly '--dshx-live-shimmer-delay': string } => ({ '--dshx-live-shimmer-delay': shimmerDelay() }), [])
     return (
       <span className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1', props.className)} data-live-activity="">
-        <span
-          className="dshx-live-shimmer dshx:min-w-0 dshx:truncate"
-          data-live-paused={props.active ? undefined : ''}
-          data-live-step=""
-          style={{ animationDelay: delay }}
-        >
+        <span className="dshx-live-shimmer dshx:min-w-0" data-live-paused={props.active ? undefined : ''} data-live-step="" style={phase}>
           {props.step}
+          <span aria-hidden="true" className="dshx-live-shimmer-sweep">
+            <span className="dshx-live-shimmer-copy" data-text={props.step} />
+          </span>
         </span>
         {props.startedAt === undefined ? null : (
           <>

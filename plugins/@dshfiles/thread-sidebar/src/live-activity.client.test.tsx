@@ -70,6 +70,18 @@ describe('live activity line', () => {
     expect(container.querySelector('[data-live-elapsed-separator]')?.nextElementSibling?.hasAttribute('data-live-elapsed')).toBe(true)
   })
 
+  it('sweeps a hidden copy of the step over it, so the shimmer moves by transform and the text reads once', async () => {
+    const container = await render(<LiveActivityLine active startedAt={undefined} step="Running pnpm test" />)
+    const step = container.querySelector<HTMLElement>('[data-live-step]')
+    // The visible copy comes from an attribute: the row's text, and what a screen reader hears, is the step once.
+    expect(step?.textContent).toBe('Running pnpm test')
+    const sweep = step?.querySelector('.dshx-live-shimmer-sweep')
+    expect(sweep?.getAttribute('aria-hidden')).toBe('true')
+    expect(sweep?.querySelector('.dshx-live-shimmer-copy')?.getAttribute('data-text')).toBe('Running pnpm test')
+    // Rows sweep in step: the phase is one variable both moving parts read.
+    expect(step?.style.getPropertyValue('--dshx-live-shimmer-delay')).toMatch(/^-\d+ms$/)
+  })
+
   it('says Working without a clock when no start is known', async () => {
     const container = await render(<LiveActivityLine active startedAt={undefined} step="Working" />)
     expect(container.textContent).toBe('Working')

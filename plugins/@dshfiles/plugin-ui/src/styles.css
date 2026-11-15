@@ -686,45 +686,90 @@
 }
 
 /*
- * The working shimmer (DESIGN.md Motion: a 2.2s sweep, not a spinner, paused off screen) as one CSS class, so a list of
- * working rows animates without a script per row. Owners phase-lock rows with a negative `animation-delay` and pause an
- * off-screen one with `data-live-paused`. Reduced motion keeps the plain secondary text.
+ * The working shimmer (DESIGN.md Motion: a 2.2s sweep, not a spinner, paused off screen), so a list of working rows
+ * animates without a script per row. Markup: the text in `.dshx-live-shimmer` (secondary, truncated), then an
+ * `aria-hidden` `.dshx-live-shimmer-sweep` holding an empty `.dshx-live-shimmer-copy` whose `data-text` is the same text.
+ * The sweep moves a masked band across the row and the copy (primary) moves back by as much, so its glyphs stay over the
+ * text: both are `transform` animations the compositor runs, nothing is repainted per frame. (A `background-position`
+ * sweep over `background-clip: text` repainted every row on every display frame: twice the CPU.) Owners phase-lock rows
+ * with `--dshx-live-shimmer-delay` (a negative delay) and drop the sweep of an off-screen row with `data-live-paused`.
+ * Reduced motion keeps the plain secondary text.
  */
-@keyframes dshx-live-shimmer {
+@keyframes dshx-live-shimmer-sweep {
   from {
-    background-position-x: 100%;
+    transform: translateX(-100%);
   }
   to {
-    background-position-x: 0%;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes dshx-live-shimmer-copy {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-100%);
   }
 }
 
 .dshx-live-shimmer {
-  background-image: linear-gradient(
-    90deg,
-    var(--dsw-alias-label-secondary) 0%,
-    var(--dsw-alias-label-secondary) 40%,
-    var(--dsw-alias-label-primary) 50%,
-    var(--dsw-alias-label-secondary) 60%,
-    var(--dsw-alias-label-secondary) 100%
-  );
-  background-size: 250% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: dshx-live-shimmer var(--dshx-duration-shimmer, 2.2s) linear infinite;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-secondary);
 }
 
-.dshx-live-shimmer[data-live-paused] {
-  animation-play-state: paused;
+.dshx-live-shimmer-sweep {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  mask-image: linear-gradient(90deg, transparent 25%, #000 50%, transparent 75%);
+  transform: translateX(-100%);
+  animation: dshx-live-shimmer-sweep var(--dshx-duration-shimmer, 2.2s) linear var(--dshx-live-shimmer-delay, 0s) infinite;
+}
+
+.dshx-live-shimmer-copy {
+  display: block;
+  height: 100%;
+  color: var(--dsw-alias-label-primary);
+  transform: translateX(100%);
+  animation: dshx-live-shimmer-copy var(--dshx-duration-shimmer, 2.2s) linear var(--dshx-live-shimmer-delay, 0s) infinite;
+}
+
+/* The copy truncates at the same width as the text, so its ellipsis lands on the text's. */
+.dshx-live-shimmer-copy::after {
+  content: attr(data-text);
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dshx-live-shimmer[data-live-paused] > .dshx-live-shimmer-sweep {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dshx-live-shimmer {
-    animation: none;
-    background-image: none;
-    color: var(--dsw-alias-label-secondary);
+  .dshx-live-shimmer-sweep {
+    display: none;
   }
+}
+
+/*
+ * The native StateDot "ongoing" spinner (@deepseek-ai/dsh-client-ui-primitives StateDot.module.css) rotates its glyph
+ * and also breathes its arc's `stroke-dasharray`: that second animation repaints the SVG on every display frame, in
+ * every working row, header and subagent lineage. The arc keeps the length the native reduced-motion rule gives it and
+ * only the rotation (a compositor transform) runs: 4 spinners went from 21% to 9% of a core in an isolated Chrome.
+ * CSS modules hash the class, so it is matched by its stable local name.
+ */
+svg [class*='_spinnerArc_'] {
+  animation: none;
+  stroke-dasharray: 18 150;
+  stroke-dashoffset: -3;
 }
 
 /*

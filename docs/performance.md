@@ -59,8 +59,27 @@ the window loses focus (and the body takes the paused attribute), and moves agai
 clipped dunes, the most; Snow Pines 17 M), so tens of MB of GPU memory for the active scene. The resting picture shows
 while a scene compiles, with `sceneFrameRate` 0, under reduced motion, or without `OffscreenCanvas`. A scene the
 compiler cannot read (an animated property other than transform, opacities, stroke width and dash offset) falls back to
-its resting picture with a console warning naming the scene. An idle DSH tab also renders continuously while any thread
-runs (sidebar spinner and shimmer indicators, ~27% of a core): separate from the scenes, not addressed here.
+its resting picture with a console warning naming the scene. The working indicators that keep an idle tab busy while a
+thread runs: next section.
+
+## Working indicators (2026-11-15)
+
+Complaint (found while measuring the scenes): with the default theme, an idle DSH tab used ~27% of a core whenever a
+thread ran. Live tab, all 20 running animations paused from DevTools: renderer 50% → 25%, GPU process 22% → 9% (noisy:
+the thread was streaming). Census of the running animations: the sidebar step shimmer (`dshx-live-shimmer`, 4), the
+native StateDot spinner (rotate + arc `stroke-dasharray`, 2 × 2), the row glyph spinner (`spin`, 4), the native tool
+row `TextShimmer` (2 × 2), `pulse` dots (3).
+
+**Isolated measurement.** Headed Chrome 157 on Wayland with the GPU, 4 copies of one indicator, CPU from CDP
+`SystemInfo.getProcessInfo` (all its processes), 8 s: plain `spin` 10%, `pulse` 9%, native `TextShimmer` (transform,
+`steps(48)`) 8%, but `dshx-live-shimmer` 25% and the StateDot spinner 21%. Those two repaint every display frame: a
+`background-position` sweep over `background-clip: text`, and an animated `stroke-dasharray`.
+
+**Fix.** `dshx-live-shimmer` (plugin-ui `styles.css`, used by thread-sidebar's live activity line) sweeps a masked,
+`aria-hidden` copy of the step over it with two opposite `transform` animations: 25% → 12%, same look, the step read
+once. The StateDot arc keeps the length the native reduced-motion rule gives it and only the rotation runs (shared
+sheet override of the native module's `_spinnerArc_` class): 21% → 9%. The others are already compositor-only and
+stay.
 
 ## Phone list → thread → Back (2026-11-13)
 
