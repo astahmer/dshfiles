@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createMistralProvider } from './mistral-provider.js'
+import { createMistralProvider, mistralTemplateId } from './mistral-provider.js'
 
 const provider = createMistralProvider()
 const catalogModel = (id: string) => provider.getModels().find(model => model.id === id)
@@ -37,14 +37,23 @@ describe('Mistral image input', () => {
   })
 })
 
-describe('Mistral-hosted models pi-ai does not catalog', () => {
-  it('catalogs DeepSeek V4.1 Flash 1017 as Mistral documents it', () => {
+describe('Mistral template choice', () => {
+  it('gives a discovered Devstral Small the Devstral template, not Medium', () => {
+    const ids = provider.getModels().map(model => model.id)
+    expect(mistralTemplateId('devstral-small-2605', ids)).toBe('devstral-latest')
+  })
+})
+
+describe('Mistral-hosted models', () => {
+  // pi-ai 1.5 catalogs DeepSeek V4.1 Flash 1017 itself (128 000 output, below Mistral's documented 131 072), so its
+  // entry wins over ours and only our image and effort corrections apply on top.
+  it('offers DeepSeek V4.1 Flash 1017 once, with the image input and efforts Mistral documents', () => {
     expect(catalogModel('deepseek-v4-1-flash-1017')).toMatchObject({
       name: 'DeepSeek V4.1 Flash 1017',
       provider: 'mistral',
       input: ['text', 'image'],
       contextWindow: 1_048_576,
-      maxTokens: 131_072,
+      maxTokens: 128_000,
       cost: { input: 0.3, output: 1.2, cacheRead: 0.007, cacheWrite: 0 },
       reasoning: true,
       thinkingLevelMap: { off: null, minimal: null, low: 'low', medium: null, high: 'high', xhigh: null, max: 'max' },

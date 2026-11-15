@@ -307,7 +307,7 @@ export const ModelCuration = (props: {
               maxLength={120}
               className="dshx:min-w-0 dshx:flex-1 dshx:font-mono! dshx:text-xs"
               value={current.modelId}
-              placeholder={account.kind === 'opencode-go' ? 'opencode-go/step-5-preview-free' : 'provider/model-id'}
+              placeholder={account.kind === 'opencode-go' ? 'opencode-go/step-5-preview' : 'provider/model-id'}
               onChange={event => updateView({ modelId: event.target.value })}
               onKeyDown={event => {
                 if (event.key === 'Enter') {
