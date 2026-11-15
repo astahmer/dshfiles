@@ -535,7 +535,7 @@
           "kind": "unit-test",
           "id": "ai-accounts.mistral-hosted-models",
           "file": "plugins/@dshfiles/ai-accounts/src/mistral-provider.test.ts",
-          "testName": "catalogs DeepSeek V4.1 Flash 1017 as Mistral documents it"
+          "testName": "offers DeepSeek V4.1 Flash 1017 once, with the image input and efforts Mistral documents"
         },
         {
           "kind": "unit-test",

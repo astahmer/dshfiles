@@ -228,8 +228,8 @@ other Mistral subscription path (t3code and Zed run Vibe over ACP instead).
   Vibe login. DSH does not implement Vibe's undocumented browser sign-in or its OIDC client.
 - **Requests.** pi-ai's Mistral transport: `https://api.mistral.ai/v1/chat/completions` with the account's bearer key and
   `x-affinity` set to the conversation for prompt caching.
-- **Models.** pi-ai's Mistral catalog, plus DeepSeek V4.1 Flash 1017 (`deepseek-v4-1-flash-1017`), which Mistral hosts
-  but pi-ai does not list yet, with the limits and price its model page documents. Then the Vibe plan catalog
+- **Models.** pi-ai's Mistral catalog, including DeepSeek V4.1 Flash 1017 (`deepseek-v4-1-flash-1017`), which pi-ai
+  lists since 1.5; an older pi-ai gets it from our own entry, with the limits and price its model page documents. Then the Vibe plan catalog
   (`/v1/model-catalog?surface=vibe-code`, e.g. `mistral-vibe-cli-latest`), falling back to the documented `/v1/models`;
   only tool-capable chat models are offered, each with the context window and image
   input Mistral reports for it. Large 4, GLM 5.3 Flash and DeepSeek V4.1 Flash always offer image input, as their
