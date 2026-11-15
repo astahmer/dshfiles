@@ -268,7 +268,7 @@
     {
       "id": "code-fences",
       "title": "Render fenced code blocks from other plugins",
-      "summary": "Other plugins add a component for fence languages to the code-fence registry (@dshfiles/chat/code-fences); while Chat renders Markdown (assistant answers through InlineReferenceMarkdown; reasoning, compaction summaries and other plugins' Markdown through FencedMarkdown, @dshfiles/chat/fenced-markdown) it swaps each native code card whose language a renderer claims for that component, handing it the source, whether the fence may still grow (a fence followed by another block is complete even while the message streams), the native card as `fallback` and the highlighted code without its header as `source`. Fences nested in lists and quotes count, a streaming message's frozen blocks keep their rendered fences, and without renderers the native tree is unchanged.",
+      "summary": "Other plugins add a component for fence languages to the code-fence registry (@dshfiles/chat/code-fences); while Chat renders Markdown (assistant answers through InlineReferenceMarkdown; reasoning, compaction summaries and other plugins' Markdown through FencedMarkdown, @dshfiles/chat/fenced-markdown) it swaps each native code card whose language a renderer claims for that component, handing it the source, whether the fence may still grow (as the native renderer reports it), the native card as `fallback` and the highlighted code without its header as `source`. It plugs into the native Markdown delegate, so every fence the native renderer draws counts, and a fence no renderer claims goes to the enclosing delegate; without renderers the native tree is unchanged.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -282,19 +282,19 @@
           "kind": "unit-test",
           "id": "chat.code-fence-claimed",
           "file": "plugins/@dshfiles/chat/tests/code-fences.test.tsx",
-          "testName": "hands a claimed fence to its renderer, nested ones included, and leaves other fences native"
+          "testName": "hands a claimed fence to its renderer, whatever its case, and leaves other fences native"
         },
         {
           "kind": "unit-test",
           "id": "chat.code-fence-streaming",
           "file": "plugins/@dshfiles/chat/tests/code-fences.test.tsx",
-          "testName": "keeps a frozen streaming block rendered once while the tail grows"
+          "testName": "tells the renderer while the message still streams"
         },
         {
           "kind": "unit-test",
-          "id": "chat.code-fence-complete-while-streaming",
+          "id": "chat.code-fence-delegate",
           "file": "plugins/@dshfiles/chat/tests/code-fences.test.tsx",
-          "testName": "renders a fence as soon as another block follows it, while the last block of a streaming message stays native"
+          "testName": "falls back to the enclosing delegate, which keeps rendering every fence the renderers do not claim"
         },
         {
           "kind": "unit-test",
