@@ -704,6 +704,19 @@ describe('WorkbenchView', () => {
     expect(api.panels).toHaveLength(2)
   })
 
+  it('leaves the docking menu out of the pane header on a phone and keeps New tab', () => {
+    const media = window.matchMedia
+    window.matchMedia = (query: string): MediaQueryList =>
+      Object.assign(new EventTarget(), { matches: query.includes('max-width'), media: query, onchange: null, addListener: () => {}, removeListener: () => {} })
+    try {
+      renderRightWorkbench('a')
+      expect(screen.getAllByRole('button', { name: 'New tab' }).length).toBeGreaterThan(0)
+      expect(screen.queryByRole('button', { name: 'Pane options' })).toBeNull()
+    } finally {
+      window.matchMedia = media
+    }
+  })
+
   it('retains bottom and left final-tab chooser semantics without closing their parents', async () => {
     for (const region of ['left', 'bottom'] as const) {
       const onClose = vi.fn()

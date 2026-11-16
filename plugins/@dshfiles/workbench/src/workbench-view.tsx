@@ -1,7 +1,7 @@
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { EllipsisIcon, PlusIcon, SquareSplitHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { PlusIcon, SquareSplitHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { missingPanelMessage } from './missing-panel.js'
 import {
@@ -583,14 +583,15 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
           },
           () => (permanentCentre ? MainSurfaceGuard.groups(groupProps.containerApi).length : groupProps.containerApi.groups.length),
         )
-        // A phone shows the dock as one sheet: no split to make, and the sheet's own Close already puts it away.
+        // A phone shows the dock as one sheet: no split to make, the sheet's own Close puts it away, and the rest of
+        // this menu (bottom panel, saved layouts, move a tab to another pane, reset) arranges panes a phone does not
+        // show. It stays in the header on a wider window, and Reset layout stays in the command palette.
         const phone = usePhoneWidth()
         const current = actions.current
-        const canClose = phone
-          ? false
-          : permanentCentre
-            ? MainSurfaceGuard.groups(groupProps.containerApi).some(group => group !== groupProps.group)
-            : current.props.onClose !== undefined || groupCount > 1
+        if (phone) return <></>
+        const canClose = permanentCentre
+          ? MainSurfaceGuard.groups(groupProps.containerApi).some(group => group !== groupProps.group)
+          : current.props.onClose !== undefined || groupCount > 1
         return (
           <div className="dshx-root dshx:flex dshx:items-center dshx:gap-0.5">
             <DropdownMenu
@@ -603,21 +604,16 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
             >
               <DropdownMenuTrigger asChild>
                 <SurfaceAction
-                  className={cn(phone && 'dshx:size-11')}
                   label="Pane options"
-                  icon={phone ? <EllipsisIcon aria-hidden /> : <SquareSplitHorizontalIcon aria-hidden />}
+                  icon={<SquareSplitHorizontalIcon aria-hidden />}
                   iconOnly
                   onPointerDown={event => event.stopPropagation()}
                 />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {current.props.headerActions?.({ api: current.api, openIds: current.openIds, menu: true })}
-                {!phone && (
-                  <>
-                    <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'right')}>Split right</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'below')}>Split down</DropdownMenuItem>
-                  </>
-                )}
+                <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'right')}>Split right</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'below')}>Split down</DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
                     if (current.props.onResetLayout !== undefined) current.props.onResetLayout()
