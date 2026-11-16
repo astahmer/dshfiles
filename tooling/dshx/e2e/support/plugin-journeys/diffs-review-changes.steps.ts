@@ -34,11 +34,13 @@ const revisionRow = (page: Page, description: string) => page.locator('article[d
 const rowButton = (page: Page, description: string) => revisionRow(page, description).locator('[data-row-focus]')
 
 When('the Changes facet is opened from the composer changes bar', async ({ page }: { page: Page }) => {
+  // The pill shows only while the workspace has changes. This journey makes its change with jj outside the UI, after
+  // the turn ended, so the pill arrives with the next poll (60 s) rather than at a turn end.
   await page
     .getByRole('button', { name: /^Review workspace changes: / })
     .filter({ visible: true })
     .first()
-    .click()
+    .click({ timeout: 90_000 })
   await expect(facet(page)).toBeVisible({ timeout: 30_000 })
 })
 
