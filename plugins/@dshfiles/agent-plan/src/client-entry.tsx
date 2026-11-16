@@ -16,7 +16,7 @@ import { Failure } from './failure.js'
 import { PlanCard, type PlanCallFacts } from './plan-card.js'
 import { PlanPin } from './plan-pin.js'
 import { PlanProgress } from './plan-progress.js'
-import { agentPlanSettings } from './settings.js'
+import { agentPlanSettings, showsTodoStrip } from './settings.js'
 import { markOwnComponent, wrapSlotEntries } from './slot-wrap.js'
 import { agentTargets, useTarget, type AgentTargets } from './targets.js'
 
@@ -98,6 +98,13 @@ const createViews = (targets: AgentTargets<SessionId>) => {
       )
     }
 
+  /** The native To-dos strip above the composer, shown only where the pinned step chip does not already show the plan. */
+  const wrapTodoStrip = (Native: ComponentType<SessionSeatProps>): ComponentType<SessionSeatProps> =>
+    function AgentPlanTodoStrip(props: SessionSeatProps): ReactNode {
+      const settings = useSettings(agentPlanSettings).value
+      return showsTodoStrip(settings) ? createElement(Native, props) : null
+    }
+
   /** "Ask to fix" in the failure card's action row; the card itself (sentence, Retry, Details) is Chat's. */
   const AskToFixSeat = (props: TurnErrorActionOwnerProps & { readonly sessionId: SessionId }): ReactNode => {
     const settings = useSettings(agentPlanSettings).value
@@ -112,7 +119,7 @@ const createViews = (targets: AgentTargets<SessionId>) => {
     return <AskToFix composer={actions} facts={Failure.fromTurnError(props)} />
   }
 
-  return { wrapTodoView, PlanPinSeat, ActivitySeat, CompactionSeat, beside, AskToFixSeat }
+  return { wrapTodoView, wrapTodoStrip, PlanPinSeat, ActivitySeat, CompactionSeat, beside, AskToFixSeat }
 }
 
 export default defineClientPlugin({
@@ -139,6 +146,16 @@ export default defineClientPlugin({
         slot: 'tool.call.toolview',
         matches: entry => entry.options.key === 'todo_write' && notOurs(entry),
         wrap: Native => api.bind(views.wrapTodoView(Native)),
+      }),
+    )
+
+    // The To-dos strip (rich-composer's `todo` dock entry) repeats the pinned step: it gives way while the pin is on.
+    api.lifecycle.onDispose(
+      wrapSlotEntries<SessionSeatProps>({
+        slots: ctx.slots,
+        slot: 'conversation.input.dock',
+        matches: entry => entry.options.id === 'todo' && notOurs(entry),
+        wrap: Native => api.bind(views.wrapTodoStrip(Native)),
       }),
     )
 
