@@ -1,8 +1,11 @@
+import { PHONE_SHELL_QUERY } from '@dshfiles/plugin-ui/lib/phone-shell'
+
 /**
- * The phone shell's width rule, in one place: the shell switches layout on it and a thread menu reads it to leave out
- * what needs a second pane.
+ * The phone shell's media rule, in one place: the shell switches layout on it and a thread menu reads it to leave out
+ * what needs a second pane. It is the kit's rule (under 640px wide, or a coarse pointer under 500px tall), so a phone
+ * turned sideways keeps the tab bar instead of the desktop rail.
  */
-export const PHONE_QUERY = '(max-width: 639.98px)'
+export const PHONE_QUERY = PHONE_SHELL_QUERY
 
 const subscribe = (listener: () => void): (() => void) => {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => undefined

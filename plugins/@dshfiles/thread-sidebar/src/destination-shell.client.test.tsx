@@ -237,6 +237,24 @@ describe('DestinationShell', () => {
     expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(false)
   })
 
+  it('keeps the phone shell on a phone turned sideways (844x390, coarse pointer)', () => {
+    // Only the landscape clause of the phone rule matches: the viewport is 844px wide.
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({
+        matches: query.split(',').some(part => part.trim() === '(pointer: coarse) and (max-height: 500px)'),
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }),
+    })
+    renderShell({ collapsed: true })
+    expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(true)
+    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.getByRole('navigation', { name: 'Destinations' })).toBeTruthy()
+    cleanup()
+  })
+
   it('on a phone, starts a thread from the + in the Threads list header and lists Land outside More', () => {
     setPhone(true)
     const shell = renderShell({ collapsed: false })
