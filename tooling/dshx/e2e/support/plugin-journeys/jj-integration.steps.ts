@@ -1319,7 +1319,7 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
   })
   await confirmLand(page)
   await recordAssertion(page, 'jj-integration-rebase-moves-the-bookmark', async () => {
-    const rebasedToast = page.getByRole('alert').filter({ hasText: 'Landed 1 revision(s) on main:' })
+    const rebasedToast = page.getByRole('alert').filter({ hasText: 'Landed 1 revision on main:' })
     await expect(rebasedToast).toContainText(description)
     await openWorkspaceMenu(page)
     await expect(rebaseButton(page)).toBeDisabled()
@@ -1359,7 +1359,7 @@ Then('the end of the turn offers one revision to integrate into main', async ({ 
   const offer = turnEndIntegrateOffer(page)
   await recordAssertion(page, 'jj-integration-turn-end-integrates-in-one-click', async () => {
     await expect(offer).toBeVisible({ timeout: 20_000 })
-    await expect(offer).toContainText('1 revision(s) ready to land on main.')
+    await expect(offer).toContainText('1 revision ready to land on main.')
     await expect(offer.getByRole('button', { name: 'Land on main', exact: true })).toBeEnabled()
     // The offer names the exact revisions the button moves, so landing is never blind.
     await offer.getByRole('button', { name: 'Show the revisions that will land' }).click()
@@ -1676,7 +1676,7 @@ When("{string} is chosen from the thread row's More menu", async ({ page }: { pa
 Then('the confirmation names the thread and its 1 revision to rebase', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'jj-integration-removal-confirmation', async () => {
     const dialog = page.getByRole('alertdialog')
-    await expect(dialog.getByRole('heading')).toHaveText(`Remove the workspace of “${REBASE_THREAD_TITLE}” and abandon 1 unlanded revision(s)?`)
+    await expect(dialog.getByRole('heading')).toHaveText(`Remove the workspace of “${REBASE_THREAD_TITLE}” and abandon 1 unlanded revision?`)
     await expect(dialog).toContainText('deletes its folder')
     await expect(dialog).toContainText('threads stay in DSH and are not archived')
   })

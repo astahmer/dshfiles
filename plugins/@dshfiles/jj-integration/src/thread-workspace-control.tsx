@@ -275,7 +275,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const statusText = (): string => {
     if (loading) return props.t('workspaceStatusLoading')
     if (!isThread) return props.t('sharedCheckoutHint')
-    if (conflicted) return props.t('conflictHint', { count: unlanded })
+    if (conflicted) return props.t(unlanded === 1 ? 'conflictHintOne' : 'conflictHintMany', { count: unlanded })
     if (unlanded > 0) return props.t('toRebase', { count: unlanded })
     if (current.behind) return props.t('behind', { bookmark })
     return props.t('upToDate')

@@ -133,7 +133,7 @@ const describeWorkspaceSync = (t: JjIntegrationTranslate, view: WorkspaceSyncVie
   if (outcome === 'failed') return t('workspaceSyncFailed', { workspace: view.workspace, message: view.message ?? view.status ?? '' })
   if (view.pluginsRebuilt.length === 0 && !view.restartNeeded) return t('workspaceSyncedQuiet', { workspace: view.workspace })
   const effect = view.restartNeeded ? t('workspaceSyncRestart') : t('workspaceSyncLive')
-  return t('workspaceSynced', { workspace: view.workspace, count: view.pluginsRebuilt.length, effect })
+  return t(view.pluginsRebuilt.length === 1 ? 'workspaceSyncedOne' : 'workspaceSyncedMany', { workspace: view.workspace, count: view.pluginsRebuilt.length, effect })
 }
 
 /** What the background sync after the last rebase did to the checkout running DSH, with the restart it may need. */
@@ -662,7 +662,10 @@ const DiscardDialog = (props: { readonly t: JjIntegrationTranslate; readonly con
             {target === null
               ? null
               : target.unlandedCount > 0
-                ? t('removeWorkspaceWithWorkTitle', { name: target.label ?? target.name, count: target.unlandedCount })
+                ? t(target.unlandedCount === 1 ? 'removeWorkspaceWithWorkTitleOne' : 'removeWorkspaceWithWorkTitleMany', {
+                    name: target.label ?? target.name,
+                    count: target.unlandedCount,
+                  })
                 : t('removeWorkspaceTitle', { name: target.label ?? target.name })}
           </AlertDialogTitle>
           <AlertDialogDescription>
@@ -840,7 +843,7 @@ export const ThreadWorkspacesPanel = (props: {
           }
         })
         toast.show({
-          text: result.warning ?? t('integrationComplete', { count: result.revisions.length, bookmark: result.bookmark }),
+          text: result.warning ?? t(result.revisions.length === 1 ? 'integrationCompleteOne' : 'integrationCompleteMany', { count: result.revisions.length, bookmark: result.bookmark }),
           success: result.warning === undefined,
         })
         return
@@ -1221,7 +1224,7 @@ export const ThreadWorkspacesPanel = (props: {
               <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2.5">
                 <StatusGlyph status="ready" decorative />
                 <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-                  <p className="dshx:text-sm dshx:font-semibold">{t('readyBannerTitle', { count: counts.ready })}</p>
+                  <p className="dshx:text-sm dshx:font-semibold">{t(counts.ready === 1 ? 'readyBannerTitleOne' : 'readyBannerTitleMany', { count: counts.ready })}</p>
                   <p className="dshx:text-xs dshx:text-muted-foreground">{t('readyBannerBody', { bookmark: panelBookmark })}</p>
                 </div>
                 {selectedEligiblePaths.length === 0 ? null : (

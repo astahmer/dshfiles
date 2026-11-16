@@ -738,7 +738,7 @@
         "press Escape",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"/rebase\"",
         "press Enter",
-        "expect text \"Landed 1 revision(s) on main.\"",
+        "expect text \"Landed 1 revision on main.\"",
         "expect button \"Mark this landed thread done\""
       ],
       "surfaces": ["host", "tool", "command", "client", "integration"],
@@ -918,7 +918,7 @@
       "reach": [
         "seed rebase-ready-thread",
         "expect button \"Land on main\"",
-        "click button \"1 revision(s) ready to land on main.*\"",
+        "click button \"1 revision ready to land on main.*\"",
         "expect text \"Seeded work to rebase\""
       ],
       "surfaces": ["client"],
