@@ -25,7 +25,7 @@ import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-
 import { VirtualThreadRows } from './virtual-thread-rows.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
-import { LiveActivityLine, useLiveTurns, type LiveTurnView } from './live-activity.js'
+import { LiveActivityLine, LiveElapsed, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
@@ -522,7 +522,7 @@ interface BatchSelectionSnapshot {
   readonly anyMuted: boolean
 }
 
-interface RowActions {
+export interface RowActions {
   readonly open: (sessionId: SessionSummary['id']) => void
   readonly selection: () => ThreadSelectionState
   /** Rows read their own multi-selected state here, so a toggle re-renders only the rows it changes. */
@@ -593,7 +593,7 @@ export interface ThreadNotifyTarget {
   readonly choice: ThreadNotifyChoice
 }
 
-interface ThreadRowProps {
+export interface ThreadRowProps {
   readonly session: SessionSummary
   readonly unread: boolean
   readonly autoSettleOverride: AutoSettleOverride
@@ -1299,8 +1299,8 @@ const OwnWorkspaceIndicator = (props: {
   )
 }
 
-/** Memoized so a session update re-renders only its own row, not the whole list. */
-const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
+/** Memoized so a session update re-renders only its own row, not the whole list. Exported for its render test. */
+export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, settled, rowStyle } = props
   const rowRef = useRef<HTMLElement | null>(null)
   const multiSelected = useThreadMultiSelected(props.actions.multiSelection, session.id)
@@ -1350,11 +1350,14 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       ? undefined
       : (workStatus.detail ?? t(workStatusLabelKeys[workStatus.status]))
   // A working thread trades its static meta for what it is doing now (polish pass b:r4et): its step or the subagent
-  // rollup, with the working shimmer, then the elapsed time. Done, idle and attention rows keep the meta line.
+  // rollup, with the working shimmer. Under a status glyph the spinner and the group already say Working, so a turn
+  // with no known step keeps the meta line (where it runs) instead of naming the state again; the dot-only groupings
+  // keep the word. The elapsed time takes the first line's time slot, so the row shows one clock, not an age and a clock.
   const live = session.running && (workStatus === undefined || workStatus.status === 'working')
-  const liveStep = live ? (workStatus?.detail ?? props.liveTurn?.step ?? t('threadSidebarWorking')) : undefined
+  const liveStep = live ? (workStatus?.detail ?? props.liveTurn?.step ?? (workStatus === undefined ? t('threadSidebarWorking') : undefined)) : undefined
+  const liveStartedAt = live ? props.liveTurn?.startedAt : undefined
   const metaLine =
-    live ||
+    liveStep !== undefined ||
     (showMark && props.workspacePath !== undefined) ||
     showProject ||
     ownWorkspace !== undefined ||
@@ -1632,13 +1635,9 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                         </Badge>,
                       )}
                   {rowStyle.time && inlineVerb === undefined ? (
-                    <span
-                      className={cn(
-                        'dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
-                        // The spinner and the live activity line say Working; the time stays colourless (DESIGN.md).
-                      )}
-                    >
-                      {props.age}
+                    // The spinner and the live activity line say Working; the time stays colourless (DESIGN.md).
+                    <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground" data-thread-time="">
+                      {liveStartedAt === undefined ? props.age : <LiveElapsed active={nearViewport} startedAt={liveStartedAt} />}
                     </span>
                   ) : null}
                 </span>
@@ -1659,7 +1658,13 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     </span>
                   ) : null}
                   {liveStep === undefined ? null : (
-                    <LiveActivityLine active={nearViewport} startedAt={props.liveTurn?.startedAt} step={liveStep} className="dshx:min-w-0 dshx:flex-1" />
+                    <LiveActivityLine
+                      active={nearViewport}
+                      // With the time column off, the clock stays beside the step.
+                      startedAt={rowStyle.time ? undefined : liveStartedAt}
+                      step={liveStep}
+                      className="dshx:min-w-0 dshx:flex-1"
+                    />
                   )}
                   {liveStep !== undefined || statusDetail === undefined ? null : (
                     <span
