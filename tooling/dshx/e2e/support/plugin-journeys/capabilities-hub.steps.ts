@@ -37,7 +37,7 @@ When('the MCP servers manager is opened from the Capabilities hub', async ({ pag
 
 Then('the MCP servers manager owns the page', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'capabilities-hub-opens-owner', async () => {
-    await expect(page.getByRole('heading', { name: 'Global MCP servers', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'MCP servers', exact: true })).toBeVisible()
     await expect(hub(page)).toBeHidden()
   })
   await finishJourneyAssertions(page)

@@ -5,7 +5,7 @@ export const MCP_LOCALE_NAMESPACE = 'settings.mcpServers'
 
 const en = {
   title: 'MCP servers',
-  subtitle: 'Manage this DSH profile’s servers. Client lifecycle and registered tools are shown separately from remote connection health.',
+  subtitle: 'Tool servers your agents can call.',
   refresh: 'Refresh status',
   add: 'Add MCP server',
   manage: 'Manage servers',
@@ -88,7 +88,6 @@ const en = {
   quickPanelSearch: 'MCP server actions…',
   quickPanelEmpty: 'No MCP server actions are available.',
   quickPanelNoResults: 'No matching MCP server actions.',
-  pageTitle: 'Global MCP servers',
   enabledCount: 'enabled',
   enabledGlobally: 'enabled globally',
   advancedHeaders: 'Advanced: request headers',
@@ -131,7 +130,7 @@ const en = {
   continueSignIn: 'Continue sign-in',
   signInHint: 'Continue the MCP server sign-in in a new tab.',
   dismiss: 'Dismiss',
-  useOAuth: 'Sign in with OAuth (discovery, dynamic client registration, PKCE)',
+  useOAuth: 'Sign in with OAuth',
   addCardDescription: 'Remote servers can sign in with OAuth. Tokens and credential values stay in DSH credential storage.',
   browseCatalog: 'Browse MCPs',
   addMcp: 'Add MCP',
@@ -231,7 +230,6 @@ const zh = {
   quickPanelSearch: 'MCP 服务器操作…',
   quickPanelEmpty: '没有可用的 MCP 服务器操作。',
   quickPanelNoResults: '没有匹配的 MCP 服务器操作。',
-  pageTitle: '全局 MCP 服务器',
   enabledCount: '个已启用',
   enabledGlobally: '个全局启用',
   advancedHeaders: '高级：请求头',
