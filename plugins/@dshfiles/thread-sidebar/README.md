@@ -230,7 +230,9 @@ full-screen list covers the thread is not "watched": it stays in the Inbox until
 
 **Drawer navigation.** Settings › Thread sidebar › `phoneNavigation` picks the phone model: `stack` (the default,
 above) or `drawer`, the model of stock DSH and the ChatGPT and Claude apps. In drawer mode the thread stays on screen and
-there is no tab bar: the top bar's leading control is **Show threads** instead of Back, and it, or a swipe in from the left
+there is no tab bar: the top bar's leading control is **Show threads** instead of Back (a thread opened from a page on
+the stage, such as an Inbox item's Open, puts a Back chevron to that page before it; Android's back gesture follows it
+too), and it, or a swipe in from the left
 edge (the edge swipe's 24px band, axis lock and ignores), opens the Threads list as a drawer, `min(85vw, 360px)` wide,
 over a scrim that dims the thread. The drawer follows the finger and snaps open or closed on release: past half way, or
 any flick of 0.4px/ms or more in its direction. Its header holds Hide threads and New thread; Inbox, Land and More sit

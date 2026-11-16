@@ -1079,7 +1079,14 @@ const PhoneNavigation = (
   }
   const bar = PhoneTopBarModel.resolve(stack)
   // The drawer never covers the stage, so its top bar always names what the stage shows.
-  const stageBar = drawer ? PhoneTopBarModel.resolve({ ...stack, listOpen: false, moreOpen: false, origin: undefined }) : bar
+  const stageBar = drawer ? PhoneTopBarModel.resolve({ ...stack, listOpen: false, moreOpen: false }) : bar
+  // Drawer mode keeps one Back: a thread opened from a page on the stage (an Inbox item's Open) returns to that page.
+  const pageBack = drawer && stageBar.back?.to === 'page' ? stageBar.back : null
+  const backToPage = (): void => {
+    if (pageBack === null) return
+    setOrigin(undefined)
+    props.selectPanel(pageBack.panelId)
+  }
   const openDrawer = (): void => {
     setDrawerMounted(true)
     props.setDestination('threads')
@@ -1140,8 +1147,10 @@ const PhoneNavigation = (
   // Android's back gesture (and a browser Back) pops the same stack: each level is one history entry. A push drops the
   // thread from the entry it leaves below, so going back never switches to another thread through the URL route.
   // In drawer mode the open drawer is one level (two inside More or a list opened there): system Back closes it first.
-  const depth = drawer ? (listOpen ? (drawerView === 'threads' ? 1 : 2) : 0) : PhoneTopBarModel.depth(stack)
-  usePhoneHistoryLayer({ key: 'dshfilesPhoneStack', depth, enabled: true, pop: drawer ? drawerBack : back, baseUrl: clearThreadUrl })
+  const drawerDepth = (pageBack === null ? 0 : 1) + (listOpen ? (drawerView === 'threads' ? 1 : 2) : 0)
+  const depth = drawer ? drawerDepth : PhoneTopBarModel.depth(stack)
+  const drawerPop = (): void => (listOpen ? drawerBack() : backToPage())
+  usePhoneHistoryLayer({ key: 'dshfilesPhoneStack', depth, enabled: true, pop: drawer ? drawerPop : back, baseUrl: clearThreadUrl })
   // Inside a thread the stage owns the bottom edge (plan phone rules): no tab bar, Back returns to the list.
   const inThread = !listOpen && stageBar.thread
   // The drawer holds every destination, so drawer mode has no tab bar at all.
@@ -1330,6 +1339,17 @@ const PhoneNavigation = (
         style={{ height: PHONE_TOP_HEIGHT }}
       >
         <div className="dshx:flex dshx:h-11 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-0.5">
+          {pageBack === null ? null : (
+            <button
+              type="button"
+              data-phone-back=""
+              aria-label={`Back to ${pageBack.label}`}
+              onClick={backToPage}
+              className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+            >
+              <ChevronLeftIcon className="dshx:size-5" aria-hidden="true" />
+            </button>
+          )}
           {drawer ? (
             <button
               ref={sidebarButton}

@@ -313,6 +313,37 @@ describe('phone navigation: drawer', () => {
     expect(closed.toggleSidebar).toHaveBeenCalledTimes(1)
   })
 
+  it('returns a thread opened from the Inbox page to the Inbox, keeping the sidebar button', () => {
+    setPhone(true)
+    const onInbox = props({
+      panels: [...panels, { id: 'attention-inbox', label: 'Inbox', order: 1 }],
+      collapsed: true,
+      activePanelId: 'attention-inbox',
+      phoneNavigation: 'drawer',
+    })
+    const view = render(shell(onInbox))
+    expect(screen.queryByRole('button', { name: 'Back to Inbox' })).toBeNull()
+    // An Inbox item's Open puts its thread on the stage in place of the page.
+    view.rerender(shell({ ...onInbox, activePanelId: null, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Answer me' }))
+    const back = screen.getByRole('button', { name: 'Back to Inbox' })
+    const sidebar = screen.getByRole('button', { name: 'Show threads' })
+    expect(back.compareDocumentPosition(sidebar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(document.querySelector('[data-phone-title]')?.textContent).toBe('Answer me')
+    showThreads()
+    expect(drawerState()).toBe('open')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(drawerState()).toBe('closed')
+    fireEvent.click(back)
+    expect(onInbox.selectPanel).toHaveBeenCalledWith('attention-inbox')
+    view.rerender(shell({ ...onInbox, selectedThreadId: 'session-1', stageThreadId: 'session-1' }))
+    expect(screen.queryByRole('button', { name: 'Back to Inbox' })).toBeNull()
+    // A thread picked from the drawer list has no page to return to.
+    showThreads()
+    view.rerender(shell({ ...onInbox, activePanelId: null, selectedThreadId: 'session-2', stageThreadId: 'session-2' }))
+    expect(drawerState()).toBe('closed')
+    expect(screen.queryByRole('button', { name: 'Back to Inbox' })).toBeNull()
+  })
+
   it('follows a swipe from the left edge and snaps open past half way, closed short of it', () => {
     setPhone(true)
     render(shell({ ...threadProps(), phoneNavigation: 'drawer' }))

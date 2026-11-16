@@ -3847,7 +3847,7 @@
     {
       "id": "phone-drawer-navigation",
       "title": "Open the thread list as a drawer on a phone",
-      "summary": "With phoneNavigation set to drawer, a phone (below 640px) keeps the thread on screen instead of pushing it over a full-screen list, as stock DSH and the ChatGPT and Claude apps do. The top bar's leading control is Show threads (no Back) and there is no bottom tab bar. The button, or a swipe in from the left edge (the edge swipe's 24px band, axis lock and its ignores: thread rows, dialogs, menus, horizontal scrollers, an open modal), opens the Threads list as a drawer: min(85vw, 360px) from the left over a scrim that dims the thread. The drawer follows the finger and on release snaps open or closed by distance (half way) or velocity (a flick of 0.4px/ms or more); reduced motion drops the slide. Its header holds Hide threads and New thread; Inbox, Land and More sit above the threads, and More and the lists opened from it show inside the drawer with Back. Picking a thread or page switches the stage and closes the drawer; the scrim, a leftward swipe on the drawer, Escape and Android's back gesture (one phone-history level, two inside More) close it. The list mounts on the first edge touch, the button, a thread link or idle time, then stays laid out but hidden, so opening is a transform. Stack stays the default.",
+      "summary": "With phoneNavigation set to drawer, a phone (below 640px) keeps the thread on screen instead of pushing it over a full-screen list, as stock DSH and the ChatGPT and Claude apps do. The top bar's leading control is Show threads and there is no bottom tab bar; only a thread opened from a page on the stage (an Inbox item's Open) puts a Back chevron to that page before it, which Android's back gesture also follows. The button, or a swipe in from the left edge (the edge swipe's 24px band, axis lock and its ignores: thread rows, dialogs, menus, horizontal scrollers, an open modal), opens the Threads list as a drawer: min(85vw, 360px) from the left over a scrim that dims the thread. The drawer follows the finger and on release snaps open or closed by distance (half way) or velocity (a flick of 0.4px/ms or more); reduced motion drops the slide. Its header holds Hide threads and New thread; Inbox, Land and More sit above the threads, and More and the lists opened from it show inside the drawer with Back. Picking a thread or page switches the stage and closes the drawer; the scrim, a leftward swipe on the drawer, Escape and Android's back gesture (one phone-history level, two inside More) close it. The list mounts on the first edge touch, the button, a thread link or idle time, then stays laid out but hidden, so opening is a transform. Stack stays the default.",
       "surfaces": ["client", "settings"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3888,6 +3888,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "thread-sidebar.phone-drawer-back-to-page",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "returns a thread opened from the Inbox page to the Inbox, keeping the sidebar button"
+        },
+        {
+          "kind": "unit-test",
           "id": "thread-sidebar.phone-drawer-snap",
           "file": "plugins/@dshfiles/thread-sidebar/src/drawer-gesture.test.ts",
           "testName": "snaps by distance, unless a flick says otherwise"
@@ -3895,7 +3901,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.phone-drawer-browser",
-          "reason": "The Gherkin harness runs Chromium at 1440x900 only; the drawer was driven at 390x844 with an Android touch context (edge drag, half drag, scrim) for docs/screenshots/phone-drawer-navigation.png."
+          "reason": "The Gherkin harness runs Chromium at 1440x900 only; the drawer was driven at 390x844 with an Android touch context (edge drag, half drag, scrim, Inbox item Open then Back) for docs/screenshots/phone-drawer-navigation.png."
         }
       ],
       "telemetry": [
