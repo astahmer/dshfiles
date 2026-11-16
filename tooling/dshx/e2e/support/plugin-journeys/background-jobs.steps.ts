@@ -231,10 +231,11 @@ Then('the composer dock previews the running job and streams its output', async 
     await expect.poll(async () => ((await output.textContent()) ?? '').length, { timeout: 30_000 }).toBeGreaterThan(earlier.length)
     // The same job also keeps its card under the tool call, inside the folded turn.
     await page
-      .getByText(/^Worked for /)
+      .getByText(/^(Worked for|Completed in) /)
       .last()
       .click()
-    // A finished turn's rows sit directly under "Worked for"; a "Ran commands" header remains only where a turn does not fold.
+    // The owned Chat fork lists a finished turn's rows directly under "Worked for"; the native Chat ("Completed in")
+    // keeps a "Ran commands" header over them.
     const toolCardSeat = page.locator('[data-dshfiles-live-preview-seat="tool-card"]')
     const commandGroup = page.getByText('Ran commands', { exact: true }).last()
     await expect(commandGroup.or(toolCardSeat).first()).toBeVisible()

@@ -21,8 +21,10 @@ const openFreshThread = async (page: Page, prefix: string): Promise<void> => {
 
 /** A finished turn folds its tool rows: open each folded turn, then each folded plan group, so the cards show. */
 const revealPlanCards = async (page: Page): Promise<void> => {
-  const folded = (text: RegExp) => page.locator('[aria-expanded="false"]').filter({ hasText: text })
-  for (const pattern of [/^Worked for/, /^Updated the plan/]) {
+  // Only folds on screen: a group header inside a folded turn is in the DOM but cannot be clicked yet. The owned Chat
+  // fork folds a turn under "Worked for"; the native Chat these compositions boot says "Completed in".
+  const folded = (text: RegExp) => page.locator('[aria-expanded="false"]').filter({ hasText: text, visible: true })
+  for (const pattern of [/^(Worked for|Completed in)/, /^Updated the plan/]) {
     while ((await folded(pattern).count()) > 0) await folded(pattern).first().click()
   }
 }
