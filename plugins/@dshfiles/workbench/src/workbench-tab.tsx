@@ -20,7 +20,7 @@ import { SurfaceAction } from './surface-action.js'
 import { NewViewTabs } from './new-view.js'
 import { closeWorkbenchPanel, type WorkbenchPanelIdentity } from './panel-close.js'
 import { TabRows } from './tab-row-visibility.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { TabStatusGlyph } from './tab-status.js'
 
 const projectChipStyle = (chip: { readonly color?: string } | undefined): CSSProperties | undefined => {
   if (chip === undefined) return undefined
@@ -133,12 +133,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
             }}
           >
             {tab?.pinned && <PinIcon aria-label={channel.label?.('pinned') || 'Pinned'} size={12} />}
-            {tab?.status && (
-              <StatusDot
-                aria-label={channel.label?.(tab.status) || tab.status}
-                className={tab.status === 'running' ? 'dshx:animate-pulse dshx:bg-info' : tab.status === 'needsYou' ? 'dshx:bg-warning' : 'dshx:bg-primary'}
-              />
-            )}
+            {tab?.status && <TabStatusGlyph status={tab.status} label={channel.label?.(tab.status)} />}
             {closeButtonPosition === 'left' ? closeButton : null}
             {project === undefined ? null : (
               <span
