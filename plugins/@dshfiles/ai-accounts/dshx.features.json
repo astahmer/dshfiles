@@ -1507,9 +1507,10 @@
       "title": "Turn on the fallback chain for stalled streams",
       "summary": "A transport Failure recovery switch that lets a stalled stream walk the thread's model fallback chain under any distribution.",
       "reach": [
-        "click text \"More\"",
-        "click text \"Settings\"",
-        "click text \"AI Accounts\"",
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Settings: AI accounts\"",
+        "click option \"Settings: AI accounts*\"",
+        "click button \"Edit failure handling\"",
         "hover switch \"Fall back on stalled streams\"",
         "expect switch \"Fall back on stalled streams\""
       ],

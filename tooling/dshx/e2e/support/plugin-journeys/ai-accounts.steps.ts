@@ -52,6 +52,12 @@ const openAccountAdvanced = async (page: Page): Promise<void> => {
   await expect(selectedAccount(page).getByRole('heading', { name: 'Runtime paths', exact: true })).toBeVisible()
 }
 
+/** Settings shows "Failure handling: default"; its options open on Edit. */
+const editFailureHandling = async (page: Page): Promise<void> => {
+  const edit = page.getByRole('button', { name: 'Edit failure handling', exact: true })
+  if ((await edit.count()) > 0) await edit.click()
+}
+
 const openPageOptions = async (page: Page): Promise<void> => {
   const options = page.getByRole('button', { name: 'Account page options', exact: true })
   if ((await options.getAttribute('data-state')) !== 'open') await options.click()
@@ -722,6 +728,7 @@ When('the AI Accounts settings section is opened', async ({ page }: { page: Page
   await openSettingsDialog(page)
   await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
   await expect(page.getByRole('heading', { name: 'Failure recovery' })).toBeVisible()
+  await editFailureHandling(page)
 })
 
 When('a verified loopback account is edited in manual save mode', async ({ page }: { page: Page }) => {
@@ -2276,6 +2283,8 @@ const failTurnOnExhaustedAccount = async (page: Page, key: string): Promise<void
   // The inline recovery choice exists only while automatic exhausted-limit failover is off.
   await openSettingsDialog(page)
   await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
+  await expect(page.getByRole('heading', { name: 'Failure recovery' })).toBeVisible()
+  await editFailureHandling(page)
   const exhausted = page.getByRole('group', { name: /Usage exhausted/ })
   const failover = exhausted.getByRole('switch', { name: 'Fail over to the next account' })
   await failover.click()
