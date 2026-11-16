@@ -82,6 +82,7 @@ import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { threadSidebarRestartApi } from './restart-api.js'
+import { RailActionsModel } from './rail-actions-model.js'
 import { RestartBridge } from './restart-bridge.js'
 import { useAutoRestart } from './restart-status-item.js'
 import { useRestartMachine } from './use-restart-machine.js'
@@ -752,7 +753,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   // its confirmation dialog, so the status strip draws no second control while that Restart is on the rail.
   const autoRestart = useAutoRestart()
   const autoRestartPhase = autoRestart.status?.phase
-  const restartOnRail = preferences.showRailActions && restartAvailable
+  const restartOnRail = RailActionsModel.restartOnRail({ preferences, restartAvailable })
   useEffect(() => {
     RestartBridge.publish({ hostPlugins: pendingPlugins, available: restartAvailable, waitingLabel: restartPendingLabel, onRail: restartOnRail })
   }, [pendingPlugins, restartAvailable, restartPendingLabel, restartOnRail])
@@ -981,7 +982,15 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const railActionsShown = preferences.showRailActions
   const autoCountdownLabel = autoRestart.secondsLeft === null ? null : props.t('threadSidebarAutoRestartCountdown', { seconds: autoRestart.secondsLeft })
   const restartLabel = autoCountdownLabel ?? restartPendingLabel ?? pendingUpdatesLabel ?? text(props.t, 'threadSidebarRestart')
-  const railActions: readonly RailAction[] = !railActionsShown
+  // Which of them the rail draws is one rule (rail-actions-model): Restart only for someone who asked for it.
+  const railActionIds = RailActionsModel.shown({
+    preferences,
+    restartAvailable,
+    reloadPending: reloadPendingLabel !== null,
+    launchUrl: launchUrl !== null,
+    pairingAvailable,
+  })
+  const railCandidates: readonly RailAction[] = !railActionsShown
     ? []
     : [
         ...(restartAvailable
@@ -1036,6 +1045,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             ]
           : []),
       ]
+  const railActions = railCandidates.filter(action => railActionIds.some(id => id === action.id))
   // With the actions on the rail, nothing pending forces the row under the list back (b:kgcc).
   const footerHidden = !preferences.showFooter && (railActionsShown || (restartPendingLabel === null && reloadPendingLabel === null))
 
@@ -1400,6 +1410,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:pt-1 dshx:text-sm">
                 <Checkbox checked={preferences.showRailActions} onCheckedChange={checked => updatePreferences({ showRailActions: checked === true })} />
                 {text(props.t, 'threadSidebarShowRailActions')}
+              </label>
+              <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:pt-1 dshx:pl-6 dshx:text-sm">
+                <Checkbox
+                  checked={preferences.showRailRestart}
+                  disabled={!preferences.showRailActions}
+                  onCheckedChange={checked => updatePreferences({ showRailRestart: checked === true })}
+                />
+                {text(props.t, 'threadSidebarShowRailRestart')}
               </label>
             </div>
             <section className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:px-2" aria-labelledby={`${headerRegionId}-rows`}>

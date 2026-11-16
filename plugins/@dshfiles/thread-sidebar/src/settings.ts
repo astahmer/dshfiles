@@ -83,7 +83,12 @@ export const threadSidebarSettings = defineSettings({
     showRailActions: Schema.boolean()
       .default(DEFAULT_PREFERENCES.showRailActions)
       .description(
-        'Show DSH actions on the rail: Restart DSH, Copy DSH URL for agents and Pair a phone, directly above Settings (on a phone, under More › DSH). Off: they move to the row under the list, which a pending restart or page reload then shows; ⌘K keeps them either way.',
+        'Show DSH actions on the rail: Copy DSH URL for agents, Pair a phone and a pending page reload, directly above Settings (on a phone, under More › DSH). Off: they move to the row under the list, which a pending restart or page reload then shows; ⌘K keeps them either way.',
+      ),
+    showRailRestart: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.showRailRestart)
+      .description(
+        'Show Restart DSH among the DSH actions on the rail. Off (the default): the status strip shows the restart notice and its Restart buttons while updates wait, and ⌘K keeps Restart DSH.',
       ),
     navigationDensity: Schema.union(['compact', 'comfortable'] as const)
       .default(DEFAULT_PREFERENCES.navigationDensity)

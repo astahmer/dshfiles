@@ -134,6 +134,8 @@ export interface SidebarPreferences {
    * on the rail, and under More › DSH on a phone (b:kgcc). Off: they go back to the row under the list.
    */
   showRailActions: boolean
+  /** Restart DSH among the rail's DSH actions; off leaves it to the status strip's restart item. */
+  showRailRestart: boolean
   headerRegionHeight: number | null
   headerOrder: string[]
   hiddenHeaderIds: string[]
@@ -238,6 +240,8 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   phoneNavigation: 'stack',
   showFooter: false,
   showRailActions: true,
+  // One restart control (DESIGN.md): the status strip's item. The rail button is for someone who asks for it.
+  showRailRestart: false,
   headerRegionHeight: null,
   headerOrder: [],
   hiddenHeaderIds: [],
