@@ -587,6 +587,25 @@
       inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
     }
 
+    /*
+     * Keyboard hints mean nothing on touch (unslop phone 4): the kit keycaps (`Kbd`, `KbdGroup`, `KeyHint`), every
+     * menu, context-menu and command row's shortcut slot, the Host menu's keycaps (`<kbd>` inside a menu row) and any
+     * legend marked `data-key-legend` go. `!important` in the base layer outranks the keycaps' own display utilities.
+     * Keycaps in content (a `<kbd>` in Markdown) stay: only kit slots and menu rows are matched.
+     */
+    :where(
+      [data-slot='kbd'],
+      [data-slot='kbd-group'],
+      [data-slot='key-hint'],
+      [data-slot='dropdown-menu-shortcut'],
+      [data-slot='context-menu-shortcut'],
+      [data-slot='command-shortcut'],
+      [data-key-legend],
+      :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio'], [role='option']) [aria-hidden='true']:has(kbd)
+    ) {
+      display: none !important;
+    }
+
     /* Menu rows are full width already; give them a 44px row instead of the 28px desktop row. */
     :where(
       [data-slot='dropdown-menu-item'],
