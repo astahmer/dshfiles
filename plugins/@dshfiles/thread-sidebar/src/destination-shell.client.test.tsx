@@ -103,6 +103,37 @@ describe('DestinationShell', () => {
     expect(shell.record).toHaveBeenCalledWith({ destination: 'observe', section: 'traces', surface: 'index' })
   })
 
+  it('lists pages for plugin authors in a Developer group at the end of Settings, which one setting hides', () => {
+    setPhone(false)
+    const developerPanels = [
+      ...panels,
+      { id: 'component-gallery', label: 'Component gallery', order: 90 },
+      { id: 'dshfiles-plugin-guide', label: 'Plugin guide', order: 8 },
+    ]
+    renderShell({ panels: developerPanels })
+    fireEvent.click(screen.getByRole('tab', { name: 'Knowledge' }))
+    expect(screen.queryByRole('button', { name: 'Component gallery' })).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+    const pages = within(screen.getByRole('navigation', { name: 'Settings pages' }))
+      .getAllByRole('button')
+      .map(button => button.getAttribute('aria-label'))
+    expect(pages).toEqual(['All settings', 'Plugins'])
+    const developer = screen.getByRole('region', { name: 'Developer' })
+    expect(
+      within(developer)
+        .getAllByRole('button')
+        .map(button => button.getAttribute('aria-label')),
+    ).toEqual(['Component gallery', 'Plugin guide'])
+    // The group follows everything a user came for.
+    expect(screen.getByRole('navigation', { name: 'Settings pages' }).compareDocumentPosition(developer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    cleanup()
+    DestinationSelection.set('settings')
+    renderShell({ panels: developerPanels, showDeveloperPages: false })
+    expect(screen.queryByRole('region', { name: 'Developer' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Component gallery' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Plugins' })).toBeTruthy()
+  })
+
   it('lets a page description wrap to a second line instead of cutting it at the column edge', () => {
     setPhone(false)
     renderShell()

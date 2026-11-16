@@ -173,6 +173,7 @@ export const useSidebarFolders = (input: {
           label: section.label,
           description: section.description,
           unmapped: section.unmapped,
+          developer: section.group === 'developer',
         })),
       ),
     [input.destinations],

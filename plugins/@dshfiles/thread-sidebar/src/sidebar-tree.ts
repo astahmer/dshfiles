@@ -321,6 +321,8 @@ export interface ResolvedEntry {
   readonly description?: string | undefined
   /** A mapped page nobody mapped explicitly: Settings › Other pages. */
   readonly unmapped: boolean
+  /** A page for plugin authors, where the mapping put it: Settings › Developer. One a person filed is an ordinary row. */
+  readonly developer?: boolean | undefined
 }
 
 export interface ResolvedFolder {
@@ -355,6 +357,7 @@ export interface MappedSection {
   readonly label: string
   readonly description?: string | undefined
   readonly unmapped: boolean
+  readonly developer?: boolean | undefined
 }
 
 /**
@@ -400,6 +403,7 @@ const resolve = (input: {
             mapped: true,
             description: section.description,
             unmapped: section.unmapped,
+            developer: section.developer === true,
           }))
       : []
     return { id: folder.id, title: folder.title, icon: folder.icon, builtIn: folder.builtIn, hidden: folder.hidden, entries: [...explicit, ...mapped] }

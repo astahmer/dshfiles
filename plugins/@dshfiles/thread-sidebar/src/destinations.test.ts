@@ -42,6 +42,39 @@ describe('Destinations', () => {
     expect(contributed.find(destination => destination.id === 'settings')?.sections).toEqual([])
   })
 
+  it('keeps pages for plugin authors out of the user lists: a Developer group at the end of Settings', () => {
+    const resolved = Destinations.resolve(
+      [
+        { id: 'dshfiles-memory-panel', label: 'Memory: Browser', order: 1 },
+        { id: 'component-gallery', label: 'Component gallery', order: 90 },
+        { id: 'dshfiles-plugin-guide', label: 'Plugin guide', order: 8 },
+        { id: 'dshfiles-capabilities-hub', label: 'Capabilities hub', order: 7 },
+        { id: 'ai-accounts', label: 'AI Accounts: Accounts', order: 2 },
+        { id: 'plugins', label: 'Plugins', order: 0 },
+      ],
+      // What the two plugins contribute themselves; a contribution wins over the table.
+      [
+        { panelId: 'dshfiles-plugin-guide', destination: 'settings', label: 'Plugin guide', order: 2, group: 'developer' },
+        { panelId: 'dshfiles-capabilities-hub', destination: 'settings', label: 'Capabilities hub', order: 6 },
+      ],
+    )
+    // Component gallery sat under Knowledge between Memory and Whiteboard.
+    expect(resolved.find(destination => destination.id === 'knowledge')?.sections.map(section => section.label)).toEqual(['Memory'])
+    const settings = resolved.find(destination => destination.id === 'settings')?.sections ?? []
+    // Capabilities hub was the first row of Settings; the managers it links to lead now, and developer pages come last.
+    expect(settings.map(section => section.label)).toEqual(['AI accounts', 'Plugins', 'Capabilities hub', 'Component gallery', 'Plugin guide'])
+    expect(settings.filter(section => section.group === 'developer').map(section => section.label)).toEqual(['Component gallery', 'Plugin guide'])
+  })
+
+  it('files a developer page under Settings whatever destination its plugin named', () => {
+    const resolved = Destinations.resolve(
+      [{ id: 'some-inspector', label: 'Inspector', order: 1 }],
+      [{ panelId: 'some-inspector', destination: 'observe', label: 'Inspector', group: 'developer' }],
+    )
+    expect(resolved.find(destination => destination.id === 'observe')?.sections).toEqual([])
+    expect(resolved.find(destination => destination.id === 'settings')?.sections.map(section => section.label)).toEqual(['Inspector'])
+  })
+
   it('finds the destination that owns an open page', () => {
     const resolved = Destinations.resolve([{ id: 'dshfiles-backlog-panel', label: 'Backlog: Items', order: 3 }])
     expect(Destinations.owning(resolved, 'dshfiles-backlog-panel')?.id).toBe('work')

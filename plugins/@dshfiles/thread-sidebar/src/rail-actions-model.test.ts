@@ -33,4 +33,11 @@ describe('DSH actions on the rail', () => {
     expect(SidebarPreferencesModel.decode(older)?.showRailRestart).toBe(false)
     expect(SidebarPreferencesModel.decode({ ...older, showRailRestart: true })?.showRailRestart).toBe(true)
   })
+
+  it('shows the Developer group by default, reads older settings as shown, and keeps a saved choice to hide it', () => {
+    const { showDeveloperPages, ...older } = DEFAULT_PREFERENCES
+    expect(showDeveloperPages).toBe(true)
+    expect(SidebarPreferencesModel.decode(older)?.showDeveloperPages).toBe(true)
+    expect(SidebarPreferencesModel.decode({ ...older, showDeveloperPages: false })?.showDeveloperPages).toBe(false)
+  })
 })

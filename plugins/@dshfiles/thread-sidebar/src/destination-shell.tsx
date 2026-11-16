@@ -173,6 +173,8 @@ export interface DestinationShellProps {
   readonly edgeSwipePanels?: boolean
   /** Phone model (Settings › phoneNavigation): the tab-bar stack, or the thread list as a drawer over the thread. */
   readonly phoneNavigation?: 'stack' | 'drawer'
+  /** Settings › Developer lists the pages for plugin authors; off hides the group (the palette still opens them). */
+  readonly showDeveloperPages?: boolean
   readonly toggleSidebar: () => void
   readonly record: (record: NavigationRecord) => void
   /** Sidebar folders (b:952m): the rail's folders and their verbs; absent, the rail lists the eight destinations. */
@@ -236,6 +238,7 @@ const entriesOfSections = (destination: ResolvedDestination): readonly ResolvedE
     mapped: true,
     description: section.description,
     unmapped: section.unmapped,
+    developer: section.group === 'developer',
   }))
 
 const railFoldersOf = (destinations: readonly ResolvedDestination[], folderUi: SidebarFolderUi | undefined): readonly RailFolder[] => {
@@ -472,16 +475,21 @@ const FolderIndex = (props: {
   readonly folderUi: SidebarFolderUi | undefined
   /** Phone: the top bar already names the destination, so the heading stays for assistive tech only. */
   readonly phone?: boolean
+  /** List the pages for plugin authors, in their own group at the end of Settings. */
+  readonly showDeveloperPages?: boolean | undefined
 }): JSX.Element => {
   const { folder, folderUi } = props
   const [renaming, setRenaming] = useState(false)
   const resolved = folderUi?.folders.find(candidate => candidate.id === folder.id)
   // Settings lists the pages nobody mapped, and the panels of a deleted folder, under Other pages.
   const other = (entry: ResolvedEntry): boolean => entry.unmapped || (folder.id === 'settings' && !entry.mapped)
-  const mapped = folder.entries.filter(entry => !other(entry))
-  const unmapped = folder.entries.filter(other)
+  // Pages for plugin authors sit apart, after everything a user came for; a sidebar setting hides the group.
+  const developerEntries = folder.entries.filter(entry => entry.developer === true)
+  const developer = props.showDeveloperPages === false ? [] : developerEntries
+  const mapped = folder.entries.filter(entry => !other(entry) && entry.developer !== true)
+  const unmapped = folder.entries.filter(entry => other(entry) && entry.developer !== true)
   const settings = folder.id === 'settings' ? props.openSettings : null
-  const empty = mapped.length === 0 && unmapped.length === 0 && settings === null
+  const empty = mapped.length === 0 && unmapped.length === 0 && developer.length === 0 && settings === null
   const rows = (entries: readonly ResolvedEntry[], descriptions = true): JSX.Element => (
     <EntryRows
       folder={folder}
@@ -527,6 +535,12 @@ const FolderIndex = (props: {
           <section className="dshx:mt-3" aria-label="Other pages">
             <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Other pages</h3>
             <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(unmapped, false)}</div>
+          </section>
+        )}
+        {developer.length === 0 ? null : (
+          <section className="dshx:mt-3 dshx:border-t dshx:border-border dshx:pt-3" aria-label="Developer" data-destination-group="developer">
+            <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Developer</h3>
+            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(developer)}</div>
           </section>
         )}
       </div>
@@ -605,6 +619,7 @@ const ListPane = (
       renderPanelIcon={props.renderPanelIcon}
       folderUi={props.folderUi}
       phone={props.phone === true}
+      showDeveloperPages={props.showDeveloperPages}
     />
   )
 

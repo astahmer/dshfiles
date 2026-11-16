@@ -3753,9 +3753,18 @@
       "surface": "destinationSection",
       "destination": "threads",
       "currentSurface": "rail: the Destinations tabs and the selected destination's list; collapsed, a folder's flyout",
-      "configuration": [],
-      "states": ["expanded", "collapsed"],
+      "configuration": [
+        {
+          "key": "showDeveloperPages",
+          "defaultValue": "true",
+          "constraints": "Boolean; off hides the Developer group at the end of Settings (pages for plugin authors). The command palette and the New tab page still open those pages.",
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.destination-developer-group-hidden", "thread-sidebar.destination-developer-group-default"]
+        }
+      ],
+      "states": ["expanded", "collapsed", "developer-group-hidden"],
       "failureModes": [
+        "A page for plugin authors (group developer) is never listed among a destination's user pages: it sits in the Developer group at the end of Settings.",
         "A page another plugin registers without a section entry is still listed, under Settings › Other pages.",
         "Without the Inbox plugin the Inbox destination shows an empty state and no badge."
       ],
@@ -3771,6 +3780,24 @@
           "id": "thread-sidebar.destination-rail-sections",
           "file": "plugins/@dshfiles/thread-sidebar/src/destinations.test.ts",
           "testName": "places registered pages and leaves pages nobody registered out"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.destination-developer-group",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destinations.test.ts",
+          "testName": "keeps pages for plugin authors out of the user lists: a Developer group at the end of Settings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.destination-developer-group-hidden",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "lists pages for plugin authors in a Developer group at the end of Settings, which one setting hides"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.destination-developer-group-default",
+          "file": "plugins/@dshfiles/thread-sidebar/src/rail-actions-model.test.ts",
+          "testName": "shows the Developer group by default, reads older settings as shown, and keeps a saved choice to hide it"
         },
         {
           "kind": "unit-test",
