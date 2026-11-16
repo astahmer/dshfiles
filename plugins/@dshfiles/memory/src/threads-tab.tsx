@@ -33,6 +33,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { memoryApi, type MemoryCitation, type PanelNote, type PanelThread } from './api.ts'
 import { PanelFormat } from './panel-format.ts'
+import { MemoryCopy } from './memory-copy.ts'
 
 type ThreadStatusFilter = 'all' | 'digested' | 'undigested'
 type ThreadSourceFilter = '' | 'trail' | 'model'
@@ -169,7 +170,7 @@ const DigestedThreadDetail = (props: {
   const timeline = useMemo(() => {
     const entries: { readonly at: number; readonly title: string; readonly detail?: string }[] = [
       { at: props.createdAt, title: 'Thread created' },
-      ...(thread.digestedAt === null ? [] : [{ at: thread.digestedAt, title: `Digested (${thread.source === 'model' ? 'cheap model' : 'BM25'})` }]),
+      ...(thread.digestedAt === null ? [] : [{ at: thread.digestedAt, title: `Digested ${MemoryCopy.digestSource(thread.source)}` }]),
       ...props.notes.map(note => ({ at: note.createdAt, title: 'Memory created', detail: PanelFormat.noteExcerpt(note.text, 120) })),
       ...props.citations.map(citation => ({
         at: citation.at,
@@ -500,7 +501,7 @@ export const ThreadsTab = (props: {
                 <span>·</span>
                 <span>Agent</span>
                 <span>·</span>
-                <span>{selected.digested ? `Digested (${selected.source === 'model' ? 'cheap model' : 'BM25'})` : 'Not digested'}</span>
+                <span>{selected.digested ? `Digested ${MemoryCopy.digestSource(selected.source)}` : 'Not digested'}</span>
                 {detail.data === undefined ? null : (
                   <>
                     <span>·</span>
