@@ -37,6 +37,11 @@ describe('phone shell media rule (unslop U8)', () => {
     expect(matchesPhoneShell(view({ width: 1440, height: 450, coarse: false }))).toBe(false)
   })
 
+  it('offers it as the `phone` variant for viewport-level overlays', () => {
+    const styles = read('src/styles.css')
+    expect(styles).toMatch(/@custom-variant phone \{\s*@media \(max-width: 639\.98px\), \(pointer: coarse\) and \(max-height: 500px\) \{\s*@slot;/u)
+  })
+
   it('is the rule every kit sheet and phone media block uses', () => {
     const styles = read('src/styles.css')
     const blocks = [...styles.matchAll(/@media ([^{]*639\.98px[^{]*)\{/gu)].map(match => (match[1] ?? '').trim())

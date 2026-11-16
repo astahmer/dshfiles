@@ -17,6 +17,16 @@
 @import 'tw-animate-css' prefix(dshx);
 
 @custom-variant dark (&:where(body[data-ds-dark-theme] *));
+/*
+ * `dshx:phone:` is the phone shell's media rule (lib/phone-shell: under 640px wide, or a coarse pointer under 500px
+ * tall), for the few viewport-level overlays that become full-screen on a phone (the command palette). Panes keep using
+ * container queries.
+ */
+@custom-variant phone {
+  @media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+    @slot;
+  }
+}
 
 @theme inline {
   --font-sans: var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
