@@ -200,6 +200,7 @@ import {
   type ThreadSelectionState,
 } from './thread-selection.js'
 import { createThreadMultiSelectionStore, useThreadMultiSelected, useThreadMultiSelectedIds, type ThreadMultiSelectionStore } from './thread-multi-selection.js'
+import { ThreadSelectionBar } from './thread-selection-bar.js'
 import { workingThreadIds, WorkingThreadsProjection } from './working-threads.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
@@ -7399,37 +7400,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
         </div>
         {selectedSessionIds.length > 0 ? (
-          <div
-            role="toolbar"
-            aria-label={props.tSidebar('threadSidebarSelection')}
-            title={props.tSidebar('threadSidebarSelectionHint')}
-            data-testid="thread-selection-bar"
-            className="dshx:mx-2 dshx:mb-2 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:bg-card dshx:p-1.5 dshx:text-xs"
-          >
-            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-medium" aria-live="polite">
-              {props.tSidebar('threadSidebarSelectedCount', { count: selectedSessionIds.length })}
-            </span>
-            <Button size="xs" variant="outline" onClick={() => void applyToSelection(allSelectedPinned ? 'unpin' : 'pin')}>
-              {allSelectedPinned ? <IconPinFillRegular size={13} /> : <PinIcon strokeWidth={1.5} size={13} />}
-              {props.tSidebar(allSelectedPinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-            </Button>
-            <Button size="xs" variant="outline" disabled={allSelectedSettled} onClick={settleSelection}>
-              <CircleCheckIcon strokeWidth={1.5} size={13} />
-              {props.tSidebar('threadSidebarSettle')}
-            </Button>
-            <Button size="xs" variant="outline" onClick={() => void applyToSelection('archive')}>
-              <ArchiveIcon strokeWidth={1.5} size={13} />
-              {props.tSidebar('threadSidebarArchive')}
-            </Button>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label={props.tSidebar('threadSidebarClearSelection')}
-              onClick={() => setThreadSelection(EMPTY_THREAD_SELECTION)}
-            >
-              <XIcon className="dshx:size-3.5" />
-            </Button>
-          </div>
+          <ThreadSelectionBar
+            count={selectedSessionIds.length}
+            allPinned={allSelectedPinned}
+            allSettled={allSelectedSettled}
+            onTogglePinned={() => void applyToSelection(allSelectedPinned ? 'unpin' : 'pin')}
+            onSettle={settleSelection}
+            onArchive={() => void applyToSelection('archive')}
+            onClear={() => setThreadSelection(EMPTY_THREAD_SELECTION)}
+            t={props.tSidebar}
+          />
         ) : null}
       </section>
       <ThreadViewManager
