@@ -551,7 +551,7 @@
     {
       "id": "working-status-item",
       "title": "See how many threads are working in the status strip",
-      "summary": "The status strip shows \"N working\" for top-level threads with a running turn, colourless, and hides it while nothing runs. On a phone it is one line in the Status chip's list.",
+      "summary": "The status strip shows \"N working\", colourless, and hides it while nothing runs. N is the thread list's one Working projection: the rows whose status is Working, with subagents rolled up into their parent and a thread that waits for your answer left out (it is Needs you). The \"Working (N)\" group, the Working preset's count and the tab title read the same number. On a phone it is one line in the Status chip's list.",
       "reach": ["expect region \"Threads\""],
       "surfaces": ["client"],
       "surface": "statusItem",

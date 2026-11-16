@@ -201,7 +201,7 @@ import {
   type ThreadSelectionState,
 } from './thread-selection.js'
 import { createThreadMultiSelectionStore, useThreadMultiSelected, useThreadMultiSelectedIds, type ThreadMultiSelectionStore } from './thread-multi-selection.js'
-import { workingThreadIds } from './working-threads.js'
+import { workingThreadIds, WorkingThreadsProjection } from './working-threads.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -3630,18 +3630,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       settledSessionIds,
     ],
   )
-  const workingThreadCountsBySource = useMemo(
-    () => ({
-      all: currentWorkingThreadIds.size + detachedThreadEntries.filter(entry => entry.session.running).length,
-      main: sectionEntries.filter(entry => currentWorkingThreadIds.has(entry.session.id) && ThreadViewModel.matchesSourceFilter(entry.session, 'main')).length,
-      subagents: [
-        ...childThreadEntries,
-        ...detachedThreadEntries,
-        ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents')),
-      ].filter(entry => entry.session.running).length,
-    }),
-    [childThreadEntries, currentWorkingThreadIds, detachedThreadEntries, sectionEntries],
-  )
   const nextMuteWake = useMemo(() => nextMuteExpiry(mutedThreads, now), [mutedThreads, now])
   const nextIdleAt = useMemo(
     () =>
@@ -3937,6 +3925,39 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     statusGlyphs,
     threadTree,
   ])
+  // The one Working count (unslop S3): the rows whose status is Working, subagents rolled up into their parent. The
+  // "Working (N)" group lists exactly these rows, and the status strip, the tab title and the Working preset read the
+  // same set, so a thread that waits for an answer (Needs you, though its turn still runs) is counted nowhere.
+  const projectedWorkingIds = useMemo(() => {
+    const statuses = new Map<string, WorkStatus>()
+    if (statusGlyphs) {
+      for (const [sessionId, status] of childStatusById) statuses.set(sessionId, status.status)
+      for (const [sessionId, status] of threadStatusById) statuses.set(sessionId, status.status)
+    }
+    return WorkingThreadsProjection.ids([...sectionEntries, ...detachedThreadEntries], {
+      statusOf: sessionId => statuses.get(sessionId),
+      waiting: waitingSessionIds,
+    })
+  }, [childStatusById, detachedThreadEntries, sectionEntries, statusGlyphs, threadStatusById, waitingSessionIds])
+  const projectedWorkingCount = projectedWorkingIds.size
+  useEffect(() => {
+    if (!isPrimarySurface || sessionState.phase !== 'ready') return
+    WorkingThreadsProjection.publish(projectedWorkingCount)
+  }, [isPrimarySurface, projectedWorkingCount, sessionState.phase])
+  // The strip falls back to its own count once no list publishes.
+  useEffect(() => (isPrimarySurface ? () => WorkingThreadsProjection.publish(null) : undefined), [isPrimarySurface])
+  const workingThreadCountsBySource = useMemo(
+    () => ({
+      all: projectedWorkingCount,
+      main: sectionEntries.filter(entry => projectedWorkingIds.has(entry.session.id) && ThreadViewModel.matchesSourceFilter(entry.session, 'main')).length,
+      subagents: [
+        ...childThreadEntries,
+        ...detachedThreadEntries,
+        ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents')),
+      ].filter(entry => entry.session.running).length,
+    }),
+    [childThreadEntries, detachedThreadEntries, projectedWorkingCount, projectedWorkingIds, sectionEntries],
+  )
   // One Host read every 3 s for every working row's step and start, only while one runs (polish pass b:r4et).
   const runningRowIds = useMemo(() => sectionEntries.filter(entry => entry.session.running).map(entry => entry.session.id), [sectionEntries])
   const liveTurns = useLiveTurns(runningRowIds, sessionState.phase === 'ready')
