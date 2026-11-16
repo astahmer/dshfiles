@@ -27,6 +27,7 @@ import css from './AppFrame.module.css'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { Minimize2Icon } from '@dshfiles/plugin-ui/icons'
+import { matchesPhoneShell } from '@dshfiles/plugin-ui/lib/phone-shell'
 import { MainSurfaceRendering } from '../../main-surface.ts'
 import { ZenMode } from '../../zen-mode.ts'
 import type { MainSurfaceMode, RightPanelMode } from '../../regions.ts'
@@ -202,6 +203,13 @@ function ZenExit({ leave }: { leave: () => void }) {
 
 /** Below this frame width the status strip collapses to one chip (the phone breakpoint of AppFrame.module.css). */
 const PHONE_STRIP_WIDTH = 640
+
+/**
+ * Local delta (dshfiles): the status strip is one chip under the phone width, and also on a phone turned sideways (the
+ * kit's phone shell rule: a coarse pointer under 500px tall), where the frame is wide but the phone shell is drawn.
+ */
+export const compactStatusStrip = (viewport: number, view?: Pick<Window, 'matchMedia'>): boolean =>
+  viewport < PHONE_STRIP_WIDTH || matchesPhoneShell(view)
 
 /** The three-column frame (see module doc). */
 export function AppFrame({
@@ -446,7 +454,7 @@ export function AppFrame({
         </div>
       )}
       {/* Local delta (dshfiles): the status strip row; empty until a plugin adds a StatusItems entry. */}
-      <StatusStrip narrow={viewport < PHONE_STRIP_WIDTH} useSessions={useSessions} />
+      <StatusStrip narrow={compactStatusStrip(viewport)} useSessions={useSessions} />
       <div className={css.overlayLayer} data-shell-overlay>
         {overlays}
       </div>
