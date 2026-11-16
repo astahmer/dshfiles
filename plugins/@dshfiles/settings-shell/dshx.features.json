@@ -211,7 +211,7 @@
     {
       "id": "settings-task-groups",
       "title": "Settings grouped by task, with deep links",
-      "summary": "Every native section and plugin settings page sits in one task group (General, Models & accounts, Agents, Tools & MCP, Projects & workspaces, Hosts & network, Security, Notifications, Plugins, About; unknown ones under Other) under a person's name, never a package id. AI accounts appears once: its section, its plugin settings and a link to the accounts page. MCP servers, Secrets, Hosts and the AI accounts page are entries that open the page their plugin owns. Every Jev setting sits under Tools & MCP › Jev, and Layout (fixed or free docking) under General. Plugin pages carry no scope line: every setting applies to every project and thread until one stores a narrower value.",
+      "summary": "Every native section and plugin settings page sits in one task group (General, Models & accounts, Agents, Tools & MCP, Projects & workspaces, Hosts & network, Security, Notifications, Plugins, About) under a person's name, never a package id. Settings several plugins hold for one task share one entry (General › Layout, Composer and Transcript; Tools & MCP › Web search and fetch; Projects & workspaces › Checks and tests; About › Diagnostics), each plugin's fields under a subheading. Every namespace and section this repository ships is placed; only an unknown third-party one shows under Other. AI accounts appears once: its section, its plugin settings and a link to the accounts page. MCP servers, Secrets, Hosts and the AI accounts page are entries that open the page their plugin owns. Every Jev setting sits under Tools & MCP › Jev, and Layout (fixed or free docking) under General. Plugin pages carry no scope line: every setting applies to every project and thread until one stores a narrower value.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -231,7 +231,7 @@
       "configuration": [],
       "states": ["grouped", "linked-page-loaded", "linked-page-missing", "jev-gathered", "other-group"],
       "failureModes": [
-        "A section or namespace nobody placed shows under Other with its own label until the group map in src/settings-groups.ts places it.",
+        "A third-party section or namespace nobody placed shows under Other with its own label until the group map in src/settings-groups.ts places it; settings-groups.test.ts fails when an owned plugin adds one without a placement.",
         "A linked page whose plugin is not loaded is left out rather than offered as a dead link.",
         "Backlog and Memory still store their own Jev key: Tools & MCP › Jev shows both together until one shared key exists."
       ],
@@ -247,6 +247,18 @@
           "id": "settings-shell.groups-unit-places-everything",
           "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
           "testName": "places every section and page somewhere, unknown ones under Other"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.groups-unit-no-other",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "places every settings namespace in a task group, never under Other"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.groups-unit-merged",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "gathers one task under one entry: layout, composer and transcript"
         },
         {
           "kind": "unit-test",
@@ -423,14 +435,14 @@
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
         "click option \"Settings: General*\"",
-        "click button \"Main tabs\"",
+        "click button \"Layout\"",
         "expect spinbutton \"Max tabs\""
       ],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
         "click combobox \"Sections\"",
-        "click option \"Main tabs\"",
+        "click option \"Layout\"",
         "expect spinbutton \"Max tabs\""
       ],
       "surfaces": ["client", "settings", "integration"],
@@ -469,7 +481,7 @@
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
         "click option \"Settings: General*\"",
-        "click button \"Main tabs\"",
+        "click button \"Layout\"",
         "fill spinbutton \"Max tabs\" \"8\"",
         "press Enter",
         "expect button \"Reset to default\""
@@ -478,7 +490,7 @@
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
         "click combobox \"Sections\"",
-        "click option \"Main tabs\"",
+        "click option \"Layout\"",
         "fill spinbutton \"Max tabs\" \"8\"",
         "press Enter",
         "expect button \"Reset to default\""
@@ -529,7 +541,7 @@
       "reach": [
         "click text \"More\"",
         "click menuitem \"Settings*\"",
-        "click button \"Main tabs\"",
+        "click button \"Layout\"",
         "fill spinbutton \"Max tabs\" \"8\"",
         "press Enter",
         "expect button \"Reset to default\"",
@@ -540,7 +552,7 @@
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
         "click combobox \"Sections\"",
-        "click option \"Main tabs\"",
+        "click option \"Layout\"",
         "fill spinbutton \"Max tabs\" \"8\"",
         "press Enter",
         "expect button \"Reset to default\"",
@@ -666,12 +678,12 @@
       "id": "plugin-enablement-tools",
       "title": "List and switch plugin entries, from Settings or an Agent",
       "summary": "Each plugin settings page shows its Loader entry: the bundle that declares the row, the bundles that reconfigure it, a Plugin enabled switch, a change waiting for a restart, and a note when pnpm profile:sync restores the row from the seed. plugin_inventory lists the same for every entry; plugin_set_enabled enables or disables one through the plugin manager and relays its verdict: applied live, waiting for a user restart (with the reason), or overridden by a higher-priority layer. It never restarts DSH; the opposite value reverses it.",
-      "reach": ["click text \"More\"", "click menuitem \"Settings*\"", "click button \"Main tabs\"", "expect switch \"Plugin enabled\""],
+      "reach": ["click text \"More\"", "click menuitem \"Settings*\"", "click button \"Layout\"", "expect switch \"Plugin enabled\""],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
         "click combobox \"Sections\"",
-        "click option \"Main tabs\"",
+        "click option \"Layout\"",
         "expect switch \"Plugin enabled\""
       ],
       "surfaces": ["client", "settings", "tool", "host"],

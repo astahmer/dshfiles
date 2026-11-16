@@ -304,7 +304,7 @@
       "id": "status-bar-settings",
       "title": "Show, hide and reorder status bar items",
       "summary": "Settings › General › Status bar lists every registered status item with a show switch and up/down buttons; right-clicking an item in the strip offers Hide this item and Status bar settings…. The choice is stored in the dshfiles-frame-layout settings namespace as hiddenStatusItems and statusItemOrder (so settings_set covers agent writes); ids nobody registers are ignored and a newly added item appears at its default place.",
-      "reach": ["click tab \"Settings\"", "click button \"Status bar\"", "expect button \"Move Quota up\""],
+      "reach": ["click tab \"Settings\"", "click button \"Layout\"", "expect button \"Move Quota up\""],
       "surfaces": ["client", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -379,7 +379,7 @@
       "summary": "When every status item is hidden the strip keeps one small control (Show hidden status items) that offers Show <item> for each hidden item and Status bar settings; each visible item's context menu also lists the hidden ones.",
       "reach": [
         "click tab \"Settings\"",
-        "click button \"Status bar\"",
+        "click button \"Layout\"",
         "click switch \"Working\"",
         "expect button \"Show hidden status items\"",
         "click switch \"Restart\"",

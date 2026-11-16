@@ -714,7 +714,7 @@ Then('the secret tools journey is complete', async ({ page }: { page: Page }) =>
 When('a marked secret-reference setting is focused', async ({ page }: { page: Page }) => {
   if (!(await settingsPage(page).isVisible())) await openSettingsDialog(page)
   // Brave web search's key: an ordinary secret-reference setting (the Jev key carries its own Jev setup button).
-  await settingsNavEntry(page, 'Web search (Brave)').click()
+  await settingsNavEntry(page, 'Web search and fetch').click()
   const field = page.locator('[data-settings-namespace="dshfiles-web-search-brave"] [data-setting-path="apiKey"] input[data-secret-input="reference"]')
   await expect(field).toBeVisible()
   await field.focus()

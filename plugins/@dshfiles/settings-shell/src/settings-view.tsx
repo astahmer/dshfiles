@@ -30,7 +30,9 @@ const headerButton =
 const navCell =
   'dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-sm dshx:leading-5 dshx:font-normal dshx:text-foreground dshx:hover:bg-[var(--dshx-tone-2)]'
 const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)] dshx:font-medium'
-const navGroup = 'dshx:mt-3 dshx:px-3 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:first:mt-0'
+// A group label is a label, not one more row: 16 px above it (none above the first), 4 px between it and its entries.
+const navGroupBlock = 'dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5 dshx:first:mt-0'
+const navGroup = 'dshx:px-3 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground'
 
 export type PluginPageHeading = 'page' | 'section' | 'none'
 
@@ -272,11 +274,13 @@ const useSingleTitle = (label: string): RefObject<HTMLDivElement> => {
 const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; readonly jevNamespaces: ReadonlySet<string> }): JSX.Element => {
   const { entry, t } = props
   const link = entry.link
-  // A section draws its own rows; a lone plugin page draws its own heading, so the entry heading would repeat it.
-  const ownHeading = entry.sectionId !== undefined || entry.pages.length !== 1 || link !== undefined
+  // A section draws its own rows; a plugin page that is the whole entry draws the entry's heading itself. A page that
+  // is one block of a task entry (Layout › Main tabs) keeps the task's heading above it, even while it is the only one.
+  const ownHeading = entry.sectionId !== undefined || entry.pages.length !== 1 || link !== undefined || entry.pages[0]?.pageId !== entry.id
   const jevHere = entry.id === JEV_ENTRY_ID ? [] : entry.pages.filter(page => props.jevNamespaces.has(page.ns))
-  const section = useSingleTitle(entry.label)
-  const headingOf = (page: PluginSettingsPage): PluginPageHeading => {
+  const section = useSingleTitle(entry.sectionLabel ?? entry.label)
+  const pages = entry.pages.map(page => <Fragment key={page.pageId}>{props.renderPluginPage(page, headingOf(page))}</Fragment>)
+  function headingOf(page: PluginSettingsPage): PluginPageHeading {
     if (!ownHeading) return 'page'
     return sameTitle(page.title, entry.label) ? 'none' : 'section'
   }
@@ -302,12 +306,15 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
           </Button>
         </div>
       )}
+      {/* A section that is one block of a task entry follows the plugin pages, under its own name. */}
+      {entry.sectionLabel !== undefined && pages}
       {entry.sectionId !== undefined && (
-        <div ref={section}>{props.renderSlot('settings.section', sectionOwnerWithTarget(props), { only: entry.sectionId })}</div>
+        <div className="dshx:flex dshx:flex-col dshx:gap-1" data-settings-section={entry.sectionId}>
+          {entry.sectionLabel !== undefined && <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{entry.sectionLabel}</h3>}
+          <div ref={section}>{props.renderSlot('settings.section', sectionOwnerWithTarget(props), { only: entry.sectionId })}</div>
+        </div>
       )}
-      {entry.pages.map(page => (
-        <Fragment key={page.pageId}>{props.renderPluginPage(page, headingOf(page))}</Fragment>
-      ))}
+      {entry.sectionLabel === undefined && pages}
       {jevHere.length > 0 && (
         <p className="dshx:m-0 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="note">
           {t('entry.jevMoved', { page: entry.label })}
@@ -440,7 +447,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4 dshx:@max-pane-compact:hidden"
           >
             {props.groups.map(({ group, entries }) => (
-              <div aria-label={group.label} className="dshx:flex dshx:flex-col dshx:gap-0.5" data-settings-group={group.id} key={group.id} role="group">
+              <div aria-label={group.label} className={navGroupBlock} data-settings-group={group.id} key={group.id} role="group">
                 <span className={navGroup}>{group.label}</span>
                 {entries.map(entry => (
                   <NavCell active={!searching && entry.id === active?.id} count={countOf(entry)} entry={entry} key={entry.id} onSelect={select} />
