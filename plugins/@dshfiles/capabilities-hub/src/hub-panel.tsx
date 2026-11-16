@@ -25,7 +25,6 @@ export interface CapabilitiesHubPanelProps {
 }
 
 const ICONS = { skills: SparklesIcon, mcp: ServerIcon, plugins: PuzzleIcon } as const satisfies Record<HubSectionId, typeof SparklesIcon>
-const TRUST_VARIANT = { 'agent-instructions': 'info', 'tools-and-credentials': 'warning', 'executable-code': 'destructive' } as const
 const GROUP_LABEL = { project: 'project', user: 'your home', plugin: 'plugins', other: 'other' } as const satisfies Record<SkillGroup, string>
 
 const Status = (props: { readonly loading: boolean; readonly error: unknown; readonly ownerName: string; readonly children: ReactNode }): ReactNode => {
@@ -51,11 +50,7 @@ const SectionCard = (props: {
   const { section } = props
   const Icon = ICONS[section.id]
   return (
-    <section
-      aria-labelledby={`capabilities-hub-${section.id}`}
-      className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:p-4"
-      data-hub-section={section.id}
-    >
+    <section aria-labelledby={`capabilities-hub-${section.id}`} className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-4" data-hub-section={section.id}>
       <div className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-3">
         <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-3">
           <Icon aria-hidden className="dshx:mt-0.5 dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />
@@ -72,7 +67,8 @@ const SectionCard = (props: {
         </Button>
       </div>
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs" data-trust={section.trust}>
-        <Badge variant={TRUST_VARIANT[section.trust]}>{section.trustLabel}</Badge>
+        {/* What the kind grants, in words. Not a status: nothing is wrong on a healthy install, so the chip has no colour. */}
+        <Badge variant="muted">{section.trustLabel}</Badge>
         <span className="dshx:min-w-0 dshx:text-muted-foreground">{section.trustDetail}</span>
       </div>
       {props.available ? null : (
@@ -90,7 +86,7 @@ const SkillsShBlock = (): ReactNode => {
   const guidance = CapabilitiesHub.skillsSh
   const [copied, setCopied] = useState(false)
   return (
-    <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:bg-muted dshx:p-3" data-skills-sh>
+    <div className="dshx:flex dshx:flex-col dshx:gap-2" data-skills-sh>
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
         <span className="dshx:text-sm dshx:font-medium">Find more on skills.sh</span>
         <Button asChild size="sm" variant="ghost">
@@ -101,7 +97,7 @@ const SkillsShBlock = (): ReactNode => {
       </div>
       <p className="dshx:text-xs dshx:text-muted-foreground">{guidance.inAppSearchReason}</p>
       <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-        <code className="dshx:min-w-0 dshx:flex-1 dshx:overflow-x-auto dshx:rounded dshx:bg-background dshx:px-2 dshx:py-1 dshx:font-mono dshx:text-xs dshx:whitespace-nowrap">
+        <code className="dshx:min-w-0 dshx:flex-1 dshx:overflow-x-auto dshx:rounded dshx:bg-muted dshx:px-2 dshx:py-1 dshx:font-mono dshx:text-xs dshx:whitespace-nowrap">
           {guidance.command}
         </code>
         <Button
@@ -149,7 +145,8 @@ export const CapabilitiesHubPanel = (props: CapabilitiesHubPanelProps): ReactNod
         description="Skills, MCP servers and DSH plugins each have their own manager and their own risk. Open one to add, change or remove what it owns."
         heading="Capabilities hub"
       >
-        <div className="dshx:flex dshx:max-w-3xl dshx:flex-col dshx:gap-4">
+        {/* One list the width of the pane: three rows with hairline dividers, not three cards in a narrow column. */}
+        <div className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-lg dshx:border dshx:border-border" data-hub-list="">
           {CapabilitiesHub.sections.map(section => {
             const available = props.hasPanel(section.manager.panelId)
             if (section.id === 'skills')
