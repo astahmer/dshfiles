@@ -16,6 +16,7 @@ import * as Schema from 'effect/Schema'
 import { useState, useSyncExternalStore } from 'react'
 import { purposeSchema, usageApi } from './api.js'
 import { UsageCharts } from './charts.js'
+import { USAGE_PAGE_DESCRIPTION, indexedLogsLabel } from './page-copy.js'
 import { UsageFoldModel, type RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { RequestLog } from './request-log.js'
@@ -184,7 +185,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
       ? 'Connecting…'
       : status.indexing
         ? 'Indexing thread logs…'
-        : `${status.indexedFiles.toLocaleString()} logs indexed${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, now, relativeTime)}`}`
+        : `${indexedLogsLabel(status.indexedFiles)}${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, now, relativeTime)}`}`
   const indexError = status?.lastError == null ? null : `Indexing failed: ${status.lastError}`
   const refreshError = refresh.isError ? errorMessage(refresh.error, 'Re-indexing failed.') : null
 
@@ -193,15 +194,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
       scroll
       className="dshx:bg-background dshx:text-foreground"
       heading="Usage"
-      description={
-        <>
-          Cost and requests from thread logs, side calls included, beside each account's quota. Costs are list-price estimates from the models.dev price catalog
-          {status?.pricingFetchedAt == null
-            ? ' (no catalog cached yet)'
-            : ` (updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)})`}
-          ; subscription traffic is priced as if it were metered.
-        </>
-      }
+      description={USAGE_PAGE_DESCRIPTION}
       meta={
         <span aria-live="polite" className="dshx:text-xs dshx:text-muted-foreground">
           {indexState}
