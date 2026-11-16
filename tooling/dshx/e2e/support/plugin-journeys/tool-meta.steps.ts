@@ -208,7 +208,7 @@ Then('once the turn settles the tool card shows how long the call took and when 
   await recordAssertion(page, 'tool-meta-settled-call-shows-duration-and-start', async () => {
     const note = page.getByRole('note', { name: /^Took \d+\.\d s, started \d{2}:\d{2}$/ })
     await expect(note).toBeVisible()
-    await expect(note).toHaveText(/^[3-9]\.\d s · \d{2}:\d{2}$/)
+    await expect(note).toHaveText(/^[3-9]\.\d s$/)
     await expect(page.getByRole('timer')).toHaveCount(0)
   })
   await finishJourneyAssertions(page)

@@ -86,25 +86,29 @@ export const ToolMetaLine = ({ owner, t }: ToolMetaLineProps): ReactElement | nu
   }
   if (timing === null || !enabled || view === undefined) return null
   const { text, label, waitTimer } = view
+  // Nothing worth a line yet: a call under a second, or one whose start is outside the loaded history.
+  if (text === '' && waitTimer === undefined) return null
   return (
     <TooltipProvider delayDuration={500}>
       <span className="dshx:contents">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              role={timing.kind === 'running' ? 'timer' : 'note'}
-              aria-label={label}
-              data-dshfiles-tool-meta={timing.kind}
-              className={cn(
-                'dshx-root dshx:pointer-events-auto dshx:shrink-0 dshx:rounded-sm dshx:bg-background dshx:px-1.5 dshx:whitespace-nowrap dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
-                timing.kind === 'running' && 'dshx:text-foreground',
-              )}
-            >
-              {text}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{label}</TooltipContent>
-        </Tooltip>
+        {text !== '' && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                role={timing.kind === 'running' ? 'timer' : 'note'}
+                aria-label={label}
+                data-dshfiles-tool-meta={timing.kind}
+                className={cn(
+                  'dshx-root dshx:pointer-events-auto dshx:shrink-0 dshx:rounded-sm dshx:bg-background dshx:px-1.5 dshx:whitespace-nowrap dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
+                  timing.kind === 'running' && 'dshx:text-foreground',
+                )}
+              >
+                {text}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{label}</TooltipContent>
+          </Tooltip>
+        )}
         {waitTimer !== undefined && <WaitTimerIndicator timer={waitTimer} t={t} />}
       </span>
     </TooltipProvider>

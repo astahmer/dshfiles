@@ -2,18 +2,18 @@
 
 ![Tool timing and a live wait countdown](docs/screenshots/tool-call-timing.png)
 
-Start time and duration on every tool call in the chat transcript: `1.2 s · 14:02:11` at the right of each tool card's header row, for native tools and plugin-owned ones, root calls and PTC children alike. While a call runs the duration counts up every second. `job_output` waits and `background_jobs_wait` calls name what they are waiting for and show a live wait bar: a countdown against an explicit timeout when one is supplied, otherwise an indeterminate bar with elapsed time. The bar measures the wait, not the job's progress or expected completion. To interrupt a wait, steer or stop the turn with the existing composer controls. It also renders the file tool cards themselves: `read` on the shared `CodeBlock`, and `edit` / `write` / `apply_patch` on the shared `PatchView`; and the native approval request as a risk card in the composer.
+How long each tool call took, in the chat transcript: `1.2 s` at the right of the tool row, for native tools and plugin-owned ones, root calls and PTC children alike. A call under one second shows nothing, so the slow step stands out; hover a duration for the start time (the turn's time divider already gives the clock time, so rows do not repeat it). While a call runs the duration counts up every second. `job_output` waits and `background_jobs_wait` calls name what they are waiting for and show a live wait bar: a countdown against an explicit timeout when one is supplied, otherwise an indeterminate bar with elapsed time. The bar measures the wait, not the job's progress or expected completion. To interrupt a wait, steer or stop the turn with the existing composer controls. It also renders the file tool cards themselves: `read` on the shared `CodeBlock`, and `edit` / `write` / `apply_patch` on the shared `PatchView`; and the native approval request as a risk card in the composer.
 
 Built with dshx (no port: nothing upstream does this). Its own small plugin rather than a slice of an existing one, because it touches no other plugin's state and has its own fragile seam to watch. Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 
 ## Settings (`dshfiles-tool-meta`)
 
-| Key            | Default    | Meaning                                                                                   |
-| -------------- | ---------- | ----------------------------------------------------------------------------------------- |
-| `enabled`      | `true`     | Show the timing line on tool cards.                                                       |
-| `timeFormat`   | `absolute` | `absolute`: clock time, with the day when not today. `relative`: `12 s ago`, `5 min ago`. |
-| `fileCards`    | `true`     | Show file reads as a code card and file mutations as collapsible diffs.                   |
-| `approvalCard` | `true`     | Show tool approval requests as a risk card instead of the native panel.                   |
+| Key            | Default    | Meaning                                                                                                                  |
+| -------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `enabled`      | `true`     | Show the duration of tool calls that took one second or more.                                                            |
+| `timeFormat`   | `absolute` | Start time in the hover label. `absolute`: clock time, with the day when not today. `relative`: `12 s ago`, `5 min ago`. |
+| `fileCards`    | `true`     | Show file reads as a code card and file mutations as collapsible diffs.                                                  |
+| `approvalCard` | `true`     | Show tool approval requests as a risk card instead of the native panel.                                                  |
 
 ## File tool cards
 
@@ -39,7 +39,7 @@ per request key, so an answered or withdrawn request never unlocks the next one.
 
 ## Where the times come from
 
-DSH already folds them into the blocks it hands every tool view: a dispatched call carries its `tool/call` time, a result carries its `tool/result` time and, while the call is still in the loaded window, the call's time (`callTime`). Nothing is read from the event stream. A result whose call fell outside the loaded window shows only `ended 14:02:12`; a call whose arguments are still streaming shows nothing.
+DSH already folds them into the blocks it hands every tool view: a dispatched call carries its `tool/call` time, a result carries its `tool/result` time and, while the call is still in the loaded window, the call's time (`callTime`). Nothing is read from the event stream. A result whose call fell outside the loaded window has no duration to show, and neither does a call whose arguments are still streaming.
 
 ## How it decorates native cards
 

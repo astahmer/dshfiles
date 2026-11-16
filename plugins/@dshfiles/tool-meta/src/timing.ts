@@ -130,7 +130,14 @@ export class ToolTimingModel {
     return input.t('daysAgo', { n: String(Math.floor(seconds / 86_400)) })
   }
 
-  /** The visible line ("1.2 s · 14:02:11") and its spoken label. */
+  /** A call shorter than this shows no duration: a column of "0.0 s" hides the one slow step. */
+  static readonly shownFromMs = 1_000
+
+  /**
+   * The visible duration ("1.2 s") and the hover label that also names the start time. The text is empty for a call
+   * under a second and for a result whose call left the loaded history: the turn's time divider already gives the
+   * clock time, so a row repeats neither it nor a zero.
+   */
   static readonly describeTiming = (input: {
     readonly timing: ToolTiming
     readonly now: number
@@ -139,13 +146,13 @@ export class ToolTimingModel {
   }): DescribedTiming => {
     const { timing, now, format, t } = input
     if (timing.kind === 'ended') {
-      const end = ToolTimingModel.formatMoment({ at: timing.endedAt, now, format, t })
-      return { text: t('ended', { end }), label: t('endedLabel', { end }) }
+      return { text: '', label: t('endedLabel', { end: ToolTimingModel.formatMoment({ at: timing.endedAt, now, format, t }) }) }
     }
     const live = timing.kind === 'running'
-    const duration = ToolTimingModel.formatDuration({ ms: (live ? now : timing.endedAt) - timing.startedAt, live, t })
+    const ms = (live ? now : timing.endedAt) - timing.startedAt
+    const duration = ToolTimingModel.formatDuration({ ms, live, t })
     const start = ToolTimingModel.formatMoment({ at: timing.startedAt, now, format, t })
-    return { text: `${duration} · ${start}`, label: t(live ? 'runningLabel' : 'finishedLabel', { duration, start }) }
+    return { text: ms >= ToolTimingModel.shownFromMs ? duration : '', label: t(live ? 'runningLabel' : 'finishedLabel', { duration, start }) }
   }
 
   /** What a line shows; equal keys mean a clock tick would change nothing on screen. */

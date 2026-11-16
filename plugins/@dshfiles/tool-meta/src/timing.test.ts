@@ -10,7 +10,6 @@ const templates = new Map([
   ['minutesAgo', '{n} min ago'],
   ['hoursAgo', '{n} h ago'],
   ['daysAgo', '{n} d ago'],
-  ['ended', 'ended {end}'],
   ['runningLabel', 'Running for {duration}, started {start}'],
   ['finishedLabel', 'Took {duration}, started {start}'],
   ['endedLabel', 'Finished {end}'],
@@ -142,18 +141,37 @@ describe('lineKey', () => {
 })
 
 describe('describeTiming', () => {
-  it('pairs the duration with the start time, live while the call runs', () => {
+  it('shows the duration alone and keeps the start time for the hover label', () => {
     const now = at('14:02:15')
     expect(ToolTimingModel.describeTiming({ timing: { kind: 'running', startedAt: at('14:02:11') }, now, format: 'absolute', t })).toEqual({
-      text: '4 s · 14:02',
+      text: '4 s',
       label: 'Running for 4 s, started 14:02',
     })
     expect(
       ToolTimingModel.describeTiming({ timing: { kind: 'finished', startedAt: at('14:02:11'), endedAt: at('14:02:11') + 1_200 }, now, format: 'relative', t }),
     ).toEqual({
-      text: '1.2 s · 4 s ago',
+      text: '1.2 s',
       label: 'Took 1.2 s, started 4 s ago',
     })
-    expect(ToolTimingModel.describeTiming({ timing: { kind: 'ended', endedAt: at('14:02:12') }, now, format: 'absolute', t }).text).toBe('ended 14:02')
+  })
+
+  it('shows nothing for a call under a second, running or finished', () => {
+    const now = at('14:02:11') + 400
+    expect(ToolTimingModel.describeTiming({ timing: { kind: 'running', startedAt: at('14:02:11') }, now, format: 'absolute', t }).text).toBe('')
+    expect(
+      ToolTimingModel.describeTiming({ timing: { kind: 'finished', startedAt: at('14:02:11'), endedAt: at('14:02:11') + 40 }, now, format: 'absolute', t }),
+    ).toEqual({ text: '', label: 'Took 0.0 s, started 14:02' })
+    expect(
+      ToolTimingModel.describeTiming({ timing: { kind: 'finished', startedAt: at('14:02:11'), endedAt: at('14:02:11') + 999 }, now, format: 'absolute', t })
+        .text,
+    ).toBe('')
+  })
+
+  it('never prints a clock time on the row, even when only the end is known', () => {
+    const now = at('14:02:15')
+    expect(ToolTimingModel.describeTiming({ timing: { kind: 'ended', endedAt: at('14:02:12') }, now, format: 'absolute', t })).toEqual({
+      text: '',
+      label: 'Finished 14:02',
+    })
   })
 })
