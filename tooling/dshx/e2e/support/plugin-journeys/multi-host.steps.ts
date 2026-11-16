@@ -1172,11 +1172,13 @@ When('a checkout on the host has unpushed work and origin moved', async ({ page 
 When('the checkout is checked from the Sync checkout dialog', async ({ page }: { readonly page: Page }) => {
   const repositories = checkoutSyncRepositories.get(page)
   if (repositories === undefined) throw new Error('The checkout sync journey created no repositories.')
+  // A host row is one verb and one menu; Sync checkout is a row of the menu.
   await page
     .getByTestId(/^host-row-/u)
     .filter({ hasText: scratchRemoteName })
-    .getByRole('button', { name: 'Sync checkout', exact: true })
+    .getByRole('button', { name: `Actions for ${scratchRemoteName}`, exact: true })
     .click()
+  await page.getByRole('menuitem', { name: 'Sync checkout', exact: true }).click()
   const dialog = syncDialog(page)
   await expect(dialog).toBeVisible()
   await dialog.getByLabel(`Checkout on ${scratchRemoteName}`).fill(repositories.checkout)
