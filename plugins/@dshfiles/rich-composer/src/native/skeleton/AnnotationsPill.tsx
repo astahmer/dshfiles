@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@dshfiles/plugin-ui/components/ui/sheet'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { MessageSquareTextIcon, PencilIcon, Trash2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import type { DraftAnnotation, DraftAnnotations } from '../input/draft-annotations.ts'
@@ -31,6 +32,7 @@ const AnnotationList = (props: {
   readonly annotations: DraftAnnotations
   readonly onReveal: (annotation: DraftAnnotation) => void
   readonly t: Translate
+  readonly phone: boolean
 }): ReactNode => {
   const { list, annotations, t } = props
   const [editing, setEditing] = useState<{ readonly id: number; readonly comment: string } | null>(null)
@@ -80,7 +82,12 @@ const AnnotationList = (props: {
                 onKeyDown={onEditKey}
                 onBlur={save}
               />
-            ) : annotation.comment === '' ? null : (
+            ) : null}
+            {editing?.id === annotation.id && props.phone ? (
+              <Button type="button" className="dshx:min-h-11 dshx:self-end" data-annotation-done="" onMouseDown={keepEditorFocus} onClick={save}>
+                {t('annotation.done')}
+              </Button>
+            ) : editing?.id === annotation.id ? null : annotation.comment === '' ? null : (
               <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
                 <span className="dshx:text-xs dshx:text-muted-foreground">{t('annotation.comment')}</span>
                 <span className="dshx:text-sm dshx:whitespace-pre-wrap dshx:wrap-anywhere dshx:text-foreground">{annotation.comment}</span>
@@ -130,7 +137,7 @@ export const AnnotationsPill = ({ annotations, t }: { readonly annotations: Draf
     window.dispatchEvent(new CustomEvent(REVEAL_EVENT, { detail: new URLSearchParams({ text: annotation.text, source: annotation.source }).toString() }))
   }
   const label = list.length === 1 ? t('annotation.one') : t('annotation.many', { count: list.length })
-  const body = <AnnotationList list={list} annotations={annotations} onReveal={reveal} t={t} />
+  const body = <AnnotationList list={list} annotations={annotations} onReveal={reveal} t={t} phone={phone} />
   const chip = (
     <button
       type="button"

@@ -33,6 +33,7 @@ export const zh = {
   'annotation.selected': '选中的文本：',
   'annotation.comment': '你的评论：',
   'annotation.edit': '编辑评论',
+  'annotation.done': '完成',
   'annotation.remove': '删除标注',
   'annotation.reveal': '在对话中显示',
   'annotation.placeholder': '添加评论，Enter 保存',
@@ -474,6 +475,7 @@ export const en = {
   'annotation.selected': 'Selected text',
   'annotation.comment': 'Your comment',
   'annotation.edit': 'Edit comment',
+  'annotation.done': 'Done',
   'annotation.remove': 'Delete annotation',
   'annotation.reveal': 'Show in thread',
   'annotation.placeholder': 'Add a comment, Enter to save',
@@ -890,7 +892,7 @@ export const en = {
 
 /** dshfiles keys upstream has no translation for: the languages it added in 0.2.2 show them in English. */
 const DSHFILES_KEYS = [
-  'annotation.clear', 'annotation.comment', 'annotation.edit', 'annotation.many',
+  'annotation.clear', 'annotation.comment', 'annotation.done', 'annotation.edit', 'annotation.many',
   'annotation.one', 'annotation.placeholder', 'annotation.remove', 'annotation.reveal',
   'annotation.selected', 'hero.headlineProject', 'hero.resume', 'hero.resumeAria',
   'hero.suggestions', 'input.send.keepDraft', 'input.send.newThread', 'input.send.whileRunning',
