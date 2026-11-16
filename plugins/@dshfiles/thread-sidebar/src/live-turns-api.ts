@@ -3,7 +3,7 @@ import * as Schema from 'effect/Schema'
 import { SchemaHelpers } from './schema-helpers.js'
 
 /**
- * The running turns this Host observes: start time and current step, for the thread list's live activity line. `now`
+ * The running turns this Host observes: start time, current step, and whether the turn waits for the user's answer, for the thread list's live activity line and the thread header's status. `now`
  * is the Host clock at the read, so a browser with a skewed clock still counts elapsed time correctly. Presentation
  * only, so no agent tool: `thread_list` already says which threads run.
  */
@@ -21,6 +21,8 @@ export const threadSidebarLiveTurnsApi = defineApi({
               sessionId: Schema.String,
               startedAt: Schema.Number,
               step: Schema.NullOr(Schema.String),
+              /** Present (true) only while the turn waits for the user's answer. */
+              needsYou: Schema.optionalKey(Schema.Literal(true)),
             }),
           ),
           now: Schema.Number,

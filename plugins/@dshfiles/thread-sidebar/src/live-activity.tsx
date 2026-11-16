@@ -17,6 +17,8 @@ export interface LiveTurnView {
   /** Browser clock, epoch ms; undefined when neither the Host nor this tab saw the turn start. */
   readonly startedAt: number | undefined
   readonly step: string | null
+  /** The turn waits for the user's answer: Needs you, not Working. */
+  readonly needsYou?: boolean
 }
 
 const LIVE_TURNS_POLL_MS = 3_000
@@ -133,6 +135,7 @@ const stabilize = (previous: ReadonlyMap<string, LiveTurnView>, next: ReadonlyMa
     const same =
       before !== undefined &&
       before.step === turn.step &&
+      (before.needsYou === true) === (turn.needsYou === true) &&
       (before.startedAt === turn.startedAt || Math.abs((before.startedAt ?? 0) - (turn.startedAt ?? 0)) < 1000)
     merged.set(id, same ? before : turn)
     if (!same) changed = true
@@ -186,7 +189,12 @@ export const useLiveTurns = (runningIds: readonly string[], listReady: boolean):
     const next = new Map<string, LiveTurnView>()
     for (const id of runningIds) {
       const turn = host.get(id)
-      next.set(id, turn === undefined ? { startedAt: seen.get(id) ?? undefined, step: null } : { startedAt: turn.startedAt + skew, step: turn.step })
+      next.set(
+        id,
+        turn === undefined
+          ? { startedAt: seen.get(id) ?? undefined, step: null }
+          : { startedAt: turn.startedAt + skew, step: turn.step, ...(turn.needsYou === true && { needsYou: true }) },
+      )
     }
     previous.current = stabilize(previous.current, next)
     return previous.current

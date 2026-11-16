@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useWorkingTabTitle } from './header-live-activity.js'
+import { HeaderLiveSignal, useWorkingTabTitle } from './header-live-activity.js'
 import { LiveActivityLine, LiveActivityModel, type LiveTurnView } from './live-activity.js'
 
 const roots: Root[] = []
@@ -34,6 +34,33 @@ describe('live activity line', () => {
     expect(LiveActivityModel.formatElapsed(9_400)).toBe('9s')
     expect(LiveActivityModel.formatElapsed(72_000)).toBe('1m 12s')
     expect(LiveActivityModel.formatElapsed(3_840_000)).toBe('1h 04m')
+  })
+
+  const labels = { working: 'Working', needsYou: 'Needs you' }
+
+  it('shows the Needs-you glyph, not the working spinner, while the thread waits for your answer', async () => {
+    const container = await render(
+      <HeaderLiveSignal labels={labels} turn={{ startedAt: Date.now() - 72_000, step: 'Asking you a question', needsYou: true }} />,
+    )
+    const glyph = container.querySelector('[data-slot="status-glyph"]')
+    expect(glyph?.getAttribute('data-status')).toBe('needs-you')
+    expect(glyph?.getAttribute('aria-label')).toBe('Needs you')
+    expect(container.querySelector('[data-glyph-spinner]')).toBeNull()
+    expect(container.querySelector('[data-live-step]')?.textContent).toBe('Needs you')
+    // A narrow pane hides the label and the clock (both marked for it); the glyph is neither, so the diamond stays.
+    expect(glyph?.closest('[data-live-step], [data-live-elapsed]')).toBeNull()
+  })
+
+  it('keeps the spinner and the step for a turn that works without you', async () => {
+    const container = await render(<HeaderLiveSignal labels={labels} turn={{ startedAt: Date.now() - 72_000, step: 'Running pnpm test' }} />)
+    expect(container.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
+    expect(container.querySelector('[data-live-step]')?.textContent).toContain('Running pnpm test')
+  })
+
+  it('treats a change of the waiting state as a change of the turn', () => {
+    const first: ReadonlyMap<string, LiveTurnView> = new Map([['a', { startedAt: 1_000, step: 'Asking you a question' }]])
+    const asking = LiveActivityModel.stabilize(first, new Map([['a', { startedAt: 1_000, step: 'Asking you a question', needsYou: true }]]))
+    expect(asking.get('a')?.needsYou).toBe(true)
   })
 
   it('keeps an unchanged turn object, so memoised rows skip a poll', () => {
