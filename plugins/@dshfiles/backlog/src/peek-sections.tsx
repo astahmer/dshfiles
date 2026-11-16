@@ -33,7 +33,7 @@ const inputClass =
 
 const Heading = (props: { readonly label: string; readonly children?: JSX.Element | null }): JSX.Element => (
   <div className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-2">
-    <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.label}</h4>
+    <h4 className="dshx:text-sm dshx:font-semibold dshx:text-foreground">{props.label}</h4>
     {props.children}
   </div>
 )

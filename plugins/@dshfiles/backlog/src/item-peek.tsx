@@ -158,7 +158,7 @@ const eventIcons = {
 const Section = (props: { readonly title: string; readonly action?: ReactNode; readonly children: ReactNode }): JSX.Element => (
   <section className="dshx:flex dshx:flex-col dshx:gap-2">
     <div className="dshx:flex dshx:h-6 dshx:items-center dshx:justify-between">
-      <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.title}</h4>
+      <h4 className="dshx:text-sm dshx:font-semibold dshx:text-foreground">{props.title}</h4>
       {props.action}
     </div>
     {props.children}
