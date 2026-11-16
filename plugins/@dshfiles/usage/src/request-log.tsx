@@ -13,7 +13,8 @@ import { useState } from 'react'
 import { usageApi, type RequestQuery, type RequestView } from './api.js'
 import type { RequestPurpose, RequestStatus } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { REQUEST_STATUS_GLYPH } from './request-status.js'
 
 const PAGE_SIZE = 200
 
@@ -25,12 +26,6 @@ const STATUS_CHIPS: readonly { readonly value: RequestStatus | 'all'; readonly l
 ]
 
 const STATUS_LABEL = { ok: 'OK', aborted: 'Aborted', failed: 'Failed', unknown: 'Unknown' } satisfies Readonly<Record<RequestStatus, string>>
-const STATUS_DOT = {
-  ok: 'dshx:bg-success',
-  aborted: 'dshx:bg-warning',
-  failed: 'dshx:bg-destructive',
-  unknown: 'dshx:bg-muted-foreground',
-} satisfies Readonly<Record<RequestStatus, string>>
 
 type SortColumn = RequestQuery['sort']
 
@@ -210,7 +205,7 @@ export const RequestLog = (props: {
                 <TableCell>
                   <span className="dshx:flex dshx:flex-col">
                     <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-                      <StatusDot className={STATUS_DOT[row.status]} />
+                      <StatusGlyph decorative status={REQUEST_STATUS_GLYPH[row.status]} />
                       {STATUS_LABEL[row.status]}
                     </span>
                     <span className="dshx:text-2xs dshx:text-muted-foreground">{row.errorCode ?? row.stopReason ?? ''}</span>
