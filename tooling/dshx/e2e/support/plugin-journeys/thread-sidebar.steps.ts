@@ -109,9 +109,31 @@ const openSettledThreadRowMenu = async (page: Page, row: Locator, item: string):
 const openThreadSubmenu = async (page: Page, name: 'Open in' | 'Copy' | 'More'): Promise<void> => {
   const trigger = page.getByRole('menuitem', { name, exact: true })
   if ((await trigger.getAttribute('aria-expanded', { timeout: 2_000 })) !== 'true') await trigger.click({ timeout: 2_000 })
+  await walkPointerTo(page, page.getByRole('menu', { name, exact: true }).getByRole('menuitem').first())
+}
+/**
+ * A submenu stays open only while the pointer travels towards it: the menu reads the direction from the pointer's
+ * moves. A test pointer jumps, which reads as leaving when the submenu opens on the left (the header menu, at the
+ * window's right edge), so the pointer is walked to the row the way a hand moves it.
+ */
+const walkPointerTo = async (page: Page, target: Locator): Promise<void> => {
+  const box = await target.boundingBox({ timeout: 2_000 })
+  if (box !== null) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 })
+}
+/**
+ * Run a row of a submenu that opened from another submenu's row (More › Mute thread › Until tomorrow morning) with the
+ * keyboard, as Enter does for a user: a row that opens a further submenu opens it, any other row runs. A second level
+ * may open on either side of the first, and a jumping test pointer then reads as leaving both.
+ */
+const clickNestedMenuItem = async (page: Page, name: string): Promise<void> => {
+  const item = page.getByRole('menuitem', { name, exact: true })
+  await item.focus()
+  await page.keyboard.press('Enter')
 }
 // Pin, Done and Snooze lead the thread menu: top-level items, not a submenu.
 const chooseRowStatusAction = async (page: Page, action: string): Promise<void> => {
+  // Archive closes a thread for good, so it is the last row of More; Pin, Done and Snooze are at the top.
+  if (action === 'Archive') await openThreadSubmenu(page, 'More')
   await page.getByRole('menuitem', { name: action, exact: true }).click()
 }
 
@@ -491,7 +513,8 @@ Then(
     const journey = phoneSubmenuJourneys.get(page)
     if (journey === undefined) throw new Error('No phone submenu journey was prepared.')
     const row = threadRow(page, journey.targetThreadId)
-    const submenu = page.locator('[data-slot="context-menu-sub-content"]')
+    // Notify and Mute open from More, itself a submenu: the one under test is the innermost.
+    const submenu = page.locator('[data-slot="context-menu-sub-content"]').last()
     // Status grouping remounts a row as its turn settles, which can close a menu opened in between: reopen until it holds.
     const openRowSubmenu = async (trigger: RegExp): Promise<void> => {
       await expect(async () => {
@@ -500,6 +523,7 @@ Then(
           if (!(await page.getByRole('menuitem', { name: 'More', exact: true }).isVisible())) await row.getByTestId('thread-row-menu').click({ timeout: 2_000 })
           await openThreadSubmenu(page, 'More')
         }
+        await walkPointerTo(page, subTrigger)
         await subTrigger.click({ timeout: 2_000 })
         await expect(submenu).toBeVisible({ timeout: 2_000 })
       }).toPass({ timeout: 30_000 })
@@ -660,7 +684,7 @@ Then('the continuation opens in that project with the conversation and the origi
   if (journey === undefined) throw new Error('No thread was continued in another project.')
   await recordAssertion(page, 'thread-sidebar-continuation-notice', async () => {
     await expect(page.getByText(/^The thread continues in the new project/).first()).toHaveText(
-      'The thread continues in the new project; the original is settled.',
+      'The thread continues in the new project; the original is done.',
       { timeout: 20_000 },
     )
   })
@@ -973,7 +997,7 @@ let settledArchiveThreadId: string | null = null
 /** One dropdown per delay setting; the group's accessible name is the label above its trigger. */
 const selectSettledArchiveDelay = async (page: Page, value: string): Promise<void> => {
   await openSidebarSettings(page)
-  const delayGroup = sidebarSettings(page).getByRole('group', { name: 'Archive settled threads' })
+  const delayGroup = sidebarSettings(page).getByRole('group', { name: 'Archive done threads' })
   await delayGroup.getByRole('button').click()
   await page.getByRole('menuitemradio', { name: value, exact: true }).click()
   await expect(delayGroup.getByRole('button', { name: value, exact: true })).toBeVisible()
@@ -1278,8 +1302,8 @@ When('a thread is snoozed until tomorrow morning from its sidebar row', async ({
   // Mute is a row menu entry (it is not among the default hover actions).
   await openThreadRowMenu(targetRow)
   await openThreadSubmenu(page, 'More')
-  await page.getByRole('menuitem', { name: 'Mute thread', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Until tomorrow morning', exact: true }).click()
+  await clickNestedMenuItem(page, 'Mute thread')
+  await clickNestedMenuItem(page, 'Until tomorrow morning')
   const marker = targetRow.getByRole('img', { name: 'Muted', exact: true })
   await expect(marker).toBeVisible()
   // A 200px sidebar row leads with its project mark (polish pass b:r4et), so on hover the row's action strip can sit
@@ -1318,8 +1342,8 @@ Then('unmuting it from the session header clears the marker', async ({ page }: {
   const threadActions = page.getByRole('group', { name: 'Thread actions', exact: true })
   await threadActions.getByRole('button', { name: 'More thread actions', exact: true }).click()
   await openThreadSubmenu(page, 'More')
-  await page.getByRole('menuitem', { name: 'Muted', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Unmute', exact: true }).click()
+  await clickNestedMenuItem(page, 'Muted')
+  await clickNestedMenuItem(page, 'Unmute')
   await recordAssertion(page, 'thread-sidebar-unmute-clears-marker', async () => {
     await expect(threadSidebar(page).getByTestId('thread-sidebar-muted-marker')).toHaveCount(0)
     await expect(threadRow(page, mutedThreadId ?? '')).toHaveCount(0)
@@ -2678,6 +2702,7 @@ Then('both menus list the referencing thread under Referenced by', async ({ page
     await openThreadSubmenu(page, 'More')
     const trigger = page.getByRole('menuitem', { name: 'Referenced by', exact: true })
     await expect(trigger).toBeVisible()
+    await walkPointerTo(page, trigger)
     await trigger.hover()
     await expect(referencedByRows(page)).toHaveCount(1, { timeout: 15_000 })
     // One Escape closes the submenu and a second the row menu: a menu left open swallows the next row click.
@@ -2694,6 +2719,7 @@ Then('both menus list the referencing thread under Referenced by', async ({ page
     await openThreadSubmenu(page, 'More')
     const trigger = page.getByRole('menuitem', { name: 'Referenced by', exact: true })
     await expect(trigger).toBeVisible()
+    await walkPointerTo(page, trigger)
     await trigger.hover()
     const row = referencedByRows(page)
     await expect(row).toHaveCount(1, { timeout: 15_000 })
