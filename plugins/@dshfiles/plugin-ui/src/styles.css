@@ -255,8 +255,9 @@
 
   /*
    * Comfortable density on touch (visual refresh phone rules), by pointer and width, never by user agent:
-   * every coarse pointer gets 44px targets and 16px inputs (no Safari zoom on focus); phone-width viewports and
-   * narrow panes (`@max-pane-narrow`) also get the 15/13/12px text steps.
+   * every coarse pointer gets 44px targets and 16px inputs (no Safari zoom on focus); phone-width viewports, a phone
+   * turned sideways (a coarse pointer under 500px tall, lib/phone-shell) and narrow panes (`@max-pane-narrow`) also
+   * get the 15/13/12px text steps.
    */
   @media (pointer: coarse) {
     :root {
@@ -265,7 +266,7 @@
     }
   }
 
-  @media (pointer: coarse) and (max-width: 28rem) {
+  @media (pointer: coarse) and (max-width: 28rem), (pointer: coarse) and (max-height: 500px) {
     :root {
       --dshx-density-text-ui: 15px;
       --dshx-density-text-prose: 15px;
@@ -604,7 +605,7 @@
   }
 
   /* Phone-width text fields are 44pt tall too (comfortable density): a field cannot widen its hit area with ::after. */
-  @media (pointer: coarse) and (max-width: 639.98px) {
+  @media (pointer: coarse) and (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
     :where(input[data-slot='input']:not([type='checkbox'], [type='radio'], [type='range'], [type='hidden'])) {
       min-height: 44px;
     }
@@ -778,7 +779,7 @@ svg [class*='_spinnerArc_'] {
 
 /*
  * Phone: every menu and picker is a bottom sheet (visual refresh T5.2, plan phone rules "Sheets, not popovers").
- * Under the phone shell (`html[data-shell-phone-nav]`, thread-sidebar, < 640px) a kit dropdown or context menu,
+ * Under the phone shell (`html[data-shell-phone-nav]`, thread-sidebar, lib/phone-shell) a kit dropdown or context menu,
  * select, popover or combobox (through its positioning wrapper, the content's parent), and the Host's native menu,
  * leave their anchor and present as a 16px-radius sheet on
  * the bottom edge with a grabber over a dim scrim. Owners keep their contents, keyboard handling and dismissal (a tap
@@ -786,7 +787,7 @@ svg [class*='_spinnerArc_'] {
  * cards stay anchored. While the software keyboard is open the anchored layer stays (a sheet would cover the field the
  * user types in). The composer's own pickers already did this (rich-composer, T3.5); this is the same rule for all.
  */
-@media (max-width: 639.98px) {
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   html[data-shell-phone-nav]:not([data-phone-keyboard])
     :where(div):has(
       > [data-slot='dropdown-menu-content'],

@@ -1,7 +1,8 @@
+import { PHONE_SHELL_QUERY } from '../lib/phone-shell.js'
 import { SheetSnap, type SheetDragSample, type SheetSnapLayout, type SheetSnapPoint } from '../lib/sheet-snap.js'
 
 /** The phone rule under which menus, pickers and popovers present as bottom sheets (styles.css). */
-const PHONE_QUERY = '(max-width: 639.98px)'
+const PHONE_QUERY = PHONE_SHELL_QUERY
 /**
  * Elements that may be a bottom sheet: an explicit `data-dshx-sheet`, or a kit/Host layer the phone sheet rules
  * restyle (styles.css, rich-composer). Only a candidate that draws the grabber (`::before`) is one right now.
