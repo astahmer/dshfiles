@@ -47,15 +47,6 @@ describe('annotatePlacement', () => {
     expect(placed.left + 65).toBeLessThanOrEqual(390)
   })
 
-  it('steps under the touch Quote action instead of covering it, or above it without room below', () => {
-    const quote = { left: 110, top: 372, right: 210, bottom: 416 }
-    const placed = annotatePlacement({ selection, end, windowWidth: 390, viewport: phone, touch: true, buttonWidth: 130, avoid: quote })
-    expect(placed.top).toBe(quote.bottom + 8)
-    const short = { offsetLeft: 0, offsetTop: 0, width: 390, height: 440 }
-    const squeezed = annotatePlacement({ selection, end, windowWidth: 390, viewport: short, touch: true, buttonWidth: 130, avoid: quote })
-    expect(squeezed.top + 44).toBeLessThanOrEqual(quote.top)
-  })
-
   it('follows a pinch-zoomed visual viewport', () => {
     const zoomed = { offsetLeft: 200, offsetTop: 400, width: 195, height: 422 }
     const placed = annotatePlacement({ selection, end, windowWidth: 390, viewport: zoomed, touch: true, buttonWidth: 130 })

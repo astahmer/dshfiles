@@ -378,6 +378,9 @@ export function ChatView({
   const interactionSurfaceRef = useRef<HTMLDivElement>(null)
   const interactionIds = useInteractionIds(ids => ids)
   const textInteraction = useTextInteraction(scroll.columnRef, interactionSurfaceRef, dispatchInteraction, interactionIds)
+  // dshfiles: on touch Annotate joins the shown selection action (Quote text) in its row instead of floating apart.
+  const [interactionSurface, setInteractionSurface] = useState<HTMLDivElement | null>(null)
+  useLayoutEffect(() => { setInteractionSurface(interactionSurfaceRef.current) }, [])
   const flowContext = useMemo<ChatFlowHookContext>(() => ({ motion: scroll.motion }), [scroll.motion])
 
   // dshfiles (productivity pass Q4): long-thread tools — find, the typed turn map, the Turns sheet, Since you left.
@@ -558,7 +561,8 @@ export function ChatView({
 
   return (
     <div ref={frameRef} className={css.frame}>
-      <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t} />
+      <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t}
+        actionRow={textInteraction.active?.trigger === 'selection' ? interactionSurface : null} />
       {scroll.initialized && (
         <TurnNavigator
           items={shownRailItems}

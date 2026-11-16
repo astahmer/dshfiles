@@ -13,19 +13,20 @@ const REVEAL_EVENT = 'dshfiles:reveal-annotation'
 /**
  * Floats an Annotate action over a finished assistant selection and adds it to the composer's annotation pill;
  * answers the pill's reveal request by scrolling to the quoted paragraph and flashing it.
- * @param props - the session, the chat scroll container, and the locale seat.
+ * @param props - the session, the chat scroll container, the locale seat, and the shown selection action row.
  * @returns the floating action, or nothing while no assistant text is selected.
  */
-export const AnnotateSelection = ({ sessionId, containerRef, t }: {
+export const AnnotateSelection = ({ sessionId, containerRef, t, actionRow }: {
   readonly sessionId: string
   readonly containerRef: RefObject<HTMLElement | null>
   readonly t: ChatViewSlotProps['t']
+  /** The chat's selection action surface while it shows an action (Quote text); on touch Annotate joins its row. */
+  readonly actionRow: HTMLElement | null
 }) => {
   const composer = useContract(Composer)
   const [selected, setSelected] = useState<AssistantSelection | undefined>(undefined)
   const [touch, setTouch] = useState(false)
   const [buttonWidth, setButtonWidth] = useState(0)
-  const [quoteAction, setQuoteAction] = useState<DOMRect | undefined>(undefined)
   const buttonRef = useRef<HTMLButtonElement>(null)
   // A press on this button or on the Quote action beside it freezes the button until the click lands: otherwise
   // it vanishes (collapsed selection) or moves (Quote dismissed) under the finger, or re-renders over Quote.
@@ -109,24 +110,14 @@ export const AnnotateSelection = ({ sessionId, containerRef, t }: {
     setButtonWidth(buttonRef.current?.offsetWidth ?? 0)
   }, [selected, touch])
 
-  // On touch the chat's text-interaction surface (Quote text) also sits under the selection end; follow it.
-  useEffect(() => {
-    pressed.current = false
-    const surface = containerRef.current?.querySelector<HTMLElement>('[data-text-interaction-surface]') ?? null
-    if (selected === undefined || !touch || surface === null) { setQuoteAction(undefined); return }
-    const read = (): void => {
-      if (pressed.current) return
-      setQuoteAction(surface.style.visibility === 'visible' && surface.hasAttribute('data-touch') ? surface.getBoundingClientRect() : undefined)
-    }
-    read()
-    const observer = new MutationObserver(read)
-    observer.observe(surface, { attributes: true, attributeFilter: ['style', 'data-touch'] })
-    return () => observer.disconnect()
-  }, [containerRef, selected, touch])
+  useEffect(() => { pressed.current = false }, [selected])
 
   if (selected === undefined || composer.status !== 'active') return null
+  // On touch the two actions placed apart stacked offset and overlapped; in one row the surface places both at
+  // once. Desktop keeps Annotate's own placement.
+  const inRow = touch && actionRow !== null
   const viewport = window.visualViewport ?? { offsetLeft: 0, offsetTop: 0, width: window.innerWidth, height: window.innerHeight }
-  const placement = annotatePlacement({ selection: selected.rect, end: selected.end, windowWidth: window.innerWidth, viewport, touch, buttonWidth, avoid: quoteAction })
+  const placement = annotatePlacement({ selection: selected.rect, end: selected.end, windowWidth: window.innerWidth, viewport, touch, buttonWidth })
   const add = (): void => {
     if (!composer.value.attach({ sessionId, attachment: { kind: 'annotation', text: selected.text, source: selected.source } })) return
     window.getSelection()?.removeAllRanges()
@@ -138,9 +129,9 @@ export const AnnotateSelection = ({ sessionId, containerRef, t }: {
       type="button"
       ref={buttonRef}
       data-annotate-selection
-      data-side={placement.side}
+      data-side={inRow ? 'row' : placement.side}
       className={css.annotate}
-      style={{ left: placement.left, top: placement.top }}
+      style={inRow ? undefined : { left: placement.left, top: placement.top }}
       onPointerDown={event => event.preventDefault()}
       onPointerCancel={() => { pressed.current = false }}
       onMouseDown={event => event.preventDefault()}
@@ -152,6 +143,6 @@ export const AnnotateSelection = ({ sessionId, containerRef, t }: {
       </svg>
       {t('message.annotate')}
     </button>,
-    document.body,
+    inRow ? actionRow : document.body,
   )
 }
