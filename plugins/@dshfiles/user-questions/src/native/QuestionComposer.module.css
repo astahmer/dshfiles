@@ -712,3 +712,21 @@
     inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
   }
 }
+
+/* Owned delta (unslop M3): the answers of a question with a rich body were below the fold of the card's own scroll,
+   under a pinned Skip and Submit (a table and a chart fill the seat on a phone, and on a desktop too). The answers now
+   stick to the bottom of that scroll seat, on the card's surface, and the body scrolls above them. Their height is
+   capped so a long list still leaves the body in view. */
+.cardRich .options {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  flex-shrink: 0;
+  max-height: min(46vh, 420px);
+  margin-top: 0;
+  padding-top: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-specific-input-major);
+}
