@@ -117,7 +117,7 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.projectColorPalette)
       .description('Choose the accessible color family used for project labels.'),
     threadRowTitle: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowTitle).description('Show the thread title.'),
-    threadRowMachine: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowMachine).description('Show the machine the DSH Host runs on.'),
+    threadRowMachine: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowMachine).description('Show the machine each thread runs on.'),
     threadRowPath: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowPath).description('Show the full working directory path.'),
     threadRowTime: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowTime).description('Show the last activity time.'),
     threadRowStatusDot: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot).description('Show the running / unread status dot.'),
@@ -148,7 +148,7 @@ export const threadSidebarSettings = defineSettings({
       .description('Semantic color used for each attention status dot and label.'),
     includeSubagentAttention: Schema.boolean()
       .default(DEFAULT_PREFERENCES.includeSubagentAttention)
-      .description('Include child session attention in groups, thread-row labels, and desktop alerts.'),
+      .description('Include subagent threads in attention groups, thread-row labels, and desktop alerts.'),
     desktopNotificationsEnabled: Schema.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled).hidden(),
     notificationCategories: notificationCategories.hidden(),
     notificationPlacement: Schema.union(THREAD_NOTIFICATION_PLACEMENTS).default(DEFAULT_PREFERENCES.notificationPlacement).hidden(),
@@ -170,7 +170,7 @@ export const threadSidebarSettings = defineSettings({
     autoRestartWhenIdle: Schema.boolean()
       .default(false)
       .description(
-        'Off by default: it restarts DSH without anyone asking. On: restart DSH by itself to apply a plugin or profile update that needs a Host restart, once no turn, subagent, background job or open question has run for the quiet period. A 30 s notice with Postpone comes first. Needs DSH started through the supervised launcher (scripts/dsh-launcher); otherwise the notice shows that command and nothing restarts.',
+        'Restart DSH by itself when idle to apply updates. A 30 s notice with Postpone comes first; it needs DSH started through the supervised launcher.',
       ),
     autoRestartQuietSeconds: Schema.natural()
       .min(30)
@@ -226,7 +226,7 @@ export const threadSidebarSettings = defineSettings({
       .min(15)
       .max(10080)
       .default(DEFAULT_PREFERENCES.idleMinutes)
-      .description('Idle threshold in minutes before threads move to Inactive; marking idle threads done uses the same threshold.'),
+      .description('Minutes without activity before a thread counts as idle; marking idle threads done uses the same threshold.'),
     subagentSettleHours: Schema.natural()
       .max(720)
       .default(DEFAULT_PREFERENCES.subagentSettleHours)

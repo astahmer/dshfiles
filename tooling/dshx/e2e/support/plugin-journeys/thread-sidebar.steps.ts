@@ -210,10 +210,10 @@ const openSidebarSettings = async (page: Page): Promise<void> => {
 const statusFilterLabels: readonly string[] = [
   'All threads',
   'Working',
-  'Needs attention',
+  'Needs you',
   'Unread',
   'Approval needed',
-  'Input needed',
+  'Answer needed',
   'Turn finished',
   'Needs resume',
   'Interrupted',
@@ -1441,10 +1441,10 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
 
 When('auto-settle is enabled with a new idle threshold and scan interval', async ({ page }: { page: Page }) => {
   await openSidebarSettings(page)
-  const autoSettle = sidebarSettings(page).getByRole('checkbox', { name: 'Mark inactive threads done' })
+  const autoSettle = sidebarSettings(page).getByRole('checkbox', { name: 'Mark idle threads done' })
   await expect(autoSettle).not.toBeChecked()
   await autoSettle.click()
-  await page.getByLabel('Move to inactive after (minutes)').fill('45')
+  await page.getByLabel('Move to Idle after (minutes)').fill('45')
   await page.getByLabel('Check every (minutes)').fill('5')
   await page.reload()
   await expect(threadSidebar(page)).toBeVisible()
@@ -1453,8 +1453,8 @@ When('auto-settle is enabled with a new idle threshold and scan interval', async
 
 Then('the policy settings survive a browser reload', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-idle-policy-settings-survive-reload', async () => {
-    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Mark inactive threads done' })).toBeChecked()
-    await expect(page.getByLabel('Move to inactive after (minutes)')).toHaveValue('45')
+    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Mark idle threads done' })).toBeChecked()
+    await expect(page.getByLabel('Move to Idle after (minutes)')).toHaveValue('45')
     await expect(page.getByLabel('Check every (minutes)')).toHaveValue('5')
   })
   await finishJourneyAssertions(page)
@@ -1626,7 +1626,7 @@ When('auto-settle is enabled for one thread while global auto-settle stays off',
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar auto archive override' })
   await expect(targetRow).toHaveCount(1)
   await openSidebarSettings(page)
-  await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Mark inactive threads done' })).not.toBeChecked()
+  await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Mark idle threads done' })).not.toBeChecked()
   await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
   await openThreadRowMenu(targetRow)
   await openThreadSubmenu(page, 'More')
@@ -1643,7 +1643,7 @@ Then('the per-thread override survives reload without changing the global settin
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar auto archive override' })
   await openSidebarSettings(page)
   await recordAssertion(page, 'thread-sidebar-global-auto-settle-remains-off', async () => {
-    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Mark inactive threads done' })).not.toBeChecked()
+    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Mark idle threads done' })).not.toBeChecked()
   })
   await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
   await openThreadRowMenu(targetRow)
@@ -2959,8 +2959,8 @@ Then('Working selects only running threads and Done also selects threads that ne
   await viewManager.getByRole('button', { name: 'Edit view Done', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-shipped-done-view-includes-usage-limits', async () => {
     await expect(viewManager.getByRole('checkbox', { name: 'Not running', exact: true })).toBeChecked()
-    await expect(viewManager.getByRole('checkbox', { name: 'Needs attention', exact: true })).toBeChecked()
-    await expect(viewManager.getByRole('checkbox', { name: 'Inactive', exact: true })).not.toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Needs you', exact: true })).toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Idle', exact: true })).not.toBeChecked()
     await expect(viewManager.getByRole('checkbox', { name: 'Interrupted', exact: true })).not.toBeChecked()
     await expect(viewManager.getByRole('checkbox', { name: 'Needs resume', exact: true })).not.toBeChecked()
     await expect(viewManager.getByRole('checkbox', { name: 'Working', exact: true })).not.toBeChecked()
