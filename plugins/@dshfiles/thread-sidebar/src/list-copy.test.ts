@@ -15,3 +15,8 @@ test('an unsent draft is a new thread, not a chat', () => {
   // Glossary: thread, never chat. The row of the open blank draft read "New chat".
   expect(english).toContain("threadSidebarNewChat: 'New thread',")
 })
+
+test('the restart notice says what to do next when DSH cannot restart itself', () => {
+  // "Restart DSH yourself to load them." named no step: the next action is in the terminal that runs DSH.
+  expect(english).toMatch(/threadSidebarUpdatesManual: '[^']*stop DSH in the terminal[^']*start it again[^']*',/u)
+})

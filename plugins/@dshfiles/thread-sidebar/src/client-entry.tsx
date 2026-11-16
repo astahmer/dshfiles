@@ -26,7 +26,7 @@ import { DESTINATION_GO_KEYS, GO_DESTINATION_EVENT, SHOW_DESTINATION_EVENT } fro
 import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
 import { WorkingStatusItem, WorkingStatusModel } from './working-status-item.js'
 import { RestartStatusItem } from './restart-status-item.js'
-import { openUpdateDshSettings, UPDATE_DSH_SECTION_ID, UpdateDshSection, UpdateStatusItem } from './update-dsh.js'
+import { UPDATE_DSH_SECTION_ID, UpdateDshSection, UpdateStatusItem } from './update-dsh.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -333,6 +333,8 @@ export default defineClient({
       const RestartItem = (props: StatusItemProps): JSX.Element | null => (
         <RestartStatusItem
           {...props}
+          // Update DSH (E3) shares this seat: an update and the restart that loads it are one flow, so one item.
+          fallback={<UpdateStatusItem {...props} />}
           text={{
             pending: count => (count === 1 ? translate('threadSidebarRestartPendingOne') : translate('threadSidebarRestartPendingCount', { count })),
             applied: translate('threadSidebarUpdatesApplied'),
@@ -359,20 +361,6 @@ export default defineClient({
             component: plugin.bind(RestartItem),
           }),
         'thread-sidebar: restart status item',
-      )
-      // Update DSH (E3): the section and strip item live beside the restart verbs they end with; the Host half is
-      // jj-integration's checkout sync, so this plugin only reads and calls it.
-      ctx.effect(
-        () =>
-          plugin.add(StatusItems, {
-            id: '@dshfiles/thread-sidebar.update-dsh',
-            side: 'global',
-            order: 85,
-            label: 'Update',
-            component: plugin.bind(UpdateStatusItem),
-            open: openUpdateDshSettings,
-          }),
-        'thread-sidebar: update status item',
       )
     }
     const skillMentions = createSkillMentionSource({
