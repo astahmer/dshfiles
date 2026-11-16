@@ -184,7 +184,7 @@ export const threadSidebarSettings = defineSettings({
       ),
     applyActionsToChildThreads: Schema.boolean()
       .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
-      .description('Apply manual pin, park, archive, and restore actions to all child threads.'),
+      .description('Apply manual pin, snooze, archive, and restore actions to all child threads.'),
     maxChildren: Schema.natural()
       .min(1)
       .max(50)
@@ -208,31 +208,31 @@ export const threadSidebarSettings = defineSettings({
       .description('How long the manual archive undo notice stays visible, in seconds.'),
     autoSettleEnabled: Schema.boolean()
       .default(DEFAULT_PREFERENCES.autoSettleEnabled)
-      .description('Settle idle threads automatically: they stay listed and openable, but run no model step until unsettled.'),
+      .description('Mark idle threads done automatically: they stay listed and openable, but run nothing until restored.'),
     rebasedThreadSettleDelay: Schema.union(THREAD_DELAYS)
       .default(DEFAULT_PREFERENCES.rebasedThreadSettleDelay)
-      .description('Settle successfully rebased threads immediately or after a delay. Running or waiting threads are never settled.'),
+      .description('Mark landed threads done immediately or after a delay. Running or waiting threads are never marked done.'),
     settledArchiveDelay: Schema.union(THREAD_DELAYS)
       .default(DEFAULT_PREFERENCES.settledArchiveDelay)
-      .description('Archive a settled thread once this delay has passed. Running, waiting, pinned or newly changed threads are never archived.'),
+      .description('Archive a done thread once this delay has passed. Running, waiting, pinned or newly changed threads are never archived.'),
     // Written with the settled ids; the banner and the archive delay read it back.
     settledAt: Schema.dict(Schema.natural()).default({}).hidden(),
     idleMinutes: Schema.natural()
       .min(15)
       .max(10080)
       .default(DEFAULT_PREFERENCES.idleMinutes)
-      .description('Idle threshold in minutes before threads move to Inactive; auto-settle uses the same threshold.'),
+      .description('Idle threshold in minutes before threads move to Inactive; marking idle threads done uses the same threshold.'),
     subagentSettleHours: Schema.natural()
       .max(720)
       .default(DEFAULT_PREFERENCES.subagentSettleHours)
       .description(
-        'Settle a subagent thread idle for this many hours and stop the background jobs it left running. Pinned, opted-out, waiting or running threads stay. 0 turns it off.',
+        'Mark a subagent thread done after this many idle hours and stop the background jobs it left running. Pinned, opted-out, waiting or running threads stay. 0 turns it off.',
       ),
     scanIntervalMinutes: Schema.natural()
       .min(1)
       .max(120)
       .default(DEFAULT_PREFERENCES.scanIntervalMinutes)
-      .description('How often auto-settle checks, in minutes.'),
+      .description('How often idle threads are checked, in minutes.'),
     paletteChord: Schema.union([Schema.const(null), Schema.string()])
       .default(DEFAULT_PREFERENCES.paletteChord)
       .hidden(),

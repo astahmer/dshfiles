@@ -442,12 +442,12 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
 
   settle: Effect.fn('thread actions settle')(function* ({ input, caller }: ThreadActionContext<ThreadArchiveInput>) {
     const sessionId = yield* targetSessionId(input.sessionId, caller)
-    yield* attempt(deps.setSettled(sessionId, true), `Could not settle thread ${sessionId}.`)
+    yield* attempt(deps.setSettled(sessionId, true), `Could not mark thread ${sessionId} done.`)
     return { sessionId }
   }),
 
   unsettle: Effect.fn('thread actions unsettle')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
-    yield* attempt(deps.setSettled(input.sessionId, false), `Could not unsettle thread ${input.sessionId}.`)
+    yield* attempt(deps.setSettled(input.sessionId, false), `Could not restore thread ${input.sessionId} from Done.`)
     return { sessionId: input.sessionId }
   }),
 

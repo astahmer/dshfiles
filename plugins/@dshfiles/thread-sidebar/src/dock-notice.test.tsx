@@ -6,7 +6,7 @@ import { DockNotice } from './dock-notice.js'
 const render = (): string =>
   renderToString(
     <DockNotice
-      label="This thread is settled."
+      label="This thread is done."
       heading="Settled 2h"
       icon={<span aria-hidden>icon</span>}
       meta={<time dateTime="2026-10-19T10:00:00.000Z">Archives in 6d</time>}
@@ -18,7 +18,7 @@ const render = (): string =>
 test('a dock notice is one labelled status strip with its title, dating and actions', () => {
   const html = render()
   assert.match(html, /role="status"/)
-  assert.match(html, /aria-label="This thread is settled\."/)
+  assert.match(html, /aria-label="This thread is done\."/)
   assert.match(html, /Settled 2h/)
   assert.match(html, /Archives in 6d/)
   assert.match(html, /aria-label="Thread actions"/)

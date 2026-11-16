@@ -25,3 +25,28 @@ test('row menu labels: a submenu has a chevron, not an ellipsis too, and no labe
   expect(english).toContain("threadSidebarNotifyOnFinish: 'Notify when finished',")
   expect(english).toContain("threadSidebarOpenPluginInSidePanel: 'Open a view in side panel',")
 })
+
+/** Every quoted value of one locale table, without its key. */
+const values = (table: string): string[] => [...table.matchAll(/^\s+(?:[A-Za-z]+:\s*)?'((?:[^'\\]|\\.)*)',$/gmu)].map(match => match[1] ?? '')
+const chinese = locales.slice(locales.indexOf('const zh'))
+const settings = readFileSync(fileURLToPath(new URL('./settings.ts', import.meta.url)), 'utf8')
+const descriptions = [...settings.matchAll(/\.description\(\s*'((?:[^'\\]|\\.)*)'/gu)].map(match => match[1] ?? '')
+
+test('lifecycle verbs follow the glossary: Done, Restore and Snooze', () => {
+  // Settle, Unsettle and Park were three more words for "get this out of my way" (docs/ade-ux §3: done, Restore, Snooze).
+  expect(english).toContain("threadSidebarSettle: 'Done',")
+  expect(english).toContain("threadSidebarUnsettle: 'Restore',")
+  expect(english).toContain("threadSidebarPark: 'Snooze',")
+  expect(english).toContain("threadSidebarUnpark: 'Unsnooze',")
+  // Mute and Archive are different actions (silence alerts; DSH's own hard close) and keep their names.
+  expect(english).toContain("threadSidebarMute: 'Mute thread',")
+  expect(english).toContain("threadSidebarArchive: 'Archive',")
+})
+
+test('no label, banner or setting text says settle or park', () => {
+  const old = /\b(?:un)?settl(?:e|ed|es|ing)\b|\b(?:un)?park(?:ed|s)?\b/iu
+  expect(values(english).filter(value => old.test(value))).toEqual([])
+  expect(descriptions.filter(value => old.test(value))).toEqual([])
+  // The other locale carries the same rename (沉淀 was Settle, 搁置 was Park).
+  expect(values(chinese).filter(value => /沉淀|搁置|停驻/u.test(value))).toEqual([])
+})

@@ -78,7 +78,7 @@ describe('thread lifecycle slash commands', () => {
     Effect.gen(function* () {
       const settled = yield* Ref.make<ReadonlyArray<string>>([])
       yield* Effect.gen(function* () {
-        expect(yield* run('settle', '')).toEqual({ kind: 'success', text: 'Settled thread session-self.' })
+        expect(yield* run('settle', '')).toEqual({ kind: 'success', text: 'Marked thread session-self done.' })
         expect(yield* Ref.get(settled)).toEqual(['session-self'])
         expect(yield* run('settle', 'extra')).toEqual({ kind: 'error', text: 'Usage: /settle' })
         expect(yield* run('archive', '')).toEqual({ kind: 'success', text: 'Archived thread session-self.' })
