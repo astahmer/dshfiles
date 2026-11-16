@@ -321,7 +321,7 @@
     {
       "id": "cross-thread-question-inbox",
       "title": "List and answer thread questions",
-      "summary": "Root Agents can list timed native questions across Sessions or by id, plus direct-child durable questions, with recommendation, timeout, and answerability metadata. Continued native forms and parent-scoped child questions use their authorized answer tools.",
+      "summary": "Root Agents can list timed native questions across Sessions or by id, plus direct-child durable questions, with recommendation, timeout, and answerability metadata. Native forms that report canAnswer (continued, or still open and held on this Host) and parent-scoped child questions use their authorized answer tools.",
       "reach": [
         "click tab \"Agents\"",
         "click button \"Capabilities\"",
@@ -345,7 +345,7 @@
       "states": ["native-open", "native-continued", "child-pending", "answer-queued", "expired", "unavailable"],
       "failureModes": [
         "A non-root Agent attempts cross-thread native access.",
-        "An open native form remains on the answerer waterfall or its target root is not live.",
+        "An open native form asked before this plugin started is not held and stays on the answerer waterfall, or its target root is not live.",
         "The Session projection is unavailable or a legacy-schema question has no timed projection."
       ],
       "externalDependencies": [],
@@ -450,18 +450,37 @@
     {
       "id": "native-questions-inbox",
       "title": "Thread questions in the Inbox",
-      "summary": "Every native ask_user_question form waiting in a live root thread is a blocking Inbox item about that thread. A continued form with one single-select question is answerable in place with its options, through the same native answer API as answer_thread_question; any other form says to answer it in the thread. The item resolves when the form settles or its thread stops.",
-      "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
+      "summary": "Every native ask_user_question form waiting in a live root thread is a blocking Inbox item about that thread. A form with one single-select question is answerable in place with its options: a continued form through the native answer API, a form still open through the question waterfall request this Host holds for it. Both are the paths answer_thread_question takes. Any other form says to answer it in the thread. The item resolves when the form settles or its thread stops.",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"commands, @ files or threads*\" \"[[once call ask_user_question {\\\"questions\\\": [{\\\"id\\\": \\\"layout\\\", \\\"question\\\": \\\"Which layout should the release notes use?\\\", \\\"options\\\": [{\\\"label\\\": \\\"Grouped by plugin (Recommended)\\\"}, {\\\"label\\\": \\\"One flat list\\\"}]}], \\\"timeout\\\": -1}]]\"",
+        "press Enter",
+        "expect text \"Which layout should the release notes use?\"",
+        "click tab \"Inbox\"",
+        "click button \"Needs you\"",
+        "expect text \"Asks: Which layout should the release notes use?\"",
+        "click button \"One flat list\"",
+        "expect text \"Answered “One flat list”*\""
+      ],
       "reachNarrow": ["click button \"Inbox\"", "expect heading \"Inbox\""],
       "surfaces": ["host", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › agent-questions.native-question",
       "configuration": [],
-      "states": ["open", "continued-answerable", "continued-in-thread", "answered-from-inbox", "answered-elsewhere", "thread-stopped", "inbox-absent"],
+      "states": [
+        "open-answerable",
+        "open-in-thread",
+        "continued-answerable",
+        "continued-in-thread",
+        "answered-from-inbox",
+        "answered-elsewhere",
+        "thread-stopped",
+        "inbox-absent"
+      ],
       "failureModes": [
         "Only forms the native question projection tracks are listed: it records forms whose tool schema carries the timed `timeout` parameter, which the web seed's `tool-ask-user` row selects; a profile on the legacy schema lists none, the same coverage as list_thread_questions.",
-        "A form still open on the native answerer waterfall is refused in place and answered in its thread; the native answer API takes continued forms only.",
+        "A form asked before this plugin started is not held on this Host: it is refused in place and answered in its thread. An answer given here closes the form the browser shows, through the request's own cancellation signal.",
         "Without the inbox (activity-timeline) loaded, questions work exactly as before; the provider reconciles when the inbox announces it is ready.",
         "The native question fork (@dshfiles/user-questions) keeps its upstream no-op Host half; agent-questions already reads the forms Host-side, so it owns this provider."
       ],
@@ -489,6 +508,18 @@
           "kind": "gherkin",
           "id": "agent-questions.native-inbox-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/agent-questions-timed.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-questions.native-inbox-open-form",
+          "file": "plugins/@dshfiles/agent-questions/src/open-question-requests.test.ts",
+          "testName": "lets the Host answer a form that is still open, and retracts the form the browser shows"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-questions.native-inbox-open-draft",
+          "file": "plugins/@dshfiles/agent-questions/src/native-question-attention.test.ts",
+          "testName": "states an open single-select form with its options once the Host holds its request"
         }
       ],
       "telemetry": [
