@@ -80,6 +80,24 @@ describe('settingFields', () => {
   })
 })
 
+describe('advanced settings', () => {
+  it('marks a field the schema folds away, alone or through the object that holds it', () => {
+    const folded = Schema.decodeUnknownSync(jsonValueSchema)(
+      Schemastery.object({
+        enabled: Schemastery.boolean().default(true),
+        chromePath: Schemastery.string().default('').collapse(),
+        tuning: Schemastery.object({ retries: Schemastery.natural().default(3) }).collapse(),
+      }).toJSON(),
+    )
+    const fields = SettingsSchemaModel.settingFields({ schema: folded, secrets: [], text })
+    expect(fields.map(field => [field.key, field.advanced])).toEqual([
+      ['enabled', false],
+      ['chromePath', true],
+      ['retries', true],
+    ])
+  })
+})
+
 describe('labels and units', () => {
   it('humanizes keys and reads units from their suffix', () => {
     expect(SettingsSchemaModel.humanizeKey('archiveUndoDurationSeconds')).toBe('Archive undo duration seconds')

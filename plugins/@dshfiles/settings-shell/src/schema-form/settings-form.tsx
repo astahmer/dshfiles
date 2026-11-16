@@ -7,7 +7,8 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
+import { ChevronRightIcon, PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import * as Schema from 'effect/Schema'
@@ -694,38 +695,74 @@ export const SettingsForm = (props: {
   const user = Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(snapshot.user))
   const base = Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(snapshot.base))
   const focusKey = props.focusPath?.join('.')
+  const isModified = (field: SettingField): boolean => {
+    const outcome = outcomes.get(field.path.join('.'))
+    const edit = outcome?.status === 'saving' ? outcome.edit : undefined
+    return edit === undefined ? user !== undefined && SettingsSchemaModel.hasValueAt(user, field.path) : edit.kind === 'set'
+  }
+  // Search results list exactly what matched: they never fold. Elsewhere the settings a schema folds sit under
+  // "Advanced", which opens by itself when one of them is modified (a changed setting is never out of sight) or
+  // focused from a link, and otherwise stays as the user left it.
+  const folds = props.highlight === undefined
+  const everyday = folds ? props.fields.filter(field => !field.advanced) : props.fields
+  const advanced = folds ? props.fields.filter(field => field.advanced) : []
+  const focusedAdvanced = advanced.some(field => field.path.join('.') === focusKey)
+  const [advancedOpen, setAdvancedOpen] = useState<boolean>()
+  useEffect(() => {
+    if (focusedAdvanced) setAdvancedOpen(true)
+  }, [focusedAdvanced, focusKey])
+  const advancedShown = advancedOpen ?? (focusedAdvanced || advanced.some(isModified))
+  const rows = (fields: readonly SettingField[]): ReactNode =>
+    fields.map((field, index) => {
+      const outcome = outcomes.get(field.path.join('.'))
+      const edit = outcome?.status === 'saving' ? outcome.edit : undefined
+      const group = field.groups.join(' › ')
+      const previous = fields[index - 1]?.groups.join(' › ')
+      return (
+        <Fragment key={field.path.join('.')}>
+          {group !== '' && group !== previous && (
+            <h4 className="dshx:mt-4 dshx:text-xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">{group}</h4>
+          )}
+          <SettingRow
+            disabled={disabled}
+            field={field}
+            focused={focusKey === field.path.join('.')}
+            highlight={props.highlight}
+            modified={isModified(field)}
+            provenance={SettingProvenanceModel.of({ field, value: values, base, user })}
+            refused={outcome?.status === 'refused'}
+            reset={reset}
+            t={props.t}
+            value={displayedValue({ edit, field, values, base })}
+            write={write}
+          />
+        </Fragment>
+      )
+    })
   if (values === undefined) return <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace} />
   return (
     <TooltipProvider delayDuration={KEY_TOOLTIP_DELAY_MS}>
       <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace}>
         {snapshot.status === 'unavailable' && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.unavailable')}</p>}
         {snapshot.status === 'ready' && !snapshot.writable && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.readOnly')}</p>}
-        {props.fields.map((field, index) => {
-          const outcome = outcomes.get(field.path.join('.'))
-          const edit = outcome?.status === 'saving' ? outcome.edit : undefined
-          const group = field.groups.join(' › ')
-          const previous = props.fields[index - 1]?.groups.join(' › ')
-          return (
-            <Fragment key={field.path.join('.')}>
-              {group !== '' && group !== previous && (
-                <h4 className="dshx:mt-4 dshx:text-xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">{group}</h4>
-              )}
-              <SettingRow
-                disabled={disabled}
-                field={field}
-                focused={focusKey === field.path.join('.')}
-                highlight={props.highlight}
-                modified={edit === undefined ? user !== undefined && SettingsSchemaModel.hasValueAt(user, field.path) : edit.kind === 'set'}
-                provenance={SettingProvenanceModel.of({ field, value: values, base, user })}
-                refused={outcome?.status === 'refused'}
-                reset={reset}
-                t={props.t}
-                value={displayedValue({ edit, field, values, base })}
-                write={write}
-              />
-            </Fragment>
-          )
-        })}
+        {rows(everyday)}
+        {advanced.length > 0 && (
+          <Collapsible className="dshx:flex dshx:flex-col" onOpenChange={setAdvancedOpen} open={advancedShown}>
+            <CollapsibleTrigger asChild>
+              <Button
+                className="dshx:-ml-2 dshx:mt-1 dshx:self-start dshx:text-muted-foreground"
+                data-settings-advanced=""
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                <ChevronRightIcon className={cn('dshx:transition-transform', advancedShown && 'dshx:rotate-90')} />
+                {props.t('form.advanced', { count: advanced.length })}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="dshx:flex dshx:flex-col">{rows(advanced)}</CollapsibleContent>
+          </Collapsible>
+        )}
       </div>
     </TooltipProvider>
   )
