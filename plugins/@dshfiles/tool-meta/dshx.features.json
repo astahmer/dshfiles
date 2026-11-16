@@ -4,8 +4,8 @@
   "features": [
     {
       "id": "tool-call-timing",
-      "title": "Start time and duration on every tool call",
-      "summary": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took and when it started (\"1.2 s · 14:02:11\"). Wait calls also show elapsed time and an indeterminate bar, or a timeout countdown bar when an explicit limit is set. Users can interrupt through the existing composer controls.",
+      "title": "How long each tool call took",
+      "summary": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took once it reaches one second (\"1.2 s\"); hovering the duration gives the start time. A card that draws its own header or prints its own duration gets no label. Wait calls also show elapsed time and an indeterminate bar, or a timeout countdown bar when an explicit limit is set. Users can interrupt through the existing composer controls.",
       "reach": ["seed tool-call-thread", "click text \"Worked for*\"", "expect note \"Took*\""],
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
@@ -15,14 +15,14 @@
         {
           "key": "enabled",
           "defaultValue": "true",
-          "constraints": "Boolean; show the timing line on tool cards.",
+          "constraints": "Boolean; show the duration of tool calls that took one second or more.",
           "choices": ["true", "false"],
           "coveredBy": ["tool-meta.settings"]
         },
         {
           "key": "timeFormat",
           "defaultValue": "absolute",
-          "constraints": "How the start time reads: clock time (with the day when not today) or relative to now.",
+          "constraints": "How the start time reads in the hover label: clock time (with the day when not today) or relative to now.",
           "choices": ["absolute", "relative"],
           "coveredBy": ["tool-meta.settings", "tool-meta.timing-unit-relative"]
         }
@@ -30,14 +30,14 @@
       "states": ["preparing", "running", "timed-wait", "untimed-wait", "finished", "start-out-of-window", "hidden"],
       "failureModes": [
         "No call time is shown while the model is still writing the arguments.",
-        "A result whose call fell outside the loaded history shows only when it ended.",
+        "A result whose call fell outside the loaded history has no duration to show.",
         "If DSH stops rendering tool cards through the keyed tool-call renderer and its renderSlot dispatch, the line disappears and the browser console logs one @dshfiles/tool-meta warning; the cards themselves are untouched."
       ],
       "externalDependencies": [],
       "onboarding": {
         "prerequisites": ["account"],
         "firstAction": "Ask the agent for a task that runs a tool.",
-        "doneWhen": "Each tool card shows when it started and how long it took."
+        "doneWhen": "A tool call that took a second or more shows its duration at the right of its row."
       },
       "verification": [
         {
