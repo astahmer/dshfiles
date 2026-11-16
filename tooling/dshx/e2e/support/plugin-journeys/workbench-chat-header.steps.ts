@@ -37,7 +37,11 @@ const more = async (page: Page, body: Locator): Promise<Locator> => {
 /** One entry the thread menu keeps under a submenu (Open in, Copy or More): open the menu, then that submenu. */
 const moreItem = async (page: Page, body: Locator, submenu: 'Open in' | 'Copy' | 'More', name: string): Promise<Locator> => {
   await (await more(page, body)).getByRole('menuitem', { name: submenu, exact: true }).click()
-  return page.getByRole('menu', { name: submenu, exact: true }).getByRole('menuitem', { name, exact: true })
+  const item = page.getByRole('menu', { name: submenu, exact: true }).getByRole('menuitem', { name, exact: true })
+  // The menu keeps a submenu open only while the pointer travels towards it; a test pointer jumps, so walk it in.
+  const box = await item.boundingBox()
+  if (box !== null) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 })
+  return item
 }
 const pin = async (page: Page, body: Locator, name: 'Pin' | 'Unpin'): Promise<void> => {
   const direct = header(body).getByRole('button', { name, exact: true, includeHidden: true })

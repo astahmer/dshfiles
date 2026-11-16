@@ -466,7 +466,11 @@ When('the thread Traces tab is opened', async ({ page }: { page: Page }) => {
       expect(names).toContain('Traces')
       if (names.includes('Trajectory')) expect(names.indexOf('Traces')).toBe(names.indexOf('Trajectory') + 1)
     })
-    await openIn.getByRole('menuitem', { name: 'Traces', exact: true }).click()
+    const traces = openIn.getByRole('menuitem', { name: 'Traces', exact: true })
+    // The menu keeps a submenu open only while the pointer travels towards it; a test pointer jumps, so walk it in.
+    const box = await traces.boundingBox()
+    if (box !== null) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 })
+    await traces.click()
   }
   await expect(sessionView(page)).toBeVisible()
 })
