@@ -32,7 +32,7 @@ const HostMenuRow = (props: {
       <ServerIcon className="dshx:size-3.5" />
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
         <span className="dshx:truncate">{props.host?.name ?? props.runtime.name}</span>
-        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground" title={state.label}>
+        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
           {props.host === undefined ? 'this machine' : hostTargetLabel(props.host)} · {state.label}
         </span>
       </span>

@@ -13,6 +13,8 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 import { useState } from 'react'
 import type { RuntimeSummary } from '../api.js'
 import { ConnectionDiagnostics } from './connection-diagnostics.js'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { hostGlyph } from './host-status.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 import { setHostDestination } from './state.js'
@@ -39,18 +41,8 @@ export const hostState = (runtime: RuntimeSummary | undefined): { readonly tone:
   return { tone: 'idle', label: runtime.lastSeenAt === undefined ? 'Not connected yet' : `Idle · last seen ${new Date(runtime.lastSeenAt).toLocaleString()}` }
 }
 
-export const StatusDot = (props: { readonly tone: 'online' | 'idle' | 'error' }) => (
-  <span
-    aria-hidden
-    className={
-      props.tone === 'online'
-        ? 'dshx:inline-block dshx:size-2 dshx:shrink-0 dshx:rounded-full dshx:bg-emerald-500'
-        : props.tone === 'error'
-          ? 'dshx:inline-block dshx:size-2 dshx:shrink-0 dshx:rounded-full dshx:bg-destructive'
-          : 'dshx:inline-block dshx:size-2 dshx:shrink-0 dshx:rounded-full dshx:bg-muted-foreground/50'
-    }
-  />
-)
+/** The host's state as a shared status glyph; the text beside it says which state. */
+export const StatusDot = (props: { readonly tone: 'online' | 'idle' | 'error' }) => <StatusGlyph decorative status={hostGlyph(props.tone)} />
 
 const HostForm = (props: { readonly api: MultiHostClient; readonly initial: HostDraft; readonly onDone: () => void; readonly onCancel: () => void }) => {
   const { api } = props
