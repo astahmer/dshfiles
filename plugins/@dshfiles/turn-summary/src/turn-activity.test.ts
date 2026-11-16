@@ -55,8 +55,8 @@ describe('TurnActivity.summarize', () => {
     expect(summary.editedFiles).toEqual(['src/cart/pricing.ts'])
     expect(summary.failedCommands).toEqual([])
     expect([summary.readFiles, summary.searches, summary.otherCalls, summary.failedOtherCalls]).toEqual([1, 1, 1, 1])
-    expect(TurnActivity.parts(summary, { includeReads: true })).toEqual(['ran 1 command', 'edited 1 file', 'read 1 file', '1 search', '1 other tool call'])
-    expect(TurnActivity.parts(summary, { includeReads: false })).toEqual(['ran 1 command', 'edited 1 file', '1 other tool call'])
+    expect(TurnActivity.parts(summary, { includeReads: true })).toEqual(['ran 1 command', 'edited 1 file', 'read 1 file', '1 search'])
+    expect(TurnActivity.parts(summary, { includeReads: false })).toEqual(['ran 1 command', 'edited 1 file'])
   })
 
   it('counts edited lines per file and reads the last test summary into the footer segments', () => {
@@ -85,7 +85,7 @@ describe('TurnActivity.summarize', () => {
     expect(TurnActivity.segments(summary, { includeReads: true, lineCounts: true, testResults: true }).map(segment => segment.text)).toEqual([
       'edited 2 files +4 −2',
       'ran 2 commands',
-      'tests 40/42',
+      '2 tests failed',
     ])
     expect(TurnActivity.segments(summary, { includeReads: true, lineCounts: false, testResults: false }).map(segment => segment.text)).toEqual([
       'edited 2 files',
@@ -93,8 +93,56 @@ describe('TurnActivity.summarize', () => {
     ])
     expect(
       TurnActivity.segments(summary, { includeReads: true, lineCounts: true, testResults: true, editedFiles: false }).map(segment => segment.text),
-    ).toEqual(['ran 2 commands', 'tests 40/42'])
+    ).toEqual(['ran 2 commands', '2 tests failed'])
     expect(TurnActivity.testCounts('===== 3 failed, 12 passed in 1.20s =====')).toEqual({ passed: 12, failed: 3, total: 15 })
     expect(TurnActivity.duration(72_000)).toBe('1m 12s')
+  })
+
+  describe('the footer says each thing once', () => {
+    const options = { includeReads: true, lineCounts: true, testResults: true }
+    const texts = (summary: Parameters<typeof TurnActivity.segments>[0]) => TurnActivity.segments(summary, options).map(segment => segment.text)
+
+    it('never prints "other tool call": a turn of only such calls has no part at all', () => {
+      const summary = TurnActivity.summarize({ calls: [call('a', 'todo_write', {}), call('b', 'html_render', {})], results: [] })
+      expect(summary.otherCalls).toBe(2)
+      expect(texts(summary)).toEqual([])
+    })
+
+    it('never prints "0s"', () => {
+      expect(TurnActivity.shownDuration(400)).toBeUndefined()
+      expect(TurnActivity.shownDuration(0)).toBeUndefined()
+      expect(TurnActivity.shownDuration(1_200)).toBe('1s')
+      expect(TurnActivity.shownDuration(72_000)).toBe('1m 12s')
+    })
+
+    it('reports a failed test run once, as the test outcome that opens the failed command', () => {
+      const summary = TurnActivity.summarize({
+        calls: [call('a', 'bash', { command: 'pnpm vitest run' })],
+        results: [{ callId: 'a', isError: false, text: ' Tests  1 failed | 4 passed (5)\n[exit code: 1]' }],
+      })
+      expect(TurnActivity.segments(summary, options)).toEqual([
+        { key: 'commands', text: 'ran 1 command' },
+        { key: 'tests', text: '1 test failed', failed: true, opensFailures: true },
+      ])
+      expect(TurnActivity.failedCommandsBeyondTests(summary, { testResults: true })).toBe(0)
+      // With test results off, the failed command is the only word on the failure.
+      expect(TurnActivity.failedCommandsBeyondTests(summary, { testResults: false })).toBe(1)
+    })
+
+    it('still counts failed commands that are not the test run, and says passing tests without colour', () => {
+      const failing = TurnActivity.summarize({
+        calls: [call('a', 'bash', { command: 'pnpm vitest run' }), call('b', 'bash', { command: 'pnpm build' })],
+        results: [
+          { callId: 'a', isError: false, text: ' Tests  1 failed | 4 passed (5)\n[exit code: 1]' },
+          { callId: 'b', isError: false, text: 'boom\n[exit code: 2]' },
+        ],
+      })
+      expect(TurnActivity.failedCommandsBeyondTests(failing, { testResults: true })).toBe(2)
+      const passing = TurnActivity.summarize({
+        calls: [call('a', 'bash', { command: 'pnpm vitest run' })],
+        results: [{ callId: 'a', isError: false, text: ' Tests  5 passed (5)\n[exit code: 0]' }],
+      })
+      expect(TurnActivity.segments(passing, options).at(-1)).toEqual({ key: 'tests', text: '5 tests passed' })
+    })
   })
 })

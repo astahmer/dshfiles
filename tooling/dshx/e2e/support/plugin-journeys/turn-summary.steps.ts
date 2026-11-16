@@ -53,9 +53,9 @@ Then('the finished turn names the failed command and its outcome', async ({ page
   await recordAssertion(page, 'turn-summary-shows-tool-count-and-failure', async () => {
     await expect(summary).toBeVisible()
     await expect(summary).toContainText('Ran 1 command')
-    await expect(summary.getByRole('button', { name: /1 failed/ })).toBeVisible()
+    await expect(summary.getByRole('button', { name: /1 command failed/ })).toBeVisible()
   })
-  await summary.getByRole('button', { name: /1 failed/ }).click()
+  await summary.getByRole('button', { name: /1 command failed/ }).click()
   await recordAssertion(page, 'turn-summary-expands-failed-command-outcome', async () => {
     await expect(summary.getByText('Run the failing summary fixture', { exact: true })).toBeVisible()
     await expect(summary.getByText('exit 7', { exact: true })).toBeVisible()

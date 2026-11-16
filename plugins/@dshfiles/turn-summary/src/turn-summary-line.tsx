@@ -2,7 +2,7 @@ import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/clien
 import { useSettings } from '@dshfiles/dshx/client'
 import { ChevronDownIcon, ChevronRightIcon, CircleCheckIcon, CircleXIcon, FileIcon, ListChecksIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import { turnSummarySettings } from './settings.js'
 import { TURN_ACTIVITY_KEY } from './turn-activity-node.js'
 import { TurnActivity, type TurnActivitySummary, type TurnSegment } from './turn-activity.js'
@@ -68,8 +68,18 @@ const CommandList = (props: { readonly summary: TurnActivitySummary; readonly on
 }
 
 /**
- * The footer under a finished Turn: "Edited 3 files +42 −7 · ran 6 commands · 1 failed · tests 40/42 · 1m 12s". The
- * file and command counts open their lists (each file opens in the editor), and the failure count opens the failures.
+ * One part of the footer. Its separator sits in its left padding, which the row clips at the start of each line, so a
+ * wrapped line never begins with "·" and a lone part has none.
+ */
+const Part = (props: { readonly children: ReactNode }): JSX.Element => (
+  <span className="dshx:relative dshx:flex dshx:min-w-0 dshx:max-w-full dshx:items-center dshx:pl-3 dshx:before:absolute dshx:before:left-1 dshx:before:content-['·']">
+    {props.children}
+  </span>
+)
+
+/**
+ * The footer under a finished Turn: "Edited 3 files +42 −7 · ran 6 commands · 2 tests failed · 1m 12s". The file and
+ * command counts open their lists (each file opens in the editor), and a failure opens the failed commands.
  */
 export const TurnSummaryLine = (props: {
   readonly turn: TurnLocation
@@ -90,14 +100,15 @@ export const TurnSummaryLine = (props: {
     testResults: settings?.testResults !== false,
     editedFiles: !walkthrough,
   })
-  const failures = summary.failedCommands.length
+  const failures = TurnActivity.failedCommandsBeyondTests(summary, { testResults: settings?.testResults !== false })
+  // A duration alone is no summary: a turn with nothing to name (one plan update, one page render) gets no line.
   if (segments.length === 0 && failures === 0 && !walkthrough) return null
-  const canList = failures > 0 && settings?.listFailures !== false
+  const canList = summary.failedCommands.length > 0 && settings?.listFailures !== false
   const openLists = settings?.openLists !== false
   const toggle = (list: OpenList) => () => setOpen(current => (current === list ? undefined : list))
   const start = props.turn.start?.time
   const end = props.turn.end?.time
-  const duration = settings?.duration !== false && start !== undefined && end !== undefined ? TurnActivity.duration(end - start) : undefined
+  const duration = settings?.duration !== false && start !== undefined && end !== undefined ? TurnActivity.shownDuration(end - start) : undefined
   const changesSeq = summary.changesSeq
   const openChanges = changesSeq === undefined ? undefined : () => props.openChanges({ seq: changesSeq, turn: props.turn.turn })
   // With file chips the edits are named once (GitHub #47): `editedFiles: !walkthrough` above already leaves the
@@ -112,53 +123,65 @@ export const TurnSummaryLine = (props: {
           {label(segment, index)}
         </Toggle>
       )
+    // The one failed command is the test run: its failure opens from the test outcome instead of a second red count.
+    if (segment.opensFailures === true && canList)
+      return (
+        <Toggle className="dshx:text-destructive" onToggle={toggle('failures')} open={open === 'failures'}>
+          {label(segment, index)}
+        </Toggle>
+      )
     return <span className={cn('dshx:min-w-0 dshx:truncate', segment.failed === true && 'dshx:text-destructive')}>{label(segment, index)}</span>
   }
   return (
     <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" data-dshfiles-turn-summary="">
-      <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-1.5 dshx:gap-y-0.5">
-        <ListChecksIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
-        {walkthrough && (
-          <TurnFileChips
-            files={summary.editedFileStats}
-            moreOpen={walkthroughOpen}
-            onMore={() => setWalkthroughOpen(current => !current)}
-            onOpen={file => (openChanges === undefined ? props.openFile(file.path) : openChanges())}
-            opensChanges={openChanges !== undefined}
-          />
-        )}
-        {segments.map((segment, index) => (
-          <Fragment key={segment.key}>
-            {(index > 0 || walkthrough) && <span aria-hidden>·</span>}
-            {segmentView(segment, index)}
-          </Fragment>
-        ))}
-        {failures > 0 && (
-          <button
-            aria-expanded={canList ? open === 'failures' : undefined}
-            className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-destructive dshx:disabled:cursor-default"
-            disabled={!canList}
-            onClick={toggle('failures')}
-            type="button"
-          >
-            <span aria-hidden>·</span>
-            {failures} failed
-            {canList && (open === 'failures' ? <ChevronDownIcon className="dshx:size-3" /> : <ChevronRightIcon className="dshx:size-3" />)}
-          </button>
-        )}
-        {duration !== undefined && (
-          <span className="dshx:shrink-0 dshx:tabular-nums" data-dshfiles-turn-summary-duration="">
-            <span aria-hidden>· </span>
-            {duration}
-          </span>
-        )}
-        {walkthrough ? (
-          <>
-            {/* The file chips lead the line, so the toggle always follows a part. */}
-            <span aria-hidden>·</span>
-            <TurnWalkthroughToggle open={walkthroughOpen} onToggle={() => setWalkthroughOpen(current => !current)} />
-          </>
-        ) : null}
+      <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-1.5">
+        <ListChecksIcon aria-hidden className="dshx:mt-0.5 dshx:size-3.5 dshx:shrink-0" />
+        {/* Each part draws its "·" in its own left padding, and the row clips that padding at its left edge: the
+            first part of every wrapped line loses its separator instead of starting the line with one. */}
+        <div className="dshx:min-w-0 dshx:flex-1 dshx:overflow-x-clip">
+          <div className="dshx:-ml-3 dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-y-0.5">
+            {walkthrough && (
+              <Part>
+                <TurnFileChips
+                  files={summary.editedFileStats}
+                  moreOpen={walkthroughOpen}
+                  onMore={() => setWalkthroughOpen(current => !current)}
+                  onOpen={file => (openChanges === undefined ? props.openFile(file.path) : openChanges())}
+                  opensChanges={openChanges !== undefined}
+                />
+              </Part>
+            )}
+            {segments.map((segment, index) => (
+              <Part key={segment.key}>{segmentView(segment, index)}</Part>
+            ))}
+            {failures > 0 && (
+              <Part>
+                <button
+                  aria-expanded={canList ? open === 'failures' : undefined}
+                  className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-destructive dshx:disabled:cursor-default"
+                  disabled={!canList}
+                  onClick={toggle('failures')}
+                  type="button"
+                >
+                  {failures} {failures === 1 ? 'command' : 'commands'} failed
+                  {canList && (open === 'failures' ? <ChevronDownIcon className="dshx:size-3" /> : <ChevronRightIcon className="dshx:size-3" />)}
+                </button>
+              </Part>
+            )}
+            {duration !== undefined && (
+              <Part>
+                <span className="dshx:shrink-0 dshx:tabular-nums" data-dshfiles-turn-summary-duration="">
+                  {duration}
+                </span>
+              </Part>
+            )}
+            {walkthrough ? (
+              <Part>
+                <TurnWalkthroughToggle open={walkthroughOpen} onToggle={() => setWalkthroughOpen(current => !current)} />
+              </Part>
+            ) : null}
+          </div>
+        </div>
       </div>
       {open === 'files' && <FileList openFile={props.openFile} summary={summary} />}
       {open === 'commands' && <CommandList onlyFailed={false} summary={summary} />}
