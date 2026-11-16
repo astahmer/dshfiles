@@ -545,7 +545,7 @@ export function ChatView({
     return location?.kind === 'turn' || location?.kind === 'step' ? location.turn.turn : undefined
   }, [groupMembers, nodeStore])
   const sincePlacement = useMemo<SinceYouLeftPlacement | null>(() => {
-    if (recap === null) return null
+    if (recap === null || !SinceYouLeftRecapModel.worthShowing(recap)) return null
     const before = transcript.entries.find(entry => (entryTurn(entry) ?? -1) >= recap.firstTurn)
     if (before === undefined) return null
     // Opening at the final answer (the default): the recap sits right above that answer, the landing position, when the

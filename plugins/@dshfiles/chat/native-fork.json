@@ -109,6 +109,7 @@
     "src/native/chat/code-like.ts",
     "src/native/chat/context-rows.ts",
     "src/native/chat/external-link-opening.ts",
+    "src/native/chat/failure-copy.ts",
     "src/native/chat/filler-reply.ts",
     "src/native/chat/find-reveal.ts",
     "src/native/chat/fold-batch.ts",

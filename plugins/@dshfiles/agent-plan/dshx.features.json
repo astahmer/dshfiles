@@ -172,8 +172,8 @@
     },
     {
       "id": "failure-card",
-      "title": "Retry and Ask to fix under failed turns",
-      "summary": "Under a native turn-error row, and under a model-retry row once retrying gave up, a bar shows the retry count and two actions: Retry puts a retry request in the composer, Ask to fix inserts the failure with a request to fix it. Neither sends: the user reviews and sends. Stopped or interrupted turns get no actions.",
+      "title": "Ask to fix on a failed turn",
+      "summary": "Adds Ask to fix beside Retry in the failed turn's one row of actions. It writes the failure and a request to fix it into the composer; the user reviews and sends. Stopped turns get no action.",
       "reach": [
         "seed jev-setup-chat-thread",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[fail The fake provider rejected this request]]\"",
@@ -183,20 +183,20 @@
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: turn error row",
+      "currentSurface": "transcript: failed turn action row",
       "configuration": [
         {
           "key": "failureCard",
           "defaultValue": "true",
-          "constraints": "Boolean; add the retry count and Retry / Ask to fix actions under failure rows.",
+          "constraints": "Boolean; add Ask to fix beside Retry on a failed turn.",
           "choices": ["true", "false"],
           "coveredBy": ["agent-plan.failure-card"]
         }
       ],
-      "states": ["turn-error", "retry-scheduled", "retry-gave-up", "stopped", "no-composer", "disabled"],
+      "states": ["turn-error", "stopped", "no-composer", "disabled"],
       "failureModes": [
-        "Without a Composer provider (@dshfiles/rich-composer) the actions are hidden and only the retry count shows.",
-        "Retry does not resend the failed request: it writes a message the user sends, so the next turn starts fresh."
+        "Without a Composer provider (@dshfiles/rich-composer) the action is hidden.",
+        "The action row belongs to the owned Chat fork (@dshfiles/chat): with the native Chat there is no row to join, so the action is absent."
       ],
       "externalDependencies": [],
       "verification": [
@@ -209,7 +209,7 @@
           "kind": "unit-test",
           "id": "agent-plan.failure-model",
           "file": "plugins/@dshfiles/agent-plan/src/failure.test.ts",
-          "testName": "reads a turn error, offers actions unless the turn was stopped, and quotes it in the fix prompt"
+          "testName": "reads a turn error, offers the action unless the turn was stopped, and quotes it in the fix prompt"
         }
       ],
       "telemetry": [

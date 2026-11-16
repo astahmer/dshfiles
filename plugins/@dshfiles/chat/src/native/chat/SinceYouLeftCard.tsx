@@ -1,7 +1,8 @@
 /**
  * dshfiles (productivity pass T4.3): the "Since you left" divider and its one recap card, drawn above the first Turn
  * the user has not seen: "3 turns · 7 files +120 −14 · 1 failed · 1 question waiting", with chips that jump to each
- * failed or questioning Turn and to the Turn that wrote each file. Dismissible; never drawn for Turns already seen.
+ * failed or questioning Turn and to the Turn that wrote each file. Dismissible; never drawn for Turns already seen,
+ * nor for a single unseen Turn, which is on screen right below.
  */
 import { createContext, memo, type ReactNode } from 'react'
 import { XIcon } from '@dshfiles/plugin-ui/icons'
