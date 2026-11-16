@@ -94,6 +94,8 @@ Then('Settings fills the main view under its own tab', async ({ page }: { page: 
     await expect(settingsView(page)).toHaveAttribute('data-settings-view', 'tab')
     await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
     await expect(page.locator('[data-slot="main"] [data-settings-panel-host] [data-settings-view="tab"]')).toBeVisible()
+    // The tab closes Settings: the header draws no second close button beside it.
+    await expect(settingsView(page).getByRole('button', { name: 'Close', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
