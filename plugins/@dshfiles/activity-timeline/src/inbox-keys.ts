@@ -54,4 +54,30 @@ const extend = (ids: readonly string[], anchor: string | null, to: string): read
   return ids.slice(Math.min(from, end), Math.max(from, end) + 1)
 }
 
-export const InboxKeys = { primaryOf, choiceAt, step, afterRemoval, extend } as const
+/** One button of the Triage bar: an answer, a provider verb, Land, Review or Open. `primary` is the one Enter runs. */
+export type TriageAction = (PrimaryAction | { readonly kind: 'review' }) & { readonly primary: boolean }
+
+/**
+ * Every way to act on the item in Triage, each once, in the order the bar shows them: its answers, its provider verb or
+ * Land, Review for work that can land, then Open. The card above the bar shows the item and no action row of its own,
+ * so nothing appears twice (Done, Snooze, Skip and Exit are the bar's fixed tail).
+ */
+const triageActions = (item: AttentionItem, input: { readonly openable: boolean; readonly reviewable: boolean }): readonly TriageAction[] => {
+  const primary = primaryOf(item)
+  const answers: readonly TriageAction[] = item.verbs.includes('Answer')
+    ? item.choices.map(choice => ({
+        kind: 'answer',
+        choiceId: choice.id,
+        label: choice.label,
+        primary: primary.kind === 'answer' && primary.choiceId === choice.id,
+      }))
+    : []
+  return [
+    ...answers,
+    ...(primary.kind === 'verb' || primary.kind === 'land' ? [{ ...primary, primary: true }] : []),
+    ...(input.reviewable ? [{ kind: 'review' as const, primary: false }] : []),
+    ...(input.openable || primary.kind === 'open' ? [{ kind: 'open' as const, primary: primary.kind === 'open' }] : []),
+  ]
+}
+
+export const InboxKeys = { primaryOf, triageActions, choiceAt, step, afterRemoval, extend } as const
