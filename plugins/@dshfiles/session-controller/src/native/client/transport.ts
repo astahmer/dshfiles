@@ -31,6 +31,7 @@ import type { SessionRemotes } from './sessions/remotes.ts'
 import { ProjectionPatches } from '@dshfiles/session-source-port/projection-patch'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { assertSessionWireEvent } from './session-wire-event.ts'
+import { coveringRequest, type HeldWindow } from './sessions/reconnect-window.ts'
 
 export {
   SESSION_SEARCH_RESULT_LIMIT,
@@ -107,6 +108,8 @@ export interface SessionEventStreamOptions {
   readonly carrierFailed?: (error: RemoteStreamCarrierError) => void
   /** Publish a terminal stream, page, or protocol failure after opening. */
   readonly failed: (error: unknown) => void
+  /** The window the reader holds; a reopened follow asks for at least that much. */
+  readonly held?: () => HeldWindow | undefined
 }
 
 /**
@@ -195,7 +198,10 @@ export class SessionEventStream extends RemoteJournalStream<
         : { carrierFailed: options.carrierFailed }),
       failed: options.failed,
     })
+    this.held = options.held
   }
+
+  private readonly held: SessionEventStreamOptions['held']
 
   /** @inheritdoc */
   protected override async * follow(
@@ -209,7 +215,7 @@ export class SessionEventStream extends RemoteJournalStream<
       address: this.address,
       activate: true,
       assistantStream: true,
-      ...this.repairRequest(request),
+      ...coveringRequest(this.repairRequest(request), this.held?.()),
     }, signal)) {
       if (frame.type === 'snapshot') {
         for (const record of frame.records) assertSessionWireEvent(record.event)

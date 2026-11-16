@@ -9,6 +9,7 @@ import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { UserMessage } from '@deepseek-ai/dsh-llm/types'
 import { SessionLogOffset, SessionSeq, type SessionId } from '@deepseek-ai/dsh-session/types'
 import { SessionEventStream } from '../transport.ts'
+import { heldWindowOf } from './reconnect-window.ts'
 import type { SessionJournalChange } from '../transport.ts'
 import type {
   PromptContentPart,
@@ -844,6 +845,7 @@ export class Session implements SessionFace {
       failed: (error) => {
         this.failEventStream(events, generation, error)
       },
+      held: () => heldWindowOf(this.eventSource.getSnapshot().entries),
     })
     this.events = events
     try {
