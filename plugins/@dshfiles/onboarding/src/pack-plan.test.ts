@@ -109,7 +109,7 @@ describe('pack outcome', () => {
     expect(live).toMatchObject({ kind: 'applied', nextActions: [] })
     const later = PackPlan.summarize({ preview, results: [{ ...result('jujutsu', 'restart-required', 'no-hmr'), step: 'enable' }] })
     expect(later.kind).toBe('restart-required')
-    expect(later.nextActions.at(-1)).toMatch(/Restart DSH \(bottom of the sidebar\)/u)
+    expect(later.nextActions.at(-1)).toMatch(/use Restart DSH in the status bar/u)
     expect(PackPlan.renderOutcome({ preview, results: [{ ...result('jujutsu', 'restart-required', 'no-hmr'), step: 'enable' }], summary: later })).toContain(
       'restart reason: no-hmr',
     )

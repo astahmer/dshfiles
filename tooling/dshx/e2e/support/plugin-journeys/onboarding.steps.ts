@@ -459,7 +459,7 @@ Then('the pack preview names what would install and the restart it needs, with 4
     const dialog = packDialog(page)
     await expect(dialog.locator('[data-preview-section="install"]')).toBeVisible()
     await expect(dialog.locator('[data-preview-section="install"]')).toContainText('Traces')
-    await expect(dialog.locator('[data-preview-section="restart"]')).toContainText('Restart DSH (bottom of the sidebar)')
+    await expect(dialog.locator('[data-preview-section="restart"]')).toContainText('use Restart DSH in the status bar')
     await expect(page.getByRole('dialog')).toHaveCount(1)
     const width = await dialog.evaluate(element => element.getBoundingClientRect().right <= window.innerWidth)
     expect(width).toBe(true)

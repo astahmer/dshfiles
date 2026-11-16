@@ -189,7 +189,7 @@ describe('GettingStartedPage', () => {
         name: /Copy node tooling\/dshx\/packages\/dshx\/dist\/cli\/bin\.js add @dshfiles\/backlog-jira --profile scratch/u,
       }),
     ).toBeTruthy()
-    expect(within(dialog).getByRole('region', { name: 'Restart' }).textContent).toMatch(/Restart DSH \(bottom of the sidebar\)/u)
+    expect(within(dialog).getByRole('region', { name: 'Restart' }).textContent).toMatch(/use Restart DSH in the status bar/u)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(applyPack).not.toHaveBeenCalled()

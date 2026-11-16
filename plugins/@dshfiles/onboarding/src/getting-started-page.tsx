@@ -305,7 +305,8 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
       >
         {overview.isError && data === undefined ? (
           <EmptyState action={{ label: 'Try again', onSelect: () => void overview.refetch() }}>
-            The checklist, packs and features could not be loaded. Try again; if it keeps failing, restart DSH from the bottom of the rail.
+            The checklist, packs and features could not be loaded. Try again; if it keeps failing, restart DSH: choose Restart DSH in the command palette, or
+            stop DSH in its terminal and start it again.
           </EmptyState>
         ) : null}
         {props.settings.checklist && checklist !== null ? (

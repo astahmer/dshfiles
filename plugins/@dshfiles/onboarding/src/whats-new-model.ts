@@ -197,6 +197,33 @@ const windowOf = (input: { readonly value: WhatsNewReady; readonly lastSeen: str
   }
 }
 
+/** What the section leads with: what was added or changed for a user. Fixes stay one click away, under Show all. */
+const FEATURED = 5
+
+/** The changes a user came for, newest first: features and breaking changes, never a list of repairs. */
+const featured = <Entry extends WhatsNewEntry>(entries: readonly Entry[]): readonly Entry[] =>
+  entries.filter(entry => entry.kind === 'feat' || entry.breaking).slice(0, FEATURED)
+
+const DAY_MS = 24 * 60 * 60 * 1000
+const startOfDay = (instant: Date): number => new Date(instant.getFullYear(), instant.getMonth(), instant.getDate()).getTime()
+
+/**
+ * When a change landed, the way a person says it: Today, Yesterday, a few days ago, then the date in the reader's
+ * locale (with the year once it is not this one). Never an ISO timestamp.
+ */
+const dateLabel = (date: string, now: Date, locale?: string): string => {
+  const landed = new Date(date)
+  const days = Math.round((startOfDay(now) - startOfDay(landed)) / DAY_MS)
+  if (days <= 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${String(days)} days ago`
+  return landed.toLocaleDateString(locale, {
+    day: 'numeric',
+    month: 'short',
+    ...(landed.getFullYear() === now.getFullYear() ? undefined : { year: 'numeric' }),
+  })
+}
+
 /** A change summary as a sentence for people: the commit title's type and scope are already gone, so only the case. */
 const sentence = (summary: string): string => `${summary.charAt(0).toLocaleUpperCase()}${summary.slice(1)}`
 
@@ -228,6 +255,8 @@ export class WhatsNewModel {
   static readonly upstreamTargets = upstreamTargets
   static readonly select = select
   static readonly window = windowOf
+  static readonly featured = featured
+  static readonly dateLabel = dateLabel
   static readonly sentence = sentence
   static readonly render = render
 }
