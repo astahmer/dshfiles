@@ -1204,7 +1204,7 @@ directions (two threads that wake each other would keep each other running); an
 archived subscriber or target ends the edge — at once through this plugin's own
 archive path, and on the next notice pass for an archive made elsewhere — and a
 subscriber the Host no longer resolves loses its edge instead of retrying. The
-same state is the **Notify…** submenu in a thread row's context menu (also the
+same state is the **Notify when finished** submenu in a thread row's context menu (also the
 phone action sheet a long press opens) — headed "When this thread finishes,
 notify “…”", with **Use default (Every turn)** (naming the current default
 level), Every turn, Landed, failed or a question, Only when stuck, and Off for
