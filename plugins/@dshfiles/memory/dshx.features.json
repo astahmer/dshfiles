@@ -544,13 +544,13 @@
           "reason": "Client-only: Show what memory costs and whether it holds up renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": ["click tab \"Knowledge\"", "click button \"Memory\"", "click tab \"Analytics\"", "expect text \"Recall\""],
+      "reach": ["click tab \"Knowledge\"", "click button \"Memory\"", "click tab \"Analytics\"", "expect combobox \"Analytics window\""],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Knowledge Memory and reference material agents use.\"",
         "click button \"Memory\"",
         "click tab \"Analytics\"",
-        "expect text \"Recall\""
+        "expect combobox \"Analytics window\""
       ]
     },
     {
