@@ -1,8 +1,9 @@
-import { act } from 'react'
+import { act, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
+import type { PluginSettingsPage } from './plugin-settings.js'
 import { SettingsGroups } from './settings-groups.js'
 import { SettingsTab, type SettingsViewProps } from './settings-view.js'
 
@@ -13,11 +14,11 @@ const rows = [
 ]
 const sectionEntries = [{ sectionId: 'appearance', sectionLabel: 'Appearance', id: 'theme', title: 'Theme', description: 'Light or dark' }]
 
-const mount = (overrides: Partial<SettingsViewProps>) => {
+const mount = (overrides: Partial<SettingsViewProps>, section: ReactNode = null) => {
   const sectionOwners: unknown[] = []
   const renderSlot: ShellRenderSlot = (name, owner) => {
     if (name === 'settings.section') sectionOwners.push(owner)
-    return null
+    return name === 'settings.section' ? section : null
   }
   const onReveal = vi.fn()
   const props: SettingsViewProps = {
@@ -71,6 +72,85 @@ describe('settings view: section entries', () => {
     const plain = mount({ sectionTarget: undefined })
     expect(plain.sectionOwners.at(-1)).not.toHaveProperty('target')
     plain.unmount()
+  })
+})
+
+describe('settings view: one title per entry', () => {
+  const entry = (view: { readonly host: HTMLElement }): HTMLElement | null => view.host.querySelector('[data-settings-entry]')
+  const shown = (element: Element | null | undefined): boolean => element instanceof HTMLElement && element.style.display !== 'none'
+
+  it('titles the entry with its own name and no group eyebrow above it', () => {
+    const view = mount({ activeId: 'appearance' })
+    const header = entry(view)?.querySelector('header')
+    expect(header?.querySelector('h2')?.textContent).toBe('Appearance')
+    expect(header?.textContent).toBe('Appearance')
+    view.unmount()
+  })
+
+  it('hides the heading a section draws when it repeats the entry title, whatever its case', () => {
+    const view = mount(
+      { activeId: 'appearance' },
+      <div>
+        <h2 data-own-title="">APPEARANCE</h2>
+        <p>Colours and fonts.</p>
+      </div>,
+    )
+    expect(shown(entry(view)?.querySelector('[data-own-title]'))).toBe(false)
+    expect(shown(entry(view)?.querySelector('header h2'))).toBe(true)
+    expect(entry(view)?.textContent).toContain('Colours and fonts.')
+    view.unmount()
+  })
+
+  it('keeps a section heading that says something else, and never hides a control', () => {
+    const other = mount({ activeId: 'appearance' }, <h3 data-own-title="">Theme</h3>)
+    expect(shown(entry(other)?.querySelector('[data-own-title]'))).toBe(true)
+    other.unmount()
+    const control = mount(
+      { activeId: 'appearance' },
+      <button data-own-title="" type="button">
+        Appearance
+      </button>,
+    )
+    expect(shown(entry(control)?.querySelector('[data-own-title]'))).toBe(true)
+    control.unmount()
+  })
+
+  it('gives a merged plugin page a subheading, unless it would repeat the entry title', () => {
+    const page = (ns: string, title: string): PluginSettingsPage => ({
+      pageId: `plugin:${ns}`,
+      ns,
+      title,
+      description: '',
+      group: 'plugins',
+      fields: [],
+      modifiedPaths: [],
+    })
+    const headings: string[] = []
+    const view = mount({
+      groups: [
+        {
+          group: { id: 'general', label: 'General', description: '' },
+          entries: [
+            {
+              id: 'appearance',
+              group: 'general',
+              label: 'Appearance',
+              order: 0,
+              sectionId: 'appearance',
+              pages: [page('theme', 'appearance'), page('fonts', 'Fonts')],
+              hiddenPages: [],
+              keywords: '',
+            },
+          ],
+        },
+      ],
+      renderPluginPage: (current, heading) => {
+        headings.push(`${current.ns}:${heading}`)
+        return null
+      },
+    })
+    expect(headings).toEqual(['theme:none', 'fonts:section'])
+    view.unmount()
   })
 })
 

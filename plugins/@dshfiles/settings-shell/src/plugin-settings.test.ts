@@ -25,7 +25,7 @@ describe('pluginSettingsPages', () => {
     expect(pages.map(page => [page.title, page.group, page.fields.length])).toEqual([
       ['Main tabs', 'plugins', 1],
       ['Thread Sidebar', 'plugins', 1],
-      ['Ui theme', 'more', 1],
+      ['UI theme', 'more', 1],
     ])
     expect(pages[1]?.description).toBe('Group threads.')
   })

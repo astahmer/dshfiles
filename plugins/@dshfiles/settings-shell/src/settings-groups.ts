@@ -66,7 +66,8 @@ const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   // The theme owner (`@dshfiles/ui-styles`) serves the fields; Settings only places them (no dependency on the owner).
   'dshfiles-ui-styles': { group: 'general', label: 'Appearance', order: 1 },
   'dshfiles-settings-shell': { group: 'general', label: 'Settings', order: 90 },
-  'thread-sidebar': { group: 'general', entry: 'thread-sidebar' },
+  // Under the Thread list section, so titled for what the fields do, not with the plugin's name ("Thread Sidebar").
+  'thread-sidebar': { group: 'general', label: 'Display and automation', entry: 'thread-sidebar' },
   'dshfiles-frame-layout': { group: 'general', entry: 'dshfiles-status-bar' },
   'dshfiles-main-tabs': { group: 'general', label: 'Main tabs', order: 30 },
   'dshfiles-workbench': { group: 'general', label: 'Docked panes', order: 31 },

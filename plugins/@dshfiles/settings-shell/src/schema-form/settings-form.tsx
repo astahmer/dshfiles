@@ -163,11 +163,24 @@ const ChoiceInput = (props: {
   if (SettingsSchemaModel.choiceDisplay(props.options) === 'segmented') {
     return (
       <ToggleGroup aria-label={props.label} disabled={props.disabled} onValueChange={pick} size="sm" type="single" value={selected} variant="outline">
-        {props.options.map(option => (
-          <ToggleGroupItem className="dshx:px-3" key={choiceKey(option.value)} title={option.detail || undefined} value={choiceKey(option.value)}>
-            {option.label}
-          </ToggleGroupItem>
-        ))}
+        {props.options.map(option =>
+          option.detail === '' ? (
+            <ToggleGroupItem className="dshx:px-3" key={choiceKey(option.value)} value={choiceKey(option.value)}>
+              {option.label}
+            </ToggleGroupItem>
+          ) : (
+            <Tooltip key={choiceKey(option.value)}>
+              <TooltipTrigger asChild>
+                <ToggleGroupItem className="dshx:px-3" value={choiceKey(option.value)}>
+                  {option.label}
+                </ToggleGroupItem>
+              </TooltipTrigger>
+              <TooltipContent className="dshx:max-w-72" side="top">
+                {option.detail}
+              </TooltipContent>
+            </Tooltip>
+          ),
+        )}
       </ToggleGroup>
     )
   }
@@ -386,9 +399,14 @@ const RecordInput = (props: {
     <div aria-label={props.label} className="dshx:flex dshx:w-full dshx:flex-col dshx:gap-1.5" role="list">
       {entries.map(([key, value]) => (
         <div className="dshx:flex dshx:items-center dshx:gap-1.5" key={key} role="listitem">
-          <span className="dshx:w-40 dshx:shrink-0 dshx:truncate dshx:font-mono dshx:text-xs" title={key}>
-            {key}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:w-40 dshx:shrink-0 dshx:truncate dshx:font-mono dshx:text-xs">{key}</span>
+            </TooltipTrigger>
+            <TooltipContent className="dshx:font-mono" side="top">
+              {key}
+            </TooltipContent>
+          </Tooltip>
           <ScalarInput
             className="dshx:w-full"
             control={props.valueControl}
