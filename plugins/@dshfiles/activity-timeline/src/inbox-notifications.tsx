@@ -114,6 +114,7 @@ const useBlockingAlerts = (
 
 export class InboxNotifications {
   static readonly Toggle = Toggle
+  static readonly supported = notificationsSupported
   static readonly useBlockingAlerts = useBlockingAlerts
   static readonly notificationOf = notificationOf
   static readonly newAlerts = newAlerts

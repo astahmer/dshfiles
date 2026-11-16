@@ -32,7 +32,7 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
 import { RowGestureModel, useRowGestures } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { ClockIcon, EllipsisIcon, ListChecksIcon, MessagesSquareIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { BellIcon, ClockIcon, EllipsisIcon, ListChecksIcon, MessagesSquareIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { fromPromise, useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
@@ -52,7 +52,7 @@ import { AttentionSubjectOpeners, type AttentionSubjectOpener } from './attentio
 import { HeldOrder } from './held-order.js'
 import { InboxQuickReplies } from './quick-replies.js'
 import { InboxKeys } from './inbox-keys.js'
-import { InboxNotifications } from './inbox-notifications.js'
+import { InboxAlerts } from './inbox-alerts.js'
 import { InboxPush } from './web-push-client.js'
 import { INBOX_CHIP, TriageBar, TriageReply, TriageZero } from './triage-stage.js'
 import { triageMachine, TriageModel, type TriageRequest } from './triage-machine.js'
@@ -1144,6 +1144,9 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
     disabled: (counts?.needsYou ?? 0) + (counts?.other ?? 0) === 0,
     onSelect: () => void startTriage(),
   }
+  const [alertSettingsOpen, setAlertSettingsOpen] = useState(false)
+  InboxPush.useNotificationOpen()
+  const alertSettingsAction = { id: 'alerts', label: t('alertSettings'), icon: <BellIcon aria-hidden />, onSelect: () => setAlertSettingsOpen(true) }
   // On a phone, Triage (one card at a time, 1 of N, verbs in the thumb zone) is the way through the Inbox: it is the
   // page's visible button rather than an entry in its overflow menu, unless Resume all needs that seat.
   const triageOnTop = coarsePointer() && resumeAllAction === null
@@ -1233,7 +1236,10 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
       heading={t('title')}
       description={t('subtitle')}
       {...(resumeAllAction !== null ? { primaryAction: resumeAllAction } : triageOnTop ? { primaryAction: triageAction } : {})}
-      actions={triageOnTop ? [] : [triageAction]}
+      actions={InboxView.pageActions({ triagePrimary: triageOnTop, alertSettings: InboxAlerts.available() }).map(action =>
+        action.id === 'triage' ? triageAction : { ...alertSettingsAction, placement: action.placement },
+      )}
+      overflowLabel={t('more')}
       tabs={{
         label: t('title'),
         value: view,
@@ -1374,8 +1380,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         </div>
       )}
       {view === 'other' ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('otherExpiryHint')}</p> : null}
-      <InboxNotifications.Toggle t={t} />
-      <InboxPush.Control t={t} />
+      <InboxAlerts.SettingsDialog t={t} open={alertSettingsOpen} onOpenChange={setAlertSettingsOpen} />
     </Page>
   )
 }

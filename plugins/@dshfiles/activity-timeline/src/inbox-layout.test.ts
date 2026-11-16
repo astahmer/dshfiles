@@ -15,4 +15,15 @@ describe('inbox page layout', () => {
     expect(InboxView.TEXT_MEASURE).toBe('dshx:max-w-[72ch]')
     expect(panel).toContain('InboxView.TEXT_MEASURE')
   })
+
+  it('keeps device alert settings behind the page menu, one step from the header, never under the list', () => {
+    expect(InboxView.pageActions({ triagePrimary: false, alertSettings: true })).toEqual([
+      { id: 'triage', placement: 'inline' },
+      { id: 'alerts', placement: 'overflow' },
+    ])
+    // On a phone Start triage is the page's primary button; a browser with no alerts to set offers no entry.
+    expect(InboxView.pageActions({ triagePrimary: true, alertSettings: true })).toEqual([{ id: 'alerts', placement: 'overflow' }])
+    expect(InboxView.pageActions({ triagePrimary: false, alertSettings: false })).toEqual([{ id: 'triage', placement: 'inline' }])
+    expect(panel).not.toMatch(/<InboxNotifications\.Toggle|<InboxPush\.Control/u)
+  })
 })
