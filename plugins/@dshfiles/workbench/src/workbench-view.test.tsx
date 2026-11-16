@@ -1205,6 +1205,24 @@ describe('WorkbenchView', () => {
     expect(Object.keys(store.get()?.panels ?? {}).sort()).toEqual(['a', 'b'])
   })
 
+  it('names a panel whose source is gone by its last title and never shows its id', async () => {
+    const storage = memoryStorage()
+    const resourceId = 'dshfiles-resource/session-2e1cc08c/tab2'
+    const registry = registryWith('a')
+    const release = registry.register({ id: resourceId, title: 'Changes', component: DraftPanel })
+    const first = renderWorkbench(registry, storage)
+    act(() => first.api.getPanel(resourceId)?.api.setActive())
+    await flushLayoutChange()
+    first.view.unmount()
+    release()
+
+    const { view } = renderWorkbench(registry, storage)
+    const placeholder = view.container.querySelector(`[data-workbench-panel-id="${resourceId}"]`)
+    expect(placeholder?.textContent).toContain('missingThreadPanelNamed:{"title":"Changes"}')
+    expect(placeholder?.textContent).not.toContain('dshfiles-resource')
+    expect(placeholder?.querySelector('[data-slot="empty-state"]')).not.toBeNull()
+  })
+
   it('keeps a saved panel whose plugin is gone as a closable placeholder that recovers on registration', async () => {
     const storage = memoryStorage()
     const first = renderWorkbench(registryWith('a', 'gone'), storage)
@@ -1214,10 +1232,10 @@ describe('WorkbenchView', () => {
 
     const registry = registryWith('a')
     const { api } = renderWorkbench(registry, storage)
-    expect(screen.getByText('missingPanel:{"id":"gone"}')).toBeTruthy()
+    expect(screen.getByText('missingPanel')).toBeTruthy()
 
     act(() => void registry.register({ id: 'gone', title: 'gone', component: DraftPanel }))
-    expect(screen.queryByText('missingPanel:{"id":"gone"}')).toBeNull()
+    expect(screen.queryByText('missingPanel')).toBeNull()
     expect(draftOf('gone')).toBeTruthy()
 
     act(() => void registry.register({ id: 'gone', title: 'gone', component: () => null })())

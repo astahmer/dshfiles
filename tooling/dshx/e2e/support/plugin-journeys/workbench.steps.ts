@@ -150,11 +150,9 @@ Then('the Workbench falls back to its default layout', async ({ page }: { page: 
 Then('the Editor tab stays as a closable placeholder', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-missing-plugin-keeps-a-placeholder', async () => {
     await expect(page.getByRole('tab', { name: viewNamePattern('Editor') })).toBeVisible()
-    await expect(
-      page.getByText('“dshfiles-editor.main” is not available. Its plugin may be disabled or removed; it comes back here once it registers again.', {
-        exact: true,
-      }),
-    ).toBeVisible()
+    // The placeholder names the panel by its last title (the editor's panel is titled "Files"), never by its id.
+    await expect(page.getByText(/^“[^”]+” is not available\. It comes back here when its plugin is turned on again\.$/u)).toBeVisible()
+    await expect(page.getByText('dshfiles-editor.main')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Close panel', exact: true })).toBeVisible()
   })
 })
@@ -162,8 +160,9 @@ Then('the Editor tab stays as a closable placeholder', async ({ page }: { page: 
 Then('the Editor tab shows the editor again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-placeholder-recovers-on-registration', async () => {
     await page.getByRole('tab', { name: viewNamePattern('Editor') }).click()
-    await expect(page.getByText('Open a session to browse and edit its files.', { exact: true })).toBeVisible()
-    await expect(page.getByText(/is not available\. Its plugin may be disabled/)).toHaveCount(0)
+    // The editor is back: its hint for no thread, or for a thread with no file picked yet.
+    await expect(page.getByText(/^(?:Open a session to browse and edit its files\.|Pick a file in the tree, or open one from another panel\.)$/u)).toBeVisible()
+    await expect(page.getByText(/is not available\. It comes back here/)).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
