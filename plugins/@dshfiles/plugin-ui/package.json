@@ -37,6 +37,10 @@
       "types": "./src/lib/format-duration.ts",
       "default": "./src/lib/format-duration.ts"
     },
+    "./lib/phone-shell": {
+      "types": "./src/lib/phone-shell.ts",
+      "default": "./src/lib/phone-shell.ts"
+    },
     "./motion": {
       "types": "./src/motion/index.ts",
       "default": "./src/motion/index.ts"
