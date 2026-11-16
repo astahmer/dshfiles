@@ -29,7 +29,7 @@ Then('the finished tool call shows a Vitest results card', async ({ page }: { pa
     if (await commandGroup.isVisible()) await commandGroup.click()
     else
       await page
-        .getByText(/^Worked for /)
+        .getByText(/^(Worked for|Completed in|Failed in) /)
         .last()
         .click()
     await expect(testCardToggle).toBeVisible({ timeout: 2_000 })

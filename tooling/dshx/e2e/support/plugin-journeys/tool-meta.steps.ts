@@ -36,9 +36,10 @@ const revealSettledToolCard = async (page: Page): Promise<void> => {
   // The transcript re-renders while it reconnects after a settings save, so a fold toggle can land on a stale row.
   await expect(async () => {
     if (await card.isVisible()) return
+    // The owned Chat fork folds a turn under "Worked for"; the native Chat these compositions boot says "Completed in".
     if (!(await group.isVisible()))
       await page
-        .getByText(/^Worked for /)
+        .getByText(/^(Worked for|Completed in) /)
         .last()
         .click()
     await expect(group.or(card).first()).toBeVisible({ timeout: 2_000 })
