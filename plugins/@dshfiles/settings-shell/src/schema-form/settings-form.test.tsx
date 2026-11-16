@@ -212,3 +212,51 @@ describe('machine values', () => {
     expect(row('baseURL')?.textContent).not.toContain('source.unknown')
   })
 })
+
+describe('advanced settings', () => {
+  const schema = wire(
+    Schemastery.object({
+      pickActiveTab: Schemastery.boolean().default(true),
+      chromePath: Schemastery.string().default('').collapse(),
+      cdpPort: Schemastery.natural().default(9222).collapse(),
+    }),
+  )
+  const fields = SettingsSchemaModel.settingFields({ schema, secrets: [], text })
+  const base = { pickActiveTab: true, chromePath: '', cdpPort: 9222 }
+  const untouched: ConfigFormSnapshot<unknown> = { status: 'ready', value: base, base, user: {}, revision: 1, writable: true }
+  const fold = (): HTMLButtonElement | null => container.querySelector('[data-settings-advanced]')
+
+  it('folds the settings a schema marks, behind one labelled control, closed', async () => {
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(untouched)} namespace="example" t={t} />))
+    expect(row('pickActiveTab')).not.toBeNull()
+    expect(row('chromePath')).toBeNull()
+    expect(fold()?.textContent).toBe('form.advanced {"count":2}')
+    expect(fold()?.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => fold()?.click())
+    expect(row('chromePath')).not.toBeNull()
+    expect(row('cdpPort')).not.toBeNull()
+  })
+
+  it('opens the fold by itself for a modified advanced setting and for one a link focuses', async () => {
+    const modified: ConfigFormSnapshot<unknown> = { ...untouched, value: { ...base, cdpPort: 9333 }, user: { cdpPort: 9333 } }
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(modified)} namespace="example" t={t} />))
+    expect(row('cdpPort')).not.toBeNull()
+    await act(async () => root.render(<div />))
+    HTMLElement.prototype.scrollIntoView = () => undefined
+    await act(async () => root.render(<SettingsForm fields={fields} focusPath={['chromePath']} form={formOf(untouched)} namespace="example" t={t} />))
+    expect(row('chromePath')).not.toBeNull()
+  })
+
+  it('lists a matching advanced setting in search results without the fold', async () => {
+    await act(async () =>
+      root.render(<SettingsForm fields={fields.filter(field => field.key === 'cdpPort')} form={formOf(untouched)} highlight="cdp" namespace="example" t={t} />),
+    )
+    expect(fold()).toBeNull()
+    expect(row('cdpPort')).not.toBeNull()
+  })
+
+  it('draws no fold for a schema that marks nothing', async () => {
+    await act(async () => root.render(<SettingsForm fields={fields.filter(field => !field.advanced)} form={formOf(untouched)} namespace="example" t={t} />))
+    expect(fold()).toBeNull()
+  })
+})

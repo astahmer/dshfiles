@@ -82,6 +82,11 @@ export interface SettingField {
   readonly groups: readonly string[]
   /** The schema default, when it declares one. */
   readonly defaultValue: JsonValue | undefined
+  /**
+   * The schema folds this setting away (`.collapse()` on the field or on an object that holds it): a developer or
+   * diagnostic knob. The form draws it under "Advanced", closed, so it does not sit level with everyday settings.
+   */
+  readonly advanced: boolean
 }
 
 /** Picks the reader's language out of a schemastery description (a string, or `{ en, zh, … }`). */
@@ -289,7 +294,7 @@ const isSecret = (walk: Walk, path: readonly string[]): boolean =>
     return shared > 0 && secret.slice(0, shared).every((segment, index) => path[index] === segment)
   })
 
-const collect = (walk: Walk, node: SchemaNode, path: readonly string[], groups: readonly string[], depth: number): SettingField[] => {
+const collect = (walk: Walk, node: SchemaNode, path: readonly string[], groups: readonly string[], depth: number, folded = false): SettingField[] => {
   if (depth > MAX_DEPTH || node.dict === undefined) return []
   return Object.entries(node.dict).flatMap(([key, reference]) => {
     const child = resolve(walk, reference)
@@ -297,7 +302,7 @@ const collect = (walk: Walk, node: SchemaNode, path: readonly string[], groups: 
     if (child === undefined || child.meta.hidden === true || child.meta.role === 'secret' || isSecret(walk, fieldPath)) return []
     const authoredTitle = walk.text(child.meta.label) || walk.text(child.meta.title)
     if (child.type === 'object' && child.dict !== undefined) {
-      return collect(walk, child, fieldPath, [...groups, authoredTitle || humanizeKey(key)], depth + 1)
+      return collect(walk, child, fieldPath, [...groups, authoredTitle || humanizeKey(key)], depth + 1, folded || child.meta.collapse === true)
     }
     const control = controlOf(walk, child, key)
     // The control shows the unit once; "Stream idle timeout ms … 300 s" would say it twice, and wrongly.
@@ -311,6 +316,7 @@ const collect = (walk: Walk, node: SchemaNode, path: readonly string[], groups: 
         control,
         groups,
         defaultValue: child.meta.default,
+        advanced: folded || child.meta.collapse === true,
       },
     ]
   })
