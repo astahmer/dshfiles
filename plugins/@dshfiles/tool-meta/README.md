@@ -1,6 +1,6 @@
 # @dshfiles/tool-meta
 
-![Tool timing and a live wait countdown](docs/screenshots/tool-call-timing.png)
+![How long a tool call took, at the right of its row](docs/screenshots/tool-call-timing.png)
 
 How long each tool call took, in the chat transcript: `1.2 s` at the right of the tool row, for native tools and plugin-owned ones, root calls and PTC children alike. A call under one second shows nothing, so the slow step stands out; hover a duration for the start time (the turn's time divider already gives the clock time, so rows do not repeat it). While a call runs the duration counts up every second. `job_output` waits and `background_jobs_wait` calls name what they are waiting for and show a live wait bar: a countdown against an explicit timeout when one is supplied, otherwise an indeterminate bar with elapsed time. The bar measures the wait, not the job's progress or expected completion. To interrupt a wait, steer or stop the turn with the existing composer controls. It also renders the file tool cards themselves: `read` on the shared `CodeBlock`, and `edit` / `write` / `apply_patch` on the shared `PatchView`; and the native approval request as a risk card in the composer.
 
