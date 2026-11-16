@@ -223,12 +223,12 @@ export const threadCommandsLayer = Layer.effectDiscard(
     const actions = yield* ThreadActions
     yield* HostCommands.register({
       name: 'settle',
-      description: 'Settle this thread so it will not run another model step until unsettled.',
+      description: 'Mark this thread done: it runs nothing more until it is restored.',
       handler: invocation =>
         invocation.rawInput.trim().length > 0
           ? Effect.succeed<CommandResult>({ kind: 'error', text: 'Usage: /settle' })
           : actions.settle({ input: {}, caller: { kind: 'agent', sessionId: invocation.agent.id } }).pipe(
-              Effect.map((result): CommandResult => ({ kind: 'success', text: `Settled thread ${result.sessionId}.` })),
+              Effect.map((result): CommandResult => ({ kind: 'success', text: `Marked thread ${result.sessionId} done.` })),
               Effect.catch(error => Effect.succeed(commandText(error))),
             ),
     })

@@ -1421,7 +1421,7 @@ When('the thread is settled from the rebase notice', async ({ page }: { page: Pa
 Then('the thread appears in the Settled sidebar section', async ({ page }: { page: Page }) => {
   await ThreadListFilter.selectView(page, await threadList(page), 'All threads')
   await ThreadSidebarJourney.arrangeManually(page)
-  const settledSection = (await threadList(page)).getByRole('button', { name: 'Settled (1)', exact: true })
+  const settledSection = (await threadList(page)).getByRole('button', { name: 'Done (1)', exact: true })
   await recordAssertion(page, 'jj-integration-rebased-thread-can-be-settled-from-notice', () => expect(settledSection).toBeVisible())
   await finishJourneyAssertions(page)
 })

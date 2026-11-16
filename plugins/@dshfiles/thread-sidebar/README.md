@@ -362,7 +362,7 @@ range without opening, Home/End jump to the ends of the list, and Ctrl/Cmd+A
 selects every visible row. Shift+click and Ctrl/Cmd+click do the same from the
 pointer, ←/→ fold the containing group section or the row's subagent children,
 and Escape or a plain click clears the selection. A selected row paints in the
-info tone, and an "N selected" bar above the list offers Pin, Settle, Archive
+info tone, and an "N selected" bar above the list offers Pin, Done, Archive
 and Clear. Rows read their selected state from a small store on the shared row
 actions (`src/thread-multi-selection.ts`), so a toggle re-renders only the rows
 whose state changed; nothing writes the rendered rows' attributes.
@@ -543,7 +543,7 @@ without scrolling. A row wide enough keeps the full names. A status filter names
 shows, and several combine as OR: **Working**, **Not running**, **Needs attention** (any label),
 **Unread**, one filter per attention label (**Approval needed**, **Input
 needed**, **Turn finished**, **Needs resume**, **Interrupted**), **Inactive**,
-and the storage states **Muted**, **Settled** and **Archived**. Unread leaves archived and
+and the storage states **Muted**, **Done** and **Archived**. Unread leaves archived and
 settled rows out, and the attention filters see the label a root row shows for
 itself or a child. A saved view from an earlier build that still asks for **Not
 working** decodes to **Not running** without removing its other selectors. Muted,
@@ -569,11 +569,11 @@ reopens it. Persistent warnings — storage failures and restart requests — st
 in the list flow instead.
 
 **Settled composer.** A settled thread opens normally and reads as history: the
-composer carries a **Settled** status strip
+composer carries a **Done** status strip
 (`src/settled-thread-dock.tsx`), one compact line beside the jj rebase notice
 titled with the settle age once it stops reading "now", the archive deadline
 in the sidebar's own relative buckets beside it, and an **Archive** button next
-to the primary **Unsettle** that lifts the block, because the Host
+to the primary **Restore** that lifts the block, because the Host
 rejects the next model step while the thread is settled. The
 rejection is a `agent/pre-step` listener in `src/host.ts` over
 `src/settled-gate.ts`: a settled
@@ -628,18 +628,18 @@ unscrollable.
 ships **unbound**, so Settings › Shortcuts lists it without it owning a chord
 until the user picks one. Which buttons a row draws on hover, and in which order,
 is a preference: Customize sidebar › Hover actions lists every one (Resume,
-Dismiss, Open in side panel, Pin, Park, Settle, Mute, Archive, Restore), each row
+Dismiss, Open in side panel, Pin, Snooze, Done, Mute, Archive, Restore), each row
 carrying the button's own icon, a grip, Move up/Move down buttons and a visibility
 checkbox. Drag a row, or move it, to set the left-to-right order the buttons draw
 in; `rowActionOrder` stores that order and `hiddenRowActions` the ones a row hides
 — an absent id means shown, so a new action ships visible at the end of the saved
-order. The shipped order puts Settle in Archive's slot and Archive just before it,
-so a row that hides Archive ends on Settle. Hiding one removes only its hover
+order. The shipped order puts Done in Archive's slot and Archive just before it,
+so a row that hides Archive ends on Done. Hiding one removes only its hover
 button; the context menu keeps every action.
 
-By default a row shows **one** verb on hover, Settle, and a `⋯` that opens the
+By default a row shows **one** verb on hover, Done, and a `⋯` that opens the
 row menu (a row that needs a resume adds Resume and Dismiss; an archived row shows
-Restore instead): Open in side panel, Pin, Park, Mute and Archive ship hidden and
+Restore instead): Open in side panel, Pin, Snooze, Mute and Archive ship hidden and
 stay in that menu and on their keys. The buttons sit in the first line's time slot
 and the line gives them their width while they show, so the title truncates before
 them instead of being covered. A row's inline verb (Answer, Approve, Retry, Resume,
@@ -738,7 +738,7 @@ launcher, brand and reopen badge remain sidebar chrome; Settings already has its
 generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
-unread**, per-thread auto-settle behavior, a **Settle**/**Unsettle** toggle, and a **Mute thread** menu. The session header's **More thread actions** menu also lets you settle or unsettle the open thread. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after` and a structured session-reference chip prefilled, labeled with the source thread title, and the caret on the next line; normal workspace isolation applies.
+unread**, per-thread auto-settle behavior, a **Done**/**Restore** toggle, and a **Mute thread** menu. The session header's **More thread actions** menu also lets you settle or unsettle the open thread. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after` and a structured session-reference chip prefilled, labeled with the source thread title, and the caret on the next line; normal workspace isolation applies.
 
 **Continue in project** (row menu and thread header menu) fixes a thread that
 started in the wrong folder, or whose work moved to another repository. It lists
@@ -834,7 +834,11 @@ minutes; a refused send returns `rate-limited` with the seconds to wait. Nothing
 is queued for pages that open later, and it adds no history entry. Each send
 leaves a `thread-sidebar user notification send` span.
 
-**Park vs settle vs mute.** Park files a finished thread away: it moves to the
+**Snooze vs Done vs Mute (and Archive).** The labels follow the glossary: the action stored as _settled_ is shown as
+**Done** (its reverse **Restore**), the one stored as _parked_ as **Snooze** (**Unsnooze**); **Mute** and **Archive**
+keep their names because they are different actions. Settings keys, command ids, Host API methods and agent tool
+names (`thread_settle`, `parkedSessionIds`, …) keep the stored words, which the rest of this section uses.
+Park files a finished thread away: it moves to the
 Parked section, is skipped by auto-settle, and stays parked until unparked, but
 its alerts still fire and it still runs steps when something wakes it. Settle
 goes further: the thread moves to the Settled section and runs no step at all

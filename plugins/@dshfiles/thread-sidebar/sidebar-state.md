@@ -103,13 +103,13 @@ the ordinary status sections. Categories configured as labels stay on their
 thread rows. With Project or Date grouping, attention is shown inline on rows.
 Turn finished defaults to an inline label; it can be changed to a group.
 
-The status sections are **Pinned**, **Active**, **Parked**, **Settled**,
+The status sections are **Pinned**, **Active**, **Snoozed** (stored as parked), **Done** (stored as settled),
 **Inactive**, and **Archived**. The status filters name states the row already
 shows, and several combine as OR (they are grouped as Activity, Waiting on you,
 and Storage in the menu): **All**, **Working** (running), **Needs attention**
 (any label), **Unread**, one per attention label — **Approval needed**, **Input
 needed**, **Turn finished**, **Needs resume**, **Interrupted** — and the storage
-states **Muted**, **Settled**, **Archived**. A storage-state filter lists only
+states **Muted**, **Done**, **Archived**. A storage-state filter lists only
 non-running threads, so a muted thread disappears from **Gone** while it or its
 child is working; adding **Working** explicitly still matches running rows.
 The Working filter hides a finished thread when neither it nor its child work

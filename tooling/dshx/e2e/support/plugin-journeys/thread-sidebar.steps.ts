@@ -210,7 +210,7 @@ const statusFilterLabels: readonly string[] = [
   'Needs resume',
   'Interrupted',
   'Muted',
-  'Settled',
+  'Done',
   'Archived',
 ]
 
@@ -255,7 +255,7 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
   if (archivedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
   await expect(targetRow).toHaveCount(1)
-  await expect(targetRow.getByRole('button', { name: 'Settle', exact: true })).toBeEnabled()
+  await expect(targetRow.getByRole('button', { name: 'Done', exact: true })).toBeEnabled()
   const scrollPane = threadSidebar(page).getByTestId('thread-sidebar-scroll')
   const scrollPaneTopBeforeArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
   await openThreadRowMenu(targetRow)
@@ -366,7 +366,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await composer.fill(timedPrompt)
   await composer.press('Enter')
   const timedRow = threadSidebar(page).locator('article').filter({ hasText: timedPrompt })
-  await expect(timedRow.getByRole('button', { name: 'Settle', exact: true })).toBeEnabled()
+  await expect(timedRow.getByRole('button', { name: 'Done', exact: true })).toBeEnabled()
   await openThreadRowMenu(timedRow)
   await chooseRowStatusAction(page, 'Archive')
   const archivedNotice = threadSidebar(page).getByText('Thread archived.', { exact: true })
@@ -383,7 +383,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await page.getByRole('textbox').first().fill(disabledPrompt)
   await page.getByRole('textbox').first().press('Enter')
   const disabledRow = threadSidebar(page).locator('article').filter({ hasText: disabledPrompt })
-  await expect(disabledRow.getByRole('button', { name: 'Settle', exact: true })).toBeEnabled()
+  await expect(disabledRow.getByRole('button', { name: 'Done', exact: true })).toBeEnabled()
   await openThreadRowMenu(disabledRow)
   await chooseRowStatusAction(page, 'Archive')
   await expect(threadSidebar(page).getByRole('button', { name: 'Archived (2)', exact: true })).toBeVisible()
@@ -407,7 +407,7 @@ When('an archived thread is opened from the Archived section', async ({ page }: 
   const archivedThreadId = currentThreadId(page)
   if (archivedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   const targetRow = threadRow(page, archivedThreadId)
-  await expect(targetRow.getByRole('button', { name: 'Settle', exact: true })).toBeEnabled()
+  await expect(targetRow.getByRole('button', { name: 'Done', exact: true })).toBeEnabled()
   await openThreadRowMenu(targetRow)
   await chooseRowStatusAction(page, 'Archive')
 
@@ -556,8 +556,8 @@ When('a nonblank Host thread is settled from its context menu', async ({ page }:
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
   await openThreadRowMenu(targetRow)
-  await chooseRowStatusAction(page, 'Settle')
-  await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
+  await chooseRowStatusAction(page, 'Done')
+  await expect(threadSidebar(page).getByRole('button', { name: 'Done (1)', exact: true })).toBeVisible()
 })
 
 Then('the thread is settled, opens read-only and unsettles to reply', async ({ page }: { page: Page }) => {
@@ -565,11 +565,11 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
   const targetRow = threadRow(page, settledThreadId)
   await recordAssertion(page, 'thread-sidebar-settle-blocks-the-composer', async () => {
     // Settled opens folded, so its rows appear after the section is expanded.
-    await threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true }).click()
+    await threadSidebar(page).getByRole('button', { name: 'Done (1)', exact: true }).click()
     await expect(targetRow).toHaveCount(1)
-    const banner = page.getByRole('status', { name: 'This thread is settled.' })
+    const banner = page.getByRole('status', { name: 'This thread is done.' })
     await expect(banner).toBeVisible()
-    await expect(banner.getByRole('button', { name: 'Unsettle', exact: true })).toBeVisible()
+    await expect(banner.getByRole('button', { name: 'Restore', exact: true })).toBeVisible()
   })
   await recordAssertion(page, 'thread-sidebar-settled-stays-out-of-finished-turns', async () => {
     // A settled thread is storage, like an archived one: a view that lists finished turns never lists it.
@@ -580,10 +580,10 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     await expect(targetRow).toHaveCount(1)
   })
   await recordAssertion(page, 'thread-sidebar-settled-banner-carries-actions', async () => {
-    const banner = page.getByRole('status', { name: 'This thread is settled.' })
+    const banner = page.getByRole('status', { name: 'This thread is done.' })
     // The banner is already titled "Settled", so a freshly settled thread shows no redundant "Settled now" age; no
     // archive delay is set here, so the banner carries no date at all.
-    await expect(banner).not.toContainText('Settled now')
+    await expect(banner).not.toContainText('Done now')
     await expect(banner.getByRole('button', { name: 'Archive', exact: true })).toBeVisible()
     // The banner reads like the jj rebase notice: capped and centred, never the dock's full width.
     const maxWidth = await banner.evaluate(element => Number.parseFloat(getComputedStyle(element).maxWidth))
@@ -592,9 +592,9 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     expect(Number.isFinite(maxWidth)).toBe(true)
     expect(bounds.width).toBeLessThanOrEqual(maxWidth + 1)
   })
-  await page.getByRole('status', { name: 'This thread is settled.' }).getByRole('button', { name: 'Unsettle', exact: true }).click()
+  await page.getByRole('status', { name: 'This thread is done.' }).getByRole('button', { name: 'Restore', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-unsettle-restores-the-composer', async () => {
-    await expect(page.getByRole('status', { name: 'This thread is settled.' })).toHaveCount(0, { timeout: 15_000 })
+    await expect(page.getByRole('status', { name: 'This thread is done.' })).toHaveCount(0, { timeout: 15_000 })
     // A settled Composer refuses input; a fill that lands and an enabled Send button prove it is live.
     await page.getByRole('textbox').first().fill('thread sidebar unsettled reply e2e')
     await expect(page.getByRole('button', { name: 'Send message' })).toBeEnabled()
@@ -602,8 +602,8 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
   await page.reload()
   await expect(threadSidebar(page)).toBeVisible()
   await recordAssertion(page, 'thread-sidebar-unsettle-survives-reload', async () => {
-    await expect(page.getByRole('status', { name: 'This thread is settled.' })).toHaveCount(0)
-    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (0)', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('status', { name: 'This thread is done.' })).toHaveCount(0)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Done (0)', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -668,8 +668,8 @@ Then('the continuation opens in that project with the conversation and the origi
     expect(listed.threads.find(thread => thread.sessionId === continuedThreadId)?.settled).toBe(false)
   })
   await recordAssertion(page, 'thread-sidebar-continued-thread-is-settled', async () => {
-    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible({ timeout: 15_000 })
-    await threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true }).click()
+    await expect(threadSidebar(page).getByRole('button', { name: 'Done (1)', exact: true })).toBeVisible({ timeout: 15_000 })
+    await threadSidebar(page).getByRole('button', { name: 'Done (1)', exact: true }).click()
     await expect(sectionOfSidebar(page, 'settled').locator(`article[data-thread-id="${journey.sourceThreadId}"]`)).toHaveCount(1)
   })
   await finishJourneyAssertions(page)
@@ -797,8 +797,8 @@ When('an archived thread and a settled thread fill the bottom sections', async (
   const settledRow = threadRow(page, settledId)
   await expect(settledRow).toHaveCount(1)
   await openThreadRowMenu(settledRow)
-  await chooseRowStatusAction(page, 'Settle')
-  await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
+  await chooseRowStatusAction(page, 'Done')
+  await expect(threadSidebar(page).getByRole('button', { name: 'Done (1)', exact: true })).toBeVisible()
 })
 
 Then('separate remote grouping is opt-in, reorderable and persists across reloads', async ({ page }: { page: Page }) => {
@@ -816,30 +816,30 @@ Then('separate remote grouping is opt-in, reorderable and persists across reload
     await page.mouse.up()
   }
   await recordAssertion(page, 'thread-sidebar-remote-group-is-opt-in', async () => {
-    expect(await headerNames()).toEqual(['Active(0)', 'Settled(1)', 'Archived(1)'])
+    expect(await headerNames()).toEqual(['Active(0)', 'Done(1)', 'Archived(1)'])
     await openSidebarSettings(page)
     const separateRemoteThreads = sidebarSettings(page).getByRole('checkbox', { name: 'Show remote threads in a separate group' })
     await expect(separateRemoteThreads).not.toBeChecked()
     await separateRemoteThreads.check()
-    await expect.poll(headerNames).toEqual(['Active(0)', 'Settled(1)', 'Archived(1)', 'Remote(0)'])
+    await expect.poll(headerNames).toEqual(['Active(0)', 'Done(1)', 'Archived(1)', 'Remote(0)'])
     await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
   })
   await recordAssertion(page, 'thread-sidebar-section-drag-reorders', async () => {
     await dragHeaderToTop(2)
-    await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)', 'Remote(0)'])
+    await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Done(1)', 'Remote(0)'])
     await dragHeaderToTop(3)
-    await expect.poll(headerNames).toEqual(['Remote(0)', 'Archived(1)', 'Active(0)', 'Settled(1)'])
+    await expect.poll(headerNames).toEqual(['Remote(0)', 'Archived(1)', 'Active(0)', 'Done(1)'])
   })
   await page.reload()
   await recordAssertion(page, 'thread-sidebar-section-order-survives-reload', async () => {
     await expect(threadSidebar(page)).toBeVisible()
-    await expect.poll(headerNames).toEqual(['Remote(0)', 'Archived(1)', 'Active(0)', 'Settled(1)'])
+    await expect.poll(headerNames).toEqual(['Remote(0)', 'Archived(1)', 'Active(0)', 'Done(1)'])
     await openSidebarSettings(page)
     const separateRemoteThreads = sidebarSettings(page).getByRole('checkbox', { name: 'Show remote threads in a separate group' })
     await expect(separateRemoteThreads).toBeChecked()
     await separateRemoteThreads.uncheck()
     await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
-    await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)'])
+    await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Done(1)'])
   })
   await finishJourneyAssertions(page)
 })
@@ -919,15 +919,15 @@ Then("the remote row offers the sidebar's own verbs and no Host verb", async ({ 
     await openThreadRowMenu(remoteRow(page))
     const menu = page.getByRole('menu', { name: 'Thread actions', exact: true })
     await expect(menu).toBeVisible()
-    await expect(page.getByRole('menuitem', { name: 'Settle', exact: true })).toBeVisible()
-    await expect(page.getByRole('menuitem', { name: 'Park', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Done', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Snooze', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Copy thread ID', exact: true })).toBeVisible()
     // Archive, pin and rename run on the runtime that owns the Session, so a mirrored row never offers them.
     await expect(menu.getByRole('menuitem', { name: 'Archive', exact: true })).toHaveCount(0)
     await expect(menu.getByRole('menuitem', { name: /Pin/u })).toHaveCount(0)
     await expect(menu.getByRole('menuitem', { name: 'Rename thread', exact: true })).toHaveCount(0)
-    await pressRemoteRowMenuItem(page, 'Settle')
-    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
+    await pressRemoteRowMenuItem(page, 'Done')
+    await expect(threadSidebar(page).getByRole('button', { name: 'Done (1)', exact: true })).toBeVisible()
     await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(0)
     await expandSection(page, 'settled')
     await expect(sectionOfSidebar(page, 'settled').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
@@ -939,13 +939,13 @@ Then('dragging the remote row onto the Active header keeps it there across a rel
     await expandSection(page, 'settled')
     await dragRowToSectionHeader(page, remoteRow(page), sectionOfSidebar(page, 'active').locator('[data-thread-section-header]'))
     await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
-    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toHaveCount(0)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Done (1)', exact: true })).toHaveCount(0)
   })
   await page.reload()
   await expect(threadSidebar(page)).toBeVisible()
   await recordAssertion(page, 'thread-sidebar-remote-row-drag-survives-reload', async () => {
     await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
-    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toHaveCount(0)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Done (1)', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -977,16 +977,16 @@ When('a thread is settled with a one-week settled-archive delay', async ({ page 
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
   await openThreadRowMenu(targetRow)
-  await chooseRowStatusAction(page, 'Settle')
-  await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
+  await chooseRowStatusAction(page, 'Done')
+  await expect(threadSidebar(page).getByRole('button', { name: 'Done (1)', exact: true })).toBeVisible()
 })
 
 Then('the settled banner shows the archive time it is waiting for', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-settled-banner-shows-archive-time', async () => {
-    const banner = page.getByRole('status', { name: 'This thread is settled.' })
+    const banner = page.getByRole('status', { name: 'This thread is done.' })
     // One dated instant: the one-week archive deadline. A freshly settled thread withholds its redundant age.
     await expect(banner.locator('time').filter({ hasText: 'Archives in' })).toHaveCount(1)
-    await expect(banner).not.toContainText('Settled now')
+    await expect(banner).not.toContainText('Done now')
     await expect(banner).toContainText('Archives')
   })
 })
@@ -999,7 +999,7 @@ Then('the settled thread archives itself without a click', async ({ page }: { pa
   if (settledArchiveThreadId === null) throw new Error('No thread was settled for auto-archive.')
   await recordAssertion(page, 'thread-sidebar-settled-auto-archive', async () => {
     await expect(threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })).toBeVisible({ timeout: 30_000 })
-    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toHaveCount(0)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Done (1)', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -1064,9 +1064,9 @@ When('a nonblank Host thread is parked from its context menu', async ({ page, $t
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
   await openThreadRowMenu(targetRow)
-  await chooseRowStatusAction(page, 'Park')
+  await chooseRowStatusAction(page, 'Snooze')
   await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
-  await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Snoozed (1)', exact: true })).toBeVisible()
   await expect(targetRow).toHaveCount(1)
 })
 
@@ -1076,14 +1076,14 @@ Then('the Host thread stays parked after reload without an attention error', asy
   await recordAssertion(page, 'thread-sidebar-context-menu-parking-succeeds', async () => {
     await expect(threadSidebar(page).getByText('The Host could not update this thread’s read or parked state.', { exact: true })).toHaveCount(0)
     await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
-    await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByRole('button', { name: 'Snoozed (1)', exact: true })).toBeVisible()
     await expect(targetRow).toHaveCount(1)
   })
   await page.reload()
   await expect(threadSidebar(page)).toBeVisible()
   await recordAssertion(page, 'thread-sidebar-context-menu-parking-survives-reload', async () => {
     await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
-    await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByRole('button', { name: 'Snoozed (1)', exact: true })).toBeVisible()
     await expect(targetRow).toHaveCount(1)
   })
   await finishJourneyAssertions(page)
@@ -1096,16 +1096,16 @@ Then('dragging its row onto the Active header unparks it and survives a reload',
   const targetRow = threadRow(page, threadId)
   const activeHeader = sectionOfSidebar(page, 'active').locator('[data-thread-section-header]')
   await recordAssertion(page, 'thread-sidebar-row-drag-moves-to-another-section', async () => {
-    await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByRole('button', { name: 'Snoozed (1)', exact: true })).toBeVisible()
     await dragRowToSectionHeader(page, targetRow, activeHeader)
     await expect(sectionOfSidebar(page, 'active').locator(`article[data-thread-id="${threadId}"]`)).toHaveCount(1)
-    await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toHaveCount(0)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Snoozed (1)', exact: true })).toHaveCount(0)
   })
   await page.reload()
   await expect(threadSidebar(page)).toBeVisible()
   await recordAssertion(page, 'thread-sidebar-row-drag-survives-reload', async () => {
     await expect(sectionOfSidebar(page, 'active').locator(`article[data-thread-id="${threadId}"]`)).toHaveCount(1)
-    await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toHaveCount(0)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Snoozed (1)', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -1180,7 +1180,7 @@ When('three nonblank Host threads fill the Active section', async ({ page }: { p
   await expect(threadSidebar(page).locator('article')).toHaveCount(3)
   for (const prompt of prompts) {
     const row = threadSidebar(page).locator('article').filter({ hasText: prompt })
-    await expect(row.getByRole('button', { name: 'Settle', exact: true })).toHaveCount(1, { timeout: 30_000 })
+    await expect(row.getByRole('button', { name: 'Done', exact: true })).toHaveCount(1, { timeout: 30_000 })
   }
   batchSelectionJourneys.set(page, { threadIds, prompts })
 })
@@ -1420,7 +1420,7 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
 
 When('auto-settle is enabled with a new idle threshold and scan interval', async ({ page }: { page: Page }) => {
   await openSidebarSettings(page)
-  const autoSettle = sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })
+  const autoSettle = sidebarSettings(page).getByRole('checkbox', { name: 'Mark inactive threads done' })
   await expect(autoSettle).not.toBeChecked()
   await autoSettle.click()
   await page.getByLabel('Move to inactive after (minutes)').fill('45')
@@ -1432,7 +1432,7 @@ When('auto-settle is enabled with a new idle threshold and scan interval', async
 
 Then('the policy settings survive a browser reload', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-idle-policy-settings-survive-reload', async () => {
-    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })).toBeChecked()
+    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Mark inactive threads done' })).toBeChecked()
     await expect(page.getByLabel('Move to inactive after (minutes)')).toHaveValue('45')
     await expect(page.getByLabel('Check every (minutes)')).toHaveValue('5')
   })
@@ -1604,11 +1604,11 @@ When('auto-settle is enabled for one thread while global auto-settle stays off',
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar auto archive override' })
   await expect(targetRow).toHaveCount(1)
   await openSidebarSettings(page)
-  await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })).not.toBeChecked()
+  await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Mark inactive threads done' })).not.toBeChecked()
   await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
   await openThreadRowMenu(targetRow)
-  await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
-  const enableForThread = page.getByRole('menuitemradio', { name: 'Settle after idle threshold', exact: true })
+  await page.getByRole('menuitem', { name: 'Mark done when idle', exact: true }).click()
+  const enableForThread = page.getByRole('menuitemradio', { name: 'Mark done after the idle threshold', exact: true })
   await enableForThread.click()
   await expect(enableForThread).toHaveAttribute('aria-checked', 'true')
   await page.reload()
@@ -1620,13 +1620,13 @@ Then('the per-thread override survives reload without changing the global settin
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar auto archive override' })
   await openSidebarSettings(page)
   await recordAssertion(page, 'thread-sidebar-global-auto-settle-remains-off', async () => {
-    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })).not.toBeChecked()
+    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Mark inactive threads done' })).not.toBeChecked()
   })
   await ThreadListFilter.clickItem(page, threadSidebar(page), 'Thread list settings')
   await openThreadRowMenu(targetRow)
-  await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Mark done when idle', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-per-thread-auto-settle-survives-reload', async () => {
-    await expect(page.getByRole('menuitemradio', { name: 'Settle after idle threshold', exact: true })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('menuitemradio', { name: 'Mark done after the idle threshold', exact: true })).toHaveAttribute('aria-checked', 'true')
   })
   await finishJourneyAssertions(page)
 })
@@ -2129,7 +2129,7 @@ Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', asy
     await page.keyboard.press('ControlOrMeta+A')
     const selectionBar = page.getByTestId('thread-selection-bar')
     await expect(selectionBar).toContainText('2 selected')
-    await selectionBar.getByRole('button', { name: 'Settle', exact: true }).click()
+    await selectionBar.getByRole('button', { name: 'Done', exact: true }).click()
     await expect(selectionBar).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
@@ -2588,7 +2588,7 @@ When('the settle hover action is moved to the front in Customize sidebar', async
   await ThreadListFilter.openSidebarSettings(page)
   const customize = customizeSidebar(page)
   await expect(customize).toBeVisible()
-  const moveUp = customize.getByRole('button', { name: 'Move up: Settle', exact: true })
+  const moveUp = customize.getByRole('button', { name: 'Move up: Done', exact: true })
   await expect(moveUp).toBeVisible()
   for (let step = 0; step < 12; step += 1) {
     if (!(await moveUp.isEnabled())) break
@@ -2602,7 +2602,7 @@ Then('the thread row draws the settle hover action first', async ({ page }: { pa
   const row = threadRow(page, asideThreadId)
   await row.hover()
   await recordAssertion(page, 'thread-sidebar-row-action-order-follows-the-setting', async () => {
-    await expect(rowActionContainer(row).getByRole('button').first()).toHaveAttribute('aria-label', 'Settle')
+    await expect(rowActionContainer(row).getByRole('button').first()).toHaveAttribute('aria-label', 'Done')
   })
   await finishJourneyAssertions(page)
 })

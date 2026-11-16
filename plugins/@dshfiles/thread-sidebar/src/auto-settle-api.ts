@@ -66,13 +66,15 @@ export type SettleRequestResult = Schema.Schema.Type<typeof settleRequestResultS
 
 const renderStatus = (status: AutoSettleStatus): string => {
   const lines = [
-    status.active ? `Auto-settle is on; the Host checks every ${String(status.intervalMinutes)} min.` : 'Auto-settle is off in the thread-sidebar settings.',
+    status.active
+      ? `Idle threads are marked done automatically; DSH checks every ${String(status.intervalMinutes)} min.`
+      : 'Marking idle threads done is off in Settings › Thread list.',
   ]
   if (status.lastScan !== null) {
     const scan = status.lastScan
     lines.push(
       scan.error === undefined
-        ? `Last scan ${new Date(scan.at).toISOString()}: ${String(scan.idleSettled)} idle, ${String(scan.rebasedSettled)} rebased and ${String(scan.subagentSettled ?? 0)} subagent threads settled; ${String(scan.jobsStopped ?? 0)} subagent jobs stopped.`
+        ? `Last scan ${new Date(scan.at).toISOString()}: ${String(scan.idleSettled)} idle, ${String(scan.rebasedSettled)} rebased and ${String(scan.subagentSettled ?? 0)} subagent threads marked done; ${String(scan.jobsStopped ?? 0)} subagent jobs stopped.`
         : `Last scan ${new Date(scan.at).toISOString()} failed: ${scan.error}`,
     )
   }
