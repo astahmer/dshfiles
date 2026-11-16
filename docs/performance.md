@@ -157,8 +157,41 @@ settled without another request"), thread-sidebar `auto-archive-machine.test.ts`
 longer has as missing, not as a failure to retry") and `organization.test.ts` ("an archive refused for a Session the Host
 does not have reads as missing").
 
-Found, not fixed (live, per tap): `settings/mutate` twice on every open and every Back, `session/modelCatalog` 4.8 per
-open and 3.3 per Back, `settings/describe` 3.0 per open.
+### Settings writes behind every open and Back (2026-11-16)
+
+Live, per tap: `settings/mutate` twice on every open and Back, `session/modelCatalog` 4.8 per open and 3.3 per Back,
+`settings/describe` 3.0 per open. Initiator stacks (CDP async stacks on the unbatched native calls) and the write bodies
+name one chain:
+
+1. Thread Sidebar's auto-archive drains a backlog of settled threads while the list is mounted (about four per Back on
+   the phone). Each archive changed the archived set, and the "archiving outranks settled" effect then rewrote the
+   whole settled status, every id and instant (52 KB live), to drop that one id: one `settings/mutate` per archive.
+2. Every write announces `settings/document-updated`, for any namespace. The page re-reads `settings/describe`, and
+   the model selector and the Subagent settings card each re-read `session/modelCatalog`. The card did so whether or
+   not it was on screen.
+
+Fixes: the sidebar holds that cleanup while an auto-archive scan runs, so a scan clears all its archived ids in one
+write (`SettledThreadsModel.archivedStillSettled`); the Subagent card (`@dshfiles/settings-subagent` fork) reads the
+catalog only while a renderer watches it, and catches up when it is shown.
+
+Scratch, phone list mounted for 25 s after settling seven listed threads with the archive delay `immediately`
+(`dshx config set thread-sidebar …`); a load with nothing to archive sends 2 `settings/describe` and 2
+`session/modelCatalog` in both builds:
+
+| Requests in 25 s           | Before (7 archived) | After (6 archived) |
+| -------------------------- | ------------------- | ------------------ |
+| `workspace/archiveSession` | 7                   | 6                  |
+| `settings/mutate`          | 5                   | 1                  |
+| `settings/describe`        | 10                  | 4                  |
+| `session/modelCatalog`     | 7                   | 3                  |
+
+Regression checks: thread-sidebar `settled-threads.test.ts` ("waits for a running auto-archive scan, so its archives
+clear the settled status in one write") and settings-subagent `catalog-read.test.ts` ("reads nothing on a settings
+write while no renderer shows the card").
+
+Still open: `settings/describe` and the model selector's catalog still follow every settings write, any namespace
+(native config-forms describe store; the selector cannot tell which namespaces feed provider routes). With the write
+per archive gone, they follow one write per scan.
 
 ## Idle polls replaced by Host change events (2026-11-12, issue #142)
 
