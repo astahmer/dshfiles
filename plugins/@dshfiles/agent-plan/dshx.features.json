@@ -84,7 +84,7 @@
     {
       "id": "pinned-step",
       "title": "Current plan step pinned beside the composer",
-      "summary": "While the latest turn's plan has steps left, a chip beside the native plan-mode control says \"Step 2 of 3 · Fix the rounding bug · 12s\" and opens the whole plan. It sits beside the native control rather than replacing it.",
+      "summary": "While the latest turn's plan has steps left, a chip beside the native plan-mode control says \"Step 2 of 3 · Fix the rounding bug · 12s\" and opens the whole plan. It sits beside the native control rather than replacing it. While the chip is on, the To-dos strip above the composer gives way to it, so the plan is not shown twice.",
       "reach": [
         "seed jev-setup-chat-thread",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
@@ -102,6 +102,13 @@
           "constraints": "Boolean; pin the current plan step beside the composer.",
           "choices": ["true", "false"],
           "coveredBy": ["agent-plan.pinned-step"]
+        },
+        {
+          "key": "todoStrip",
+          "defaultValue": "false",
+          "constraints": "Boolean; also show the To-dos strip above the composer while the pinned step is on.",
+          "choices": ["true", "false"],
+          "coveredBy": ["agent-plan.todo-strip"]
         }
       ],
       "states": ["hidden-no-plan", "step-in-progress", "hidden-plan-done", "hidden-new-turn", "disabled"],
@@ -112,6 +119,12 @@
           "kind": "gherkin",
           "id": "agent-plan.pinned-step",
           "featureFile": "tooling/dshx/e2e/features/agent-plan.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-plan.todo-strip",
+          "file": "plugins/@dshfiles/agent-plan/src/settings.test.ts",
+          "testName": "hides the To-dos strip while the pinned step shows the same plan"
         }
       ],
       "telemetry": [
