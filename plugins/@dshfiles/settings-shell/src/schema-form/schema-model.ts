@@ -44,7 +44,13 @@ export interface NumberControl {
   min?: number
   max?: number
   step?: number
+  /** The unit the control shows beside the number. */
   unit?: string
+  /**
+   * How many stored units one shown unit holds (stored = shown × factor), when the control shows a larger unit than
+   * the key stores: `streamIdleTimeoutMs` 300000 shows as 300 s. `min`, `max` and `step` stay in stored units.
+   */
+  factor?: number
 }
 
 export type ScalarControl =
@@ -138,8 +144,61 @@ const UNIT_SUFFIXES: readonly (readonly [RegExp, string])[] = [
   [/(Percent|Pct)$/, '%'],
 ]
 
+/** A size named inside the key rather than at its end (`imageOffloadByteQuantum`). */
+const BYTES_WORD = /Bytes?(?=[A-Z])/
+
 /** The unit a numeric key spells out (`idleMinutes` → "min"), or undefined. */
-const unitOfKey = (key: string): string | undefined => UNIT_SUFFIXES.find(([pattern]) => pattern.test(key))?.[1]
+const unitOfKey = (key: string): string | undefined => UNIT_SUFFIXES.find(([pattern]) => pattern.test(key))?.[1] ?? (BYTES_WORD.test(key) ? 'bytes' : undefined)
+
+/** The key without the unit its control shows (`streamIdleTimeoutMs` → `streamIdleTimeout`); a key that is only a unit stays. */
+const withoutUnitSuffix = (key: string): string => {
+  const suffix = UNIT_SUFFIXES.find(([pattern]) => pattern.test(key))?.[0]
+  const rest = suffix === undefined ? key : key.replace(suffix, '')
+  return rest === '' ? key : rest
+}
+
+/** A number of four or more digits is hard to judge: it climbs to the next unit. */
+const READABLE_BELOW = 1000
+const TIME_LADDER: readonly (readonly [unit: string, perPrevious: number])[] = [
+  ['ms', 1],
+  ['s', 1000],
+  ['min', 60],
+  ['h', 60],
+  ['days', 24],
+]
+const SIZE_UNITS = ['bytes', 'KB', 'MB', 'GB'] as const
+
+interface ReadableUnit {
+  readonly unit: string
+  readonly factor: number
+}
+
+/**
+ * The unit a duration or size reads well in, chosen from the schema default so it never changes while a value is
+ * edited: 300000 ms shows as 300 s, 134217728 bytes as 128 MB, 5000000 bytes as 5 MB. A default that does not divide
+ * evenly (800 ms, 1600 bytes) or is zero keeps the unit of its key. Sizes divide by 1024 when the default is a
+ * multiple of it, by 1000 otherwise, which is what the default's author meant by "MB".
+ */
+const readableUnit = (unit: string, defaultValue: JsonValue | undefined): ReadableUnit => {
+  const sizeAt = SIZE_UNITS.findIndex(candidate => candidate === unit)
+  const timeAt = TIME_LADDER.findIndex(([candidate]) => candidate === unit)
+  if (typeof defaultValue !== 'number' || !Number.isInteger(defaultValue) || defaultValue <= 0 || (sizeAt === -1 && timeAt === -1)) return { unit, factor: 1 }
+  const sizeStep = defaultValue % 1024 === 0 ? 1024 : 1000
+  const next = (index: number): readonly [string, number] | undefined => {
+    if (sizeAt === -1) return TIME_LADDER[index + 1]
+    const larger = SIZE_UNITS[index + 1]
+    return larger === undefined ? undefined : [larger, sizeStep]
+  }
+  let index = sizeAt === -1 ? timeAt : sizeAt
+  let shown = defaultValue
+  let readable: ReadableUnit = { unit, factor: 1 }
+  for (let step = next(index); step !== undefined && shown >= READABLE_BELOW && shown % step[1] === 0; step = next(index)) {
+    shown /= step[1]
+    index += 1
+    readable = { unit: step[0], factor: readable.factor * step[1] }
+  }
+  return readable
+}
 
 const choiceOptions = (walk: Walk, node: SchemaNode): readonly ChoiceOption[] | undefined => {
   if (node.type === 'const') {
@@ -166,12 +225,14 @@ const scalarControl = (walk: Walk, node: SchemaNode, key: string): ScalarControl
   if (node.type === 'number' || node.type === 'natural' || node.type === 'percent') {
     const bounds = decoded(numberMeta, node.meta) ?? {}
     const percent = node.type === 'percent' || (node.meta.role === 'slider' && bounds.min === 0 && bounds.max === 1)
-    const unit = percent ? '%' : unitOfKey(key)
+    const keyUnit = percent ? '%' : unitOfKey(key)
+    const readable = keyUnit === undefined ? undefined : readableUnit(keyUnit, node.meta.default)
     const control: NumberControl = { kind: 'number', percent }
     if (bounds.min !== undefined) control.min = bounds.min
     if (bounds.max !== undefined) control.max = bounds.max
     if (bounds.step !== undefined) control.step = bounds.step
-    if (unit !== undefined) control.unit = unit
+    if (readable !== undefined) control.unit = readable.unit
+    if (readable !== undefined && readable.factor !== 1) control.factor = readable.factor
     return control
   }
   const options = choiceOptions(walk, node)
@@ -201,15 +262,20 @@ const collect = (walk: Walk, node: SchemaNode, path: readonly string[], groups: 
     const child = resolve(walk, reference)
     const fieldPath = [...path, key]
     if (child === undefined || child.meta.hidden === true || child.meta.role === 'secret' || isSecret(walk, fieldPath)) return []
-    const title = walk.text(child.meta.label) || walk.text(child.meta.title) || humanizeKey(key)
-    if (child.type === 'object' && child.dict !== undefined) return collect(walk, child, fieldPath, [...groups, title], depth + 1)
+    const authoredTitle = walk.text(child.meta.label) || walk.text(child.meta.title)
+    if (child.type === 'object' && child.dict !== undefined) {
+      return collect(walk, child, fieldPath, [...groups, authoredTitle || humanizeKey(key)], depth + 1)
+    }
+    const control = controlOf(walk, child, key)
+    // The control shows the unit once; "Stream idle timeout ms … 300 s" would say it twice, and wrongly.
+    const showsUnit = control.kind === 'number' && control.unit !== undefined
     return [
       {
         key,
         path: fieldPath,
-        title,
+        title: authoredTitle || humanizeKey(showsUnit ? withoutUnitSuffix(key) : key),
         description: walk.text(child.meta.description),
-        control: controlOf(walk, child, key),
+        control,
         groups,
         defaultValue: child.meta.default,
       },

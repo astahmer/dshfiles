@@ -37,8 +37,11 @@ const valuePreview = (value: JsonValue): string => {
 /** How long the pointer rests on a setting's name before its config key shows. */
 const KEY_TOOLTIP_DELAY_MS = 600
 
-/** A value that is the schema default needs no caption: the source line is for the rows that differ. */
-const showsSource = (provenance: SettingProvenance): boolean => provenance.source !== 'default'
+/**
+ * A value that is the schema default needs no caption: the source line is for the rows that differ. A schema without
+ * a default gives the Host nothing to compare with, and "Source unknown" read as a fault, so that row says nothing.
+ */
+const showsSource = (provenance: SettingProvenance): boolean => provenance.source !== 'default' && provenance.source !== 'unknown'
 
 /** A search that matched the config key shows it, so the highlighted match is on screen. */
 const keyMatches = (key: string, query: string | undefined): boolean => {
@@ -118,10 +121,25 @@ const useDraft = (stored: string, commit: (draft: string) => void) => {
   }
 }
 
+/** Float noise from a division (0.1 + 0.2) never reaches the field. */
+const SHOWN_PRECISION = 12
+
+/** A stored number in the unit the control shows: a fraction as a percentage, 300000 ms as 300 s. */
+const shownNumber = (control: NumberControl, stored: number): number => {
+  if (control.percent) return Math.round(stored * 10_000) / 100
+  return control.factor === undefined ? stored : Number((stored / control.factor).toPrecision(SHOWN_PRECISION))
+}
+
+/** What a typed number stores. A scaled unit stores whole base units: 1.5 s is 1500 ms. */
+const storedNumber = (control: NumberControl, shown: number): number => {
+  if (control.percent) return shown / 100
+  return control.factor === undefined ? shown : Math.round(shown * control.factor)
+}
+
 const formatNumber = (control: NumberControl, value: JsonValue | undefined): string => {
   const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(numberSchema)(value))
   if (parsed === undefined || value === undefined || value === null) return ''
-  return String(control.percent ? Math.round(parsed * 10_000) / 100 : parsed)
+  return String(shownNumber(control, parsed))
 }
 
 const ChoiceInput = (props: {
@@ -176,10 +194,10 @@ const NumberInput = (props: {
 }): JSX.Element => {
   const [invalid, setInvalid] = useState(false)
   const { control } = props
-  const scale = control.percent ? 100 : 1
+  const shownBound = (bound: number | undefined): number | undefined => (bound === undefined ? undefined : shownNumber(control, bound))
   const draft = useDraft(formatNumber(control, props.value), text => {
     const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(numberSchema)(text))
-    const value = parsed !== undefined ? parsed / scale : Number.NaN
+    const value = parsed !== undefined ? storedNumber(control, parsed) : Number.NaN
     const outOfRange = (control.min !== undefined && value < control.min) || (control.max !== undefined && value > control.max)
     setInvalid(parsed === undefined || text.trim() === '' || outOfRange)
     if (parsed !== undefined && text.trim() !== '' && !outOfRange) props.onChange(value)
@@ -193,14 +211,15 @@ const NumberInput = (props: {
           className="dshx:text-right dshx:font-mono! dshx:tabular-nums"
           disabled={props.disabled}
           inputMode="decimal"
-          max={control.max === undefined ? undefined : control.max * scale}
-          min={control.min === undefined ? undefined : control.min * scale}
+          max={shownBound(control.max)}
+          min={shownBound(control.min)}
           onBlur={draft.onCommit}
           onChange={event => draft.onChange(event.currentTarget.value)}
           onKeyDown={event => {
             if (event.key === 'Enter') draft.onCommit()
           }}
-          step={control.step === undefined ? undefined : control.step * scale}
+          // A scaled unit takes fractions (1.5 s); its step in stored units would be a sliver of the shown one.
+          step={control.factor === undefined ? shownBound(control.step) : 'any'}
           type="number"
           value={draft.value}
         />
@@ -213,8 +232,8 @@ const NumberInput = (props: {
       {invalid && (
         <span className="dshx:text-xs dshx:text-destructive" role="alert">
           {props.t('form.invalidNumber', {
-            min: control.min === undefined ? '−∞' : control.min * scale,
-            max: control.max === undefined ? '∞' : control.max * scale,
+            min: shownBound(control.min) ?? '−∞',
+            max: shownBound(control.max) ?? '∞',
           })}
         </span>
       )}
