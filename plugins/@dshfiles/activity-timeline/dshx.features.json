@@ -571,6 +571,56 @@
           "testName": "records a web-push send span with the push service host and status, never the endpoint or payload"
         }
       ]
+    },
+    {
+      "id": "thread-question-strip",
+      "title": "Answer a subagent's question in its parent thread",
+      "summary": "A question a subagent asked its parent shows above the parent thread's composer with its options, so the Answer verb on a thread row lands on something answerable. It reads the same Needs you list as the Inbox, answers through the same provider verb, and leaves when the question is answered anywhere.",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Ship the hotfix now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022ship\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Ship\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022hold\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Hold\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022ship\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+        "press Enter",
+        "expect text \"A subagent asks: Ship the hotfix now?\"",
+        "click button \"Hold\"",
+        "expect text \"Tool finished.\""
+      ],
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "thread: above the composer while a subagent's question waits",
+      "configuration": [],
+      "states": ["waiting", "answering", "answered", "refused", "no-question"],
+      "failureModes": [
+        "A refused answer (the question expired, or the parent thread stopped) shows the provider's message with what to do instead.",
+        "A native question form is left out: its own card already takes the composer seat.",
+        "Without a question provider (agent-questions) the strip shows nothing."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/agent-questions",
+          "boundary": "agent-questions publishes subagent questions as attention items and answers them through the dshfiles/attention/act event; activity-timeline never imports it.",
+          "deterministicFake": "src/inbox-view.test.ts filters attention items built in the test."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only view over the attention-api list and act methods, whose Host spans already exist."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.thread-question-strip",
+          "file": "plugins/@dshfiles/activity-timeline/src/inbox-view.test.ts",
+          "testName": "is answerable where Answer lands: the parent thread lists it with its options"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "activity-timeline.thread-question-strip-browser",
+          "reason": "The strip needs a subagent question, which only the agent-questions provider and a fake-provider subagent produce; the isolated composition of this plugin's journeys has neither. The catalog reach walks it in a scratch DSH that loads every bundle, and the filtering is unit-tested."
+        }
+      ]
     }
   ]
 }
