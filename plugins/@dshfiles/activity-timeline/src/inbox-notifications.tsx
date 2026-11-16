@@ -5,6 +5,7 @@ import { Schema } from 'effect'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { AttentionItem } from './attention-api.js'
 import type { InboxTranslate } from './inbox-locales.js'
+import { InboxPreview } from './inbox-preview.js'
 
 /** Opt-in, per browser: off until the user turns it on and grants permission (plan §4.8: only what needs you alerts). */
 const storedBlockingAlerts = createStoredValue({ key: 'dshfiles.attention-inbox.blocking-alerts.v1', schema: Schema.Boolean, fallback: false })
@@ -62,10 +63,12 @@ const alerts = (item: AttentionItem): boolean => item.severity === 'blocking' ||
  */
 const notificationOf = (item: AttentionItem, sessionLabel: (sessionId: string) => string): AttentionNotification => {
   const title = item.subject.kind === 'session' ? sessionLabel(item.subject.id) : (item.subject.label ?? item.subject.id)
+  // A question arrives as Markdown; a notification shows words, never source.
+  const reason = InboxPreview.firstParagraph(item.reason) || item.reason
   const recovery = item.severity === 'failed' && item.detail !== null ? item.detail.split('\n')[0]?.trim() : undefined
   return {
     title,
-    body: shorten(recovery === undefined || recovery === '' ? item.reason : `${item.reason} ${recovery}`),
+    body: shorten(recovery === undefined || recovery === '' ? reason : `${reason} ${recovery}`),
     tag: `dshfiles-attention-${item.id}`,
   }
 }

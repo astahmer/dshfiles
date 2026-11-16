@@ -25,6 +25,25 @@ const item = (overrides: Partial<AttentionItem> = {}): AttentionItem => ({
 })
 
 describe('inbox view', () => {
+  it('prints a Markdown question as two plain lines: the first paragraph, then the detail', () => {
+    const question = item({
+      source: 'agent-questions.native-question',
+      reason:
+        'Asks: Pick a layout for [the 0.2 release notes](https://example.test/notes)\n\nBoth drafts list the same **12 changes**:\n\n| Layout | Lines |\n| --- | ---: |\n| Grouped | 48 |\n\n```html preview Lines per layout\n<style>body{margin:8px',
+      detail: 'Options: Grouped by plugin · One flat list. Open the thread to choose.',
+    })
+    expect(InboxView.textOf(question)).toEqual({
+      reason: 'Asks: Pick a layout for the 0.2 release notes',
+      detail: 'Options: Grouped by plugin · One flat list. Open the thread to choose.',
+    })
+    // A plan under review is Markdown too: its words, without the markers.
+    expect(
+      InboxView.textOf(item({ reason: 'Asks: Approve this plan?', detail: '## Plan\n\n1. Rename `session` to **thread**\n\nOpen the thread.' })).detail,
+    ).toBe('Plan Rename session to thread Open the thread.')
+    // A reason with no prose at all still says something, and an absent detail stays absent.
+    expect(InboxView.textOf(item({ reason: '```ts\nconst a = 1\n```', detail: null }))).toEqual({ reason: 'Subagent question', detail: null })
+  })
+
   it('never offers canned replies on an item that waits on a question', () => {
     // A thread question the Inbox cannot answer in place: its form is still open in the thread.
     const openForm = item({ source: 'agent-questions.native-question', verbs: ['Open', 'Done', 'Snooze', 'MuteSource'] })
@@ -37,7 +56,9 @@ describe('inbox view', () => {
     expect(InboxView.offersQuickReplies(failedTurn, 'needs-you')).toBe(true)
     expect(InboxView.offersQuickReplies(failedTurn, 'closed')).toBe(false)
     expect(InboxView.offersQuickReplies(item({ source: 'thread-sidebar.finished-turn', severity: 'ready', verbs: ['Open'] }), 'other')).toBe(false)
-    expect(InboxView.offersQuickReplies(item({ source: 'backlog.attention', subject: { kind: 'backlog-item', id: 'b:1' }, verbs: ['Open'] }), 'needs-you')).toBe(false)
+    expect(
+      InboxView.offersQuickReplies(item({ source: 'backlog.attention', subject: { kind: 'backlog-item', id: 'b:1' }, verbs: ['Open'] }), 'needs-you'),
+    ).toBe(false)
   })
 
   it('offers the reopen path for done and snoozed items, unmute for muted ones, and nothing for resolved ones', () => {

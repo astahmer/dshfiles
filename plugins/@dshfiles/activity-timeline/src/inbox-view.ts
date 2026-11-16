@@ -1,5 +1,6 @@
 import type { AttentionItem, AttentionSeverity, AttentionView } from './attention-api.js'
 import type { RowSwipeSide } from '@dshfiles/plugin-ui/hooks/row-gestures'
+import { InboxPreview } from './inbox-preview.js'
 
 /** Sources the inbox names in words; any other source shows its own id. */
 const SOURCE_LABELS = new Map([
@@ -86,7 +87,18 @@ const asksQuestion = (item: AttentionItem): boolean => QUESTION_SOURCES.has(item
 const offersQuickReplies = (item: AttentionItem, view: AttentionView): boolean =>
   view !== 'closed' && view !== 'muted' && item.subject.kind === 'session' && item.severity !== 'ready' && !asksQuestion(item)
 
+/**
+ * What a row prints under its title: the first paragraph of the reason and the detail, both as plain words. Providers
+ * pass a question through as written (Markdown, a table, a fenced chart); the row clamps each to two lines.
+ */
+const textOf = (item: AttentionItem) => {
+  const reason = InboxPreview.firstParagraph(item.reason)
+  const detail = item.detail === null ? '' : InboxPreview.flat(item.detail)
+  return { reason: reason === '' ? sourceLabel(item.source) : reason, detail: detail === '' ? null : detail }
+}
+
 export class InboxView {
+  static readonly textOf = textOf
   static readonly asksQuestion = asksQuestion
   static readonly offersQuickReplies = offersQuickReplies
   static readonly openActionOf = openActionOf
