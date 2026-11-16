@@ -205,6 +205,8 @@ Then('the header remains usable with its Workbench tab row hidden and after relo
     const tab = outerTab(right(page), FIRST)
     const a = await bodyOf(page, tab)
     await tab.click({ button: 'right' })
+    // A tab's docking verbs sit under Layout.
+    await page.getByRole('menuitem', { name: 'Layout', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Hide tab row', exact: true }).click()
     await expect(tab).toHaveCount(0)
     await header(a).getByRole('button', { name: 'More thread actions', exact: true }).click()

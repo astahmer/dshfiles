@@ -1507,6 +1507,8 @@ When('a Jujutsu preview is opened and closed from its Dockview tab', async ({ pa
   const tab = dockTab(mainDock(page), 'Jujutsu')
   await expect(tab.locator('[data-preview="true"]')).toBeVisible()
   await tab.click({ button: 'right' })
+  // A tab's docking verbs sit under Layout.
+  await page.getByRole('menuitem', { name: 'Layout', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Float panel', exact: true }).click()
   const floating = page.locator('.dv-groupview-floating').filter({ has: page.getByRole('tab', { name: viewNamePattern('Jujutsu') }) })
   await expect(floating).toBeVisible()
