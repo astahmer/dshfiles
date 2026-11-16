@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
-import { backlogLabel, backlogRef, withBacklogRefs } from './backlog-refs.js'
+import { backlogLabel, backlogRef, withBacklogRefs, openBacklogViewMenu, runBacklogPageAction } from './backlog-refs.js'
 import {
   finishJourneyAssertions,
   openSettingsDialog,
@@ -161,7 +161,7 @@ When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
 })
 
 When('the Backlog settings are opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Backlog settings', exact: true }).click()
+  await runBacklogPageAction(page, 'Settings')
   await expect(page.getByRole('dialog', { name: 'Backlog settings' }).getByRole('heading', { name: 'Jev triage', exact: true })).toBeVisible()
   // Settings open over the backlog instead of replacing it: the feed stays mounted behind the sheet.
   await expect(page.getByRole('feed', { name: 'Backlog feed', includeHidden: true })).toHaveCount(1)
@@ -590,10 +590,11 @@ Then('the item detail can be resized without being cut off', async ({ page }: { 
     const after = Number(await splitter.getAttribute('aria-valuenow'))
     expect(after).toBeGreaterThan(before)
     const detailBox = await detail.boundingBox()
-    const regionBox = await region.boundingBox()
-    if (detailBox === null || regionBox === null) throw new Error('The item detail or its content region has no layout box.')
-    expect(detailBox.y).toBeCloseTo(regionBox.y, 0)
-    expect(detailBox.y + detailBox.height).toBeCloseTo(regionBox.y + regionBox.height, 0)
+    // The region is a bordered card: the detail fills its inside, between the top and bottom borders.
+    const inside = await region.evaluate(element => ({ top: element.getBoundingClientRect().top + element.clientTop, height: element.clientHeight }))
+    if (detailBox === null) throw new Error('The item detail has no layout box.')
+    expect(detailBox.y).toBeCloseTo(inside.top, 0)
+    expect(detailBox.y + detailBox.height).toBeCloseTo(inside.top + inside.height, 0)
   })
 })
 
@@ -1387,7 +1388,7 @@ Then('the backlog detail shows {string}', async ({ page }: { page: Page }, text:
 })
 
 When('the backlog backfill is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Backfill triage', exact: true }).click()
+  await runBacklogPageAction(page, 'Backfill triage')
 })
 
 Then('the backfill dialog explains that it runs Jev and the configured triage model', async ({ page }: { page: Page }) => {
@@ -1508,8 +1509,10 @@ Then('the reply and its attachment are removed from the activity', async ({ page
 
 Then('the capture composer offers a project picker', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-project-scope-picker', async () => {
-    await expect(page.getByRole('combobox', { name: 'Filter by project', exact: true })).toBeVisible()
     await expect(page.getByRole('combobox', { name: 'Project of the new item', exact: true })).toBeVisible()
+    await openBacklogViewMenu(page)
+    await expect(page.getByRole('combobox', { name: 'Filter by project', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
   })
   await finishJourneyAssertions(page)
 })

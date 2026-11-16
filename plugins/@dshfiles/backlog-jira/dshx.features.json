@@ -190,7 +190,7 @@
           "testName": "records one jira request span per call, with the operation and status only"
         }
       ],
-      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Backlog settings\"", "expect button \"Add Jira connection\""]
+      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"More backlog actions\"", "click menuitem \"Settings\"", "expect button \"Add Jira connection\""]
     }
   ]
 }

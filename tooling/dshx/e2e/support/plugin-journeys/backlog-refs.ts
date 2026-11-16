@@ -31,3 +31,15 @@ export const withBacklogRefs = async (page: Page, text: string): Promise<string>
   )
   return text.replace(/(?<![\w/])b:([1-9]\d*)\b/gu, (token, ordinal: string) => labels.get(Number(ordinal)) ?? token)
 }
+
+/** Opens the Backlog's "View" menu (project scope, sort, agent items, saved views) unless it is already open. */
+export const openBacklogViewMenu = async (page: Page): Promise<void> => {
+  const trigger = page.getByRole('button', { name: 'Backlog view options', exact: true })
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click()
+}
+
+/** Runs one of the Backlog page's `⋯` actions (Settings, Backfill triage). */
+export const runBacklogPageAction = async (page: Page, name: 'Settings' | 'Backfill triage'): Promise<void> => {
+  await page.getByRole('button', { name: 'More backlog actions', exact: true }).click()
+  await page.getByRole('menuitem', { name, exact: true }).click()
+}
