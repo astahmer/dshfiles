@@ -74,6 +74,26 @@ describe('CapabilitiesHubPanel', () => {
     expect(openPanel.mock.calls).toEqual([['mcp-servers'], ['plugins'], ['dshfiles-agent-toolkit']])
   })
 
+  it('draws the three kinds as one list that fills the pane, with neutral chips and no card inside a card', async () => {
+    renderPanel()
+    const list = document.querySelector('[data-hub-list]')
+    expect(list).not.toBeNull()
+    // The page fills its pane: no max-width column around the list.
+    expect(list?.className).not.toMatch(/max-w-/u)
+    for (const name of ['Skills', 'MCP servers', 'DSH plugins']) {
+      const row = screen.getByRole('region', { name })
+      // A row of the list, not a bordered card of its own.
+      expect(row.className).not.toMatch(/dshx:border\b|rounded-lg/u)
+      const chip = row.querySelector('[data-slot="badge"]')
+      // What a kind grants is said in words; blue, amber and solid red were permanent colour on a healthy install.
+      expect(chip?.getAttribute('data-variant')).toBe('muted')
+    }
+    // The warning sentence stays as text beside the chip.
+    expect(screen.getByText(/A DSH plugin runs code in the Host and in this browser/u)).toBeTruthy()
+    const skillsSh = document.querySelector('[data-skills-sh]')
+    expect(skillsSh?.className).not.toMatch(/bg-muted|rounded-md|dshx:border\b/u)
+  })
+
   it('links out to skills.sh and copies the telemetry-off command without running it', async () => {
     renderPanel()
     const link = screen.getByRole('link', { name: 'Open skills.sh' })

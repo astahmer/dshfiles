@@ -19,13 +19,14 @@ export default defineClient({
   name: '@dshfiles/capabilities-hub',
   inject: ['slots', 'layout', 'remote', 'remote.pluginInventory'],
   setup(ctx, decorate, metadata) {
-    // Settings lists the hub beside the managers it opens; without the rail it stays a plain sidebar page.
+    // Settings lists the hub after the managers it opens, never as its first row; without the rail it stays a plain
+    // sidebar page.
     metadata?.plugin?.add(DestinationSections, {
       panelId: PANEL_ID,
       destination: 'settings',
       label: 'Capabilities hub',
       description: 'Skills, MCP servers and plugins in one place.',
-      order: 0,
+      order: 6,
     })
 
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
