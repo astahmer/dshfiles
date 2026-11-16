@@ -75,6 +75,25 @@ describe('Destinations', () => {
     expect(resolved.find(destination => destination.id === 'settings')?.sections.map(section => section.label)).toEqual(['Inspector'])
   })
 
+  it('gives the Inbox one name and one page: Needs you is a view inside it, and the per-thread page is not a second row', () => {
+    const inbox = Destinations.resolve(
+      [
+        { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 },
+        { id: 'thread-sidebar-waiting', label: 'Waiting threads', order: 3 },
+      ],
+      // What the sidebar contributes for its own per-thread page.
+      [{ panelId: 'thread-sidebar-waiting', destination: 'inbox', label: 'Waiting threads', order: 2, unlisted: true }],
+    )
+    const destination = inbox.find(candidate => candidate.id === 'inbox')
+    expect(destination?.label).toBe('Inbox')
+    // The page was labelled "Needs you" under a destination named Inbox, beside a page listing the same threads.
+    expect(destination?.sections.map(section => section.label)).toEqual(['Inbox'])
+    expect(destination?.description).not.toMatch(/needs you/iu)
+    // Unlisted is not "nobody mapped it": the page does not fall into Settings › Other pages either.
+    expect(inbox.find(candidate => candidate.id === 'settings')?.sections).toEqual([])
+    expect(KNOWN_SECTIONS.find(section => section.panelId === 'attention-inbox')?.formerLabels).toContain('Needs you')
+  })
+
   it('finds the destination that owns an open page', () => {
     const resolved = Destinations.resolve([{ id: 'dshfiles-backlog-panel', label: 'Backlog: Items', order: 3 }])
     expect(Destinations.owning(resolved, 'dshfiles-backlog-panel')?.id).toBe('work')

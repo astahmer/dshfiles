@@ -1347,12 +1347,15 @@ export default defineClient({
         WaitingThreadsGlyph,
       ),
     )
+    // The Inbox lists the same threads (its items are what this page groups by thread), so the Inbox list does not
+    // offer both: this page opens from the palette and the New tab page, and can be filed in any folder.
     metadata?.plugin?.add(DestinationSections, {
       panelId: WAITING_THREADS_PANEL_ID,
       destination: 'inbox',
       label: translate('waitingThreadsSectionLabel'),
       description: translate('waitingThreadsDescription'),
       order: 2,
+      unlisted: true,
     })
     ctx.effect(
       () =>

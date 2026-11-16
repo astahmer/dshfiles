@@ -390,7 +390,6 @@
         "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
         "press Enter",
         "click tab \"Inbox\"",
-        "click button \"Needs you\"",
         "expect heading \"Inbox\"",
         "expect text \"A subagent asks: Deploy the release now?\"",
         "click button \"Deploy*\"",
@@ -457,7 +456,6 @@
         "press Enter",
         "expect text \"Which layout should the release notes use?\"",
         "click tab \"Inbox\"",
-        "click button \"Needs you\"",
         "expect text \"Asks: Which layout should the release notes use?\"",
         "click button \"One flat list\"",
         "expect text \"Answered “One flat list”*\""

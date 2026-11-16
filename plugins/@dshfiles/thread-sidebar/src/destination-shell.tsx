@@ -364,6 +364,15 @@ const folderIcon = (props: Pick<DestinationShellProps, 'panels' | 'renderPanelIc
     destinationIcon(props, folder.destination, active, size)
   )
 
+/**
+ * A page glyph may draw a count over its icon (the Inbox's Needs you count): right for the 20px rail seat, but in a list
+ * row the count sat on the icon and touched the label. In a row the count is positioned against the row instead, at its
+ * trailing edge, clear of the label and of the row's menu.
+ */
+const SECTION_ROW_BADGE =
+  'dshx:[&_[data-attention-badge]]:static dshx:[&_[data-attention-badge]>span]:top-2 dshx:[&_[data-attention-badge]>span]:right-8 dshx:[&_[data-attention-badge]>span]:left-auto'
+const SECTION_ROW_BADGE_ROOM = "dshx:has-[[data-attention-badge]:not([data-attention-badge='0'])]:pr-14"
+
 /** One section: its label is the button's whole name, so a reach or a screen reader finds it by that alone. */
 const SectionButton = (props: {
   readonly label: string
@@ -410,14 +419,19 @@ const SectionButton = (props: {
         aria-describedby={props.description === undefined ? undefined : descriptionId}
         onClick={props.onSelect}
         className={cn(
-          'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-colors',
+          'dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-colors',
           'dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+          // A row whose glyph carries a count keeps room for it at its trailing edge, before the row's own menu.
+          SECTION_ROW_BADGE_ROOM,
           props.selected && 'dshx:bg-accent',
         )}
       >
         {props.icon === undefined || props.icon === null ? null : (
           <span
-            className="dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
+            className={cn(
+              'dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground',
+              SECTION_ROW_BADGE,
+            )}
             aria-hidden="true"
           >
             {props.icon}

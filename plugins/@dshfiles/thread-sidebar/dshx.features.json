@@ -4250,12 +4250,12 @@
     {
       "id": "waiting-threads-page",
       "title": "See the threads waiting on you in one page",
-      "summary": "Inbox › Waiting threads lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
-      "reach": ["click tab \"Inbox\"", "click button \"Waiting threads\"", "expect heading \"Waiting threads\""],
+      "summary": "The Waiting threads page lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
+      "reach": ["click button \"Open command palette\"", "click option \"*Waiting threads*\"", "expect heading \"Waiting threads\""],
       "surfaces": ["client", "integration"],
       "surface": "destinationSection",
       "destination": "inbox",
-      "currentSurface": "left-nav: Inbox › Waiting threads",
+      "currentSurface": "command palette and New tab page: Waiting threads (not a second row of the Inbox list)",
       "configuration": [],
       "states": ["needs-you", "ready", "empty", "busy", "provider-absent"],
       "failureModes": [
@@ -4278,7 +4278,7 @@
         }
       ],
       "onboarding": {
-        "firstAction": "Open Inbox › Waiting threads.",
+        "firstAction": "Open the command palette and choose Waiting threads.",
         "doneWhen": "Each thread waiting on you is listed once, with Open and Done.",
         "open": {
           "panel": "thread-sidebar-waiting"

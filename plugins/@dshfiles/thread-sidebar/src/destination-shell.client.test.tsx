@@ -167,6 +167,54 @@ describe('DestinationShell', () => {
     expect(shell.toggleSidebar).toHaveBeenCalled()
   })
 
+  it('opens the Inbox page at once, with its count at the trailing edge of its one row', () => {
+    setPhone(false)
+    const inboxPanels = [
+      ...panels,
+      { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 },
+      { id: 'thread-sidebar-waiting', label: 'Waiting threads', order: 3 },
+    ]
+    const contributed = [{ panelId: 'thread-sidebar-waiting', destination: 'inbox' as const, label: 'Waiting threads', order: 2, unlisted: true }]
+    const shell = renderShell({
+      panels: inboxPanels,
+      contributed,
+      // The Inbox glyph as its plugin draws it: a count over the icon.
+      renderPanelIcon: panelId =>
+        panelId === 'attention-inbox' ? (
+          <span data-attention-badge="2">
+            <svg />
+            <span>2</span>
+          </span>
+        ) : null,
+    })
+    fireEvent.click(screen.getByRole('tab', { name: 'Inbox' }))
+    // One page, so the rail opens it: no second row that lists the same threads.
+    expect(shell.selectPanel).toHaveBeenCalledWith('attention-inbox')
+    const rows = within(screen.getByRole('navigation', { name: 'Inbox pages' })).getAllByRole('button')
+    expect(rows.map(row => row.getAttribute('aria-label'))).toEqual(['Inbox'])
+    const row = rows[0] as HTMLElement
+    const seat = row.querySelector('[data-attention-badge]')?.parentElement
+    // The count is positioned against the row (its trailing edge), not over the 16px icon where it touched the label.
+    expect(row.className).toContain('dshx:relative')
+    expect(seat?.className).toContain('dshx:[&_[data-attention-badge]]:static')
+    expect(seat?.className).toContain('dshx:[&_[data-attention-badge]>span]:right-8')
+  })
+
+  it('on a phone, the Inbox tab opens the Inbox page directly', () => {
+    setPhone(true)
+    const inboxPanels = [
+      ...panels,
+      { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 },
+      { id: 'thread-sidebar-waiting', label: 'Waiting threads', order: 3 },
+    ]
+    const contributed = [{ panelId: 'thread-sidebar-waiting', destination: 'inbox' as const, label: 'Waiting threads', order: 2, unlisted: true }]
+    const shell = renderShell({ panels: inboxPanels, contributed, collapsed: true })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'Inbox' }))
+    // No intermediate two-row list (Needs you, Waiting threads) between the tab and the page.
+    expect(shell.selectPanel).toHaveBeenCalledWith('attention-inbox')
+    expect(screen.queryByRole('button', { name: 'Waiting threads' })).toBeNull()
+  })
+
   it('replaces the rail with a bottom tab bar on a phone', () => {
     setPhone(true)
     const shell = renderShell({ collapsed: true })

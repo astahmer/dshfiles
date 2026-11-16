@@ -166,6 +166,12 @@ while no restart waits, so update-then-restart is one item, not two. Customize s
 rail** (`showRailRestart`, off by default) adds a Restart button to the rail's DSH actions (only while the supervisor
 offers a restart; amber with a slow pulse while updates or a restart wait); the strip then draws no restart item.
 
+**One Inbox.** The Inbox destination and its page share one name; "Needs you" is the view inside the page. The
+sidebar's own per-thread page (Waiting threads) groups the same inbox items by thread, so it is `unlisted`: the Inbox
+list does not offer it as a second row, the rail and the phone tab open the Inbox page at once, and the palette and the
+New tab page still open Waiting threads (it can also be filed in any folder). A page glyph that draws a count over its
+icon (the Inbox count) shows it at the trailing edge of its list row instead, clear of the label.
+
 **Developer pages.** A page for people who write plugins declares `group: 'developer'` in its destination section
 (Component gallery and Plugin guide do). Such a page is never listed among a destination's own pages: it sits in a
 labelled **Developer** group at the end of the Settings list, whatever destination its plugin named. Customize sidebar ›
