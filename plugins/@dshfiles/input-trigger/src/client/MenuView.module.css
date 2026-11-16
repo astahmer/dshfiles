@@ -290,3 +290,52 @@
   display: inline-flex;
   color: var(--dsw-alias-menu-icon);
 }
+
+/*
+ * Touch (unslop phone 3): the composer's other pickers are 44px sheets, so this list matches them while it stays
+ * anchored above the composer (focus never leaves the field, so typing still filters and the keyboard stays up).
+ * Rows are 44px at the comfortable UI size, every caption reads as meta (13px on a phone, never 10-11px), the Tab
+ * key hint goes, and the drill chevron gets a 44px hit area.
+ */
+@media (pointer: coarse) {
+  .item {
+    min-height: 44px;
+    font-size: var(--dshx-density-text-ui, 15px);
+    line-height: 22px;
+  }
+
+  .sectionTitle,
+  .groupTitle,
+  .crumb,
+  .itemDescription,
+  .itemAlias {
+    font-size: var(--dshx-density-text-meta, 13px);
+    line-height: 18px;
+  }
+
+  .item.active .drillHintText,
+  .item.active .drillHint {
+    display: none;
+  }
+
+  .drill {
+    position: relative;
+  }
+
+  .drill::after {
+    content: '';
+    position: absolute;
+    inset: -13px;
+  }
+
+  .skeletonRow {
+    min-height: 44px;
+  }
+}
+
+/* Under the phone shell the list takes the sheet radius (DESIGN.md: 16px phone sheets). */
+@media (max-width: 639.98px) {
+  :global(html[data-shell-phone-nav]) .menu {
+    border-radius: var(--dsw-radius-panel, 16px);
+  }
+}
