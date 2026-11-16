@@ -1,6 +1,6 @@
 # Real-phone verification
 
-**Resume here:** nothing set up; T1 waits for the owner's phone-side steps and the open questions below.
+**Resume here:** nothing set up; deferred by the owner (2026-11-16). Start at T1 when a phone bug needs it.
 
 Goal: an agent can check phone behavior on the owner's real phone, not only in a desktop Chromium that imitates one.
 That covers attaching to the DSH tab the owner is using, scripted journeys on real hardware, and the cases emulation
@@ -45,8 +45,9 @@ be emulated faithfully).
 2. **PIN lock.** `adb` can wake the screen but not unlock a PIN; unlock-dependent checks need the owner to unlock while
    the agent captures.
 3. **Re-pairing** after each reboot (Wi-Fi needed for that step only).
-4. **Not covered:** iPhone (Safari Web Inspector needs a Mac and a USB cable; separate plan if wanted); perceived
-   smoothness (frame timings can be measured, feel cannot).
+4. **iPhone** needs its own path: Safari Web Inspector over a USB cable from the Mac (Settings › Safari › Advanced ›
+   Web Inspector on the phone), or `ios-webkit-debug-proxy` for scripted CDP-like access; no lock/wake control.
+5. **Not covered:** perceived smoothness (frame timings can be measured, feel cannot).
 
 ## Tasks
 
@@ -60,10 +61,12 @@ be emulated faithfully).
 | T6 | Journeys on the real phone: lock/resume (blank thread), image upload from the gallery, Quote/Annotate with the native toolbar, return key, offline banner (toggle Tailscale on the phone) | dshfiles | Each produces a before/after evidence folder                              |
 | T7 | Skill `verify-phone` (or a section of `verify-dsh`): when to use it, setup, safety rules, cleanup (`adb usb`)                 | dshfiles        | Skill loads; `features:check` unaffected                                  |
 | T8 | Optional: Playwright `_android` scripted contexts for repeatable journeys                                                    | dshfiles        | One journey runs end to end on the device                                 |
+| T9 | iPhone: Safari Web Inspector / `ios-webkit-debug-proxy` attach to the DSH Home Screen app; same journeys where possible        | dshfiles        | Attach and capture on the owner's iPhone                                  |
 
-## Open questions
+## Decisions (2026-11-16)
 
-1. Set it up now (T1–T5), or only when a phone bug needs it?
-2. May the agent drive the phone (taps, lock/wake) or only observe the DSH tab and take screenshots?
-3. Add the Tailscale ACL (T4)? It lives in the owner's admin console, not a repository.
-4. Is an iPhone pass wanted too (Safari Web Inspector, USB), or Android only?
+1. Set up later, when a phone bug needs it.
+2. The agent may drive the phone (taps, swipes, lock/wake via `adb`): that is what reproduces the lock/resume and
+   gesture bugs and runs journeys unattended; a PIN unlock stays with the owner.
+3. Add the Tailscale ACL (T4), at setup time.
+4. Both Android and iPhone (T9).
