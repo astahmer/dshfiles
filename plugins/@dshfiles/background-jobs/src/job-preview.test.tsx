@@ -63,11 +63,21 @@ const fakeJobs = (rows: readonly JobView[] = [row()]) => {
 }
 
 // SAFETY: the card reads only these fields of the native owner.
-const owner = (input: { readonly text?: string; readonly expanded?: boolean; readonly toggle?: () => void; readonly toolName?: string }) =>
+const owner = (input: {
+  readonly text?: string
+  readonly expanded?: boolean
+  readonly toggle?: () => void
+  readonly toolName?: string
+  readonly argsRaw?: string
+}) =>
   ({
     phase: 'result',
     toolName: input.toolName ?? 'bash',
-    block: { isError: false, content: [{ type: 'text', text: input.text ?? `started background job ${JOB_ID}` }] },
+    block: {
+      isError: false,
+      content: [{ type: 'text', text: input.text ?? `started background job ${JOB_ID}` }],
+      call: input.argsRaw === undefined ? null : { name: input.toolName ?? 'bash', argsRaw: input.argsRaw },
+    },
     useDisclosure: () => ({ expanded: input.expanded ?? false, toggle: input.toggle ?? (() => undefined) }),
   }) as unknown as ToolCallSectionProps['owner']
 
@@ -105,6 +115,25 @@ describe('JobPreviewSection', () => {
     expect(screen.getByRole('status').textContent).toContain('statusRunning')
     expect(screen.getByText('pnpm build')).toBeTruthy()
     expect(observe).not.toHaveBeenCalled()
+  })
+
+  it('titles the job by the description its call carried, with the command as the second line', async () => {
+    const fake = fakeJobs([row({ label: 'for i in 1 2 3; do echo compiled; done' })])
+    render(
+      <PluginQueryProvider>
+        <JobPreviewSection
+          {...bindings}
+          jobs={fake.jobs}
+          owner={owner({ argsRaw: JSON.stringify({ command: 'for i in 1 2 3; do echo compiled; done', description: 'Build', run_in_background: true }) })}
+          sessionId={SESSION}
+        />
+        <JobPreviewDock {...bindings} jobs={fake.jobs} sessionId={SESSION} />
+      </PluginQueryProvider>,
+    )
+    await waitFor(() => expect(document.querySelectorAll('[data-job-title]')).toHaveLength(2))
+    for (const title of document.querySelectorAll('[data-job-title]')) expect(title.textContent).toBe('Build')
+    for (const command of document.querySelectorAll('[data-job-command]')) expect(command.textContent).toBe('for i in 1 2 3; do echo compiled; done')
+    expect(document.querySelector('[data-dshfiles-live-preview-seat="dock"]')?.getAttribute('aria-label')).toBe('previewKind: Build')
   })
 
   it('streams output only while open and releases the stream on collapse', () => {
