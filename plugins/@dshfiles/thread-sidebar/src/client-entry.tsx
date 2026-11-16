@@ -15,7 +15,7 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
-import { BellIcon, LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
+import { BellIcon } from '@dshfiles/plugin-ui/icons'
 import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -1367,15 +1367,6 @@ export default defineClient({
             group: 'action',
             suggested: true,
             run: context => PaletteBridge.openFanOut(context.workspace?.id ?? null),
-          },
-          {
-            id: '@dshfiles/thread-sidebar/open-board',
-            label: () => translate('threadSidebarBoardTitle'),
-            aliases: ['thread board', 'board', 'kanban', 'columns'],
-            icon: <LayoutGridIcon className="dshx:size-4" />,
-            group: 'destination',
-            // SAFETY: BOARD_PANEL_ID names the board panel this plugin registers.
-            run: () => ctx.layout.selectPanel(BOARD_PANEL_ID as MainPanelId),
           },
         ]),
       'thread-sidebar: open the thread board',
