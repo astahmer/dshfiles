@@ -5,7 +5,7 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1, 2, 4, 5, 6 and 7 are done and step 3 is half done (the tab strips are open). Open follow-ups are
+**Resume here:** steps 1 to 7 are done. Open follow-ups are
 listed under [Thread lane](#thread-lane). Steps 5, 6 and 8–14 are open. See
 [Work list](#work-list).
 
@@ -191,7 +191,7 @@ before and passes after; see each revision's description for the reason.
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------ |
 | 1 ✅ | Composer menus: the card no longer clips (WebKit paints the lists again) and native menus are opaque. Probed in Playwright WebKit 26.0 and Chromium at 390 px before and after; not yet re-checked on the iPhone. | U1, U2 | small |
 | 2 ✅ | Deletions on the main surface: "Context injection" rows hidden, no timing overlay on card headers, one header `⋯` holding Copy link, Pin and the native More actions, one verb plus `⋯` on row hover. | U3, N3, N4, N5 | small |
-| 3 ◐  | Tab strips use the shared status glyph; one projection for working and needs-you counts; failed stays Failed. Done: N2, M5 (see [Thread lane](#thread-lane)). Open: N1 and N7 in main-tabs and workbench. | N1, N2, M5, N7 | medium |
+| 3 ✅ | Tab strips draw the shared status glyph; one projection for working counts; failed stays Failed. See [Thread lane](#thread-lane) and [Tabs lane](#tabs-lane). N7 is only partly closed: the plugin pages that draw their own status dots are steps 8 and 12. | N1, N2, M5, N7 | medium |
 | 4 ✅ | Failure card: one sentence, one Retry, "Ask to fix" in the same row, code and payload under Details. No "Compact and retry": the over-long sentence names `/compact`. | M4 | medium |
 | 5 ✅ | Inbox question items show the question's own options and answer in place, open forms included; a subagent's question is answerable in its parent thread; the phone question card keeps its options in view; triage has one action row. See [Inbox lane](#inbox-lane). | M1, M2, M3, M8 | medium |
 | 6 ✅ | A primary "Land" in the header when there is work to land, behind one confirmation; the "+N −N" chip shows only for a thread's own workspace. See [Land lane](#land-lane). | M6, M7 | medium |
@@ -359,6 +359,46 @@ Unverified:
   checked.
 
 jj-integration's Host half changed (`/rebase` wording), so a running instance needs a restart.
+
+## Tabs lane
+
+18 revisions (`vtwkrtvltpzy` … `ystlqzpkqnmv`) in workbench, main-tabs, dialogs and sidebar-right. All client code,
+so no restart is needed.
+
+- Both tab strips draw one shared glyph (`@dshfiles/workbench/tab-status`): ring spinner for working, indigo diamond
+  for Needs you, red cross for failed, ink dot for an unseen finish. A tab and its list row now agree.
+- A restored panel whose source is gone is named by its title, never its resource id, and a gone thread's page is
+  replaced instead of gaining a twin tab.
+- Preview tabs are muted, not italic; titles are capped and a clipped strip edge fades.
+- The New tab page fills its pane and leads with views that can be opened; with no thread open it shows one muted
+  line instead of twelve disabled rows.
+- Toasts are plain bordered cards with a tone icon (colour only on failure), one at a time with the rest queued,
+  lifted clear of the composer. App dialogs use the 12 px radius.
+- The tab menu keeps tab and thread verbs at the top and groups docking under "Layout"; "Close panel" merged into
+  "Close tab".
+- The phone thread panel sheet has a 16 px radius, no docking `⋯`, and no leftover "New tab" beside an opened view.
+
+Did not reproduce on this base: the "N working" strip item doing nothing on click, and Workbench offered as a thread
+panel.
+
+Not done: the lone right-sidebar toggle on the new-thread screen; an edge fade in main-tabs' legacy strip; a "New
+tab" chooser saved beside a view in an old layout stays until closed. The New tab page still lists about 40 views in
+one flat grid, with mixed naming ("Observe › Usage" style beside bare "Quota", "Revision graph", "Traces"): that is
+step 10.
+
+Proposed, not built: a fixed segmented row (Changes, Files, Jobs, Cost, Context) in the phone sheet.
+
+Unverified:
+
+- Journeys: dialogs 2 of 2. main-tabs 14 of 15; the failure stops at the sidebar "More" button at the base too.
+  workbench 19 of 45; all 26 failures fail at the base too, 18 of them at the "two real threads" setup.
+- The "Layout" step added to five journey files ran green in two scenarios only; three catalog walks with it were not
+  walked green.
+- The toast's phone position after its last change is unit-tested only. WebKit was not used.
+
+For other plugins, not started: chooser labels ("Browse files in this session's workspace" is core; "Jujutsu",
+"Editor … with Monaco"); plugin-ui dialogs default to 8 px corners; thread-sidebar could export its failed-turns
+hook, which main-tabs restates.
 
 ## Settings lane
 
