@@ -23,6 +23,12 @@ export interface DestinationSection {
    * supervising agents. It is listed in the Developer group at the end of Settings, which a sidebar setting hides.
    */
   readonly group?: 'developer'
+  /**
+   * Not listed under its destination: the page repeats what another page of the destination already shows, so the list
+   * would offer the same thing twice. The command palette and the New tab page still open it, and a person can file it
+   * in any folder.
+   */
+  readonly unlisted?: boolean
 }
 
 /**
@@ -41,9 +47,10 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
   {
     panelId: 'attention-inbox',
     destination: 'inbox',
-    label: 'Needs you',
+    // The destination and its page share one name; "Needs you" is the view inside the page.
+    label: 'Inbox',
     description: 'Questions, approvals and failures waiting on you.',
-    formerLabels: ['Inbox'],
+    formerLabels: ['Inbox', 'Needs you'],
   },
   {
     panelId: 'jj-integration',

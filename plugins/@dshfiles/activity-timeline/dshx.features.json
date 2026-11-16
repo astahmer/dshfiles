@@ -397,8 +397,8 @@
       "surface": "destinationSection",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox",
-      "reach": ["click tab \"Inbox\"", "click button \"Needs you\"", "expect heading \"Inbox\"", "expect tab \"Needs you*\""],
-      "reachNarrow": ["click button \"Inbox\"", "click button \"Needs you\"", "expect heading \"Inbox\"", "expect tab \"Needs you*\""],
+      "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\"", "expect tab \"Needs you*\""],
+      "reachNarrow": ["click button \"Inbox\"", "expect heading \"Inbox\"", "expect tab \"Needs you*\""],
       "surfaces": ["client"],
       "configuration": [],
       "states": ["empty", "needs-you", "other", "snoozed", "closed", "muted", "answered-in-place", "action-refused", "alerts-opt-in", "compact"],
@@ -514,7 +514,6 @@
       "currentSurface": "left-nav: Inbox › More actions › Alerts on this device",
       "reach": [
         "click tab \"Inbox\"",
-        "click button \"Needs you\"",
         "expect heading \"Inbox\"",
         "click button \"More actions\"",
         "click menuitem \"Alerts on this device\"",

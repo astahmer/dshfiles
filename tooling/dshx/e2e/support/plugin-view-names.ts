@@ -75,7 +75,7 @@ const moreDestinationsButton = (page: Page): Locator =>
  */
 const railLocations = new Map<string, { readonly destination: string; readonly section: string }>([
   ['Thread Sidebar: Board', { destination: 'Threads', section: 'Board' }],
-  ['Inbox', { destination: 'Inbox', section: 'Needs you' }],
+  ['Inbox', { destination: 'Inbox', section: 'Inbox' }],
   ['JJ Integration: Thread integration', { destination: 'Land', section: 'Workspaces' }],
   ['pulls.review: Reviews', { destination: 'Land', section: 'Review' }],
   ['Jujutsu: Revision graph', { destination: 'Land', section: 'History' }],
