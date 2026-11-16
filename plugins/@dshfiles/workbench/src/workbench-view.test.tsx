@@ -684,6 +684,26 @@ describe('WorkbenchView', () => {
     expect(mounts.get('resource')).toBe(before)
   })
 
+  it("puts the empty right pane's own chooser away once a view arrives, and keeps a chooser the user opened", async () => {
+    const { api, registry, setVisible } = renderRightWorkbench('a')
+    act(() => api.getPanel('a')?.api.close())
+    setVisible(false)
+    await flushLayoutChange()
+    setVisible(true)
+    expect(api.panels).toHaveLength(1)
+    expect(NewViewTabs.isChooser(api.panels[0]!.id)).toBe(true)
+    act(() => {
+      registry.register({ id: 'resource', title: 'Resource', component: DraftPanel, hiddenFromAdd: true })
+      api.addPanel({ id: 'resource', title: 'Resource', component: WORKBENCH_COMPONENT })
+    })
+    await flushLayoutChange()
+    expect(api.panels.map(panel => panel.id)).toEqual(['resource'])
+
+    act(() => void NewViewTabs.open(api))
+    await flushLayoutChange()
+    expect(api.panels).toHaveLength(2)
+  })
+
   it('retains bottom and left final-tab chooser semantics without closing their parents', async () => {
     for (const region of ['left', 'bottom'] as const) {
       const onClose = vi.fn()
