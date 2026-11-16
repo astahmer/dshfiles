@@ -222,13 +222,13 @@ export default defineClient({
       return panel({ surface: 'side-panel', scope: target.scope, sessionId: target.sessionId, defaultPath: target.defaultPath, visible })
     })
     const DockSurfacePanel = decorate((props: WorkbenchPanelProps) =>
-      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'graph' }),
+      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'graph', defaultPath: currentProjectPath() }),
     )
     const DockSourceControlPanel = decorate((props: WorkbenchPanelProps) =>
-      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'source' }),
+      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'source', defaultPath: currentProjectPath() }),
     )
     const ScopedWorkbenchPanel = decorate((props: WorkbenchPanelProps & { readonly scope: string }) =>
-      panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph' }),
+      panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph', defaultPath: currentProjectPath() }),
     )
     ctx.effect(() => PanelScopes.listen(), 'dshfiles-jujutsu: the scope each main tab shows')
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: HistoryPage.titles.graph }, PanelGlyph))

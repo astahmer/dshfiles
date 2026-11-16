@@ -616,9 +616,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   // its thread.
   const pageDefaultPath = HistoryPage.defaultProjectPath({ currentProjectPath: props.defaultPath ?? null, projects: props.projects })
   useEffect(() => {
-    if (props.surface !== 'main' || path.trim().length > 0 || pageDefaultPath === undefined) return
+    if (sidePanel || path.trim().length > 0 || pageDefaultPath === undefined) return
     setPath(pageDefaultPath)
-  }, [props.surface, path, pageDefaultPath, setPath])
+  }, [sidePanel, path, pageDefaultPath, setPath])
 
   useEffect(() => {
     if (state === undefined) return
@@ -1939,8 +1939,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const emptyPrompt = (target: View): JSX.Element | null =>
     repositoryStatus.showEmptyPrompt ? <EmptyState data-repository-empty={target}>{HistoryPage.emptyTexts[target]}</EmptyState> : null
 
-  // A2 #36 (unslop): on a page the project select is header meta beside the title; in a panel it leads the toolbar.
-  const pageSurface = props.surface === 'main'
+  // A2 #36 (unslop): History and Source control are pages wherever the shell puts them (a main tab, a docked pane), so
+  // they carry the page header there and the project select is header meta beside the title. Only the per-thread side
+  // panel, which follows its thread and switches views with tabs, keeps the compact toolbar.
+  const pageSurface = !sidePanel
   const repositorySelect = (
     <Tooltip>
       <TooltipTrigger asChild>
