@@ -458,17 +458,15 @@ When('the thread Traces tab is opened', async ({ page }: { page: Page }) => {
   } else {
     // Productivity pass Q5: with a thread panel, Traces is a facet opened from the header's More thread actions.
     await page.getByRole('button', { name: 'More thread actions', exact: true }).filter({ visible: true }).first().click()
+    // The thread menu lists the thread's views under Open in.
+    await page.getByRole('menuitem', { name: 'Open in', exact: true }).click()
+    const openIn = page.getByRole('menu', { name: 'Open in', exact: true })
     await recordAssertion(page, 'traces-thread-tab-follows-trajectory', async () => {
-      const names = (
-        await page
-          .getByRole('menuitem')
-          .filter({ hasText: /^Open / })
-          .allTextContents()
-      ).map(name => name.trim())
-      expect(names).toContain('Open Traces')
-      if (names.includes('Open Trajectory')) expect(names.indexOf('Open Traces')).toBe(names.indexOf('Open Trajectory') + 1)
+      const names = (await openIn.getByRole('menuitem').allTextContents()).map(name => name.trim())
+      expect(names).toContain('Traces')
+      if (names.includes('Trajectory')) expect(names.indexOf('Traces')).toBe(names.indexOf('Trajectory') + 1)
     })
-    await page.getByRole('menuitem', { name: 'Open Traces', exact: true }).click()
+    await openIn.getByRole('menuitem', { name: 'Traces', exact: true }).click()
   }
   await expect(sessionView(page)).toBeVisible()
 })

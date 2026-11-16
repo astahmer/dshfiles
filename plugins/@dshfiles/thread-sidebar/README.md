@@ -834,6 +834,16 @@ minutes; a refused send returns `rate-limited` with the seconds to wait. Nothing
 is queued for pages that open later, and it adds no history entry. Each send
 leaves a `thread-sidebar user notification send` span.
 
+**One thread menu.** A thread's row menu in the list and the header's `⋯` render one layout
+(`src/thread-menu-model.ts`, drawn by `src/thread-menu.tsx`): Pin, Done (or Restore), Snooze, Rename, Open in side
+panel and Copy thread link at the top, then the submenus **Open in** (the thread's views, Continue in project, other
+applications), **Copy** (thread ID, Markdown) and **More** (Turns, @Mention, Follow-up, Mute, Mark unread, Notify,
+Mark done when idle, Move to group, Referenced by, what other plugins add, and Archive last). Each surface fills in
+the entries it can run, in that order and with those icons; an entry it cannot run there is left out rather than
+shown disabled: the list has no Find in thread, the header no Rename, and a phone no side panel and no single-key
+hints. A row action another plugin registers (`ThreadRowActions`) may carry an `icon`; without one it gets a neutral
+mark so the labels stay in one column.
+
 **Snooze vs Done vs Mute (and Archive).** The labels follow the glossary: the action stored as _settled_ is shown as
 **Done** (its reverse **Restore**), the one stored as _parked_ as **Snooze** (**Unsnooze**); **Mute** and **Archive**
 keep their names because they are different actions. Settings keys, command ids, Host API methods and agent tool

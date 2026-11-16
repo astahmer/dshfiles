@@ -5,7 +5,7 @@
       "id": "conversation-header",
       "title": "Keep the original conversation toolbar and child views inside each thread",
       "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and one thread actions `⋯` whose Open Trajectory/Traces/Requests items open those views as thread-panel facets (productivity pass Q5: no view tabs in the header; the stage is always Chat). The original header child has one declarer behind a reusable owned Factory, shared with native mode; no borrowed renderer or global-following duplicate is used. The title keeps its room: header chips shrink and leave from the start edge before it truncates. The original right-sidebar opener uses the registered Workbench dock actions, not the hidden native carrier. Outer Workbench tab layout, original blank hero and independent view-only panels retain their owners. The optional producer-owned ConversationScope contract wraps this occurrence's resident header and composer together; without a provider both Factories render unchanged.",
-      "reach": ["seed tool-call-thread", "click button \"More thread actions\"", "expect menuitem \"Open Traces\""],
+      "reach": ["seed tool-call-thread", "click button \"More thread actions\"", "click menuitem \"Open in\"", "expect menuitem \"Traces\""],
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -166,7 +166,13 @@
       "id": "sidebar-preview-tab",
       "title": "Account Preview is a regular movable docked view",
       "summary": "The existing footer.above assembly is seated once as an ordinary left Workbench tab, preserving the real account preview owner and actions. Existing saved placements in any root/nested region win; moving or explicitly closing it never creates a duplicate or resurrects it on reload. Reset layout can restore the default. Native brand/account toolbar and update notices remain fixed; a standalone Sidebar without the Workbench override retains its old preview fallback.",
-      "reach": ["expect tab \"Quota\"", "rightclick tab \"Quota\"", "click menuitem \"Layout\"", "click menuitem \"Hide tab row\"", "expect button \"Add AI account\""],
+      "reach": [
+        "expect tab \"Quota\"",
+        "rightclick tab \"Quota\"",
+        "click menuitem \"Layout\"",
+        "click menuitem \"Hide tab row\"",
+        "expect button \"Add AI account\""
+      ],
       "surfaces": ["client", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",

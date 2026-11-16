@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -26,12 +26,15 @@ const NATIVE_ACTIONS: readonly ThreadHeaderMenuAction[] = [
 const labels = {
   threadSidebarPin: 'Pin',
   threadSidebarUnpin: 'Unpin',
-  threadSidebarPark: 'Park',
-  threadSidebarUnpark: 'Unpark',
+  threadSidebarPark: 'Snooze',
+  threadSidebarUnpark: 'Unsnooze',
   threadSidebarArchive: 'Archive',
   threadSidebarRestore: 'Restore',
-  threadSidebarSettle: 'Settle',
-  threadSidebarUnsettle: 'Unsettle',
+  threadSidebarSettle: 'Done',
+  threadSidebarUnsettle: 'Restore from Done',
+  threadSidebarOpenIn: 'Open in',
+  threadSidebarCopy: 'Copy',
+  threadSidebarMore: 'More',
   threadSidebarMute: 'Mute thread',
   threadSidebarMuted: 'Muted',
   threadSidebarMuteFor1Hour: 'For 1 hour',
@@ -133,6 +136,10 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
 const openMoreMenu = (): void => {
   fireEvent.keyDown(screen.getByRole('button', { name: 'More thread actions' }), { key: 'ArrowDown' })
 }
+/** Open one of the menu's submenus (Open in, Copy, More, or a submenu inside one) from the keyboard. */
+const openSubmenu = (name: string): void => {
+  fireEvent.keyDown(screen.getByRole('menuitem', { name }), { key: 'ArrowRight' })
+}
 
 beforeEach(() => {
   localStorage.clear()
@@ -146,7 +153,7 @@ afterEach(() => {
 })
 
 describe('HeaderThreadActions', () => {
-  it('draws one control in the header, the thread menu, which holds Pin, Park and Copy thread link', () => {
+  it('draws one control in the header, the thread menu, which holds Pin, Snooze and Copy thread link', () => {
     const header = mount()
     // DESIGN.md: the thread header is one row with one ⋯; a verb goes into that menu, not beside it.
     expect(screen.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['More thread actions'])
@@ -157,7 +164,7 @@ describe('HeaderThreadActions', () => {
     expect(header.pinSession).toHaveBeenCalledWith('s1')
 
     openMoreMenu()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Park' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Snooze' }))
     expect(localStorage.getItem(PREFERENCES_STORAGE_KEY)).not.toBeNull()
   })
 
@@ -165,8 +172,13 @@ describe('HeaderThreadActions', () => {
     mount()
     openMoreMenu()
     const rows = screen.getAllByRole('menuitem')
-    expect(rows.length).toBeGreaterThan(8)
+    // The lifecycle verbs and the three most used ones, then one row per submenu: a short list, never the old 13 rows.
+    expect(rows.map(row => row.textContent)).toEqual(['Find in threadCtrlF', 'Pin', 'Done', 'Snooze', 'Copy thread link', 'Open in', 'Copy', 'More'])
     expect(rows.filter(row => row.querySelector('svg, img') === null).map(row => row.textContent)).toEqual([])
+    openSubmenu('More')
+    const moreRows = screen.getAllByRole('menuitem').filter(row => !rows.includes(row))
+    expect(moreRows.map(row => row.textContent)).toEqual(['Turns', 'Mute thread', 'Referenced by', 'Archive'])
+    expect(moreRows.filter(row => row.querySelector('svg, img') === null).map(row => row.textContent)).toEqual([])
   })
 
   it("lists the header's own More actions in the same menu, and takes the second ⋯ off the header while it does", () => {
@@ -179,11 +191,17 @@ describe('HeaderThreadActions', () => {
       dispose,
     }))
     const header = mount()
+    onTestFinished(withdraw)
     expect(ThreadViewsModel.headerMenuHosted()).toBe(true)
     openMoreMenu()
     // Thread wording for the two exports; an unknown action keeps the label its plugin gave it.
+    openSubmenu('Copy')
     expect(screen.getByRole('menuitem', { name: 'Copy thread as Markdown' })).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: 'Open in' }).getAttribute('aria-haspopup')).toBe('menu')
+    // The Host's own "Open in" list joins this menu's Open in instead of nesting a second one inside it.
+    openSubmenu('Open in')
+    expect(screen.getAllByRole('menuitem', { name: 'Open in' })).toHaveLength(1)
+    expect(screen.getByRole('menuitem', { name: 'Zed' })).toBeTruthy()
+    openSubmenu('More')
     expect(screen.getByRole('menuitem', { name: 'Feedback' })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Download thread log' }))
     expect(select).toHaveBeenCalledWith('export/download')
@@ -201,7 +219,8 @@ describe('HeaderThreadActions', () => {
   it('snoozes the current thread until tomorrow morning, then offers Unmute', () => {
     mount()
     openMoreMenu()
-    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Mute thread' }), { key: 'ArrowRight' })
+    openSubmenu('More')
+    openSubmenu('Mute thread')
     expect(screen.getByRole('menuitem', { name: 'Unmute' }).getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Until tomorrow morning' }))
     const wake = new Date(storedPreferences.get()?.mutedThreads.s1?.until ?? 0)
@@ -209,7 +228,8 @@ describe('HeaderThreadActions', () => {
     expect(wake.getTime()).toBeGreaterThan(Date.now())
     expect(storedPreferences.get()?.mutedThreads.s1?.activityAt).toBe(1)
     openMoreMenu()
-    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Muted' }), { key: 'ArrowRight' })
+    openSubmenu('More')
+    openSubmenu('Muted')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Unmute' }))
     expect(storedPreferences.get()?.mutedThreads).toEqual({})
   })
@@ -218,15 +238,11 @@ describe('HeaderThreadActions', () => {
     mount({ archived: true })
     openMoreMenu()
     expect(screen.queryByRole('menuitem', { name: 'Pin' })).toBeNull()
-    // Find in thread (with its ⌘F / Ctrl+F keycap) and Turns lead the menu, archived or not: reading tools, not lifecycle verbs.
-    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      'Find in threadCtrlF',
-      'Turns',
-      'Restore',
-      'Copy thread ID',
-      'Copy thread link',
-      'Referenced by',
-    ])
+    // Find in thread (with its ⌘F / Ctrl+F keycap) leads the menu, archived or not: a reading tool, not a lifecycle verb.
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Find in threadCtrlF', 'Restore', 'Copy thread link', 'Copy', 'More'])
+    openSubmenu('More')
+    expect(screen.queryByRole('menuitem', { name: 'Archive' })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: 'Turns' })).toBeTruthy()
     cleanup()
     mount({ blank: true })
     expect(screen.queryByRole('group', { name: 'Thread actions' })).toBeNull()
@@ -235,6 +251,7 @@ describe('HeaderThreadActions', () => {
   it('offers the thread-reference submenu without resolving it until it opens', () => {
     mount()
     openMoreMenu()
+    openSubmenu('More')
 
     expect(screen.getByRole('menuitem', { name: 'Referenced by' })).toBeTruthy()
     expect(screen.queryByText('Looking for referencing threads…')).toBeNull()
@@ -246,6 +263,7 @@ describe('HeaderThreadActions', () => {
     window.history.replaceState({}, '', '/?token=private#section')
     mount()
     openMoreMenu()
+    openSubmenu('Copy')
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Copy thread ID' }))
     await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('Thread ID copied.'))
@@ -262,7 +280,7 @@ describe('HeaderThreadActions', () => {
     const header = mount({ pinned: true })
     openMoreMenu()
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Settle' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Done' }))
     await vi.waitFor(() => expect(storedPreferences.get()?.settledSessionIds).toContain('s1'))
     expect(storedPreferences.get()?.settledAt.s1).toBeGreaterThan(0)
     expect(storedPreferences.get()?.parkedSessionIds).toEqual([])
@@ -271,16 +289,17 @@ describe('HeaderThreadActions', () => {
     cleanup()
     const settledHeader = mount({ pinned: true })
     openMoreMenu()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Unsettle' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Restore from Done' }))
     expect(storedPreferences.get()?.settledSessionIds).not.toContain('s1')
     expect(settledHeader.unpinSession).not.toHaveBeenCalled()
   })
 
-  it('disables park, settle and archive while a thread is running', () => {
+  it('disables Snooze, Done and Archive while a thread is running', () => {
     mount({ running: true })
     openMoreMenu()
-    expect(screen.getByRole('menuitem', { name: 'Park' }).getAttribute('aria-disabled')).toBe('true')
-    expect(screen.getByRole('menuitem', { name: 'Settle' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('menuitem', { name: 'Snooze' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('menuitem', { name: 'Done' }).getAttribute('aria-disabled')).toBe('true')
+    openSubmenu('More')
     expect(screen.getByRole('menuitem', { name: 'Archive' }).getAttribute('aria-disabled')).toBe('true')
   })
 

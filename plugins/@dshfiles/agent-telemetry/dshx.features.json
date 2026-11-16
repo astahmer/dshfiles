@@ -326,7 +326,8 @@
       "reach": [
         "seed tool-call-thread",
         "click button \"More thread actions\"",
-        "click menuitem \"Open Traces\"",
+        "click menuitem \"Open in\"",
+        "click menuitem \"Traces\"",
         "expect region \"Thread telemetry summary\""
       ],
       "surfaces": ["host", "integration"],
