@@ -269,7 +269,7 @@ export class GatewayUnreachable extends Schema.TaggedError<GatewayUnreachable>()
   { dshxWireCode: 'gateway-unreachable' },
 ) {
   override get message(): string {
-    return 'Could not reach the runtime through its recorded connector.'
+    return "Can't reach this host. Check that DSH is running there, then reconnect."
   }
 }
 

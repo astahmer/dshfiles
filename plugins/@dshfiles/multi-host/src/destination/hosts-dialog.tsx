@@ -14,7 +14,7 @@ import { useState } from 'react'
 import type { RuntimeSummary } from '../api.js'
 import { ConnectionDiagnostics } from './connection-diagnostics.js'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
-import { hostGlyph } from './host-status.js'
+import { hostGlyph, hostState } from './host-status.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 import { setHostDestination } from './state.js'
@@ -33,13 +33,7 @@ const WEIGHTS = [1, 2, 4] as const
 const failure = (result: { readonly ok: boolean; readonly code?: string; readonly message?: string }): Error =>
   new Error(result.message === undefined ? 'The host request failed.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
 
-/** Status of one host as the chip and the dialog show it. */
-export const hostState = (runtime: RuntimeSummary | undefined): { readonly tone: 'online' | 'idle' | 'error'; readonly label: string } => {
-  if (runtime === undefined) return { tone: 'error', label: 'No DSH runtime registered' }
-  if (runtime.connected) return { tone: 'online', label: 'Connected' }
-  if (runtime.lastError !== undefined) return { tone: 'error', label: runtime.lastError.message }
-  return { tone: 'idle', label: runtime.lastSeenAt === undefined ? 'Not connected yet' : `Idle · last seen ${new Date(runtime.lastSeenAt).toLocaleString()}` }
-}
+export { hostState } from './host-status.js'
 
 /** The host's state as a shared status glyph; the text beside it says which state. */
 export const StatusDot = (props: { readonly tone: 'online' | 'idle' | 'error' }) => <StatusGlyph decorative status={hostGlyph(props.tone)} />
