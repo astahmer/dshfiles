@@ -14,7 +14,7 @@ type OpenList = 'files' | 'commands' | 'failures'
 const Toggle = (props: { readonly open: boolean; readonly onToggle: () => void; readonly className?: string; readonly children: ReactNode }): JSX.Element => (
   <button
     aria-expanded={props.open}
-    className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:hover:text-foreground', props.className)}
+    className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:hover:text-foreground dshx:pointer-coarse:min-h-11', props.className)}
     onClick={props.onToggle}
     type="button"
   >
@@ -160,7 +160,7 @@ export const TurnSummaryLine = (props: {
               <Part>
                 <button
                   aria-expanded={canList ? open === 'failures' : undefined}
-                  className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-destructive dshx:disabled:cursor-default"
+                  className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-destructive dshx:disabled:cursor-default dshx:pointer-coarse:min-h-11"
                   disabled={!canList}
                   onClick={toggle('failures')}
                   type="button"
