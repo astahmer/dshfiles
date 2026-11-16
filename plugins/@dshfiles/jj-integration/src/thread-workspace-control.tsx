@@ -346,7 +346,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
               <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" data-workspace-path="" tabIndex={0}>
+                    <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" data-workspace-path="">
                       {workspacePath === null ? props.t('unknownWorkspace') : WorkspaceControlModel.pathTail(workspacePath)}
                     </span>
                   </TooltipTrigger>
