@@ -1,9 +1,7 @@
 import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ProviderGlyph as ProviderLogo } from './provider-glyph.js'
-import { KIND_ACCENT } from './account-labels.js'
 import type { AccountProfile } from './api.js'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useId, type ReactNode } from 'react'
 
 /** Kit `Field` drops its vertical layout (unprefixed classes), so the column is restated here. */
@@ -29,23 +27,9 @@ export const ActionHint = (props: { readonly label: string; readonly children: J
   </Tooltip>
 )
 
-/** Branded marks match the account rail/header, independently of editable picker tags. */
-export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; readonly large?: boolean }): JSX.Element => (
-  <span
-    aria-hidden
-    className={cn(
-      'dshx:grid dshx:shrink-0 dshx:place-items-center dshx:rounded-lg dshx:bg-foreground dshx:text-background dshx:shadow-sm',
-      props.large ? 'dshx:size-16' : 'dshx:size-11',
-      props.kind === 'opencode-go' && 'dshx:bg-violet dshx:text-primary-foreground',
-    )}
-    style={
-      props.kind === 'claude' || props.kind === 'commandcode' || props.kind === 'mistral'
-        ? { backgroundColor: KIND_ACCENT[props.kind], color: 'white' }
-        : undefined
-    }
-  >
-    <ProviderLogo kind={props.kind} monochrome className={props.large ? 'dshx:size-10' : 'dshx:size-7'} />
-  </span>
+/** The provider's mark at text size in the account rail and header: ink, with no tile, fill or shadow behind it. */
+export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind'] }): JSX.Element => (
+  <ProviderLogo kind={props.kind} monochrome className="dshx:size-5 dshx:text-foreground" />
 )
 
 /** A settings or usage section; numbering is optional for older callers. */

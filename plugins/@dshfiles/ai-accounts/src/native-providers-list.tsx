@@ -55,9 +55,7 @@ export const NativeProvidersList = (props: {
                 onClick={() => props.onSelect?.(provider.entryId)}
                 type="button"
               >
-                <span className="dshx:grid dshx:size-11 dshx:shrink-0 dshx:place-items-center dshx:rounded-lg dshx:bg-muted dshx:text-muted-foreground">
-                  <BoxIcon className="dshx:size-7" />
-                </span>
+                <BoxIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />
                 <span className="dshx:min-w-0">
                   <strong className="dshx:block dshx:truncate dshx:text-sm dshx:font-semibold">{provider.label}</strong>
                   <span className="dshx:mt-1 dshx:block dshx:text-2xs dshx:text-muted-foreground">Built-in provider</span>

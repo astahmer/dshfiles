@@ -223,7 +223,9 @@ When('two synthetic work accounts and recorded account usage populate the dashbo
     await accountCard(page, oldName)
       .getByRole('button', { name: `Select ${oldName}`, exact: true })
       .click()
-    await selectedAccount(page).getByRole('button', { name: 'Rename account', exact: true }).click()
+    // Rename is a row of the account's ⋯ menu; the header keeps one row of controls.
+    await selectedAccount(page).getByRole('button', { name: 'Account actions', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Rename account', exact: true }).click()
     const nameInput = selectedAccount(page).getByRole('textbox', { name: 'Account name', exact: true }).first()
     await nameInput.fill(newName)
     await nameInput.press('Enter')
