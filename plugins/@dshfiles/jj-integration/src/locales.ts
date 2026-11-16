@@ -4,7 +4,7 @@ import { defineLocale } from '@dshfiles/dshx/client'
 export const JJ_INTEGRATION_LOCALE_NAMESPACE = 'dshfiles.jjIntegration'
 
 const en = {
-  title: 'Land',
+  title: 'Workspaces',
   subtitle: 'Land finished thread work on {bookmark}. Active work, unresolved conflicts and missing descriptions stay blocked.',
   refresh: 'Refresh',
   workspaceFilters: 'Filter thread workspaces',
@@ -296,7 +296,7 @@ const en = {
 } as const
 
 const zh = {
-  title: '线程集成',
+  title: '工作区',
   subtitle: '将经过验证的线程修改集成到 {bookmark}。仍在工作的线程、未解决的冲突和未描述的修订会保持阻止状态。',
   refresh: '刷新',
   workspaceFilters: '筛选会话工作区',
