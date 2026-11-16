@@ -74,6 +74,11 @@ export const PlanProgress = {
   itemsOf: parseItems,
   formatDuration,
 
+  /** A step's time for the plan list, or undefined when it never started or took under a second: "0s" reads as noise. */
+  shownDuration(elapsedMs: number | undefined): string | undefined {
+    return elapsedMs === undefined || Math.round(elapsedMs / 1000) < 1 ? undefined : formatDuration(elapsedMs)
+  },
+
   /** `todos` from a `todo_write` call's raw JSON arguments, or undefined while incomplete or invalid. */
   itemsFromArguments(argsRaw: string | undefined): readonly PlanItem[] | undefined {
     if (argsRaw === undefined) return undefined
