@@ -302,6 +302,8 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
     const mutation = api.onDidMutateLayout(event => {
       const emptied = panelCount > 0 && api.panels.length === 0
       panelCount = api.panels.length
+      // The pane's own stand-in chooser has done its job once a view sits beside it (after the mutation settles).
+      if (panelCount > 1) queueMicrotask(() => NewViewTabs.dropPlaceholders(api))
       if (event.kind === 'load' || event.kind === 'clear') return
       if (emptied && emptyPane.current.visible !== false) emptyPane.current.onClose?.()
     })
@@ -311,7 +313,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   useLayoutEffect(() => {
     // The retained API stays empty after auto-close. A manual reopen needs a
     // chooser, but an explicit resource admission already populated it first.
-    if (api !== null && region === 'right' && props.visible !== false && api.panels.length === 0) NewViewTabs.open(api)
+    if (api !== null && region === 'right' && props.visible !== false && api.panels.length === 0) NewViewTabs.openPlaceholder(api)
   }, [api, region, props.visible])
 
   // Admission is checked before native mutation too, not only after a drop.

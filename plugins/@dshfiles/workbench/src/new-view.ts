@@ -6,6 +6,9 @@ import { WORKBENCH_COMPONENT } from './layout-store.js'
 const NEW_VIEW_PREFIX = 'dshfiles-workbench.new-view/'
 const sourceParams = Schema.Struct({ sourceId: Schema.String.check(Schema.isMinLength(1)) })
 const isSourceParams = Schema.is(sourceParams)
+/** Saved with the layout, so a stand-in restored beside a view is still known as one. */
+const PLACEHOLDER_PARAMS = { placeholder: true } as const
+const isPlaceholderParams = Schema.is(Schema.Struct({ placeholder: Schema.Literal(true) }))
 
 export interface NewViewSelection {
   readonly group?: DockviewGroupPanel
@@ -28,6 +31,24 @@ export class NewViewTabs {
   static open(api: DockviewApi, group?: DockviewGroupPanel, direction: 'within' | 'right' | 'below' = 'within'): IDockviewPanel {
     const options = { id: `${NEW_VIEW_PREFIX}${randomUUID()}`, title: 'New tab', component: WORKBENCH_COMPONENT }
     return group === undefined ? api.addPanel(options) : api.addPanel({ ...options, position: { referenceGroup: group, direction } })
+  }
+
+  /**
+   * The chooser an empty pane opens for itself, so the pane is never blank. Unlike a chooser the user opened with
+   * "+", it is only a stand-in: it goes away as soon as a real view is seated beside it.
+   */
+  static openPlaceholder(api: DockviewApi): IDockviewPanel {
+    return api.addPanel({ id: `${NEW_VIEW_PREFIX}${randomUUID()}`, title: 'New tab', component: WORKBENCH_COMPONENT, params: PLACEHOLDER_PARAMS })
+  }
+
+  /** Close every stand-in chooser of a pane that now shows something else; returns whether one was closed. */
+  static dropPlaceholders(api: DockviewApi): boolean {
+    if (api.panels.length < 2) return false
+    const placeholders = api.panels.filter(panel => NewViewTabs.isChooser(panel.id) && isPlaceholderParams(panel.params))
+    // Two stand-ins and nothing else never happens; were it to, one stays so the pane is not left blank.
+    const closing = placeholders.length === api.panels.length ? placeholders.slice(1) : placeholders
+    for (const panel of closing) panel.api.close()
+    return closing.length > 0
   }
 
   /** Successful adoption closes only its chooser, never the real resource callback. */
