@@ -720,9 +720,7 @@ export const SettingsForm = (props: {
       const previous = fields[index - 1]?.groups.join(' › ')
       return (
         <Fragment key={field.path.join('.')}>
-          {group !== '' && group !== previous && (
-            <h4 className="dshx:mt-4 dshx:text-xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">{group}</h4>
-          )}
+          {group !== '' && group !== previous && <h4 className="dshx:m-0 dshx:mt-5 dshx:text-sm dshx:font-semibold dshx:text-foreground">{group}</h4>}
           <SettingRow
             disabled={disabled}
             field={field}

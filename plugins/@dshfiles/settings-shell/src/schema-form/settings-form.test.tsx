@@ -260,3 +260,15 @@ describe('advanced settings', () => {
     expect(fold()).toBeNull()
   })
 })
+
+describe('settings held by a nested object', () => {
+  it('heads them with a sentence-case label, never an all-caps one', async () => {
+    const schema = wire(Schemastery.object({ autoCleanup: Schemastery.object({ onSettle: Schemastery.boolean().default(false) }) }))
+    const fields = SettingsSchemaModel.settingFields({ schema, secrets: [], text })
+    const snapshot: ConfigFormSnapshot<unknown> = { status: 'ready', value: {}, base: {}, user: {}, revision: 1, writable: true }
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot)} namespace="example" t={t} />))
+    const heading = container.querySelector('h4')
+    expect(heading?.textContent).toBe('Auto cleanup')
+    expect(heading?.className).not.toContain('uppercase')
+  })
+})
