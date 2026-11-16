@@ -8,7 +8,7 @@ export const tracesSettings = defineSettings({
   namespace: 'dshfiles-traces',
   schema: Schema.object({
     mode: Schema.union([
-      Schema.const('plugin').description('This plugin: the built-in receiver owns the OTLP port and this panel shows what it stores'),
+      Schema.const('plugin').description('Built-in receiver: owns the OTLP port and stores what arrives'),
       Schema.const('external').description('External viewer: the receiver stays off; another tool (dsh-traces, a collector) owns the port'),
       Schema.const('both').description('Both: the built-in receiver stores and also forwards every request to the external viewer'),
     ])
