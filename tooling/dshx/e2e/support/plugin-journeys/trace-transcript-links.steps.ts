@@ -5,6 +5,12 @@ import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
 
+/** Opens one of the Traces views kept under More views (Service map, Metrics, Operations, Errors, Boards). */
+const openMoreTracesView = async (page: Page, name: string): Promise<void> => {
+  await page.getByRole('button', { name: 'More views', exact: true }).click()
+  await page.getByRole('menuitem', { name, exact: true }).click()
+}
+
 // Port 0 lets every scenario bind its own receiver port; the receiver publishes it to dshx tracing in-process.
 const freePortPatch = `- id: dshfiles-traces
   config:
@@ -190,7 +196,7 @@ Then('the model call span shows its own cost', async ({ page }: { page: Page }) 
 
 Then("the Traces panel overview lists the model's calls, tokens and cost", async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, 'Traces: Explorer')
-  await page.getByRole('tab', { name: 'Operations', exact: true }).click()
+  await openMoreTracesView(page, 'Operations')
   const table = page.getByTestId('traces-model-costs')
   await recordAssertion(page, 'traces-overview-model-costs', async () => {
     await expect(table.getByRole('row').filter({ hasText: 'gpt-test' })).toContainText('2', { timeout: 15_000 })
