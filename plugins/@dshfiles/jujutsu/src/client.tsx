@@ -112,6 +112,7 @@ import { InlineWorkspaceRemoval } from './inline-workspace-removal.js'
 import { WorkspaceCleanupDialog } from './workspace-cleanup-dialog.js'
 import { WorkspaceCleanupTrail } from './workspace-cleanup-trail.js'
 import { HistoryPage } from './history-page.js'
+import { RevisionTime } from './revision-time.js'
 import { DEFAULT_PANEL_SCOPE, PanelScopes, usePanelScopeState } from './panel-scope.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { filterGraphRevisions, mergeGraphRevisions } from './graph-navigation.js'
@@ -1347,9 +1348,17 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground">
           <span>{revision.author || 'Unknown author'}</span>
           <span aria-hidden>·</span>
-          <time dateTime={editTimes.get(revision.commitId) ?? revision.authorTime}>
-            {revisionDates(revision, editTimes.get(revision.commitId)).replaceAll('\n', ' · ')}
-          </time>
+          {/* A2 #37 (unslop): one relative time; the three absolute timestamps are the tooltip's. */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <time data-revision-time="" dateTime={RevisionTime.lastChanged(revision, editTimes.get(revision.commitId), Date.now()).dateTime} tabIndex={0}>
+                {RevisionTime.lastChanged(revision, editTimes.get(revision.commitId), Date.now()).text}
+              </time>
+            </TooltipTrigger>
+            <TooltipContent className="dshx:whitespace-pre-line" side="bottom">
+              {revisionDates(revision, editTimes.get(revision.commitId))}
+            </TooltipContent>
+          </Tooltip>
           <span aria-hidden>·</span>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -1415,7 +1424,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           </Button>
           {!revision.workingCopy && !revision.immutable && (
             <Button disabled={busy} onClick={() => askForConfirmation({ kind: 'edit', commitId: revision.commitId })} size="xs" type="button" variant="outline">
-              Edit This Change
+              Edit this change
             </Button>
           )}
           {!revision.immutable && parent !== undefined && !parent.immutable && (
@@ -2573,10 +2582,13 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const workspaceLabel = (workspace: string): JSX.Element => (
     <span
       className={cn(
-        'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:cursor-grab dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-2xs dshx:font-medium dshx:text-background',
-        revision.workingCopy ? 'dshx:bg-info' : 'dshx:bg-teal',
+        // A2 #37 (unslop): an outline chip. Indigo marks focus, selection and Needs you, never a label; the working
+        // copy reads by its ink border and text, the other workspaces by a muted one.
+        'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:cursor-grab dshx:items-center dshx:gap-1 dshx:rounded-full dshx:border dshx:bg-background dshx:px-1.5 dshx:text-2xs dshx:font-medium',
+        revision.workingCopy ? 'dshx:border-foreground/60 dshx:text-foreground' : 'dshx:border-border dshx:text-muted-foreground',
         props.draggedLabel?.kind === 'workspace' && props.draggedLabel.name === workspace && 'dshx:opacity-40',
       )}
+      data-workspace-marker={revision.workingCopy ? 'working-copy' : 'workspace'}
       draggable
       onContextMenu={event => event.stopPropagation()}
       onDragStart={event => {
