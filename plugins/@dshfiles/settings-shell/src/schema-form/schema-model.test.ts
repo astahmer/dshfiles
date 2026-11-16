@@ -65,7 +65,7 @@ describe('settingFields', () => {
   it('edits arrays and dicts of scalars as lists and records, and anything else as JSON', () => {
     expect(byKey.get('tags')?.control).toEqual({ kind: 'list', item: { kind: 'text', multiline: false } })
     expect(byKey.get('colors')?.control).toMatchObject({ kind: 'record', value: { kind: 'choice' } })
-    expect(byKey.get('rows')?.control).toEqual({ kind: 'json' })
+    expect(byKey.get('rows')?.control).toEqual({ kind: 'json', shape: 'list' })
   })
 
   it('groups nested objects and leaves hidden and secret fields out', () => {

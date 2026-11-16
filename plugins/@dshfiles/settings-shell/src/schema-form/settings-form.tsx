@@ -17,6 +17,7 @@ import {
   jsonValueSchema,
   SettingsSchemaModel,
   type ChoiceOption,
+  type JsonShape,
   type JsonValue,
   type NumberControl,
   type ScalarControl,
@@ -117,6 +118,11 @@ const useDraft = (stored: string, commit: (draft: string) => void) => {
     onCommit: () => {
       editing.current = false
       if (draft !== stored) commit(draft)
+    },
+    /** Drops what was typed: the field shows the stored value again. */
+    onReset: () => {
+      editing.current = false
+      setDraft(stored)
     },
   }
 }
@@ -431,24 +437,33 @@ const RecordInput = (props: {
   )
 }
 
-/** The fallback for shapes no control fits: the value as JSON, saved when it parses. */
+const JSON_HINT = { list: 'form.jsonList', object: 'form.jsonObject' } as const
+const JSON_PROBLEM = { syntax: 'form.invalidJson', list: 'form.invalidJsonList', object: 'form.invalidJsonObject' } as const
+
+/**
+ * The fallback for shapes no control fits (a list of objects, a nested map): the value as JSON. The draft is checked
+ * as it is typed, against the shape the schema declares, and only a valid one is ever saved, so a typo cannot break
+ * the setting: the stored value stays, the field says what is wrong and how to fix it, and one button restores it.
+ */
 const JsonInput = (props: {
   readonly label: string
+  readonly shape: JsonShape | undefined
   readonly value: JsonValue | undefined
   readonly disabled: boolean
   readonly t: ShellTranslate
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
-  const [invalid, setInvalid] = useState(false)
-  const draft = useDraft(props.value === undefined ? '' : (JSON.stringify(props.value, null, 2) ?? ''), text => {
-    const value = SettingsSchemaModel.parseJsonDraft(text)
-    setInvalid(value === undefined)
-    if (value !== undefined) props.onChange(value)
+  const stored = props.value === undefined ? '' : (JSON.stringify(props.value, null, 2) ?? '')
+  const draft = useDraft(stored, text => {
+    const checked = SettingsSchemaModel.checkJsonDraft(text, props.shape)
+    if (checked.ok) props.onChange(checked.value)
   })
+  const checked = draft.value === stored ? undefined : SettingsSchemaModel.checkJsonDraft(draft.value, props.shape)
+  const problem = checked === undefined || checked.ok ? undefined : checked.reason
   return (
     <div className="dshx:flex dshx:w-full dshx:flex-col dshx:gap-1">
       <Textarea
-        aria-invalid={invalid}
+        aria-invalid={problem !== undefined}
         aria-label={props.label}
         className="dshx:min-h-24 dshx:w-full dshx:font-mono! dshx:text-xs"
         disabled={props.disabled}
@@ -457,9 +472,16 @@ const JsonInput = (props: {
         spellCheck={false}
         value={draft.value}
       />
-      <span className={cn('dshx:text-xs', invalid ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')} role={invalid ? 'alert' : undefined}>
-        {invalid ? props.t('form.invalidJson') : props.t('form.json')}
-      </span>
+      {problem === undefined ? (
+        <span className="dshx:text-xs dshx:text-muted-foreground">{props.t(props.shape === undefined ? 'form.json' : JSON_HINT[props.shape])}</span>
+      ) : (
+        <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-xs dshx:text-destructive">
+          <span role="alert">{props.t(JSON_PROBLEM[problem])}</span>
+          <Button className="dshx:h-6 dshx:text-foreground" onClick={draft.onReset} size="xs" type="button" variant="outline">
+            {props.t('form.restoreJson')}
+          </Button>
+        </span>
+      )}
     </div>
   )
 }
@@ -496,7 +518,9 @@ const SettingControlInput = (props: {
   if (control.kind === 'record') {
     return <RecordInput disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} valueControl={control.value} />
   }
-  if (control.kind === 'json') return <JsonInput disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
+  if (control.kind === 'json') {
+    return <JsonInput disabled={props.disabled} label={props.label} onChange={props.onChange} shape={control.shape} t={props.t} value={props.value} />
+  }
   return <ScalarInput control={control} disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
 }
 
