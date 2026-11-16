@@ -43,3 +43,13 @@ export const runBacklogPageAction = async (page: Page, name: 'Settings' | 'Backf
   await page.getByRole('button', { name: 'More backlog actions', exact: true }).click()
   await page.getByRole('menuitem', { name, exact: true }).click()
 }
+
+/**
+ * The capture box. Feed always shows it; any other Backlog view shows it after New, so a step that captures there
+ * opens it first.
+ */
+export const openBacklogCapture = async (page: Page) => {
+  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  if (!(await capture.isVisible())) await page.locator('[data-backlog-panel] [data-page-action="new"]').first().click()
+  return capture
+}

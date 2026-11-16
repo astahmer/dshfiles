@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { Schema } from 'effect'
@@ -26,6 +27,7 @@ import {
   MicIcon,
   PlusIcon,
   RotateCcwIcon,
+  XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
@@ -190,6 +192,8 @@ export const Composer = (props: {
   readonly captureRequest?: { readonly id: number; readonly text: string }
   /** Template names from Backlog settings; picking one fills the capture's kind, tags, body and criteria on the Host. */
   readonly templates?: readonly string[]
+  /** Present where capture was opened on demand (any view but Feed): Escape and Close put it away again. */
+  readonly onDismiss?: () => void
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
@@ -493,6 +497,7 @@ export const Composer = (props: {
           }
           if (event.key === 'Escape') {
             input.current?.element()?.blur()
+            props.onDismiss?.()
             return
           }
           if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
@@ -645,6 +650,11 @@ export const Composer = (props: {
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
           {recording ? <span className="dshx:text-2xs dshx:text-destructive">Recording…</span> : null}
           {transcribing ? <span className="dshx:text-2xs dshx:text-muted-foreground">Transcribing…</span> : null}
+          {props.onDismiss === undefined ? null : (
+            <Button type="button" variant="ghost" size="icon-sm" aria-label="Close capture" onClick={props.onDismiss} className="dshx:text-muted-foreground">
+              <XIcon aria-hidden />
+            </Button>
+          )}
           <ComposerTools
             {...BacklogComposerScope.capture(props.draftKey)}
             insertText={value => {
