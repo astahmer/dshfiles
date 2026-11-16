@@ -25,7 +25,7 @@ const repository = (workspace: string) => ({
   remoteBookmarks: [],
 })
 
-const host = vi.hoisted(() => ({ workspace: 'default', totals: { files: 3, additions: 21, deletions: 0 } }))
+const host = vi.hoisted(() => ({ workspace: 'default', totals: { files: 3, additions: 21, deletions: 0 }, reads: 0 }))
 
 // The native package pulls its icon set at import; the pill needs none of it.
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({ ReferenceChip: () => null }))
@@ -37,7 +37,12 @@ vi.mock('@dshfiles/dshx/client', async importOriginal => ({
 }))
 vi.mock('@dshfiles/jj-integration/project-bookmark', () => ({ useProjectBookmark: () => 'main' }))
 vi.mock('./use-jujutsu-api.js', () => ({
-  useComposerContextApi: () => ({ context: async () => ({ repository: { ...repository(host.workspace), totals: host.totals } }) }),
+  useComposerContextApi: () => ({
+    context: async () => {
+      host.reads += 1
+      return { repository: { ...repository(host.workspace), totals: host.totals } }
+    },
+  }),
 }))
 vi.mock('./auto-refresh.js', () => ({ useAutoRefresh: () => ({ ref: () => undefined, queryOptions: {} }) }))
 
@@ -83,6 +88,7 @@ afterEach(() => {
   pluginQueryClient().clear()
   host.workspace = 'default'
   host.totals = { files: 3, additions: 21, deletions: 0 }
+  host.reads = 0
 })
 
 describe('Changes pill', () => {
@@ -144,5 +150,29 @@ describe('Location chip on the meter line', () => {
     host.workspace = 'default'
     const view = await mount(<ComposerChips sessionId={'session-1' as never} jujutsu={services('/work/sample', () => true)} />)
     expect(view.querySelector('[data-composer-meta="location"]')?.textContent).toBe('In the project · 1 ahead of main')
+  })
+})
+
+describe('Changes pill at the end of a turn', () => {
+  it('reads the workspace again when the turn ends, so new changes show without waiting for the poll', async () => {
+    host.workspace = 'thread-31057e'
+    host.totals = { files: 0, additions: 0, deletions: 0 }
+    const base = services('/work/sample-threads/thread-31057e', () => true)
+    const listeners = new Set<() => void>()
+    let byId = { 'session-1': { id: 'session-1', cwd: '/work/sample-threads/thread-31057e', blank: false, running: true } }
+    const sessions = { list: { subscribe: (listener: () => void) => (listeners.add(listener), () => listeners.delete(listener)), getSnapshot: () => ({ byId }) } }
+    const view = await mount(<ChangesPill sessionId={'session-1' as never} jujutsu={{ ...base, sessions } as never} />)
+    expect(view.querySelector('[data-changes-pill]')).toBeNull()
+    const readsWhileRunning = host.reads
+
+    // The agent wrote a file and its turn ended.
+    host.totals = { files: 1, additions: 4, deletions: 0 }
+    byId = { 'session-1': { ...byId['session-1'], running: false } }
+    await act(async () => {
+      for (const listener of listeners) listener()
+    })
+    for (let turn = 0; turn < 5; turn += 1) await act(async () => void (await new Promise(resolve => setTimeout(resolve, 0))))
+    expect(host.reads).toBeGreaterThan(readsWhileRunning)
+    expect(view.querySelector('[data-changes-pill]')?.textContent).toBe('+4−0')
   })
 })

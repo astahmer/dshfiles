@@ -70,6 +70,13 @@ const useSessionCwd = (sessions: ISessions, workspaces: WorkspaceItems, sessionI
   return cwd === null || cwd.length === 0 ? null : cwd
 }
 
+/** Whether this Session's turn is running, from the client's own thread list. */
+const useSessionRunning = (sessions: ISessions, sessionId: SessionSummary['id']): boolean => {
+  const subscribe = useCallback((listener: () => void) => sessions.list.subscribe(listener), [sessions])
+  const read = useCallback(() => sessions.list.getSnapshot().byId[sessionId]?.running === true, [sessionId, sessions])
+  return useSyncExternalStore(subscribe, read, read)
+}
+
 const composerKeys = {
   context: (cwd: string, base: string) => ['jujutsu', 'composer', cwd, base, 'context'] as const,
 }
@@ -103,6 +110,14 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
   })
   // The Changes pill, location chip and header toggle all become visible on the same switch; they join one read.
   refetch.current = () => void query.refetch({ cancelRefetch: false })
+  // A turn that just ended is when a thread's changes appear. The pill shows only while there are changes, so it reads
+  // once at that moment instead of staying absent until the next poll.
+  const running = useSessionRunning(props.jujutsu.sessions, props.sessionId)
+  const wasRunning = useRef(running)
+  useEffect(() => {
+    if (wasRunning.current && !running && loaded) refetch.current()
+    wasRunning.current = running
+  }, [loaded, running])
   const repository = query.isSuccess ? query.data.repository : null
   return {
     ref: refresh.ref,
