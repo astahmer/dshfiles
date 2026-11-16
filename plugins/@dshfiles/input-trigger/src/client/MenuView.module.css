@@ -334,7 +334,7 @@
 }
 
 /* Under the phone shell the list takes the sheet radius (DESIGN.md: 16px phone sheets). */
-@media (max-width: 639.98px) {
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   :global(html[data-shell-phone-nav]) .menu {
     border-radius: var(--dsw-radius-panel, 16px);
   }
