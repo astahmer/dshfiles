@@ -1,3 +1,4 @@
+import type { StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
 import type { ServerView } from './api.js'
 import type { McpServersTranslate } from './locales.js'
 
@@ -24,17 +25,18 @@ export class McpServerStatusModel {
     inactive: 'clientStopped',
   } as const satisfies Record<ServerView['clientLifecycle'], string>
 
-  private static readonly lifecycleDotClassNames = {
-    loaded: 'dshx:bg-success',
-    starting: 'dshx:bg-info dshx:animate-pulse',
-    'start-failed': 'dshx:bg-destructive',
-    'manually-disconnected': 'dshx:bg-muted-foreground/50',
-    inactive: 'dshx:bg-muted-foreground/50',
-  } as const satisfies Record<ServerView['clientLifecycle'], string>
+  /** The shared status vocabulary: a connected server is quiet, one that is starting works, only a failed start is coloured. */
+  private static readonly lifecycleGlyphs = {
+    loaded: 'idle',
+    starting: 'working',
+    'start-failed': 'failed',
+    'manually-disconnected': 'stopped',
+    inactive: 'stopped',
+  } as const satisfies Record<ServerView['clientLifecycle'], StatusGlyphState>
 
   static readonly lifecycleText = ({ server, t }: LifecycleTextInput): string => t(McpServerStatusModel.lifecycleCopy[server.clientLifecycle])
 
-  static readonly lifecycleDotClassName = (server: ServerView): string => McpServerStatusModel.lifecycleDotClassNames[server.clientLifecycle]
+  static readonly lifecycleGlyph = (server: ServerView): StatusGlyphState => McpServerStatusModel.lifecycleGlyphs[server.clientLifecycle]
 
   static readonly localProcessText = ({ server, t }: LocalProcessTextInput): string | undefined =>
     server.localProcess === 'not-configured' ? undefined : `${t('localProcess')}: ${t(McpServerStatusModel.localProcessCopy[server.localProcess])}`

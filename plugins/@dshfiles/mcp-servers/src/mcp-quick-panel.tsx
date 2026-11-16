@@ -14,7 +14,7 @@ import { ServerEditorDialog } from './server-editor.js'
 import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { useServerActions, useServerSnapshot, type ServerActions } from './server-queries.js'
 import { McpServerStatusModel } from './server-status.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 
 interface QuickPanelEditor {
   readonly key: number
@@ -173,7 +173,7 @@ const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JS
                   <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                     <p className="dshx:truncate dshx:text-sm dshx:font-medium">{server.name}</p>
                     <p className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-                      <StatusDot size="sm" className={McpServerStatusModel.lifecycleDotClassName(server)} />
+                      <StatusGlyph decorative status={McpServerStatusModel.lifecycleGlyph(server)} />
                       <span className="dshx:truncate">
                         {server.oauth === 'needs-sign-in'
                           ? t('signInRequired')

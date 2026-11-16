@@ -9,6 +9,11 @@ import { allowLoopbackBrowserOrigin, finishJourneyAssertions, recordAssertion } 
 const fakeServer = join(dirname(fileURLToPath(import.meta.url)), '..', 'fake-mcp-server.mjs')
 const newThreadComposerName = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
 const addForm = (page: Page) => page.getByRole('form', { name: 'Add MCP server', exact: true })
+/** The add form is a dialog behind the header's primary action; open it once, then fill it. */
+const openAddForm = async (page: Page): Promise<void> => {
+  if (!(await addForm(page).isVisible())) await page.getByRole('button', { name: 'Add server', exact: true }).first().click()
+  await expect(addForm(page)).toBeVisible()
+}
 const servers = (page: Page) => page.getByRole('region', { name: 'Registered servers', exact: true })
 const serverRow = (page: Page, name: string) => servers(page).getByRole('listitem').filter({ hasText: name })
 
@@ -19,10 +24,11 @@ When('the MCP servers page is opened', async ({ page }: { page: Page }) => {
     .getByRole('button', { name: 'MCP Servers: Servers', exact: true })
     .first()
     .click()
-  await expect(page.getByRole('heading', { name: 'Global MCP servers', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'MCP servers', exact: true })).toBeVisible()
 })
 
 When('the local echo MCP server is added as a stdio command', async ({ page }: { page: Page }) => {
+  await openAddForm(page)
   await addForm(page).getByRole('combobox', { name: 'Transport', exact: true }).click()
   await page.getByRole('option', { name: 'Local command (stdio)', exact: true }).click()
   await addForm(page).getByRole('textbox', { name: 'Display name', exact: true }).fill('Echo server')
@@ -59,6 +65,7 @@ When('the Echo server is {string}', async ({ page }: { page: Page }, action: str
 })
 
 Then('plain-HTTP and credential-bearing endpoints are refused on submit', async ({ page }: { page: Page }) => {
+  await openAddForm(page)
   const endpoint = addForm(page).getByRole('textbox', { name: 'HTTPS endpoint', exact: true })
   const submit = addForm(page).getByRole('button', { name: 'Add server', exact: true })
   await addForm(page).getByRole('textbox', { name: 'Display name', exact: true }).fill('Leaky')
@@ -70,7 +77,8 @@ Then('plain-HTTP and credential-bearing endpoints are refused on submit', async 
     if (await submit.isEnabled()) await submit.click()
     await recordAssertion(page, id, async () => {
       await expect(addForm(page).getByRole('alert').filter({ hasText: 'Use an HTTPS endpoint without embedded credentials.' })).toBeVisible()
-      await expect(servers(page).getByText('No MCP servers configured yet.', { exact: true })).toBeVisible()
+      // The add form is a modal dialog, so the list behind it is out of the accessibility tree: find its text directly.
+      await expect(page.getByText('No MCP servers configured yet.', { exact: true })).toBeVisible()
     })
   }
   await endpoint.fill('https://example.com/mcp')
@@ -175,11 +183,12 @@ Then('the catalog no longer searches the public Registry', async ({ page }: { pa
 const oauthRow = (page: Page) => serverRow(page, 'Fake OAuth')
 
 When('a loopback OAuth-protected MCP server is added with OAuth sign-in', async ({ page }: { page: Page }) => {
+  await openAddForm(page)
   const fake = await startFakeOAuthMcp(page)
   allowLoopbackBrowserOrigin(page, fake.origin)
   await addForm(page).getByRole('textbox', { name: 'Display name', exact: true }).fill('Fake OAuth')
   await addForm(page).getByRole('textbox', { name: 'HTTPS endpoint', exact: true }).fill(fake.endpoint)
-  await addForm(page).getByRole('checkbox', { name: 'Sign in with OAuth (discovery, dynamic client registration, PKCE)', exact: true }).click()
+  await addForm(page).getByRole('checkbox', { name: 'Sign in with OAuth', exact: true }).click()
   await addForm(page).getByRole('button', { name: 'Add server', exact: true }).click()
   await expect(oauthRow(page)).toBeVisible()
 })
@@ -230,6 +239,7 @@ After(async ({ page }: { page: Page }) => {
 When(
   'the local echo MCP server is added with {string} bound to the vault alias {string}',
   async ({ page }: { page: Page }, variable: string, alias: string) => {
+    await openAddForm(page)
     const form = addForm(page)
     await form.getByRole('combobox', { name: 'Transport', exact: true }).click()
     await page.getByRole('option', { name: 'Local command (stdio)', exact: true }).click()
