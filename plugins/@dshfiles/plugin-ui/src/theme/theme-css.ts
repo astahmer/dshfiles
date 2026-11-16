@@ -138,6 +138,10 @@ export const HOST_ALIASES: readonly AliasRow[] = [
   ['--dsw-specific-bubble', 2, 2],
   ['--dsw-specific-bubble-highlight', 3, 3],
   ['--dsw-specific-input-major', 0, 2],
+  // Native menus are opaque, on the kit popover fill. The Host material is a 70% fill over a 40px blur, and wherever
+  // that blur has no backdrop to sample (the composer's @, / and + lists) the transcript reads through the rows.
+  ['--dsw-menu-surface-fill', 0, 2],
+  ['--dsw-menu-backdrop-filter', 'none', 'none'],
 ]
 
 /** Syntax hues for Shiki's `css-variables` theme (keyword red, constant blue, parameter orange, function violet, string teal). */
