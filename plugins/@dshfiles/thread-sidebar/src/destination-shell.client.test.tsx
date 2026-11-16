@@ -103,6 +103,18 @@ describe('DestinationShell', () => {
     expect(shell.record).toHaveBeenCalledWith({ destination: 'observe', section: 'traces', surface: 'index' })
   })
 
+  it('lets a page description wrap to a second line instead of cutting it at the column edge', () => {
+    setPhone(false)
+    renderShell()
+    fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
+    const usage = screen.getByRole('button', { name: 'Usage' })
+    const description = document.getElementById(usage.getAttribute('aria-describedby') ?? '')
+    expect(description?.textContent).toBe('Cost, quota, requests and tools.')
+    // The 200px column cut every description after about 27 characters ("Cost, quota, requests and t…").
+    expect(description?.className).toContain('dshx:line-clamp-2')
+    expect(description?.className.split(' ')).not.toContain('dshx:truncate')
+  })
+
   it('lists the Settings pages without a layout switch: one sidebar layout (b:952m)', () => {
     setPhone(false)
     const shell = renderShell()

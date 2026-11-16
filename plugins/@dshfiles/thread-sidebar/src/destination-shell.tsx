@@ -432,7 +432,8 @@ const SectionButton = (props: {
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <span className={cn('dshx:truncate dshx:text-sm', props.selected && 'dshx:font-medium')}>{props.label}</span>
           {props.description === undefined ? null : (
-            <span id={descriptionId} className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+            // Two lines, not one: the list column is about 200px, which cut every description mid-word.
+            <span id={descriptionId} className="dshx:line-clamp-2 dshx:text-xs dshx:text-muted-foreground">
               {props.description}
             </span>
           )}
