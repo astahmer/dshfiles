@@ -427,7 +427,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-end dshx:gap-1.5">
             {props.renderSlot('settings.action', {})}
             {props.onClose !== undefined && (
-              <button className={headerButton} onClick={props.onClose} type="button">
+              <button className={headerButton} data-settings-close="" onClick={props.onClose} type="button">
                 <XIcon strokeWidth={1.5} size={14} />
                 <span className="dshx:sr-only">{props.renderSlot('settings.close', {})}</span>
               </button>
