@@ -351,8 +351,8 @@
     {
       "id": "composer-context",
       "title": "See project and Jujutsu workspace context in the composer",
-      "summary": "The Changes pill in the thread header (and the phone top bar) reads the net file diff since branching from the selected base as +N −M, names the revisions present only on @ or only on that base in its tooltip, and opens the Changes view; the composer itself carries no changes bar.",
-      "reach": ["seed rebase-ready-thread", "click button \"Changes since branching from main*\"", "expect text \"seeded-work.md\""],
+      "summary": "For a thread in its own workspace, the Changes pill in the thread header (and the phone top bar) reads the net file diff since branching from the selected base as +N −M and opens the Changes view. A thread in the project checkout has no pill; its workspace menu states the checkout's changes as the project's.",
+      "reach": ["seed rebase-ready-thread", "click button \"Review workspace changes: *\"", "expect text \"seeded-work.md\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",

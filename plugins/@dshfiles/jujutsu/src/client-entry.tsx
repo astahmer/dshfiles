@@ -30,7 +30,15 @@ import { ChatReferenceTitleStore } from './chat-reference-titles.js'
 import { sessionProjectPath } from './session-project-path.js'
 import { JujutsuPanel } from './client.js'
 import type {} from '@dshfiles/rich-composer/conversation-contract'
-import { ChangesPill, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
+import {
+  ChangesPill,
+  ComposerChips,
+  ConversationHeaderToggle,
+  ProjectChangesSection,
+  type ComposerJujutsuServices,
+  type ComposerSlotProps,
+} from './composer-context.js'
+import { WorkspaceMenuSections, type WorkspaceMenuSectionProps } from '@dshfiles/jj-integration/workspace-menu-sections'
 import { DEFAULT_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
@@ -294,6 +302,15 @@ export default defineClient({
         composerSlot(ChangesPill),
       ),
     )
+    // H3 (unslop): a thread in the project checkout gets no pill; the workspace menu states the checkout's diff as the
+    // project's, with the same way into the Changes view.
+    const ProjectChanges = (props: WorkspaceMenuSectionProps): JSX.Element => (
+      <PluginQueryProvider>
+        <ProjectChangesSection dismiss={props.dismiss} jujutsu={composerServices} sessionId={SessionId(props.sessionId)} />
+      </PluginQueryProvider>
+    )
+    if (metadata?.plugin !== undefined)
+      metadata.plugin.add(WorkspaceMenuSections, { id: '@dshfiles/jujutsu/project-changes', order: 10, Component: metadata.plugin.bind(ProjectChanges) })
     // dshfiles (b:212a): the location chip stays our own meter-line entry after the run summary ("Own workspace · 1 ahead
     // of main"); upstream's conversation.composer.location seat was removed from rich-composer (b:ysaj).
     ctx.slots.inject('conversation.composer.dock', () =>

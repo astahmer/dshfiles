@@ -522,7 +522,17 @@ Then('the composer dock names the project, thread workspace and bookmark in one 
 })
 
 Then('the composer summary shows an exact revision count against main', async ({ page }: { page: Page }) => {
-  const summary = page.getByRole('button', { name: /^Review workspace changes: @ vs main: 1 only on @$/u })
+  // This thread works in the project checkout, so its header carries no Changes pill: the checkout's diff is the
+  // project's, stated in the workspace menu with the same way into the Changes view.
+  await recordAssertion(page, 'jujutsu-project-checkout-thread-has-no-changes-pill', () =>
+    expect(page.getByRole('button', { name: /^Review workspace changes: /u }).filter({ visible: true })).toHaveCount(0),
+  )
+  await page
+    .getByRole('button', { name: /^Workspace actions for /u })
+    .filter({ visible: true })
+    .first()
+    .click()
+  const summary = page.getByRole('button', { name: /^Review project changes: @ vs main: 1 only on @$/u })
   await recordAssertion(page, 'jujutsu-composer-summary-shows-a-real-ahead-or-behind-count', () => expect(summary).toBeVisible())
   await summary.click()
   const review = page.getByTestId('changes-diffs')

@@ -80,9 +80,14 @@ A phone keeps the same compact rows and toolbar. Under a touch pointer each tool
   (setting `composerBar`): the thread workspace's net file diff since branching
   from the base (`composerBarBase`, `main` by default) as `+N −M`, the revisions
   only on `@` or only on that base in its tooltip, and one click into the Changes
-  view (or this panel when no Changes owner is loaded). A new thread shows no
-  pill. It replaced the changed-files bar that sat above the composer (visual
-  refresh T3.2); the Changes view carries the file list, diffs and scopes.
+  view (or this panel when no Changes owner is loaded). The diff is read for the
+  thread's folder, so the pill shows only for a thread in its own workspace that
+  changed something. A new thread, an unchanged workspace and a thread working
+  in the project checkout show no pill: there the workspace menu says "The
+  project has changes that are not on main" with a **Review** button, because
+  those changes can come from any thread. It replaced the changed-files bar that
+  sat above the composer (visual refresh T3.2); the Changes view carries the file
+  list, diffs and scopes.
 - One-click toggle of the right-panel Jujutsu page on the current thread's
   repository: the workspace and bookmark reading after Rich Composer's
   `project · host` run summary chip on the meter line (a
