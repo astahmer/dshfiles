@@ -5,6 +5,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Effect, FileSystem, Layer, Option, PubSub, Ref } from 'effect'
 import { TestClock } from 'effect/testing'
 import { ThreadAttention } from './attention-store.js'
+import { FailedTurns } from './failed-turns.js'
 import { INFLIGHT_FILE, InflightTurns } from './inflight-turns.js'
 import { AutoResumeReport, Recoveries, bootRecovery, type AutoResumeOutcome } from './recoveries.js'
 import { RECOVERY_FILE, RecoveryStore } from './restart-recovery.js'
@@ -33,7 +34,7 @@ const withWiring = <A, E>(
     readonly publish: (event: SessionEvent['event'], sessionId?: string) => Effect.Effect<void>
     readonly fake: FakeHost
     readonly reported: Ref.Ref<ReadonlyArray<AutoResumeOutcome>>
-  }) => Effect.Effect<A, E, InflightTurns | RecoveryStore | ThreadAttention | Recoveries>,
+  }) => Effect.Effect<A, E, InflightTurns | RecoveryStore | ThreadAttention | FailedTurns | Recoveries>,
 ) =>
   Effect.gen(function* () {
     const root = yield* (yield* FileSystem.FileSystem).makeTempDirectoryScoped({ prefix: 'thread-sidebar-host-' })
@@ -61,7 +62,13 @@ const withWiring = <A, E>(
         ? Layer.mergeAll(attentionRecorder, inflightTracker, bootRecovery.pipe(Layer.provide(AutoResumeReport.layerTest(reported))))
         : Layer.mergeAll(attentionRecorder, inflightTracker)
     const layer = consumers.pipe(
-      Layer.provideMerge(Layer.mergeAll(ThreadAttention.layer.pipe(Layer.provide(jsonStorageDomain(root))), InflightTurns.layer, Recoveries.layer)),
+      Layer.provideMerge(
+        Layer.mergeAll(
+          Layer.mergeAll(ThreadAttention.layer, FailedTurns.layer).pipe(Layer.provide(jsonStorageDomain(root))),
+          InflightTurns.layer,
+          Recoveries.layer,
+        ),
+      ),
       Layer.provideMerge(RecoveryStore.layer),
       Layer.provideMerge(Layer.mergeAll(SessionEvents.layerTest(pubsub), fakeSidebarHost(fake), SidebarSettings.layer.pipe(Layer.provide(settings)))),
       Layer.provide(Layer.succeed(StateFiles, files)),
@@ -86,6 +93,7 @@ const turnEnd = (kind: string, reason?: { readonly kind: string }) => ({
 const inflightIds = InflightTurns.use(inflight => Effect.map(inflight.list, entries => entries.map(entry => entry.sessionId)))
 const recoveryRows = RecoveryStore.use(store => Effect.map(store.list, entries => entries.map(entry => [entry.sessionId, entry.reason])))
 const attentionRows = ThreadAttention.use(attention => Effect.map(attention.snapshot, snapshot => snapshot.sessions))
+const failedRows = FailedTurns.use(failed => failed.list)
 
 describe('thread-sidebar Host event wiring', () => {
   it.effect('stores a finished turn and ignores turn ends that ask for nothing', () =>
@@ -99,6 +107,22 @@ describe('thread-sidebar Host event wiring', () => {
         expect(rows).toEqual([
           expect.objectContaining({ sessionId: 'session-1', finishedReason: 'error', finishedSeq: 16, finishedAt: 1_700_000_000_000, manuallyUnread: false }),
         ])
+      }),
+    ),
+  )
+
+  it.effect('keeps a failed turn after the thread is read, until a later turn finishes without failing', () =>
+    withWiring({}, ({ publish }) =>
+      Effect.gen(function* () {
+        yield* publish(turnEnd('error'))
+        const unread = yield* eventually(attentionRows, sessions => sessions.length > 0)
+        expect(yield* failedRows).toEqual([{ sessionId: 'session-1', failedAt: 1_700_000_000_000, reason: 'error' }])
+        // Opening the thread drops its attention record; the failure is not something reading can clear.
+        yield* ThreadAttention.use(attention => attention.clearUnread({ sessionId: 'session-1', version: unread[0]?.version ?? 0 }))
+        expect(yield* attentionRows).toEqual([])
+        expect(yield* failedRows).toEqual([{ sessionId: 'session-1', failedAt: 1_700_000_000_000, reason: 'error' }])
+        yield* publish(turnEnd('completed'))
+        expect(yield* eventually(failedRows, rows => rows.length === 0)).toEqual([])
       }),
     ),
   )

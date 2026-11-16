@@ -46,6 +46,24 @@ describe('thread status', () => {
     expect(status).toMatchObject({ status: 'failed', group: 'needs-you', verb: 'Retry' })
   })
 
+  it('keeps a thread Failed after its failed turn was read, until a later turn runs or the thread is done', () => {
+    const failedTurn = { at: NOW - 30_000, reason: 'error' } as const
+    // Read: no inbox item and no unread record are left, only the Host's record of the failed last turn.
+    expect(ThreadStatusModel.statusOf(input({ failedTurn }))).toMatchObject({
+      status: 'failed',
+      group: 'needs-you',
+      detail: 'Turn failed',
+      since: NOW - 30_000,
+    })
+    expect(ThreadStatusModel.statusOf(input({ failedTurn: { at: NOW, reason: 'max-tokens' } })).detail).toBe('Stopped at the output limit')
+    // Not something idle time folds away.
+    expect(ThreadStatusModel.statusOf(input({ failedTurn, activityAt: NOW - DONE_AFTER_IDLE_MS - 1 })).status).toBe('failed')
+    // A retry in flight is Working; marking the thread done ends it.
+    expect(ThreadStatusModel.statusOf(input({ failedTurn, running: true })).status).toBe('working')
+    expect(ThreadStatusModel.statusOf(input({ failedTurn, settled: true })).status).toBe('done')
+    expect(ThreadStatusModel.statusOf(input({ failedTurn, archived: true })).status).toBe('done')
+  })
+
   it('uses the sidebar labels when the inbox is absent', () => {
     expect(ThreadStatusModel.statusOf(input({ labels: ['threadSidebarInputNeeded'] }))).toMatchObject({ status: 'needs-you', verb: 'Answer' })
     expect(ThreadStatusModel.statusOf(input({ labels: ['threadSidebarNeedsResume'] }))).toMatchObject({ status: 'needs-you', verb: 'Resume' })

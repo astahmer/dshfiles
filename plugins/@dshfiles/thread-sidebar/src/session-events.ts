@@ -2,6 +2,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer, PubSub, type Scope, Stream } from 'effect'
 import { ThreadAttention, ThreadAttentionStoreModel } from './attention-store.js'
+import { FailedTurns } from './failed-turns.js'
 import { InflightTurns, turnBoundaryFromEvent } from './inflight-turns.js'
 import { RecoveryStore } from './restart-recovery.js'
 import { InflightMarkerWriteFailed } from './sidebar-errors.js'
@@ -54,14 +55,18 @@ export class SessionEvents extends Context.Service<SessionEvents, { readonly sub
 export const attentionRecorder = Layer.effectDiscard(
   Effect.gen(function* () {
     const attention = yield* ThreadAttention
+    const failedTurns = yield* FailedTurns
     const events = yield* (yield* SessionEvents).subscribe
     yield* DshxPlugin.worker(
       Stream.runForEach(events, ({ sessionId, event }) => {
         const reason = ThreadAttentionStoreModel.finishReasonFromEvent(event)
         if (reason === null) return Effect.void
-        return attention
-          .recordFinish({ sessionId, seq: event.seq, time: event.time, reason })
-          .pipe(Effect.catch(error => Effect.logWarning('thread-sidebar: a finished turn was not recorded as unread', error)))
+        // The failed state is written first: the attention write announces the change every page then re-reads.
+        return failedTurns.record({ sessionId, time: event.time, reason }).pipe(
+          Effect.catch(error => Effect.logWarning('thread-sidebar: a finished turn did not update the failed threads', error)),
+          Effect.andThen(attention.recordFinish({ sessionId, seq: event.seq, time: event.time, reason })),
+          Effect.catch(error => Effect.logWarning('thread-sidebar: a finished turn was not recorded as unread', error)),
+        )
       }),
     )
   }),

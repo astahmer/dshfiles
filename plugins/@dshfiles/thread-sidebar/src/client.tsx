@@ -245,6 +245,7 @@ import { ViewedThreadModel } from './viewed-thread.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
 import { useThreadAttention } from './attention-client.js'
+import { useFailedTurns } from './failed-turns-client.js'
 import { useRowAgentHandles } from './use-row-agent-handles.js'
 import type { ThreadAttentionView } from './attention-api.js'
 import { SinceYouLeftModel } from '@dshfiles/chat/thread-tools'
@@ -1901,6 +1902,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   preferencesRef.current = preferences
   const stageShowsPage = useStageCovered()
   const attention = useThreadAttention({ enabled: sessionState.phase === 'ready' })
+  const failedTurns = useFailedTurns({ enabled: sessionState.phase === 'ready' })
   const agentHandleOf = useRowAgentHandles()
   const recoveryApi = useApi(threadSidebarRecoveryApi)
   const queryClient = useQueryClient()
@@ -3812,6 +3814,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         const status = childStatusById.get(child.id)
         return status === undefined ? [] : [status]
       })
+      // Top-level rows only: a subagent's failed turn is its parent's tool result, which the parent's own turn answers.
+      const failedTurn = failedTurns.get(entry.session.id)
       statuses.set(
         entry.session.id,
         ThreadStatusModel.statusOf(
@@ -3823,6 +3827,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             unread: attention.records.has(entry.session.id),
             labels: attentionLabelsBySession.get(entry.session.id) ?? [],
             inbox: inbox.signals.get(entry.session.id),
+            failedTurn: failedTurn === undefined ? undefined : { at: failedTurn.failedAt, reason: failedTurn.reason },
             activityAt: entry.activity.updatedAt,
             settledAt: preferences.settledAt[entry.session.id],
             now,
@@ -3837,6 +3842,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     attention.records,
     attentionLabelsBySession,
     childStatusById,
+    failedTurns,
     inbox.signals,
     now,
     pinnedSessionIds,

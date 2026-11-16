@@ -5,7 +5,9 @@
  * "Needs you" and "Failed" are a projection of the inbox (§4.8): an open inbox item about the thread (subject kind
  * `session`) with blocking or failed severity, plus the thread states this sidebar already classifies (a pending
  * question or approval, a usage-limit stop, an interrupted turn). A parent rolls up its subagents, so it never looks
- * finished while a child failed or waits. Pure: the client passes every input, so tests cover the whole mapping.
+ * finished while a child failed or waits. A thread whose last finished turn failed stays Failed after it is read (the
+ * inbox item resolves on reading; the Host's failed-turn record does not), until a later turn runs or the thread is done.
+ * Pure: the client passes every input, so tests cover the whole mapping.
  */
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import type { ThreadAttentionLabel } from './attention-presentation.js'
@@ -40,6 +42,15 @@ export interface InboxThreadSignal {
   readonly choices?: readonly { readonly id: string; readonly label: string; readonly recommended?: boolean }[]
 }
 
+/** The Host's record that the thread's last finished turn failed. */
+export interface FailedTurnSignal {
+  readonly at: number
+  readonly reason: 'error' | 'max-tokens'
+}
+
+/** Why the last turn failed, for the row's detail line. */
+const FAILED_TURN_DETAIL = { error: 'Turn failed', 'max-tokens': 'Stopped at the output limit' } as const satisfies Record<FailedTurnSignal['reason'], string>
+
 export interface ThreadStatusInput {
   readonly running: boolean
   readonly pinned: boolean
@@ -50,6 +61,8 @@ export interface ThreadStatusInput {
   /** The sidebar's own attention labels for this thread (not its children). */
   readonly labels: readonly ThreadAttentionLabel[]
   readonly inbox: InboxThreadSignal | undefined
+  /** Set while the thread's last finished turn is a failed one, read or not. */
+  readonly failedTurn?: FailedTurnSignal | undefined
   /** Last activity: the newest of its update, finish or mute time. */
   readonly activityAt: number
   /** When it was settled, when known. */
@@ -110,6 +123,10 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
     }
   }
   if (input.running) return { status: 'working', detail: undefined, verb: undefined, itemId: undefined, since: input.activityAt }
+  // Reading a failed thread resolves its inbox item; the failure itself stays until a later turn finishes without failing.
+  if (input.failedTurn !== undefined) {
+    return { status: 'failed', detail: FAILED_TURN_DETAIL[input.failedTurn.reason], verb: undefined, itemId: undefined, since: input.failedTurn.at }
+  }
   if (input.unread || input.labels.includes('threadSidebarTurnFinished') || inbox?.severity === 'ready') {
     const fromInbox = inbox?.severity === 'ready'
     return {
