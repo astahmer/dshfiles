@@ -259,8 +259,8 @@ const InboxRow = (props: {
       }
       description={
         <>
-          <span className="dshx:line-clamp-2 dshx:break-words">{text.reason}</span>
-          {text.detail === null ? null : <span className="dshx:line-clamp-2 dshx:break-words">{text.detail}</span>}
+          <span className={cn('dshx:line-clamp-2 dshx:break-words', InboxView.TEXT_MEASURE)}>{text.reason}</span>
+          {text.detail === null ? null : <span className={cn('dshx:line-clamp-2 dshx:break-words', InboxView.TEXT_MEASURE)}>{text.detail}</span>}
         </>
       }
     >
@@ -1159,7 +1159,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   if (triaging) {
     const progress = TriageModel.progress(triage.context)
     return (
-      <Page scroll heading={t('triage')} description={t('subtitle')} className="dshx:mx-auto dshx:w-full dshx:max-w-3xl">
+      <Page scroll heading={t('triage')} description={t('subtitle')}>
         <div
           ref={triageRoot}
           tabIndex={-1}
@@ -1232,7 +1232,6 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
       scroll
       heading={t('title')}
       description={t('subtitle')}
-      className="dshx:mx-auto dshx:w-full dshx:max-w-3xl"
       {...(resumeAllAction !== null ? { primaryAction: resumeAllAction } : triageOnTop ? { primaryAction: triageAction } : {})}
       actions={triageOnTop ? [] : [triageAction]}
       tabs={{
