@@ -40,7 +40,7 @@ export const LandPreview = (props: {
           onClick={() => setOpen(current => !current)}
           type="button"
         >
-          <span className="dshx:min-w-0">{props.t('inlineIntegrateHint', { count: props.revisions.length, bookmark: props.bookmark })}</span>
+          <span className="dshx:min-w-0">{props.t(props.revisions.length === 1 ? 'inlineIntegrateHintOne' : 'inlineIntegrateHintMany', { count: props.revisions.length, bookmark: props.bookmark })}</span>
           <span className="dshx:sr-only">{props.t(open ? 'inlineIntegrateHideDetails' : 'inlineIntegrateShowDetails')}</span>
           <ChevronDownIcon
             aria-hidden="true"
