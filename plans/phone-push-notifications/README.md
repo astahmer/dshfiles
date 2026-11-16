@@ -45,9 +45,11 @@ notifications already are.
    failed turns (today's behavior); off for completed turns, stopped turns and agent messages, so nothing new
    interrupts until the user opts in. The Inbox toggle moves to Settings › Notifications › **This device** (subscribe,
    test, remove), with the Inbox keeping a link.
-3. **Completed turns:** push on the turn-end event thread-sidebar already records in notification history, with the
-   thread title as title and the last assistant line (bounded, like `shorten()`) as body. Subagent turns follow
-   `includeSubagentAttention`. Per-thread **Notify** subscriptions override the category default for that thread.
+3. **Completed turns:** push on the turn-end event thread-sidebar already records in notification history, for every
+   thread (not only those started from the phone), with the thread title as title and the last assistant line
+   (bounded, like `shorten()`) as body. Subagent turns follow `includeSubagentAttention`. Per-thread **Notify**
+   subscriptions override the category default for that thread. A setting can narrow the scope later; the default is
+   all threads.
 4. **Duplicate suppression:** the browser reports presence (visible tab, which thread, last input) over the existing
    dshx channel; the Host skips the push to a device whose page is visible on that thread within the last ~30 s.
    Pages report, the Host decides; no presence means push.
@@ -58,7 +60,11 @@ notifications already are.
    the path end to end.
 7. **Privacy:** payloads carry thread title and a bounded first line only, encrypted end to end to the device; the
    push service sees ciphertext. A setting can drop the body ("A thread needs you") for lock-screen privacy.
-8. **Cost:** no polling and no background model calls; one HTTPS request per delivered notification.
+8. **Quiet hours:** a setting with a start and end time in the device's time zone (recorded at subscribe time and
+   editable), off by default. Inside them, pushes are held, not dropped: blocking categories (approval, question)
+   can be marked "still notify" (default on, configurable per category); everything else is summarized in one push when
+   quiet hours end ("3 threads finished, 1 failed"), or dropped if the user already opened those threads.
+9. **Cost:** no polling and no background model calls; one HTTPS request per delivered notification.
 
 ## Tasks
 
@@ -71,10 +77,10 @@ notifications already are.
 | T5 | Presence-based duplicate suppression                                                                              | thread-sidebar    | Test: visible page on the thread suppresses; hidden page or other thread pushes |
 | T6 | Settings › Notifications › This device: subscribe, test, remove, health; Inbox link; phone onboarding hint         | activity-timeline | 390 px journey; screenshots                                                   |
 | T7 | Lock-screen privacy option (title only)                                                                           | thread-sidebar    | Payload test                                                                  |
+| T7b | Quiet hours: per-device window and time zone, per-category "still notify", one summary push when they end      | thread-sidebar    | Clock-injected tests: held, summarized, skipped when already opened           |
 | T8 | Real-device pass on the Redmi (background, other app, locked) and an iPhone Home Screen app if available          | —                 | Recorded in this plan, then `complete-plan`                                   |
 
-## Open questions
+## Decisions
 
-1. Should a completed turn push only for threads the user started from that phone, or for every thread (with the
-   per-thread Notify override)?
-2. Quiet hours: needed now, or later?
+1. 2026-11-16: completed turns push for every thread, not only those started from the phone (configurable).
+2. 2026-11-16: quiet hours are in scope (configurable, off by default).
