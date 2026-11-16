@@ -631,6 +631,15 @@ order. The shipped order puts Settle in Archive's slot and Archive just before i
 so a row that hides Archive ends on Settle. Hiding one removes only its hover
 button; the context menu keeps every action.
 
+By default a row shows **one** verb on hover, Settle, and a `⋯` that opens the
+row menu (a row that needs a resume adds Resume and Dismiss; an archived row shows
+Restore instead): Open in side panel, Pin, Park, Mute and Archive ship hidden and
+stay in that menu and on their keys. The buttons sit in the first line's time slot
+and the line gives them their width while they show, so the title truncates before
+them instead of being covered. A row's inline verb (Answer, Approve, Retry, Resume,
+Land) sits at the end of its second line, which leaves the first line to the title
+and the time.
+
 **Pending restarts.** Client bundles hot-reload; Host code, `package.json` and
 `cordis.patch.yml` load only at boot. The Host half remembers a content hash of
 those files for every plugin package the Host's client module registry lists

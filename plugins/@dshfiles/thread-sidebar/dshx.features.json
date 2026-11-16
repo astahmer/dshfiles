@@ -454,7 +454,7 @@
     {
       "id": "status-grouped-thread-list",
       "title": "See every thread grouped by what it needs from you",
-      "summary": "All threads is grouped by the ADE status vocabulary: Pinned on top, then Needs you, Working, Ready, Idle and Done (Done folded; a thread idle for 72 hours folds into Done unless pinned). Within a group the newest return comes first. Needs you and Failed are a projection of the inbox (open items about the thread) plus the questions, approvals, usage limits and interrupted turns the sidebar already sees, and a parent rolls up its subagents so it never looks finished while a child waits or failed. Each row shows a status glyph, the title, the agent preset, muted project and host chips, the elapsed time and one inline verb when it needs you (Answer and Approve open the thread; Retry, Resume and Land run the inbox item's verb); the hover action strip opens to the left of that verb, so neither covers the other. A Needs you group header offers Resume all for every row whose verb is Resume, so quota stops and interrupted turns leave together. Group › Arrange manually brings back the drag-to-arrange sections; saved views keep their own grouping.",
+      "summary": "All threads is grouped by the ADE status vocabulary: Pinned on top, then Needs you, Working, Ready, Idle and Done (Done folded; a thread idle for 72 hours folds into Done unless pinned). Within a group the newest return comes first. Needs you and Failed are a projection of the inbox (open items about the thread) plus the questions, approvals, usage limits and interrupted turns the sidebar already sees, and a parent rolls up its subagents so it never looks finished while a child waits or failed. Each row shows a status glyph, the title, the agent preset, muted project and host chips, the elapsed time and one inline verb when it needs you (Answer and Approve open the thread; Retry, Resume and Land run the inbox item's verb). The verb sits at the end of the row's second line, so the title and the time keep the first; the hover actions (one verb and the row menu by default) take the time slot. A Needs you group header offers Resume all for every row whose verb is Resume, so quota stops and interrupted turns leave together. Group › Arrange manually brings back the drag-to-arrange sections; saved views keep their own grouping.",
       "reach": [
         "expect region \"Threads\"",
         "click button \"Filter: *\"",
@@ -3197,9 +3197,9 @@
       "configuration": [
         {
           "key": "hiddenRowActions",
-          "defaultValue": "none",
-          "constraints": "Which hover buttons a row hides: none, or any combination of resume, resumeDismiss, aside, pin, park, mute, archive and restore. A missing id keeps its button.",
-          "choices": ["none", "resume", "resumeDismiss", "aside", "pin", "park", "mute", "archive", "restore"],
+          "defaultValue": "[aside, pin, park, mute, archive]",
+          "constraints": "Which hover buttons a row hides: none, or any combination of resume, resumeDismiss, aside, pin, park, mute, archive and restore. A missing id keeps its button. By default a row shows Settle and the row menu button; the hidden ones stay in the row menu.",
+          "choices": ["[aside, pin, park, mute, archive]", "none", "resume", "resumeDismiss", "aside", "pin", "park", "mute", "archive", "restore"],
           "coveredBy": ["thread-sidebar.open-in-side-panel"]
         },
         {
@@ -3245,7 +3245,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.aside-hover-actions-default",
           "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
-          "testName": "older preferences show every thread-row hover action"
+          "testName": "a row hovers one verb by default, and a saved choice of hover actions is kept"
         },
         {
           "kind": "unit-test",

@@ -264,7 +264,10 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   threadRowTime: true,
   threadRowStatusDot: true,
   arrowKeysSwitchThread: true,
-  hiddenRowActions: [],
+  // One verb beside the row menu (DESIGN.md: a row carries one inline verb): Done, plus the recovery pair on a row that
+  // needs a resume and Restore on an archived one. The rest stay in the row menu and on their keys; Customize sidebar
+  // shows any of them again.
+  hiddenRowActions: ['aside', 'pin', 'park', 'mute', 'archive'],
   rowActionOrder: [...DEFAULT_THREAD_ROW_ACTION_ORDER],
   approvalNeededDisplay: 'group',
   inputNeededDisplay: 'group',
