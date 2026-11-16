@@ -160,7 +160,7 @@ const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   'dshfiles-hmr-gate': { group: 'plugins', label: 'Plugin updates', order: 20 },
   'dshfiles-opencode-compat': { group: 'plugins', label: 'OpenCode plugins', order: 30 },
   // About: updates, first-run surfaces and diagnostics
-  // Settings' own fields are the release check and the preview notice: they sit with Update DSH.
+  // Settings' own fields are the release check and, under Advanced, the preview notice: they sit with Update DSH.
   'dshfiles-settings-shell': { group: 'about', label: 'Release checks and notices', order: 6, entry: 'dshfiles-update-dsh' },
   'dshfiles-onboarding': { group: 'about', label: 'Getting started', order: 10 },
   'dshfiles-agent-telemetry': { group: 'about', label: 'Agent telemetry', order: 0, entry: 'diagnostics' },
