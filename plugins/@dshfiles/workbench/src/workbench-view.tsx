@@ -1,8 +1,9 @@
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { EllipsisIcon, PlusIcon, SquareSplitHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { missingPanelMessage } from './missing-panel.js'
 import {
   DockviewReact,
   getPanelData,
@@ -189,16 +190,14 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
         )
       }
       if (definition === undefined) {
+        // The saved layout keeps the id and the last title; only the title is fit to show.
+        const message = missingPanelMessage(id, panelProps.api.title)
         return (
-          <div
-            data-workbench-panel-id={id}
-            className="dshx-root dshx:group dshx:relative dshx:flex dshx:h-full dshx:flex-col dshx:items-start dshx:gap-3 dshx:p-4 dshx:text-sm dshx:text-muted-foreground"
-          >
+          <div data-workbench-panel-id={id} className="dshx-root dshx:group dshx:relative dshx:flex dshx:h-full dshx:flex-col dshx:justify-center">
             <HiddenTabRowRestore api={panelProps.api} containerApi={panelProps.containerApi} />
-            <p>{t('missingPanel', { id })}</p>
-            <Button size="sm" variant="outline" onClick={() => panelProps.api.close()}>
-              {t('closePanel')}
-            </Button>
+            <EmptyState action={{ label: t('closePanel'), onSelect: () => panelProps.api.close() }}>
+              {'params' in message ? t(message.key, message.params) : t(message.key)}
+            </EmptyState>
           </div>
         )
       }
