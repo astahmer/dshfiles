@@ -20,27 +20,37 @@ import { HostSnapshotsModel } from './snapshots.js'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
+  AppWindowIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
+  AtSignIcon,
   BellIcon,
   BellOffIcon,
+  CircleCheckIcon,
+  CircleDashedIcon,
   CopyIcon,
+  DownloadIcon,
   EllipsisIcon,
+  FileTextIcon,
+  FolderInputIcon,
+  LinkIcon,
   ListIcon,
   PauseIcon,
   PinIcon,
   PinOffIcon,
+  PlayIcon,
   SearchIcon,
+  SendIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { ThreadToolsModel } from '@dshfiles/chat/thread-tools'
-import { ThreadViewsModel } from '@dshfiles/rich-composer/thread-views'
+import { ThreadViewsModel, type ThreadHeaderMenu, type ThreadHeaderMenuAction } from '@dshfiles/rich-composer/thread-views'
 import { PanelRightIcon } from '@dshfiles/plugin-ui/icons'
-import { useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { ThreadDirectories } from './workspace-paths.js'
 import { ThreadMuteModel, THREAD_MUTE_OPTIONS, type ThreadMuteOption } from './thread-mute.js'
 import { ThreadChildrenModel } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
-import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
+import { THREAD_SIDEBAR_LOCALE_NAMESPACE, type ThreadSidebarLocaleKey } from './locales.js'
 import { SidebarOrganization } from './organization.js'
 import { ThreadUrlModel } from './thread-url.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
@@ -76,39 +86,78 @@ const sameActionRows = (left: Readonly<Record<SessionId, SessionSummary>>, right
 const muteUntilNow = (option: ThreadMuteOption): number | null => ThreadMuteModel.muteUntil(option, Date.now())
 const settleAtNow = (): number => Date.now()
 
-// Room the native title cluster keeps for the breadcrumb before Pin folds into the menu.
-const TITLE_MIN_WIDTH = 160
-// Copy-link and pin buttons plus the utilities gap; the hysteresis keeps them from flickering at the edge.
-const PIN_SLOT_WIDTH = 76
+/** The thread menu's own icon for each action the Host's header menu is known to carry; any other gets a neutral mark. */
+const NATIVE_ACTION_ICONS = {
+  'session-log-download.copy': FileTextIcon,
+  'session-log-download.download': DownloadIcon,
+  'session-log-download.feedback': SendIcon,
+  'open-in-app.application': AppWindowIcon,
+} as const
 
-// The native header row is the ancestor that holds the corner seat; its first child is the title cluster.
-const findTitleCluster = (bar: HTMLElement): HTMLElement | null => {
-  for (let row = bar.parentElement; row !== null; row = row.parentElement) {
-    if (!Array.from(row.children).some(child => child.hasAttribute('data-conversation-header-corner'))) continue
-    const cluster = row.firstElementChild
-    return cluster instanceof HTMLElement && !cluster.contains(bar) ? cluster : null
-  }
-  return null
+const isKnownNativeIcon = (key: string | undefined): key is keyof typeof NATIVE_ACTION_ICONS => key !== undefined && Object.hasOwn(NATIVE_ACTION_ICONS, key)
+
+/** Thread wording for the Host's two exports (its own labels say Session); any other action keeps its plugin's label. */
+const NATIVE_ACTION_LABELS = {
+  'session-log-download.copy': 'threadSidebarCopyAsMarkdown',
+  'session-log-download.download': 'threadSidebarDownloadLog',
+} as const satisfies Readonly<Record<string, ThreadSidebarLocaleKey>>
+
+const nativeActionLabelKey = (iconKey: string | undefined): (typeof NATIVE_ACTION_LABELS)[keyof typeof NATIVE_ACTION_LABELS] | undefined =>
+  iconKey === 'session-log-download.copy' || iconKey === 'session-log-download.download' ? NATIVE_ACTION_LABELS[iconKey] : undefined
+
+const NativeActionIcon = (props: { readonly action: ThreadHeaderMenuAction }): JSX.Element => {
+  if (props.action.iconSrc !== undefined) return <img src={props.action.iconSrc} alt="" className="dshx:size-4 dshx:shrink-0 dshx:rounded-sm" />
+  const Icon = isKnownNativeIcon(props.action.iconKey) ? NATIVE_ACTION_ICONS[props.action.iconKey] : CircleDashedIcon
+  return <Icon aria-hidden="true" />
 }
 
-const useCrowdedHeader = (bar: HTMLElement | null): boolean => {
-  const [crowded, setCrowded] = useState(false)
-  useLayoutEffect(() => {
-    if (bar === null) return
-    const cluster = findTitleCluster(bar)
-    if (cluster === null) return
-    const observer = new ResizeObserver(entries => {
-      const clusterWidth = entries.at(-1)?.contentRect.width ?? cluster.clientWidth
-      const titleSiblingsWidth = Array.from(cluster.children)
-        .slice(1)
-        .reduce((total, child) => total + child.getBoundingClientRect().width, 0)
-      const availableTitleWidth = clusterWidth - titleSiblingsWidth
-      setCrowded(current => (current ? availableTitleWidth < TITLE_MIN_WIDTH + PIN_SLOT_WIDTH : availableTitleWidth < TITLE_MIN_WIDTH))
-    })
-    observer.observe(cluster)
-    return () => observer.disconnect()
-  }, [bar])
-  return crowded
+const NO_NATIVE_ACTIONS: readonly ThreadHeaderMenuAction[] = []
+const noSubscription = (): (() => void) => () => undefined
+const noNativeActions = (): readonly ThreadHeaderMenuAction[] => NO_NATIVE_ACTIONS
+
+/**
+ * The thread header's own More actions (Copy as Markdown, Download log, Open in…, Feedback: what native DSH plugins
+ * register for the header menu), listed here so the header has one `⋯`. Mounted with the menu: it resolves them when
+ * the menu opens and lets go when it closes.
+ */
+const NativeHeaderMenuItems = (props: { readonly sessionId: string; readonly t: HeaderThreadActionsProps['t'] }): JSX.Element | null => {
+  const [menu, setMenu] = useState<ThreadHeaderMenu | undefined>(undefined)
+  useEffect(() => {
+    const resolved = ThreadViewsModel.headerMenu(props.sessionId)
+    setMenu(resolved)
+    return () => resolved?.dispose()
+  }, [props.sessionId])
+  const actions = useSyncExternalStore(menu?.subscribe ?? noSubscription, menu?.actions ?? noNativeActions, noNativeActions)
+  if (menu === undefined || actions.length === 0) return null
+  const row = (action: ThreadHeaderMenuAction): JSX.Element => {
+    const labelKey = nativeActionLabelKey(action.iconKey)
+    const label = labelKey === undefined ? action.label : props.t(labelKey)
+    if (action.children !== undefined && action.children.length > 0) {
+      return (
+        <DropdownMenuSub key={action.id}>
+          <DropdownMenuSubTrigger disabled={action.disabled === true}>
+            <NativeActionIcon action={action} />
+            {label}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="dshx-root dshx:min-w-44 dshx:max-w-72" aria-label={label}>
+            {action.children.map(row)}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      )
+    }
+    return (
+      <DropdownMenuItem key={action.id} disabled={action.disabled === true} onSelect={() => menu.select(action.id)}>
+        <NativeActionIcon action={action} />
+        {label}
+      </DropdownMenuItem>
+    )
+  }
+  return (
+    <>
+      <DropdownMenuSeparator />
+      {actions.map(row)}
+    </>
+  )
 }
 
 /** Submenu content sized like the menu's own submenus. */
@@ -161,10 +210,12 @@ export const HeaderThreadActions = ({
   const { preferences, updatePreferences } = usePreferences()
   const [actionFailed, setActionFailed] = useState(false)
   const [copyStatus, setCopyStatus] = useState('')
-  const [bar, setBar] = useState<HTMLElement | null>(null)
   // Expired mutes are pruned by the sidebar's own clock; this header only needs the moment it opened.
   const [openedAt] = useState(() => Date.now())
-  const crowded = useCrowdedHeader(bar)
+  // The header's own More actions fold into this menu while their owner can resolve them; the header then draws no
+  // second `⋯` (DESIGN.md: the thread header is one row with one `⋯`).
+  const nativeMenuAvailable = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.headerMenuAvailable, ThreadViewsModel.headerMenuAvailable)
+  useEffect(() => (nativeMenuAvailable ? ThreadViewsModel.hostHeaderMenu() : undefined), [nativeMenuAvailable])
   // Trajectory, Traces, Requests: thread-panel facets since productivity pass Q5 (E5); this menu opens them.
   const threadViews = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.list, ThreadViewsModel.list)
   // Only lineage, blankness, running and folder feed the derivations below; a streaming turn republishes the list
@@ -263,37 +314,15 @@ export const HeaderThreadActions = ({
     }
   }
   const togglePinned = (): void => void updateThreadOperation(pinned ? 'unpin' : 'pin')
-  const copyLinkLabel = t('threadSidebarCopyLink')
-  const copyLink = (): void => void copy(ThreadUrlModel.buildThreadUrl(window.location.href, sessionId, workspaceId), 'threadSidebarLinkCopied')
   const pinLabel = t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')
   const pinIcon = pinned ? <PinOffIcon aria-hidden="true" /> : <PinIcon aria-hidden="true" />
   const moreLabel = t('threadSidebarMoreThreadActions')
   const archiveDisabled = !archived && targetIds.some(targetId => sessionState.byId[targetId]?.running === true)
-  const showPinButton = !archived && !crowded
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div ref={setBar} className="dshx-root dshx:flex dshx:items-center dshx:gap-1" role="group" aria-label={t('threadSidebarThreadActions')}>
-        {!crowded ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label={copyLinkLabel} onClick={copyLink}>
-                <CopyIcon aria-hidden="true" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{copyLinkLabel}</TooltipContent>
-          </Tooltip>
-        ) : null}
-        {showPinButton ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label={pinLabel} onClick={togglePinned}>
-                {pinIcon}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{pinLabel}</TooltipContent>
-          </Tooltip>
-        ) : null}
+      <div className="dshx-root dshx:flex dshx:items-center dshx:gap-1" role="group" aria-label={t('threadSidebarThreadActions')}>
+        {/* One control: every verb of the thread is a row of this menu, never a second button beside it. */}
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -324,17 +353,16 @@ export const HeaderThreadActions = ({
             <DropdownMenuSeparator />
             {archived ? null : (
               <>
-                {showPinButton ? null : (
-                  <DropdownMenuItem onSelect={togglePinned}>
-                    {pinIcon}
-                    {pinLabel}
-                  </DropdownMenuItem>
-                )}
+                <DropdownMenuItem onSelect={togglePinned}>
+                  {pinIcon}
+                  {pinLabel}
+                </DropdownMenuItem>
                 <DropdownMenuItem disabled={session.running} onSelect={updateParked}>
                   <PauseIcon aria-hidden="true" />
                   {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!settled && settleDisabled} onSelect={updateSettled}>
+                  {settled ? <PlayIcon aria-hidden="true" /> : <CircleCheckIcon aria-hidden="true" />}
                   {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
                 </DropdownMenuItem>
                 <DropdownMenuSub>
@@ -358,7 +386,10 @@ export const HeaderThreadActions = ({
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger disabled={session.running}>{t('threadSidebarContinueIn')}</DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger disabled={session.running}>
+                    <FolderInputIcon aria-hidden="true" />
+                    {t('threadSidebarContinueIn')}
+                  </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="dshx-root dshx:min-w-48 dshx:max-w-72" aria-label={t('threadSidebarContinueIn')}>
                     <ContinueInProjectItems t={t} continueIn={projectId => void continueIn(projectId)} Item={DropdownMenuItem} />
                   </DropdownMenuSubContent>
@@ -378,13 +409,17 @@ export const HeaderThreadActions = ({
             <DropdownMenuItem
               onSelect={() => void copy(ThreadUrlModel.buildThreadUrl(window.location.href, sessionId, workspaceId), 'threadSidebarLinkCopied')}
             >
-              <CopyIcon aria-hidden="true" />
+              <LinkIcon aria-hidden="true" />
               {t('threadSidebarCopyLink')}
             </DropdownMenuItem>
+            <NativeHeaderMenuItems sessionId={sessionId} t={t} />
             <DropdownMenuSeparator />
             <RegisteredThreadMenuSections sessionId={sessionId} />
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger>{t('threadSidebarReferencedBy')}</DropdownMenuSubTrigger>
+              <DropdownMenuSubTrigger>
+                <AtSignIcon aria-hidden="true" />
+                {t('threadSidebarReferencedBy')}
+              </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>
                 <ThreadReferencesItems sessionId={sessionId} t={t} openThread={openThread} Item={DropdownMenuItem} />
               </DropdownMenuSubContent>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -8,6 +8,20 @@ import { HeaderThreadActions } from './header-actions.js'
 import { storedPreferences, PREFERENCES_STORAGE_KEY } from './preferences.js'
 import { SidebarStateProvider } from './sidebar-state.js'
 import { DEFAULT_PREFERENCES } from './organization.js'
+import { ThreadViewsModel, type ThreadHeaderMenuAction } from '@dshfiles/rich-composer/thread-views'
+
+const NATIVE_ACTIONS: readonly ThreadHeaderMenuAction[] = [
+  { id: 'export/copy', label: 'Copy Session as Markdown', iconKey: 'session-log-download.copy' },
+  { id: 'export/download', label: 'Download session log', iconKey: 'session-log-download.download' },
+  {
+    id: 'open/openWith',
+    label: 'Open in',
+    iconKey: 'open-in-app.application',
+    separatorBefore: true,
+    children: [{ id: 'open/openWith/app:zed', label: 'Zed', iconKey: 'open-in-app.application', iconSrc: '/icons/zed' }],
+  },
+  { id: 'feedback/feedback', label: 'Feedback', iconKey: 'session-log-download.feedback', separatorBefore: true },
+]
 
 const labels = {
   threadSidebarPin: 'Pin',
@@ -38,6 +52,9 @@ const labels = {
   threadSidebarReferencedBy: 'Referenced by',
   threadSidebarFindInThread: 'Find in thread',
   threadSidebarTurns: 'Turns',
+  threadSidebarContinueIn: 'Continue in project',
+  threadSidebarCopyAsMarkdown: 'Copy thread as Markdown',
+  threadSidebarDownloadLog: 'Download thread log',
 } satisfies Readonly<Record<string, string>>
 
 const NO_THREAD_DIRECTORIES: ReadonlyMap<string, string> = new Map()
@@ -52,12 +69,6 @@ class RecordingResizeObserver {
   observe(): void {}
   unobserve(): void {}
   disconnect(): void {}
-}
-
-const resizeTitleCluster = (width: number): void => {
-  act(() => {
-    for (const callback of resizeCallbacks) callback([{ contentRect: { width } }])
-  })
 }
 
 const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolean; failPin?: boolean; nativeHeader?: boolean; pinned?: boolean }) => {
@@ -135,30 +146,56 @@ afterEach(() => {
 })
 
 describe('HeaderThreadActions', () => {
-  it('keeps Pin as an icon button and moves Park into the More menu', () => {
+  it('draws one control in the header, the thread menu, which holds Pin, Park and Copy thread link', () => {
     const header = mount()
-    expect(screen.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Copy thread link', 'Pin', 'More thread actions'])
-    fireEvent.click(screen.getByRole('button', { name: 'Pin' }))
+    // DESIGN.md: the thread header is one row with one ⋯; a verb goes into that menu, not beside it.
+    expect(screen.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['More thread actions'])
+
+    openMoreMenu()
+    expect(screen.getAllByRole('menuitem', { name: 'Copy thread link' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin' }))
     expect(header.pinSession).toHaveBeenCalledWith('s1')
 
     openMoreMenu()
-    expect(screen.queryByRole('menuitem', { name: 'Pin' })).toBeNull()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Park' }))
     expect(localStorage.getItem(PREFERENCES_STORAGE_KEY)).not.toBeNull()
   })
 
-  it('folds Pin into the More menu when the native title has no room, and restores it once there is', () => {
-    const header = mount({ nativeHeader: true })
-    resizeTitleCluster(120)
-    expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
+  it('leads every row of the menu with an icon, so the labels share one column', () => {
+    mount()
     openMoreMenu()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin' }))
-    expect(header.pinSession).toHaveBeenCalledWith('s1')
+    const rows = screen.getAllByRole('menuitem')
+    expect(rows.length).toBeGreaterThan(8)
+    expect(rows.filter(row => row.querySelector('svg, img') === null).map(row => row.textContent)).toEqual([])
+  })
 
-    resizeTitleCluster(180)
-    expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
-    resizeTitleCluster(600)
-    expect(screen.getByRole('button', { name: 'Pin' })).toBeTruthy()
+  it("lists the header's own More actions in the same menu, and takes the second ⋯ off the header while it does", () => {
+    const select = vi.fn()
+    const dispose = vi.fn()
+    const withdraw = ThreadViewsModel.provideHeaderMenu(() => ({
+      subscribe: () => () => undefined,
+      actions: () => NATIVE_ACTIONS,
+      select,
+      dispose,
+    }))
+    const header = mount()
+    expect(ThreadViewsModel.headerMenuHosted()).toBe(true)
+    openMoreMenu()
+    // Thread wording for the two exports; an unknown action keeps the label its plugin gave it.
+    expect(screen.getByRole('menuitem', { name: 'Copy thread as Markdown' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Open in' }).getAttribute('aria-haspopup')).toBe('menu')
+    expect(screen.getByRole('menuitem', { name: 'Feedback' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Download thread log' }))
+    expect(select).toHaveBeenCalledWith('export/download')
+    expect(dispose).toHaveBeenCalled()
+    header.unmount()
+    expect(ThreadViewsModel.headerMenuHosted()).toBe(false)
+    withdraw()
+  })
+
+  it("does not claim the header's More actions when nothing can resolve them", () => {
+    mount()
+    expect(ThreadViewsModel.headerMenuHosted()).toBe(false)
   })
 
   it('snoozes the current thread until tomorrow morning, then offers Unmute', () => {
@@ -179,8 +216,8 @@ describe('HeaderThreadActions', () => {
 
   it('offers only restore for archived threads and omits controls for blank ones', () => {
     mount({ archived: true })
-    expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
     openMoreMenu()
+    expect(screen.queryByRole('menuitem', { name: 'Pin' })).toBeNull()
     // Find in thread (with its ⌘F / Ctrl+F keycap) and Turns lead the menu, archived or not: reading tools, not lifecycle verbs.
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
       'Find in threadCtrlF',
@@ -214,7 +251,8 @@ describe('HeaderThreadActions', () => {
     await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('Thread ID copied.'))
     expect(writeText).toHaveBeenCalledWith('s1')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy thread link' }))
+    openMoreMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy thread link' }))
     await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('Thread link copied.'))
     expect(writeText).toHaveBeenCalledWith('http://localhost:3000/?thread=s1')
   })
@@ -248,7 +286,8 @@ describe('HeaderThreadActions', () => {
 
   it('reports failed Host mutations beside the action', async () => {
     const header = mount({ failPin: true })
-    fireEvent.click(screen.getByRole('button', { name: 'Pin' }))
+    openMoreMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin' }))
     await vi.waitFor(() => expect(header.pinSession).toHaveBeenCalledOnce())
     expect((await screen.findByRole('alert')).textContent).toBe('Could not update thread')
   })
