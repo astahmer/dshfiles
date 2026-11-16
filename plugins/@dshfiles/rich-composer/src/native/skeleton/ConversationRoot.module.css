@@ -59,15 +59,19 @@
 }
 
 /* A narrow inline header (a half-width split) keeps the title readable: the
-   view switch and actions wrap under it rather than squeezing it to "F…". */
-.titleCluster {
-  flex-wrap: wrap;
-  row-gap: 6px;
-}
+   view switch and actions wrap under it rather than squeezing it to "F…".
+   dshfiles (unslop H2): only there. In a wider row the title takes the room up to the status chip and the chips beside
+   it shrink first; the 45% cap used to cut it at about 200px beside an empty header. The title row is the container. */
+@container (max-width: 36rem) {
+  .titleCluster {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
 
-.crumbs {
-  flex: 0 1 auto;
-  max-width: max(45%, 140px);
+  .crumbs {
+    flex: 0 1 auto;
+    max-width: max(45%, 140px);
+  }
 }
 
 /* Blank Sessions retain navigation controls without conversation title or tabs.
@@ -202,6 +206,14 @@
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
   cursor: default;
+}
+
+/* dshfiles (unslop H2): naming the thread is the header's job. The current title takes the room the row has (the chips
+   beside it shrink first) and ends in an ellipsis only when the row is full; ancestor crumbs keep the 220px cap. */
+.crumb.crumbCurrent {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
 }
 
 .crumbSubagent {
