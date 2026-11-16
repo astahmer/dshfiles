@@ -555,8 +555,11 @@
   opacity: 0.7;
 }
 
-/* An item with nothing to say renders null: its row leaves the list instead of showing a bare label. */
-.statusSheetRow:has(.statusItem:empty) {
+/* An item with nothing to say renders null (or an empty open button): its row leaves the list instead of showing a bare
+   label ("Working", "Orphans", "Restart" with no value on a phone). An item whose only child is an empty button, the
+   frame's open wrapper or its own control, has nothing to say either. */
+.statusSheetRow:has(.statusItem:empty),
+.statusSheetRow:has(.statusItem > button:only-child:empty) {
   display: none;
 }
 
