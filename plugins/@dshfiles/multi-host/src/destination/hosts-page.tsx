@@ -63,7 +63,7 @@ const ResourceUsage = (props: { readonly hostName: string; readonly resource: Re
   if (!props.resource.probe.ok) {
     return (
       <p data-testid={`host-resources-${props.resource.hostId}`} className="dshx:text-xs dshx:text-muted-foreground">
-        Resource data unavailable
+        Load and memory are unavailable. Reconnect this host to read them.
       </p>
     )
   }
@@ -160,7 +160,7 @@ const HostRow = (props: {
   const [popupBlocked, setPopupBlocked] = useState(false)
   const reconnect = useMutation({
     mutationFn: async () => {
-      if (runtime === undefined) throw new Error('This host has no runtime. Edit the host to set its remote DSH home, then reconnect.')
+      if (runtime === undefined) throw new Error('This host is not set up yet. Edit it to set its DSH home, then reconnect.')
       const result = await api.runtimeReconnect({ runtimeId: runtime.id })
       if (!result.ok) throw failure(result)
     },
@@ -168,7 +168,7 @@ const HostRow = (props: {
   })
   const remoteView = useMutation({
     mutationFn: async ({ action, tab }: { readonly action: 'copy' | 'open'; readonly tab?: Window }) => {
-      if (runtime === undefined) throw new Error('This host has no runtime. Edit the host to set its remote DSH home, then reconnect.')
+      if (runtime === undefined) throw new Error('This host is not set up yet. Edit it to set its DSH home, then reconnect.')
       if (action === 'open' && tab === undefined) throw new Error('Allow pop-ups to open the remote host.')
       const view = await api.runtimeOpenView({ runtimeId: runtime.id })
       if (action === 'open') {
@@ -186,7 +186,7 @@ const HostRow = (props: {
   const [plainHttpConsent, setPlainHttpConsent] = useState(false)
   const linkBack = useMutation({
     mutationFn: async (input: { readonly allowPlainHttp: boolean }) => {
-      if (runtime === undefined) throw new Error('This host has no runtime. Edit the host to set its remote DSH home, then reconnect.')
+      if (runtime === undefined) throw new Error('This host is not set up yet. Edit it to set its DSH home, then reconnect.')
       const result = await api.linkBack({ runtimeId: runtime.id, allowPlainHttp: input.allowPlainHttp })
       if (!result.ok) throw failure(result)
       return result
