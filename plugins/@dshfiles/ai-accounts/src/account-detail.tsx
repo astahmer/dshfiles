@@ -20,7 +20,6 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { BarChart3Icon, LayersIcon, MoreHorizontalIcon, PencilIcon, RefreshCwIcon, Settings2Icon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { AccountSignOut } from './account-sign-out.js'
 import { AccountSettings, AccountInlineSettings } from './account-settings.js'
 import { AccountNameEditor } from './account-name-editor.js'
@@ -31,6 +30,7 @@ import { AutoSaveIndicator } from './auto-save-indicator.js'
 import type { AccountDraft, AccountsFile } from './api.js'
 import { ModelCuration } from './model-curation.js'
 import { ProviderGlyph } from './panel-primitives.js'
+import { DETAIL_PANE_CLASS, DetailHeader } from './detail-header.js'
 import { QuotaSection } from './quota-section.js'
 import { AccountUsageSlot } from './account-usage-view.js'
 import { UsageMovedNotice, useUsageRedirect } from './usage-redirect.js'
@@ -63,32 +63,22 @@ export const AccountDetail = (props: {
     if (selected !== null) sendRemove({ type: 'request', target: { instanceId: selected.instanceId, displayName: selected.displayName } })
   }
   return (
-    <section
-      aria-label="Selected account"
-      className="dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-xl dshx:border dshx:border-border/60 dshx:bg-card"
-    >
-      <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-4 dshx:px-6 dshx:py-5 dshx:@max-pane-narrow:px-4">
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-4">
-          <ProviderGlyph kind={draft.kind} large />
-          <div className="dshx:min-w-0 dshx:flex-1">
-            <AccountNameEditor
-              disabled={saving}
-              editing={props.editingName}
-              name={draft.displayName || draft.instanceId}
-              onChange={displayName => setDraft({ ...draft, displayName })}
-              onEditingChange={props.onEditingNameChange}
-            />
-            <p className="dshx:mt-1.5 dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-              {[selected?.plan, selected?.identity].filter(Boolean).join(' · ') || 'Identity not reported by provider'}
-            </p>
-          </div>
-        </div>
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-3">
-          {stateLine === null ? null : (
-            <span className={cn('dshx:text-xs', stateLine.tone === 'warning' ? 'dshx:text-warning' : 'dshx:text-muted-foreground')} role="status">
-              {stateLine.text}
-            </span>
-          )}
+    <section aria-label="Selected account" className={DETAIL_PANE_CLASS}>
+      <DetailHeader
+        detail={[selected?.plan, selected?.identity].filter(Boolean).join(' · ')}
+        mark={<ProviderGlyph kind={draft.kind} />}
+        state={stateLine}
+        title={
+          <AccountNameEditor
+            disabled={saving}
+            editing={props.editingName}
+            name={draft.displayName || draft.instanceId}
+            onChange={displayName => setDraft({ ...draft, displayName })}
+            onEditingChange={props.onEditingNameChange}
+          />
+        }
+      >
+        <>
           <Switch
             aria-label={
               routedKind(draft.kind)
@@ -130,8 +120,8 @@ export const AccountDetail = (props: {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      </header>
+        </>
+      </DetailHeader>
       <Tabs
         className="dshx:min-w-0 dshx:gap-0"
         onValueChange={section => {
@@ -141,7 +131,7 @@ export const AccountDetail = (props: {
         }}
         value={props.activeSection}
       >
-        <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:px-4 dshx:pb-0.5">
+        <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:px-4 dshx:pt-3 dshx:pb-0.5">
           <TabsList aria-label="Account sections">
             {(
               [
@@ -157,26 +147,28 @@ export const AccountDetail = (props: {
             ))}
           </TabsList>
         </div>
-        <TabsContent className="dshx:min-w-0 dshx:space-y-4 dshx:p-4" value="models">
+        <TabsContent className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:divide-y dshx:px-4" value="models">
           {routedKind(draft.kind) ? (
             <>
-              <ModelCuration
-                account={draft}
-                catalog={catalog?.instanceId === draft.instanceId ? catalog.models : []}
-                onChange={patch => setDraft({ ...draft, ...patch })}
-              />
-              {catalog?.warning === undefined ? null : (
-                <p className="dshx:text-xs dshx:text-warning" role="status">
-                  {catalog.warning}
-                </p>
-              )}
+              <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:py-4">
+                <ModelCuration
+                  account={draft}
+                  catalog={catalog?.instanceId === draft.instanceId ? catalog.models : []}
+                  onChange={patch => setDraft({ ...draft, ...patch })}
+                />
+                {catalog?.warning === undefined ? null : (
+                  <p className="dshx:text-xs dshx:text-warning" role="status">
+                    {catalog.warning}
+                  </p>
+                )}
+              </div>
               <AccountInlineSettings draft={draft} file={props.file} state={props.state} onConnect={connect} />
             </>
           ) : (
             <p className="dshx:py-6 dshx:text-sm dshx:text-muted-foreground">Cursor tracks quota here. Its models and threads use the Cursor Agent runtime.</p>
           )}
         </TabsContent>
-        <TabsContent className="dshx:min-w-0 dshx:p-4" value="settings">
+        <TabsContent className="dshx:min-w-0 dshx:px-4" value="settings">
           <AccountSettings draft={draft} file={props.file} state={props.state} folderPicker={props.folderPicker} onConnect={connect} />
         </TabsContent>
         <TabsContent className="dshx:min-w-0 dshx:space-y-4 dshx:p-4" value="usage">
@@ -185,7 +177,7 @@ export const AccountDetail = (props: {
           ) : (
             <>
               <AccountUsageSlot accountId={draft.instanceId} displayName={draft.displayName} onOpenUsageHistory={props.onOpenUsageHistory} />
-              <details className="dshx:rounded-lg dshx:border dshx:bg-card dshx:p-4">
+              <details className="dshx:border-t dshx:pt-4">
                 <summary className="dshx:cursor-pointer dshx:text-sm dshx:font-semibold">Subscription quota & history</summary>
                 <p className="dshx:my-3 dshx:text-xs dshx:text-muted-foreground">
                   Provider-reported subscription allowance is separate from recorded requests and list-price estimates.

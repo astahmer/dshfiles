@@ -1,4 +1,5 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Empty, EmptyDescription } from '@dshfiles/plugin-ui/components/ui/empty'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -91,44 +92,38 @@ export const ModelCuration = (props: {
     customize({ reasoningDefaults: next })
   }
   return (
-    <section
-      className="dshx-root dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-background dshx:p-4"
-      aria-label="Models"
+    <PageSection
+      className="dshx-root dshx:@container dshx:gap-3"
+      description={`Choose which models from ${KIND_LABEL[account.kind]} are available for this account.`}
+      heading="Models"
     >
-      <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:justify-between dshx:gap-4 dshx:@max-pane-compact:flex-wrap">
-        <div className="dshx:min-w-0 dshx:flex-1">
-          <h3 className="dshx:text-base dshx:font-semibold">Models</h3>
-          <p className="dshx:mt-0.5 dshx:text-xs dshx:text-muted-foreground">
-            Choose which models from {KIND_LABEL[account.kind]} are available for this account.
-          </p>
-        </div>
-        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:@max-pane-narrow:w-full dshx:@max-pane-narrow:flex-wrap">
-          <Combobox
-            label="Model settings mode"
-            value={inherited ? 'inherit' : 'customize'}
-            options={[
-              { value: 'inherit', label: 'Inherit from provider defaults' },
-              { value: 'customize', label: 'Customize for this account' },
-            ]}
-            onValueChange={value => props.onChange({ inheritModelSettings: value === 'inherit' })}
-            triggerClassName="dshx:h-8 dshx:w-56 dshx:text-xs dshx:@max-pane-narrow:w-full"
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:@max-pane-narrow:flex-wrap">
+        <Combobox
+          label="Model settings mode"
+          value={inherited ? 'inherit' : 'customize'}
+          options={[
+            { value: 'inherit', label: 'Inherit from provider defaults' },
+            { value: 'customize', label: 'Customize for this account' },
+          ]}
+          onValueChange={value => props.onChange({ inheritModelSettings: value === 'inherit' })}
+          triggerClassName="dshx:h-8 dshx:w-56 dshx:text-xs dshx:@max-pane-narrow:w-full"
+        />
+        <div className="dshx:relative dshx:w-48 dshx:min-w-0 dshx:@max-pane-narrow:w-full">
+          <SearchIcon aria-hidden className="dshx:pointer-events-none dshx:absolute dshx:left-2.5 dshx:top-2 dshx:size-4 dshx:text-muted-foreground" />
+          <Input
+            aria-label="Search models"
+            type="search"
+            placeholder="Search models…"
+            value={current.search}
+            onChange={event => updateView({ search: event.target.value, expanded: false })}
+            className="dshx:h-8 dshx:pl-8 dshx:text-xs"
           />
-          <div className="dshx:relative dshx:w-48 dshx:min-w-0 dshx:@max-pane-narrow:w-full">
-            <SearchIcon aria-hidden className="dshx:pointer-events-none dshx:absolute dshx:left-2.5 dshx:top-2 dshx:size-4 dshx:text-muted-foreground" />
-            <Input
-              aria-label="Search models"
-              type="search"
-              placeholder="Search models…"
-              value={current.search}
-              onChange={event => updateView({ search: event.target.value, expanded: false })}
-              className="dshx:h-8 dshx:pl-8 dshx:text-xs"
-            />
-          </div>
         </div>
       </div>
-      <div className="dshx:overflow-x-auto dshx:rounded-md dshx:border">
+      {/* Rows separate by hairlines; the detail pane is the only frame. */}
+      <div className="dshx:overflow-x-auto dshx:border-y">
         <table className="dshx:w-full dshx:min-w-[600px] dshx:border-collapse dshx:text-sm">
-          <thead className="dshx:border-b dshx:bg-muted/20 dshx:text-left dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
+          <thead className="dshx:border-b dshx:text-left dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
             <tr>
               <th className="dshx:px-3 dshx:py-2 dshx:font-normal">Model</th>
               <th className="dshx:w-48 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
@@ -299,7 +294,7 @@ export const ModelCuration = (props: {
         </div>
       </div>
       {current.adding ? (
-        <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:p-3">
+        <div className="dshx:flex dshx:flex-col dshx:gap-2">
           <div className="dshx:flex dshx:gap-2">
             <Input
               aria-label="Additional model ID"
@@ -322,6 +317,6 @@ export const ModelCuration = (props: {
           <p className="dshx:text-xs dshx:text-muted-foreground">Add an ID the provider catalog does not return. The account/provider prefix is optional.</p>
         </div>
       ) : null}
-    </section>
+    </PageSection>
   )
 }

@@ -29,7 +29,7 @@ export const ActionHint = (props: { readonly label: string; readonly children: J
   </Tooltip>
 )
 
-/** Branded marks match the account rail/header, independently of editable picker tags. */
+/** Branded marks match the account rail/header, independently of editable picker tags: each provider keeps its colour. */
 export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; readonly large?: boolean }): JSX.Element => (
   <span
     aria-hidden
