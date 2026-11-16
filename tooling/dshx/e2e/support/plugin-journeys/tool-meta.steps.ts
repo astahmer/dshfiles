@@ -35,6 +35,7 @@ const revealSettledToolCard = async (page: Page): Promise<void> => {
   const group = page.getByText('Ran commands', { exact: true }).last()
   // The transcript re-renders while it reconnects after a settings save, so a fold toggle can land on a stale row.
   await expect(async () => {
+    if (await card.isVisible()) return
     if (!(await group.isVisible()))
       await page
         .getByText(/^Worked for /)

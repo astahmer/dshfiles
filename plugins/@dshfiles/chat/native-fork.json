@@ -58,6 +58,7 @@
     "src/native/chat/TurnUsagePanel.tsx",
     "src/native/chat/UserContent.tsx",
     "src/native/chat/flow-motion.ts",
+    "src/native/chat/step-process.ts",
     "src/native/chat/register-node-renderers.ts",
     "src/native/chat/turn-rail-items.ts",
     "src/native/chat/use-chat-reading.ts",
