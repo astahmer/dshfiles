@@ -43,13 +43,19 @@
           "kind": "unit-test",
           "id": "settings-subagent.catalog-read-once",
           "file": "plugins/@dshfiles/settings-subagent/tests/catalog-read.test.ts",
-          "testName": "reads once at boot: the read waits for the first connected generation, which needs no reread"
+          "testName": "reads once when shown: the read waits for the first connected generation, which needs no reread"
         },
         {
           "kind": "unit-test",
           "id": "settings-subagent.catalog-read-shared",
           "file": "plugins/@dshfiles/settings-subagent/tests/catalog-read.test.ts",
           "testName": "shares one request with another owner reading the catalog at the same time"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-subagent.catalog-read-while-shown",
+          "file": "plugins/@dshfiles/settings-subagent/tests/catalog-read.test.ts",
+          "testName": "reads nothing on a settings write while no renderer shows the card, and catches up when it is shown"
         }
       ]
     }
