@@ -274,10 +274,10 @@ Then('the Analytics tab shows the memory counters and the activity charts', asyn
     await page.getByRole('tab', { name: 'Analytics', exact: true }).click()
     // DSH keeps an inactive main-panel copy mounted; scope every assertion to the visible page and its active tab.
     const view = page.locator('main.dshx-root:visible [data-slot="tabs-content"][data-state="active"]')
-    await expect(view).toContainText('Digest calls')
-    await expect(view).toContainText('Digest activity')
-    await expect(view).toContainText('Recall')
-    await expect(view).toContainText('Recent events')
+    // One sentence of state leads; a counter row, a chart or a card appears only once it has something to show.
+    await expect(view.getByRole('combobox', { name: 'Analytics window', exact: true })).toBeVisible()
+    await expect(view).toContainText(/\d+ digests?[;( ]|Nothing recorded yet\./u)
+    await expect(view).not.toContainText('Memory is active')
   })
   await finishJourneyAssertions(page)
 })
