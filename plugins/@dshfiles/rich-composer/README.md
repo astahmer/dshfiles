@@ -94,6 +94,12 @@ authorized `conversation.session` declarer as the Workbench view panels below, s
 Requests**. The header title never truncates before its chips: they shrink first and leave from the start edge, so the
 `⋯` goes last.
 
+The same module folds the header's second `⋯` into the thread menu: `ThreadViewsModel.headerMenu(sessionId)` hands a
+thread menu the actions native DSH plugins register for the header (Copy as Markdown, Download log, Open in…,
+Feedback) as plain rows, and while a menu says it lists them (`hostHeaderMenu`) the header draws no More button of its
+own. Without such a menu the native button stays, so the actions are never out of reach. The thread title takes the
+row's width up to the status chip; only a header narrower than 36rem caps it at 45% and wraps the chips under it.
+
 ## Workbench Conversation views
 
 In Workbench mode, **Add panel** offers each registered non-chat view for known threads (for example, **Trajectory — thread title**). Each mounted panel retains its own explicit Session and releases it when closed. Renaming only changes the label, not the component identity. A failed acquisition shows an error rather than borrowing the active thread.
