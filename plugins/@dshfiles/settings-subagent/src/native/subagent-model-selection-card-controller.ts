@@ -139,6 +139,12 @@ export class SubagentModelSelectionCardController {
   private saveGeneration = 0
   private catalogGeneration = 0
   private readonly store: SnapshotStore<SubagentModelSelectionCardState>
+  /**
+   * dshfiles: how many renderers watch the card. The catalog only fills the card's candidates, and every settings write
+   * anywhere (a sidebar preference included) refreshes it, so a card nobody shows must not read it on each write.
+   */
+  private watchers = 0
+  private readonly watchedStore: SnapshotStore<SubagentModelSelectionCardState>
   private readonly unsubscribe: () => void
 
   /**
@@ -154,6 +160,20 @@ export class SubagentModelSelectionCardController {
   ) {
     if (!connected) this.connected = new Promise((resolve) => { this.releaseConnected = resolve })
     this.store = createSnapshotStore(this.projection())
+    this.watchedStore = {
+      getSnapshot: () => this.store.getSnapshot(),
+      update: mutator => { this.store.update(mutator) },
+      set: next => { this.store.set(next) },
+      subscribe: (listener) => {
+        this.watchers += 1
+        if (this.watchers === 1 && this.enabled() && this.catalogStatus === 'idle') void this.loadCatalog()
+        const stop = this.store.subscribe(listener)
+        return () => {
+          this.watchers -= 1
+          stop()
+        }
+      },
+    }
     this.unsubscribe = scope.subscribe(() => {
       if (!this.saving && this.draftRoutes !== undefined
         && this.scope.getSnapshot().revision !== this.draftRevision) {
@@ -161,10 +181,14 @@ export class SubagentModelSelectionCardController {
           && sameRoutes(this.currentRoutes(), this.desiredRoutes())) this.clearDraft()
         else this.conflicted = true
       }
-      if (this.enabled() && this.catalogStatus === 'idle') void this.loadCatalog()
+      if (this.watched() && this.enabled() && this.catalogStatus === 'idle') void this.loadCatalog()
       this.publish()
     })
-    if (this.enabled() && this.catalogStatus === 'idle') void this.loadCatalog()
+  }
+
+  /** dshfiles: whether a renderer shows the card now. */
+  private watched(): boolean {
+    return this.watchers > 0
   }
 
   /** Stop observing settings and suppress late directory/write settlements. */
@@ -181,7 +205,7 @@ export class SubagentModelSelectionCardController {
    */
   inject(): SubagentModelSelectionCardFace {
     return {
-      hooks: { subagentModelSelectionCard: this.store },
+      hooks: { subagentModelSelectionCard: this.watchedStore },
       toggleEnabled: () => { this.toggleEnabled() },
       toggleModel: (key) => { this.toggleModel(key) },
       retryCatalog: () => { void this.loadCatalog() },
@@ -323,7 +347,7 @@ export class SubagentModelSelectionCardController {
     this.catalogGeneration += 1
     this.catalogStatus = 'idle'
     this.catalogPartial = false
-    if (this.enabled()) void this.loadCatalog()
+    if (this.watched() && this.enabled()) void this.loadCatalog()
     else this.publish()
   }
 
