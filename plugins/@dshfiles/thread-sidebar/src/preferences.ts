@@ -136,6 +136,7 @@ const preferencesInputFields = {
   phoneNavigation: SchemaHelpers.withDecodedDefault(Schema.Literals(['stack', 'drawer']), () => DEFAULT_PREFERENCES.phoneNavigation),
   showFooter: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.showFooter),
   showRailActions: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.showRailActions),
+  showRailRestart: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.showRailRestart),
   headerRegionHeight: SchemaHelpers.withDecodedDefault(
     Schema.NullOr(
       Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(40)).check(Schema.isLessThanOrEqualTo(10000)),

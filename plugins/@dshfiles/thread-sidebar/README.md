@@ -152,13 +152,19 @@ the pages and the DSH actions below. It comes back from Customize sidebar › **
 **Sidebar: show the row under the list** (`showFooter`). Its entries stay mounted without tooltips.
 
 **DSH actions on the rail (b:kgcc).** A small group at the bottom of the rail, directly above Settings (below the
-folders and + New folder), expanded and collapsed alike: **Restart DSH** (only while the supervisor offers a restart;
-amber with a slow pulse while updates or a restart wait, its tooltip then names them), a pending **page reload** (amber;
+folders and + New folder), expanded and collapsed alike: a pending **page reload** (amber;
 opens the list of updated plugins), **Copy DSH URL for agents** (the tooltip says Copied) and **Pair a phone** (only
 with phone-pairing; opens the pairing dialog). Each has a tooltip and an accessible name. They are actions, not
 folders, so the folder model never lists them. On a phone they are rows of a **DSH** section at the end of the More
 tab. ⌘K keeps all of them. Customize sidebar › **Show DSH actions on the rail** (`showRailActions`, on by default)
 turned off puts them back in the row under the list, which a pending restart or page reload then shows.
+
+**One restart control.** Restart is the status strip's item: it shows what waits ("Restart pending · 2 plugins", the
+plugins named in plain words), offers **Restart DSH** and **Restart when idle** where the launcher can restart DSH, and
+otherwise says what to do (stop DSH in its terminal, start it again). The same seat shows the **Update DSH** notice
+while no restart waits, so update-then-restart is one item, not two. Customize sidebar › **Show Restart DSH on the
+rail** (`showRailRestart`, off by default) adds a Restart button to the rail's DSH actions (only while the supervisor
+offers a restart; amber with a slow pulse while updates or a restart wait); the strip then draws no restart item.
 
 **Rail and destinations.** The left column is a labelled rail of eight destinations (plan
 `docs/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread

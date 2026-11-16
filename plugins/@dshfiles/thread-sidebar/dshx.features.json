@@ -2099,8 +2099,8 @@
     },
     {
       "id": "rail-actions",
-      "title": "Restart DSH, Copy DSH URL and Pair a phone on the rail above Settings",
-      "summary": "The DSH actions sit in a small group at the bottom of the rail, directly above Settings and below the folders and + New folder, expanded and collapsed alike: Restart DSH (only while the supervisor offers a restart; amber with a slow pulse while updates or a restart wait), a pending page reload (amber, opens the list of updated plugins), Copy DSH URL for agents (shows Copied) and Pair a phone (only with phone-pairing). Each has a tooltip and an accessible name; they are actions, not folders. On a phone they are rows of a DSH section at the end of the More tab. They are no longer drawn in the row under the list, and the command palette keeps them. Show DSH actions on the rail (on by default) puts them back in that row, which a pending restart or page reload then shows.",
+      "title": "Copy DSH URL, Pair a phone and a pending page reload on the rail above Settings",
+      "summary": "The DSH actions sit in a small group at the bottom of the rail, directly above Settings and below the folders and + New folder, expanded and collapsed alike: Restart DSH (off by default: the status strip's restart item is the one restart control; Show Restart DSH on the rail turns it on while the supervisor offers a restart, amber with a slow pulse while updates or a restart wait), a pending page reload (amber, opens the list of updated plugins), Copy DSH URL for agents (shows Copied) and Pair a phone (only with phone-pairing). Each has a tooltip and an accessible name; they are actions, not folders. On a phone they are rows of a DSH section at the end of the More tab. They are no longer drawn in the row under the list, and the command palette keeps them. Show DSH actions on the rail (on by default) puts them back in that row, which a pending restart or page reload then shows.",
       "reach": ["expect tab \"Settings\"", "expect button \"Copy DSH URL for agents\""],
       "surfaces": ["client", "settings"],
       "surface": "command",
@@ -2113,6 +2113,13 @@
           "constraints": "Boolean; off moves the DSH actions back to the row under the list.",
           "choices": ["true", "false"],
           "coveredBy": ["thread-sidebar.rail-actions"]
+        },
+        {
+          "key": "showRailRestart",
+          "defaultValue": "false",
+          "constraints": "Boolean; on adds Restart DSH to the rail's DSH actions (and the status strip then draws no restart item). Off leaves restart to the status strip and ⌘K.",
+          "choices": ["false", "true"],
+          "coveredBy": ["thread-sidebar.rail-restart-off-by-default"]
         }
       ],
       "states": ["expanded", "collapsed", "phone", "restart-pending", "reload-pending", "copied", "setting-off"],
@@ -2127,6 +2134,12 @@
           "kind": "gherkin",
           "id": "thread-sidebar.rail-actions",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.rail-restart-off-by-default",
+          "file": "plugins/@dshfiles/thread-sidebar/src/rail-actions-model.test.ts",
+          "testName": "leaves Restart to the status strip by default: one restart control, not a rail button beside it"
         },
         {
           "kind": "unit-test",
