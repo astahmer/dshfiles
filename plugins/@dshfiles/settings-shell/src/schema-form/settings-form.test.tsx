@@ -13,13 +13,26 @@ const text = (value: JsonValue | undefined): string => Schema.decodeUnknownOptio
 const wire = (schema: Schemastery): JsonValue => Schema.decodeUnknownSync(jsonValueSchema)(schema.toJSON())
 const t: ShellTranslate = (key, values) => (values === undefined ? key : `${key} ${JSON.stringify(values)}`)
 
-const formOf = (snapshot: ConfigFormSnapshot<unknown>): ConfigForm<unknown> => ({
+const formOf = (snapshot: ConfigFormSnapshot<unknown>, mutate: ConfigForm<unknown>['mutate'] = async () => true): ConfigForm<unknown> => ({
   getSnapshot: () => snapshot,
   subscribe: () => () => undefined,
-  mutate: async () => true,
+  mutate,
   set: async () => true,
   unset: async () => true,
 })
+
+/** Types into a field and leaves it, as a person does: React commits a draft on blur. */
+const typeAndLeave = async (field: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> => {
+  const prototype = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+  const setValue = Object.getOwnPropertyDescriptor(prototype, 'value')?.set
+  await act(async () => {
+    setValue?.call(field, value)
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => {
+    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+  })
+}
 
 let container: HTMLDivElement
 let root: Root
@@ -77,5 +90,63 @@ describe('settings form rows', () => {
     await act(async () => root.render(<SettingsForm fields={fields} form={form} highlight="maxtabs" namespace="example" t={t} />))
     expect(row('maxTabs')?.querySelector('code mark')?.textContent).toBe('maxTabs')
     expect(row('focusThreadInSidebar')?.querySelector('code')).toBeNull()
+  })
+})
+
+describe('machine values', () => {
+  const schema = wire(
+    Schemastery.object({
+      maxRequestFilesBytes: Schemastery.natural().min(1_048_576).default(134_217_728),
+      streamIdleTimeoutMs: Schemastery.natural().default(300_000),
+      baseURL: Schemastery.string(),
+    }),
+  )
+  const fields = SettingsSchemaModel.settingFields({ schema, secrets: [], text })
+  const snapshot: ConfigFormSnapshot<unknown> = {
+    status: 'ready',
+    value: { maxRequestFilesBytes: 134_217_728, streamIdleTimeoutMs: 300_000 },
+    base: { maxRequestFilesBytes: 134_217_728, streamIdleTimeoutMs: 300_000 },
+    user: {},
+    revision: 1,
+    writable: true,
+  }
+  const numberField = (path: string): HTMLInputElement | null => row(path)?.querySelector('input') ?? null
+
+  it('shows a byte count in MB and a millisecond count in seconds, with one unit', async () => {
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot)} namespace="example" t={t} />))
+    expect(numberField('maxRequestFilesBytes')?.value).toBe('128')
+    expect(row('maxRequestFilesBytes')?.textContent).toBe('Max request files' + 'MB')
+    expect(numberField('streamIdleTimeoutMs')?.value).toBe('300')
+    expect(row('streamIdleTimeoutMs')?.textContent).toBe('Stream idle timeout' + 's')
+  })
+
+  it('stores the same unit the schema declares: 256 MB is saved in bytes, 1.5 s in milliseconds', async () => {
+    const mutate = vi.fn<ConfigForm<unknown>['mutate']>(async () => true)
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot, mutate)} namespace="example" t={t} />))
+    const bytes = numberField('maxRequestFilesBytes')
+    const timeout = numberField('streamIdleTimeoutMs')
+    if (bytes === null || timeout === null) throw new Error('number fields missing')
+    await typeAndLeave(bytes, '256')
+    await typeAndLeave(timeout, '1.5')
+    expect(mutate.mock.calls.map(([ops]) => ops)).toEqual([
+      [{ op: 'set', path: ['maxRequestFilesBytes'], value: 268_435_456 }],
+      [{ op: 'set', path: ['streamIdleTimeoutMs'], value: 1500 }],
+    ])
+  })
+
+  it('refuses a value under the minimum, naming the bounds in the unit shown', async () => {
+    const mutate = vi.fn<ConfigForm<unknown>['mutate']>(async () => true)
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot, mutate)} namespace="example" t={t} />))
+    const bytes = numberField('maxRequestFilesBytes')
+    if (bytes === null) throw new Error('number field missing')
+    await typeAndLeave(bytes, '0.5')
+    expect(mutate).not.toHaveBeenCalled()
+    expect(row('maxRequestFilesBytes')?.querySelector('[role="alert"]')?.textContent).toBe('form.invalidNumber {"min":1,"max":"∞"}')
+  })
+
+  it('says nothing about the source of a value whose schema declares no default', async () => {
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot)} namespace="example" t={t} />))
+    expect(row('baseURL')?.querySelector('[data-setting-source]')).toBeNull()
+    expect(row('baseURL')?.textContent).not.toContain('source.unknown')
   })
 })

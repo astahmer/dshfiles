@@ -94,6 +94,54 @@ describe('labels and units', () => {
   })
 })
 
+describe('readable units', () => {
+  const machine = Schema.decodeUnknownSync(jsonValueSchema)(
+    Schemastery.object({
+      streamIdleTimeoutMs: Schemastery.natural().default(300_000),
+      autoSaveDelayMs: Schemastery.natural().default(800),
+      maxRequestFilesBytes: Schemastery.natural().min(1_048_576).default(134_217_728),
+      maxResponseBytes: Schemastery.natural().default(5_000_000),
+      maxOutputBytes: Schemastery.natural().default(64_000),
+      imageOffloadByteQuantum: Schemastery.natural().default(67_108_864),
+      blockBytes: Schemastery.natural().default(1600),
+      fileExpiresAfterSeconds: Schemastery.natural().default(604_800),
+      waitSeconds: Schemastery.natural().default(0),
+      idleMinutes: Schemastery.natural().default(120),
+      timeoutMs: Schemastery.natural().description('How long a command may run.').default(60_000),
+      ms: Schemastery.natural().default(5),
+    }).toJSON(),
+  )
+  const byKey = new Map(SettingsSchemaModel.settingFields({ schema: machine, secrets: [], text }).map(field => [field.key, field]))
+
+  it('shows milliseconds as seconds and bytes as KB or MB, storing the same number', () => {
+    expect(byKey.get('streamIdleTimeoutMs')?.control).toMatchObject({ kind: 'number', unit: 's', factor: 1000 })
+    expect(byKey.get('maxRequestFilesBytes')?.control).toMatchObject({ unit: 'MB', factor: 1_048_576, min: 1_048_576 })
+    expect(byKey.get('maxResponseBytes')?.control).toMatchObject({ unit: 'MB', factor: 1_000_000 })
+    expect(byKey.get('maxOutputBytes')?.control).toMatchObject({ unit: 'KB', factor: 1000 })
+    expect(byKey.get('imageOffloadByteQuantum')?.control).toMatchObject({ unit: 'MB', factor: 1_048_576 })
+    expect(byKey.get('fileExpiresAfterSeconds')?.control).toMatchObject({ unit: 'h', factor: 3600 })
+  })
+
+  it('keeps the unit a value already reads well in', () => {
+    expect(byKey.get('autoSaveDelayMs')?.control).toEqual({ kind: 'number', percent: false, step: 1, min: 0, unit: 'ms' })
+    expect(byKey.get('blockBytes')?.control).toMatchObject({ unit: 'bytes' })
+    expect(byKey.get('waitSeconds')?.control).toMatchObject({ unit: 's' })
+    expect(byKey.get('idleMinutes')?.control).toMatchObject({ unit: 'min' })
+    for (const key of ['autoSaveDelayMs', 'blockBytes', 'waitSeconds', 'idleMinutes']) expect(byKey.get(key)?.control).not.toHaveProperty('factor')
+  })
+
+  it('names the setting without the unit its control already shows', () => {
+    expect(byKey.get('streamIdleTimeoutMs')?.title).toBe('Stream idle timeout')
+    expect(byKey.get('maxRequestFilesBytes')?.title).toBe('Max request files')
+    expect(byKey.get('fileExpiresAfterSeconds')?.title).toBe('File expires after')
+    expect(byKey.get('idleMinutes')?.title).toBe('Idle')
+    expect(byKey.get('timeoutMs')?.title).toBe('Timeout')
+    // The unit word is part of the name here, and a key that is only a unit keeps it.
+    expect(byKey.get('imageOffloadByteQuantum')?.title).toBe('Image offload byte quantum')
+    expect(byKey.get('ms')?.title).toBe('Ms')
+  })
+})
+
 describe('paths', () => {
   it('reads nested values and tells an override apart from a missing key', () => {
     const user = { layout: { dense: false }, tags: ['a'] }
