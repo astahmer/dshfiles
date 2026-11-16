@@ -1,8 +1,10 @@
 import { Toast } from '@deepseek-ai/dsh-client-ui-primitives'
-import { usePlugin } from '@dshfiles/dshx/client'
+import { usePlugin, useSettings } from '@dshfiles/dshx/client'
 import * as Schema from 'effect/Schema'
 import { useEffect, useState } from 'react'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { tracesSettings } from '../settings.js'
+import { AlertsOnScreen, announceableEvents } from './alert-announcements.js'
 import type { AlertEvent } from './alert-types.js'
 import type { TracesAlertsTranslate } from './alerts-locale.js'
 import { useAlertsFeed } from './alerts-queries.js'
@@ -35,8 +37,9 @@ const titleOf = (event: AlertEvent, t: TracesAlertsTranslate): string => `${even
 
 /**
  * Lives in the shell overlay so an alert is announced wherever the user is: an in-app banner through the Host's own
- * Toast, and a browser notification when the user allowed them. Only firing events of rules that announce, and resolutions
- * of those, are shown; a muted rule's events carry notify: false.
+ * Toast, and a browser notification when the user allowed them. Only firing events of rules that announce are shown
+ * (resolutions too when the announceResolved setting is on); a muted rule's events carry notify: false, and nothing is
+ * announced while an Alerts view is on screen.
  */
 export const AlertNotifier = (props: { readonly onOpenAlerts: () => void; readonly t: TracesAlertsTranslate }): JSX.Element | null => {
   const t = props.t
@@ -44,11 +47,14 @@ export const AlertNotifier = (props: { readonly onOpenAlerts: () => void; readon
   const announcedId = storedAnnouncedId.useValue()
   const feed = useAlertsFeed(announcedId)
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
+  const announceResolved = useSettings(tracesSettings).value?.announceResolved ?? false
 
   useEffect(() => {
     if (feed.data === undefined) return
-    const fresh = claimEvents(feed.data.latestEventId, feed.data.events)
-    if (fresh === null || fresh.length === 0) return
+    const claimed = claimEvents(feed.data.latestEventId, feed.data.events)
+    if (claimed === null) return
+    const fresh = announceableEvents(claimed, { announceResolved, alertsOnScreen: AlertsOnScreen.now() })
+    if (fresh.length === 0) return
     const newest = fresh[0]
     if (newest === undefined) return
     const more = fresh.length > 1 ? ` (+${String(fresh.length - 1)})` : ''
@@ -60,7 +66,7 @@ export const AlertNotifier = (props: { readonly onOpenAlerts: () => void; readon
         tag: `dshfiles-traces-alert-${String(event.id)}`,
         onClick: props.onOpenAlerts,
       })
-  }, [feed.data, t, props.onOpenAlerts, plugin])
+  }, [feed.data, t, props.onOpenAlerts, plugin, announceResolved])
 
   if (announcement === null) return null
   return (
