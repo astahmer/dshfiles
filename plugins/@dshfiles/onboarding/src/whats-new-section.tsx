@@ -6,8 +6,6 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 import { WhatsNewModel, type Upstream, type WhatsNew, type WhatsNewEntry, type WhatsNewInput } from './whats-new-model.js'
 
-const FIRST_SHOWN = 12
-
 export interface WhatsNewSectionProps {
   readonly loadWhatsNew: (input: WhatsNewInput, signal: AbortSignal) => Promise<WhatsNew>
   readonly lastSeen: string | null
@@ -15,30 +13,41 @@ export interface WhatsNewSectionProps {
   readonly copy: (text: string) => Promise<boolean>
 }
 
-/** A fix or a breaking change says so; a feature needs no badge. Commit types and plugin names stay out of the copy. */
-const KIND_LABEL = { feat: null, fix: 'Fix' } as const
+/**
+ * The one chip a line may carry, in its own column: a breaking change, a fix, or New since the last visit. A feature
+ * needs none. Commit types and plugin names stay out of the copy.
+ */
+const chipOf = (entry: WhatsNewEntry, isNew: boolean): { readonly label: string; readonly strong: boolean } | null => {
+  if (entry.breaking) return { label: 'Breaking', strong: true }
+  if (isNew) return { label: entry.kind === 'fix' ? 'New fix' : 'New', strong: true }
+  return entry.kind === 'fix' ? { label: 'Fix', strong: false } : null
+}
 
-const EntryLine = (props: { readonly entry: WhatsNewEntry; readonly isNew: boolean }): ReactNode => {
+const EntryLine = (props: { readonly entry: WhatsNewEntry; readonly isNew: boolean; readonly now: Date; readonly chipColumn: boolean }): ReactNode => {
   const { entry } = props
-  const kind = entry.breaking ? 'Breaking change' : KIND_LABEL[entry.kind]
+  const chip = chipOf(entry, props.isNew)
   return (
     <li
-      className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2 dshx:gap-y-1 dshx:py-1"
+      className="dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-2 dshx:py-1"
       data-whats-new-entry={entry.commit}
       data-whats-new-plugin={entry.plugin}
       data-new={props.isNew ? '' : undefined}
     >
-      {props.isNew ? (
-        <Badge className="dshx:font-semibold" variant="secondary">
-          New
-        </Badge>
+      {/* While any line of the list has a chip, every line reserves its column: the sentences start on one edge. */}
+      {props.chipColumn ? (
+        <span className="dshx:flex dshx:w-16 dshx:shrink-0" data-whats-new-chip="">
+          {chip === null ? null : (
+            <Badge className={chip.strong ? 'dshx:font-semibold' : undefined} variant={chip.strong ? 'secondary' : 'muted'}>
+              {chip.label}
+            </Badge>
+          )}
+        </span>
       ) : null}
-      {kind === null ? null : <Badge variant="muted">{kind}</Badge>}
       <span className="dshx:min-w-0 dshx:flex-1 dshx:text-sm" data-whats-new-summary="">
         {WhatsNewModel.sentence(entry.summary)}
       </span>
-      <time className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" dateTime={entry.date}>
-        {entry.date.slice(0, 10)}
+      <time className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" dateTime={entry.date}>
+        {WhatsNewModel.dateLabel(entry.date, props.now)}
       </time>
     </li>
   )
@@ -47,8 +56,10 @@ const EntryLine = (props: { readonly entry: WhatsNewEntry; readonly isNew: boole
 /** Changes the remote has and this checkout lacks: a quiet detail, since the fetch status is a maintainer's concern. */
 const UpstreamList = (props: { readonly upstream: Upstream; readonly copy: (text: string) => Promise<boolean> }): ReactNode => {
   const [copied, setCopied] = useState(false)
+  const [now] = useState(() => new Date())
   const target = props.upstream
   const count = `${String(target.entries.length)}${target.more ? '+' : ''}`
+  const upstreamChips = target.entries.some(entry => chipOf(entry, false) !== null)
   return (
     <details className="dshx:min-w-0 dshx:text-xs dshx:text-muted-foreground" data-whats-new-upstream={target.remote}>
       <summary className="dshx:cursor-pointer dshx:rounded-sm dshx:py-1 dshx:tabular-nums dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring">
@@ -60,7 +71,7 @@ const UpstreamList = (props: { readonly upstream: Upstream; readonly copy: (text
         </p>
         <ul className="dshx:flex dshx:flex-col dshx:text-foreground">
           {target.entries.map(entry => (
-            <EntryLine entry={entry} isNew={false} key={`${entry.commit}:${entry.plugin}`} />
+            <EntryLine chipColumn={upstreamChips} entry={entry} isNew={false} key={`${entry.commit}:${entry.plugin}`} now={now} />
           ))}
         </ul>
         <div>
@@ -90,6 +101,7 @@ const CommitsLink = (props: { readonly href: string }): ReactNode => (
 /** Changes to owned plugins from the checkout's history, read only while this section is on screen. */
 export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
   const [expanded, setExpanded] = useState(false)
+  const [now] = useState(() => new Date())
   const history = useQuery({
     queryKey: ['onboarding', 'whats-new'],
     queryFn: ({ signal }) => props.loadWhatsNew({}, signal),
@@ -102,7 +114,8 @@ export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
     return (
       <PageSection data-whats-new="error" heading="What's new">
         <p className="dshx:text-sm dshx:text-muted-foreground">
-          What's new could not be loaded. Try again; if Getting started was updated since DSH started, restart DSH from the bottom of the rail first.
+          What's new could not be loaded. Try again; if Getting started was updated since DSH started, restart DSH first (the status bar shows Restart DSH while
+          an update waits).
         </p>
         <div>
           <Button onClick={() => void history.refetch()} size="sm" variant="outline">
@@ -130,7 +143,11 @@ export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
   const view = WhatsNewModel.window({ value, lastSeen: props.lastSeen })
   const newest = view.newest
   const unseen = newest !== null && (props.lastSeen === null || view.newCount > 0)
-  const shown = expanded ? view.entries : view.entries.slice(0, FIRST_SHOWN)
+  // What was added leads, five at most; every change, fixes included, is one click away.
+  const featured = WhatsNewModel.featured(view.entries)
+  const shown = expanded ? view.entries : featured
+  const hidden = view.entries.length - featured.length
+  const chipColumn = shown.some(entry => chipOf(entry, entry.isNew) !== null)
 
   return (
     <PageSection
@@ -143,21 +160,23 @@ export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
       }
       data-whats-new="ready"
       heading="What's new"
-      meta={view.newCount > 0 ? `${String(view.newCount)} new` : String(value.entries.length)}
+      {...(view.newCount > 0 ? { meta: `${String(view.newCount)} new` } : undefined)}
     >
       {value.entries.length === 0 ? (
         <p className="dshx:text-sm dshx:text-muted-foreground">Nothing has changed in this setup's history yet.</p>
+      ) : shown.length === 0 ? (
+        <p className="dshx:text-sm dshx:text-muted-foreground">No new feature lately; the latest changes are fixes.</p>
       ) : (
         <ul aria-label="Changes" className="dshx:flex dshx:flex-col">
           {shown.map(entry => (
-            <EntryLine entry={entry} isNew={entry.isNew} key={`${entry.commit}:${entry.plugin}`} />
+            <EntryLine chipColumn={chipColumn} entry={entry} isNew={entry.isNew} key={`${entry.commit}:${entry.plugin}`} now={now} />
           ))}
         </ul>
       )}
-      {value.entries.length > FIRST_SHOWN ? (
+      {hidden > 0 ? (
         <div>
           <Button aria-expanded={expanded} onClick={() => setExpanded(!expanded)} size="sm" variant="ghost">
-            {expanded ? 'Show fewer' : `Show all ${String(value.entries.length)}`}
+            {expanded ? 'Show features only' : `Show all ${String(view.entries.length)} changes`}
           </Button>
         </div>
       ) : null}

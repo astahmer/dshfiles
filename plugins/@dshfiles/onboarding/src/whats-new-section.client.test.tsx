@@ -60,27 +60,59 @@ const mount = (value: WhatsNew, initialSeen: string | null = null) =>
   )
 
 describe('WhatsNewSection', () => {
-  it('reads each change as a sentence, newest first, with no commit type, plugin name or New badge on a first visit', async () => {
+  it('leads with features, as sentences, newest first; fixes and the rest are one click away', async () => {
     mount(ready)
     const section = await screen.findByRole('region', { name: /What's new/u })
     const changes = within(section).getByRole('list', { name: 'Changes' })
-    expect([...changes.querySelectorAll('[data-whats-new-summary]')].map(line => line.textContent)).toEqual([
-      'Show what is new',
-      'Keep the order',
-      'Walk a feature',
-    ])
-    expect(within(changes).getAllByText('Fix')).toHaveLength(1)
+    const summaries = (): (string | null)[] => [...changes.querySelectorAll('[data-whats-new-summary]')].map(line => line.textContent)
+    // A list of repairs is not what is new for a user: the fix is not in the default list.
+    expect(summaries()).toEqual(['Show what is new', 'Walk a feature'])
+    expect(within(changes).queryByText('Fix')).toBeNull()
     expect(section.textContent).not.toMatch(/\bfeat\b|\bfix\b|Onboarding|Backlog|Getting started\./u)
     expect(within(section).queryAllByText('New')).toEqual([])
+    // The heading no longer carries the size of the history ("What's new 50").
+    expect(within(section).getByRole('heading', { name: "What's new" }).parentElement?.textContent).not.toMatch(/\d/u)
+    fireEvent.click(within(section).getByRole('button', { name: 'Show all 3 changes' }))
+    expect(summaries()).toEqual(['Show what is new', 'Keep the order', 'Walk a feature'])
+    expect(within(changes).getAllByText('Fix')).toHaveLength(1)
+    fireEvent.click(within(section).getByRole('button', { name: 'Show features only' }))
+    expect(summaries()).toEqual(['Show what is new', 'Walk a feature'])
+  })
+
+  it('shows at most five features, in a reserved chip column, with no ISO date', async () => {
+    const many: WhatsNew = {
+      ...ready,
+      entries: Array.from({ length: 9 }, (_, index) =>
+        entry('onboarding', `feature ${String(index + 1)}`, `2026-11-${String(20 - index).padStart(2, '0')}T10:00:00.000Z`),
+      ),
+    }
+    // Two of the five landed since the last visit, so two lines carry New and three carry nothing.
+    mount(many, '2026-11-18T12:00:00.000Z')
+    const section = await screen.findByRole('region', { name: /What's new/u })
+    const lines = [...within(section).getByRole('list', { name: 'Changes' }).querySelectorAll('li')]
+    expect(lines).toHaveLength(5)
+    expect(within(section).getAllByText('New')).toHaveLength(2)
+    for (const line of lines) {
+      // Every line reserves the chip column, so a line with a chip and one without start their sentence on one edge.
+      expect(line.firstElementChild?.getAttribute('data-whats-new-chip')).toBe('')
+      expect(line.querySelector('time')?.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/u)
+    }
+    expect(within(section).getByRole('button', { name: 'Show all 9 changes' })).toBeTruthy()
+    // With no chip on any line there is no column to reserve, and no empty indent.
+    fireEvent.click(within(section).getByRole('button', { name: 'Mark as seen' }))
+    expect(section.querySelectorAll('[data-whats-new-chip]')).toHaveLength(0)
   })
 
   it('marks what landed since the last visit as New until the user marks it seen, never on its own', async () => {
     mount(ready, '2026-11-09T12:00:00.000Z')
     const section = await screen.findByRole('region', { name: /What's new/u })
     expect(within(section).getByText('2 new')).toBeTruthy()
-    expect(within(section).getAllByText('New')).toHaveLength(2)
+    // The new feature shows at once; the new fix says so under Show all.
+    expect(within(section).getAllByText('New')).toHaveLength(1)
+    fireEvent.click(within(section).getByRole('button', { name: 'Show all 3 changes' }))
+    expect(within(section).getAllByText('New fix')).toHaveLength(1)
     fireEvent.click(within(section).getByRole('button', { name: 'Mark as seen' }))
-    expect(within(section).queryAllByText('New')).toEqual([])
+    expect(within(section).queryAllByText(/^New/u)).toEqual([])
     expect(within(section).queryByRole('button', { name: 'Mark as seen' })).toBeNull()
   })
 

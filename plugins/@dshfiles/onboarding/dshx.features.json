@@ -527,7 +527,7 @@
           "kind": "unit-test",
           "id": "onboarding.whats-new-readable",
           "file": "plugins/@dshfiles/onboarding/src/whats-new-section.client.test.tsx",
-          "testName": "reads each change as a sentence, newest first, with no commit type, plugin name or New badge on a first visit"
+          "testName": "leads with features, as sentences, newest first; fixes and the rest are one click away"
         },
         {
           "kind": "unit-test",

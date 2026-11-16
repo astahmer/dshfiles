@@ -102,11 +102,14 @@ blocks the app, makes no model request, and changes the profile only when you co
 
 ## What's new
 
-1. **List.** Getting started's **What's new** lists each `feat(<plugin>): …` and `fix(<plugin>): …` change whose scope
-   names an owned plugin directory (a title scoping two plugins counts for each), newest first, at most 50 changes (12
-   until **Show all**), each with its date. A change reads as a sentence: the `type(scope):` prefix is dropped and the
-   first letter capitalized; a fix carries a **Fix** badge and a breaking change **Breaking change**, and no plugin name
-   shows. `chore`, `docs`, `test`, `refactor` and `perf` stay out: they rarely change what a user sees.
+1. **List.** Getting started's **What's new** reads each `feat(<plugin>): …` and `fix(<plugin>): …` change whose scope
+   names an owned plugin directory (a title scoping two plugins counts for each), newest first, at most 50 changes. It
+   leads with what was added: the five newest features (and breaking changes); **Show all N changes** lists everything,
+   fixes included, and **Show features only** folds it back. A change reads as a sentence: the `type(scope):` prefix is
+   dropped and the first letter capitalized, and no plugin name shows. A line carries at most one chip (**Breaking**,
+   **New** or **Fix**) in a column every line reserves while any line has one, so the sentences start on one edge. Its
+   date reads Today, Yesterday, "3 days ago", then the date in the reader's locale. `chore`, `docs`, `test`,
+   `refactor` and `perf` stay out: they rarely change what a user sees.
 2. **Since your last visit.** A change reads **New** when it landed after the instant you last pressed **Mark as seen**
    (kept per browser, `dshfiles.onboarding.whats-new.v1`). Opening the page never moves it, and before the first press
    nothing reads New.
