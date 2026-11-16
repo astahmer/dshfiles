@@ -5,7 +5,7 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1, 2, 4, 5 and 7 are done and step 3 is half done (the tab strips are open). Open follow-ups are
+**Resume here:** steps 1, 2, 4, 5, 6 and 7 are done and step 3 is half done (the tab strips are open). Open follow-ups are
 listed under [Thread lane](#thread-lane). Steps 5, 6 and 8–14 are open. See
 [Work list](#work-list).
 
@@ -194,7 +194,7 @@ before and passes after; see each revision's description for the reason.
 | 3 ◐  | Tab strips use the shared status glyph; one projection for working and needs-you counts; failed stays Failed. Done: N2, M5 (see [Thread lane](#thread-lane)). Open: N1 and N7 in main-tabs and workbench. | N1, N2, M5, N7 | medium |
 | 4 ✅ | Failure card: one sentence, one Retry, "Ask to fix" in the same row, code and payload under Details. No "Compact and retry": the over-long sentence names `/compact`. | M4 | medium |
 | 5 ✅ | Inbox question items show the question's own options and answer in place, open forms included; a subagent's question is answerable in its parent thread; the phone question card keeps its options in view; triage has one action row. See [Inbox lane](#inbox-lane). | M1, M2, M3, M8 | medium |
-| 6    | A primary "Land" in the header and as the row's inline verb when there is work to land; settle what the "+N −N" chip counts.                           | M6, M7            | medium |
+| 6 ✅ | A primary "Land" in the header when there is work to land, behind one confirmation; the "+N −N" chip shows only for a thread's own workspace. See [Land lane](#land-lane). | M6, M7 | medium |
 | 7 ✅ | Settings rows: key and source lines hidden, no package-description fallback, units and enums humanised, nav regrouped with no "Other". See [Settings lane](#settings-lane). | P1, P2, P3 | medium |
 | 8    | Do not render zero-count chips, tiles and stat blocks.                                                                                                 | P6                | small  |
 | 9    | AI accounts onto the kit switch and the colour rule.                                                                                                   | P4                | small  |
@@ -312,6 +312,53 @@ agent-questions and activity-timeline changed their Host halves, so a running in
 For thread-sidebar, not started: "What needs you, answered in place" and the "Needs you" page label, merging Waiting
 threads into the Inbox, the count badge drawn over the Needs you icon, and the subagent card's "Working · In
 ask_parent_question" with a raw route id.
+
+## Land lane
+
+23 revisions (`rxmpwnolspxz` … `umwxvmmpwynr`) in jj-integration, jujutsu and diffs-review, plus a repair of the
+`rebase-ready-thread` scratch seed in dshx.
+
+- The "+N −N" chip was `jj diff --stat` from the fork point of main to `@` for the thread's folder, so a thread in
+  the project checkout showed the whole checkout's diff. It now shows only for a thread in its own workspace with
+  changes. A project thread has no chip; its workspace menu says "The project has changes that are not on main" with
+  a Review button.
+- The header carries a primary "Land" while there is work to land and landing can start (no conflict, every revision
+  described, no busy thread, nothing queued). It and the menu's "Land on main" open one dialog listing the
+  revisions. Before, the menu's button landed on click with no confirmation.
+- The chip reads "Own workspace · N to land"; the menu shows the end of the workspace path with the full path in a
+  tooltip and a copy button.
+- History and Source control have a page header, a repository select that defaults to the current project, one
+  toolbar row with a Filter menu, and their own empty text.
+- The Workspaces page has one name and the shared status glyphs, with zero-count filters hidden. The land card says
+  what holds in one muted line and shows a chip only for a failing check. The Changes scopes use the kit segmented
+  control.
+
+Not done:
+
+- "Download thread log" is still in the workspace menu as well as the thread `⋯`: jj-integration cannot tell
+  whether the thread menu hosts the native entry.
+- At 390 px the phone top bar has no seat for the workspace control, so there is no header "Land" on a phone; landing
+  there goes through the turn-end offer or the land card.
+- Host activity strings still say "revision(s)" and "rebased"; the thread panel's view is still titled "Jujutsu".
+- The meter line of a project thread still says "N ahead of main".
+
+Seen and left: two black "Land" buttons when the Changes view is open (header and land card); the thread list's
+inline Land runs without the confirmation; the "N to land" tag can stay stale up to 60 s after `/rebase`; a New
+thread send can land in another prepared workspace than the composer named.
+
+Proposed, not built: keep Changes as the thread's one workspace view, drop Thread workspaces from "Choose a view",
+rename the panel's Jujutsu to History, remove the Land › Review redirect and fold Source control into Changes.
+
+Unverified:
+
+- Journeys, first pass: diffs-review 7 of 9, jujutsu 16 of 17, jj-integration 20 of 28. Six failures were caused by
+  the lane and pass after step fixes. Five fail at the base too (`git-thread-scopes`, `ambiguous-destination`,
+  `new-thread-preparation`, `project-switch-with-saved-draft`, `thread-workspace-menu`). No full pass after the
+  last fixes; the edited multi-host and thread-sidebar steps were not run.
+- The row verb "Land" in the thread list was not seen rendered. WebKit and a remote thread's header Land were not
+  checked.
+
+jj-integration's Host half changed (`/rebase` wording), so a running instance needs a restart.
 
 ## Settings lane
 
