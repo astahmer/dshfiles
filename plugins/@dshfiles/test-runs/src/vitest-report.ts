@@ -235,6 +235,25 @@ export class VitestReport {
     }
   }
 
+  /**
+   * The headline in parts, so only a failure is drawn in the failure colour: "1 failed" red, "4 passed" not. The parts
+   * joined with " · " read exactly as {@link VitestReport.summaryLabel}.
+   */
+  static summaryParts(run: Pick<TestRun, 'fileTally' | 'testTally'>): readonly { readonly text: string; readonly failed: boolean }[] {
+    const tally = run.testTally
+    const parts: { text: string; failed: boolean }[] = []
+    if (tally.failed > 0) parts.push({ text: `${tally.failed} failed`, failed: true })
+    else if (run.fileTally.failed > 0) parts.push({ text: `${run.fileTally.failed} test file${run.fileTally.failed === 1 ? '' : 's'} failed`, failed: true })
+    parts.push({ text: `${tally.passed} passed`, failed: false })
+    if (tally.skipped > 0) parts.push({ text: `${tally.skipped} skipped`, failed: false })
+    return parts
+  }
+
+  /** The filters worth a tab: "All" always, the selected one, and each filter that would match a test. */
+  static shownFilters<Filter extends string>(filters: readonly Filter[], counts: Readonly<Record<Filter, number>>, selected: Filter): readonly Filter[] {
+    return filters.filter((filter, index) => index === 0 || filter === selected || counts[filter] > 0)
+  }
+
   static summaryLabel(run: Pick<TestRun, 'fileTally' | 'testTally'>): string {
     const tally = run.testTally
     const skipped = tally.skipped > 0 ? ` · ${tally.skipped} skipped` : ''
