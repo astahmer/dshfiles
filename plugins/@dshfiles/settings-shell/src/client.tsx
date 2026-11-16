@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { createSnapshotStore, type ObservableSnapshot, type SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
-import { resolveSlotLabel, type PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import { resolveSlotLabel, type PropsRenderSlots, type SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   createApiClient,
   defineClient,
@@ -65,6 +65,7 @@ import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
 import { SettingsTab, type PluginPageHeading, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
+import { TAB_STRIP_SLOTS, tabStripLoaded } from './tab-strip.js'
 import { PORTED_FROM } from './upstream.js'
 import {
   createSettingsHubRouter,
@@ -77,7 +78,6 @@ import {
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
 const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
-const MAIN_TABS_OVERLAY_ID = 'dshfiles-main-tabs'
 const PUBLISH_SETTLE_MS = 250
 const OPEN_SETTINGS_COMMAND = 'settings.open'
 
@@ -453,9 +453,15 @@ export default defineClient({
       openSettingsTarget: target => openSettingsTarget(target),
     }
 
+    // The frame's `shell.beforeMain` region is frame-layout's declaration, which this plugin does not depend on: the
+    // ledger itself is keyed by plain strings, so it is read through that face.
+    const slotLedger: Pick<SlotCore, 'entriesOfSlot' | 'subscribe'> = ctx.slots
     const mainTabsLoaded: ObservableSnapshot<boolean> = {
-      getSnapshot: () => ctx.slots.entriesOfSlot('shell.overlay').some(entry => entry.options.id === MAIN_TABS_OVERLAY_ID),
-      subscribe: listener => ctx.slots.subscribe('shell.overlay', listener),
+      getSnapshot: () => tabStripLoaded(slot => slotLedger.entriesOfSlot(slot).map(entry => entry.options.id)),
+      subscribe: listener => {
+        const disposers = TAB_STRIP_SLOTS.map(slot => slotLedger.subscribe(slot, listener))
+        return () => disposers.forEach(dispose => dispose())
+      },
     }
 
     const deps: ShellRootDeps = {
