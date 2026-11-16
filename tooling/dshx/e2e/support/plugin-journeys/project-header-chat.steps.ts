@@ -129,7 +129,7 @@ Then('the project header plus creates in its own project without toggling collap
       await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toHaveText('Alpha project')
       expect(Schema.decodeUnknownSync(listedSchema)(await journey.call('list', {})).threads.some(thread => thread.sessionId === sessionId)).toBe(false)
       await collapsed.click()
-      await expect(row(page, sessionId)).toContainText('New chat')
+      await expect(row(page, sessionId)).toContainText('New thread')
       await openRow(page, journey.betaThread)
       await expect(row(page, sessionId)).toHaveCount(0)
       expect(creates).toEqual([])
@@ -155,7 +155,7 @@ Then('the project header plus works with keyboard activation and a narrow sideba
       const sessionId = await createFromHeader(page, create, key)
       await openThreadList(page)
       await expect(group.getByRole('button', { expanded: true })).toBeVisible()
-      await expect(row(page, sessionId)).toContainText('New chat')
+      await expect(row(page, sessionId)).toContainText('New thread')
       expect(Schema.decodeUnknownSync(listedSchema)(await journey.call('list', {})).threads.some(thread => thread.sessionId === sessionId)).toBe(false)
     }
     const longTitle = 'Beta project with a very long title that should truncate instead of hiding the new chat button'
@@ -208,7 +208,7 @@ Then('typing saves independent unsent project chats that reopen from All threads
   }
   await recordAssertion(page, 'typed-project-drafts-save-before-send', async () => {
     journey.alphaDraft = await createFromHeader(page, alphaCreate)
-    await expect(row(page, journey.alphaDraft)).toContainText('New chat')
+    await expect(row(page, journey.alphaDraft)).toContainText('New thread')
     // Whitespace remains temporary and makes no Host conversation.
     await composer(page).fill('   ')
     expect(Schema.decodeUnknownSync(listedSchema)(await journey.call('list', {})).threads.some(thread => thread.sessionId === journey.alphaDraft)).toBe(false)
