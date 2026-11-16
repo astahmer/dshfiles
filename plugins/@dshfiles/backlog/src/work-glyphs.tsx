@@ -197,7 +197,7 @@ const RunStateChip = (props: { readonly run: { readonly state: AgentRunState } |
   return (
     <WithTooltip tip={`Agent: ${runStateLabels[props.run.state]}`}>
       <span aria-label={`Agent ${runStateLabels[props.run.state].toLowerCase()}`} className={cn(chip, runStateTone[props.run.state])}>
-        <Icon aria-hidden className={cn('dshx:size-3', props.run.state === 'working' && 'dshx:animate-spin')} />
+        <Icon aria-hidden className={cn('dshx:size-3', props.run.state === 'working' && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
         {props.compact === true ? null : runStateLabels[props.run.state]}
       </span>
     </WithTooltip>
