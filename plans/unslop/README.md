@@ -5,9 +5,8 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1, 4 and 7 are done and step 2 is half done (transcript half). Still running on 2026-11-16:
-the thread list and header lane (rest of step 2, step 3) and the follow-ups listed under
-[Transcript lane](#transcript-lane) and [Settings lane](#settings-lane). Steps 5, 6 and 8–14 are not dispatched. See
+**Resume here:** steps 1, 2, 4 and 7 are done and step 3 is half done (the tab strips are open). Open follow-ups are
+listed under [Thread lane](#thread-lane) and [Settings lane](#settings-lane). Steps 5, 6 and 8–14 are open. See
 [Work list](#work-list).
 
 ## Method and limits
@@ -191,8 +190,8 @@ before and passes after; see each revision's description for the reason.
 | Step | Work                                                                                                                                                  | Findings          | Size   |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------ |
 | 1 ✅ | Composer menus: the card no longer clips (WebKit paints the lists again) and native menus are opaque. Probed in Playwright WebKit 26.0 and Chromium at 390 px before and after; not yet re-checked on the iPhone. | U1, U2 | small |
-| 2 ◐  | Deletions on the main surface: hide "Context injection" rows, stop the timing overlay on card headers, one header `⋯` with Copy link and Pin inside it, one `⋯` instead of the row hover strip. Done: U3, N5. Open: N3, N4 (thread lane). | U3, N3, N4, N5 | small |
-| 3    | Tab strips use the shared status glyph; one projection for working and needs-you counts; failed stays Failed.                                          | N1, N2, M5, N7    | medium |
+| 2 ✅ | Deletions on the main surface: "Context injection" rows hidden, no timing overlay on card headers, one header `⋯` holding Copy link, Pin and the native More actions, one verb plus `⋯` on row hover. | U3, N3, N4, N5 | small |
+| 3 ◐  | Tab strips use the shared status glyph; one projection for working and needs-you counts; failed stays Failed. Done: N2, M5 (see [Thread lane](#thread-lane)). Open: N1 and N7 in main-tabs and workbench. | N1, N2, M5, N7 | medium |
 | 4 ✅ | Failure card: one sentence, one Retry, "Ask to fix" in the same row, code and payload under Details. No "Compact and retry": the over-long sentence names `/compact`. | M4 | medium |
 | 5    | Inbox question items render the question's own options; "Answer" lands on an answerable card; phone question card gets one scroll.                     | M1, M2, M3, M8    | medium |
 | 6    | A primary "Land" in the header and as the row's inline verb when there is work to land; settle what the "+N −N" chip counts.                           | M6, M7            | medium |
@@ -219,20 +218,61 @@ Deliberate differences from the audit's proposals:
 - The walkthrough is offered only when it says more than the file chips; the three-line rewrite was not done.
 - "Since you left" is hidden for a single unseen turn.
 
-Open in this lane:
+Follow-ups, closed in three more revisions (`yospzvntmxrq`, `pvkyoyovrmzw`, `wqkpnmmsqkxo`):
 
-- Journeys re-run after the last lint fold-ins; `test-runs.card` and a background-jobs board scenario fail and are
-  not yet proven to fail at the base.
-- tool-meta's committed screenshot shows the old timing format.
-- The summary line still marks one failure with two red segments.
-- Dark theme and WebKit were not looked at.
+- Journeys on the final tip, forced: chat 11 of 11, tool-meta 5 of 5, agent-plan 5 of 5, turn-summary 2 of 2.
+- `test-runs.card` and two background-jobs scenarios (`board-browser-journey`, `transcript-job-preview`) fail at the
+  base revision too; the last one passes with this lane's step fix.
+- The summary line spends one red part on a failure ("2 of 8 tests failed ›") and puts no separator after a chevron.
+- tool-meta's screenshot and catalog text describe the new timing format.
+- Dark theme looked at for the failure card, work fold, test card and summary line: nothing to fix.
+
+Not looked at: WebKit.
 
 Outside the lane, not started: the job strip titled by its shell command (background-jobs), the duplicate "Ask
 question" row (tool-ask-user, user-questions), the green check on `ToolCard` (plugin-ui), the stalled-stream advice
-verb and route id (ai-accounts), the edited-file card with a coloured tile (owner not identified).
+verb and route id (ai-accounts), the "Edited N files" card with a coloured tile (deliverables).
 
 Host-side settings text changed in chat, tool-meta, agent-plan and turn-summary, so a running instance shows those
 only after a restart.
+
+## Thread lane
+
+20 revisions (`ulsmquzryowl` … `kxsumpqpzxmu`) in thread-sidebar, plus two in rich-composer for the header. Each has a
+test that failed before and passes after.
+
+- A failed thread stays Failed (red cross, "Turn failed") in the Needs you group after it is read.
+- The group header, the status-strip item and the filter preset read one working count.
+- Row hover keeps the title and shows one verb plus `⋯`; needs-you rows give the title the first line.
+- The header has one `⋯`. Copy link and Pin are rows of it, and so are the native More actions: rich-composer reads
+  them through the Host's context-menu service, so no core patch was needed. Without thread-sidebar the native button
+  stays.
+- The title flexes to the status chip; a thread waiting on a question shows the Needs you glyph in the header.
+- Update and Restart are one status-strip item with a next step; Restart is off the rail by default behind a new
+  "Show Restart DSH on the rail" setting.
+
+Deliberate differences: Failed has no inline Retry on the row; the default hover verb is still labelled "Settle"; a
+user who saved a choice of hover actions keeps it; a header narrower than 36rem keeps the old title cap.
+
+Not done:
+
+- A thread with a running background job is not Working: thread-sidebar has no per-thread job signal
+  (background-jobs would have to expose one).
+- The unsent draft is renamed "New thread" but still counted under Idle (a journey asserts it is listed).
+- A pending approval still shows the working spinner in the header.
+- The row menu still has 18 entries and says Settle, Park and Archive. Proposed, not built: Done, Restore and Snooze
+  in labels only, and about 8 entries grouped under Open in, Copy and More.
+- The indigo dots on filter presets follow the user's attention-colour setting and were left.
+
+Unverified:
+
+- `pnpm check:e2e thread-sidebar`: 43 passed, 18 failed. 14 of the 18 fail at the base too; the other 4 pass after
+  step fixes, one of them (`remote-row-verbs`) only on a third try. No full run after the last fixes.
+- `row-verb-clear-of-hover-actions` has not passed; the 1 px clearance was measured by hand in a scratch instance.
+- Phone and touch layout of the changed row; the subagent row title and the Ready state were never seen rendered.
+
+The Host half of thread-sidebar changed (failed turns, live-turn flag), so a running instance shows the failed and
+Needs you fixes only after a restart. Onboarding still says "Restart DSH (bottom of the sidebar)".
 
 ## Settings lane
 
