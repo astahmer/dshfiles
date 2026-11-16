@@ -147,6 +147,7 @@ export default defineClient({
             key={options.scope}
             scope={options.scope}
             defaultPath={options.defaultPath ?? null}
+            currentProjectPath={options.currentProjectPath ?? null}
             surface={options.surface}
             visible={options.visible ?? true}
             {...(options.view === undefined ? {} : { view: options.view })}
@@ -210,11 +211,11 @@ export default defineClient({
     const MainSurfacePanel = decorate((props: PropsRuntime<'main'>) => {
       const scope = useActiveJujutsuScope()
       const visible = SurfaceVisibility.useMainPanelVisible({ usePanelInfo: props.usePanelInfo, panelId: PANEL_ID })
-      return panel({ surface: 'main', scope, visible, view: 'graph', defaultPath: currentProjectPath() })
+      return panel({ surface: 'main', scope, visible, view: 'graph', currentProjectPath: currentProjectPath() })
     })
     const MainSourceControlPanel = decorate((props: PropsRuntime<'main'>) => {
       const visible = SurfaceVisibility.useMainPanelVisible({ usePanelInfo: props.usePanelInfo, panelId: SOURCE_CONTROL_PANEL_ID })
-      return panel({ surface: 'main', scope: DEFAULT_PANEL_SCOPE, visible, view: 'source', defaultPath: currentProjectPath() })
+      return panel({ surface: 'main', scope: DEFAULT_PANEL_SCOPE, visible, view: 'source', currentProjectPath: currentProjectPath() })
     })
     const SideSurfacePanel = decorate((props: PropsRuntime<'sidebar.right.pane.tab'>) => {
       const target = useMountedSession()
@@ -222,13 +223,13 @@ export default defineClient({
       return panel({ surface: 'side-panel', scope: target.scope, sessionId: target.sessionId, defaultPath: target.defaultPath, visible })
     })
     const DockSurfacePanel = decorate((props: WorkbenchPanelProps) =>
-      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'graph', defaultPath: currentProjectPath() }),
+      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'graph', currentProjectPath: currentProjectPath() }),
     )
     const DockSourceControlPanel = decorate((props: WorkbenchPanelProps) =>
-      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'source', defaultPath: currentProjectPath() }),
+      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'source', currentProjectPath: currentProjectPath() }),
     )
     const ScopedWorkbenchPanel = decorate((props: WorkbenchPanelProps & { readonly scope: string }) =>
-      panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph', defaultPath: currentProjectPath() }),
+      panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph', currentProjectPath: currentProjectPath() }),
     )
     ctx.effect(() => PanelScopes.listen(), 'dshfiles-jujutsu: the scope each main tab shows')
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: HistoryPage.titles.graph }, PanelGlyph))
@@ -471,6 +472,8 @@ interface SurfacePanelOptions {
   readonly surface: 'main' | 'side-panel' | 'dock'
   readonly scope: string
   readonly defaultPath?: string | null
+  /** The project of the thread last on screen: where a page opens when it remembers no repository of its own. */
+  readonly currentProjectPath?: string | null
   readonly visible?: boolean | undefined
   /** Omitted only on the narrow side panel, which switches between both views with tabs. */
   readonly view?: 'graph' | 'source'

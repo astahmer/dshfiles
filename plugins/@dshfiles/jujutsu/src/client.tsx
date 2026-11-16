@@ -144,6 +144,8 @@ interface JujutsuPanelProps {
   readonly scope: string
   /** The repository to open when this scope remembers none (a thread's own project). */
   readonly defaultPath?: string | null
+  /** A page's fallback when it remembers no repository: the project of the thread last on screen. Never overrides a remembered or last-opened repository. */
+  readonly currentProjectPath?: string | null
   readonly projects: readonly RegisteredProject[]
   readonly directoryPicker: DirectoryPickerPort
   readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
@@ -611,10 +613,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     if (selectedPath.length === 0) return
     sendRegistration({ type: 'register', path: selectedPath })
   }, [path, sendRegistration])
-  // A2 #36 (unslop): a page nobody chose a project on opens the current project (else the first registered one), so
-  // its empty prompt shows only when there is no project at all. Panels keep their own rule: a thread panel follows
-  // its thread.
-  const pageDefaultPath = HistoryPage.defaultProjectPath({ currentProjectPath: props.defaultPath ?? null, projects: props.projects })
+  // A2 #36 (unslop): a page that remembers no repository (its own pick, then the last one opened anywhere) opens the
+  // current project, else the first registered one, so its empty prompt shows only when there is no project at all.
+  // The per-thread side panel keeps its own rule: it follows its thread.
+  const pageDefaultPath = HistoryPage.defaultProjectPath({ currentProjectPath: props.currentProjectPath ?? null, projects: props.projects })
   useEffect(() => {
     if (sidePanel || path.trim().length > 0 || pageDefaultPath === undefined) return
     setPath(pageDefaultPath)
