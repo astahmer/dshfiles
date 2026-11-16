@@ -517,14 +517,17 @@ Then('the Models section renders the owned fork instead of a placeholder', async
 
 When('the Web search plugin page is opened in Settings', async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, 'Plugins')
-  await page.getByRole('button', { name: 'View Web search', exact: true }).click()
+  // The fork titles its Plugins row "Web search and fetch" (settings-web-search/src/native/locales.ts).
+  await page.getByRole('button', { name: 'View Web search and fetch', exact: true }).click()
 })
 
 Then('the Web search page renders the owned fork instead of a placeholder', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'settings-web-search-page-renders-the-fork', async () => {
-    await expect(page.getByRole('heading', { name: 'Web search', exact: true }).first()).toBeVisible()
-    await expect(page.getByText('Set up the DeepSeek search provider.')).toBeVisible()
-    await expect(page.getByRole('textbox', { name: 'API key' })).toBeVisible()
+    // The fork's page as it renders today: its own title and description, then one provider choice per capability.
+    await expect(page.getByRole('heading', { name: 'Web search and fetch', exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Choose the providers web search and web fetch use.')).toBeVisible()
+    await expect(page.getByText('Web search provider', { exact: true })).toBeVisible()
+    await expect(page.getByText('Web fetch provider', { exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
