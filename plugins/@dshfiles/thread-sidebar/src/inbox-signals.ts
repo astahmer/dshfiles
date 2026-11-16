@@ -21,6 +21,7 @@ const signalsOf = (items: readonly AttentionItem[]): ReadonlyMap<string, InboxTh
     const verb = INLINE_VERBS.find((candidate: InlineVerb) => item.verbs.includes(candidate))
     const next: InboxThreadSignal = {
       itemId: item.id,
+      source: item.source,
       severity,
       reason: item.reason,
       verb,
