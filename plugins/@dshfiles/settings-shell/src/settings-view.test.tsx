@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
+import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsGroups } from './settings-groups.js'
 import { SettingsTab, type SettingsViewProps } from './settings-view.js'
 
@@ -150,6 +151,25 @@ describe('settings view: one title per entry', () => {
       },
     })
     expect(headings).toEqual(['theme:none', 'fonts:section'])
+    view.unmount()
+  })
+})
+
+describe('settings view: search counts', () => {
+  it('counts each matching setting once on its navigation row', () => {
+    // SAFETY: search reads only the key, path, title and description of a field.
+    const field = { key: 'maxTabs', path: ['maxTabs'], title: 'Max tabs', description: '', groups: [] } as unknown as SettingField
+    const example: PluginSettingsPage = {
+      pageId: 'plugin:example',
+      ns: 'example',
+      title: 'Example',
+      description: '',
+      group: 'plugins',
+      fields: [field],
+      modifiedPaths: [],
+    }
+    const view = mount({ groups: SettingsGroups.group({ sections: rows, pages: [example], panels: new Set() }), pluginPages: [example], query: 'max tabs' })
+    expect(view.host.querySelector('[data-nav-id="plugin:example"]')?.textContent).toBe('Example1')
     view.unmount()
   })
 })
