@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -24,18 +25,17 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@dshfiles/plugin-ui/components/ui/table'
 import { BellIcon, BellOffIcon, EllipsisIcon, PlayIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { TraceFormat } from '../format.js'
 import { AlertRuleDialog, AlertRuleLabels } from './alert-rule-dialog.js'
 import type { AlertEvent, AlertRule, AlertRuleDraft, AlertRuleView, AlertSeverity } from './alert-types.js'
 import { tracesAlertsApi } from './alerts-api.js'
 import type { TracesAlertsTranslate } from './alerts-locale.js'
 import { alertsKeys, alertsOwnerMissing, alertsQueries, useAlertsFeed } from './alerts-queries.js'
+import { AlertsOnScreen } from './alert-announcements.js'
 
 const numeric = 'dshx:text-right dshx:font-mono dshx:text-xs'
 
-const severityVariant = (severity: AlertSeverity): 'destructive' | 'warning' | 'info' =>
-  severity === 'critical' ? 'destructive' : severity === 'warning' ? 'warning' : 'info'
 
 const severityLabel = (severity: AlertSeverity, t: TracesAlertsTranslate): string =>
   severity === 'critical' ? t('severityCritical') : severity === 'warning' ? t('severityWarning') : t('severityInfo')
@@ -111,14 +111,13 @@ class AlertBadges {
       </Badge>
     ) : null
 
-  static readonly status = (rule: AlertRuleView, t: TracesAlertsTranslate): JSX.Element =>
+  /** The shared glyph: nothing for a healthy rule, stopped for one turned off, failed while it fires. */
+  static readonly status = (rule: AlertRuleView, t: TracesAlertsTranslate): JSX.Element | null =>
     !rule.enabled ? (
-      <Badge variant="muted">{t('statusOff')}</Badge>
+      <StatusGlyph status="stopped" label={t('statusOff')} data-rule-state="off" />
     ) : rule.state.status === 'firing' ? (
-      <Badge variant="destructive">{t('statusFiring')}</Badge>
-    ) : (
-      <Badge variant="success">{t('statusOk')}</Badge>
-    )
+      <StatusGlyph status="failed" label={t('statusFiring')} data-rule-state="firing" />
+    ) : null
 }
 
 const ThreadLinks = (props: {
@@ -168,8 +167,9 @@ const FiringList = (props: {
             className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-destructive/40 dshx:bg-destructive/5 dshx:p-3"
           >
             <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
-              <Badge variant={severityVariant(rule.severity)}>{severityLabel(rule.severity, t)}</Badge>
+              <StatusGlyph status="failed" label={t('statusFiring')} />
               <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{rule.name}</span>
+              <span className="dshx:text-xs dshx:text-muted-foreground">{severityLabel(rule.severity, t)}</span>
               <span className="dshx:font-mono dshx:text-xs dshx:text-destructive">{formatValue(rule, rule.state.value)}</span>
               <span className="dshx:text-xs dshx:text-muted-foreground">{conditionOf(rule, t)}</span>
               {AlertBadges.muted(rule, props.now, t)}
@@ -229,22 +229,16 @@ const RulesTable = (props: {
             <TableCell className="dshx:max-w-0">
               <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                  <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{rule.name}</span>
                   {AlertBadges.status(rule, t)}
-                  {rule.builtin ? (
-                    <Badge variant="outline" className="dshx:@max-pane-narrow:hidden">
-                      {t('builtin')}
-                    </Badge>
-                  ) : null}
+                  <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{rule.name}</span>
+                  {rule.builtin ? <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{t('builtin')}</span> : null}
                   {AlertBadges.muted(rule, props.now, t)}
                 </span>
                 <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{filterOf(rule, t)}</span>
               </div>
             </TableCell>
             <TableCell className="dshx:text-xs dshx:@max-pane-compact:hidden">{conditionOf(rule, t)}</TableCell>
-            <TableCell className="dshx:text-right">
-              <Badge variant={severityVariant(rule.severity)}>{severityLabel(rule.severity, t)}</Badge>
-            </TableCell>
+            <TableCell className="dshx:text-right dshx:text-xs dshx:text-muted-foreground">{severityLabel(rule.severity, t)}</TableCell>
             <TableCell className={numeric}>{rule.enabled ? formatValue(rule, rule.state.value) : '—'}</TableCell>
             <TableCell>
               <DropdownMenu>
@@ -297,9 +291,8 @@ const HistoryList = (props: {
             className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:py-2 dshx:text-xs"
           >
             <span className="dshx:w-20 dshx:shrink-0 dshx:font-mono dshx:text-muted-foreground">{TraceFormat.clock(event.at)}</span>
-            <Badge variant={event.kind === 'firing' ? severityVariant(event.severity) : 'success'}>
-              {event.kind === 'firing' ? t('eventFiring') : t('eventResolved')}
-            </Badge>
+            <StatusGlyph status={event.kind === 'firing' ? 'failed' : 'done'} decorative />
+            <span className="dshx:shrink-0 dshx:text-muted-foreground">{event.kind === 'firing' ? t('eventFiring') : t('eventResolved')}</span>
             <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{event.ruleName}</span>
             <span className="dshx:font-mono dshx:text-muted-foreground">{rule === undefined ? event.value : formatValue(rule, event.value)}</span>
             {event.reason === 'threshold' ? null : (
@@ -339,6 +332,11 @@ export const AlertsView = (props: {
   })
   const remove = useMutation({ mutationFn: (id: string) => client.remove({ id, confirm: true }), onSuccess: invalidate })
   const evaluate = useMutation({ mutationFn: () => client.evaluate({}), onSuccess: invalidate })
+  const unregisterOnScreen = useRef<(() => void) | null>(null)
+  const registerOnScreen = useCallback((element: HTMLDivElement | null) => {
+    unregisterOnScreen.current?.()
+    unregisterOnScreen.current = element === null ? null : AlertsOnScreen.register(element)
+  }, [])
 
   if (stateQuery.isError)
     return (
@@ -357,7 +355,7 @@ export const AlertsView = (props: {
   if (snapshot === undefined) return <p className="dshx:text-sm dshx:text-muted-foreground">…</p>
   const mutationError = [save, mute, remove, evaluate].find(mutation => mutation.isError)?.error
   return (
-    <div className="dshx:flex dshx:flex-col dshx:gap-4" data-testid="traces-alerts-view" data-firing={snapshot.firing}>
+    <div ref={registerOnScreen} className="dshx:flex dshx:flex-col dshx:gap-4" data-testid="traces-alerts-view" data-firing={snapshot.firing}>
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
         <p className="dshx:min-w-0 dshx:max-w-prose dshx:text-sm dshx:text-muted-foreground">{t('alertsSubtitle')}</p>
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">

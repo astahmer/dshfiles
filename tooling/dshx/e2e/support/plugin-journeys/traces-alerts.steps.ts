@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
+import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
 
 /** Opens one of the Traces views kept under More views (Service map, Metrics, Operations, Errors, Boards). */
 const openMoreTracesView = async (page: Page, name: string): Promise<void> => {
@@ -38,8 +39,12 @@ When('an error-rate alert rule for {string} is created in the Alerts tab', async
   await recordAssertion(page, 'traces-alerts-rule-created', () => expect(ruleRow(page, RULE_NAME)).toHaveAttribute('data-status', 'ok'))
 })
 
-When('the alert rules are evaluated now', async ({ page }: { page: Page }) => {
-  await alertsView(page).getByRole('button', { name: 'Evaluate now' }).click()
+When('the alert rules are evaluated while the Traces tab is shown', async ({ page }: { page: Page }) => {
+  // The Alerts view already shows what fires, so the announcer stays quiet there: evaluate from another view.
+  await page.getByRole('tab', { name: 'Traces', exact: true }).click()
+  await expect(alertsView(page)).toHaveCount(0)
+  const call = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/traces', apiId: 'traces-alerts', version: 1 })
+  await call('evaluate', {})
 })
 
 Then('the rule fires with its value and its sample trace', async ({ page }: { page: Page }) => {

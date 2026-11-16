@@ -37,6 +37,9 @@ export const tracesSettings = defineSettings({
       .max(2_000_000)
       .default(60_000)
       .description('Keep at most this many metric data points; the oldest go first.'),
+    announceResolved: Schema.boolean()
+      .default(false)
+      .description('Also announce when an alert resolves. Off: only firing alerts show a banner and a browser notification.'),
     eventLoopStallMs: Schema.natural()
       .max(10_000)
       .default(100)
