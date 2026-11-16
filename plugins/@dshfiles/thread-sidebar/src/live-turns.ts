@@ -2,6 +2,7 @@ import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer, Option, Ref, Schema, Stream } from 'effect'
 import { InflightTurns, type InflightTurn } from './inflight-turns.js'
 import { SessionEvents, type SessionEvent } from './session-events.js'
+import { ToolSteps } from './tool-steps.js'
 
 /**
  * What a running turn is doing right now, for the thread list's live activity line (polish pass b:r4et): when the turn
@@ -42,8 +43,7 @@ const clip = (text: string): string => {
 
 const basename = (path: string): string => path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
 
-/** `mcp__dsh__bash` and `bash` are the same tool to a reader. */
-const toolName = (name: string): string => (name.split('__').at(-1) ?? name).toLowerCase()
+const { toolName, EDIT_TOOLS, SHELL_TOOLS, QUESTION_TOOL, FIXED_STEPS } = ToolSteps
 
 /** The few argument fields the activity line reads; every other field of a tool's input is ignored. */
 const callArgumentsSchema = Schema.Struct({
@@ -75,32 +75,12 @@ const stringField = (args: CallArguments, ...keys: readonly ArgumentKey[]): stri
   return undefined
 }
 
-const EDIT_TOOLS = new Set(['edit', 'write', 'apply_patch', 'editor_write', 'str_replace_editor', 'multiedit', 'notebookedit'])
-const SHELL_TOOLS = new Set(['bash', 'shell', 'pwsh', 'powershell', 'terminal', 'exec', 'multi_host_exec'])
-
 /** One tool call in words, and the turn's edited files after it. */
 interface CallStep {
   readonly step: string
   readonly edited: readonly string[]
   readonly needsYou: boolean
 }
-
-/** The call that stops a turn until the user answers it. */
-const QUESTION_TOOL = 'ask_user_question'
-
-const FIXED_STEPS = new Map<string, string>([
-  ['grep', 'Searching'],
-  ['glob', 'Searching'],
-  ['find_threads', 'Searching'],
-  ['memory_search', 'Searching'],
-  ['web_search', 'Searching the web'],
-  ['web_fetch', 'Reading a web page'],
-  ['subagent', 'Delegating to a subagent'],
-  ['subagent_fork', 'Delegating to a subagent'],
-  ['workflow', 'Delegating to a subagent'],
-  [QUESTION_TOOL, 'Asking you a question'],
-  ['todo_write', 'Planning'],
-])
 
 const describeCall = (state: TurnState, name: string, args: CallArguments): CallStep => {
   const tool = toolName(name)
@@ -119,7 +99,7 @@ const describeCall = (state: TurnState, name: string, args: CallArguments): Call
     const path = stringField(args, 'file_path', 'path')
     return unchanged(path === undefined ? 'Reading a file' : `Reading ${clip(basename(path))}`)
   }
-  return unchanged(FIXED_STEPS.get(tool) ?? `Using ${clip(tool.replaceAll('_', ' '))}`)
+  return unchanged(FIXED_STEPS.get(tool) ?? ToolSteps.usingWords(tool))
 }
 
 /** Fold one Session event into the live turns; every other event leaves the state as it is (same reference). */

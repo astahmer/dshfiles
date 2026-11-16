@@ -3026,7 +3026,7 @@ Then('the composer dock reports the working subagent and what it runs', async ({
   await recordAssertion(page, 'thread-sidebar-subagent-preview-working', async () => {
     await expect(row).toHaveAttribute('data-state', 'working', { timeout: 45_000 })
     await row.getByRole('button', { name: /^Show or hide the progress of / }).click()
-    await expect(row.locator('[data-dshfiles-live-preview-progress]')).toContainText('In bash', { timeout: 30_000 })
+    await expect(row.locator('[data-dshfiles-live-preview-progress]')).toContainText('Running a command', { timeout: 30_000 })
   })
 })
 

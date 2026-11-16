@@ -4314,7 +4314,7 @@
         "press Enter",
         "expect region \"Working subagents\"",
         "click button \"Show or hide the progress of *\"",
-        "expect text \"In bash*\""
+        "expect text \"Running a command*\""
       ],
       "surfaces": ["client"],
       "surface": "transcriptCard",
