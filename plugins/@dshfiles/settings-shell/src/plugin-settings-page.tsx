@@ -22,8 +22,9 @@ export const PageViewMemoryProvider = (props: { readonly children: ReactNode }):
 /**
  * One plugin's settings: its title, description and every visible field, as the form or as its overrides in JSON.
  * Nested under an entry that already has a heading (a section with merged plugin settings), the title becomes a
- * subheading. The scope line is read-only: no plugin setting stores per-project or per-thread values today, so the page
- * says where it applies instead of offering a control it cannot honour. The JSON editor stays mounted while the form
+ * subheading. There is no scope line: no plugin setting stores per-project or per-thread values today, so every page
+ * applies everywhere and saying so on each one is noise; a scope caption returns with the first namespace that stores
+ * a narrower scope. The JSON editor stays mounted while the form
  * shows, so switching views keeps an unsaved draft. A focused field opens in the view showing: the form scrolls to its
  * row, the JSON editor selects its key.
  */
@@ -33,7 +34,7 @@ export const PluginSettingsPageView = (props: {
   readonly t: ShellTranslate
   readonly focusPath?: readonly string[]
   readonly nested?: boolean
-  /** The plugin entry behind the page, drawn under its scope line. */
+  /** The plugin entry behind the page, drawn under its description. */
   readonly entry?: ReactNode
 }): JSX.Element => {
   const memory = useContext(PageViewMemory)
@@ -71,7 +72,6 @@ export const PluginSettingsPageView = (props: {
         </ToggleGroup>
       </div>
       {props.page.description !== '' && <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">{props.page.description}</p>}
-      {props.nested !== true && <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground/80">{props.t('entry.scope')}</p>}
       {props.entry}
       <div className="dshx:mt-3" hidden={view !== 'form'}>
         <SettingsForm

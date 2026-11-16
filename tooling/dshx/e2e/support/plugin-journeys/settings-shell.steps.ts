@@ -242,7 +242,9 @@ const jsonDocumentSchema = Schema.fromJsonString(Schema.Record(Schema.String, Sc
 Then('the Max tabs row says it is an override that inherits {int}', async ({ page }: { page: Page }, value: number) => {
   await recordAssertion(page, 'settings-shell-row-source', async () => {
     await expect(settingRow(page, 'maxTabs').locator('[data-setting-source="user"]')).toHaveText(`Override · inherits ${String(value)}`)
-    await expect(settingRow(page, 'enabled').locator('[data-setting-source]')).toHaveText('Default')
+    // A value that is the default carries no source line and no config key: only rows that differ say why.
+    await expect(settingRow(page, 'enabled').locator('[data-setting-source]')).toHaveCount(0)
+    await expect(settingRow(page, 'enabled').locator('code')).toHaveCount(0)
   })
 })
 

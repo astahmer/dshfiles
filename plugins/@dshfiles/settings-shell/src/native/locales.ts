@@ -10,7 +10,6 @@ export const SHELL_LOCALE_NAMESPACE = 'dshfiles.settings-shell'
 // Keys this plugin adds on top of the port.
 const shellEn = {
   'palette.open': 'Open Settings',
-  'entry.scope': 'Applies to every project and thread.',
   'entry.open': 'Open {page}',
   'entry.opensPage': 'This page has its own place in the stage.',
   'entry.jevMoved': 'Jev settings for {page} are in Tools & MCP › Jev.',
@@ -130,7 +129,6 @@ const shellEn = {
 
 const shellZh = {
   'palette.open': '打开设置',
-  'entry.scope': '适用于所有项目和线程。',
   'entry.open': '打开{page}',
   'entry.opensPage': '此页面在主区域中有自己的位置。',
   'entry.jevMoved': '{page} 的 Jev 设置位于“工具与 MCP › Jev”。',

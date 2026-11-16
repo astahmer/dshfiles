@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
@@ -31,6 +32,18 @@ const MAX_PREVIEW = 40
 const valuePreview = (value: JsonValue): string => {
   const text = JSON.stringify(value) ?? ''
   return text.length > MAX_PREVIEW ? `${text.slice(0, MAX_PREVIEW - 1)}…` : text
+}
+
+/** How long the pointer rests on a setting's name before its config key shows. */
+const KEY_TOOLTIP_DELAY_MS = 600
+
+/** A value that is the schema default needs no caption: the source line is for the rows that differ. */
+const showsSource = (provenance: SettingProvenance): boolean => provenance.source !== 'default'
+
+/** A search that matched the config key shows it, so the highlighted match is on screen. */
+const keyMatches = (key: string, query: string | undefined): boolean => {
+  const needle = query?.trim().toLowerCase() ?? ''
+  return needle !== '' && key.toLowerCase().includes(needle)
 }
 
 /** Where the row's value comes from, in words: no colour carries the meaning. */
@@ -504,6 +517,9 @@ const SettingRow = (props: {
     void props.reset(field)
   }
   const block = isBlockControl(field.control)
+  const key = field.path.join('.')
+  const keyShown = keyMatches(key, props.highlight)
+  const sourceShown = showsSource(props.provenance)
   const control = <SettingControlInput control={field.control} disabled={props.disabled} label={field.title} onChange={save} t={props.t} value={props.value} />
   return (
     <div
@@ -515,19 +531,21 @@ const SettingRow = (props: {
       data-setting-path={field.path.join('.')}
       ref={row}
     >
-      {props.modified && (
-        <span
-          aria-hidden="true"
-          className="dshx:absolute dshx:inset-y-3 dshx:-left-3 dshx:w-0.5 dshx:rounded-full dshx:bg-info"
-          title={props.t('form.modified')}
-        />
-      )}
+      {props.modified && <span aria-hidden="true" className="dshx:absolute dshx:inset-y-3 dshx:-left-3 dshx:w-0.5 dshx:rounded-full dshx:bg-info" />}
       <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-6">
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
           <span className="dshx:flex dshx:min-h-5 dshx:items-center dshx:gap-2 dshx:text-base dshx:leading-5 dshx:text-foreground">
-            <span data-setting-label={field.path.join('.')}>
-              <Highlight query={props.highlight} text={field.title} />
-            </span>
+            {/* The config key stays one hover away (and in the JSON view); it is not a line of every row. */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span data-setting-label={key}>
+                  <Highlight query={props.highlight} text={field.title} />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="dshx:font-mono" side="top">
+                {key}
+              </TooltipContent>
+            </Tooltip>
             {props.modified && <span className="dshx:sr-only">{props.t('form.modified')}</span>}
             {props.modified && (
               <Button
@@ -548,12 +566,16 @@ const SettingRow = (props: {
               <Highlight query={props.highlight} text={field.description} />
             </span>
           )}
-          <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2 dshx:text-2xs dshx:text-muted-foreground/80">
-            <code className="dshx:font-mono">
-              <Highlight query={props.highlight} text={field.path.join('.')} />
-            </code>
-            <span data-setting-source={props.provenance.source}>{sourceText(props.provenance, props.t)}</span>
-          </span>
+          {(keyShown || sourceShown) && (
+            <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2 dshx:text-2xs dshx:text-muted-foreground/80">
+              {keyShown && (
+                <code className="dshx:font-mono">
+                  <Highlight query={props.highlight} text={key} />
+                </code>
+              )}
+              {sourceShown && <span data-setting-source={props.provenance.source}>{sourceText(props.provenance, props.t)}</span>}
+            </span>
+          )}
         </div>
         {!block && <div className="dshx:shrink-0">{control}</div>}
       </div>
@@ -613,35 +635,37 @@ export const SettingsForm = (props: {
   const focusKey = props.focusPath?.join('.')
   if (values === undefined) return <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace} />
   return (
-    <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace}>
-      {snapshot.status === 'unavailable' && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.unavailable')}</p>}
-      {snapshot.status === 'ready' && !snapshot.writable && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.readOnly')}</p>}
-      {props.fields.map((field, index) => {
-        const outcome = outcomes.get(field.path.join('.'))
-        const edit = outcome?.status === 'saving' ? outcome.edit : undefined
-        const group = field.groups.join(' › ')
-        const previous = props.fields[index - 1]?.groups.join(' › ')
-        return (
-          <Fragment key={field.path.join('.')}>
-            {group !== '' && group !== previous && (
-              <h4 className="dshx:mt-4 dshx:text-xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">{group}</h4>
-            )}
-            <SettingRow
-              disabled={disabled}
-              field={field}
-              focused={focusKey === field.path.join('.')}
-              highlight={props.highlight}
-              modified={edit === undefined ? user !== undefined && SettingsSchemaModel.hasValueAt(user, field.path) : edit.kind === 'set'}
-              provenance={SettingProvenanceModel.of({ field, value: values, base, user })}
-              refused={outcome?.status === 'refused'}
-              reset={reset}
-              t={props.t}
-              value={displayedValue({ edit, field, values, base })}
-              write={write}
-            />
-          </Fragment>
-        )
-      })}
-    </div>
+    <TooltipProvider delayDuration={KEY_TOOLTIP_DELAY_MS}>
+      <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace}>
+        {snapshot.status === 'unavailable' && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.unavailable')}</p>}
+        {snapshot.status === 'ready' && !snapshot.writable && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.readOnly')}</p>}
+        {props.fields.map((field, index) => {
+          const outcome = outcomes.get(field.path.join('.'))
+          const edit = outcome?.status === 'saving' ? outcome.edit : undefined
+          const group = field.groups.join(' › ')
+          const previous = props.fields[index - 1]?.groups.join(' › ')
+          return (
+            <Fragment key={field.path.join('.')}>
+              {group !== '' && group !== previous && (
+                <h4 className="dshx:mt-4 dshx:text-xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">{group}</h4>
+              )}
+              <SettingRow
+                disabled={disabled}
+                field={field}
+                focused={focusKey === field.path.join('.')}
+                highlight={props.highlight}
+                modified={edit === undefined ? user !== undefined && SettingsSchemaModel.hasValueAt(user, field.path) : edit.kind === 'set'}
+                provenance={SettingProvenanceModel.of({ field, value: values, base, user })}
+                refused={outcome?.status === 'refused'}
+                reset={reset}
+                t={props.t}
+                value={displayedValue({ edit, field, values, base })}
+                write={write}
+              />
+            </Fragment>
+          )
+        })}
+      </div>
+    </TooltipProvider>
   )
 }
