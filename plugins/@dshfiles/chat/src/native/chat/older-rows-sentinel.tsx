@@ -15,7 +15,10 @@ export function OlderRowsSentinel({ listRef, hidden, onVisible, fillSteps }: {
   // Observed again after every step: a step that still leaves the sentinel in view must take the next one.
   useEffect(() => {
     const target = ref.current
-    const list = listRef.current
+    // A shared conversation scrollport (the phone layout) scrolls instead of the list, as in ChatViewport.attach: the
+    // list then never scrolls and always measures as an unfilled tail, so it can neither see the reader move up nor
+    // stop the opening fill steps.
+    const list = listRef.current?.closest<HTMLElement>('[data-conversation-scroll]') ?? listRef.current
     if (target === null || list === null || typeof IntersectionObserver !== 'function') return
     let near = false
     let fired = false

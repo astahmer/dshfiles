@@ -60,3 +60,50 @@ describe('older rows on a transcript that does not fill the view', () => {
     expect(sentinel.calls()).toBe(0)
   })
 })
+
+/** Fixes a box's layout, which jsdom does not compute. */
+const layOut = (element: HTMLElement, box: { scrollHeight: number; clientHeight: number; scrollTop: number }): void => {
+  Object.defineProperty(element, 'scrollHeight', { configurable: true, value: box.scrollHeight })
+  Object.defineProperty(element, 'clientHeight', { configurable: true, value: box.clientHeight })
+  Object.defineProperty(element, 'scrollTop', { configurable: true, writable: true, value: box.scrollTop })
+}
+
+/** The phone layout: the list grows with its rows inside a shared conversation scrollport that scrolls instead. */
+const renderInScrollport = (fillSteps: number) => {
+  const scrollport = document.createElement('div')
+  scrollport.setAttribute('data-conversation-scroll', '')
+  const list = document.createElement('div')
+  scrollport.append(list)
+  document.body.append(scrollport)
+  layOut(scrollport, { scrollHeight: 7000, clientHeight: 700, scrollTop: 6300 })
+  layOut(list, { scrollHeight: 6900, clientHeight: 6900, scrollTop: 0 })
+  let calls = 0
+  render(
+    <OlderRowsSentinel
+      listRef={{ current: list }}
+      hidden={0}
+      onVisible={() => {
+        calls += 1
+      }}
+      fillSteps={{ current: fillSteps }}
+    />,
+    { container: list },
+  )
+  return { scrollport, calls: () => calls }
+}
+
+describe('older rows inside a shared conversation scrollport', () => {
+  it('takes no opening fill step when the scrollport is already full', async () => {
+    const sentinel = renderInScrollport(3)
+    await act(async () => {})
+    expect(sentinel.calls()).toBe(0)
+  })
+
+  it('pages older rows when the reader scrolls the scrollport up', async () => {
+    const sentinel = renderInScrollport(0)
+    await act(async () => {})
+    sentinel.scrollport.scrollTop = 0
+    sentinel.scrollport.dispatchEvent(new Event('scroll'))
+    expect(sentinel.calls()).toBe(1)
+  })
+})
