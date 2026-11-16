@@ -51,6 +51,16 @@ describe('live activity line', () => {
     expect(glyph?.closest('[data-live-step], [data-live-elapsed]')).toBeNull()
   })
 
+  it('shows the Needs-you glyph while the thread waits on an approval, whatever its last step was', async () => {
+    // An approval is not a tool call: the turn's step still read "Running pnpm test" beside the working spinner.
+    const container = await render(<HeaderLiveSignal labels={labels} turn={{ startedAt: Date.now() - 72_000, step: 'Running pnpm test' }} waitingOnYou />)
+    const glyph = container.querySelector('[data-slot="status-glyph"]')
+    expect(glyph?.getAttribute('data-status')).toBe('needs-you')
+    expect(container.querySelector('[data-glyph-spinner]')).toBeNull()
+    expect(container.querySelector('[data-live-step]')?.textContent).toBe('Needs you')
+    expect(container.querySelector('[data-needs-you]')).not.toBeNull()
+  })
+
   it('keeps the spinner and the step for a turn that works without you', async () => {
     const container = await render(<HeaderLiveSignal labels={labels} turn={{ startedAt: Date.now() - 72_000, step: 'Running pnpm test' }} />)
     expect(container.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
