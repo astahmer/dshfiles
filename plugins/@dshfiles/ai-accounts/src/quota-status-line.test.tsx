@@ -184,10 +184,22 @@ describe('quota status line', () => {
     expect(container.querySelector('[data-quota-segment] [data-quota-account="alfred"]')).not.toBeNull()
   })
 
-  it('keeps the add and settings tools, an empty state, and an account that is off', async () => {
+  it('is one status-strip item: add and settings open from the quota popover, which names no host', async () => {
+    const container = await mount({ cards: [card('jarvis', 'Jarvis', 51)] })
+    expect(container.querySelector('[aria-label="Add AI account"]')).toBeNull()
+    expect(container.querySelector('[aria-label="AI account settings"]')).toBeNull()
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-quota-segment] button, button[aria-expanded]')?.click()
+    })
+    await flush()
+    const popover = document.body.querySelector('[aria-label="AI account usage"]')
+    expect(popover?.querySelector('[aria-label="Add AI account"]')).not.toBeNull()
+    expect(popover?.querySelector('[aria-label="AI account settings"]')).not.toBeNull()
+    expect(popover?.textContent).not.toContain('synthetic-host')
+  })
+
+  it('keeps an empty state and an account that is off', async () => {
     const empty = await mount({ cards: [] })
-    expect(empty.querySelector('[aria-label="Add AI account"]')).not.toBeNull()
-    expect(empty.querySelector('[aria-label="AI account settings"]')).not.toBeNull()
     expect(empty.textContent).toContain('Usage')
     const off = card('off', 'Spare', 42)
     const container = await mount({ cards: [{ ...off, enabled: false }] })

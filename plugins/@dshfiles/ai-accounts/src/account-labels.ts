@@ -73,3 +73,16 @@ export const connectHintFor = (kind: AccountProfile['kind']): string => {
   if (kind === 'mistral') return 'Run `vibe --setup` (Launch browser) with your Le Chat plan, or store MISTRAL_API_KEY, and the picker publishes the route.'
   return 'Set OPENCODE_API_KEY (or a shared key on the ai-accounts entry) and the route serves.'
 }
+
+/**
+ * A provider's plan as a plain name. Providers report either a name written for people ("Pro+", "ChatGPT Team"),
+ * kept as it is, or an id ("individual-pro", "pro_200"), which reads as words here: "Individual Pro", "Pro 200".
+ */
+export const planLabel = (plan: string): string => {
+  const trimmed = plan.trim()
+  if (!/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/u.test(trimmed)) return trimmed
+  return trimmed
+    .split(/[-_]/u)
+    .map(word => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(' ')
+}

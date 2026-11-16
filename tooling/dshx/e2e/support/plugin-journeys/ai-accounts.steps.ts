@@ -70,11 +70,28 @@ const moveAccountEarlier = async (page: Page, name: string): Promise<void> => {
   await page.getByRole('menuitem', { name: `Move ${name} earlier in account order`, exact: true }).click()
 }
 
+/**
+ * Add account and AI account settings open from the quota popover: the status strip is one item. A surface that
+ * still shows the tool itself (the docked usage strip) is used as it is.
+ */
+const accountTool = async (page: Page, name: 'Add AI account' | 'AI account settings') => {
+  const tool = page.getByRole('button', { name, exact: true }).first()
+  if (!(await tool.isVisible()))
+    await page
+      .getByRole('group', { name: /^AI accounts usage/ })
+      .first()
+      .getByRole('button')
+      .first()
+      .click()
+  await expect(tool).toBeVisible()
+  return tool
+}
+
 const chooseNewAccount = async (page: Page, provider: string): Promise<void> => {
   // Header and empty state intentionally share this action; the header is first.
   const add = page.getByRole('button', { name: 'Add account', exact: true }).first()
   if (await add.isVisible()) await add.click()
-  else await page.getByRole('button', { name: 'Add AI account', exact: true }).click()
+  else await (await accountTool(page, 'Add AI account')).click()
   await page
     .getByRole('dialog', { name: 'Add account', exact: true })
     .getByRole('button', { name: `${provider} account`, exact: true })
@@ -215,9 +232,8 @@ Given('the isolated account dashboard reference profile is booted', async ({ pag
 
 When('two synthetic work accounts and recorded account usage populate the dashboard', async ({ page }: { page: Page }) => {
   await startFakeCommandCode(page)
-  const accountSettings = page.getByRole('button', { name: 'AI account settings', exact: true })
-  await expect(accountSettings).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Add AI account', exact: true })).toBeVisible()
+  const accountSettings = await accountTool(page, 'AI account settings')
+  await expect(page.getByRole('button', { name: 'Add AI account', exact: true }).first()).toBeVisible()
   await accountSettings.click()
   await expect(page.getByRole('heading', { name: 'AI accounts', exact: true, level: 1 })).toBeVisible()
   await addCommandCodeAccount(page, { name: 'Command Code 1', routeSlug: 'commandcode_work', key: 'e2e-fake-key-ALPHA1' })
@@ -292,9 +308,8 @@ Then('the account dashboard reference screens fit desktop mobile and dark layout
     for (const width of [1816, 1536, 1024, 768, 480, 360]) {
       await page.setViewportSize({ width, height: 1150 })
       if (width >= 1024) {
-        const accountSettings = page.getByRole('button', { name: 'AI account settings', exact: true })
-        await expect(accountSettings).toBeVisible()
         await openGlobalPanel(page, 'AI Accounts: Usage history')
+        const accountSettings = await accountTool(page, 'AI account settings')
         await accountSettings.focus()
         await accountSettings.press('Enter')
         await expect(page.getByRole('heading', { name: 'AI accounts', exact: true, level: 1 })).toBeVisible()
@@ -487,7 +502,7 @@ When('the sidebar add-account shortcut is opened from the composer', async ({ pa
   const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill('Keep this unsent draft while connecting an account.')
   sidebarAddOrigins.set(page, page.url())
-  await page.getByRole('button', { name: 'Add AI account', exact: true }).click()
+  await (await accountTool(page, 'Add AI account')).click()
   await expect(page.getByRole('dialog', { name: 'Add account', exact: true })).toBeVisible()
 })
 
@@ -496,7 +511,7 @@ Then('account setup closes without navigating away or losing the composer draft'
     let first = true
     for (const name of ['Codex', 'Claude', 'GitHub Copilot', 'OpenCode Go', 'Command Code', 'Cursor']) {
       for (const dismissal of ['Cancel', 'Close', 'Escape']) {
-        if (!first) await page.getByRole('button', { name: 'Add AI account', exact: true }).click()
+        if (!first) await (await accountTool(page, 'Add AI account')).click()
         first = false
         const chooser = page.getByRole('dialog', { name: 'Add account', exact: true })
         await chooser.getByRole('button', { name: `${name} account`, exact: true }).click()
@@ -1042,10 +1057,10 @@ Then('the account shows the session and weekly windows the provider reports', as
   await recordAssertion(page, 'ai-accounts-quota-windows-follow-the-provider', async () => {
     await expect(page.getByRole('progressbar', { name: 'Current session remaining', exact: true })).toBeVisible()
     await expect(page.getByRole('article', { name: 'Current session: 75% left', exact: true })).toBeVisible()
-    await expect(page.getByText(/^Resets in (?:59|60) min$/u)).toBeVisible()
+    await expect(page.getByText(/^Resets in (?:59m|1h 0m)$/u)).toBeVisible()
     await expect(page.getByRole('progressbar', { name: 'Weekly limit remaining', exact: true })).toBeVisible()
     await expect(page.getByRole('article', { name: 'Weekly limit: 10% left', exact: true })).toBeVisible()
-    await expect(page.getByText(/^Resets in 2 d \d+ h$/u)).toBeVisible()
+    await expect(page.getByText(/^Resets in 2d \d+h$/u)).toBeVisible()
   })
   await recordAssertion(page, 'ai-accounts-sidebar-foot-shows-the-tightest-window', () =>
     expect(page.getByRole('button', { name: /^Command Code 1: Weekly limit: 10% left, resets in 2d \d+h$/ })).toBeVisible(),
@@ -1533,11 +1548,9 @@ Then('the sidebar tiles follow the shared priority order after reload', async ({
         .getByRole('button', { name: /^Command Code [12]:/ })
         .nth(0),
     ).toHaveAttribute('aria-label', /^Command Code 1:/)
-    expect(
-      await usageStrip(page)
-        .getByRole('button', { name: 'Add AI account', exact: true })
-        .evaluate(element => element.closest('[draggable]') === null),
-    ).toBe(true)
+    // The status strip holds no add tool (it is in the popover); a docked usage strip keeps one outside its draggable meters.
+    const addTool = usageStrip(page).getByRole('button', { name: 'Add AI account', exact: true })
+    if ((await addTool.count()) > 0) expect(await addTool.first().evaluate(element => element.closest('[draggable]') === null)).toBe(true)
     await page.reload()
     await openAccountsPanel(page)
     await expect(providerAccounts(page).getByRole('listitem').nth(0)).toContainText('Command Code 1')
@@ -1628,8 +1641,8 @@ const expectDisabledPopoverQuota = async (page: Page): Promise<void> => {
     await expect(meter).toBeVisible()
     expect(await meter.locator('[data-slot="progress-indicator"]').evaluate(element => getComputedStyle(element).backgroundColor)).toBe(mutedColor)
   }
-  await expect(card.getByText(/^Resets in (?:59|60) min$/u)).toBeVisible()
-  await expect(card.getByText('Resets in 2 d 23 h', { exact: true })).toBeVisible()
+  await expect(card.getByText(/^Resets in (?:59m|1h 0m)$/u)).toBeVisible()
+  await expect(card.getByText('Resets in 2d 23h', { exact: true })).toBeVisible()
   await expect(card.getByText('Disabled', { exact: true })).toHaveCount(0)
 }
 const expectPreviewOrder = async (page: Page): Promise<void> => {
@@ -2096,9 +2109,9 @@ Then('widening the usage popover from its grip lays the accounts out side by sid
   await expectUsageCards(page, 'stacked')
   await recordAssertion(page, 'ai-accounts-quota-header-shows-provider-plan', async () => {
     const header = usagePopover(page).locator('article header').filter({ hasText: 'Command Code 1' })
-    const plan = header.getByLabel('Subscription plan: individual-pro', { exact: true })
+    const plan = header.getByLabel('Subscription plan: Individual Pro', { exact: true })
     await expect(plan).toBeVisible()
-    await expect(plan).toHaveText('individual-pro')
+    await expect(plan).toHaveText('Individual Pro')
     const bounds = await plan.evaluate(element => {
       const header = element.closest('header')
       if (header === null) throw new Error('The plan badge is not in a quota card header')
