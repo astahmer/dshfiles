@@ -22,6 +22,17 @@ const showsLand = (facts: LandFacts): boolean =>
   !facts.queued &&
   facts.unlanded.every(revision => !revision.conflict && revision.description.trim().length > 0)
 
+/**
+ * The last folders of a workspace path, for a label: an absolute path cut at its end hides the one part that tells
+ * workspaces apart (`/private/var/folders/3k/k0xz2zs…`). The full path stays in the tooltip and behind Copy path.
+ */
+const pathTail = (path: string, segments = 2): string => {
+  const parts = path.split(/[\\/]/u).filter(part => part.length > 0)
+  if (parts.length <= segments) return path
+  return parts.slice(-segments).join(path.includes('\\') && !path.includes('/') ? '\\' : '/')
+}
+
 export class WorkspaceControlModel {
   static readonly showsLand = showsLand
+  static readonly pathTail = pathTail
 }
