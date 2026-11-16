@@ -201,7 +201,7 @@ function BoardEditor(props: {
         <Alert variant="warning" className="dshx:rounded-none dshx:border-x-0 dshx:border-t-0">
           <AlertTitle>The queued diagram could not be drawn</AlertTitle>
           <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            {snapshot.context.conversionError} Ask the agent to fix the source with whiteboard_write, or discard it.
+            {snapshot.context.conversionError} Ask the agent to fix the diagram's source, or discard it.
             <Button size="sm" variant="outline" onClick={() => send({ type: 'DISCARD_PENDING' })}>
               Discard queued diagram
             </Button>
