@@ -750,7 +750,11 @@ survives even when every browser was closed while the thread finished. Watching
 a thread finish acknowledges that completion, and so does opening the thread
 from any tab; the acknowledgement carries the record version the browser
 rendered, so a turn that finishes in between stays unacknowledged, and it never
-clears a manual unread mark on the same thread. A browser that still holds markers
+clears a manual unread mark on the same thread. A failed turn is one more
+record, in the `thread_failed_turns` domain (`failedTurns` on the same API, the
+`thread_failed_turns` tool): it is not an unread mark, so reading the thread
+does not drop it. The row stays Failed until a later turn of the thread finishes
+without failing, or the thread is marked done. A browser that still holds markers
 from the older browser-local version hands them to the Host once and then drops
 its copy. A page reads the whole state once, then follows each `changed` event
 and its 30 s poll with `changesSince`, which returns only the records written
