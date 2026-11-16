@@ -5,7 +5,7 @@
     {
       "id": "project-automations",
       "title": "Start threads in a project on a schedule",
-      "summary": "Work › Automations lists per-project automations and creates, edits, pauses, resumes, runs now and deletes them. A schedule (cron, daily, weekly with an explicit IANA time zone, or every N minutes) starts a new thread in its project with its prompt, agent preset and model through the sessions API. Timing uses DSH's own Schedule domain, so DST gaps are skipped and repeated local times run once; a Host that was down catches up once, for the latest missed occurrence, and a resumed automation starts from its next target. Automations and the last 25 runs of each (trigger, outcome, thread, reason) live in plugin storage and survive Host restarts. Every verb is also an agent tool.",
+      "summary": "Work › Automations lists per-project automations and creates, edits, pauses, resumes, runs now and deletes them. A schedule (cron, daily, weekly with an explicit IANA time zone, or every N minutes) starts a new thread in its project with its prompt, agent preset and model through the sessions API. Its Workspace picker (shown for a jj or git project, read from jj-integration's destination like the New thread row) runs each new thread in the project checkout, the default automations always had, or in a new workspace of its own cut from the main branch or any local or fetched remote bookmark through the version-control provider (remote ones are fetched first). Timing uses DSH's own Schedule domain, so DST gaps are skipped and repeated local times run once; a Host that was down catches up once, for the latest missed occurrence, and a resumed automation starts from its next target. Automations and the last 25 runs of each (trigger, outcome, thread, reason) live in plugin storage and survive Host restarts. Every verb is also an agent tool.",
       "reach": ["click tab \"Work\"", "click button \"Automations\"", "expect heading \"Automations\""],
       "reachNarrow": [
         "click button \"More\"",
@@ -23,6 +23,9 @@
         "An unknown time zone, a malformed cron expression or an interval under one minute is refused at save with the Schedule domain's message.",
         "A project that is no longer registered records a failed run that says to choose a project again.",
         "A missing session-controller records a failed run naming the plugin to add; the schedule keeps its next target.",
+        "A starting bookmark without a workspace of its own is refused at save with what to change.",
+        "A run that asked for a workspace of its own never falls back to the project checkout: a bookmark the provider cannot use, or a project no jj or git provider claims, records a failed run with the provider's reason and how to edit the automation.",
+        "When the repository cannot be read, the Workspace picker is hidden and the saved choice is kept unchanged.",
         "The Host must be running at the target time; while it is down nothing runs, and at boot each schedule runs once for its latest missed occurrence.",
         "Without the Host plugin the page shows a restart-and-retry message instead of the list."
       ],
@@ -31,6 +34,16 @@
           "id": "@dshfiles/session-controller",
           "boundary": "Every run is one sessionsApi.create call (projectId, title, prompt, agentPreset, model) made in process as @dshfiles/project-automations.",
           "deterministicFake": "src/automations-host.test.ts mounts a sessionsApi owner that records each create call."
+        },
+        {
+          "id": "@dshfiles/vcs-provider-port",
+          "boundary": "A run whose new thread gets a workspace of its own resolves the provider that claims the project path (detect) and calls its provision method (workspaceId, isolate: true, base) in process; the returned workspace is the one sessionsApi.create starts the thread in.",
+          "deterministicFake": "src/automations-host.test.ts mounts a fake vcs-provider owner that claims the sample project and records each provision call."
+        },
+        {
+          "id": "@dshfiles/jj-integration",
+          "boundary": "The dialog's Workspace picker reads jjIntegrationApi.destination({ workspaceId }) for the project's bookmarks and main branch; a failure or a folder outside a repository hides the picker.",
+          "deterministicFake": "src/automation-dialog.test.tsx passes a loadDestination returning a fixed repository, or null."
         },
         {
           "id": "@deepseek-ai/dsh-schedule",
@@ -85,6 +98,30 @@
           "id": "project-automations.dialog",
           "file": "plugins/@dshfiles/project-automations/src/automation-dialog.test.tsx",
           "testName": "renders the schedule form and submits a daily automation"
+        },
+        {
+          "kind": "host-test",
+          "id": "project-automations.workspace-choice",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "runs a new thread in the project checkout by default, or in a workspace of its own cut from the chosen bookmark"
+        },
+        {
+          "kind": "host-test",
+          "id": "project-automations.workspace-refusals",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "refuses a starting bookmark without a workspace of its own, and records a workspace that could not be cut"
+        },
+        {
+          "kind": "host-test",
+          "id": "project-automations.workspace-no-repository",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "refuses to cut a workspace from a bookmark in a project no version-control provider claims"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-automations.workspace-picker",
+          "file": "plugins/@dshfiles/project-automations/src/automation-dialog.test.tsx",
+          "testName": "picks a new workspace from a bookmark in the workspace picker"
         },
         {
           "kind": "unit-test",

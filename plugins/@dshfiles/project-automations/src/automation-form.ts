@@ -10,6 +10,8 @@ export interface AutomationForm {
   readonly projectId: string
   readonly destinationKind: 'new-thread' | 'existing-thread'
   readonly sessionId: string
+  /** Where a new thread edits files: `in-place` (the project checkout), `own` (a new workspace from the main branch) or `own:<bookmark>`. */
+  readonly checkout: string
   readonly prompt: string
   readonly agentPreset: string
   readonly provider: string
@@ -50,6 +52,32 @@ export const automationFormProblem = (form: AutomationForm): string | undefined 
   return undefined
 }
 
+/**
+ * What a project's repository offers a new thread, as jj-integration describes it for the New thread row: the bookmarks
+ * (git: branches) a workspace of its own can start from, fetched remote ones apart, and the main branch by default.
+ */
+export interface CheckoutDestination {
+  readonly vcs: 'jj' | 'git'
+  readonly mainBookmark: string | null
+  readonly bookmarks: readonly string[]
+  readonly remoteBookmarks: readonly string[]
+}
+
+/** One entry of the dialog's workspace picker. */
+export interface CheckoutOption {
+  readonly value: string
+  readonly label: string
+  readonly description: string
+  readonly group: string
+  /** A fetched remote bookmark, which the provider fetches again before the workspace starts from it. */
+  readonly remote: boolean
+}
+
+const OWN_PREFIX = 'own:'
+
+/** The bookmark a picker value starts its own workspace from; undefined for the main branch or the project checkout. */
+const baseOf = (checkout: string): string | undefined => (checkout.startsWith(OWN_PREFIX) ? checkout.slice(OWN_PREFIX.length) : undefined)
+
 export const browserTimeZone = (): string => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -65,6 +93,8 @@ export class AutomationFormModel {
       projectId: input.projectId,
       destinationKind: 'new-thread',
       sessionId: '',
+      // Automations always ran in the project checkout; a workspace of its own is an explicit choice.
+      checkout: 'in-place',
       prompt: '',
       agentPreset: '',
       provider: '',
@@ -95,6 +125,7 @@ export class AutomationFormModel {
       enabled: view.enabled,
       destinationKind: view.destination?.kind ?? 'new-thread',
       sessionId: view.destination?.kind === 'existing-thread' ? view.destination.sessionId : '',
+      checkout: AutomationFormModel.checkoutOf(view.destination),
     }
     if (view.trigger.kind === 'webhook')
       return { ...common, triggerKind: 'webhook', secretRef: view.trigger.secretRef, ratePerMinute: String(view.trigger.ratePerMinute) }
@@ -109,6 +140,45 @@ export class AutomationFormModel {
       case 'every':
         return { ...common, timingKind: 'every', everyMinutes: String(Math.max(1, Math.round(timing.everySeconds / 60))) }
     }
+  }
+
+  /** The picker value of a saved destination: a new thread's workspace of its own (from a bookmark), or the checkout. */
+  static checkoutOf(destination: AutomationView['destination']): string {
+    if (destination?.kind !== 'new-thread' || destination.isolate !== true) return 'in-place'
+    return destination.base === undefined ? 'own' : `${OWN_PREFIX}${destination.base}`
+  }
+
+  /**
+   * The New thread row's workspace choices for one repository: the project checkout (where automations always ran), a
+   * new workspace from the main branch, then every local and fetched remote bookmark a new workspace can start from. A
+   * saved bookmark the repository no longer lists is kept, so editing an automation never silently changes it.
+   */
+  static checkoutOptions(destination: CheckoutDestination, current: string): CheckoutOption[] {
+    const main = destination.mainBookmark
+    const branch = destination.vcs === 'git' ? 'branch' : 'bookmark'
+    const startFrom = (base: string, group: string, remote: boolean, description = remote ? 'New workspace · fetched first' : 'New workspace'): CheckoutOption => ({
+      value: `${OWN_PREFIX}${base}`,
+      label: base,
+      description,
+      group,
+      remote,
+    })
+    const options: CheckoutOption[] = [
+      { value: 'in-place', label: 'Project checkout', description: 'Edits the project folder directly', group: 'Workspace', remote: false },
+      {
+        value: 'own',
+        label: 'New workspace',
+        description: main === null ? `From the project's main ${branch}` : `From ${main}`,
+        group: 'Workspace',
+        remote: false,
+      },
+      ...destination.bookmarks.filter(name => name !== main).map(name => startFrom(name, 'Start from', false)),
+      ...destination.remoteBookmarks.map(name => startFrom(name, 'Start from remote', true)),
+    ]
+    const saved = baseOf(current)
+    if (saved !== undefined && !options.some(option => option.value === current))
+      options.push(startFrom(saved, 'Saved', saved.includes('@'), `Not listed in the repository now`))
+    return options
   }
 
   static timing(form: AutomationForm): Timing {
@@ -135,11 +205,16 @@ export class AutomationFormModel {
     if (id !== undefined) draft = { ...draft, id }
     if (form.agentPreset.trim() !== '') draft = { ...draft, agentPreset: form.agentPreset.trim() }
     if (form.provider.trim() !== '' && form.model.trim() !== '') draft = { ...draft, model: { provider: form.provider.trim(), model: form.model.trim() } }
-    draft = {
-      ...draft,
-      destination: form.destinationKind === 'existing-thread' ? { kind: 'existing-thread', sessionId: form.sessionId.trim() } : { kind: 'new-thread' },
-    }
+    draft = { ...draft, destination: AutomationFormModel.destination(form) }
     return draft
+  }
+
+  /** The API destination of a form; a new thread in the checkout keeps the shape automations always stored. */
+  static destination(form: AutomationForm): NonNullable<AutomationDraft['destination']> {
+    if (form.destinationKind === 'existing-thread') return { kind: 'existing-thread', sessionId: form.sessionId.trim() }
+    if (form.checkout === 'in-place') return { kind: 'new-thread' }
+    const base = baseOf(form.checkout)
+    return base === undefined ? { kind: 'new-thread', isolate: true } : { kind: 'new-thread', isolate: true, base }
   }
 
   /** A shell command that signs and sends a test request, so the user can check the webhook end to end. */

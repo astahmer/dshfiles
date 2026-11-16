@@ -7,11 +7,12 @@ import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import type { ApiHostInput } from '@dshfiles/dshx/api'
+import { PluginApiError, type ApiHostInput } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineHost, pluginStorage } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
+import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { afterEach, expect, it } from 'vitest'
 import { Schema } from 'effect'
 import { automationRecordSchema, automationsApi, type AutomationRecord } from './automations-api.js'
@@ -42,8 +43,20 @@ const eventually = async <A>(read: () => Promise<A | undefined>, timeoutMs = 5_0
   }
 }
 
-/** The sessions owner stands in for session-controller; the secret port stands in for the Secret Catalog. */
-const fixture = async (input: { readonly githubDeliveryWindowHours?: number } = {}) => {
+/** What a run asks a version-control provider for, and what that fake answers. */
+interface ProvisionRequest {
+  readonly workspaceId: string
+  readonly isolate?: boolean | undefined
+  readonly base?: string | undefined
+}
+
+/**
+ * The sessions owner stands in for session-controller; the secret port stands in for the Secret Catalog. `vcs` mounts a
+ * version-control provider that claims the sample project, as jj-integration does for a jj repository.
+ */
+const fixture = async (
+  input: { readonly githubDeliveryWindowHours?: number; readonly vcs?: (request: ProvisionRequest) => { workspaceId: string; isolated: boolean } } = {},
+) => {
   const root = await mkdtemp(join(tmpdir(), 'project-automations-'))
   const host = await createTestHost()
   cleanups.push(async () => {
@@ -121,6 +134,31 @@ const fixture = async (input: { readonly githubDeliveryWindowHours?: number } = 
     }),
     { packageId: '@dshfiles/session-controller' },
   )
+  const provisioned: ProvisionRequest[] = []
+  const vcs = input.vcs
+  if (vcs !== undefined)
+    await host.mount(
+      defineHost({
+        name: '@acme/fake-vcs',
+        apis: [
+          VcsProviders.contract('@acme/fake-vcs').host({
+            detect: ({ input: request }) => ({
+              match: request.path.startsWith('/tmp/sample')
+                ? { vcs: 'jj', priority: 10, repoRoot: '/tmp/sample', workspaceRoot: request.path, isolated: false }
+                : null,
+            }),
+            threadsDirectories: () => ({ directories: [] }),
+            provision: ({ input: request }) => {
+              provisioned.push({ ...request })
+              return vcs(request)
+            },
+            snapshot: unused,
+            restore: unused,
+          }),
+        ],
+      }),
+      { packageId: '@acme/fake-vcs' },
+    )
   let plugin = await host.mount(automationsHost, { packageId: '@dshfiles/project-automations' })
   const restart = async () => {
     await plugin.dispose()
@@ -146,6 +184,7 @@ const fixture = async (input: { readonly githubDeliveryWindowHours?: number } = 
     origin,
     created,
     prompted,
+    provisioned,
     references,
     restart,
     routes,
@@ -403,6 +442,76 @@ it('posts into an existing thread when the automation names one, and records a m
     outcome: 'failed',
     detail: expect.stringContaining('session-gone'),
   })
+})
+
+it('runs a new thread in the project checkout by default, or in a workspace of its own cut from the chosen bookmark', async () => {
+  const { automations, created, provisioned } = await fixture({ vcs: () => ({ workspaceId: 'ws-thread-1', isolated: true }) })
+  const inCheckout = await automations.save({
+    title: 'In place',
+    projectId: 'project-1',
+    prompt: 'Check the build.',
+    trigger: { kind: 'schedule', timing: { kind: 'every', everySeconds: 3600 } },
+  })
+  expect(await automations.runNow({ id: inCheckout.id })).toMatchObject({ outcome: 'started', sessionId: 'session-1' })
+  // A saved automation that never chose keeps running where it always did: no workspace is cut for it.
+  expect(provisioned).toEqual([])
+  expect(created).toEqual([{ projectId: 'project-1', title: 'In place', prompt: 'Check the build.' }])
+
+  const isolated = await automations.save({
+    title: 'From a feature',
+    projectId: 'project-1',
+    prompt: 'Review the feature.',
+    destination: { kind: 'new-thread', isolate: true, base: 'feature@origin' },
+    trigger: { kind: 'schedule', timing: { kind: 'every', everySeconds: 3600 } },
+  })
+  expect(isolated.destination).toEqual({ kind: 'new-thread', isolate: true, base: 'feature@origin' })
+  expect(await automations.runNow({ id: isolated.id })).toMatchObject({ outcome: 'started', sessionId: 'session-2' })
+  expect(provisioned).toEqual([{ workspaceId: 'project-1', isolate: true, base: 'feature@origin' }])
+  expect(created.at(-1)).toEqual({ projectId: 'ws-thread-1', title: 'From a feature', prompt: 'Review the feature.' })
+})
+
+it('refuses a starting bookmark without a workspace of its own, and records a workspace that could not be cut', async () => {
+  const { automations, created } = await fixture({
+    vcs: () => {
+      // A provider refuses with a PluginApiError, whose message reaches the caller; a plain Error is masked.
+      throw new PluginApiError('bookmark feature@origin does not exist', { code: 'unknown-bookmark' })
+    },
+  })
+  await expect(
+    automations.save({
+      title: 'Contradiction',
+      projectId: 'project-1',
+      prompt: 'Do it.',
+      destination: { kind: 'new-thread', isolate: false, base: 'feature' },
+      trigger: { kind: 'schedule', timing: { kind: 'every', everySeconds: 3600 } },
+    }),
+  ).rejects.toThrow(/project checkout cannot start from "feature"/u)
+
+  const saved = await automations.save({
+    title: 'Missing bookmark',
+    projectId: 'project-1',
+    prompt: 'Do it.',
+    destination: { kind: 'new-thread', isolate: true, base: 'feature@origin' },
+    trigger: { kind: 'schedule', timing: { kind: 'every', everySeconds: 3600 } },
+  })
+  expect(await automations.runNow({ id: saved.id })).toMatchObject({
+    outcome: 'failed',
+    detail: expect.stringContaining('feature@origin does not exist'),
+  })
+  expect(created).toEqual([])
+})
+
+it('refuses to cut a workspace from a bookmark in a project no version-control provider claims', async () => {
+  const { automations, created } = await fixture()
+  const saved = await automations.save({
+    title: 'No repository',
+    projectId: 'project-1',
+    prompt: 'Do it.',
+    destination: { kind: 'new-thread', isolate: true, base: 'feature' },
+    trigger: { kind: 'schedule', timing: { kind: 'every', everySeconds: 3600 } },
+  })
+  expect(await automations.runNow({ id: saved.id })).toMatchObject({ outcome: 'failed', detail: expect.stringContaining('not a jj or git repository') })
+  expect(created).toEqual([])
 })
 
 it('accepts GitHub webhook signatures over the raw body and refuses tampered, double-signed or replayed deliveries', async () => {

@@ -1,7 +1,8 @@
 import type { Api } from '@dshfiles/dshx/effect'
 import type { sessionsApi } from '@dshfiles/session-controller/sessions-api'
-import { Clock, Context, Effect, Layer } from 'effect'
-import type { AutomationRecord, RunRecord } from './automations-api.js'
+import { VcsProviderService } from '@dshfiles/vcs-provider-port/effect'
+import { Clock, Context, Effect, Layer, Option } from 'effect'
+import type { AutomationDestination, AutomationRecord, RunRecord } from './automations-api.js'
 import { AutomationStore, newRunId, type AutomationStorageFailure } from './automation-store.js'
 
 /** The session controller's API: the native path that starts a thread, as the New thread button does. */
@@ -42,10 +43,39 @@ const startFailure = (error: { readonly _tag: string; readonly message: string; 
   return 'No thread started: the session controller did not answer. Try Run now; if it keeps failing, read the Host log for @dshfiles/session-controller.'
 }
 
+type Placed = { readonly ok: true; readonly workspaceId: string } | { readonly ok: false; readonly detail: string }
+
 const make = Effect.gen(function* () {
   const store = yield* AutomationStore
   const sessions = yield* AutomationSessions
   const projects = yield* AutomationProjects
+  const vcs = yield* VcsProviderService
+
+  /**
+   * The workspace a run's new thread edits: the project checkout, as automations always ran, or a new workspace of its
+   * own that the version-control provider claiming the project cuts from `base`. An unattended run never falls back to
+   * the checkout when it asked for a workspace of its own: it fails and says why.
+   */
+  const placeNewThread = Effect.fn('automation workspace')(function* (project: ProjectRow, destination: AutomationDestination | undefined) {
+    if (destination?.kind !== 'new-thread' || destination.isolate !== true) return { ok: true, workspaceId: project.projectId } satisfies Placed
+    const base = destination.base
+    const from = base === undefined ? '' : ` from "${base}"`
+    const provider = yield* vcs.resolve({ path: project.path })
+    if (Option.isNone(provider))
+      return {
+        ok: false,
+        detail: `No thread started: ${project.path} is not a jj or git repository DSH can read, so the thread cannot get a workspace of its own${from}. Enable Jujutsu (jj-integration) or git-worktrees for the project, or edit the automation to run in the project checkout, then use Run now.`,
+      } satisfies Placed
+    return yield* provider.value.client.provision(base === undefined ? { workspaceId: project.projectId, isolate: true } : { workspaceId: project.projectId, isolate: true, base }).pipe(
+      Effect.map((provisioned): Placed => ({ ok: true, workspaceId: provisioned.workspaceId })),
+      Effect.catch(error =>
+        Effect.succeed<Placed>({
+          ok: false,
+          detail: `No thread started: its workspace${from} could not be created: ${clip(error.message, 300)} Edit the automation to start from another bookmark or in the project checkout, then use Run now.`,
+        }),
+      ),
+    )
+  })
 
   /**
    * Start one run: a new thread in the automation's project with the given prompt. The run is recorded whatever the
@@ -60,11 +90,20 @@ const make = Effect.gen(function* () {
     const { automation } = input
     const startedAt = yield* Clock.currentTimeMillis
     yield* Effect.annotateCurrentSpan({ 'dshx.automation.id': automation.id, 'dshx.automation.trigger': input.trigger })
-    const known = (yield* projects.list).some(project => project.projectId === automation.projectId)
-    const request: CreateRequest = { projectId: automation.projectId, title: automation.title, prompt: input.prompt }
-    if (automation.agentPreset !== undefined) request.agentPreset = automation.agentPreset
-    if (automation.model !== undefined) request.model = automation.model
+    const project = (yield* projects.list).find(candidate => candidate.projectId === automation.projectId)
     const destination = automation.destination
+    yield* Effect.annotateCurrentSpan({
+      'dshx.automation.checkout': destination?.kind === 'new-thread' && destination.isolate === true ? 'own' : 'in-place',
+    })
+    const createIn = (workspaceId: string) => {
+      const request: CreateRequest = { projectId: workspaceId, title: automation.title, prompt: input.prompt }
+      if (automation.agentPreset !== undefined) request.agentPreset = automation.agentPreset
+      if (automation.model !== undefined) request.model = automation.model
+      return sessions.create(request).pipe(
+        Effect.map(result => ({ ok: true as const, sessionId: result.sessionId })),
+        Effect.catch(error => Effect.succeed({ ok: false as const, detail: startFailure(error) })),
+      )
+    }
     const created =
       destination?.kind === 'existing-thread'
         ? yield* sessions.prompt({ sessionId: destination.sessionId, text: input.prompt, mode: 'queue' }).pipe(
@@ -76,10 +115,9 @@ const make = Effect.gen(function* () {
               }),
             ),
           )
-        : known
-          ? yield* sessions.create(request).pipe(
-              Effect.map(result => ({ ok: true as const, sessionId: result.sessionId })),
-              Effect.catch(error => Effect.succeed({ ok: false as const, detail: startFailure(error) })),
+        : project !== undefined
+          ? yield* placeNewThread(project, destination).pipe(
+              Effect.flatMap(placed => (placed.ok ? createIn(placed.workspaceId) : Effect.succeed({ ok: false as const, detail: placed.detail }))),
             )
           : {
               ok: false as const,
