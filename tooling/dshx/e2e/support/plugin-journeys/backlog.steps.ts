@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
-import { backlogLabel, backlogRef, withBacklogRefs, openBacklogViewMenu, runBacklogPageAction } from './backlog-refs.js'
+import { backlogLabel, backlogRef, withBacklogRefs, openBacklogViewMenu, runBacklogPageAction, openBacklogCapture } from './backlog-refs.js'
 import {
   finishJourneyAssertions,
   openSettingsDialog,
@@ -157,7 +157,7 @@ When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
   // A loaded machine can raise the provider-setup modal after the boot step stopped waiting; it hides the panel from role queries.
   await StartupDialogs.registerProviderSetupDismissal(page)
   await openGlobalPanel(page, 'Backlog')
-  await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
+  await expect(await openBacklogCapture(page)).toBeVisible()
 })
 
 When('the Backlog settings are opened', async ({ page }: { page: Page }) => {
@@ -387,7 +387,7 @@ Then('the link dialog explains how to bind the Linear key', async ({ page }: { p
 })
 
 When('the image references are submitted with the capture', async ({ page }: { page: Page }) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   await capture.fill('Capture screenshots with the issue\n\n@Image 1 @Image 2')
   await capture.press('Enter')
 })
@@ -406,7 +406,7 @@ When('two images are attached to the capture', async ({ page }: { page: Page }) 
 
 When('{string} is captured', async ({ page }: { page: Page }, journeyText: string) => {
   const text = await withBacklogRefs(page, journeyText)
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   await capture.fill(text)
   await capture.press('Enter')
   await expect(capture).toHaveText('')
@@ -779,7 +779,7 @@ Then('backlog item b:{int} exposes all context actions in the {string} view', as
 })
 
 When('ArrowUp is pressed from the empty backlog composer', async ({ page }: { page: Page }) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   await capture.fill('')
   await capture.press('ArrowUp')
 })
@@ -921,7 +921,7 @@ When('the thread is started from the dialog without a first message', async ({ p
 
 Then('the backlog panel stays open while the thread is created', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-start-thread-stays', async () => {
-    await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
+    await expect(await openBacklogCapture(page)).toBeVisible()
     await expect(page.getByRole('alert')).toContainText(await withBacklogRefs(page, 'Thread started for b:1'), { timeout: 30_000 })
   })
 })
@@ -941,7 +941,7 @@ Then('the thread composer is open for it', async ({ page }: { page: Page }) => {
 
 When('the Backlog panel is opened again', async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, 'Backlog')
-  await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
+  await expect(await openBacklogCapture(page)).toBeVisible()
 })
 
 Then('the item links the thread it started as {string}', async ({ page }: { page: Page }, title: string) => {
@@ -955,7 +955,7 @@ Then('the item links the thread it started as {string}', async ({ page }: { page
 })
 
 When('an item with linked title and description is captured', async ({ page }: { page: Page }) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   const title = 'Open [guide](https://example.com/guide) https://example.com'
   const description = 'Read [description](https://example.org/description) https://example.org'
   await capture.fill(`${title}\n${description}`)
@@ -1173,7 +1173,7 @@ const expectSelectionActionsOnOneLine = async (page: Page, tier: 'compact' | 'na
 }
 
 When('{int} numbered items are captured', async ({ page }: { page: Page }, count: number) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   for (let index = 1; index <= count; index += 1) {
     await capture.fill(`Numbered item ${String(index)}`)
     await capture.press('Enter')
@@ -1632,7 +1632,7 @@ When('Backlog automatic triage is configured to use the local fake model', async
 })
 
 When('an item with a deterministic fake triage proposal is captured', async ({ page }: { page: Page }) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   await capture.fill('[[answer {"confidence":0.99,"title":"Automatic triage proposal"}]]')
   await capture.press('Enter')
   await expect(capture).toHaveText('')
@@ -1895,7 +1895,7 @@ When('the reply is added to the backlog', async ({ page }: { page: Page }) => {
 
 Then('the capture quotes the reply {string} and links the thread', async ({ page }: { page: Page }, reply: string) => {
   await recordAssertion(page, 'backlog-quote-reply', async () => {
-    const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+    const capture = await openBacklogCapture(page)
     await expect(capture).toBeVisible()
     // The capture editor may draw the Markdown quote as a block, so read the words rather than the `>` marker.
     await expect(capture).toContainText(reply)

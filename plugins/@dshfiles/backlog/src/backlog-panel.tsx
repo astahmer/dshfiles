@@ -23,6 +23,7 @@ import { backfillStatusQueries } from './backfill-queries.js'
 import { BoardView } from './board-view.js'
 import { setBacklogViewSelection, type BacklogView, type BacklogViewSelection } from './view-selection.js'
 import { Composer, type ComposerThread } from './composer.js'
+import { captureVisible } from './capture-visibility.js'
 import type { BacklogImageEditorHandle } from './image-reference-editor.js'
 import { FeedView } from './feed-view.js'
 import type { BacklogSort } from './backlog-sort.js'
@@ -249,6 +250,7 @@ export const BacklogPanel = (props: {
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [captureStatus, setCaptureStatus] = useState<BacklogStatus | null>(null)
   const [captureRequest, setCaptureRequest] = useState<{ readonly id: number; readonly text: string } | undefined>()
+  const [captureRequested, setCaptureRequested] = useState(false)
   const [startThreadItems, setStartThreadItems] = useState<readonly StartThreadItem[] | null>(null)
   const [backfillOpen, setBackfillOpen] = useState(false)
   const openStartThread = (items: readonly StartThreadItem[]): void => setStartThreadItems(items)
@@ -275,7 +277,10 @@ export const BacklogPanel = (props: {
   }, [revision.data, queryClient])
   usePanelRequests({
     visible,
-    onCapture: setCaptureRequest,
+    onCapture: request => {
+      setCaptureRequested(true)
+      setCaptureRequest(request)
+    },
     onFocus: key => {
       const select = (itemId: number): void => {
         setOpenId(itemId)
@@ -414,9 +419,11 @@ export const BacklogPanel = (props: {
     else setPreference({ view: next })
     setSearch(SearchScopes.leaveResults)
     setExpanded(false)
+    setCaptureRequested(false)
   }
   const startCapture = (status: BacklogStatus | null): void => {
     setCaptureStatus(status)
+    setCaptureRequested(true)
     requestAnimationFrame(() => captureComposer.current?.focus())
   }
 
@@ -545,6 +552,7 @@ export const BacklogPanel = (props: {
         tabIndex={-1}
         onKeyDown={onKeyDown}
         data-shortcut-scope="list"
+        data-backlog-panel=""
         className="dshx-root dshx:relative dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground dshx:outline-none"
       >
         <Page
@@ -809,27 +817,30 @@ export const BacklogPanel = (props: {
             </>
           )}
         </div>
-        <div className="dshx:shrink-0">
-          <div className="dshx:mx-auto dshx:max-w-4xl">
-            <Composer
-              key={draftKey}
-              variant="chat"
-              draftKey={draftKey}
-              placeholder="Capture a thought, a task, a bug… like sending a message"
-              tags={tags}
-              threads={threads}
-              projects={projectPaths}
-              projectFilter={projectFilters.length === 0 ? null : projectFilters.length === 1 ? (projectFilters[0] ?? null) : null}
-              reuseProject={settings.value?.reuseCaptureProject ?? true}
-              templates={(settings.value?.templates ?? []).map(entry => entry.name)}
-              status={captureStatus}
-              onClearStatus={() => setCaptureStatus(null)}
-              inputRef={captureComposer}
-              onNavigateUp={navigateToNearestItem}
-              {...(captureRequest === undefined ? {} : { captureRequest })}
-            />
+        {captureVisible({ view, requested: captureRequested }) ? (
+          <div className="dshx:shrink-0">
+            <div className="dshx:mx-auto dshx:max-w-4xl">
+              <Composer
+                key={draftKey}
+                variant="chat"
+                draftKey={draftKey}
+                placeholder="Capture a thought, a task, a bug… like sending a message"
+                tags={tags}
+                threads={threads}
+                projects={projectPaths}
+                projectFilter={projectFilters.length === 0 ? null : projectFilters.length === 1 ? (projectFilters[0] ?? null) : null}
+                reuseProject={settings.value?.reuseCaptureProject ?? true}
+                templates={(settings.value?.templates ?? []).map(entry => entry.name)}
+                status={captureStatus}
+                onClearStatus={() => setCaptureStatus(null)}
+                inputRef={captureComposer}
+                onNavigateUp={navigateToNearestItem}
+                {...(view === 'feed' ? {} : { onDismiss: () => setCaptureRequested(false) })}
+                {...(captureRequest === undefined ? {} : { captureRequest })}
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
         </Page>
         <BacklogSettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen}>
           <BacklogSettingsPanel />

@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
-import { backlogLabel, withBacklogRefs, openBacklogViewMenu } from './backlog-refs.js'
+import { backlogLabel, withBacklogRefs, openBacklogViewMenu, openBacklogCapture } from './backlog-refs.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 /**
