@@ -657,7 +657,7 @@
       "configuration": [],
       "states": ["listed", "no-thread", "opened", "following", "kept-without-thread", "closed"],
       "failureModes": [
-        "With no thread on screen the rows are disabled and the chooser says to open a thread; nothing is asked of the native owner.",
+        "With no thread on screen the rows are withdrawn and one line says to open a thread; nothing is asked of the native owner.",
         "Only the single page of a kind follows the thread; addressed resources (a file, one of several terminals) stay with the thread that opened them.",
         "Each thread keeps its own native page record, so a facet closed while another thread is on screen can reappear when its thread returns."
       ],
@@ -698,7 +698,7 @@
           "kind": "unit-test",
           "id": "workbench.thread-facets-chooser",
           "file": "plugins/@dshfiles/workbench/src/thread-facets.test.tsx",
-          "testName": "lists facets under Thread panels with their description, disabled until a thread is on screen"
+          "testName": "lists facets under Thread panels with their description once a thread is on screen"
         },
         {
           "kind": "unit-test",

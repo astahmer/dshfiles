@@ -95,6 +95,45 @@ describe('NewViewChooser', () => {
     expect(select).toHaveBeenCalledWith(newThread)
   })
 
+  it('shows one muted line instead of unusable thread panels while no thread is open, and leads with the views', () => {
+    let thread: string | undefined
+    const listeners = new Set<() => void>()
+    const onScreen = {
+      subscribe: (listener: () => void) => {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+      getSnapshot: () => thread,
+    }
+    const facet = (kind: string, order: number, title: string) =>
+      source(`facet/${kind}`, title, { threadFacet: { kind, order, title: () => title, description: () => `This thread's ${kind}.`, onScreen } })
+    const definitions = [facet('changes', 20, 'Changes'), facet('cost', 61, 'Cost'), source('backlog', 'Backlog'), source('dshfiles-settings', 'Settings')]
+    render(<NewViewChooser definitions={definitions} onSelect={() => undefined} />)
+
+    expect(screen.queryByRole('group', { name: 'Thread panels' })).toBeNull()
+    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Settings', 'Backlog'])
+    expect(screen.getAllByRole('button').every(button => !button.hasAttribute('disabled'))).toBe(true)
+    expect(screen.getByText('Open a thread to choose its panels here.')).toBeDefined()
+
+    act(() => {
+      thread = 'thread-a'
+      for (const listener of listeners) listener()
+    })
+    expect(screen.queryByText('Open a thread to choose its panels here.')).toBeNull()
+    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual([
+      "ChangesThis thread's changes.",
+      "CostThis thread's cost.",
+      'Settings',
+      'Backlog',
+    ])
+  })
+
+  it('fills its pane instead of sitting in a centred column', () => {
+    render(<NewViewChooser definitions={[source('backlog', 'Backlog')]} onSelect={() => undefined} />)
+    const column = screen.getByRole('region', { name: 'Choose a view' }).firstElementChild
+    expect(column?.className).not.toMatch(/mx-auto|max-w-xl/u)
+  })
+
   it('lists contributed workbench.new-view rows as actions that run and close the chooser', async () => {
     const client = await createTestClient()
     const run = vi.fn()
