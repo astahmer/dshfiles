@@ -514,8 +514,9 @@
       "reach": [
         "seed tool-call-thread",
         "expect button \"New tab\"",
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Settings: General\"",
+        "click option \"Settings: General*\"",
         "click button \"Layout\"",
         "expect radio \"Left\"",
         "click radio \"Right\"",
