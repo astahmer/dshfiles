@@ -503,6 +503,7 @@ export default defineClient({
           form={formFor(page.ns)}
           key={page.pageId}
           heading={heading}
+          namedByNavigation
           page={page}
           t={input.t}
           {...(input.field?.sectionId === page.pageId ? { focusPath: input.field.fieldPath } : {})}

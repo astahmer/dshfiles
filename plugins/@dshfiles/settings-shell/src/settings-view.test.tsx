@@ -155,6 +155,17 @@ describe('settings view: one title per entry', () => {
   })
 })
 
+describe('settings view: narrow panes', () => {
+  it('leaves the entry title to the Sections select when the navigation collapses into it', () => {
+    const view = mount({ activeId: 'appearance' })
+    const header = view.host.querySelector('[data-settings-entry] header')
+    // The select right above already reads "Appearance": the heading stays for assistive technology only.
+    expect(header?.className).toContain('dshx:@max-pane-compact:sr-only')
+    expect(header?.querySelector('h2')?.textContent).toBe('Appearance')
+    view.unmount()
+  })
+})
+
 describe('settings view: search counts', () => {
   it('counts each matching setting once on its navigation row', () => {
     // SAFETY: search reads only the key, path, title and description of a field.
