@@ -251,6 +251,10 @@ const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs:
       'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/jj-integration ...".',
     )
   }
+  // An open right pane (an earlier walk's Changes view) leaves the New thread screen a narrow column, where the project
+  // and workspace choices fold into one menu; this seed drives the two separate choices, so it closes the pane first.
+  const closePane = page.getByRole('button', { name: 'Close pane', exact: true }).filter({ visible: true })
+  for (let attempt = 0; attempt < 4 && (await closePane.count()) > 0; attempt += 1) await closePane.first().click({ timeout: timeoutMs })
   const projectButton = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
   // A started thread left on screen (a second walk of this seed) has a composer too, but no project or workspace
   // choice: this seed needs the New thread screen.
