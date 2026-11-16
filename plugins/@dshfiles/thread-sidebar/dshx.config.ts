@@ -29,6 +29,8 @@ export default defineConfig({
     'thread-directories': 'src/thread-directories.ts',
     // The colour chosen when a project is imported, and the palette class it resolves to.
     'project-colors': 'src/project-colors.ts',
+    // Surfaces that mark a failed thread (a tab strip) read the Host's failed-turn record through the list's own hook.
+    'failed-turns-client': 'src/failed-turns-client.ts',
   },
   build: { sourcemap: true, declarations: true, minify: true },
 })

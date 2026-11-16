@@ -72,6 +72,10 @@
     "./project-colors": {
       "types": "./src/project-colors.ts",
       "default": "./dist/project-colors.js"
+    },
+    "./failed-turns-client": {
+      "types": "./src/failed-turns-client.ts",
+      "default": "./dist/failed-turns-client.js"
     }
   },
   "scripts": {
