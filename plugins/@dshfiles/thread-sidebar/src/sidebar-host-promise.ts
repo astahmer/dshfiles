@@ -30,6 +30,8 @@ export interface HostSession {
   readonly updatedAt: number
   readonly parentSessionId: string | undefined
   readonly pendingQuestions: number
+  /** An Agent of this Host holds the Session: only such a Session's question can still be answered here. */
+  readonly live: boolean
   readonly cwd: string | undefined
 }
 
@@ -56,6 +58,7 @@ const hostSession = (item: SessionListItem): HostSession => ({
   updatedAt: item.updatedAt,
   parentSessionId: item.parentSessionId === undefined ? undefined : String(item.parentSessionId),
   pendingQuestions: item.projections?.values.userQuestions?.active.length ?? 0,
+  live: item.agentAvailable,
   cwd: item.cwd,
 })
 

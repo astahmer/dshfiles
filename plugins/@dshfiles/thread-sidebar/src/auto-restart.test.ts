@@ -101,11 +101,24 @@ describe('automatic restart when idle', () => {
         expect(yield* AutoRestart.use(auto => auto.status)).toMatchObject({ phase: 'waiting', busy: { jobs: 1 } })
         yield* Ref.set(fake.jobs, 0)
         yield* Ref.set(fake.sessions, [
-          { sessionId: 'asking', running: false, blank: false, updatedAt: 0, parentSessionId: undefined, pendingQuestions: 1, cwd: undefined },
+          { sessionId: 'asking', running: false, blank: false, updatedAt: 0, parentSessionId: undefined, pendingQuestions: 1, live: true, cwd: undefined },
         ])
         yield* advance(300)
         expect(yield* AutoRestart.use(auto => auto.status)).toMatchObject({ phase: 'waiting', busy: { questions: 1 } })
         expect(yield* requested(requestPath)).toBe(false)
+      }),
+    ),
+  )
+
+  it.effect('a question left in a stopped Session never blocks it', () =>
+    withAutoRestart({}, ({ fake, requestPath, updates }) =>
+      Effect.gen(function* () {
+        yield* Ref.set(updates, ['@dshfiles/example'])
+        yield* Ref.set(fake.sessions, [
+          { sessionId: 'stale', running: false, blank: false, updatedAt: 0, parentSessionId: undefined, pendingQuestions: 1, live: false, cwd: undefined },
+        ])
+        yield* advance(65)
+        expect(yield* eventually(requested(requestPath), present => present)).toBe(true)
       }),
     ),
   )
