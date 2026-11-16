@@ -307,13 +307,13 @@
         "fill combobox \"Search the command palette\" \"Settings: General\"",
         "click option \"Settings: General*\"",
         "fill searchbox \"Search settings\" \"max tabs\"",
-        "expect text \"1 Setting Found\""
+        "expect text \"1 setting found\""
       ],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
         "fill searchbox \"Search settings\" \"max tabs\"",
-        "expect text \"1 matching settings\"",
+        "expect text \"1 matching setting\"",
         "expect spinbutton \"Max tabs\""
       ],
       "surfaces": ["client", "settings"],
@@ -370,7 +370,7 @@
         "fill combobox \"Search the command palette\" \"Settings: General\"",
         "click option \"Settings: General*\"",
         "fill searchbox \"Search settings\" \"coding view\"",
-        "expect text \"1 Setting Found\"",
+        "expect text \"1 setting found\"",
         "click button \"Show coding view*\"",
         "expect switch \"Show coding view\""
       ],

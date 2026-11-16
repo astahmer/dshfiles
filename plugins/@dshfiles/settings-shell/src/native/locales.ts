@@ -11,7 +11,7 @@ export const SHELL_LOCALE_NAMESPACE = 'dshfiles.settings-shell'
 const shellEn = {
   'palette.open': 'Open Settings',
   'entry.open': 'Open {page}',
-  'entry.opensPage': 'This page has its own place in the stage.',
+  'entry.opensPage': 'Opens as a page.',
   'entry.jevMoved': 'Jev settings for {page} are in Tools & MCP › Jev.',
   'entry.openJev': 'Open Jev settings',
   'entryCard.from': 'from {bundle}',
@@ -92,12 +92,13 @@ const shellEn = {
   'nav.more': 'More settings',
   'search.placeholder': 'Search settings',
   'search.clear': 'Clear search',
-  'search.found': '{count} Settings Found',
-  'search.foundOne': '1 Setting Found',
-  'search.none': 'No Settings Found',
+  'search.found': '{count} settings found',
+  'search.foundOne': '1 setting found',
+  'search.none': 'No settings match. Try another word, or clear the search.',
   'search.sections': 'Sections',
   'search.openSection': 'Open {section}',
   'search.matches': '{count} matching settings',
+  'search.matchesOne': '1 matching setting',
   'config.more': 'More ways to open the configuration file',
   'config.openWith': 'Open with',
   'config.default': 'default',
@@ -110,7 +111,7 @@ const shellEn = {
   'config.noApps': 'No other app opens this file',
   'config.failed': 'Could not open the configuration file',
   'config.editorNeedsThread': 'Open a thread first: the Editor opens files in a thread’s panel',
-  'port.stale': 'This Settings shell was ported from DSH {ported}; DSH {installed} may have changed it. Refresh @dshfiles/settings-shell.',
+  'port.stale': 'Settings was built for DSH {ported} and may be out of date for DSH {installed}. Update the Settings plugin.',
   'releaseNotice.badge': 'DSH {version} is available. Open Settings → General for a summary.',
   'releaseNotice.available': 'DSH {version} is available',
   'releaseNotice.dateLocale': 'en',
@@ -118,8 +119,8 @@ const shellEn = {
   'releaseNotice.latest': 'Latest',
   'releaseNotice.behindOne': '1 release behind',
   'releaseNotice.behind': '{count} releases behind',
-  'releaseNotice.showSummary': 'TL;DR',
-  'releaseNotice.hideSummary': 'Hide TL;DR',
+  'releaseNotice.showSummary': 'Summary',
+  'releaseNotice.hideSummary': 'Hide summary',
   'releaseNotice.dismiss': 'Dismiss DSH {version} update notice',
   'releaseNotice.noHighlights': 'No concise English highlights were included in these release notes.',
   'releaseNotice.releaseNotes': 'Open release notes',
@@ -135,7 +136,7 @@ const shellEn = {
 const shellZh = {
   'palette.open': '打开设置',
   'entry.open': '打开{page}',
-  'entry.opensPage': '此页面在主区域中有自己的位置。',
+  'entry.opensPage': '以页面形式打开。',
   'entry.jevMoved': '{page} 的 Jev 设置位于“工具与 MCP › Jev”。',
   'entry.openJev': '打开 Jev 设置',
   'entryCard.from': '来自 {bundle}',
@@ -217,10 +218,11 @@ const shellZh = {
   'search.clear': '清除搜索',
   'search.found': '找到 {count} 项设置',
   'search.foundOne': '找到 1 项设置',
-  'search.none': '未找到设置',
+  'search.none': '没有匹配的设置。请换一个词，或清除搜索。',
   'search.sections': '设置分区',
   'search.openSection': '打开{section}',
   'search.matches': '{count} 项匹配的设置',
+  'search.matchesOne': '1 项匹配的设置',
   'config.more': '打开配置文件的更多方式',
   'config.openWith': '打开方式',
   'config.default': '默认',
@@ -233,7 +235,7 @@ const shellZh = {
   'config.noApps': '没有其他应用可以打开此文件',
   'config.failed': '无法打开配置文件',
   'config.editorNeedsThread': '请先打开一个会话：编辑器在会话面板中打开文件',
-  'port.stale': '此设置界面移植自 DSH {ported}；DSH {installed} 可能已更改它。请更新 @dshfiles/settings-shell。',
+  'port.stale': '设置界面为 DSH {ported} 构建，对 DSH {installed} 可能已过时。请更新设置插件。',
   'releaseNotice.badge': 'DSH {version} 已发布。打开设置 → 通用设置查看摘要。',
   'releaseNotice.available': 'DSH {version} 已发布',
   'releaseNotice.dateLocale': 'zh-CN',
@@ -255,8 +257,9 @@ const shellZh = {
   'releaseNotice.off': '已关闭 DSH 版本自动检查',
 } satisfies Record<keyof typeof shellEn, string>
 
-// Ported verbatim from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.2 (MIT), lib/client.js `zh` and `en`, without the
-// update-channel row's `desktop.channel.*` keys (that row is not ported).
+// Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.2 (MIT), lib/client.js `zh` and `en`, without the
+// update-channel row's `desktop.channel.*` keys (that row is not ported). The English text differs where upstream used
+// Title Case or "please": this repository writes sentence case (DESIGN.md) and `locales.test.ts` holds it.
 const zh = {
   'desktop.channel.unavailable': '配置不可用',
   'desktop.update.configurationFailed': '未能应用更新配置。请点击桌面更新入口查看原因。',
@@ -329,20 +332,20 @@ const en = {
   'desktop.update.progress': '{percent}%',
   'desktop.update.verifying': 'Verifying update files…',
   'desktop.update.installing': 'Preparing to restart…',
-  'desktop.update.ready': 'Install and Restart',
+  'desktop.update.ready': 'Install and restart',
   'desktop.update.retry': 'Retry update',
   'desktop.update.versionDetail': '{label}: {version}',
   'desktop.update.downloadDetail': 'Downloading update: {percent}%\nTarget version: {version}',
-  'desktop.update.checkFailed': 'Could not check for updates. Please try again later.',
-  'desktop.update.downloadFailed': 'Could not download the update. Please try again.',
+  'desktop.update.checkFailed': 'Update check failed. Try again later.',
+  'desktop.update.downloadFailed': 'Could not download the update. Try again.',
   'desktop.update.downloadSpaceFailed': 'Not enough disk space to download the update. Free up space, then retry.',
   'desktop.update.downloadPermissionFailed': 'Cannot write the update files. Check the folder permissions and retry.',
   'desktop.update.downloadBusyFailed': 'An update file is in use. Close the program using it, then retry.',
-  'desktop.update.installFailed': 'Could not install the update. Please try again later.',
+  'desktop.update.installFailed': 'Could not install the update. Try again later.',
   'desktop.update.checkNetworkFailed': 'Could not check for updates. Check your connection and try again.',
   'desktop.update.downloadNetworkFailed': 'Could not download the update. Check your connection and try again.',
   'desktop.update.installNetworkFailed': 'Could not install the update. Check your connection and try again.',
-  'desktop.update.stopFailed': 'Could not safely stop the tasks. The update has not been installed. Please try again later.',
+  'desktop.update.stopFailed': 'Could not safely stop the tasks. The update has not been installed. Try again later.',
   'desktop.update.tasksChanged': 'New tasks have started. Confirm again to stop the tasks and update.',
   'desktop.update.tasksUnavailable': 'Task status is unavailable. Try updating again when the workspace is ready.',
   'desktop.update.fullscreenTimeout': 'Could not exit fullscreen. Exit fullscreen, then retry the update.',
@@ -353,8 +356,8 @@ const en = {
   'general.nav': 'General',
   'general.currentVersion': 'Current version: {version}',
   'developerTools.title': 'Show coding view',
-  'developerTools.error': 'Could not save. Please try again.',
-  'developerTools.description': 'Shows trajectory, code diffs, and all Agent presets',
+  'developerTools.error': 'Not saved. Try again.',
+  'developerTools.description': 'Shows trajectory, code diffs, and all agent presets',
   'connection.error': 'Disconnected',
   'connection.connecting': 'Reconnecting',
   'connection.connected': 'Connected',
@@ -381,4 +384,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 export type ShellTranslate = TranslateNS<typeof SHELL_LOCALE_NAMESPACE>
 
-export const shellLocale = defineLocale(SHELL_LOCALE_NAMESPACE, { zh, en })
+/** Both dictionaries, for the copy checks. */
+export const shellMessages = { zh, en }
+
+export const shellLocale = defineLocale(SHELL_LOCALE_NAMESPACE, shellMessages)

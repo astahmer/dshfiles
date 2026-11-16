@@ -387,7 +387,7 @@ Then('the page fits the phone width and the form shows the saved override', asyn
 
 Then('only the Max tabs setting is listed', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'settings-shell-modified-filter', async () => {
-    await expect(settingsView(page).getByText('1 Setting Found', { exact: true })).toBeVisible()
+    await expect(settingsView(page).getByText('1 setting found', { exact: true })).toBeVisible()
     await expect(settingRow(page, 'maxTabs')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Modified', exact: true })).toHaveAttribute('aria-pressed', 'true')
   })

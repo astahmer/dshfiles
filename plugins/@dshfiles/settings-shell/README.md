@@ -60,7 +60,7 @@ One field at the top of Settings searches every setting the shell can draw: thei
 (`thread sidebar children` finds `maxChildren` on the Thread list page), plus entry and group names ("models &
 accounts") and key bindings, by command name or keys ("open settings", "⌘,"). Every
 word must match; accents and case are ignored; hidden and secret fields never match. Results replace the section as a
-flat list grouped by page, with matches highlighted, editable in place, and a count ("6 Settings Found"). The tree
+flat list grouped by page, with matches highlighted, editable in place, and a count ("6 settings found"). The tree
 stays visible with a match count per entry; picking an entry with matches scrolls to its results. `Escape` clears the
 query. **Modified** beside the field toggles VS Code's `@modified` filter in the query: only fields the user layer
 sets are listed (alone, or narrowed by the other words); sections, published entries and key bindings carry no user
