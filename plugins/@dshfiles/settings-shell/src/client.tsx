@@ -224,7 +224,12 @@ export default defineClient({
     const labels = createSnapshotStore<ReadonlyMap<string, NamespaceLabel>>(new Map())
     const installLabels = (rows: readonly BundleLabel[]): void => {
       const next = new Map<string, NamespaceLabel>()
-      for (const row of rows) next.set(row.rowId, namespaceLabelOf(row, text => ctx.locale.resolveText(text)))
+      for (const row of rows) {
+        next.set(
+          row.rowId,
+          namespaceLabelOf(row, text => ctx.locale.resolveText(text)),
+        )
+      }
       labels.set(next)
     }
     const labelsApi = createApiClient(ctx, settingsShellApi, metadata?.packageId)
