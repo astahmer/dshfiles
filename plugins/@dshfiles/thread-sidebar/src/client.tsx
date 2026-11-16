@@ -104,7 +104,6 @@ import {
   CirclePauseIcon,
   EllipsisIcon,
   GripVerticalIcon,
-  FolderIcon,
   GitBranchIcon,
   LayersIcon,
   LinkIcon,
@@ -6469,7 +6468,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       data-thread-group-by-project=""
                       onCheckedChange={checked => selectThreadGroupBy(checked ? 'project' : 'state')}
                     >
-                      <FolderIcon aria-hidden="true" />
+                      {/* No icon: the check takes the icon column, so the label lines up with its neighbours. */}
                       <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.tSidebar('threadSidebarGroupByProject')}</span>
                     </DropdownMenuCheckboxItem>
                   ) : null}
