@@ -19,6 +19,8 @@ import { ComposerBar, type ComposerBarPlacement } from './composer-more.ts'
 import { ComposerMoreMenu } from './composer-more-menu.tsx'
 import { ModeChip } from './mode-chip.tsx'
 import { ModeChipCatalog, type ModeChipHost } from './mode-chip-model.ts'
+import { threadHeaderMenuOf } from './thread-header-menu.ts'
+import { ThreadViewsModel } from './thread-views.ts'
 
 type ComposerControls = SettingsValue<typeof composerControlsSettings.schema>
 
@@ -33,6 +35,15 @@ export default defineClient({
     metadata?.plugin?.provide(ConversationScope, { Scope: PhoneMenuScope })
     apply(ctx)
     metadata?.plugin?.provide(Composer, createComposerService(ctx))
+    // The header's More actions as plain rows, for the thread menu that lists them (thread-views.ts): one `⋯` per header.
+    ctx.effect(
+      () =>
+        ThreadViewsModel.provideHeaderMenu(sessionId => {
+          const menus = ctx.get('contextMenus')
+          return menus === undefined ? undefined : threadHeaderMenuOf(menus.resolve({ kind: 'sessionHeader', value: { sessionId: SessionId(sessionId) } }))
+        }),
+      'rich-composer: thread header menu',
+    )
     // The composer's own keymap runs these chords (it knows the draft, the uploads and the IME); these rows only list
     // them in the ? sheet, so their run declines and the key goes on to the editor.
     for (const command of [

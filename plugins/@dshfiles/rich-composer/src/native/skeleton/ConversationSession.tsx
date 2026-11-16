@@ -205,6 +205,10 @@ export function ConversationSessionHeader({
   // Traces and Requests as facets (thread-view-facets.tsx), the header's `⋯` opens them and the stage is always Chat.
   // A composition without a right pane keeps this view switch, so those views stay reachable.
   const facetsHosted = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.hosted, ThreadViewsModel.hosted)
+  // dshfiles (unslop H1, DESIGN.md "the thread header is one row with one `⋯`"): where the thread menu lists this
+  // header's More actions (thread-sidebar reads them through ThreadViewsModel.headerMenu), the header draws no second
+  // `⋯`. A composition without that menu keeps the native button, so the actions stay reachable.
+  const headerMenuHosted = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.headerMenuHosted, ThreadViewsModel.headerMenuHosted)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const phone = usePhoneShell()
   const { service: phoneMenu, snapshot: phoneMenuState } = usePhoneThreadMenu()
@@ -570,7 +574,7 @@ export function ConversationSessionHeader({
             <div className={css.headerUtilities}>
               {renderSlot('conversation.session.header.changes', {})}
               {renderSlot('conversation.session.header.utilities', {})}
-              {renderFactorySlot('contextMenu.button', {
+              {headerMenuHosted ? null : renderFactorySlot('contextMenu.button', {
                 target: { kind: 'sessionHeader', value: { sessionId } },
                 label: t('header.more'), className: css.headerMenuButton, size: 'sm',
               })}
