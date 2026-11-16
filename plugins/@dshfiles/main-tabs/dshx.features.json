@@ -113,10 +113,10 @@
         "expect tab \"Renamed thread*\"",
         "click button \"Account menu\"",
         "click menuitem \"Settings*\"",
-        "click button \"Main tabs\"",
-        "expect radio \"left\"",
-        "click radio \"right\"",
-        "expect radio \"right\""
+        "click button \"Layout\"",
+        "expect radio \"Left\"",
+        "click radio \"Right\"",
+        "expect radio \"Right\""
       ],
       "surfaces": ["client", "integration", "storage", "settings"],
       "surface": "infrastructure",

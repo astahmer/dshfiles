@@ -104,7 +104,7 @@ Then('the page lists its task groups with human page titles and no dialog', asyn
     await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
     for (const group of ['General', 'Models & accounts', 'Plugins']) await expect(navigation.getByRole('group', { name: group, exact: true })).toBeVisible()
     // Plugin pages sit in their task group under a person's name, never a package id.
-    await expect(navigation.getByRole('group', { name: 'General', exact: true }).getByRole('button', { name: 'Main tabs', exact: true })).toBeVisible()
+    await expect(navigation.getByRole('group', { name: 'General', exact: true }).getByRole('button', { name: 'Layout', exact: true })).toBeVisible()
     const names = await navigation.getByRole('button').allTextContents()
     for (const name of names) expect(name).not.toMatch(/^[a-z0-9@][a-z0-9@/._-]*$/u)
   })
@@ -130,7 +130,7 @@ Then('the Main tabs settings are listed with highlights, a count and a tree coun
     await expect(results.getByRole('region', { name: 'Main tabs', exact: true })).toBeVisible()
     await expect(results.locator('[data-setting-path="maxTabs"]')).toBeVisible()
     await expect(results.locator('[data-setting-path="maxTabs"] mark').first()).toHaveText(/tabs/i)
-    await expect(page.getByRole('group', { name: 'General' }).getByRole('button', { name: /^Main tabs \d+$/ })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'General' }).getByRole('button', { name: /^Layout \d+$/ })).toBeVisible()
   })
 })
 
@@ -171,7 +171,8 @@ Then('the General section shows with the coding view switch focused', async ({ p
 
 When('the Main tabs page is opened in Settings', async ({ page }: { page: Page }) => {
   await openSettings(page)
-  await settingsNavEntry(page, 'Main tabs').click()
+  // Main tabs is one block of General › Layout.
+  await settingsNavEntry(page, 'Layout').click()
   await expect(page.getByRole('region', { name: 'Main tabs', exact: true })).toBeVisible()
 })
 

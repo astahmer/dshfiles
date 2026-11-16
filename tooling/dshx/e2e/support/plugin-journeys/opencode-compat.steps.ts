@@ -11,7 +11,7 @@ const toolResults = (page: Page): string[] =>
 
 When('the OpenCode sample plugin is saved in Settings', async ({ page }: { page: Page }) => {
   await openSettingsDialog(page)
-  await settingsNavEntry(page, 'Opencode compat').click()
+  await settingsNavEntry(page, 'OpenCode plugins').click()
   const plugins = page.locator('[data-setting-path="plugins"]').getByRole('textbox')
   await plugins.fill(
     JSON.stringify([

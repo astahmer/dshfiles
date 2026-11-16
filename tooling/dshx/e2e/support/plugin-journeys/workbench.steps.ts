@@ -967,7 +967,7 @@ Then('Main tabs settings still show disabled tabs and Preview opening', async ({
   await openSettingsDialog(page)
   const settings = mainSeat(page).locator('[data-settings-view]')
   await expect(settings).toBeVisible()
-  await settingsNavEntry(page, 'Main tabs').click()
+  await settingsNavEntry(page, 'Layout').click()
   const controls = settings.getByRole('region', { name: 'Main tabs', exact: true })
   await recordAssertion(page, acceptanceId(page, 'legacy-disabled-preview-settings-are-real'), async () => {
     await expect(controls.getByRole('switch', { name: 'Enabled', exact: true })).not.toBeChecked()
