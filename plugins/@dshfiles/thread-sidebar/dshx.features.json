@@ -2565,12 +2565,12 @@
     {
       "id": "pending-host-restart",
       "title": "Warn when a host restart is required",
-      "summary": "Detect pending host-side plugin updates and show them, with the bundles hmr-gate held back, as one Restart pending item in the status strip whose Restart DSH and Restart when idle verbs open the same confirmation; ask for explicit confirmation before handing off a restart when the supervisor supports it, then make sure the old Host exits and tell the page when the new one is back or did not come back.",
+      "summary": "Detect pending host-side plugin updates and show them, with the bundles hmr-gate held back, as one Restart pending item in the status strip (the seat it shares with the Update DSH notice, which shows only while no restart waits) whose Restart DSH and Restart when idle verbs open the same confirmation; the notice names the plugins in plain words and, where DSH cannot restart itself, says to stop and start it in its terminal; ask for explicit confirmation before handing off a restart when the supervisor supports it, then make sure the old Host exits and tell the page when the new one is back or did not come back.",
       "reach": [
         "seed pending-restart",
         "expect button \"Restart pending*\"",
         "click button \"Restart pending*\"",
-        "expect text \"Restart DSH yourself to load them.\""
+        "expect text \"To load them, stop DSH in the terminal*\""
       ],
       "surfaces": ["client", "host", "integration"],
       "surface": "statusItem",

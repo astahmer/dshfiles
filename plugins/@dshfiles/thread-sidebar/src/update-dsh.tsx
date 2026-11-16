@@ -314,9 +314,19 @@ const UpdateStatusView = (props: StatusItemProps): JSX.Element | null => {
   )
 }
 
-/** The status strip's Update item: hidden while DSH is up to date; it opens Settings › Update DSH. */
+/**
+ * The status strip's Update notice: hidden while DSH is up to date; it opens Settings › Update DSH. It shares the
+ * restart item's seat (it is that item's fallback), so the strip holds one control for "update, then restart".
+ */
 export const UpdateStatusItem = (props: StatusItemProps): JSX.Element => (
   <PluginQueryProvider>
-    <UpdateStatusView {...props} />
+    <button
+      type="button"
+      // Empty while DSH is up to date: an empty button takes no room and no tab stop.
+      className="dshx-root dshx:inline-flex dshx:h-5 dshx:min-w-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:empty:hidden"
+      onClick={openUpdateDshSettings}
+    >
+      <UpdateStatusView {...props} />
+    </button>
   </PluginQueryProvider>
 )
