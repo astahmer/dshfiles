@@ -1269,7 +1269,7 @@ Then('the thread header has no Rebase button', async ({ page }: { page: Page }) 
 Then('the rebase command advances main and reports success', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
   await recordAssertion(page, 'jj-integration-rebase-command-advances-main', async () => {
-    await expect(page.getByText(/Landed 1 revision\(s\) on main/)).toBeVisible()
+    await expect(page.getByText(/Landed 1 revision on main/)).toBeVisible()
     await expect.poll(() => descriptionOf(repository, 'main')).toBe('Rebase from command')
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
   })
@@ -1280,7 +1280,9 @@ Then('the rebase command refuses the shared checkout without moving main', async
   const repository = repositoryFor(page)
   await recordAssertion(page, 'jj-integration-rebase-command-refuses-shared-checkout', async () => {
     await expect(
-      page.getByText('This Session is not in a managed thread workspace. Use an isolated thread workspace to run /rebase.', { exact: true }),
+      page.getByText('This thread works in the project checkout, so there is nothing to land. Start a thread in its own workspace to use /rebase.', {
+        exact: true,
+      }),
     ).toBeVisible()
     expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
   })
