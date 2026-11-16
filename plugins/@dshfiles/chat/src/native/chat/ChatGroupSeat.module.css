@@ -164,3 +164,8 @@
     transition: none;
   }
 }
+
+/* dshfiles (unslop T1): a group of nothing but hidden Context rows shows neither header nor body. */
+.root[data-routine-context-only] {
+  display: none;
+}

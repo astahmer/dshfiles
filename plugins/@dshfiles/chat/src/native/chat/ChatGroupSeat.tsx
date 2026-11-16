@@ -6,11 +6,13 @@ import {
   IconPlanOutlineRegular, IconSparkleRegular, IconThinkOutlineRegular, TextShimmer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { GroupKey, NodeReference } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatNode } from '../contract/chat-nodes.ts'
 import type { ProcessActivity, RunningProcessActivity } from '../contract/process-groups.ts'
 import type { ChatStoreState } from '../contract/store.ts'
 import type { ChatFlowSlotProps } from '../contract/slots.ts'
 import { turnProcessOpen } from '../stores.ts'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
+import { isRoutineContextNode, showsRoutineContext } from './context-rows.ts'
 import { hiddenOrCollapsing } from './flow-motion.ts'
 import { chatRenderKey } from './render-entry.ts'
 import { useRunFoldPlacements } from './RunFold.tsx'
@@ -139,6 +141,10 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
   const turn = useChatGroup(groupKey, group => group?.data.turn)
   const closed = useChatGroup(groupKey, group => group?.data.closed)
   const foldCompleted = props.usePresentation(policy => policy.foldCompletedTurns)
+  const routineContextShown = props.usePresentation(policy => showsRoutineContext(policy.mode))
+  const nodeStore = props.nodeStore
+  const onlyHiddenContext = useMemo(() => !routineContextShown && members !== undefined && members.length > 0
+    && members.every(member => isRoutineContextNode(nodeStore.get(member.key) as ChatNode | undefined)), [routineContextShown, members, nodeStore])
   const { expanded: open, setExpanded: setOpen } = useDisclosure()
   const firstKey = members?.[0]?.key ?? ''
   const bottom = props.useChatNodeBottom(firstKey)
@@ -198,7 +204,10 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
     <div ref={rootRef} className={css.root} data-chat-group-key={groupKey}
       data-chat-flow-key={groupKey} data-chat-anchor-key={`group:${groupKey}`} data-chat-turn={turn}
       data-chat-paging-anchor={grouped && !open || undefined}
-      data-step-process data-group-expanded-mode={!grouped || undefined}>
+      data-step-process data-group-expanded-mode={!grouped || undefined}
+      // dshfiles (unslop T1): a group of nothing but hidden Context rows would be a header over an empty body. It
+      // stays mounted and takes no space, so the fold's visibility hooks keep their elements.
+      data-routine-context-only={onlyHiddenContext || undefined}>
       <div ref={headerRef}>
         <ProcessGroupHeader groupKey={groupKey} useChatGroup={useChatGroup}
           usePresentation={props.usePresentation} t={props.t} open={open} bodyId={bodyId} toggle={toggle} />

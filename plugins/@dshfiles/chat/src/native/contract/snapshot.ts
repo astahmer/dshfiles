@@ -94,6 +94,8 @@ export interface ChatTurnProcessPresentation {
   readonly hasExternalProcess: boolean
   /** Like `hasExternalProcess`, but a reply from another Step counts only through its reasoning. */
   readonly hasNonReplyProcess: boolean
+  /** dshfiles (unslop T1): every process row is a routine Context injection, hidden outside the Verbose view mode. */
+  readonly onlyRoutineContext: boolean
   /** A visible input after process output prevents one disclosure from hiding its surrounding groups. */
   readonly hasInterleavedInput: boolean
 }
