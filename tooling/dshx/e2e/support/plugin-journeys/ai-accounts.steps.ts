@@ -2371,7 +2371,7 @@ Then('the failed turn explains how to recover from the stall', async ({ page }: 
   await recordAssertion(page, 'ai-accounts-stalled-stream-advice', async () => {
     const advice = page.getByRole('status').filter({ hasText: 'The model sent no data for 2 min' })
     await expect(advice).toBeVisible()
-    await expect(advice).toContainText('Resume to retry it')
+    await expect(advice).toContainText('Retry it, or pick another model')
     await expect(advice).toContainText('Fall back on stalled streams')
   })
   await finishJourneyAssertions(page)
