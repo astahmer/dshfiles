@@ -886,10 +886,9 @@
     z-index: 1;
   }
 
-  /* The chips scroll inside the bar; nothing they hold may widen the card (menus open above it, never sideways). */
-  .card {
-    overflow-x: clip;
-  }
+  /* The card itself never clips: the @, / and + menus hang above it from `.overlayAnchor`, and WebKit clips both axes
+     of a box that clips one, which left an iPhone with tappable but unpainted menus. The chips stay inside the bar
+     because the row scrolls (above). */
 
   /* The new-thread bar wraps instead (composer redesign b:v9yh): project, host, workspace, mode and model are all
      choices to read before the first message, so none may hide off the edge of a scrolling line. Send keeps its seat
