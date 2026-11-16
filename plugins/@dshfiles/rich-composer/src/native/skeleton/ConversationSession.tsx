@@ -15,6 +15,7 @@ import { FIXED_VIEW_ID } from '../view-pins.ts'
 import { DefaultConversationViews } from './DefaultConversationViews.tsx'
 import { phoneMenuScope, usePhoneMenuReader, usePhoneThreadMenu } from '../../phone-thread-menu.tsx'
 import css from './ConversationRoot.module.css'
+import { PHONE_SHELL_QUERY } from '@dshfiles/plugin-ui/lib/phone-shell'
 
 /** Full props composed from the strict session body contract. */
 export type ConversationSessionProps = ConversationSessionSlotProps
@@ -163,11 +164,12 @@ function SessionTitleEditor({ title, label, error, onCommit, onCancel }: Session
 }
 
 /**
- * The phone shell (thread-sidebar's stack navigation: `data-shell-phone-nav` on the document under 640px) draws its
+ * The phone shell (thread-sidebar's stack navigation: `data-shell-phone-nav` on the document under the kit's phone
+ * shell rule, @dshfiles/plugin-ui/lib/phone-shell: under 640px wide or a coarse pointer under 500px tall) draws its
  * own 44pt top bar with Back and the title. There the conversation header gives up its row (visual refresh T1.4):
  * the title is already in the bar, and the view switch and header actions move into one `⋯` sheet.
  */
-const PHONE_QUERY = '(max-width: 639.98px)'
+const PHONE_QUERY = PHONE_SHELL_QUERY
 const phoneShell = {
   subscribe: (listener: () => void): (() => void) => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => undefined
