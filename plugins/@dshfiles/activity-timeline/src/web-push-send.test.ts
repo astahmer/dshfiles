@@ -109,3 +109,12 @@ describe('WebPushSend', () => {
     expect(() => new Function(WEB_PUSH_WORKER_SOURCE)).not.toThrow()
   })
 })
+
+describe('a Markdown question in a notification', () => {
+  const MARKDOWN =
+    'Asks: Pick a layout for [the 0.2 release notes](https://example.test/notes)\n\nBoth drafts list the same **12 changes**:\n\n| Layout | Lines |\n| --- | ---: |'
+
+  it('reads as plain words, not as source', () => {
+    expect(WebPushSend.payloadOf(item({ reason: MARKDOWN })).body).toBe('Asks: Pick a layout for the 0.2 release notes')
+  })
+})

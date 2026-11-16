@@ -194,6 +194,7 @@ const InboxRow = (props: {
   const status = statusOf(item, props.view)
   const statusLabel = statusLabelOf(status, t)
   const title = InboxView.subjectTitleOf(item, props.sessionLabel)
+  const text = InboxView.textOf(item)
   const opener = item.subject.kind === 'session' ? undefined : props.openers.get(item.subject.kind)
   const openable = item.subject.kind === 'session' || opener !== undefined
   const openAction = InboxView.openActionOf(item)
@@ -250,8 +251,8 @@ const InboxRow = (props: {
       }
       description={
         <>
-          <span>{item.reason}</span>
-          {item.detail === null ? null : <span className="dshx:line-clamp-2">{item.detail}</span>}
+          <span className="dshx:line-clamp-2 dshx:break-words">{text.reason}</span>
+          {text.detail === null ? null : <span className="dshx:line-clamp-2 dshx:break-words">{text.detail}</span>}
         </>
       }
     >
@@ -373,9 +374,9 @@ const InboxRow = (props: {
         <AlertDialogContent className="dshx-root">
           <AlertDialogHeader>
             <AlertDialogTitle>{t('landConfirmTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>{item.reason}</AlertDialogDescription>
+            <AlertDialogDescription>{text.reason}</AlertDialogDescription>
           </AlertDialogHeader>
-          {item.detail === null ? null : <p className="dshx:text-sm dshx:text-foreground dshx:break-words">{item.detail}</p>}
+          {text.detail === null ? null : <p className="dshx:text-sm dshx:text-foreground dshx:break-words">{text.detail}</p>}
           <p className="dshx:text-xs dshx:text-muted-foreground">{t('landConfirmHint')}</p>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
@@ -462,7 +463,7 @@ const InboxActionSheet = (props: {
       <DropdownMenuTrigger asChild>
         <span aria-hidden="true" tabIndex={-1} className="dshx:pointer-events-none dshx:absolute dshx:inset-x-0 dshx:bottom-0 dshx:h-0" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" aria-label={t('actionSheet', { title: item.reason })} data-inbox-action-sheet="">
+      <DropdownMenuContent align="start" aria-label={t('actionSheet', { title: InboxView.textOf(item).reason })} data-inbox-action-sheet="">
         {props.openable ? <DropdownMenuItem onSelect={props.onOpen}>{t('open')}</DropdownMenuItem> : null}
         {live && props.onReview !== undefined ? <DropdownMenuItem onSelect={props.onReview}>{t('review')}</DropdownMenuItem> : null}
         {live
@@ -1323,14 +1324,14 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
           {cursorItem === undefined ? null : (
             <RowPeek anchor={peekAnchor} open={peeking} onOpenChange={setPeeking} side="bottom">
               <PeekCard
-                heading={cursorItem.reason}
+                heading={InboxView.textOf(cursorItem).reason}
                 status={statusOf(cursorItem, view)}
                 statusLabel={statusLabelOf(statusOf(cursorItem, view), t)}
                 {...(cursorItem.subject.kind === 'session' ? { reply } : {})}
                 {...(listOpen && cursorItem.verbs.includes('Answer') && cursorItem.choices.length > 0
                   ? {
                       question: {
-                        text: cursorItem.detail ?? cursorItem.reason,
+                        text: InboxView.textOf(cursorItem).detail ?? InboxView.textOf(cursorItem).reason,
                         choices: cursorItem.choices,
                         busy: transition.isPending,
                         onAnswer: (choiceId: string) => answer(cursorItem, choiceId),
@@ -1343,7 +1344,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
                     cursorItem.subject.kind === 'session' ? sessionLabel(cursorItem.subject.id) : (cursorItem.subject.label ?? cursorItem.subject.id),
                     InboxView.relativeAge(cursorItem.openedAt, now),
                   ].join(' · '),
-                  ...(cursorItem.detail === null || cursorItem.verbs.includes('Answer') ? [] : [cursorItem.detail]),
+                  ...(cursorItem.verbs.includes('Answer') ? [] : [InboxView.textOf(cursorItem).detail ?? []].flat()),
                 ]}
                 actions={
                   <Button size="sm" variant="outline" onClick={() => openItem(cursorItem)}>
