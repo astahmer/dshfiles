@@ -347,6 +347,11 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
               bucket={preferences.bucket}
               groupBy={preferences.groupBy}
               onGroupBy={groupBy => update({ groupBy })}
+              pricingNote={`List-price estimate from the models.dev price catalog (${
+                status?.pricingFetchedAt == null
+                  ? 'no catalog cached yet'
+                  : `updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)}`
+              }). Subscription traffic is priced as if it were metered.`}
               onShowRequests={(search, groupBy) => {
                 if (groupBy === 'purpose') {
                   const purpose = Schema.decodeUnknownOption(purposeSchema)(search)

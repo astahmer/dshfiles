@@ -47,7 +47,7 @@ DSH session logs and bounded Host-side call observations. Observation only.
   summary or another side call. Cache savings prices cache-read tokens at the
   input rate they avoided, per list price. Charts use TanStack Charts from
   `@dshfiles/plugin-ui`.
-- **Jev API usage**: DSH-origin calls from Backlog and Memory, grouped by the
+- **Jev API usage** (shown once DSH has recorded a Jev call): DSH-origin calls from Backlog and Memory, grouped by the
   configured secret reference (or the `TYPESAFE_API_KEY` environment-variable
   label), with provider-reported tokens, request counts and a TypeSafe
   list-price estimate. Calendar month-to-date spend, request count and tokens

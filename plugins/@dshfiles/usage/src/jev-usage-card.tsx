@@ -28,8 +28,13 @@ const Tile = (props: { readonly label: string; readonly value: string; readonly 
   </div>
 )
 
-export const JevUsageCard = (props: { readonly usage: JevUsageView | undefined; readonly error: unknown; readonly failed: boolean }): JSX.Element => {
+/**
+ * Jev usage this month. It draws nothing until DSH has recorded a Jev call (or failed to read them): someone who
+ * never set up Jev sees no block of zeros.
+ */
+export const JevUsageCard = (props: { readonly usage: JevUsageView | undefined; readonly error: unknown; readonly failed: boolean }): JSX.Element | null => {
   const credentialRows = props.usage?.byCredential ?? []
+  if (!props.failed && (props.usage === undefined || (props.usage.calls === 0 && credentialRows.length === 0))) return null
   const maximumInputTokens = Math.max(0, ...credentialRows.map(row => row.inputTokens))
   return (
     <Panel title="Jev API usage" description="DSH-local estimated usage · $0.042 per 1M input tokens · output free. Not provider account balance.">
