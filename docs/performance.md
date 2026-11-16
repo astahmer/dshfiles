@@ -119,9 +119,46 @@ list still re-renders on every pick (`display: none` also makes the virtual rows
 puts the cost in layout forced by the virtual rows' `measureElement` and the Workbench's `_scrollTabIntoView`, paid by
 any frame that lays the page out.
 
-Found, not fixed: each list mount (load and every Back) asks the Host to auto-archive two settled threads that no
-longer exist; the Host answers `session/not-found` inside HTTP 200 and the auto-archive retries on the next mount
-(`thread-sidebar` `dueArchiveSessionIds` keeps them due while their rows stay listed).
+### Duplicate reads per switch and the auto-archive retry (2026-11-16)
+
+`METHODS=1` on the phone probe expands every batched dshx call by API method. Live, read-only (main build, emulated
+phone, four taps; the probe's taps record navigation, nothing else): each Back sent `workspace/archiveSession` 4.8 times
+and each open 0.3 times, for settled threads the Host no longer has (`session/not-found` inside HTTP 200, retried on
+every list mount and again after each settled scan); each open read `multi-host/sessionRuntime` twice for one thread.
+
+The four-fold `scheduled-sends/list`, `annotations/list` and `session-undo/history` reads of the stored phone trace did
+not reproduce: in scratch (40 threads, Workbench keeping three released thread views mounted, switches through
+`dshfiles:open-thread` 9 to 12 s apart so kept data went stale) and live, every switch read them once, for the shown
+thread only. A kept view is not remounted on a switch, so it does not refetch. Not measured: a Host event fanning out
+to every mounted body (`scheduled-sends` `changed` carries no Session, so each kept dock re-reads its own list).
+
+Owners of the second `sessionRuntime` read: the thread header's remote-host link and the model picker shared only reads
+still in flight (`joinPageRead`), and the JJ thread control (`useSessionThreadApi`, behind `threadAt`) read once per
+mount. All three now read through `@dshfiles/multi-host/session-runtime-read`, one page-wide resource-store entry per
+thread (30 s stale time). Auto-archive reports a `session/not-found` refusal as `missing`, and the sidebar drops those
+ids from its settled status, so they are never sent again.
+
+| Scratch, 40 threads, RTT 100 ms, 4× CPU   | Before (load 4.5) | After (load 10–18, two runs) |
+| ----------------------------------------- | ----------------- | ---------------------------- |
+| `multi-host/sessionRuntime` per open      | 2.2               | 1.2 / 1.2                    |
+| same, desktop main-tabs switch (6 × 9 s)  | 2.2               | 1.2                          |
+| dshx calls per desktop switch             | 19.0              | 17.8                         |
+| dshx calls per open, p50                  | 14                | 13 / 13                      |
+| tap → title p50 (ms)                      | 427               | 531 / 444                    |
+| tap → first message p50 (ms)              | 848               | 1189 / 1015                  |
+| Back → list p50 (ms)                      | 749               | 999 / 853                    |
+
+The timings moved with the machine's load (other agents' builds; 10 cores), not with the change: fewer calls cannot
+slow a tap. The auto-archive retry has no scratch reproduction (a listed thread the Host's workspace does not know), so
+its proof is the regression test and the live count above.
+
+Regression checks: multi-host `session-runtime-read.test.ts` ("answers a second bundle that asks after the first read
+settled without another request"), thread-sidebar `auto-archive-machine.test.ts` ("reports a Session the Host no
+longer has as missing, not as a failure to retry") and `organization.test.ts` ("an archive refused for a Session the Host
+does not have reads as missing").
+
+Found, not fixed (live, per tap): `settings/mutate` twice on every open and every Back, `session/modelCatalog` 4.8 per
+open and 3.3 per Back, `settings/describe` 3.0 per open.
 
 ## Idle polls replaced by Host change events (2026-11-12, issue #142)
 
