@@ -119,7 +119,7 @@ events and named milestones (`session.error`, `session.input`,
 of `workspace.sync_refused` events (jj-integration's safe "checkout kept as is"
 refusals): those with the same checkout and the same reason within thirty
 minutes fold into one attention row (`N× <summary>`), placed at the newest one.
-Selecting it shows the count, and **Detailed** expands each event. Folding is
+Selecting it shows the count, and **Every event** expands each event. Folding is
 read-only: nothing is retried or rebased. Every group carries the ids of its
 members, and the `detailed` filter expands every retained event.
 
@@ -130,7 +130,7 @@ attention-only, detailed), a chronological feed (oldest top, newest bottom),
 auto-scroll only when already near the bottom, a new-events indicator, jump to
 latest, "load older" cursor pagination, and a detail drawer with metadata,
 references, provenance, and correlated events. When an event names a Session,
-"Open Session" navigates through the public Client workspace API only if that
+"Open thread" navigates through the public Client workspace API only if that
 Session is in the current Host list. Missing or archived Sessions show an
 unavailable message without being revived or changed. Verification detail is a
 historical summary; open Project Checks for live source freshness and the full

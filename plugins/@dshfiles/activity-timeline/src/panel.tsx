@@ -18,6 +18,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import type { ActivityEvent, ActivitySource, CondensedItem } from './types.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { activityTimelineApi } from './api.js'
+import { ActivityView } from './activity-view.js'
 import { activityFeedKeys, activityFeedQueries, NO_PAGES, type ActivityFeedFilter } from './feed-queries.js'
 import { mergeFeedItems } from './feed-history.js'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -27,9 +28,6 @@ const statsKey = ['activity-timeline', 'stats'] as const
 
 /** How many rows one page carries; the tail page polls and the older pages load on demand. */
 const FEED_PAGE_LIMIT = 80
-
-/** Dark cockpit: only attention gets colour; the source stays a neutral chip. */
-const badgeVariant = (item: CondensedItem): 'outline' | 'destructive' => (item.level === 'attention' ? 'destructive' : 'outline')
 
 const SOURCE_INITIALS = { session: 'AG', communication: 'CO', integration: 'JJ', workspace: 'WS', system: 'SY' } as const satisfies Record<
   ActivitySource,
@@ -55,7 +53,10 @@ const formatTime = (at: number, now: number = Date.now()): string => {
 /** The unambiguous spelling, for a hover or an event detail. */
 const formatExact = (at: number): string => new Date(at).toLocaleString()
 
-/** Rows group under their day, so each row keeps only its clock; attention is the one actor tile with colour. */
+/**
+ * Rows group under their day, so each row keeps only its clock. The initials tile says the source once (no chip beside
+ * it repeats the word) and attention is the one tile with colour, as the tinted status trio.
+ */
 const feedEvent = (props: {
   readonly item: CondensedItem
   readonly selected: boolean
@@ -73,16 +74,22 @@ const feedEvent = (props: {
   return {
     id: item.id,
     actor,
-    summary: item.summary,
+    summary: ActivityView.summaryOf(item.summary, props.sessionLabel),
     time: formatClock(item.at),
     dateTime: new Date(item.at).toISOString(),
     group: day === props.today ? props.t('today') : day,
     selected: props.selected,
     meta: (
       <>
-        <Badge variant={badgeVariant(item)}>{props.t(item.source)}</Badge> {item.count > 1 ? <Badge variant="outline">{item.count}×</Badge> : null}{' '}
-        {item.sessionId === null ? null : <span className="dshx:min-w-0 dshx:truncate">{props.sessionLabel(item.sessionId)}</span>}{' '}
-        {item.correlationId === null ? null : <span className="dshx:truncate">correlation {item.correlationId}</span>}
+        {/* The tile is decorative: the row still says its source, and that it needs attention, to a screen reader. */}
+        <span className="dshx:sr-only">{props.t(item.source)}</span>{' '}
+        {item.level === 'attention' ? (
+          <span className="dshx:sr-only" data-activity-attention="">
+            {props.t('attention')}
+          </span>
+        ) : null}{' '}
+        {item.count > 1 ? <Badge variant="outline">{item.count}×</Badge> : null}{' '}
+        {item.sessionId === null ? null : <span className="dshx:min-w-0 dshx:truncate">{props.sessionLabel(item.sessionId)}</span>}
       </>
     ),
   }
@@ -227,15 +234,11 @@ export const ActivityTimelinePanel = (props: {
       description={t('subtitle')}
       meta={
         <>
-          <Badge variant="muted">
-            {statsQuery.data?.retained ?? 0} {t('retained')}
-          </Badge>
-          <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'muted'}>
-            {statsQuery.data?.attention ?? 0} {t('attention')}
-          </Badge>
-          <Badge variant="muted">
-            {statsQuery.data?.duplicates ?? 0} {t('duplicates')}
-          </Badge>
+          {ActivityView.headerChips(statsQuery.data).map(chip => (
+            <Badge key={chip.id} variant={chip.tone} data-activity-chip={chip.id}>
+              {chip.count} {t(chip.id)}
+            </Badge>
+          ))}
         </>
       }
       actions={[
@@ -263,7 +266,7 @@ export const ActivityTimelinePanel = (props: {
               {t(source)}
             </Button>
           ))}
-          <Button size="sm" variant={attentionOnly ? 'destructive' : 'outline'} aria-pressed={attentionOnly} onClick={() => setAttentionOnly(value => !value)}>
+          <Button size="sm" variant={attentionOnly ? 'secondary' : 'outline'} aria-pressed={attentionOnly} onClick={() => setAttentionOnly(value => !value)}>
             {t('attentionOnly')}
           </Button>
           <Button size="sm" variant={detailed ? 'secondary' : 'outline'} aria-pressed={detailed} onClick={() => setDetailed(value => !value)}>
@@ -279,7 +282,7 @@ export const ActivityTimelinePanel = (props: {
       {/* Two sections, no cards (visual refresh T4.4): spacing plus one hairline between feed and detail. */}
       <div className="dshx:grid dshx:min-h-0 dshx:gap-4 dshx:@4xl:grid-cols-[minmax(0,1fr)_22rem]">
         <PageSection
-          heading={t('title')}
+          heading={t('feed')}
           actions={
             <>
               {pendingNew > 0 ? (
@@ -308,7 +311,13 @@ export const ActivityTimelinePanel = (props: {
               <EmptyState>{debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}</EmptyState>
             ) : null}
             <div key="activity-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
-            <ActivityFeed events={feedEvents} emptyLabel={null} onSelectEvent={selectFeedEvent} />
+            {/* Sentence case for the day label ("Today"): the kit heading is upper case (DESIGN.md retires ALL-CAPS labels). */}
+            <ActivityFeed
+              events={feedEvents}
+              emptyLabel={null}
+              onSelectEvent={selectFeedEvent}
+              className="dshx:[&_h3]:tracking-normal dshx:[&_h3]:normal-case"
+            />
           </div>
           {feedQuery.isFetchingNextPage ? (
             <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">
@@ -323,7 +332,7 @@ export const ActivityTimelinePanel = (props: {
           {selected === null ? <EmptyState>{t('emptyDetail')}</EmptyState> : null}
           {selected !== null && selected.kind === 'group' ? (
             <>
-              <p className="dshx:text-sm dshx:font-medium">{selected.summary}</p>
+              <p className="dshx:text-sm dshx:font-medium">{ActivityView.summaryOf(selected.summary, sessionLabel)}</p>
               <p className="dshx:text-xs dshx:text-muted-foreground">
                 {t('groupMembers')}: {selected.eventIds.length} {t('events')}
               </p>
@@ -334,7 +343,7 @@ export const ActivityTimelinePanel = (props: {
           ) : null}
           {selectedEvent === undefined ? null : (
             <>
-              <p className="dshx:break-words dshx:text-sm dshx:font-medium">{selectedEvent.summary}</p>
+              <p className="dshx:break-words dshx:text-sm dshx:font-medium">{ActivityView.summaryOf(selectedEvent.summary, sessionLabel)}</p>
               <p className="dshx:text-xs dshx:text-muted-foreground" title={formatExact(selectedEvent.at)}>
                 {selectedEvent.type} · {formatTime(selectedEvent.at)} · {formatExact(selectedEvent.at)}
               </p>
@@ -368,7 +377,7 @@ export const ActivityTimelinePanel = (props: {
                 <div className="dshx:flex dshx:flex-col dshx:gap-1">
                   {(relatedQuery.data?.events ?? []).slice(0, 20).map(event => (
                     <span key={event.id} className="dshx:text-xs" title={formatExact(event.at)}>
-                      {formatTime(event.at)} · {event.summary}
+                      {formatTime(event.at)} · {ActivityView.summaryOf(event.summary, sessionLabel)}
                     </span>
                   ))}
                 </div>
