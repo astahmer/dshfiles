@@ -379,7 +379,7 @@ export const UsageOverview = (props: {
                 type="button"
                 variant="ghost"
               >
-                <RefreshCwIcon className={props.refreshing ? 'dshx:animate-spin' : undefined} />
+                <RefreshCwIcon className={props.refreshing ? 'dshx:animate-spin dshx:motion-reduce:animate-none' : undefined} />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Refresh usage</TooltipContent>

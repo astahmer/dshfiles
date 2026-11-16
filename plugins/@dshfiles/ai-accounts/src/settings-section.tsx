@@ -724,7 +724,7 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
       >
         {() => (
           <Button disabled={pricing === null || refresh.isPending} onClick={() => refresh.mutate()} size="sm" type="button" variant="outline">
-            <RefreshCwIcon className={refresh.isPending ? 'dshx:animate-spin' : undefined} />
+            <RefreshCwIcon className={refresh.isPending ? 'dshx:animate-spin dshx:motion-reduce:animate-none' : undefined} />
             Refresh now
           </Button>
         )}

@@ -70,7 +70,7 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
         </DialogHeader>
         {preview.isPending ? (
           <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
-            <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin" />
+            <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin dshx:motion-reduce:animate-none" />
             Checking available models…
           </p>
         ) : null}
@@ -129,8 +129,12 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
           </Button>
           {switching.isSuccess ? null : (
             <Button disabled={plan === undefined || preview.isError || preview.isFetching || switching.isPending} onClick={() => switching.mutate()}>
-              {switching.isPending ? <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin" /> : <ArrowLeftRightIcon className="dshx:size-4" />}Use this
-              account
+              {switching.isPending ? (
+                <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin dshx:motion-reduce:animate-none" />
+              ) : (
+                <ArrowLeftRightIcon className="dshx:size-4" />
+              )}
+              Use this account
             </Button>
           )}
         </DialogFooter>
