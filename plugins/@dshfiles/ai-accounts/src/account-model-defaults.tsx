@@ -40,7 +40,6 @@ export const AccountInheritanceControl = (props: AccountModelDefaultsProps): JSX
   <label className="dshx-root dshx:flex dshx:items-start dshx:gap-3">
     <Switch
       aria-label="Inherit model settings from provider"
-      className="dshx:data-[state=checked]:bg-info"
       checked={AccountModelSettingsModel.inheritsModelSettings(props.draft)}
       onCheckedChange={checked => props.onChange({ inheritModelSettings: checked })}
     />

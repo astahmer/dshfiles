@@ -53,21 +53,18 @@ export const AccountGroup = (props: {
           const selected = profile.instanceId === props.selectedId
           const open = expanded[profile.instanceId] ?? (selected && props.activeSection === 'models')
           const status = accountConnectionStatus(profile, props.usage ?? null)
+          const identity = [profile.plan, profile.identity].filter(Boolean).join(' · ')
+          const signIn = profile.signedIn ? 'Credentials available' : 'Not signed in'
           return (
             <li
               data-account-priority={index + 1}
               key={profile.instanceId}
               className={cn(
-                'dshx:min-w-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:bg-card dshx:transition-colors',
-                selected ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/10' : 'dshx:border-border/60 dshx:hover:border-muted-foreground/40',
+                'dshx:min-w-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border/60 dshx:bg-card dshx:transition-colors',
+                !selected && 'dshx:hover:border-muted-foreground/40',
               )}
             >
-              <div
-                className={cn(
-                  'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:border-l-[3px] dshx:px-3 dshx:py-3',
-                  selected ? 'dshx:border-l-info dshx:bg-info/5' : 'dshx:border-l-transparent',
-                )}
-              >
+              <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-3 dshx:py-3', selected && 'dshx:bg-accent')}>
                 <button
                   aria-current={selected ? 'true' : undefined}
                   aria-label={`Select ${profile.displayName}`}
@@ -78,9 +75,7 @@ export const AccountGroup = (props: {
                   <ProviderGlyph kind={profile.kind} />
                   <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
                     <strong className="dshx:truncate dshx:text-sm dshx:font-semibold">{profile.displayName}</strong>
-                    <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">
-                      {[profile.plan, profile.identity].filter(Boolean).join(' · ') || (profile.signedIn ? 'Credentials available' : 'Not signed in')}
-                    </span>
+                    <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{identity || signIn}</span>
                   </span>
                 </button>
                 {selected ? (
@@ -95,17 +90,17 @@ export const AccountGroup = (props: {
                     <PencilIcon className="dshx:size-3" />
                   </Button>
                 ) : null}
-                <ActionHint label={status.detail ?? status.label}>
-                  <span
-                    className={cn(
-                      'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs',
-                      status.tone === 'success' ? 'dshx:text-success' : status.tone === 'warning' ? 'dshx:text-warning' : 'dshx:text-muted-foreground',
-                    )}
-                  >
-                    <StatusDot tone="current" />
-                    <span className={status.tone === 'warning' ? undefined : 'dshx:@max-pane-narrow:hidden'}>{status.label}</span>
-                  </span>
-                </ActionHint>
+                {/* Healthy is quiet: the switch says enabled. Only a state that blocks routing gets a label and colour. */}
+                {status.tone === 'warning' ? (
+                  <ActionHint label={status.detail ?? status.label}>
+                    <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-warning">
+                      <StatusDot tone="current" />
+                      {status.label}
+                    </span>
+                  </ActionHint>
+                ) : identity !== '' && status.label === 'Not signed in' ? (
+                  <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">{status.label}</span>
+                ) : null}
                 <Switch
                   aria-label={
                     routedKind(profile.kind)
@@ -113,7 +108,7 @@ export const AccountGroup = (props: {
                       : `${profile.enabled ? 'Disable' : 'Enable'} quota tracking for ${profile.displayName}`
                   }
                   checked={profile.enabled}
-                  className="dshx:shrink-0 dshx:data-[state=checked]:bg-info"
+                  className="dshx:shrink-0"
                   onCheckedChange={() => props.onToggle(profile)}
                   size="sm"
                 />

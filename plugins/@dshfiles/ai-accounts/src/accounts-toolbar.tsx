@@ -13,7 +13,7 @@ const OverlaySwitch = (props: { readonly label: string; readonly checked: boolea
   const id = useId()
   return (
     <span className="dshx:flex dshx:items-center dshx:gap-2">
-      <Switch checked={props.checked} className="dshx:data-[state=checked]:bg-info" id={id} onCheckedChange={props.onChange} size="sm" />
+      <Switch checked={props.checked} id={id} onCheckedChange={props.onChange} size="sm" />
       <Label className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground" htmlFor={id}>
         {props.label}
       </Label>
