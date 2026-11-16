@@ -251,6 +251,18 @@ describe('workbench semantic tab chrome', () => {
     expect(glyph()).toBeNull()
   })
 
+  it('marks a preview tab with a muted title instead of italics, and caps the title width with an ellipsis', () => {
+    const tab = fixture()
+    const title = screen.getByText('Thread A')
+    expect(tab.trigger().getAttribute('data-preview')).toBe('true')
+    expect(title.className).not.toContain('italic')
+    expect(title.className).toContain('dshx:text-muted-foreground')
+    expect(title.className).toContain('dshx:truncate')
+    expect(title.className).toContain('dshx:max-w-56')
+    tab.update({ preview: false })
+    expect(screen.getByText('Thread A').className).not.toContain('dshx:text-muted-foreground')
+  })
+
   it('keeps a preview on double click and delegates close exactly once without archiving', () => {
     const tab = fixture()
     fireEvent.doubleClick(tab.trigger())
