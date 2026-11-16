@@ -3,6 +3,7 @@ import { Settings } from '@dshfiles/dshx/effect/settings'
 import { defineSettings, type SettingsValue } from '@dshfiles/dshx/settings'
 import type { Retention } from './trace-repo.js'
 
+// Receiver plumbing, retention limits and the Host stall probe are developer knobs: Settings folds them under Advanced.
 export const tracesSettings = defineSettings({
   namespace: 'dshfiles-traces',
   schema: Schema.object({
@@ -13,14 +14,14 @@ export const tracesSettings = defineSettings({
     ])
       .default('plugin')
       .description('Where OTLP telemetry goes. Exporters send to OTEL_EXPORTER_OTLP_ENDPOINT, so in plugin or both mode set it to http://<host>:<port> below.'),
-    host: Schema.string().default('127.0.0.1').description('Address the receiver listens on. Loopback by default.'),
+    host: Schema.string().default('127.0.0.1').collapse().description('Address the receiver listens on. Loopback by default.'),
     allowNonLoopback: Schema.boolean()
       .default(false)
-      .description('Allow a non-loopback listen address. Anything on that network can then post telemetry here; leave off unless you mean it.'),
-    port: Schema.natural().max(65_535).default(4318).description('OTLP/HTTP port. 4318 is the standard one; 0 picks any free port (the panel shows which).'),
+      .collapse().description('Allow a non-loopback listen address. Anything on that network can then post telemetry here; leave off unless you mean it.'),
+    port: Schema.natural().max(65_535).default(4318).collapse().description('OTLP/HTTP port. 4318 is the standard one; 0 picks any free port (the panel shows which).'),
     forwardUrl: Schema.string()
       .default('')
-      .description('Both mode: the external viewer’s OTLP/HTTP base URL, e.g. http://127.0.0.1:4319. /v1/traces, /v1/metrics and /v1/logs are appended.'),
+      .collapse().description('Both mode: the external viewer’s OTLP/HTTP base URL, e.g. http://127.0.0.1:4319. /v1/traces, /v1/metrics and /v1/logs are appended.'),
     externalViewerUrl: Schema.string()
       .default('')
       .description('The external viewer’s web page (e.g. http://127.0.0.1:8000 for otel-desktop-viewer), linked from the panel in external and both modes.'),
@@ -29,21 +30,21 @@ export const tracesSettings = defineSettings({
       .description(
         'Store GenAI message, prompt and tool-payload attributes (gen_ai.input.messages, gen_ai.tool.call.arguments, …) as their size only. Exporters send them only when content capture is opted into.',
       ),
-    retentionHours: Schema.natural().min(1).max(720).default(72).description('Drop stored telemetry older than this many hours.'),
-    retentionSpans: Schema.natural().min(1_000).max(1_000_000).default(30_000).description('Keep at most this many spans; the oldest whole traces go first.'),
-    retentionLogs: Schema.natural().min(1_000).max(1_000_000).default(100_000).description('Keep at most this many log records; the oldest go first.'),
+    retentionHours: Schema.natural().min(1).max(720).default(72).collapse().description('Drop stored telemetry older than this many hours.'),
+    retentionSpans: Schema.natural().min(1_000).max(1_000_000).default(30_000).collapse().description('Keep at most this many spans; the oldest whole traces go first.'),
+    retentionLogs: Schema.natural().min(1_000).max(1_000_000).default(100_000).collapse().description('Keep at most this many log records; the oldest go first.'),
     retentionMetricPoints: Schema.natural()
       .min(1_000)
       .max(2_000_000)
       .default(60_000)
-      .description('Keep at most this many metric data points; the oldest go first.'),
+      .collapse().description('Keep at most this many metric data points; the oldest go first.'),
     announceResolved: Schema.boolean()
       .default(false)
       .description('Also announce when an alert resolves. Off: only firing alerts show a banner and a browser notification.'),
     eventLoopStallMs: Schema.natural()
       .max(10_000)
       .default(100)
-      .description(
+      .collapse().description(
         'Record a "host event-loop stall" span whenever the DSH Host event loop is blocked at least this many milliseconds (a 100 ms probe, about 0.6 ms of CPU per second). 0 turns the probe off.',
       ),
   }),
