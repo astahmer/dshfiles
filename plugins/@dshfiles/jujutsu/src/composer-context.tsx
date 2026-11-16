@@ -119,6 +119,41 @@ const basename = (path: string): string =>
     .split(/[\\/]/u)
     .at(-1) ?? path
 
+type ComposerRepository = NonNullable<ReturnType<typeof useComposerContext>['repository']>
+
+/**
+ * Where this Session edits files: its own jj workspace or the project checkout, with the project's name. One rule for
+ * the location chip, the Changes pill and the workspace menu's project row, so they never disagree.
+ */
+const useWorkspacePlace = (props: ComposerSlotProps, repository: ComposerRepository | null) => {
+  const workspaces = useWorkspaceItems(props.jujutsu.workspaces)
+  const currentWorkspace = workspaces.find(workspace => workspace.sessionIds.includes(props.sessionId))
+  const workspaceId = currentWorkspace?.workspaceId
+  const api = useApi(jjIntegrationApi)
+  const destination = useQuery({
+    queryKey: ['jujutsu', 'composer-project', workspaceId ?? ''],
+    enabled: repository !== null && workspaceId !== undefined,
+    retry: false,
+    queryFn: ({ signal }) =>
+      runHostRequest({
+        signal,
+        timeoutMs: 15_000,
+        request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }),
+      }).catch(error => {
+        if (isApiOwnerMissing(error)) return null
+        throw error
+      }),
+  })
+  const project =
+    workspaces.find(workspace => workspace.workspaceId === destination.data?.projectWorkspaceId)?.title ??
+    currentWorkspace?.title ??
+    (repository === null ? '' : basename(repository.root))
+  // Plain words (productivity pass Q5, T5.4; b:212a): "Own workspace", "In the project" rather than the raw
+  // "sample (thread-842240 / main+)"; the workspace slug, bookmark and change id stay in the tooltip.
+  const ownWorkspace = repository !== null && repository.workspace !== null && repository.workspace !== 'default' && repository.workspace !== project
+  return { project, ownWorkspace }
+}
+
 /** Whether this Session has not sent its first message: its run row already says where it will work. */
 const useBlankSession = (props: ComposerSlotProps): boolean => {
   const sessions = props.jujutsu.sessions
@@ -137,16 +172,24 @@ export const ChangesPill = (props: ComposerSlotProps): JSX.Element | null => (us
 const ChangesPillContent = (props: ComposerSlotProps): JSX.Element | null => {
   const context = useComposerContext(props, 'composerBar')
   const repository = context.repository
+  const place = useWorkspacePlace(props, repository)
   if (repository === null) return null
-  const fileCount = repository.totals?.files ?? repository.files.length
+  // H3 (unslop): the diff is read for the Session's folder. In the project checkout that is every thread's work plus
+  // the user's own edits, so no pill claims it; the workspace menu states it as the project's (ProjectChangesSection).
+  const reading = ComposerContextModel.changesPill({
+    ownWorkspace: place.ownWorkspace,
+    files: repository.totals?.files ?? repository.files.length,
+    totals: repository.totals,
+    conflict: repository.conflict,
+  })
+  if (reading === null) return null
   const heading = context.base.kind === 'parent' ? 'Working copy' : 'Changes since branching from ' + repository.base.label
   const revisionSummary = ComposerContextModel.revisionSummary({
     baseLabel: repository.base.label,
     baseFound: repository.base.found,
     counts: repository.revisionCounts,
   })
-  const files = fileCount === 0 ? 'no file changes' : fileCount + (fileCount === 1 ? ' file' : ' files')
-  const totals = repository.totals === null ? '' : ', +' + repository.totals.additions + ' −' + repository.totals.deletions
+  const files = reading.files === 0 ? 'no file changes' : reading.files + (reading.files === 1 ? ' file' : ' files')
   // The accessible name is the one the replaced bar's review button had, so journeys and agents keep finding it; the
   // file counts live in the tooltip and the visible text.
   const label = 'Review workspace changes: ' + revisionSummary
@@ -154,8 +197,8 @@ const ChangesPillContent = (props: ComposerSlotProps): JSX.Element | null => {
     if (!props.jujutsu.openWorkspaceReview(repository.root, String(props.sessionId))) props.jujutsu.toggleJujutsu(repository.root)
   }
   // b:ark0: one line, never shrunk. The header's utilities group floors its width at its occupants' min-content and
-  // clips its start edge past that; a label free to wrap ("No changes") counted only as its longest word there, so the
-  // group came out narrower than the pill and cut its first letters off ("o changes").
+  // clips its start edge past that; a label free to wrap counted only as its longest word there, so the group came out
+  // narrower than the pill and cut its first letters off.
   return (
     <TooltipProvider delayDuration={500}>
       <Tooltip>
@@ -173,22 +216,68 @@ const ChangesPillContent = (props: ComposerSlotProps): JSX.Element | null => {
           >
             <FileDiffIcon />
             {/* b:czs9: in a header row under 26rem the pill keeps its icon; the counts stay in its name and tooltip. */}
-            {fileCount === 0 || repository.totals === null ? (
-              <span className={cn('dshx:@max-[26rem]:hidden', fileCount === 0 && 'dshx:max-sm:hidden')}>{fileCount === 0 ? 'No changes' : files}</span>
+            {reading.totals === null ? (
+              reading.files === 0 ? null : (
+                <span className="dshx:@max-[26rem]:hidden">{files}</span>
+              )
             ) : (
               <span className="dshx:font-mono! dshx:flex dshx:gap-1 dshx:@max-[26rem]:hidden">
-                <span>+{repository.totals.additions}</span>
-                <span>−{repository.totals.deletions}</span>
+                <span>+{reading.totals.additions}</span>
+                <span>−{reading.totals.deletions}</span>
               </span>
             )}
-            {repository.conflict && <span className="dshx:text-destructive">conflict</span>}
+            {reading.conflict && <span className="dshx:text-destructive">conflict</span>}
           </button>
         </TooltipTrigger>
         <TooltipContent className="dshx:whitespace-pre-line" side="bottom">
-          {heading + ' · ' + files + totals + '\n' + revisionSummary}
+          {heading + ' · ' + ComposerContextModel.changesSize(reading) + '\n' + revisionSummary}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
+  )
+}
+
+/**
+ * The workspace menu's row for a thread that edits the project checkout (H3, unslop): the checkout's diff, stated as
+ * the project's and not as this thread's, with the way into the Changes view the header pill gives an own workspace.
+ */
+export const ProjectChangesSection = (props: ComposerSlotProps & { readonly dismiss: () => void }): JSX.Element | null => {
+  const context = useComposerContext(props, 'composerBar')
+  const repository = context.repository
+  // The pill's own rule, so exactly one of the two ever states the diff.
+  const place = useWorkspacePlace(props, repository)
+  if (repository === null) return null
+  const reading = ComposerContextModel.projectChanges({
+    ownWorkspace: place.ownWorkspace,
+    files: repository.totals?.files ?? repository.files.length,
+    totals: repository.totals,
+    conflict: repository.conflict,
+  })
+  if (reading === null) return null
+  const revisionSummary = ComposerContextModel.revisionSummary({
+    baseLabel: repository.base.label,
+    baseFound: repository.base.found,
+    counts: repository.revisionCounts,
+  })
+  const open = (): void => {
+    props.dismiss()
+    if (!props.jujutsu.openWorkspaceReview(repository.root, String(props.sessionId))) props.jujutsu.toggleJujutsu(repository.root)
+  }
+  return (
+    <div
+      className="dshx-root dshx:flex dshx:items-center dshx:gap-2 dshx:px-3 dshx:pb-3 dshx:text-xs dshx:text-muted-foreground"
+      data-project-changes=""
+      ref={context.ref}
+    >
+      <p className="dshx:min-w-0 dshx:flex-1">
+        {context.base.kind === 'parent' ? 'The project has uncommitted changes' : `The project has changes that are not on ${repository.base.label}`}:{' '}
+        <span className="dshx:tabular-nums">{ComposerContextModel.changesSize(reading)}</span>
+        {reading.conflict ? <span className="dshx:text-destructive"> · conflict</span> : null}. They can come from any thread working here.
+      </p>
+      <Button aria-label={'Review project changes: ' + revisionSummary} className="dshx:shrink-0" onClick={open} size="sm" type="button" variant="outline">
+        Review
+      </Button>
+    </div>
   )
 }
 
@@ -216,35 +305,13 @@ const Chip = (props: { readonly tooltip: string; readonly onClick: () => void; r
 export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   const context = useComposerContext(props, 'composerChips')
   const repository = context.repository
-  const workspaces = useWorkspaceItems(props.jujutsu.workspaces)
-  const currentWorkspace = workspaces.find(workspace => workspace.sessionIds.includes(props.sessionId))
-  const workspaceId = currentWorkspace?.workspaceId
-  const api = useApi(jjIntegrationApi)
-  const destination = useQuery({
-    queryKey: ['jujutsu', 'composer-project', workspaceId ?? ''],
-    enabled: repository !== null && workspaceId !== undefined,
-    retry: false,
-    queryFn: ({ signal }) =>
-      runHostRequest({
-        signal,
-        timeoutMs: 15_000,
-        request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }),
-      }).catch(error => {
-        if (isApiOwnerMissing(error)) return null
-        throw error
-      }),
-  })
+  const { project, ownWorkspace } = useWorkspacePlace(props, repository)
   if (repository === null) return null
   const toggle = (): void => props.jujutsu.toggleJujutsu(repository.root)
 
   const ownBookmark = repository.bookmarks[0]
   const nearestBookmark = repository.nearestBookmarks[0]
   const bookmark = ownBookmark ?? nearestBookmark
-  const project =
-    workspaces.find(workspace => workspace.workspaceId === destination.data?.projectWorkspaceId)?.title ?? currentWorkspace?.title ?? basename(repository.root)
-  // Plain words (productivity pass Q5, T5.4; b:212a): "Own workspace · 1 ahead of main", "In the project · on main" rather
-  // than the raw "sample (thread-842240 / main+)"; the workspace slug, bookmark and change id stay in the tooltip.
-  const ownWorkspace = repository.workspace !== null && repository.workspace !== 'default' && repository.workspace !== project
   // Composer follow-up b:gyk7: the composer's run summary already names the project, so the chip says only where the
   // working copy stands, with the count when the base is that bookmark ("2 ahead of main", "2 behind").
   const counts = bookmark !== undefined && repository.base.label === bookmark ? repository.revisionCounts : undefined
