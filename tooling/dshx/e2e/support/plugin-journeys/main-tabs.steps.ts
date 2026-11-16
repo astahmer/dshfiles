@@ -12,8 +12,16 @@ const STORAGE_KEY = 'dshfiles.main-tabs.v1'
 const strip = (page: Page) => page.getByRole('tablist', { name: 'Open views', exact: true })
 // Tab titles name the page, never its plugin (docs/ade-ux Phase 3b): the rail section label ("History"), else the
 // navigation label without its "Plugin: " prefix. Native core page titles stay as they are.
-const nativeTabName = (name: string): string | RegExp =>
-  name === 'Plugins' || name === 'Automation tasks' || name === 'Settings' ? name : viewNamePattern(name)
+/**
+ * A thread tab's accessible name ends with its status when it has one ("Thread, Failed"). A journey thread's turn
+ * fails at once (no provider answers it), so the status can land before a step reads the tab: match the title either way.
+ */
+const THREAD_STATUS_SUFFIX = '(?:, (?:Working|Needs you|Failed|Finished, unread))?'
+const nativeTabName = (name: string): string | RegExp => {
+  if (name === 'Plugins' || name === 'Automation tasks' || name === 'Settings') return name
+  // viewNamePattern anchors its alternatives with a closing `$`: the optional status goes in front of it.
+  return new RegExp(`${viewNamePattern(name).source.slice(0, -1)}${THREAD_STATUS_SUFFIX}$`, 'u')
+}
 const tab = (page: Page, name: string) => strip(page).getByRole('tab', { name: nativeTabName(name), exact: true })
 /**
  * The Jujutsu page carries no title heading since its own header became the tab strip's job, so its repository control
@@ -27,7 +35,8 @@ const tabSummary = (page: Page): Promise<readonly string[]> =>
     .evaluateAll(nodes =>
       nodes.map(node => {
         const element = node instanceof HTMLElement ? node : null
-        const name = node.getAttribute('aria-label') ?? ''
+        // The status a thread tab's name ends with is not part of this summary.
+        const name = (node.getAttribute('aria-label') ?? '').replace(/, (?:Working|Needs you|Failed|Finished, unread)$/u, '')
         const active = node.getAttribute('aria-selected') === 'true' ? '*' : ''
         const preview = element?.dataset.preview === undefined ? '' : ' (preview)'
         const pinned = element?.dataset.pinned === undefined ? '' : ' (pinned)'

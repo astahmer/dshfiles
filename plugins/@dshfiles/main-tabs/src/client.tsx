@@ -34,6 +34,7 @@ import { TabMenuItems } from './tab-menu-items.js'
 import { effectiveTabPreferences } from './tab-preferences-policy.js'
 import { installThreadLinkClicks } from './thread-link-click.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
+import { useFailedThreadIds } from './failed-threads.js'
 import { DEFAULT_TAB_PREFERENCES, START_TAB_ID, tabIdOf, tabsMachine, type TabPreferences, type TabsEvent } from './tabs-machine.js'
 import { DEFAULT_CLOSE_BUTTON_POSITION, type HostTarget } from '@dshfiles/workbench/tabs'
 import { connectWorkbenchTabs, WorkbenchTabDocking, type WorkbenchTab } from './workbench-tabs.js'
@@ -445,6 +446,7 @@ export default defineClient({
             }
           }, [attentionRecords, clearAttention])
           const attentionSessionIds = useMemo(() => new Set(attention.views.map(record => record.sessionId)), [attention.views])
+          const failedSessionIds = useFailedThreadIds(attention.views)
           const catalog = useSyncExternalStore(subscribeCatalog, catalogSnapshot)
           const startContentVersion = useMemo(() => ({ byId, statuses, catalog, panelVersion }), [byId, statuses, catalog, panelVersion])
 
@@ -469,6 +471,7 @@ export default defineClient({
             const tabStatus = threadTabStatus({
               needsYou: status?.pendingInteraction !== undefined,
               running: status?.running ?? session?.running ?? false,
+              failed: session !== undefined && failedSessionIds.has(session.id),
               unread: session !== undefined && attentionSessionIds.has(session.id),
             })
             const title = session?.title ?? (session === undefined || session.blank ? translate('untitledThread') : session.displayTitle)

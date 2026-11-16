@@ -17,7 +17,7 @@ import type { TabsEvent } from './tabs-machine.js'
 
 export type { TabView, TabStatus } from '@dshfiles/workbench/tabs'
 import { DEFAULT_CLOSE_BUTTON_POSITION, type CloseButtonPosition, type TabView, type TabStatus } from '@dshfiles/workbench/tabs'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { TabStatusGlyph } from '@dshfiles/workbench/tab-status'
 
 /** What one dragged tab can move into: a thread's aside, or a panel with both a main tab and a right-sidebar tab. */
 type DraggedMove =
@@ -39,21 +39,21 @@ interface TabStripProps {
   readonly projectNames?: ReadonlyMap<string, string>
 }
 
-/** One dot per thread tab, most urgent first: a question or approval waits, then work in progress, then an unseen finish. */
-export const threadTabStatus = (facts: { readonly needsYou: boolean; readonly running: boolean; readonly unread: boolean }): TabStatus | null => {
+/** One glyph per thread tab, most urgent first: a question or approval waits, then work in progress, then a failed last turn, then an unseen finish. */
+export const threadTabStatus = (facts: {
+  readonly needsYou: boolean
+  readonly running: boolean
+  readonly failed?: boolean
+  readonly unread: boolean
+}): TabStatus | null => {
   if (facts.needsYou) return 'needsYou'
   if (facts.running) return 'running'
+  if (facts.failed === true) return 'failed'
   if (facts.unread) return 'unread'
   return null
 }
 
-const statusDotClass = {
-  running: 'dshx:animate-pulse dshx:bg-info',
-  needsYou: 'dshx:bg-warning',
-  unread: 'dshx:bg-primary',
-} satisfies Record<TabStatus, string>
-
-const statusLabel = { running: 'running', needsYou: 'needsYou', unread: 'unread' } as const satisfies Record<TabStatus, string>
+const statusLabel = { running: 'running', needsYou: 'needsYou', failed: 'failed', unread: 'unread' } as const satisfies Record<TabStatus, string>
 
 /** DSH's dock-kit strip glyphs (`dsh-client-ui-dockkit`): a 1px cross and plus on a 16px grid, drawn at 14px. */
 const CloseGlyph = (): ReactElement => (
@@ -331,7 +331,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                         {closeButtonPosition === 'left' ? closeButton : null}
                         <span className="dshx:flex dshx:min-w-0 dshx:flex-auto dshx:items-center dshx:gap-[5px] dshx:overflow-hidden dshx:leading-[1.4]">
                           {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
-                          {tab.status === null ? null : <StatusDot size="sm" className={cn('dshx:flex-none', statusDotClass[tab.status])} />}
+                          {tab.status === null ? null : <TabStatusGlyph status={tab.status} decorative className="dshx:flex-none" />}
                           {project === undefined ? null : (
                             <span data-tab-project="" className="dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:text-(--dsw-alias-label-tertiary)">
                               {project} /
@@ -417,7 +417,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
             {tabs.map(tab => (
               <DropdownMenuItem key={tab.id} onSelect={() => send({ type: 'tab.select', tabId: tab.id })} className={cn(tab.active && 'dshx:font-semibold')}>
                 <span className="dshx:truncate">{tab.title}</span>
-                {tab.status === null ? null : <StatusDot className={cn('dshx:ml-auto', statusDotClass[tab.status])} />}
+                {tab.status === null ? null : <TabStatusGlyph status={tab.status} label={t(statusLabel[tab.status])} className="dshx:ml-auto" />}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
