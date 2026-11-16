@@ -8,7 +8,7 @@ import { LiveActivityLine, LiveElapsed, useLiveTurns, type LiveTurnView } from '
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { HostSnapshotsModel } from './snapshots.js'
 
-type HeaderLiveActivityProps = Pick<PropsRuntime<'conversation.session.header.utilities'>, 'sessionId' | 'useSessions'> &
+type HeaderLiveActivityProps = Pick<PropsRuntime<'conversation.session.header.utilities'>, 'sessionId' | 'useSessions' | 'useSessionStatus'> &
   Pick<PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>, 't'>
 
 const NO_IDS: readonly string[] = []
@@ -22,14 +22,17 @@ const NO_IDS: readonly string[] = []
  * Instead it sheds parts by the header row's width (the row is an inline-size container): the elapsed time first,
  * then the step, leaving the glyph. The workspace chip sheds its label and count at narrower tiers.
  *
- * A turn that waits for the user's answer is not Working (unslop H8): it shows the Needs-you glyph and label, and the
- * glyph is what stays in a narrow pane, so a blocked thread never reads as a busy one.
+ * A turn that waits for the user is not Working (unslop H8): it shows the Needs-you glyph and label, and the glyph is
+ * what stays in a narrow pane, so a blocked thread never reads as a busy one. That holds for a question (the turn's
+ * open call says so) and for an approval or any other pending interaction (the thread's own status says so).
  */
 export const HeaderLiveSignal = (props: {
   readonly turn: LiveTurnView | undefined
+  /** The thread holds a pending interaction (an approval, a plan review, a question): nothing runs until the user acts. */
+  readonly waitingOnYou?: boolean
   readonly labels: { readonly working: string; readonly needsYou: string }
 }): JSX.Element => {
-  const needsYou = props.turn?.needsYou === true
+  const needsYou = props.turn?.needsYou === true || props.waitingOnYou === true
   return (
     <span
       className={cn(
@@ -69,10 +72,13 @@ const HeaderLiveActivityBody = (props: HeaderLiveActivityProps): JSX.Element | n
   const running = session !== undefined && session.running && !session.blank
   const ids = useMemo(() => (running ? [props.sessionId] : NO_IDS), [props.sessionId, running])
   const turns = useLiveTurns(ids, sessionState.phase === 'ready')
+  // An approval is not a tool call the live-turn fold can see: the thread's pending interaction is the signal.
+  const waitingOnYou = props.useSessionStatus(statuses => statuses.get(props.sessionId)?.pendingInteraction !== undefined)
   if (!running) return null
   return (
     <HeaderLiveSignal
       turn={turns.get(props.sessionId)}
+      waitingOnYou={waitingOnYou}
       labels={{ working: props.t('threadSidebarWorking'), needsYou: props.t('threadSidebarStateNeedsYou') }}
     />
   )
