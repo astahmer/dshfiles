@@ -266,7 +266,8 @@ Feature: Thread sidebar journeys
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/sidebar-right, @dshfiles/command-palette" is booted
     When a nonblank Host thread is opened in the side panel from its context menu
     Then the side panel hosts that thread's scrollable conversation and composer
-    And the thread row offers the side-panel hover action
+    When the side-panel hover action is switched on in Customize sidebar
+    Then the thread row offers the side-panel hover action
     When the side panel is closed and the same thread is opened from the command palette
     Then the side panel hosts that thread again
     When the side-panel hover action is switched off in Customize sidebar
