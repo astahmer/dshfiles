@@ -6,7 +6,7 @@
 
 A footer under each finished turn that says what the agent did with tools:
 
-> `pricing.ts +40 −3` `cart.ts +2 −4` · ran 6 commands › · tests 40/42 · read 4 files · 2 searches · **1 failed ›** · 1m 12s
+> `pricing.ts +40 −3` `cart.ts +2 −4` · ran 6 commands › · **2 tests failed ›** · read 4 files · 2 searches · 1m 12s
 
 - **Changed-file chips** (visual refresh T2.3) name each file the turn actually wrote (a rejected edit is not counted)
   with its lines added and removed; a chip opens that turn's review in the Changes facet (the file in the editor until
@@ -14,7 +14,8 @@ A footer under each finished turn that says what the agent did with tools:
   walkthrough. With the walkthrough setting off, the footer falls back to the `Edited 3 files +42 −7 ›` count, whose
   list opens each file in the editor.
 - **Commands** open every command (its description, or the first line of the command) with how it ended.
-- **Tests** are passed / total from the last Vitest, Jest or pytest summary a command printed in the turn; red when any failed.
+- **Tests** are the outcome of the last Vitest, Jest or pytest summary a command printed in the turn: "2 tests failed" in red, else "40 tests passed". When the test run is the turn's one failed command, the test outcome opens it and no second failure count is shown.
+- **Nothing twice, nothing empty.** Calls that are neither a command, an edit, a read nor a search get no part (no "1 other tool call"), a turn under a second shows no duration, and a turn with nothing to name gets no line. A wrapped line never starts with a separator.
 - The red **failure count** opens the failed commands and how each ended: `exit 1`, `signal SIGKILL`, `no exit code`, or `error` when the tool rejected the call.
 - **Duration** is the turn's wall time, from `turn/start` to `turn/end`.
 
@@ -37,7 +38,7 @@ All apply live.
 | `includeReads` | `true`  | Count file reads and searches as well as commands and edits.   |
 | `listFailures` | `true`  | Let the failed-command count open the list of failed commands. |
 | `lineCounts`   | `true`  | Show lines added and removed next to the edited-file count.    |
-| `testResults`  | `true`  | Show passed / total tests from the last test-runner summary.   |
+| `testResults`  | `true`  | Show the test outcome from the last test-runner summary.       |
 | `duration`     | `true`  | Show how long the turn took.                                   |
 | `openLists`    | `true`  | Let the edited-file and command counts open their lists.       |
 | `walkthrough`  | `true`  | Show the walkthrough row after a turn that edited files.       |
