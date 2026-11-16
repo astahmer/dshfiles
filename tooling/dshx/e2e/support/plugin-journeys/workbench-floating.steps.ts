@@ -53,6 +53,8 @@ const floatSource = async (page: Page, sourceRegion: string, name: string): Prom
   if (original === null) throw new Error('Native Threads body has not mounted')
   journeys.set(page, { id, name, sourceRegion, original })
   await threads.click({ button: 'right' })
+  // A tab's docking verbs sit under Layout.
+  await page.getByRole('menuitem', { name: 'Layout', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Float panel', exact: true }).click()
   await expect(chrome(page)).toBeVisible()
   await expect(chrome(page).locator('.dv-groupview-floating')).toHaveCount(1)

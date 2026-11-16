@@ -6,6 +6,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -177,17 +178,24 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
+          {/* Tab verbs first. One close verb, "Close tab": the provider's menu carries its own, the rest get it here. */}
           {tab &&
             (channel.renderTabMenu?.(tab.id, () => setRenaming(true), setNotice) ?? (
               <>
                 <ContextMenuItem onSelect={() => channel.actions.keep(tab.id)}>Keep tab</ContextMenuItem>
                 <ContextMenuItem onSelect={() => channel.actions.togglePin(tab.id)}>{tab.pinned ? 'Unpin tab' : 'Pin tab'}</ContextMenuItem>
                 <ContextMenuItem onSelect={() => channel.actions.moveAside(tab.id)}>Move to side panel</ContextMenuItem>
+                <ContextMenuItem onSelect={close}>Close tab</ContextMenuItem>
                 <ContextMenuItem onSelect={() => channel.actions.closeOthers(tab.id)}>Close other tabs</ContextMenuItem>
                 <ContextMenuItem onSelect={() => channel.actions.closeToRight(tab.id)}>Close tabs to the right</ContextMenuItem>
               </>
             ))}
-          {tab === undefined && <GroupCloseItems panel={props.api} closePanel={closePanel} />}
+          {tab === undefined && (
+            <>
+              <ContextMenuItem onSelect={close}>Close tab</ContextMenuItem>
+              <GroupCloseItems panel={props.api} closePanel={closePanel} />
+            </>
+          )}
           {/* Add to sidebar ▸ ‹folder› (b:952m): a reusable view or page, never a thread tab or a chooser. */}
           {(() => {
             const sidebar = SidebarFolderTargets.get()
@@ -208,18 +216,24 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
               </ContextMenuSub>
             )
           })()}
-          <ContextMenuItem
-            onSelect={() => {
-              const panel = props.containerApi.getPanel(props.api.id)
-              if (panel !== undefined) props.containerApi.addFloatingGroup(panel)
-            }}
-          >
-            Float panel
-          </ContextMenuItem>
-          <ContextMenuItem disabled={!TabRows.canHide(props.api.group)} onSelect={() => TabRows.hide(props.containerApi, props.api.group)}>
-            Hide tab row
-          </ContextMenuItem>
-          <ContextMenuItem onSelect={close}>Close panel</ContextMenuItem>
+          {/* Docking verbs act on the pane, not on the tab's content: one submenu keeps them out of the tab verbs. */}
+          <ContextMenuSeparator />
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>Layout</ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              <ContextMenuItem
+                onSelect={() => {
+                  const panel = props.containerApi.getPanel(props.api.id)
+                  if (panel !== undefined) props.containerApi.addFloatingGroup(panel)
+                }}
+              >
+                Float panel
+              </ContextMenuItem>
+              <ContextMenuItem disabled={!TabRows.canHide(props.api.group)} onSelect={() => TabRows.hide(props.containerApi, props.api.group)}>
+                Hide tab row
+              </ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
         </ContextMenuContent>
       </ContextMenu>
     )
