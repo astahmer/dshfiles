@@ -347,8 +347,9 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   const content = useRef<HTMLDivElement>(null)
   const countOf = (entry: SettingsEntry): number | undefined => {
     if (!searching) return undefined
-    const ids = [entry.id, ...(entry.sectionId === undefined || entry.sectionId === entry.id ? [] : [entry.sectionId]), ...entry.pages.map(page => page.pageId)]
-    return ids.reduce((sum, id) => sum + (result.counts.get(id) ?? 0), 0)
+    // A page that is the whole entry shares its id with it: each id counts once ("Main tabs 2" for one match).
+    const ids = new Set([entry.id, ...(entry.sectionId === undefined ? [] : [entry.sectionId]), ...entry.pages.map(page => page.pageId)])
+    return [...ids].reduce((sum, id) => sum + (result.counts.get(id) ?? 0), 0)
   }
   // While searching, a tree entry with matches scrolls to its results (VS Code filters the same way); others open.
   const select = (id: string): void => {
