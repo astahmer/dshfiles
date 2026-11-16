@@ -1377,13 +1377,20 @@ Then('the inline backlog preview gallery opens above its card and navigates both
 })
 
 When('the backlog preview is opened in the Backlog panel', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Open in Backlog', exact: true }).click()
+  const open = page.getByRole('button', { name: 'Open in Backlog', exact: true })
+  // A scroll closes the card by design; ask again from the last preview link the detail shows until it holds still.
+  const lastLink = peek(page).getByRole('button', { name: /^Preview backlog item /u }).last()
+  await expect(async () => {
+    if (!(await open.isVisible())) await lastLink.click()
+    await open.click({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
   await expect(peek(page)).toBeVisible()
 })
 
 Then('the backlog detail shows {string}', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'backlog-reference-opened-in-panel', async () => {
-    await expect(peek(page).getByText(text, { exact: true })).toBeVisible()
+    // The detail is headed by the item's title (and repeats it as the editable title below).
+    await expect(peek(page).locator('[data-peek-title]')).toHaveText(text)
   })
 })
 

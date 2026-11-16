@@ -100,7 +100,7 @@ import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import { ItemTimeline } from './item-timeline.js'
 import { BacklogReference } from './backlog-reference.js'
-import { BacklogMentionHandle } from './backlog-mention-handle.js'
+import { PeekHeading } from './peek-heading.js'
 
 type OpenThread = (sessionId: string) => void
 type ThreadLabel = (sessionId: string) => string
@@ -1255,16 +1255,7 @@ const PeekBody = (props: {
   return (
     <>
       <header className="dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-4">
-        <nav aria-label="Breadcrumb" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-          {item.project === null ? null : (
-            <>
-              <ItemGlyphs.ProjectLabel project={item.project} />
-              <span>/</span>
-            </>
-          )}
-          <BacklogMentionHandle item={item} className="dshx:text-foreground" />
-          {item.freshness === 'fresh' ? null : <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-2xs">{item.freshness}</span>}
-        </nav>
+        <PeekHeading item={item} />
         <TooltipProvider>
           <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
             <Tooltip>
