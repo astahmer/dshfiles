@@ -185,6 +185,39 @@ describe('settings view: search counts', () => {
   })
 })
 
+describe('settings view: Jev pointer', () => {
+  const jevField = (key: string): SettingField =>
+    // SAFETY: grouping reads only the key and path of a field.
+    ({ key, path: [key], title: key, description: '', groups: [] }) as unknown as SettingField
+  const page = (ns: string, keys: readonly string[]): PluginSettingsPage => ({
+    pageId: `plugin:${ns}`,
+    ns,
+    title: ns,
+    description: '',
+    group: 'plugins',
+    fields: keys.map(jevField),
+    modifiedPaths: [],
+  })
+  const groups = SettingsGroups.group({
+    sections: [...rows, { id: 'dshfiles-update-dsh', order: 20, label: 'Update DSH' }],
+    pages: [page('dshfiles-settings-shell', ['releaseCheck', 'jevSecret']), page('dshfiles-backlog', ['autoTriage', 'jevEnabled'])],
+    panels: new Set(),
+  })
+  const note = (view: { readonly host: HTMLElement }): string | undefined => view.host.querySelector('[role="note"]')?.textContent ?? undefined
+
+  it('points a plugin page at the Jev entry that holds its Jev settings', () => {
+    const view = mount({ groups, activeId: 'plugin:dshfiles-backlog' })
+    expect(note(view)).toContain('entry.jevMoved')
+    view.unmount()
+  })
+
+  it('says nothing on the page whose namespace only lends the shared key', () => {
+    const view = mount({ groups, activeId: 'dshfiles-update-dsh' })
+    expect(note(view)).toBeUndefined()
+    view.unmount()
+  })
+})
+
 describe('settings view: one grouped page', () => {
   it('lists entries under task groups and opens a linked page from its entry', () => {
     const view = mount({ activeId: 'link:mcp-servers' })
