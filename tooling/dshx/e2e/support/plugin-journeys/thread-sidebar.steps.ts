@@ -255,7 +255,7 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
   if (archivedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
   await expect(targetRow).toHaveCount(1)
-  await expect(targetRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
+  await expect(targetRow.getByRole('button', { name: 'Settle', exact: true })).toBeEnabled()
   const scrollPane = threadSidebar(page).getByTestId('thread-sidebar-scroll')
   const scrollPaneTopBeforeArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
   await openThreadRowMenu(targetRow)
@@ -366,7 +366,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await composer.fill(timedPrompt)
   await composer.press('Enter')
   const timedRow = threadSidebar(page).locator('article').filter({ hasText: timedPrompt })
-  await expect(timedRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
+  await expect(timedRow.getByRole('button', { name: 'Settle', exact: true })).toBeEnabled()
   await openThreadRowMenu(timedRow)
   await chooseRowStatusAction(page, 'Archive')
   const archivedNotice = threadSidebar(page).getByText('Thread archived.', { exact: true })
@@ -383,7 +383,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await page.getByRole('textbox').first().fill(disabledPrompt)
   await page.getByRole('textbox').first().press('Enter')
   const disabledRow = threadSidebar(page).locator('article').filter({ hasText: disabledPrompt })
-  await expect(disabledRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
+  await expect(disabledRow.getByRole('button', { name: 'Settle', exact: true })).toBeEnabled()
   await openThreadRowMenu(disabledRow)
   await chooseRowStatusAction(page, 'Archive')
   await expect(threadSidebar(page).getByRole('button', { name: 'Archived (2)', exact: true })).toBeVisible()
@@ -407,7 +407,7 @@ When('an archived thread is opened from the Archived section', async ({ page }: 
   const archivedThreadId = currentThreadId(page)
   if (archivedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   const targetRow = threadRow(page, archivedThreadId)
-  await expect(targetRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
+  await expect(targetRow.getByRole('button', { name: 'Settle', exact: true })).toBeEnabled()
   await openThreadRowMenu(targetRow)
   await chooseRowStatusAction(page, 'Archive')
 
@@ -573,7 +573,7 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
   })
   await recordAssertion(page, 'thread-sidebar-settled-stays-out-of-finished-turns', async () => {
     // A settled thread is storage, like an archived one: a view that lists finished turns never lists it.
-    await setThreadStatusFilters(page, 'Filter: None', ['Turn finished'])
+    await setThreadStatusFilters(page, 'Filter: Any', ['Turn finished'])
     await expect(targetRow).toHaveCount(0)
     await expect(threadSidebar(page).getByText('No finished turns to review right now.', { exact: true })).toBeVisible()
     await setThreadStatusFilters(page, 'Filter: Turn finished', [])
@@ -1029,7 +1029,7 @@ Then('the board shows only columns, grouped and filtered independently from the 
   })
 
   await selectThreadViewValue(page, 'Group: Arrange manually', 'Project', board)
-  await selectThreadViewValue(page, 'Filter: None', 'Working', board)
+  await selectThreadViewValue(page, 'Filter: Any', 'Working', board)
   await selectThreadViewValue(page, 'Filter: Working', 'Subagent threads', board)
   const projectFilter = board.getByRole('combobox', { name: 'Project filter', exact: true })
   await projectFilter.click()
@@ -1125,12 +1125,15 @@ When('a nonblank Host thread is pinned from its session header', async ({ page }
   await expect(threadRow(page, threadId)).toHaveCount(1)
   const threadActions = page.getByRole('group', { name: 'Thread actions', exact: true })
   await expect(threadActions).toHaveCount(1)
+  // The header draws one control, the thread menu: Pin is a row of it, beside Archive.
+  await expect(threadActions.getByRole('button')).toHaveCount(1)
   await threadActions.getByRole('button', { name: 'More thread actions', exact: true }).click()
   await expect(page.getByRole('menuitem', { name: 'Archive', exact: true })).toBeVisible()
-  await page.keyboard.press('Escape')
-  await threadActions.getByRole('button', { name: 'Pin', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Pin', exact: true }).click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Pinned (1)', exact: true })).toBeVisible()
-  await expect(threadActions.getByRole('button', { name: 'Unpin', exact: true })).toBeVisible()
+  await threadActions.getByRole('button', { name: 'More thread actions', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: 'Unpin', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('alert').filter({ hasText: 'could not update' })).toHaveCount(0)
 })
 
@@ -1149,12 +1152,17 @@ When('a nonblank Host thread is pinned from its sidebar row', async ({ page, $te
   await expect.poll(() => threadRowActions.evaluate(element => getComputedStyle(element).pointerEvents)).toBe('auto')
   const scrollPane = threadSidebar(page).getByTestId('thread-sidebar-scroll')
   await expect.poll(() => scrollPane.evaluate(element => getComputedStyle(element).overscrollBehaviorY)).toBe('contain')
-  const pinButton = targetRow.getByRole('button', { name: 'Pin', exact: true })
-  await pinButton.hover()
+  // A row hovers one verb and the row menu (unslop S1): Pin is a row of that menu, which the strip's ⋯ opens.
+  await expect(threadRowActions.getByRole('button')).toHaveCount(2)
+  const rowMenuButton = threadRowActions.getByRole('button', { name: 'Thread actions', exact: true })
+  await rowMenuButton.hover()
   await expect.poll(() => threadRowActions.evaluate(element => getComputedStyle(element).opacity)).toBe('1')
-  await pinButton.click()
+  await rowMenuButton.click()
+  await page.getByRole('menuitem', { name: 'Pin', exact: true }).click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Pinned (1)', exact: true })).toBeVisible()
-  await expect(targetRow.getByRole('button', { name: 'Unpin', exact: true })).toHaveCount(1)
+  await openThreadRowMenu(targetRow)
+  await expect(page.getByRole('menuitem', { name: 'Unpin', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
   await expect(threadSidebar(page).getByText('could not update', { exact: false })).toHaveCount(0)
 })
 
@@ -1172,7 +1180,7 @@ When('three nonblank Host threads fill the Active section', async ({ page }: { p
   await expect(threadSidebar(page).locator('article')).toHaveCount(3)
   for (const prompt of prompts) {
     const row = threadSidebar(page).locator('article').filter({ hasText: prompt })
-    await expect(row.getByRole('button', { name: 'Archive', exact: true })).toHaveCount(1, { timeout: 30_000 })
+    await expect(row.getByRole('button', { name: 'Settle', exact: true })).toHaveCount(1, { timeout: 30_000 })
   }
   batchSelectionJourneys.set(page, { threadIds, prompts })
 })
@@ -1249,8 +1257,9 @@ When('a thread is snoozed until tomorrow morning from its sidebar row', async ({
   if (mutedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   const targetRow = threadRow(page, mutedThreadId)
   await expect(targetRow).toHaveCount(1)
-  await targetRow.hover()
-  await targetRow.getByRole('button', { name: 'Mute thread', exact: true }).click()
+  // Mute is a row menu entry (it is not among the default hover actions).
+  await openThreadRowMenu(targetRow)
+  await page.getByRole('menuitem', { name: 'Mute thread', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Until tomorrow morning', exact: true }).click()
   const marker = targetRow.getByRole('img', { name: 'Muted', exact: true })
   await expect(marker).toBeVisible()
@@ -1279,7 +1288,7 @@ Then('it stays snoozed after reload and the Muted filter lists it', async ({ pag
   await recordAssertion(page, 'thread-sidebar-mute-survives-reload', async () => {
     await expect(targetRow.getByRole('img', { name: 'Muted', exact: true })).toBeVisible()
   })
-  await selectThreadViewValue(page, 'Filter: None', 'Muted')
+  await selectThreadViewValue(page, 'Filter: Any', 'Muted')
   await recordAssertion(page, 'thread-sidebar-muted-filter-lists-muted-thread', async () => {
     await expect(targetRow).toHaveCount(1)
   })
@@ -1333,7 +1342,7 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar view filter e2e' })
   await expect(targetRow).toHaveCount(1)
   await expect(page.getByText('This turn failed', { exact: false })).toBeVisible()
-  await selectThreadViewValue(page, 'Filter: None', 'Working')
+  await selectThreadViewValue(page, 'Filter: Any', 'Working')
   await expect(targetRow).toHaveCount(0)
   await expect(threadSidebar(page).getByText('No threads are working right now.', { exact: true })).toBeVisible()
   await selectThreadViewValue(page, 'Filter: Working', 'All threads')
@@ -1350,7 +1359,7 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await selectBlankThreadAwayFrom(page, archivedThreadId)
 
   await selectThreadViewValue(page, 'Group: Arrange manually', 'Date')
-  await selectThreadViewValue(page, 'Filter: None', 'Archived')
+  await selectThreadViewValue(page, 'Filter: Any', 'Archived')
   await selectThreadViewValue(page, 'Filter: Archived', 'Main threads')
   await expect(targetRow).toBeVisible()
   await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(displayTitle)
@@ -1443,7 +1452,8 @@ When('a view context menu marks a thread unread', async ({ page }: { page: Page 
   // Productivity pass Q5: the view's read / unread verbs are in the Filter menu, under the active preset's options.
   await ThreadListFilter.selectView(page, threadSidebar(page), 'All threads')
   await ThreadListFilter.clickViewItem(page, threadSidebar(page), 'Mark all as unread')
-  await expect(row.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
+  // The fixture turn fails (no provider): the row's glyph says Failed, so the unread mark is read from the row itself.
+  await expect(row).toHaveAttribute('data-unread', '')
 })
 
 Then('the same view context menu marks it read', async ({ page }: { page: Page }) => {
@@ -1452,7 +1462,7 @@ Then('the same view context menu marks it read', async ({ page }: { page: Page }
   const row = threadRow(page, threadId)
   await ThreadListFilter.clickViewItem(page, threadSidebar(page), 'Mark all as read')
   await recordAssertion(page, 'thread-sidebar-view-context-read-unread', async () => {
-    await expect(row.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
+    await expect(row).not.toHaveAttribute('data-unread', '')
   })
   await finishJourneyAssertions(page)
 })
@@ -1477,11 +1487,13 @@ When('one thread is marked unread and another thread is opened', async ({ page }
   await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
   await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Mark unread', exact: true }).click()
-  await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
+  // The fixture turn fails (no provider): the row's glyph says Failed, so the unread mark is read from the row itself.
+  await expect(targetRow).toHaveAttribute('data-unread', '')
 
   await openThreadRow(otherRow)
   await expect.poll(() => currentThreadId(page)).toBe(otherThreadId)
-  await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
+  // The fixture turn fails (no provider): the row's glyph says Failed, so the unread mark is read from the row itself.
+  await expect(targetRow).toHaveAttribute('data-unread', '')
 
   await openThreadRow(targetRow)
   await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
@@ -1491,7 +1503,7 @@ Then('its unread marker clears on open', async ({ page }: { page: Page }) => {
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar primary unread' })
   await recordAssertion(page, 'thread-sidebar-manual-unread-clears-on-open', async () => {
     await expect(targetRow).toHaveCount(1)
-    await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
+    await expect(targetRow).not.toHaveAttribute('data-unread', '')
   })
   await finishJourneyAssertions(page)
 })
@@ -1527,11 +1539,12 @@ When('a thread finishes its turn and the browser hands its unfinished marker to 
 Then('every open tab shows the finished turn until one tab opens it', async ({ page }: { page: Page }) => {
   const journey = finishedTurnJourneys.get(page)
   if (journey === undefined) throw new Error('No finished-turn journey was recorded for this browser page.')
-  // Status grouping shows an unacknowledged finished turn as the Ready glyph; opening the thread makes it Idle.
-  const finishedLabel = (target: Page) => threadRow(target, journey.targetThreadId).getByRole('img', { name: 'Ready', exact: true })
+  // The fixture turn fails (no provider), so its row reads Failed whether or not it was opened: a failure is not
+  // something reading clears. What is still unacknowledged shows in the Done preset's name and dot, read below.
+  const failedLabel = (target: Page) => threadRow(target, journey.targetThreadId).getByRole('img', { name: 'Failed', exact: true })
   await recordAssertion(page, 'thread-sidebar-turn-finished-outlives-its-client', async () => {
     await page.reload()
-    await expect(finishedLabel(page)).toBeVisible({ timeout: 60_000 })
+    await expect(failedLabel(page)).toBeVisible({ timeout: 60_000 })
     // The views are the Filter menu's presets (Q5, b:xpvk); each keeps the former tab's name and dot.
     const tabs = await ThreadListFilter.openViews(page, threadSidebar(page))
     const doneTab = tabs.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })
@@ -1545,7 +1558,7 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
   try {
     await otherTab.goto(page.url())
     await recordAssertion(page, 'thread-sidebar-turn-finished-is-shared-across-tabs', async () => {
-      await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
+      await expect(failedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
       await expect(
         (await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab)))
           .getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })
@@ -1553,7 +1566,7 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
       ).toBeVisible()
       await ThreadListFilter.close(otherTab)
       await otherTab.reload()
-      await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
+      await expect(failedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
       await expect(
         (await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab)))
           .getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })
@@ -1563,16 +1576,17 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
     })
     await recordAssertion(page, 'thread-sidebar-turn-finished-clears-in-every-tab', async () => {
       await openThreadRow(threadRow(otherTab, journey.targetThreadId))
-      await expect(finishedLabel(otherTab)).toHaveCount(0, { timeout: 15_000 })
+      // Opening it acknowledges the finish (the preset loses its count); the row stays Failed.
       const otherViews = await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab))
-      await expect(otherViews.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0)
+      await expect(otherViews.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0, { timeout: 15_000 })
       await expect(otherViews.getByRole('menuitemradio', { name: ThreadListFilter.viewName('Done') }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
       await ThreadListFilter.close(otherTab)
+      // Read with the menu closed: an open menu hides the list from role queries.
+      await expect(failedLabel(otherTab)).toBeVisible()
       await page.bringToFront()
       await page.reload()
-      await expect(finishedLabel(page)).toHaveCount(0, { timeout: 30_000 })
       const views = await ThreadListFilter.openViews(page, threadSidebar(page))
-      await expect(views.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0)
+      await expect(views.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0, { timeout: 30_000 })
       await ThreadListFilter.close(page)
     })
   } finally {
@@ -2409,9 +2423,7 @@ Then('it confirms the copy, sits directly above Settings, and the setting moves 
   })
   await recordAssertion(page, 'thread-sidebar-rail-actions-above-settings', async () => {
     // The group is the rail's last block before Settings, and the URL action is drawn once, only there.
-    await expect
-      .poll(() => railActions(page).evaluate(group => group.nextElementSibling?.getAttribute('data-destination') ?? null))
-      .toBe('settings')
+    await expect.poll(() => railActions(page).evaluate(group => group.nextElementSibling?.getAttribute('data-destination') ?? null)).toBe('settings')
     await expect(page.getByRole('button', { name: 'Copy DSH URL for agents', exact: true })).toHaveCount(1)
   })
   await setCustomizeCheckbox(page, 'Show DSH actions on the rail', false)
@@ -2537,6 +2549,17 @@ Then('the side panel hosts that thread again', async ({ page }: { page: Page }) 
     await expect(asideTab(page)).toHaveCount(1)
     await expect(page.locator('[data-dshfiles-thread-aside]')).toHaveCount(1)
   })
+})
+
+When('the side-panel hover action is switched on in Customize sidebar', async ({ page }: { page: Page }) => {
+  await ThreadListFilter.openSidebarSettings(page)
+  const customize = customizeSidebar(page)
+  await expect(customize).toBeVisible()
+  const checkbox = customize.getByRole('checkbox', { name: 'Open in side panel', exact: true })
+  // Hidden by default: a row hovers one verb and its menu until a person asks for more.
+  await expect(checkbox).not.toBeChecked()
+  await checkbox.click()
+  await customize.getByRole('button', { name: 'Done', exact: true }).click()
 })
 
 When('the side-panel hover action is switched off in Customize sidebar', async ({ page }: { page: Page }) => {
@@ -2879,7 +2902,8 @@ Then('every view tab fits without scrolling and keeps its full name as tooltip a
     expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(sidebarBox.x + sidebarBox.width + 1)
     const views = await ThreadListFilter.openViews(page, threadSidebar(page))
     // Each view keeps its name; the accessible name may add the former tab's count and attention ("Working (0)").
-    for (const name of ['All threads', 'Working', 'Done']) await expect(views.getByRole('menuitemradio', { name: ThreadListFilter.viewName(name) })).toBeVisible()
+    for (const name of ['All threads', 'Working', 'Done'])
+      await expect(views.getByRole('menuitemradio', { name: ThreadListFilter.viewName(name) })).toBeVisible()
   })
   await recordAssertion(page, 'thread-sidebar-compact-view-tabs-names', async () => {
     await page.getByRole('menuitemradio', { name: 'Done', exact: true }).click()
