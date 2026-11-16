@@ -2479,7 +2479,7 @@
     {
       "id": "session-header-actions",
       "title": "Manage threads from the session header",
-      "summary": "Keep Pin as an icon button in the conversation header and put park, settle or unsettle, mute or snooze, archive, and restore in a More menu; Pin folds into the menu when the header is too narrow. Child-thread action preferences apply.",
+      "summary": "The conversation header draws one control, a More menu: find and turns, pin, park, settle or unsettle, mute or snooze, continue in a project, archive or restore, copy the thread ID or link, the header's own exports (copy as Markdown, download the log, open in an application, feedback) and referencing threads, each row led by an icon. Child-thread action preferences apply.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose project\"",
@@ -2516,13 +2516,13 @@
           "kind": "unit-test",
           "id": "thread-sidebar.session-header-actions-unit-pin-and-park",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "keeps Pin as an icon button and moves Park into the More menu"
+          "testName": "draws one control in the header, the thread menu, which holds Pin, Park and Copy thread link"
         },
         {
           "kind": "unit-test",
           "id": "thread-sidebar.session-header-actions-unit-narrow-overflow",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "folds Pin into the More menu when the native title has no room, and restores it once there is"
+          "testName": "leads every row of the menu with an icon, so the labels share one column"
         },
         {
           "kind": "unit-test",
