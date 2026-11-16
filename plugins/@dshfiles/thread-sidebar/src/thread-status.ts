@@ -27,9 +27,14 @@ export const DONE_GROUP_OPEN_KEY = `${DONE_GROUP_KEY}:open`
 export const INLINE_VERBS = ['Answer', 'Approve', 'Retry', 'Resume', 'Land'] as const
 export type InlineVerb = (typeof INLINE_VERBS)[number]
 
+/** The inbox source of this sidebar's own items: a finished turn the user has not opened yet. */
+export const FINISHED_TURN_SOURCE = 'thread-sidebar.finished-turn'
+
 /** What the inbox says about one thread: its most urgent open item. */
 export interface InboxThreadSignal {
   readonly itemId: string
+  /** The provider that published the item. */
+  readonly source?: string
   readonly severity: 'blocking' | 'failed' | 'ready'
   readonly reason: string
   /** The first provider verb the item offers, if any. */
@@ -114,9 +119,12 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
   const failedLabel = labelFor(FAILED_LABELS)
   if (inbox?.severity === 'failed' || failedLabel !== undefined) {
     const fromInbox = inbox?.severity === 'failed'
+    // The finished-turn item's headline leads with the thread title, which the row already shows: say why instead.
+    const ownFailure =
+      fromInbox && inbox.source === FINISHED_TURN_SOURCE && input.failedTurn !== undefined ? FAILED_TURN_DETAIL[input.failedTurn.reason] : undefined
     return {
       status: 'failed',
-      detail: fromInbox ? inbox.reason : undefined,
+      detail: ownFailure ?? (fromInbox ? inbox.reason : undefined),
       verb: (fromInbox ? inbox.verb : undefined) ?? (failedLabel === undefined ? undefined : LABEL_VERB[failedLabel]),
       itemId: fromInbox ? inbox.itemId : undefined,
       since: fromInbox ? inbox.openedAt : input.activityAt,

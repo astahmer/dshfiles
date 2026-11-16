@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DONE_AFTER_IDLE_MS, DONE_GROUP_KEY, DONE_GROUP_OPEN_KEY, ThreadStatusModel, type ThreadStatusInput } from './thread-status.js'
+import { DONE_AFTER_IDLE_MS, DONE_GROUP_KEY, DONE_GROUP_OPEN_KEY, FINISHED_TURN_SOURCE, ThreadStatusModel, type ThreadStatusInput } from './thread-status.js'
 
 const NOW = 10_000_000_000
 
@@ -62,6 +62,24 @@ describe('thread status', () => {
     expect(ThreadStatusModel.statusOf(input({ failedTurn, running: true })).status).toBe('working')
     expect(ThreadStatusModel.statusOf(input({ failedTurn, settled: true })).status).toBe('done')
     expect(ThreadStatusModel.statusOf(input({ failedTurn, archived: true })).status).toBe('done')
+  })
+
+  it('says why a failed turn failed instead of repeating the thread title', () => {
+    const inbox = {
+      itemId: 'i9',
+      severity: 'failed',
+      reason: '“Refactor pricing rounding” failed',
+      verb: undefined,
+      openedAt: NOW,
+      source: FINISHED_TURN_SOURCE,
+    } as const
+    expect(ThreadStatusModel.statusOf(input({ inbox, failedTurn: { at: NOW, reason: 'error' } })).detail).toBe('Turn failed')
+    // Another provider's failed item keeps its own reason.
+    expect(
+      ThreadStatusModel.statusOf(
+        input({ inbox: { ...inbox, source: 'jj.conflict', reason: 'Conflict in src/a.ts' }, failedTurn: { at: NOW, reason: 'error' } }),
+      ).detail,
+    ).toBe('Conflict in src/a.ts')
   })
 
   it('uses the sidebar labels when the inbox is absent', () => {

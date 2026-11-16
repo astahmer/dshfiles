@@ -5,9 +5,9 @@ import { Effect, Layer, Stream } from 'effect'
 import { threadSidebarAttentionApi, type ThreadAttentionView } from './attention-api.js'
 import { ThreadAttention } from './attention-store.js'
 import { SessionLineage } from './session-lineage.js'
+import { FINISHED_TURN_SOURCE } from './thread-status.js'
 
-/** The inbox source of finished turns the user has not opened yet. */
-export const FINISHED_TURN_SOURCE = 'thread-sidebar.finished-turn'
+export { FINISHED_TURN_SOURCE }
 
 const RECONCILE_DEBOUNCE = '250 millis'
 
