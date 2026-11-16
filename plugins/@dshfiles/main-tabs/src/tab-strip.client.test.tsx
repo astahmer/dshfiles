@@ -146,6 +146,18 @@ const openAsideFromMenu = async (): Promise<void> => {
 }
 
 describe('TabStrip layout', () => {
+  it('marks a preview tab with a muted title instead of italics', () => {
+    mount(
+      undefined,
+      undefined,
+      tabs.map(tab => (tab.kind === 'panel' ? { ...tab, preview: true } : tab)),
+    )
+    const title = screen.getByText('Workbench')
+    expect(title.className).not.toContain('italic')
+    expect(title.className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(screen.getByText('Thread').className).not.toContain('dshx:text-(--dsw-alias-label-tertiary)')
+  })
+
   it('draws the shared status glyph on a thread tab and never a coloured dot of its own', () => {
     const withStatus = (status: TabView['status']): readonly TabView[] => tabs.map(tab => (tab.kind === 'thread' ? { ...tab, status } : tab))
     const view = mount()
