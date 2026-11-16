@@ -28,10 +28,10 @@ const answerableQuestion = (item: NativeQuestionInboxItem) => {
 }
 
 /**
- * Why a form is answered in its thread, with its options when it has some, so the Inbox still shows what is asked. A
- * form still open in its thread (`ask_user_question` with `timeout: -1`, or before its timeout) is held by the native
- * answerer in the browser that shows its card; the Host's answer API takes only continued forms, so the Inbox cannot
- * answer it in place (productivity pass Q6 carried item). Several questions, multi-select and free text need the form.
+ * Why a form is answered in its thread, with its options when it has some, so the Inbox still shows what is asked.
+ * Several questions, multi-select and free text need the form. A form still open (`ask_user_question` with
+ * `timeout: -1`, or before its timeout) is answerable in place while this Host holds its request
+ * (`OpenQuestionRequests`); one opened before this plugin started is not held, and only its thread answers it.
  */
 const inThreadDetail = (item: NativeQuestionInboxItem): string => {
   const [question, ...rest] = item.questions
@@ -45,9 +45,9 @@ const inThreadDetail = (item: NativeQuestionInboxItem): string => {
 }
 
 /**
- * One pending form in a live thread as a blocking item about it. A continued, single-question, single-select form is
- * answerable in place with its options; any other form (still open on the native waterfall, several questions, multi
- * select or free text) is answered in its thread.
+ * One pending form in a live thread as a blocking item about it. A single-question, single-select form is answerable
+ * in place with its options, whether it is continued or still open and held here; any other form (several questions,
+ * multi select, free text, or an open form this Host does not hold) is answered in its thread.
  */
 const draftOf = (item: NativeQuestionInboxItem): AttentionDraft | undefined => {
   const first = item.questions[0]
@@ -105,7 +105,7 @@ const make = Effect.gen(function* () {
     return scan.reads.flatMap(sessionRead =>
       (sessionRead.facts?.pending ?? []).map(question => {
         const wait = sessionRead.facts?.waits.find(record => record.callId === question.callId)
-        const input = { ...sessionRead.target, pending: question, observedAt }
+        const input = { ...sessionRead.target, pending: question, observedAt, openHeld: native.holdsOpen(sessionRead.target.sessionId, question.callId) }
         return wait === undefined ? projectNativeQuestion(input) : projectNativeQuestion({ ...input, wait })
       }),
     )
@@ -130,8 +130,11 @@ const make = Effect.gen(function* () {
     const option = question.options[Number(request.choiceId ?? '-1')]
     if (option === undefined) return refused('Pick one of the offered answers.')
     const status = native.answer({ sessionId: item.sessionId, callId: item.callId, answer: { answers: [{ id: question.id, selected: [option.label] }] } })
-    if (status === 'queued') return { ok: true, message: `Answered “${clamp(option.label, 120)}”. The thread continues once it reads the reply.` }
+    const chosen = clamp(option.label.replace(/\s*\(Recommended\)\s*$/iu, ''), 120)
+    if (status === 'queued') return { ok: true, message: `Answered “${chosen}”. The thread continues once it reads the reply.` }
+    if (status === 'answered') return { ok: true, message: `Answered “${chosen}”. The thread continues.` }
     if (status === 'not-continued') return refused('This form is still open in the thread, which answers it there. Open the thread to answer.')
+    if (status === 'bad-answer') return refused('This question needs more than one answer. Open the thread and answer it there.')
     return refused('The thread is not running, so it cannot receive an answer. Open the thread to resume it, then answer again.')
   })
 

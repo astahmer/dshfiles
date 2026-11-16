@@ -23,7 +23,12 @@ export interface NativeQuestionInboxItem {
   readonly sessionLive: boolean
   readonly sessionPersisted: boolean
   readonly canAnswer: boolean
-  readonly answerability: 'open-form-uses-native-waterfall' | 'session-not-live' | 'target-not-live-root' | 'continued-form-can-be-answered'
+  readonly answerability:
+    | 'open-form-uses-native-waterfall'
+    | 'open-form-can-be-answered'
+    | 'session-not-live'
+    | 'target-not-live-root'
+    | 'continued-form-can-be-answered'
   readonly questions: {
     readonly id: string
     readonly question: string
@@ -61,16 +66,19 @@ export const projectNativeQuestion = (input: {
   readonly targetIsLiveRoot: boolean
   readonly pending: PendingUserQuestion
   readonly wait?: QuestionWaitRecord
+  /** The Host holds this open form's request, so it can settle it without the browser that shows it. */
+  readonly openHeld?: boolean
   readonly observedAt: number
 }): NativeQuestionInboxItem => {
   const waits = input.wait?.waitMode === 'blocking' || input.wait?.waitMode === 'timed'
   const blocking = input.pending.state === 'continued' ? false : waits || null
-  const canAnswer = input.pending.state === 'continued' && input.sessionLive && input.targetIsLiveRoot
+  const openHeld = input.pending.state === 'open' && input.openHeld === true
+  const canAnswer = (input.pending.state === 'continued' || openHeld) && input.sessionLive && input.targetIsLiveRoot
   const answerability = ((): NativeQuestionInboxItem['answerability'] => {
     if (!input.sessionLive) return 'session-not-live'
-    if (input.pending.state === 'open') return 'open-form-uses-native-waterfall'
+    if (input.pending.state === 'open' && !openHeld) return 'open-form-uses-native-waterfall'
     if (!input.targetIsLiveRoot) return 'target-not-live-root'
-    return 'continued-form-can-be-answered'
+    return openHeld ? 'open-form-can-be-answered' : 'continued-form-can-be-answered'
   })()
   const questions = input.pending.questions.map(question => {
     const options = (question.options ?? []).map(option => {
