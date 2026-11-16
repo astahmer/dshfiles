@@ -5,7 +5,9 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** step 1 is done; steps 2–14 are open. See [Work list](#work-list).
+**Resume here:** steps 1 and 4 are done and step 2 is half done (transcript half). Three lanes were running on
+2026-11-16: thread list and header (rest of step 2, step 3), Settings (step 7), and the transcript follow-ups listed
+under [Transcript lane](#transcript-lane). Steps 5, 6 and 8–14 are not dispatched. See [Work list](#work-list).
 
 ## Method and limits
 
@@ -188,9 +190,9 @@ before and passes after; see each revision's description for the reason.
 | Step | Work                                                                                                                                                  | Findings          | Size   |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------ |
 | 1 ✅ | Composer menus: the card no longer clips (WebKit paints the lists again) and native menus are opaque. Probed in Playwright WebKit 26.0 and Chromium at 390 px before and after; not yet re-checked on the iPhone. | U1, U2 | small |
-| 2    | Deletions on the main surface: hide "Context injection" rows, stop the timing overlay on card headers, one header `⋯` with Copy link and Pin inside it, one `⋯` instead of the row hover strip. | U3, N3, N4, N5 | small |
+| 2 ◐  | Deletions on the main surface: hide "Context injection" rows, stop the timing overlay on card headers, one header `⋯` with Copy link and Pin inside it, one `⋯` instead of the row hover strip. Done: U3, N5. Open: N3, N4 (thread lane). | U3, N3, N4, N5 | small |
 | 3    | Tab strips use the shared status glyph; one projection for working and needs-you counts; failed stays Failed.                                          | N1, N2, M5, N7    | medium |
-| 4    | Failure card: one sentence, one cause-matched button, details folded.                                                                                  | M4                | medium |
+| 4 ✅ | Failure card: one sentence, one Retry, "Ask to fix" in the same row, code and payload under Details. No "Compact and retry": the over-long sentence names `/compact`. | M4 | medium |
 | 5    | Inbox question items render the question's own options; "Answer" lands on an answerable card; phone question card gets one scroll.                     | M1, M2, M3, M8    | medium |
 | 6    | A primary "Land" in the header and as the row's inline verb when there is work to land; settle what the "+N −N" chip counts.                           | M6, M7            | medium |
 | 7    | Settings rows: hide key and source lines, no package-description fallback, humanise units and enums, regroup the nav with no "Other".                  | P1, P2, P3        | medium |
@@ -201,6 +203,35 @@ before and passes after; see each revision's description for the reason.
 | 12   | Backlog, History, Source control and Traces onto `Page`.                                                                                               | P5, P7, P8, P12   | large  |
 | 13   | Phone: type scale, landscape shell, thread panel sheet, palette as full-screen search, hide keyboard hints on touch.                                   | U7, U8, N12       | large  |
 | 14   | Guardrails: both ratchets into `check:green` after re-baselining, widen `copy-check`, add rules for shadows, durations, viewport variants and solid status fills, repair the catalog walks. | G1–G7 | medium |
+
+## Transcript lane
+
+18 revisions (`oprnuozzrsyo` … `psutzysxqxps`) in chat, tool-meta, agent-plan, turn-summary and test-runs, each with a
+test that failed before and passes after. Beyond U3, N5 and M4 they cover N6 (plan and summary shown once), one work
+fold instead of two, zero durations and repeated clock times removed, the test card's colour and zero-count filters,
+and 44 px targets on the summary row.
+
+Deliberate differences from the audit's proposals:
+
+- Context rows show in the existing Verbose view mode; no new "3 context items" row.
+- The To-dos strip is off by default behind a new `todoStrip` setting (agent-plan).
+- The walkthrough is offered only when it says more than the file chips; the three-line rewrite was not done.
+- "Since you left" is hidden for a single unseen turn.
+
+Open in this lane:
+
+- Journeys re-run after the last lint fold-ins; `test-runs.card` and a background-jobs board scenario fail and are
+  not yet proven to fail at the base.
+- tool-meta's committed screenshot shows the old timing format.
+- The summary line still marks one failure with two red segments.
+- Dark theme and WebKit were not looked at.
+
+Outside the lane, not started: the job strip titled by its shell command (background-jobs), the duplicate "Ask
+question" row (tool-ask-user, user-questions), the green check on `ToolCard` (plugin-ui), the stalled-stream advice
+verb and route id (ai-accounts), the edited-file card with a coloured tile (owner not identified).
+
+Host-side settings text changed in chat, tool-meta, agent-plan and turn-summary, so a running instance shows those
+only after a restart.
 
 ## Open items
 
