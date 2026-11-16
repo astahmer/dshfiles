@@ -10,6 +10,11 @@
 The thread panel's **Jobs** tab shows the same for the thread on stage: its jobs, its dev servers
 and the RAM its processes use.
 
+A thread list that wants to show a thread as working while its job outlives the turn reads
+`@dshfiles/background-jobs/running-threads`: `RunningThreads.read(api)` returns the ids of the threads that own a
+running job (the same request the Processes page polls, under `RunningThreads.queryKey`), with the contract to bind
+through `useApi(backgroundJobsApi)`. The reader depends on background-jobs, never the reverse.
+
 One page for every background job of every Session: the ones still running, and —
 opt-in — the ones that already finished. Rows are classified deterministically
 from the job kind and its label, so "when did we last run the e2e suite", "which
