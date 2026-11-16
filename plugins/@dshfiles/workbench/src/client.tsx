@@ -50,6 +50,7 @@ import { WorkbenchTabDocking, workbenchTabs } from './tabs.js'
 import { canMovePanelToRegion, createNestedSurfaceRegistry, type NestedSurfaceProps } from './nested-surfaces.js'
 import { decodeNestedSurfacePath, nestedLayoutStores } from './layout-store.js'
 import { sidebarResourcePanels, type SidebarResourcePanel } from '@dshfiles/sidebar-right/resource-panels'
+import { OrphanedResourcePanels } from './orphaned-resource-panels.js'
 import { createResourcePanelHost } from './resource-panel-host.js'
 import { createWorkbenchTerminalSource } from './terminal-source.js'
 import { createNativePageAdmission } from './native-page-admission.js'
@@ -868,6 +869,37 @@ export default defineClient({
         return false
       }
       /**
+       * A saved layout can restore the page of a thread whose record is gone: nothing registers it, so it would stay
+       * an unavailable tab beside the on-screen thread's page of the same name. The arriving page takes its place; a
+       * page the layout already placed just loses the unavailable twin.
+       */
+      const takeOrphanPlace = (resource: SidebarResourcePanel): boolean => {
+        if (!threadFacets.follows(resource) || resource.sessionId !== facetThread.getSnapshot()) return false
+        const listed = resources.list()
+        for (const [region, api] of regions.entries()) {
+          const orphanId = OrphanedResourcePanels.replacedBy(
+            resource,
+            api.panels.map(panel => ({ id: panel.id, title: panel.title })),
+            { registered: id => registry.get(id) !== undefined, listed: id => listed.some(entry => entry.id === id) },
+          )
+          const orphan = orphanId === undefined ? undefined : api.getPanel(orphanId)
+          if (orphan === undefined) continue
+          if (placedIn(resource.id) === undefined) {
+            api.addPanel({
+              id: resource.id,
+              component: WORKBENCH_COMPONENT,
+              title: resource.title,
+              position: { referencePanel: orphan, direction: 'within' },
+              inactive: !orphan.api.isVisible,
+            })
+            facetHome.set(resource.kind, region)
+          } else if (orphan.api.isVisible) api.getPanel(resource.id)?.api.setActive()
+          orphan.api.close()
+          return true
+        }
+        return false
+      }
+      /**
        * Pages of a thread that left the screen, kept in place until the on-screen thread's page of the same kind
        * replaces them; one page state per id, asked once per thread.
        */
@@ -908,6 +940,7 @@ export default defineClient({
           if (workbench) {
             const owner = placedIn(resource.id)
             if (owner === undefined && takeFacetPlace(resource)) continue
+            if (takeOrphanPlace(resource)) continue
             // Startup projection is passive; only the declarer's explicit
             // place/focus action reveals a closed pane after admission.
             const home = threadFacets.follows(resource) ? facetHome.get(resource.kind) : undefined
