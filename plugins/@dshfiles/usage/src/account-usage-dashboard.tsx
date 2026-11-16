@@ -11,7 +11,8 @@ import { usageApi, type ChartQuery, type ChartView, type RequestPage } from './a
 import { useMemo, useState, type ReactNode } from 'react'
 import type { AccountUsageViewProps } from '@dshfiles/ai-accounts/account-usage-view'
 import { AccountUsageDashboardModel, type AccountUsageDay, type UsagePeriod } from './account-usage-dashboard-model.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { REQUEST_STATUS_GLYPH } from './request-status.js'
 
 const Panel = (props: { heading: string; children: ReactNode; action?: ReactNode; className?: string }): JSX.Element => (
   <section className={cn('dshx:min-w-0 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-3', props.className)}>
@@ -185,7 +186,7 @@ const ModelTable = (props: { view: ChartView }): JSX.Element => {
                       <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-2">
                         <span>{share === null ? '—' : `${share.toFixed(0)}%`}</span>
                         <span className="dshx:h-1.5 dshx:w-16 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
-                          <span className="dshx:block dshx:h-full dshx:rounded-full dshx:bg-info" style={{ width: `${share ?? 0}%` }} />
+                          <span className="dshx:block dshx:h-full dshx:rounded-full dshx:bg-chart-1" style={{ width: `${share ?? 0}%` }} />
                         </span>
                       </div>
                     </td>
@@ -275,10 +276,7 @@ const RecentRequests = (props: { requests: RequestPage; onViewAll: () => void })
                 <td className={cellClass}>{AccountUsageDashboardModel.usageCost(row.cost)}</td>
                 <td className={cellClass}>
                   <span className="dshx:inline-flex dshx:items-center dshx:gap-1.5">
-                    <StatusDot
-                      size="sm"
-                      className={row.status === 'ok' ? 'dshx:bg-success' : row.status === 'failed' ? 'dshx:bg-destructive' : 'dshx:bg-muted-foreground'}
-                    />
+                    <StatusGlyph decorative status={REQUEST_STATUS_GLYPH[row.status]} />
                     {row.status === 'ok' ? 'Success' : row.status === 'failed' ? 'Failed' : 'Aborted'}
                   </span>
                 </td>
