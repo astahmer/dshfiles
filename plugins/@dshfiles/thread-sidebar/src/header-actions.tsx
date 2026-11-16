@@ -21,25 +21,14 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   AppWindowIcon,
-  ArchiveIcon,
-  ArchiveRestoreIcon,
-  AtSignIcon,
-  BellIcon,
   BellOffIcon,
-  CircleCheckIcon,
   CircleDashedIcon,
-  CopyIcon,
   DownloadIcon,
   EllipsisIcon,
   FileTextIcon,
-  FolderInputIcon,
-  LinkIcon,
-  ListIcon,
-  PauseIcon,
-  PinIcon,
   PinOffIcon,
   PlayIcon,
-  SearchIcon,
+  RotateCcwIcon,
   SendIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { ThreadToolsModel } from '@dshfiles/chat/thread-tools'
@@ -59,6 +48,8 @@ import { SettledThreadsModel } from './settled-threads.js'
 import { useStableValue } from './stable-value.js'
 import { useRegistry } from '@dshfiles/dshx/client'
 import { ThreadMenuSections } from './thread-menu-sections.js'
+import { PhoneLayout } from './phone-layout.js'
+import { ThreadMenu, type ThreadMenuEntries, type ThreadMenuKit } from './thread-menu.js'
 
 interface HeaderThreadActionsInjected {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -117,18 +108,33 @@ const noNativeActions = (): readonly ThreadHeaderMenuAction[] => NO_NATIVE_ACTIO
 
 /**
  * The thread header's own More actions (Copy as Markdown, Download log, Open in…, Feedback: what native DSH plugins
- * register for the header menu), listed here so the header has one `⋯`. Mounted with the menu: it resolves them when
- * the menu opens and lets go when it closes.
+ * register for the header menu), listed in this menu so the header has one `⋯`. Read inside the open menu: it resolves
+ * them when the menu opens and lets go when it closes.
  */
-const NativeHeaderMenuItems = (props: { readonly sessionId: string; readonly t: HeaderThreadActionsProps['t'] }): JSX.Element | null => {
+const useNativeHeaderMenu = (sessionId: string): { readonly menu: ThreadHeaderMenu | undefined; readonly actions: readonly ThreadHeaderMenuAction[] } => {
   const [menu, setMenu] = useState<ThreadHeaderMenu | undefined>(undefined)
   useEffect(() => {
-    const resolved = ThreadViewsModel.headerMenu(props.sessionId)
+    const resolved = ThreadViewsModel.headerMenu(sessionId)
     setMenu(resolved)
     return () => resolved?.dispose()
-  }, [props.sessionId])
+  }, [sessionId])
   const actions = useSyncExternalStore(menu?.subscribe ?? noSubscription, menu?.actions ?? noNativeActions, noNativeActions)
-  if (menu === undefined || actions.length === 0) return null
+  return { menu, actions }
+}
+
+/** Where a native action sits in the thread menu: its Markdown copy under Copy, its application list under Open in. */
+const nativeActionPlace = (action: ThreadHeaderMenuAction): 'copy-markdown' | 'native-open-in' | 'native-actions' => {
+  if (action.iconKey === 'session-log-download.copy') return 'copy-markdown'
+  if (action.iconKey === 'open-in-app.application' || (action.children ?? []).some(child => child.iconKey === 'open-in-app.application'))
+    return 'native-open-in'
+  return 'native-actions'
+}
+
+const NativeHeaderMenuRows = (props: {
+  readonly menu: ThreadHeaderMenu
+  readonly actions: readonly ThreadHeaderMenuAction[]
+  readonly t: HeaderThreadActionsProps['t']
+}): JSX.Element => {
   const row = (action: ThreadHeaderMenuAction): JSX.Element => {
     const labelKey = nativeActionLabelKey(action.iconKey)
     const label = labelKey === undefined ? action.label : props.t(labelKey)
@@ -146,18 +152,13 @@ const NativeHeaderMenuItems = (props: { readonly sessionId: string; readonly t: 
       )
     }
     return (
-      <DropdownMenuItem key={action.id} disabled={action.disabled === true} onSelect={() => menu.select(action.id)}>
+      <DropdownMenuItem key={action.id} disabled={action.disabled === true} onSelect={() => props.menu.select(action.id)}>
         <NativeActionIcon action={action} />
         {label}
       </DropdownMenuItem>
     )
   }
-  return (
-    <>
-      <DropdownMenuSeparator />
-      {actions.map(row)}
-    </>
-  )
+  return <>{props.actions.map(row)}</>
 }
 
 /** Submenu content sized like the menu's own submenus. */
@@ -189,6 +190,148 @@ const RegisteredThreadMenuSections = (props: { readonly sessionId: string }): JS
   )
 }
 
+/** The header's menu parts, for the shared thread menu. */
+const DROPDOWN_MENU_KIT: ThreadMenuKit = {
+  Item: DropdownMenuItem,
+  Sub: DropdownMenuSub,
+  SubTrigger: DropdownMenuSubTrigger,
+  SubContent: DropdownMenuSubContent,
+  Separator: DropdownMenuSeparator,
+}
+
+interface HeaderMenuBodyProps {
+  readonly sessionId: SessionSummary['id']
+  readonly t: HeaderThreadActionsProps['t']
+  readonly openThread: HeaderThreadActionsInjected['openThread']
+  readonly state: {
+    readonly archived: boolean
+    readonly pinned: boolean
+    readonly parked: boolean
+    readonly settled: boolean
+    readonly muted: boolean
+    readonly running: boolean
+    readonly settleDisabled: boolean
+    readonly archiveDisabled: boolean
+  }
+  readonly run: {
+    readonly togglePinned: () => void
+    readonly updateParked: () => void
+    readonly updateSettled: () => void
+    readonly mute: (option: ThreadMuteOption) => void
+    readonly unmute: () => void
+    readonly continueIn: (projectId: string) => void
+    readonly archive: () => void
+    readonly restore: () => void
+    readonly copyId: () => void
+    readonly copyLink: () => void
+  }
+}
+
+/**
+ * The open thread's menu: the same layout as the thread's row menu in the list (`thread-menu-model.ts`), filled with
+ * what the header can run. Find in thread leads it, because on a phone this menu is the way in (no ⌘F, no rail).
+ * Mounted while the menu is open, so the native header actions resolve then.
+ */
+const HeaderMenuBody = ({ sessionId, t, openThread, state, run }: HeaderMenuBodyProps): JSX.Element => {
+  // Trajectory, Traces, Requests: thread-panel facets since productivity pass Q5 (E5); this menu opens them.
+  const threadViews = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.list, ThreadViewsModel.list)
+  const native = useNativeHeaderMenu(sessionId)
+  const sections = useRegistry(ThreadMenuSections)
+  const nativeRows = (place: ReturnType<typeof nativeActionPlace>): ThreadMenuEntries => {
+    const menu = native.menu
+    const placed = native.actions.filter(action => nativeActionPlace(action) === place)
+    // The Host's own "Open in" is a submenu of applications; inside this menu's Open in they are rows of it.
+    const actions = place === 'native-open-in' ? placed.flatMap(action => action.children ?? [action]) : placed
+    return menu === undefined || actions.length === 0 ? {} : { [place]: { kind: 'rows', rows: <NativeHeaderMenuRows menu={menu} actions={actions} t={t} /> } }
+  }
+  const entries: ThreadMenuEntries = {
+    find: { kind: 'item', label: t('threadSidebarFindInThread'), keys: 'Mod+F', onSelect: () => ThreadToolsModel.request({ sessionId, tool: 'find' }) },
+    pin: {
+      kind: 'item',
+      label: t(state.pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
+      ...(state.pinned ? { icon: <PinOffIcon aria-hidden="true" /> } : undefined),
+      onSelect: run.togglePinned,
+    },
+    done: {
+      kind: 'item',
+      label: t(state.settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle'),
+      disabled: !state.settled && state.settleDisabled,
+      ...(state.settled ? { icon: <RotateCcwIcon aria-hidden="true" /> } : undefined),
+      onSelect: run.updateSettled,
+    },
+    snooze: {
+      kind: 'item',
+      label: t(state.parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
+      disabled: state.running,
+      ...(state.parked ? { icon: <PlayIcon aria-hidden="true" /> } : undefined),
+      onSelect: run.updateParked,
+    },
+    restore: { kind: 'item', label: t('threadSidebarRestore'), onSelect: run.restore },
+    'copy-link': { kind: 'item', label: t('threadSidebarCopyLink'), onSelect: run.copyLink },
+    ...(threadViews.length === 0
+      ? undefined
+      : {
+          'thread-views': {
+            kind: 'rows',
+            rows: threadViews.map(view => (
+              <DropdownMenuItem key={view.id} data-thread-view-open={view.id} onSelect={() => ThreadViewsModel.open({ sessionId, viewId: view.id })}>
+                <PanelRightIcon aria-hidden="true" />
+                {view.label}
+              </DropdownMenuItem>
+            )),
+          },
+        }),
+    'continue-in': {
+      kind: 'sub',
+      label: t('threadSidebarContinueIn'),
+      disabled: state.running,
+      content: <ContinueInProjectItems t={t} continueIn={run.continueIn} Item={DropdownMenuItem} />,
+    },
+    ...nativeRows('native-open-in'),
+    'copy-id': { kind: 'item', label: t('threadSidebarCopyId'), onSelect: run.copyId },
+    ...nativeRows('copy-markdown'),
+    turns: { kind: 'item', label: t('threadSidebarTurns'), onSelect: () => ThreadToolsModel.request({ sessionId, tool: 'turns' }) },
+    mute: {
+      kind: 'sub',
+      label: t(state.muted ? 'threadSidebarMuted' : 'threadSidebarMute'),
+      ...(state.muted ? { icon: <BellOffIcon aria-hidden="true" /> } : undefined),
+      contentClassName: 'dshx-root dshx:min-w-44',
+      content: (
+        <>
+          {THREAD_MUTE_OPTIONS.map(option => (
+            <DropdownMenuItem key={option} onSelect={() => run.mute(option)}>
+              {t(ThreadMuteModel.muteOptionLabelKeys[option])}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={!state.muted} onSelect={run.unmute}>
+            {t('threadSidebarUnmute')}
+          </DropdownMenuItem>
+        </>
+      ),
+    },
+    'referenced-by': {
+      kind: 'sub',
+      label: t('threadSidebarReferencedBy'),
+      contentClassName: 'dshx-root dshx:min-w-56 dshx:max-w-72',
+      content: <ThreadReferencesItems sessionId={sessionId} t={t} openThread={openThread} Item={DropdownMenuItem} />,
+    },
+    ...(sections.length === 0 ? undefined : { sections: { kind: 'rows', rows: <RegisteredThreadMenuSections sessionId={sessionId} /> } }),
+    ...nativeRows('native-actions'),
+    archive: { kind: 'item', label: t('threadSidebarArchive'), disabled: state.archiveDisabled, onSelect: run.archive },
+  }
+  return (
+    <ThreadMenu
+      kit={DROPDOWN_MENU_KIT}
+      entries={entries}
+      archived={state.archived}
+      phone={PhoneLayout.matches()}
+      coarsePointer={typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches}
+      labels={{ openIn: t('threadSidebarOpenIn'), copy: t('threadSidebarCopy'), more: t('threadSidebarMore') }}
+    />
+  )
+}
+
 export const HeaderThreadActions = ({
   sessionId,
   useSessions,
@@ -216,8 +359,6 @@ export const HeaderThreadActions = ({
   // second `⋯` (DESIGN.md: the thread header is one row with one `⋯`).
   const nativeMenuAvailable = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.headerMenuAvailable, ThreadViewsModel.headerMenuAvailable)
   useEffect(() => (nativeMenuAvailable ? ThreadViewsModel.hostHeaderMenu() : undefined), [nativeMenuAvailable])
-  // Trajectory, Traces, Requests: thread-panel facets since productivity pass Q5 (E5); this menu opens them.
-  const threadViews = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.list, ThreadViewsModel.list)
   // Only lineage, blankness, running and folder feed the derivations below; a streaming turn republishes the list
   // several times a second with none of them changed, and three mounted conversations each render this header.
   const actionRowsById = useStableValue(sessionState.byId, sameActionRows)
@@ -314,8 +455,6 @@ export const HeaderThreadActions = ({
     }
   }
   const togglePinned = (): void => void updateThreadOperation(pinned ? 'unpin' : 'pin')
-  const pinLabel = t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')
-  const pinIcon = pinned ? <PinOffIcon aria-hidden="true" /> : <PinIcon aria-hidden="true" />
   const moreLabel = t('threadSidebarMoreThreadActions')
   const archiveDisabled = !archived && targetIds.some(targetId => sessionState.byId[targetId]?.running === true)
 
@@ -335,95 +474,24 @@ export const HeaderThreadActions = ({
             <TooltipContent side="bottom">{moreLabel}</TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="end" className="dshx-root dshx:min-w-48" aria-label={moreLabel}>
-            {/* Long-thread tools (productivity pass Q4); on a phone this menu is the way in (no ⌘F, no rail). */}
-            <DropdownMenuItem keys="Mod+F" onSelect={() => ThreadToolsModel.request({ sessionId, tool: 'find' })}>
-              <SearchIcon aria-hidden="true" />
-              {t('threadSidebarFindInThread')}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => ThreadToolsModel.request({ sessionId, tool: 'turns' })}>
-              <ListIcon aria-hidden="true" />
-              {t('threadSidebarTurns')}
-            </DropdownMenuItem>
-            {threadViews.map(view => (
-              <DropdownMenuItem key={view.id} data-thread-view-open={view.id} onSelect={() => ThreadViewsModel.open({ sessionId, viewId: view.id })}>
-                <PanelRightIcon aria-hidden="true" />
-                {t('threadSidebarOpenThreadView', { view: view.label })}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            {archived ? null : (
-              <>
-                <DropdownMenuItem onSelect={togglePinned}>
-                  {pinIcon}
-                  {pinLabel}
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled={session.running} onSelect={updateParked}>
-                  <PauseIcon aria-hidden="true" />
-                  {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled={!settled && settleDisabled} onSelect={updateSettled}>
-                  {settled ? <PlayIcon aria-hidden="true" /> : <CircleCheckIcon aria-hidden="true" />}
-                  {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
-                </DropdownMenuItem>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    {muted ? <BellOffIcon aria-hidden="true" /> : <BellIcon aria-hidden="true" />}
-                    {t(muted ? 'threadSidebarMuted' : 'threadSidebarMute')}
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMute')}>
-                    {THREAD_MUTE_OPTIONS.map(option => (
-                      <DropdownMenuItem key={option} onSelect={() => mute(option)}>
-                        {t(ThreadMuteModel.muteOptionLabelKeys[option])}
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      disabled={!muted}
-                      onSelect={() => updatePreferences({ mutedThreads: ThreadMuteModel.unmuteSessions(preferences.mutedThreads, targetIds) })}
-                    >
-                      {t('threadSidebarUnmute')}
-                    </DropdownMenuItem>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger disabled={session.running}>
-                    <FolderInputIcon aria-hidden="true" />
-                    {t('threadSidebarContinueIn')}
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="dshx-root dshx:min-w-48 dshx:max-w-72" aria-label={t('threadSidebarContinueIn')}>
-                    <ContinueInProjectItems t={t} continueIn={projectId => void continueIn(projectId)} Item={DropdownMenuItem} />
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-                <DropdownMenuSeparator />
-              </>
-            )}
-            <DropdownMenuItem disabled={archiveDisabled} onSelect={() => void updateThreadOperation(archived ? 'unarchive' : 'archive')}>
-              {archived ? <ArchiveRestoreIcon aria-hidden="true" /> : <ArchiveIcon aria-hidden="true" />}
-              {t(archived ? 'threadSidebarRestore' : 'threadSidebarArchive')}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void copy(sessionId, 'threadSidebarIdCopied')}>
-              <CopyIcon aria-hidden="true" />
-              {t('threadSidebarCopyId')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => void copy(ThreadUrlModel.buildThreadUrl(window.location.href, sessionId, workspaceId), 'threadSidebarLinkCopied')}
-            >
-              <LinkIcon aria-hidden="true" />
-              {t('threadSidebarCopyLink')}
-            </DropdownMenuItem>
-            <NativeHeaderMenuItems sessionId={sessionId} t={t} />
-            <DropdownMenuSeparator />
-            <RegisteredThreadMenuSections sessionId={sessionId} />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <AtSignIcon aria-hidden="true" />
-                {t('threadSidebarReferencedBy')}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>
-                <ThreadReferencesItems sessionId={sessionId} t={t} openThread={openThread} Item={DropdownMenuItem} />
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <HeaderMenuBody
+              sessionId={sessionId}
+              t={t}
+              openThread={openThread}
+              state={{ archived, pinned, parked, settled, muted, running: session.running, settleDisabled, archiveDisabled }}
+              run={{
+                togglePinned,
+                updateParked,
+                updateSettled,
+                mute,
+                unmute: () => updatePreferences({ mutedThreads: ThreadMuteModel.unmuteSessions(preferences.mutedThreads, targetIds) }),
+                continueIn: projectId => void continueIn(projectId),
+                archive: () => void updateThreadOperation('archive'),
+                restore: () => void updateThreadOperation('unarchive'),
+                copyId: () => void copy(sessionId, 'threadSidebarIdCopied'),
+                copyLink: () => void copy(ThreadUrlModel.buildThreadUrl(window.location.href, sessionId, workspaceId), 'threadSidebarLinkCopied'),
+              }}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
         {actionFailed ? (

@@ -44,6 +44,7 @@ import { ListHeaderExtras } from './list-header-extras.js'
 import { AddPanelButton, EntryMenu, FolderDialog, FolderGlyph, FolderMenu, FolderNotice, ViewGlyph, viewDrag, type SidebarFolderUi } from './sidebar-folders.js'
 import { SidebarTrees, type ResolvedEntry } from './sidebar-tree.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar } from './phone-shell.js'
+import { PhoneLayout } from './phone-layout.js'
 import { useEdgeSwipe } from './edge-swipe.js'
 import { runStackMotion } from './stack-motion.js'
 import { clearThreadUrl, pageLoadThreadRoute } from './thread-url.js'
@@ -123,8 +124,6 @@ const storedDestination = createStoredValue({
 const soleSection = (destination: ResolvedDestination): string | undefined =>
   destination.id !== 'threads' && destination.id !== 'settings' && destination.sections.length === 1 ? destination.sections[0]?.panelId : undefined
 
-const PHONE_QUERY = '(max-width: 639.98px)'
-
 /**
  * Opens `@dshfiles/settings-shell`'s Settings page in the stage through its documented cross-plugin request (plan §4.6).
  * False when the shell is not loaded: the rail then only shows its list, never the native Settings dialog.
@@ -136,15 +135,7 @@ const PHONE_NAV_HIDDEN_HEIGHT = 'env(safe-area-inset-bottom, 0px)'
 /** The phone top bar (Back, title, thread panels; the frame's status chip takes its trailing 48px). */
 const PHONE_TOP_HEIGHT = 'calc(44px + env(safe-area-inset-top, 0px))'
 
-const subscribePhone = (listener: () => void): (() => void) => {
-  if (typeof window.matchMedia !== 'function') return () => undefined
-  const query = window.matchMedia(PHONE_QUERY)
-  query.addEventListener('change', listener)
-  return () => query.removeEventListener('change', listener)
-}
-const readPhone = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches
-
-export const usePhoneLayout = (): boolean => useSyncExternalStore(subscribePhone, readPhone, () => false)
+export const usePhoneLayout = (): boolean => useSyncExternalStore(PhoneLayout.subscribe, PhoneLayout.matches, () => false)
 
 export interface DestinationShellProps {
   readonly panels: readonly DestinationPanel[]

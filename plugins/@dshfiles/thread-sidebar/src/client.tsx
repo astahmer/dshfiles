@@ -97,10 +97,12 @@ import {
   ArchiveRestoreIcon,
   BellIcon,
   BellOffIcon,
+  BellRingIcon,
   BookmarkPlusIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   CircleCheckIcon,
+  CircleDashedIcon,
   CirclePauseIcon,
   EllipsisIcon,
   GripVerticalIcon,
@@ -108,11 +110,13 @@ import {
   LayersIcon,
   LinkIcon,
   ListFilterIcon,
+  MailIcon,
   MonitorIcon,
   PanelRightOpenIcon,
   PauseIcon,
   PencilIcon,
   PinIcon,
+  PinOffIcon,
   PlayIcon,
   RefreshCwIcon,
   RotateCcwIcon,
@@ -123,6 +127,9 @@ import {
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { PhoneLayout } from './phone-layout.js'
+import { ThreadMenu, type ThreadMenuEntries, type ThreadMenuKit } from './thread-menu.js'
+import { ThreadMenuModel } from './thread-menu-model.js'
 import {
   type CSSProperties,
   createContext,
@@ -950,7 +957,12 @@ const NotifyChoiceMenu = (props: {
   readonly t: ThreadSidebarTranslate
 }): JSX.Element => (
   <ContextMenuSub>
-    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">{props.t('threadSidebarNotifyOnFinish')}</ContextMenuSubTrigger>
+    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">
+      <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+        <BellRingIcon aria-hidden="true" />
+        {props.t('threadSidebarNotifyOnFinish')}
+      </span>
+    </ContextMenuSubTrigger>
     <ContextMenuSubContent className="dshx-root dshx:min-w-44 dshx:max-w-72">
       <ContextMenuLabel className="dshx:font-normal dshx:text-muted-foreground">
         {props.t('threadSidebarNotifyOnFinishFor', { title: props.subscriberTitle })}
@@ -968,6 +980,12 @@ const NotifyChoiceMenu = (props: {
   </ContextMenuSub>
 )
 
+/** A list key hint for a batch row, on a device that has the key. */
+const batchKeys = (keys: string): { readonly keys?: string } => {
+  const hint = ThreadMenuModel.keyHint(keys, coarsePointer())
+  return hint === undefined ? {} : { keys: hint }
+}
+
 const BatchThreadMenuItems = (props: {
   readonly snapshot: BatchSelectionSnapshot
   readonly actions: RowActions
@@ -980,24 +998,52 @@ const BatchThreadMenuItems = (props: {
       <ContextMenuLabel>{props.t('threadSidebarSelectedCount', { count: snapshot.ids.length })}</ContextMenuLabel>
       <ContextMenuSeparator />
       {snapshot.anyUnpinned ? (
-        <ContextMenuItem keys="P" onSelect={() => props.actions.batchMutate('pin')}>
+        <ContextMenuItem {...batchKeys('P')} onSelect={() => props.actions.batchMutate('pin')}>
+          <PinIcon aria-hidden="true" />
           {props.t('threadSidebarPin')}
         </ContextMenuItem>
       ) : null}
-      {snapshot.anyPinned ? <ContextMenuItem onSelect={() => props.actions.batchMutate('unpin')}>{props.t('threadSidebarUnpin')}</ContextMenuItem> : null}
-      {snapshot.anyUnparked ? <ContextMenuItem onSelect={() => props.actions.batchSetParked(true)}>{props.t('threadSidebarPark')}</ContextMenuItem> : null}
-      {snapshot.anyParked ? <ContextMenuItem onSelect={() => props.actions.batchSetParked(false)}>{props.t('threadSidebarUnpark')}</ContextMenuItem> : null}
+      {snapshot.anyPinned ? (
+        <ContextMenuItem onSelect={() => props.actions.batchMutate('unpin')}>
+          <PinOffIcon aria-hidden="true" />
+          {props.t('threadSidebarUnpin')}
+        </ContextMenuItem>
+      ) : null}
       {snapshot.anyUnsettled ? (
-        <ContextMenuItem keys="E" onSelect={() => props.actions.batchSetSettled(true)}>
+        <ContextMenuItem {...batchKeys('E')} onSelect={() => props.actions.batchSetSettled(true)}>
+          <CircleCheckIcon aria-hidden="true" />
           {props.t('threadSidebarSettle')}
         </ContextMenuItem>
       ) : null}
-      {snapshot.anySettled ? <ContextMenuItem onSelect={() => props.actions.batchSetSettled(false)}>{props.t('threadSidebarUnsettle')}</ContextMenuItem> : null}
-      <ContextMenuItem keys="U" onSelect={() => props.actions.batchMarkUnread()}>
+      {snapshot.anySettled ? (
+        <ContextMenuItem onSelect={() => props.actions.batchSetSettled(false)}>
+          <RotateCcwIcon aria-hidden="true" />
+          {props.t('threadSidebarUnsettle')}
+        </ContextMenuItem>
+      ) : null}
+      {snapshot.anyUnparked ? (
+        <ContextMenuItem onSelect={() => props.actions.batchSetParked(true)}>
+          <PauseIcon aria-hidden="true" />
+          {props.t('threadSidebarPark')}
+        </ContextMenuItem>
+      ) : null}
+      {snapshot.anyParked ? (
+        <ContextMenuItem onSelect={() => props.actions.batchSetParked(false)}>
+          <PlayIcon aria-hidden="true" />
+          {props.t('threadSidebarUnpark')}
+        </ContextMenuItem>
+      ) : null}
+      <ContextMenuItem {...batchKeys('U')} onSelect={() => props.actions.batchMarkUnread()}>
+        <MailIcon aria-hidden="true" />
         {props.t('threadSidebarMarkUnread')}
       </ContextMenuItem>
       <ContextMenuSub>
-        <ContextMenuSubTrigger>{props.t('threadSidebarMute')}</ContextMenuSubTrigger>
+        <ContextMenuSubTrigger>
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+            <BellIcon aria-hidden="true" />
+            {props.t('threadSidebarMute')}
+          </span>
+        </ContextMenuSubTrigger>
         <ContextMenuSubContent className="dshx-root dshx:min-w-44">
           {THREAD_MUTE_OPTIONS.map(option => (
             <ContextMenuItem key={option} onSelect={() => props.actions.batchMute(option)}>
@@ -1010,7 +1056,10 @@ const BatchThreadMenuItems = (props: {
           </ContextMenuItem>
         </ContextMenuSubContent>
       </ContextMenuSub>
-      <ContextMenuItem onSelect={() => props.actions.batchCopyLinks()}>{props.t('threadSidebarCopyLinks')}</ContextMenuItem>
+      <ContextMenuItem onSelect={() => props.actions.batchCopyLinks()}>
+        <LinkIcon aria-hidden="true" />
+        {props.t('threadSidebarCopyLinks')}
+      </ContextMenuItem>
       {notifySubscriber === undefined ? null : (
         <NotifyChoiceMenu
           subscriberTitle={notifySubscriber.title}
@@ -1021,12 +1070,24 @@ const BatchThreadMenuItems = (props: {
         />
       )}
       <ContextMenuSeparator />
-      {snapshot.anyLive ? <ContextMenuItem onSelect={() => props.actions.batchMutate('archive')}>{props.t('threadSidebarArchive')}</ContextMenuItem> : null}
+      {snapshot.anyLive ? (
+        <ContextMenuItem onSelect={() => props.actions.batchMutate('archive')}>
+          <ArchiveIcon aria-hidden="true" />
+          {props.t('threadSidebarArchive')}
+        </ContextMenuItem>
+      ) : null}
       {snapshot.anyArchived ? (
-        <ContextMenuItem onSelect={() => props.actions.batchMutate('unarchive')}>{props.t('threadSidebarRestore')}</ContextMenuItem>
+        <ContextMenuItem onSelect={() => props.actions.batchMutate('unarchive')}>
+          <ArchiveRestoreIcon aria-hidden="true" />
+          {/* Two kinds of Restore can meet in one selection; this one says which it is. */}
+          {props.t(snapshot.anySettled ? 'threadSidebarRestoreArchived' : 'threadSidebarRestore')}
+        </ContextMenuItem>
       ) : null}
       <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => props.actions.clearSelection()}>{props.t('threadSidebarClearSelection')}</ContextMenuItem>
+      <ContextMenuItem onSelect={() => props.actions.clearSelection()}>
+        <XIcon aria-hidden="true" />
+        {props.t('threadSidebarClearSelection')}
+      </ContextMenuItem>
     </>
   )
 }
@@ -1047,11 +1108,19 @@ const RegisteredThreadRowActions = (props: { readonly target: ThreadRowActionTar
     <>
       {shown.map(action => (
         <ContextMenuItem key={action.id} data-thread-row-action={action.id} onSelect={() => action.run(props.target)}>
+          {action.icon === undefined ? <CircleDashedIcon aria-hidden /> : <action.icon aria-hidden />}
           {typeof action.label === 'string' ? action.label : action.label()}
         </ContextMenuItem>
       ))}
     </>
   )
+}
+
+/** A touch-first device (the phone rules apply under `pointer: coarse`); read once, it does not change mid-session. */
+let coarsePointerMatch: boolean | undefined
+const coarsePointer = (): boolean => {
+  coarsePointerMatch ??= typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+  return coarsePointerMatch
 }
 
 /** A scratch thread's own folder is its Session cwd, or its project folder when the summary carries none. */
@@ -1069,31 +1138,91 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   if (selection.sessionIds.length > 1 && selection.sessionIds.includes(session.id)) {
     return <BatchThreadMenuItems snapshot={props.actions.batch()} actions={props.actions} t={t} />
   }
-  // Lifecycle verbs lead (productivity pass E8): on a phone this menu is the row's action sheet, and Pin, Settle (the
-  // swipe's Done), Park, Archive and Mute are what a supervisor reaches for; the thread's other verbs follow.
-  return (
-    <>
-      {archived ? (
-        <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, 'unarchive')}>{t('threadSidebarRestore')}</ContextMenuItem>
-      ) : (
+  const copy = (value: string, done: ThreadSidebarLabelKey): void => void props.actions.copy(value, t(done))
+  const autoDone = (override: AutoSettleOverride, label: ThreadSidebarLabelKey): JSX.Element => (
+    <ContextMenuRadioItem
+      value={override}
+      onSelect={event => {
+        event.preventDefault()
+        props.actions.setAutoSettleOverride(session.id, override)
+      }}
+    >
+      {t(label)}
+    </ContextMenuRadioItem>
+  )
+  // One menu for a thread (`thread-menu-model.ts`): the header's `⋯` renders the same layout, so this body only says
+  // what each entry does for a row. On a phone it is the row's action sheet.
+  const entries: ThreadMenuEntries = {
+    pin: {
+      kind: 'item',
+      label: t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
+      keys: 'P',
+      ...(pinned ? { icon: <PinOffIcon aria-hidden="true" /> } : undefined),
+      onSelect: () => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin'),
+    },
+    done: {
+      kind: 'item',
+      label: t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle'),
+      keys: 'E',
+      disabled: session.running,
+      ...(settled ? { icon: <RotateCcwIcon aria-hidden="true" /> } : undefined),
+      onSelect: () => props.actions.toggleSettled(session.id),
+    },
+    snooze: {
+      kind: 'item',
+      label: t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
+      keys: 'H',
+      disabled: session.running,
+      ...(parked ? { icon: <PlayIcon aria-hidden="true" /> } : undefined),
+      onSelect: () => props.actions.toggleParked(session.id),
+    },
+    restore: { kind: 'item', label: t('threadSidebarRestore'), onSelect: () => void props.actions.mutate(session.id, 'unarchive') },
+    rename: { kind: 'item', label: t('threadSidebarRenameThread'), onSelect: () => props.actions.beginRename(session.id) },
+    ...(openAside === null ? undefined : { 'side-panel': { kind: 'item', label: t('threadSidebarOpenInSidePanel'), onSelect: () => openAside(session.id) } }),
+    // A draft nothing was sent in is not a thread to link to yet.
+    ...(session.blank
+      ? undefined
+      : {
+          'copy-link': {
+            kind: 'item',
+            label: t('threadSidebarCopyLink'),
+            onSelect: () => copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), 'threadSidebarLinkCopied'),
+          },
+        }),
+    ...(sidePanelDefinitions.length === 0
+      ? undefined
+      : {
+          'side-panel-views': {
+            kind: 'sub',
+            label: t('threadSidebarOpenPluginInSidePanel'),
+            content: sidePanelDefinitions.map(definition => (
+              <ContextMenuItem key={definition.id} onSelect={() => openRegisteredPanelAside(definition.id)}>
+                {definition.title}
+              </ContextMenuItem>
+            )),
+          },
+        }),
+    'continue-in': {
+      kind: 'sub',
+      label: t('threadSidebarContinueIn'),
+      disabled: session.running,
+      content: <ContinueInProjectItems t={t} continueIn={projectId => props.actions.continueIn(session.id, projectId)} Item={ContextMenuItem} />,
+    },
+    'copy-id': { kind: 'item', label: t('threadSidebarCopyId'), onSelect: () => copy(session.id, 'threadSidebarIdCopied') },
+    mention: { kind: 'item', label: t('threadSidebarInsertMention'), onSelect: () => requestThreadMentionInsertion(session.id) },
+    'follow-up': {
+      kind: 'item',
+      label: t('threadSidebarFollowUp'),
+      disabled: props.workspaceId === undefined,
+      onSelect: () => props.actions.followUp(session.id, props.workspaceId),
+    },
+    mute: {
+      kind: 'sub',
+      label: t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted'),
+      ...(props.mute === undefined ? undefined : { icon: <BellOffIcon aria-hidden="true" /> }),
+      contentClassName: 'dshx-root dshx:min-w-44',
+      content: (
         <>
-          <ContextMenuItem keys="P" onSelect={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}>
-            {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} keys="E" onSelect={() => props.actions.toggleSettled(session.id)}>
-            {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} keys="H" onSelect={() => props.actions.toggleParked(session.id)}>
-            {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} onSelect={() => void props.actions.mutate(session.id, 'archive')}>
-            {t('threadSidebarArchive')}
-          </ContextMenuItem>
-        </>
-      )}
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
           {THREAD_MUTE_OPTIONS.map(option => (
             <ContextMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
               {t(muteOptionLabelKeys[option])}
@@ -1103,118 +1232,88 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           <ContextMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
             {t('threadSidebarUnmute')}
           </ContextMenuItem>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
-      <ContextMenuItem disabled={props.workspaceId === undefined} onSelect={() => props.actions.followUp(session.id, props.workspaceId)}>
-        {t('threadSidebarFollowUp')}
-      </ContextMenuItem>
-      {archived ? null : (
-        <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={session.running}>{t('threadSidebarContinueIn')}</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-48 dshx:max-w-72" aria-label={t('threadSidebarContinueIn')}>
-            <ContinueInProjectItems t={t} continueIn={projectId => props.actions.continueIn(session.id, projectId)} Item={ContextMenuItem} />
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-      )}
-      {scratchThread(session, props.workspacePath, props.workspaceTitle) ? (
-        <ContextMenuItem onSelect={() => props.actions.turnIntoProject(session, props.workspacePath)}>{t('threadSidebarTurnIntoProject')}</ContextMenuItem>
-      ) : null}
-      <ContextMenuItem onSelect={() => props.actions.beginRename(session.id)}>{t('threadSidebarRenameThread')}</ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarCopy')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-          <ContextMenuItem onSelect={() => void props.actions.copy(session.id, t('threadSidebarIdCopied'))}>{t('threadSidebarCopyId')}</ContextMenuItem>
-          <ContextMenuItem
-            onSelect={() => void props.actions.copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), t('threadSidebarLinkCopied'))}
-          >
-            {t('threadSidebarCopyLink')}
-          </ContextMenuItem>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      {archived || openAside === null ? null : <ContextMenuItem onSelect={() => openAside(session.id)}>{t('threadSidebarOpenInSidePanel')}</ContextMenuItem>}
-      {!archived && sidePanelDefinitions.length > 0 ? (
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>{t('threadSidebarOpenPluginInSidePanel')}</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-            {sidePanelDefinitions.map(definition => (
-              <ContextMenuItem key={definition.id} onSelect={() => openRegisteredPanelAside(definition.id)}>
-                {definition.title}
-              </ContextMenuItem>
-            ))}
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-      ) : null}
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarReferencedBy')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>
-          <ThreadReferencesItems sessionId={session.id} t={t} openThread={props.actions.open} Item={ContextMenuItem} />
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      <RegisteredThreadRowActions target={{ sessionId: session.id, workspaceId: props.workspaceId, archived, running: session.running }} />
-      <ContextMenuSeparator />
-      {notifyTarget === undefined ? null : (
-        <NotifyChoiceMenu
-          subscriberTitle={notifyTarget.subscriberTitle}
-          choice={notifyTarget.choice}
-          defaultLevel={props.actions.notifyDefaultLevel()}
-          onChoose={choice => props.actions.setNotify(notifyTarget, choice)}
-          t={t}
-        />
-      )}
-      <ContextMenuItem disabled={unread} keys="U" onSelect={() => props.actions.markUnread(session.id)}>
-        {t('threadSidebarMarkUnread')}
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarAutoSettleBehavior')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-          <ContextMenuRadioGroup value={props.autoSettleOverride}>
-            <ContextMenuRadioItem
-              value="inherit"
-              onSelect={event => {
-                event.preventDefault()
-                props.actions.setAutoSettleOverride(session.id, 'inherit')
-              }}
-            >
-              {t('threadSidebarAutoSettleInherit')}
-            </ContextMenuRadioItem>
-            <ContextMenuRadioItem
-              value="enabled"
-              onSelect={event => {
-                event.preventDefault()
-                props.actions.setAutoSettleOverride(session.id, 'enabled')
-              }}
-            >
-              {t('threadSidebarAutoSettleEnabled')}
-            </ContextMenuRadioItem>
-            <ContextMenuRadioItem
-              value="disabled"
-              onSelect={event => {
-                event.preventDefault()
-                props.actions.setAutoSettleOverride(session.id, 'disabled')
-              }}
-            >
-              {t('threadSidebarAutoSettleDisabled')}
-            </ContextMenuRadioItem>
-          </ContextMenuRadioGroup>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarMoveToSection')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMoveToSection')}>
-          {SIDEBAR_SECTIONS.map(section => (
-            <ContextMenuItem key={section} disabled={section === props.section} onSelect={() => props.actions.moveToSection(session.id, section)}>
-              {t(sectionLabels[section])}
-            </ContextMenuItem>
-          ))}
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-    </>
+        </>
+      ),
+    },
+    'mark-unread': { kind: 'item', label: t('threadSidebarMarkUnread'), keys: 'U', disabled: unread, onSelect: () => props.actions.markUnread(session.id) },
+    ...(notifyTarget === undefined
+      ? undefined
+      : {
+          notify: {
+            kind: 'rows',
+            rows: (
+              <NotifyChoiceMenu
+                subscriberTitle={notifyTarget.subscriberTitle}
+                choice={notifyTarget.choice}
+                defaultLevel={props.actions.notifyDefaultLevel()}
+                onChoose={choice => props.actions.setNotify(notifyTarget, choice)}
+                t={t}
+              />
+            ),
+          },
+        }),
+    'auto-done': {
+      kind: 'sub',
+      label: t('threadSidebarAutoSettleBehavior'),
+      contentClassName: 'dshx-root dshx:min-w-44',
+      content: (
+        <ContextMenuRadioGroup value={props.autoSettleOverride}>
+          {autoDone('inherit', 'threadSidebarAutoSettleInherit')}
+          {autoDone('enabled', 'threadSidebarAutoSettleEnabled')}
+          {autoDone('disabled', 'threadSidebarAutoSettleDisabled')}
+        </ContextMenuRadioGroup>
+      ),
+    },
+    'move-to-group': {
+      kind: 'sub',
+      label: t('threadSidebarMoveToSection'),
+      contentClassName: 'dshx-root dshx:min-w-44',
+      content: SIDEBAR_SECTIONS.map(section => (
+        <ContextMenuItem key={section} disabled={section === props.section} onSelect={() => props.actions.moveToSection(session.id, section)}>
+          {t(sectionLabels[section])}
+        </ContextMenuItem>
+      )),
+    },
+    'referenced-by': {
+      kind: 'sub',
+      label: t('threadSidebarReferencedBy'),
+      contentClassName: 'dshx-root dshx:min-w-56 dshx:max-w-72',
+      content: <ThreadReferencesItems sessionId={session.id} t={t} openThread={props.actions.open} Item={ContextMenuItem} />,
+    },
+    ...(scratchThread(session, props.workspacePath, props.workspaceTitle)
+      ? {
+          'turn-into-project': {
+            kind: 'item',
+            label: t('threadSidebarTurnIntoProject'),
+            onSelect: () => props.actions.turnIntoProject(session, props.workspacePath),
+          },
+        }
+      : undefined),
+    'row-actions': {
+      kind: 'rows',
+      rows: <RegisteredThreadRowActions target={{ sessionId: session.id, workspaceId: props.workspaceId, archived, running: session.running }} />,
+    },
+    archive: { kind: 'item', label: t('threadSidebarArchive'), disabled: session.running, onSelect: () => void props.actions.mutate(session.id, 'archive') },
+  }
+  return (
+    <ThreadMenu
+      kit={CONTEXT_MENU_KIT}
+      entries={entries}
+      archived={archived}
+      phone={PhoneLayout.matches()}
+      coarsePointer={coarsePointer()}
+      labels={{ openIn: t('threadSidebarOpenIn'), copy: t('threadSidebarCopy'), more: t('threadSidebarMore') }}
+    />
   )
+}
+
+/** The list's menu parts, for the shared thread menu. */
+const CONTEXT_MENU_KIT: ThreadMenuKit = {
+  Item: ContextMenuItem,
+  Sub: ContextMenuSub,
+  SubTrigger: ContextMenuSubTrigger,
+  SubContent: ContextMenuSubContent,
+  Separator: ContextMenuSeparator,
 }
 
 /** Right-click menu of one thread, shared by thread rows and the usage-limit rows. */
@@ -1244,13 +1343,6 @@ const ThreadRowMenu = {
     row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: rect.left, clientY: rect.bottom }))
   },
 } as const
-
-/** A touch-first device (the phone rules apply under `pointer: coarse`); read once, it does not change mid-session. */
-let coarsePointerMatch: boolean | undefined
-const coarsePointer = (): boolean => {
-  coarsePointerMatch ??= typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
-  return coarsePointerMatch
-}
 
 /**
  * The 16px project mark that leads a thread row: the project's own icon (favicon, `dsh.project.json` icon) or its
