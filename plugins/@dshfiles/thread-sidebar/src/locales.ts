@@ -113,7 +113,7 @@ const en = {
   threadSidebarWorkingNone: 'Nothing working',
   threadSidebarGroupNone: 'None',
   threadSidebarFilter: 'Filter',
-  threadSidebarFilterNone: 'None',
+  threadSidebarFilterNone: 'Any',
   threadSidebarFilterStatus: 'Status',
   threadSidebarFilterAttention: 'Needs attention',
   threadSidebarFilterNotRunning: 'Not running',
