@@ -128,7 +128,7 @@ When('Settings are searched for {string}', async ({ page }: { page: Page }, quer
 Then('the Main tabs settings are listed with highlights, a count and a tree count', async ({ page }: { page: Page }) => {
   const results = page.locator('[data-settings-results]')
   await recordAssertion(page, 'settings-shell-search-lists-grouped-matches', async () => {
-    await expect(page.getByRole('status').filter({ hasText: /\d+ Settings? Found/ })).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: /\d+ settings? found/ })).toBeVisible()
     await expect(results.getByRole('region', { name: 'Main tabs', exact: true })).toBeVisible()
     await expect(results.locator('[data-setting-path="maxTabs"]')).toBeVisible()
     await expect(results.locator('[data-setting-path="maxTabs"] mark').first()).toHaveText(/tabs/i)
