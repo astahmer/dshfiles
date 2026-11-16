@@ -21,7 +21,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
-import { KIND_LABEL, routedKind } from './account-labels.js'
+import { KIND_LABEL, planLabel, routedKind } from './account-labels.js'
 import type { AccountOrderDirection, AccountProfile, AccountsUsage } from './api.js'
 import { ActionHint, ProviderGlyph } from './panel-primitives.js'
 import { accountConnectionStatus, type AccountSection } from './account-connection-status.js'
@@ -53,7 +53,7 @@ export const AccountGroup = (props: {
           const selected = profile.instanceId === props.selectedId
           const open = expanded[profile.instanceId] ?? (selected && props.activeSection === 'models')
           const status = accountConnectionStatus(profile, props.usage ?? null)
-          const identity = [profile.plan, profile.identity].filter(Boolean).join(' · ')
+          const identity = [profile.plan === null ? null : planLabel(profile.plan), profile.identity].filter(Boolean).join(' · ')
           const signIn = profile.signedIn ? 'Credentials available' : 'Not signed in'
           return (
             <li

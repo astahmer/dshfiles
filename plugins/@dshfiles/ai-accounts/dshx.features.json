@@ -162,7 +162,7 @@
       ],
       "title": "Connect an account without leaving the chat",
       "summary": "Minimal provider dialogs show common sign-in choices, with named credentials and custom CLI homes under More options. A pencil edits the provisional new-account name without changing route identity or restarting authentication. New profiles remain outside saved accounts and model routes until verification. Claude subscriptions use official CLI configuration status, not remote token validation.",
-      "reach": ["click button \"Add AI account\"", "expect dialog \"Add account\""],
+      "reach": ["click group \"AI accounts usage*\"", "click button \"Add AI account\"", "expect dialog \"Add account\""],
       "surfaces": ["client", "host", "storage"],
       "surface": "settingsSection",
       "destination": "settings",

@@ -210,9 +210,18 @@ export const UsagePopoverContent = (props: {
   readonly order?: 'arranged' | 'remaining'
   readonly onOpenUsageHistory: () => void
   readonly onConnectAccount: (accountId: string) => void
+  readonly onAddAccount?: (() => void) | undefined
+  readonly onOpenAccounts?: (() => void) | undefined
   readonly close: () => void
 }): JSX.Element => {
   const { usage, refreshing, failure, refresh } = useAccountsUsage()
+  const closing = (action: (() => void) | undefined): (() => void) | undefined =>
+    action === undefined
+      ? undefined
+      : () => {
+          props.close()
+          action()
+        }
   return (
     <PopoverContent
       align="start"
@@ -234,6 +243,8 @@ export const UsagePopoverContent = (props: {
           props.close()
           props.onConnectAccount(accountId)
         }}
+        onAddAccount={closing(props.onAddAccount)}
+        onOpenAccounts={closing(props.onOpenAccounts)}
         onRefresh={() => void refresh()}
         order={props.order ?? 'arranged'}
         refreshing={refreshing}

@@ -71,9 +71,11 @@ describe('usage overview', () => {
   it('formats resets and ages like the reference footer', () => {
     expect(UsageOverviewModel.formatResetShort((4 * 24 + 12) * 3_600_000, 0)).toBe('4d 12h')
     expect(UsageOverviewModel.formatResetShort(null, 0)).toBeNull()
-    expect(UsageOverviewModel.formatResetIn(0 + (1 * 60 + 11) * 60_000 + 30_000, 0)).toBe('Resets in 1 h 11 min')
-    expect(UsageOverviewModel.formatResetIn((5 * 24 + 20) * 3_600_000 + 1, 0)).toBe('Resets in 5 d 20 h')
-    expect(UsageOverviewModel.formatResetSpaced(9 * 60_000, 0)).toBe('9 min')
+    expect(UsageOverviewModel.formatResetIn(0 + (1 * 60 + 11) * 60_000 + 30_000, 0)).toBe('Resets in 1h 11m')
+    expect(UsageOverviewModel.formatResetIn((5 * 24 + 20) * 3_600_000 + 1, 0)).toBe('Resets in 5d 20h')
+    // One duration format on every quota surface: the popover reads the same "2d 23h" as the status strip.
+    const reset = (2 * 24 + 23) * 3_600_000 + 1
+    expect(UsageOverviewModel.formatResetIn(reset, 0)).toBe(`Resets in ${UsageOverviewModel.formatResetShort(reset, 0) ?? ''}`)
     expect(UsageOverviewModel.formatResetIn(10, 20)).toBe('Resetting now')
     expect(UsageOverviewModel.formatReadAge(0, 30_000)).toBe('just now')
     expect(UsageOverviewModel.formatReadAge(0, 4 * 60_000 + 38_000)).toBe('4m ago')
@@ -110,7 +112,7 @@ describe('usage overview', () => {
     const resetsAt = new Date(2026, 10, 12, 3, 0).getTime()
     const now = resetsAt - (45 * 60 + 30) * 60_000
     const line = UsageOverviewModel.resetLine(resetsAt, now)
-    expect(line).toMatch(/^Resets in 1 d 21 h · \S+ 03:00$/)
+    expect(line).toMatch(/^Resets in 1d 21h · \S+ 03:00$/)
     expect(UsageOverviewModel.resetLine(null, now)).toBeNull()
     expect(UsageOverviewModel.resetLine(now - 1, now)).toBe('Resetting now')
   })
@@ -428,7 +430,7 @@ describe('status-bar reset times (b:jaz6)', () => {
     const at = new Date(2026, 10, 12, 3, 0).getTime()
     const now = at - (45 * 60 + 30) * MINUTE
     expect(UsageOverviewModel.windowTooltipLine({ label: 'Weekly limit', percentRemaining: 51, resetsAt: at }, now)).toMatch(
-      /^Weekly limit: 51% left · resets in 1 d 21 h · \S+ 03:00$/u,
+      /^Weekly limit: 51% left · resets in 1d 21h · \S+ 03:00$/u,
     )
     expect(UsageOverviewModel.windowTooltipLine({ label: 'Current session', percentRemaining: 0, resetsAt: null }, now)).toBe('Current session: limit reached')
   })

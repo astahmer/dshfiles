@@ -24,7 +24,7 @@ import { AccountSignOut } from './account-sign-out.js'
 import { AccountSettings, AccountInlineSettings } from './account-settings.js'
 import { AccountNameEditor } from './account-name-editor.js'
 import { accountConnectionStatus, accountStateLine, type AccountSection } from './account-connection-status.js'
-import { routedKind } from './account-labels.js'
+import { planLabel, routedKind } from './account-labels.js'
 import { accountRemoveMachine } from './account-remove-machine.js'
 import { AutoSaveIndicator } from './auto-save-indicator.js'
 import type { AccountDraft, AccountsFile } from './api.js'
@@ -65,7 +65,7 @@ export const AccountDetail = (props: {
   return (
     <section aria-label="Selected account" className={DETAIL_PANE_CLASS}>
       <DetailHeader
-        detail={[selected?.plan, selected?.identity].filter(Boolean).join(' · ')}
+        detail={[selected?.plan == null ? null : planLabel(selected.plan), selected?.identity].filter(Boolean).join(' · ')}
         mark={<ProviderGlyph kind={draft.kind} />}
         state={stateLine}
         title={

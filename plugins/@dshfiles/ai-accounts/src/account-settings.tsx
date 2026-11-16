@@ -6,7 +6,7 @@ import { PageSection } from '@dshfiles/plugin-ui/components/page'
 import { CheckIcon, CopyIcon, PencilIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
-import { KIND_LABEL, routedKind } from './account-labels.js'
+import { KIND_LABEL, planLabel, routedKind } from './account-labels.js'
 import { accountAuthenticationLabel, accountConnectionStatus } from './account-connection-status.js'
 import { AccountIdentitySection } from './account-identity-section.js'
 import { ExtraUsageMeter } from './extra-usage-view.js'
@@ -203,7 +203,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
           <dt className="dshx:text-xs dshx:text-muted-foreground">Provider</dt>
           <dd>{KIND_LABEL[props.draft.kind]}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Account type</dt>
-          <dd>{selected?.plan ?? 'Not reported by provider'}</dd>
+          <dd>{selected?.plan == null ? 'Not reported by provider' : planLabel(selected.plan)}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Email / identity</dt>
           <dd className="dshx:break-words">{selected?.identity ?? 'Not reported by provider'}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Account ID</dt>
