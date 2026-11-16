@@ -28,11 +28,15 @@
    */
   --text-2xs: var(--dshx-density-text-min, 11px);
   --text-2xs--line-height: 1.35;
-  --text-xs: 0.75rem;
+  /*
+   * Meta, UI and prose follow the density tokens too, so the same class reads 12/13/14px on desktop and 13/15/15px
+   * on a coarse-pointer phone or a narrow pane (DESIGN.md › Density). The fallbacks are the desktop values.
+   */
+  --text-xs: var(--dshx-density-text-meta, 0.75rem);
   --text-xs--line-height: 1.35;
-  --text-sm: 0.8125rem;
+  --text-sm: var(--dshx-density-text-ui, 0.8125rem);
   --text-sm--line-height: 1.45;
-  --text-base: 0.875rem;
+  --text-base: var(--dshx-density-text-prose, 0.875rem);
   --text-base--line-height: 1.45;
 
   --color-background: var(--dsw-alias-bg-base);
@@ -170,7 +174,7 @@
 
     /*
      * Density. Compact (desktop): UI 13px, meta 12px, minimum 11px, inputs 13px. Comfortable values switch in below
-     * on a coarse pointer. P0 only defines them; surfaces adopt them phase by phase, so nothing moves yet.
+     * on a coarse pointer. `.dshx-root` and the `text-2xs|xs|sm|base` steps read them.
      */
     --dshx-density-text-ui: 13px;
     --dshx-density-text-prose: 14px;
@@ -513,7 +517,7 @@
 
   .dshx-root {
     color: var(--dsw-alias-label-primary);
-    font: 0.8125rem/1.45 var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
+    font: var(--dshx-density-text-ui, 0.8125rem) / 1.45 var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
     -webkit-font-smoothing: antialiased;
   }
 }
