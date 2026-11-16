@@ -25,6 +25,21 @@ const item = (overrides: Partial<AttentionItem> = {}): AttentionItem => ({
 })
 
 describe('inbox view', () => {
+  it('never offers canned replies on an item that waits on a question', () => {
+    // A thread question the Inbox cannot answer in place: its form is still open in the thread.
+    const openForm = item({ source: 'agent-questions.native-question', verbs: ['Open', 'Done', 'Snooze', 'MuteSource'] })
+    expect(InboxView.offersQuickReplies(openForm, 'needs-you')).toBe(false)
+    // A subagent question, and any item a provider marks answerable, with or without choices.
+    expect(InboxView.offersQuickReplies(item(), 'needs-you')).toBe(false)
+    expect(InboxView.offersQuickReplies(item({ source: 'acme.poll', verbs: ['Answer', 'Open'] }), 'needs-you')).toBe(false)
+    // A failed turn still takes one: a queued prompt is how the user moves that thread.
+    const failedTurn = item({ source: 'thread-sidebar.finished-turn', severity: 'failed', verbs: ['Retry', 'Open', 'Done'] })
+    expect(InboxView.offersQuickReplies(failedTurn, 'needs-you')).toBe(true)
+    expect(InboxView.offersQuickReplies(failedTurn, 'closed')).toBe(false)
+    expect(InboxView.offersQuickReplies(item({ source: 'thread-sidebar.finished-turn', severity: 'ready', verbs: ['Open'] }), 'other')).toBe(false)
+    expect(InboxView.offersQuickReplies(item({ source: 'backlog.attention', subject: { kind: 'backlog-item', id: 'b:1' }, verbs: ['Open'] }), 'needs-you')).toBe(false)
+  })
+
   it('offers the reopen path for done and snoozed items, unmute for muted ones, and nothing for resolved ones', () => {
     expect(InboxView.undoOf(item({ doneAt: 5 }), 'closed')).toBe('reopen')
     expect(InboxView.undoOf(item({ snoozeUntilChange: true }), 'snoozed')).toBe('unsnooze')

@@ -166,7 +166,7 @@ const InboxRow = (props: {
   readonly onFocusRow?: () => void
   /** The choice keys (1–9) shown on the answer buttons while this row is highlighted. */
   readonly showChoiceKeys?: boolean
-  /** Quick-reply chips for a waiting thread (prompt library), sent to that thread. */
+  /** Quick-reply chips for a stopped thread (prompt library), sent to that thread; never on an item that asks a question. */
   readonly quickReplies?: (sessionId: string) => React.ReactNode
   /** Bumped by Triage's Enter on a Land item: open the Land confirmation, never Land itself. */
   readonly landSignal?: number
@@ -272,9 +272,7 @@ const InboxRow = (props: {
               </Button>
             ))
           : null}
-        {open && item.subject.kind === 'session' && item.severity !== 'ready' && !(item.verbs.includes('Answer') && item.choices.length > 0)
-          ? props.quickReplies?.(item.subject.id)
-          : null}
+        {InboxView.offersQuickReplies(item, props.view) ? props.quickReplies?.(item.subject.id) : null}
         {open
           ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).map(verb =>
               verb === 'Land' ? (
