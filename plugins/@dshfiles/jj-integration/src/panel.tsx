@@ -32,8 +32,6 @@ import {
   CheckIcon,
   ChevronDownIcon,
   CircleAlertIcon,
-  CircleCheckIcon,
-  CircleSlashIcon,
   ClockIcon,
   CopyIcon,
   EllipsisIcon,
@@ -51,6 +49,7 @@ import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore 
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { multiHostApi } from '@dshfiles/multi-host/api'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
+import { LandStatusModel } from './land-status.js'
 import { landRepositoriesApi, type LandRepositories, type LocalLandApi, type RemoteLandPort } from './land-repositories.js'
 import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
@@ -73,7 +72,6 @@ import { ProjectBookmarkQuery } from './project-bookmark-query.js'
 import { threadAtQueryKey } from './thread-query-keys.js'
 import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
 import { workspaceSyncOutcome } from './workspace-sync-outcome.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 /** The Land page lists the newest revisions of each thread; the full list of one thread is `threadAt`. */
 const LAND_REVISION_LIMIT = 10
@@ -102,84 +100,22 @@ const GroupLoadMoreSentinel = (props: { readonly enabled: boolean; readonly rese
   return <div ref={sentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
 }
 
-type ToneClasses = { readonly solid: string; readonly text: string; readonly chip: string; readonly dot: string }
-
 /** The one-line notice a queued integration shows, in the tone its outcome earns. */
 interface IntegrationNotice {
   readonly tone: 'default' | 'destructive'
   readonly text: string
 }
 
-const toneClasses = {
-  conflicts: {
-    solid: 'dshx:bg-destructive',
-    text: 'dshx:text-destructive',
-    chip: 'dshx:border-destructive/30 dshx:bg-destructive/10 dshx:text-destructive',
-    dot: 'dshx:bg-destructive',
-  },
-  ready: {
-    solid: 'dshx:bg-success',
-    text: 'dshx:text-success',
-    chip: 'dshx:border-success/30 dshx:bg-success/10 dshx:text-success',
-    dot: 'dshx:bg-success',
-  },
-  blocked: {
-    solid: 'dshx:bg-warning',
-    text: 'dshx:text-warning',
-    chip: 'dshx:border-warning/30 dshx:bg-warning/10 dshx:text-warning',
-    dot: 'dshx:bg-warning',
-  },
-  unknown: {
-    solid: 'dshx:bg-warning',
-    text: 'dshx:text-warning',
-    chip: 'dshx:border-warning/40 dshx:bg-warning/5 dshx:text-warning',
-    dot: 'dshx:bg-warning',
-  },
-  integrating: {
-    solid: 'dshx:bg-primary',
-    text: 'dshx:text-primary',
-    chip: 'dshx:border-primary/30 dshx:bg-primary/10 dshx:text-primary',
-    dot: 'dshx:bg-primary',
-  },
-  integrated: {
-    solid: 'dshx:bg-muted-foreground',
-    text: 'dshx:text-muted-foreground',
-    chip: 'dshx:border-border dshx:bg-muted dshx:text-muted-foreground',
-    dot: 'dshx:bg-muted-foreground',
-  },
-  'no-changes': {
-    solid: 'dshx:bg-muted-foreground',
-    text: 'dshx:text-muted-foreground',
-    chip: 'dshx:border-border dshx:bg-muted dshx:text-muted-foreground',
-    dot: 'dshx:bg-muted-foreground',
-  },
-} satisfies Record<ThreadIntegrationCategory, ToneClasses>
-
+/** A status in the shared vocabulary: the glyph carries the state, the label is plain text (DESIGN.md, six states). */
 const statusChip = (props: { readonly label: string; readonly tone: ThreadIntegrationCategory }): JSX.Element => (
-  <Badge variant="outline" className={cn('dshx:w-fit dshx:gap-1.5 dshx:px-2.5 dshx:py-1', toneClasses[props.tone].chip)}>
-    <StatusDot size="sm" className={toneClasses[props.tone].dot} />
-    {props.label}
-  </Badge>
+  <span className="dshx:flex dshx:w-fit dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs" data-land-status={LandStatusModel.glyph(props.tone)}>
+    <StatusGlyph status={LandStatusModel.glyph(props.tone)} decorative />
+    <span className={cn('dshx:truncate', props.tone === 'ready' && 'dshx:font-medium')}>{props.label}</span>
+  </span>
 )
 
-const groupIcon = (category: ThreadIntegrationCategory): JSX.Element => {
-  if (category === 'conflicts' || category === 'unknown') return <CircleAlertIcon className="dshx:size-4" />
-  if (category === 'ready' || category === 'integrated') return <CircleCheckIcon className="dshx:size-4" />
-  if (category === 'integrating') return <GitForkIcon className="dshx:size-4" />
-  if (category === 'no-changes') return <CircleSlashIcon className="dshx:size-4" />
-  return <ClockIcon className="dshx:size-4" />
-}
-
 const groupGlyph = (category: ThreadIntegrationCategory): JSX.Element => (
-  <span
-    aria-hidden="true"
-    className={cn(
-      'dshx:mt-0.5 dshx:flex dshx:size-6 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-white',
-      toneClasses[category].solid,
-    )}
-  >
-    {groupIcon(category)}
-  </span>
+  <StatusGlyph status={LandStatusModel.glyph(category)} decorative className="dshx:mt-0.5" />
 )
 
 /** The thread sidebar owns restarting DSH (with its confirmation dialog) and registers it as a palette action. */
@@ -466,7 +402,7 @@ const ThreadRow = (props: {
               key={blocker}
               className={cn('dshx:flex dshx:items-start dshx:gap-2 dshx:text-sm', index === 0 ? 'dshx:text-foreground' : 'dshx:text-muted-foreground')}
             >
-              <CircleAlertIcon aria-hidden="true" className={cn('dshx:mt-0.5 dshx:size-4 dshx:shrink-0', toneClasses.blocked.text)} />
+              <CircleAlertIcon aria-hidden="true" className="dshx:mt-0.5 dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
               <span className="dshx:min-w-0">{blockerMessage(t, blocker, props.bookmark)}</span>
             </li>
           ))}
@@ -1130,15 +1066,18 @@ export const ThreadWorkspacesPanel = (props: {
       tone: 'no-changes',
     },
   ]
-  const tabs: readonly { readonly id: IntegrationFilter; readonly label: string; readonly dot: string | undefined }[] = [
-    { id: 'attention', label: t('attentionFilter'), dot: undefined },
-    { id: 'ready', label: t('readyToIntegrate'), dot: toneClasses.ready.dot },
-    { id: 'blocked', label: t('blockedHeading'), dot: toneClasses.blocked.dot },
-    { id: 'conflicts', label: t('conflictsHeading'), dot: toneClasses.conflicts.dot },
-    { id: 'integrating', label: t('integratingHeading'), dot: toneClasses.integrating.dot },
-    { id: 'completed', label: t('completedFilter'), dot: toneClasses['no-changes'].dot },
-    { id: 'all', label: t('allThreads'), dot: undefined },
+  const allTabs: readonly { readonly id: IntegrationFilter; readonly label: string; readonly category: ThreadIntegrationCategory | undefined }[] = [
+    { id: 'attention', label: t('attentionFilter'), category: undefined },
+    { id: 'ready', label: t('readyToIntegrate'), category: 'ready' },
+    { id: 'blocked', label: t('blockedHeading'), category: 'blocked' },
+    { id: 'conflicts', label: t('conflictsHeading'), category: 'conflicts' },
+    { id: 'integrating', label: t('integratingHeading'), category: 'integrating' },
+    { id: 'completed', label: t('completedFilter'), category: 'no-changes' },
+    { id: 'all', label: t('allThreads'), category: undefined },
   ]
+  // A2 #38 (unslop): a filter that counts nothing takes no seat; Needs you, All and the selected one always show.
+  const shownFilters = LandStatusModel.visibleFilters({ filters: allTabs.map(tab => tab.id), counts, selected: filter })
+  const tabs = allTabs.filter(tab => shownFilters.includes(tab.id))
   const lifecycleOptions: readonly { readonly id: LifecycleFilter; readonly label: string }[] = [
     { id: 'any', label: t('lifecycleAny') },
     { id: 'active', label: t('lifecycleActive') },
@@ -1244,7 +1183,7 @@ export const ThreadWorkspacesPanel = (props: {
                   aria-pressed={filter === tab.id}
                   onClick={() => setFilter(tab.id)}
                 >
-                  {tab.dot === undefined ? null : <StatusDot size="sm" className={tab.dot} />}
+                  {tab.category === undefined ? null : <StatusGlyph status={LandStatusModel.glyph(tab.category)} decorative />}
                   {tab.label}
                   <span className="dshx:text-muted-foreground dshx:tabular-nums">{counts[tab.id]}</span>
                 </Button>

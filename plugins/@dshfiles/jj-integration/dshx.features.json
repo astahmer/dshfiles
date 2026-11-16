@@ -977,7 +977,7 @@
         "click button \"Own workspace actions\"",
         "expect button \"Open thread workspaces in side panel\"",
         "click button \"Open thread workspaces in side panel\"",
-        "expect heading \"Land\"",
+        "expect heading \"Workspaces\"",
         "expect button \"Land\"",
         "expect button \"Land all*\"",
         "click button \"View details\"",
@@ -985,7 +985,7 @@
         "expect text \"You\"",
         "click tab \"Land\"",
         "click button \"Workspaces\"",
-        "expect heading \"Land\""
+        "expect heading \"Workspaces\""
       ],
       "configuration": [
         {
@@ -1137,7 +1137,7 @@
       "reach": [
         "click tab \"Land\"",
         "click button \"Workspaces\"",
-        "expect heading \"Land\"",
+        "expect heading \"Workspaces\"",
         "expect button \"Needs you*\"",
         "click button \"Refresh\"",
         "click button \"All*\"",
@@ -1187,7 +1187,7 @@
         "click button \"Own workspace actions\"",
         "expect button \"Open thread workspaces in side panel\"",
         "click button \"Open thread workspaces in side panel\"",
-        "expect heading \"Land\"",
+        "expect heading \"Workspaces\"",
         "click button \"View details\"",
         "expect button \"Preview\""
       ],
@@ -1227,12 +1227,12 @@
       "id": "thread-integration-empty",
       "title": "Thread integration with no thread workspaces",
       "summary": "A registered project with no thread workspace shows one plain sentence instead of empty groups, banners or filter tabs: the page never fabricates work, and the counts only appear once a workspace exists.",
-      "reach": ["click tab \"Land\"", "click button \"Workspaces\"", "expect heading \"Land\"", "expect text \"No thread workspaces.\""],
+      "reach": ["click tab \"Land\"", "click button \"Workspaces\"", "expect heading \"Workspaces\"", "expect text \"No thread workspaces.\""],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Land Workspaces ready to land, and repository history.\"",
         "click button \"Workspaces\"",
-        "expect heading \"Land\"",
+        "expect heading \"Workspaces\"",
         "expect text \"No thread workspaces.\""
       ],
       "surfaces": ["client"],

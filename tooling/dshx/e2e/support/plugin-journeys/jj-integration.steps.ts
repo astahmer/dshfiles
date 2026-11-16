@@ -758,7 +758,7 @@ Then('the current thread header identifies its jj workspace', async ({ page }: {
   await indicator.click()
   await expect(rebaseButton(page)).toBeVisible()
   await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Land', exact: true }).last()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Workspaces', exact: true }).last()).toBeVisible()
   await expect(indicator).toBeVisible()
 })
 
@@ -1426,7 +1426,7 @@ Then('the thread appears in the Settled sidebar section', async ({ page }: { pag
 
 When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, 'Land')
-  await expect(page.getByRole('heading', { name: 'Land', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
 })
 
 Then('the Thread integration panel prioritises work needing attention', async ({ page }: { page: Page }) => {
@@ -1621,7 +1621,7 @@ When('the conversation is opened from its workspace row', async ({ page }: { pag
 When('the Thread workspaces side panel is opened', async ({ page }: { page: Page }) => {
   await openWorkspaceMenu(page)
   await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Land', exact: true }).last()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Workspaces', exact: true }).last()).toBeVisible()
 })
 
 Then('the thread header offers Rebase for its 1 revision', async ({ page }: { page: Page }) => {

@@ -1948,7 +1948,7 @@ Then('the header More menu still offers Settings and opens a destination the row
     // click still runs the option's own select handler, as a real click does.
     await menu.getByRole('option', { name: landName }).first().dispatchEvent('click')
     await expect(menu).toHaveCount(0)
-    await expect(page.getByRole('heading', { name: 'Land', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
