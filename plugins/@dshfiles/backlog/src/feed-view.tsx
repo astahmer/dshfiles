@@ -53,6 +53,19 @@ const Chip = (props: { readonly children: ReactNode; readonly className?: string
   </span>
 )
 
+/** Who captured the item, when and its `b:` id: trailing muted meta, so the row leads with the item itself. */
+export const FeedEntryMeta = (props: {
+  readonly item: { readonly id: number; readonly ref?: string | undefined; readonly title: string; readonly createdAt: number }
+  readonly author: string | undefined
+}): JSX.Element => (
+  <span data-feed-entry-meta="" className="dshx:flex dshx:shrink-0 dshx:items-baseline dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
+    <span className="dshx:@max-pane-narrow:hidden">{ItemGlyphs.actorName(props.author)} ·</span>
+    <span>{new Date(props.item.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+    <span aria-hidden>·</span>
+    <BacklogMentionHandle item={props.item} />
+  </span>
+)
+
 const FeedEntry = (props: {
   readonly item: BacklogSummaryView
   readonly open: boolean
@@ -107,11 +120,6 @@ const FeedEntry = (props: {
         ) : null}
         <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-2xs dshx:ring-0" />
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
-          <div className="dshx:flex dshx:items-baseline dshx:gap-2 dshx:text-xs">
-            <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(author)}</span>
-            <span className="dshx:text-muted-foreground">{new Date(item.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-            <BacklogMentionHandle item={item} className="dshx:text-2xs dshx:text-muted-foreground" />
-          </div>
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
             <span onClick={event => event.stopPropagation()}>
               <ItemPickers.Status
@@ -138,6 +146,7 @@ const FeedEntry = (props: {
                 )}
               />
             )}
+            <FeedEntryMeta item={item} author={author} />
           </div>
           {item.preview === '' ? null : (
             <BacklogText
@@ -192,7 +201,7 @@ const FeedEntry = (props: {
         </div>
         <div
           onClick={event => event.stopPropagation()}
-          className="dshx:absolute dshx:-top-3 dshx:right-3 dshx:flex dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-sm dshx:transition-opacity dshx:group-hover/entry:opacity-100"
+          className="dshx:absolute dshx:-top-3 dshx:right-3 dshx:flex dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-sm dshx:transition-opacity dshx:group-hover/entry:opacity-100 dshx:@max-pane-narrow:hidden"
         >
           <button
             type="button"
