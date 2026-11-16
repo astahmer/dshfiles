@@ -133,6 +133,7 @@ const preferencesInputFields = {
   headerMode: Schema.Literals(['compact', 'expanded']),
   hideBrandLogo: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.hideBrandLogo),
   phoneEdgeSwipePanels: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.phoneEdgeSwipePanels),
+  phoneNavigation: SchemaHelpers.withDecodedDefault(Schema.Literals(['stack', 'drawer']), () => DEFAULT_PREFERENCES.phoneNavigation),
   showFooter: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.showFooter),
   showRailActions: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.showRailActions),
   headerRegionHeight: SchemaHelpers.withDecodedDefault(

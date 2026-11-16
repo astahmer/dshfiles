@@ -70,6 +70,11 @@ export const threadSidebarSettings = defineSettings({
       .description(
         "On a phone, inside a thread, a swipe in from the right screen edge opens the thread panel. Off by default because Android's back gesture also uses that edge; the swipe starts slightly inside it.",
       ),
+    phoneNavigation: Schema.union(['stack', 'drawer'] as const)
+      .default(DEFAULT_PREFERENCES.phoneNavigation)
+      .description(
+        'On a phone: stack shows a bottom tab bar and the thread list full screen, with Back from a thread; drawer keeps the thread on screen and slides the thread list in from the left (sidebar button or a swipe from the left edge), with Inbox, Land and More at its top.',
+      ),
     showFooter: Schema.boolean()
       .default(DEFAULT_PREFERENCES.showFooter)
       .description(

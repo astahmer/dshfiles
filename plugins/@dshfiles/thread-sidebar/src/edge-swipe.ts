@@ -50,7 +50,7 @@ export const EdgeSwipeModel = {
 } as const
 
 /** A horizontally scrollable element between the target and the document owns sideways drags, even at its start. */
-const insideHorizontalScroller = (target: Element | null): boolean => {
+export const insideHorizontalScroller = (target: Element | null): boolean => {
   for (let node = target; node !== null && node !== document.documentElement; node = node.parentElement) {
     if (!(node instanceof HTMLElement) || node.scrollWidth <= node.clientWidth) continue
     if (EdgeSwipeModel.scrollsSideways({ scrollWidth: node.scrollWidth, clientWidth: node.clientWidth, overflowX: getComputedStyle(node).overflowX }))
@@ -59,7 +59,8 @@ const insideHorizontalScroller = (target: Element | null): boolean => {
   return false
 }
 
-const ignored = (target: EventTarget | null): boolean => {
+/** A touch that never starts an edge swipe: outside an element, under an open modal, or owned by content that drags itself. */
+export const ignoresEdgeSwipe = (target: EventTarget | null): boolean => {
   if (!(target instanceof Element)) return true
   // A modal (the thread panel sheet, a dialog) owns the screen, scrim included, until it closes on its own controls.
   if (document.querySelector('[aria-modal="true"]:not([hidden])') !== null) return true
@@ -79,7 +80,7 @@ export const useEdgeSwipe = (input: { readonly side: EdgeSwipeSide; readonly ena
     const start = (event: TouchEvent): void => {
       gesture = undefined
       const touch = event.touches.length === 1 ? event.touches[0] : undefined
-      if (touch === undefined || !EdgeSwipeModel.starts({ side, x: touch.clientX, width: window.innerWidth }) || ignored(event.target)) return
+      if (touch === undefined || !EdgeSwipeModel.starts({ side, x: touch.clientX, width: window.innerWidth }) || ignoresEdgeSwipe(event.target)) return
       gesture = { id: touch.identifier, x: touch.clientX, y: touch.clientY, intent: 'undecided' }
     }
     const find = (list: TouchList, id: number): Touch | undefined => Array.from(list).find(touch => touch.identifier === id)

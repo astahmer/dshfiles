@@ -612,7 +612,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "thread-sidebar",
       "description": "Replace the DSH sidebar with project-scoped thread groups and customizable navigation.",
       "ui": true,
-      "features": 55
+      "features": 56
     },
     {
       "name": "thread-transfer",
@@ -25848,6 +25848,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "Below 640px the fixed layout is a stack (docs/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from…",
       "destination": "threads",
       "currentSurface": "shell: phone tab bar only; the stage kept the desktop tab strip and no Back",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "thread-sidebar#phone-drawer-navigation",
+      "plugin": "thread-sidebar",
+      "id": "phone-drawer-navigation",
+      "title": "Open the thread list as a drawer on a phone",
+      "summary": "With phoneNavigation set to drawer, a phone (below 640px) keeps the thread on screen instead of pushing it over a full-screen list, as stock DSH and the ChatGPT and Claude apps do. The top bar's leading control is Show threads (no Back) and there is no bottom tab bar. The button…",
+      "destination": "threads",
+      "currentSurface": "shell: phone stack only (tab bar, full-screen list, Back)",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

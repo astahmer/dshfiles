@@ -210,6 +210,134 @@ describe('DestinationShell', () => {
   })
 })
 
+describe('phone navigation: drawer', () => {
+  /**
+   * jsdom has no Touch constructor: a touch event carries plain touch points, which is all the gesture reads. Each event
+   * lands 100ms after the previous one, so the release velocity is the last step's travel per 100ms.
+   */
+  let clock = 0
+  const touch = (target: Element, type: string, x: number, y = 300): void => {
+    const event = new Event(type, { bubbles: true })
+    clock += 100
+    Object.defineProperty(event, 'timeStamp', { value: clock })
+    Object.defineProperty(event, 'touches', { value: type === 'touchend' ? [] : [{ identifier: 1, clientX: x, clientY: y }] })
+    Object.defineProperty(event, 'changedTouches', { value: [{ identifier: 1, clientX: x, clientY: y }] })
+    act(() => {
+      target.dispatchEvent(event)
+    })
+  }
+  const drag = (target: Element, xs: readonly number[]): void => {
+    const [first, ...rest] = xs
+    if (first === undefined) return
+    touch(target, 'touchstart', first)
+    for (const x of rest) touch(target, 'touchmove', x)
+    touch(target, 'touchend', xs.at(-1) ?? first)
+  }
+  const shell = (shellProps: DestinationShellProps): JSX.Element => (
+    <TooltipProvider>
+      <DestinationShell {...shellProps} />
+    </TooltipProvider>
+  )
+  const threadProps = (): DestinationShellProps =>
+    props({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix the login race' })
+
+  const drawerState = (): string | null | undefined => document.querySelector('[data-phone-drawer]')?.getAttribute('data-phone-drawer')
+  const showThreads = (): void => {
+    fireEvent.click(screen.getByRole('button', { name: 'Show threads' }))
+  }
+
+  it('switches the stack for a drawer: a sidebar button instead of Back, and no tab bar', () => {
+    setPhone(true)
+    const inThread = threadProps()
+    const view = render(shell(inThread))
+    expect(screen.getByRole('button', { name: 'Back to Threads' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Show threads' })).toBeNull()
+    view.rerender(shell({ ...inThread, phoneNavigation: 'drawer' }))
+    expect(screen.queryByRole('button', { name: 'Back to Threads' })).toBeNull()
+    expect(document.querySelector('[data-phone-tab-bar]')).toBeNull()
+    expect(document.querySelector('[data-phone-title]')?.textContent).toBe('Fix the login race')
+    const button = screen.getByRole('button', { name: 'Show threads' })
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+    // Closed, the drawer is laid out but hidden from pointer and assistive tech.
+    expect(document.querySelector<HTMLElement>('[data-phone-drawer]')?.style.visibility).toBe('hidden')
+    showThreads()
+    expect(drawerState()).toBe('open')
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    // The drawer is the shell's own state: the frame's column never flips, so the frame and sidebar do not re-render.
+    expect(inThread.toggleSidebar).not.toHaveBeenCalled()
+    // Back to the stack: the Back button and the stack's behaviour return.
+    view.rerender(shell({ ...inThread, phoneNavigation: 'stack' }))
+    expect(screen.getByRole('button', { name: 'Back to Threads' })).toBeTruthy()
+    expect(document.querySelector('[data-phone-drawer]')).toBeNull()
+  })
+
+  it('opens over the thread with New thread and every destination, and closes on the scrim, Escape and a pick', () => {
+    setPhone(true)
+    const closed = { ...threadProps(), phoneNavigation: 'drawer' as const }
+    const view = render(shell(closed))
+    showThreads()
+    const drawer = screen.getByRole('dialog', { name: 'Threads' })
+    expect(drawer.getAttribute('aria-modal')).toBe('true')
+    expect(within(drawer).getByText('Thread list')).toBeTruthy()
+    // The thread stays on the stage: the top bar still names it.
+    expect(document.querySelector('header[data-phone-top-bar]')?.getAttribute('data-phone-stage')).toBe('thread')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'New thread' }))
+    expect(closed.startSession).toHaveBeenCalled()
+    expect(drawerState()).toBe('closed')
+    showThreads()
+    const destinations = within(screen.getByRole('dialog', { name: 'Threads' })).getByRole('navigation', { name: 'Destinations' })
+    expect(
+      within(destinations)
+        .getAllByRole('button')
+        .map(button => button.textContent),
+    ).toEqual(['Inbox', 'Land', 'More'])
+    // More lists the rest inside the drawer, with Back to Threads.
+    fireEvent.click(within(destinations).getByRole('button', { name: 'More' }))
+    expect(screen.getByRole('navigation', { name: 'More destinations' }).querySelector('[data-destination=work]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Threads' }))
+    expect(screen.getByRole('button', { name: 'New thread' })).toBeTruthy()
+    const scrim = document.querySelector('[data-phone-drawer-scrim]')
+    if (scrim === null) throw new Error('the drawer renders its scrim')
+    fireEvent.click(scrim)
+    expect(drawerState()).toBe('closed')
+    showThreads()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(drawerState()).toBe('closed')
+    // Picking another thread closes it at once, without the stack's page transition.
+    showThreads()
+    view.rerender(shell({ ...closed, selectedThreadId: 'session-2', stageThreadId: 'session-2', stageSessionId: 'session-2' }))
+    expect(drawerState()).toBe('closed')
+    // A frame reveal (a palette "Go to…") expands the column: the drawer opens and the column folds back.
+    view.rerender(shell({ ...closed, collapsed: false, selectedThreadId: 'session-2', stageThreadId: 'session-2', stageSessionId: 'session-2' }))
+    expect(drawerState()).toBe('open')
+    expect(closed.toggleSidebar).toHaveBeenCalledTimes(1)
+  })
+
+  it('follows a swipe from the left edge and snaps open past half way, closed short of it', () => {
+    setPhone(true)
+    render(shell({ ...threadProps(), phoneNavigation: 'drawer' }))
+    const stage = document.body
+    // A short drag snaps back closed and leaves the drawer hidden again.
+    drag(stage, [4, 30, 60, 90])
+    expect(drawerState()).toBe('closed')
+    const panel = document.querySelector<HTMLElement>('[data-phone-drawer]')
+    expect(panel?.style.transform).toBe('translateX(-100%)')
+    // Mid-drag the drawer follows the finger.
+    touch(stage, 'touchstart', 4)
+    touch(stage, 'touchmove', 40)
+    touch(stage, 'touchmove', 184)
+    expect(panel?.hasAttribute('data-phone-drawer-dragging')).toBe(true)
+    expect(panel?.style.transform).toBe('translateX(-50.00%)')
+    touch(stage, 'touchmove', 260)
+    touch(stage, 'touchend', 260)
+    expect(drawerState()).toBe('open')
+    expect(panel?.hasAttribute('data-phone-drawer-dragging')).toBe(false)
+    // Open, a leftward swipe on the drawer closes it.
+    drag(screen.getByRole('dialog', { name: 'Threads' }), [300, 270, 200, 100])
+    expect(drawerState()).toBe('closed')
+  })
+})
+
 describe('DSH actions on the rail (b:kgcc)', () => {
   const actions = (overrides: { copied?: boolean; pending?: boolean } = {}): DestinationShellProps['railActions'] => [
     {
