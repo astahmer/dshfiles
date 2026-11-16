@@ -2289,7 +2289,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const archiveSessionProp = props.archiveSession
   const archiveClient = useMemo<AutoArchiveClient>(
     () => ({
-      archiveSession: sessionId => archiveSessionProp(sessionId),
+      archiveSession: sessionId =>
+        archiveSessionProp(sessionId).then(
+          () => 'archived' as const,
+          (error: unknown) => {
+            if (SidebarOrganization.isMissingSessionRefusal(error)) return 'missing' as const
+            throw error
+          },
+        ),
       getCandidateSessionIds: () => archiveScan.current,
     }),
     [archiveSessionProp],
@@ -2298,7 +2305,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     client: archiveClient,
     enabled: isPrimarySurface && settledArchiveEnabled,
     intervalMs: preferences.scanIntervalMinutes * 60_000,
-    onSettled: () => refreshCandidates('all'),
+    onSettled: settled => {
+      // A Session the Host no longer has stays due forever, so it would be re-sent on every list mount.
+      if (settled.missingSessionIds.length > 0)
+        updatePreferences(
+          SettledThreadsModel.unsettle({ settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }, settled.missingSessionIds),
+        )
+      refreshCandidates('all')
+    },
   })
   const dueArchiveSessionIdsKey = dueSettledArchiveSessionIds.join(',')
   useEffect(() => {
