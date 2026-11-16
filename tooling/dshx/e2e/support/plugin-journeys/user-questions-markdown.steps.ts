@@ -122,6 +122,17 @@ Then('the question form fits a phone-width viewport', async ({ page }: { page: P
     expect(box).not.toBeNull()
     expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390)
     await expect(card.getByRole('button', { name: 'Submit' })).toBeInViewport()
+    // The answers are in view with Skip and Submit, before any scroll inside the card: the rich body scrolls above them.
+    const seat = card.locator('[data-question-scroll]')
+    await expect(seat).toHaveJSProperty('scrollTop', 0)
+    const footerTop = (await card.locator('footer').boundingBox())?.y ?? 0
+    const seatTop = (await seat.boundingBox())?.y ?? 0
+    for (const option of await card.getByRole('radio').all()) {
+      const optionBox = await option.boundingBox()
+      expect(optionBox).not.toBeNull()
+      expect(optionBox?.y ?? -1).toBeGreaterThanOrEqual(seatTop)
+      expect((optionBox?.y ?? 0) + (optionBox?.height ?? 0)).toBeLessThanOrEqual(footerTop + 1)
+    }
   })
   await finishJourneyAssertions(page)
 })
