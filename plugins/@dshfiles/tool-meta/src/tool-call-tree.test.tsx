@@ -3,7 +3,14 @@ import type { ToolCallOwnerProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { ComponentType, ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { installToolCallTreeWrapper, isToolCallTreeWrapped, RESERVE_PROPERTY, RESERVED_ROW_ATTRIBUTE, type ToolMetaComponent } from './tool-call-tree.js'
+import {
+  ANCHORED_ATTRIBUTE,
+  installToolCallTreeWrapper,
+  isToolCallTreeWrapped,
+  RESERVE_PROPERTY,
+  RESERVED_ROW_ATTRIBUTE,
+  type ToolMetaComponent,
+} from './tool-call-tree.js'
 
 afterEach(cleanup)
 
@@ -171,6 +178,50 @@ describe('installToolCallTreeWrapper', () => {
     it('reserves nothing while the label is hidden', () => {
       labelWidth = 0
       renderNesting()
+      expect(document.querySelectorAll(`[${RESERVED_ROW_ATTRIBUTE}]`)).toHaveLength(0)
+    })
+
+    const renderCard = (card: ReactNode): HTMLElement => {
+      const entry: StoredEntry = { component: NestingTree, options: { key: 'tool-call' } }
+      installToolCallTreeWrapper({ slots: ledger([entry]), Meta })
+      // SAFETY: the wrapper stored its component in the entry; NestingTree reads only renderSlot.
+      const Wrapped = entry.component as ComponentType<{ readonly renderSlot: () => ReactNode }>
+      render(<Wrapped renderSlot={() => card} />)
+      const label = document.querySelector<HTMLElement>('[data-dshfiles-tool-meta-label]')
+      if (label === null) throw new Error('no timing label rendered')
+      return label
+    }
+
+    it('shows the label only over a row that makes room for it', () => {
+      renderNesting()
+      const labels = [...document.querySelectorAll<HTMLElement>('[data-dshfiles-tool-meta-label]')]
+      expect(labels.map(label => label.hasAttribute(ANCHORED_ATTRIBUTE))).toEqual([true, true])
+      // Hidden until anchored: the class pair is what keeps an unanchored label off a card's own header.
+      expect(labels[0]?.className).toContain('dshx:invisible')
+      expect(labels[0]?.className).toContain('dshx:data-[dshfiles-tool-meta-anchored]:visible')
+    })
+
+    it('keeps the label hidden on a card that draws its own header', () => {
+      const label = renderCard(
+        <section>
+          <header>
+            Sales dashboard <button type="button">Copy HTML</button>
+          </header>
+        </section>,
+      )
+      expect(label.hasAttribute(ANCHORED_ATTRIBUTE)).toBe(false)
+      expect(document.querySelectorAll(`[${RESERVED_ROW_ATTRIBUTE}]`)).toHaveLength(0)
+    })
+
+    it('keeps the label hidden on a card that prints its own duration', () => {
+      const label = renderCard(
+        <div data-tool-card-timing="own">
+          <div data-disclosure-row="" data-expandable="" role="button">
+            Ran tests · 1.2s
+          </div>
+        </div>,
+      )
+      expect(label.hasAttribute(ANCHORED_ATTRIBUTE)).toBe(false)
       expect(document.querySelectorAll(`[${RESERVED_ROW_ATTRIBUTE}]`)).toHaveLength(0)
     })
   })
