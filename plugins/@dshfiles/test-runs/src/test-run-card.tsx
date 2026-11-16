@@ -316,7 +316,8 @@ export const TestRunCard = (props: {
       onToggle={() => setOpen(value => !value)}
       open={open}
       status={failing ? 'failed' : 'passed'}
-      summary={headline}
+      // The card prints the run's own duration, so the tool-call timing label stays off it (tool-meta reads this mark).
+      summary={<span data-tool-card-timing="own">{headline}</span>}
     >
       <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-1" data-test-runs-card="">
         <TallyBar tally={tally} />
