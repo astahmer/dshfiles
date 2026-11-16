@@ -48,11 +48,10 @@ export const NativeProviderDetail = (props: {
           <h2 className="dshx:truncate dshx:text-2xl dshx:font-semibold">{provider.label}</h2>
           <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">Built-in provider</p>
         </div>
-        <span className="dshx:text-xs dshx:text-success">{nativeProviderStatus(provider, query.data?.liveReload ?? false)}</span>
+        <span className="dshx:text-xs dshx:text-muted-foreground">{nativeProviderStatus(provider, query.data?.liveReload ?? false)}</span>
         <Switch
           aria-label={`${provider.enabled ? 'Disable' : 'Enable'} ${provider.label}`}
           checked={provider.enabled}
-          className="dshx:data-[state=checked]:bg-info"
           disabled={toggle.isPending || provider.lockedReason !== null}
           onCheckedChange={enabled => toggle.mutate(enabled)}
         />

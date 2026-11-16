@@ -255,7 +255,8 @@ describe('popover account availability', () => {
     if (toggle === null) throw new Error('Missing Enable Work toggle')
     expect(toggle.getAttribute('aria-label')).toBe('Enable Work')
     expect(toggle.getAttribute('data-state')).toBe('checked')
-    expect(toggle.classList.contains('dshx:data-[state=checked]:bg-info')).toBe(true)
+    // The kit switch as it is: no indigo override on its checked track.
+    expect(toggle.className).not.toContain('bg-info')
     expect(overviewCard('Work').querySelector('[role="checkbox"]')).toBeNull()
     const renamed = savedFile([{ ...initial, displayName: 'Renamed elsewhere' }])
     const latest: AccountsFile = { ...renamed, accounts: renamed.accounts.map(account => ({ ...account, badge: 'NEW' })) }

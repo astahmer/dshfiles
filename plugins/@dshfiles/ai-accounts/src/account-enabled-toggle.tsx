@@ -30,7 +30,6 @@ export const AccountEnabledToggle = (props: { readonly instanceId: string; reado
         <Switch
           aria-label={`Enable ${props.name}`}
           checked={account?.enabled ?? false}
-          className="dshx:data-[state=checked]:bg-info"
           disabled={account === undefined || file.isError || change.isPending}
           onCheckedChange={enabled => change.mutate(enabled)}
         />

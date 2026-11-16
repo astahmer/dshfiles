@@ -24,7 +24,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { AccountSignOut } from './account-sign-out.js'
 import { AccountSettings, AccountInlineSettings } from './account-settings.js'
 import { AccountNameEditor } from './account-name-editor.js'
-import { accountConnectionStatus, type AccountSection } from './account-connection-status.js'
+import { accountConnectionStatus, accountStateLine, type AccountSection } from './account-connection-status.js'
 import { routedKind } from './account-labels.js'
 import { accountRemoveMachine } from './account-remove-machine.js'
 import { AutoSaveIndicator } from './auto-save-indicator.js'
@@ -36,7 +36,6 @@ import { AccountUsageSlot } from './account-usage-view.js'
 import { UsageMovedNotice, useUsageRedirect } from './usage-redirect.js'
 import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export const AccountDetail = (props: {
   readonly state: AccountsPanelState
@@ -55,7 +54,7 @@ export const AccountDetail = (props: {
   const [removeSnapshot, sendRemove] = useMachine(accountRemoveMachine, { input: { removeAccount: remove } })
   const removing = removeSnapshot.matches('removing')
   const removeOpen = removeSnapshot.matches('confirming') || removing || removeSnapshot.matches('error')
-  const status = selected === null ? null : accountConnectionStatus(selected, props.state.usage)
+  const stateLine = selected === null ? null : accountStateLine(accountConnectionStatus(selected, props.state.usage))
   const connect = (): void => {
     if (selected !== null && !dirty && !saving) props.onConnectAccount(selected.instanceId)
   }
@@ -85,22 +84,11 @@ export const AccountDetail = (props: {
           </div>
         </div>
         <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-3">
-          <div
-            className={cn(
-              'dshx:rounded-lg dshx:px-3 dshx:py-2 dshx:text-xs',
-              status?.tone === 'success' ? 'dshx:bg-success/10 dshx:text-success' : 'dshx:bg-muted/50 dshx:text-muted-foreground',
-            )}
-          >
-            <span className="dshx:flex dshx:items-center dshx:gap-2">
-              <StatusDot tone="current" />
-              {status?.label ?? 'Not connected'}
+          {stateLine === null ? null : (
+            <span className={cn('dshx:text-xs', stateLine.tone === 'warning' ? 'dshx:text-warning' : 'dshx:text-muted-foreground')} role="status">
+              {stateLine.text}
             </span>
-            <small className="dshx:mt-1 dshx:block dshx:text-2xs">
-              {status?.checkedAt == null
-                ? 'Not checked by provider'
-                : `Last checked ${new Date(status.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
-            </small>
-          </div>
+          )}
           <Switch
             aria-label={
               routedKind(draft.kind)
@@ -112,7 +100,6 @@ export const AccountDetail = (props: {
                   : 'Quota tracking off'
             }
             checked={draft.enabled}
-            className="dshx:data-[state=checked]:bg-info"
             disabled={saving}
             onCheckedChange={enabled => void props.state.persist({ enabled })}
           />

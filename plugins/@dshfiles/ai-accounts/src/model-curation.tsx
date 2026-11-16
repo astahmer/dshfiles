@@ -198,7 +198,6 @@ export const ModelCuration = (props: {
                   </td>
                   <td className="dshx:px-3 dshx:py-2">
                     <Switch
-                      className="dshx:data-[state=checked]:bg-info"
                       aria-label={`Show ${model.name} in the picker`}
                       checked={!hidden.has(model.id)}
                       onCheckedChange={checked => customize({ hiddenModelIds: membership(account.hiddenModelIds, model.id, !checked) })}

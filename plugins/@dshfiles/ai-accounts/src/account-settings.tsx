@@ -14,8 +14,6 @@ import { RuntimePathsSection } from './runtime-paths-section.js'
 import type { AccountDraft, AccountsFile } from './api.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const cardClass =
   'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4 dshx:rounded-lg dshx:border dshx:border-border/70 dshx:bg-card dshx:p-5 dshx:@max-pane-narrow:p-4'
@@ -54,7 +52,7 @@ const RoutingSwitch = (props: Pick<SettingsProps, 'draft' | 'state'>): JSX.Eleme
     <Switch
       aria-label={routedKind(props.draft.kind) ? 'Enable for model routing' : 'Enable quota tracking'}
       checked={props.draft.enabled}
-      className="dshx:mt-0.5 dshx:data-[state=checked]:bg-info"
+      className="dshx:mt-0.5"
       onCheckedChange={enabled => void props.state.persist({ enabled })}
     />
     <span>
@@ -140,7 +138,7 @@ const AccountAuthenticationDetails = (props: Pick<SettingsProps, 'draft' | 'stat
         <dt className="dshx:text-muted-foreground">Signed in as</dt>
         <dd className="dshx:break-words">{profile?.identity ?? 'Not reported by provider'}</dd>
         <dt className="dshx:text-muted-foreground">Token status</dt>
-        <dd className={status?.tone === 'success' ? 'dshx:text-success' : 'dshx:text-muted-foreground'}>
+        <dd className={status?.tone === 'warning' ? 'dshx:text-warning' : undefined}>
           {status?.authenticated ? 'Authenticated' : (status?.label ?? 'Not verified')}
         </dd>
         <dt className="dshx:text-muted-foreground">Last checked</dt>
@@ -248,8 +246,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
           <dt className="dshx:text-xs dshx:text-muted-foreground">Authentication</dt>
           <dd>{accountAuthenticationLabel(props.draft)}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Token status</dt>
-          <dd className={cn('dshx:inline-flex dshx:items-center dshx:gap-2', status?.tone === 'success' ? 'dshx:text-success' : 'dshx:text-muted-foreground')}>
-            <StatusDot tone="current" />
+          <dd className={status?.tone === 'warning' ? 'dshx:text-warning' : undefined}>
             {status?.authenticated ? 'Authenticated' : (status?.label ?? 'Not verified')}
           </dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Last checked</dt>
