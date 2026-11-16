@@ -68,6 +68,10 @@
     "./thread-directories": {
       "types": "./src/thread-directories.ts",
       "default": "./dist/thread-directories.js"
+    },
+    "./failed-turns-client": {
+      "types": "./src/failed-turns-client.ts",
+      "default": "./dist/failed-turns-client.js"
     }
   },
   "scripts": {

@@ -166,6 +166,11 @@ while no restart waits, so update-then-restart is one item, not two. Customize s
 rail** (`showRailRestart`, off by default) adds a Restart button to the rail's DSH actions (only while the supervisor
 offers a restart; amber with a slow pulse while updates or a restart wait); the strip then draws no restart item.
 
+**Failed threads, one read.** `@dshfiles/thread-sidebar/failed-turns-client` is a dshx module: `useFailedTurns()` reads
+the Host's failed-turn record (re-read on every attention change) and `useFailedThreadIds(views)` /
+`FailedThreadsModel.ids` add the unread failed finish an older Host can only report. A surface that marks a failed
+thread imports it instead of restating the read and its cache times.
+
 **One Inbox.** The Inbox destination and its page share one name; "Needs you" is the view inside the page. The
 sidebar's own per-thread page (Waiting threads) groups the same inbox items by thread, so it is `unlisted`: the Inbox
 list does not offer it as a second row, the rail and the phone tab open the Inbox page at once, and the palette and the
