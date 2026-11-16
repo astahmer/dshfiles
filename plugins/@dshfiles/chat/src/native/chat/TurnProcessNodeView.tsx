@@ -31,9 +31,13 @@ export const TurnProcessNodeView = memo(function TurnProcessNodeView({
   const announcement = stopped ? t('message.stopped')
     : reason === 'error' ? t('message.turnProcess.failed')
       : t('message.turnProcess.worked')
+  const status = <span className={a11yCss.visuallyHidden} role="status" aria-live="polite" aria-atomic="true">{announcement}</span>
+  // dshfiles (unslop T10): a failed Turn stays open and its failure card says "This turn failed" right below, so a
+  // "Failed" heading that folds nothing only repeats it. The announcement stays for screen readers.
+  if (reason === 'error') return status
   return (
     <>
-      <span className={a11yCss.visuallyHidden} role="status" aria-live="polite" aria-atomic="true">{announcement}</span>
+      {status}
       <button
         type="button"
         className={css.root}

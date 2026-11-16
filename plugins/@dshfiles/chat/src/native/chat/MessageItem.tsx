@@ -10,6 +10,7 @@ import type {
 import type { ModelRetryNode, TurnErrorNode, UserMessageNode } from '../contract/snapshot.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
+import { failureDetails, failureSentence } from './failure-copy.ts'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import css from './MessageItem.module.css'
 import { formatMessageClock } from './message-chrome.ts'
@@ -51,16 +52,27 @@ interface RetryCountdown {
   seconds: number
 }
 
+/** Codes whose sentence the Host's own catalog already words. */
+function codedFailureMessage(code: unknown, t: ChatViewSlotProps['t']): string | undefined {
+  if (code === 'ACCOUNT_SIGNED_OUT') return t('message.failure.accountSignedOut')
+  if (code === 'INTERRUPTED') return t('message.failure.interrupted')
+  if (code === 'ACCOUNT_SIGN_IN_REQUIRED') return t('message.failure.accountSignInRequired')
+  if (code === 'QUOTA' || code === 'ACCOUNT_QUOTA') return t('message.failure.quota')
+  return code === 'AUTH' ? t('message.failure.auth') : undefined
+}
+
+/** dshfiles (unslop T8, T9): one plain sentence instead of the provider's raw payload or a library string. */
 function failureMessage(
   message: string,
   code: unknown,
   t: ChatViewSlotProps['t'],
 ): string {
-  if (code === 'ACCOUNT_SIGNED_OUT') return t('message.failure.accountSignedOut')
-  if (code === 'INTERRUPTED') return t('message.failure.interrupted')
-  if (code === 'ACCOUNT_SIGN_IN_REQUIRED') return t('message.failure.accountSignInRequired')
-  if (code === 'QUOTA' || code === 'ACCOUNT_QUOTA') return t('message.failure.quota')
-  return code === 'AUTH' ? t('message.failure.auth') : message
+  const coded = codedFailureMessage(code, t)
+  if (coded !== undefined) return coded
+  const sentence = failureSentence(message, typeof code === 'string' ? code : undefined)
+  if (sentence.kind === 'stalled') return t('message.failure.stalled', { minutes: sentence.minutes })
+  if (sentence.kind === 'tooLong') return t('message.failure.tooLong')
+  return sentence.kind === 'provider' ? sentence.text : t('message.failure.unknown')
 }
 
 function ModelRetryItem({ node, active, t }: {
@@ -131,23 +143,37 @@ function ModelRetryItem({ node, active, t }: {
   )
 }
 
-/** Persistent, turn-positioned feedback for a terminal failure. */
+/**
+ * Persistent, turn-positioned feedback for a terminal failure.
+ * dshfiles (unslop T8): one card. A plain sentence, one row of recovery actions (Retry first, then what other plugins
+ * add), and the failure code with the provider's original text behind "Details".
+ */
 function TurnErrorItem({ node, t, action, extraActions }: {
   node: TurnErrorNode
   action?: ReactNode
   extraActions?: ReactNode
   t: ChatViewSlotProps['t']
 }) {
+  const sentence = failureMessage(node.message, node.code, t)
+  const details = node.code === 'INTERRUPTED' ? null : failureDetails(node.message, node.code, sentence)
   return (
     <div className={css.turnErrorRow} role="status">
       <StateDot state="error" className={css.turnErrorDot} />
       <div className={css.turnErrorCopy}>
         <span className={css.turnErrorTitle}>{node.code === 'ACCOUNT_SIGNED_OUT' || node.code === 'INTERRUPTED' ? t('message.taskStopped') : t('message.turnError')}</span>
-        <span className={css.turnErrorMessage}>{failureMessage(node.message, node.code, t)}</span>
+        <span className={css.turnErrorMessage} data-turn-error-message>{sentence}</span>
+        <div className={css.turnErrorActions} data-turn-error-actions>
+          {action}
+          {extraActions}
+        </div>
+        {details !== null && (
+          <details className={css.turnErrorDetails} data-turn-error-details>
+            <summary className={css.turnErrorDetailsSummary}>{t('message.failure.details')}</summary>
+            {details.code !== undefined && <code className={css.turnErrorCode}>{details.code}</code>}
+            {details.raw !== undefined && <pre className={css.turnErrorRaw}>{details.raw}</pre>}
+          </details>
+        )}
       </div>
-      {extraActions}
-      {action}
-      {node.code !== undefined && node.code !== 'INTERRUPTED' && <code className={css.turnErrorCode}>{node.code}</code>}
     </div>
   )
 }
@@ -423,7 +449,7 @@ export const TurnErrorNodeView = memo(function TurnErrorNodeView({
 }: ChatNodeViewProps<'turn-error'> & PropsRenderSlots<'conversation.chat.turnErrorAction'>) {
   const resume = useResumeAction({ turn: node.data.turn, seq: node.data.seq, useChat, useSession, useAccess })
   const action = node.data.code === 'ACCOUNT_SIGNED_OUT' ? undefined : resume
-  const extraActions = renderSlot('conversation.chat.turnErrorAction', { seq: node.data.seq, code: node.data.code ?? '' })
+  const extraActions = renderSlot('conversation.chat.turnErrorAction', { seq: node.data.seq, code: node.data.code ?? '', message: node.data.message })
   return <TurnErrorItem node={node.data} t={t} action={action} extraActions={extraActions} />
 })
 

@@ -8,11 +8,11 @@ Agent work you can read at a glance, in the transcript and beside the composer:
 - **Pinned step.** While the latest turn's plan has steps left, a chip beside the native plan-mode control says "Step 2 of 3 · Fix the rounding bug · 12s" and opens the whole plan.
 - **Live activity strip.** While anything runs, a strip beside the native composer activity names it — the running tool call, background jobs, subagents — with a live timer, and opens the full list with a timer per row. It renders nothing while idle.
 - **Compaction meter.** Open the composer's context ring: under the occupancy breakdown, a row counts the tokens left before automatic compaction ("Compacts in ~40K", then "Compacts next step") and gives the trigger and the window ("Automatic compaction at ~126K of 200K (63%)"). The meter line keeps one context item.
-- **Failure card.** Under a native turn-error row, and under a model-retry row once retrying gave up, a bar shows the retry count and two actions: **Retry** puts a retry request in the composer, **Ask to fix** inserts the failure with a request to fix it. Neither sends: you review and send. Stopped or interrupted turns get no actions.
+- **Ask to fix.** A failed turn is one card, drawn by `@dshfiles/chat`: a plain sentence, **Retry**, and the failure code behind Details. This plugin adds **Ask to fix** beside Retry: it inserts the failure with a request to fix it into the composer. It does not send: you review and send. Stopped or interrupted turns get no action.
 
 ![Live activity strip beside the composer controls](docs/screenshots/live-activity-strip.png)
 
-![Retry and Ask to fix under a failed turn](docs/screenshots/failure-card.png)
+![Ask to fix beside Retry on a failed turn](docs/screenshots/failure-card.png)
 
 ![Tokens left before automatic compaction in the composer meter line](docs/screenshots/compaction-meter.png)
 
@@ -29,7 +29,7 @@ All apply live. Turning a card off restores the native view.
 | `stepTiming`      | `true`  | Show how long each step took.                                                 |
 | `pinnedStep`      | `true`  | Pin the current plan step beside the composer.                                |
 | `activityStrip`   | `true`  | Show what runs now beside the composer controls.                              |
-| `failureCard`     | `true`  | Add the retry count and Retry / Ask to fix under failure rows.                |
+| `failureCard`     | `true`  | Add Ask to fix beside Retry on a failed turn.                                 |
 | `compactionMeter` | `true`  | Count the tokens left before automatic compaction in the context meter panel. |
 
 ## How it works
@@ -41,14 +41,14 @@ All apply live. Turning a card off restores the native view.
 - **Seats.** Every native occupant here takes injected props a shadowing entry could not supply (the todo row's `todoHistory` hook, the plan-mode chip's `exitPlanMode`, the voice input's actions), so the plugin wraps the occupant in place, as `@dshfiles/tool-meta` does for the tool-call tree: the ledger renders the wrapper with the native props, and the wrapper draws ours beside or over the native view.
   - `tool.call.toolview` key `todo_write`: the plan card, with the native row as the fallback.
   - `conversation.input.plan` and `conversation.input.activity` are single slots held by native controls: the pin and the strip render **beside** the occupant, never instead of it. Where no native control holds the seat, the plugin's own entry (priority 100, losing to any native one) shows the chip alone.
-  - `conversation.chat.node` keys `turn-error` and `model-retry`: the native row stays as drawn, the failure bar goes under it.
+  - `conversation.chat.turnErrorAction` (declared by `@dshfiles/chat`, a list seat, so no wrapping): Ask to fix joins the failed turn's action row after Retry. Two plugins once drew a recovery row each, with two Retry buttons; the card now has one row.
 - **Compaction meter.** The context meter itself is native: the ring and its breakdown come from `@deepseek-ai/dsh-token-meter`'s `contextPressure` / `contextBreakdown` projections (`@dshfiles/rich-composer` draws them), and the cost estimate is `@dshfiles/ai-accounts`'. This plugin adds only the missing reading, the next compaction, as a row in rich-composer's `conversation.composer.context` seat inside the context meter panel (order 5). The trigger comes from `@dshfiles/context-compaction`'s `threshold` API (agent tool `compaction_threshold`), which applies the running engine's policy to the thread's routed model, window and output reservation exactly as the engine does; it is refetched when the route's window changes. The live size is the `projectedTokens` the ring shows. Without context-compaction (stock `compaction-basic`), or with automatic compaction off, the row stays hidden; like the ring it shows from 25% occupancy.
-- **Actions.** Retry and Ask to fix use the dshx `Composer` contract (`setText` / `insert`, then `focus`), provided by `@dshfiles/rich-composer`. Without a provider the actions are hidden and only the retry count shows.
+- **Actions.** Ask to fix uses the dshx `Composer` contract (`insert`, then `focus`), provided by `@dshfiles/rich-composer`. Without a provider the action is hidden. Retry is Chat's own button and asks the Host to run the failed turn again.
 
 ## Limits
 
 - Queued messages are not counted in the activity strip: the native queue dock above the composer already lists them.
 - Background jobs registered before the loaded history window are not listed until their next event.
-- Retry does not resend the failed request; it writes a message you send, so the next turn starts fresh.
+- Ask to fix needs the owned Chat fork: the native Chat has no action row for it to join.
 - The pin follows the native todo dock: a plan from an earlier turn is not pinned once a new turn starts.
 - The compaction count is approximate: the ring's projected prompt size and the engine's own `measure()` (prompt plus response pressure) can differ by a turn's output.

@@ -2,7 +2,7 @@ Feature: Agent plan, live activity and failure cards
 
   todo_write calls read as a plan with step N of M and the current step is
   pinned by the composer; what runs now shows beside the composer controls;
-  a failed turn offers Retry and Ask to fix through the composer.
+  a failed turn offers Ask to fix beside its one Retry.
 
   @scenario:agent-plan.plan-card
   Scenario: Successive todo_write calls show the plan, its progress and the pinned step
@@ -27,10 +27,10 @@ Feature: Agent plan, live activity and failure cards
 
   @scenario:agent-plan.failure-card
   Scenario: A failed turn offers Ask to fix through the composer
-    Given the isolated plugin composition of "@dshfiles/agent-plan, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker, @dshfiles/rich-composer, @dshfiles/session-controller" is booted
+    Given the isolated plugin composition of "@dshfiles/agent-plan, @dshfiles/chat, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker, @dshfiles/rich-composer, @dshfiles/session-controller" is booted
     When a Command Code account backed by a local fake provider is added
     And the fake provider rejects the next request in a fresh workspace
-    Then the failed turn offers Retry and Ask to fix
+    Then the failed turn offers one Retry and Ask to fix in one row
     And Ask to fix puts the failure into the composer
 
   @scenario:agent-plan.compaction-meter

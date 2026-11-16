@@ -1,52 +1,40 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { RotateCcwIcon, WrenchIcon } from '@dshfiles/plugin-ui/icons'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { WrenchIcon } from '@dshfiles/plugin-ui/icons'
 import type { ReactNode } from 'react'
 import { Failure, type FailureFacts } from './failure.js'
 
 export interface FailureComposer {
-  /** Replace the draft and focus the composer; false when no composer can take it. */
-  readonly retry: (text: string) => boolean
-  /** Insert into the draft and focus the composer. */
+  /** Insert into the draft and focus the composer; false when no composer can take it. */
   readonly askToFix: (text: string) => boolean
 }
 
 /**
- * The bar under a native failure row: retry count, and two actions that write into the composer for the user to send.
- * Neither sends on its own: the user reviews the text first, the same contract `test-runs` uses for "Ask to fix".
+ * "Ask to fix" in the failure card's one row of actions, beside the card's own Retry. It writes a request into the
+ * composer and does not send it: the user reviews the text first, the same contract `test-runs` uses for "Ask to fix".
+ * A stopped turn, or a thread with no composer to write into, gets no button.
  */
-export const FailureActions = (props: {
-  readonly facts: FailureFacts
-  readonly composer: FailureComposer | undefined
-  readonly actions: boolean
-}): ReactNode => {
-  const retry = Failure.retryLabel(props.facts)
-  const actionable = props.actions && props.composer !== undefined && Failure.actionable(props.facts)
-  if (retry === undefined && !actionable) return null
+export const AskToFix = (props: { readonly facts: FailureFacts; readonly composer: FailureComposer | undefined }): ReactNode => {
+  const composer = props.composer
+  if (composer === undefined || !Failure.actionable(props.facts)) return null
   return (
-    <div
-      className="dshx-root dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:py-1 dshx:pl-6 dshx:text-xs dshx:text-muted-foreground"
-      data-dshfiles-agent-failure={props.facts.kind}
-    >
-      {retry !== undefined && (
-        <span className="dshx:shrink-0 dshx:tabular-nums">
-          {retry}
-          {props.facts.provider === undefined ? '' : ` · ${props.facts.provider}`}
-          {props.facts.retryState === 'cancelled' ? ' · gave up' : ''}
-        </span>
-      )}
-      {actionable && props.composer !== undefined && (
-        <>
-          <Button onClick={() => props.composer?.retry(Failure.retryPrompt())} size="xs" type="button" variant="outline">
-            <RotateCcwIcon aria-hidden />
-            Retry
-          </Button>
-          <Button onClick={() => props.composer?.askToFix(Failure.fixPrompt(props.facts))} size="xs" type="button" variant="outline">
+    <TooltipProvider delayDuration={500}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            className="dshx-root"
+            data-dshfiles-agent-failure="turn-error"
+            onClick={() => composer.askToFix(Failure.fixPrompt(props.facts))}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
             <WrenchIcon aria-hidden />
             Ask to fix
           </Button>
-          <span className="dshx:min-w-0 dshx:truncate">Puts a message in the composer for you to send.</span>
-        </>
-      )}
-    </div>
+        </TooltipTrigger>
+        <TooltipContent>Writes a request in the composer for you to review and send</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
