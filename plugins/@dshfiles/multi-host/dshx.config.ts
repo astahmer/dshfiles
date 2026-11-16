@@ -3,7 +3,7 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/multi-host',
-  modules: { api: 'src/api.ts', 'interaction-feed': 'src/interaction-feed.ts' },
+  modules: { api: 'src/api.ts', 'interaction-feed': 'src/interaction-feed.ts', 'session-runtime-read': 'src/session-runtime-read.ts' },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: { entry: 'src/client-entry.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },

@@ -1785,6 +1785,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/multi-host/session-runtime-read",
+      "kind": "module",
+      "title": "@dshfiles/multi-host/session-runtime-read",
+      "summary": "Public module of @dshfiles/multi-host.",
+      "publicSymbol": "readSessionRuntime",
+      "importFrom": "@dshfiles/multi-host/session-runtime-read",
+      "owner": "@dshfiles/multi-host",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/multi-host/src/session-runtime-read.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "phoneEdgeApi",
       "importFrom": "@dshfiles/phone-access/edge-api",
       "owner": "@dshfiles/phone-access",
