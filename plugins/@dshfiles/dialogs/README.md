@@ -29,9 +29,12 @@ press outside each dialog answer `false` (confirm) or `undefined`.
 
 ## Toasts
 
-A stack in the bottom-right corner. `tone` colors the edge (`info`, `success`, `warning`, `danger`), an `action`
-button runs and closes the toast, and each toast closes after `duration` ms (5000 by default; `0` keeps it). `show`
-returns a function that dismisses it.
+One toast at a time in the bottom-right corner, lifted above a composer it would cover. `tone` picks a small icon
+(`info`, `success`, `warning`, `danger`); only `danger` is coloured. An `action` button runs and closes the toast, and
+each toast closes after `duration` ms (5000 by default; `0` keeps it). `show` returns a function that dismisses it.
+
+Toasts shown while one is on screen wait their turn and get their full time: a `danger` toast goes first, then the
+oldest one that closes on its own, then a sticky one.
 
 ## Agent parity
 
