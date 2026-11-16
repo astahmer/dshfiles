@@ -1,5 +1,6 @@
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { ShellTranslate } from './native/locales.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
@@ -35,6 +36,11 @@ export const PluginSettingsPageView = (props: {
   readonly focusPath?: readonly string[]
   /** `page` (default): the page titles itself. `section`: a subheading under an entry title. `none`: no title. */
   readonly heading?: 'page' | 'section' | 'none'
+  /**
+   * The page sits under a Settings navigation that names it: once that navigation collapses into the Sections select
+   * (a narrow pane), the select reads the same words, so the page title stays for assistive technology only.
+   */
+  readonly namedByNavigation?: boolean
   /** The plugin entry behind the page, drawn under its description. */
   readonly entry?: ReactNode
 }): JSX.Element => {
@@ -51,12 +57,20 @@ export const PluginSettingsPageView = (props: {
       <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3">
         {props.heading === 'section' && <h3 className="dshx:m-0 dshx:min-w-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{props.page.title}</h3>}
         {(props.heading === undefined || props.heading === 'page') && (
-          <h2 className="dshx:m-0 dshx:min-w-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{props.page.title}</h2>
+          <h2
+            className={cn(
+              'dshx:m-0 dshx:min-w-0 dshx:text-title dshx:font-semibold dshx:text-foreground',
+              props.namedByNavigation === true && 'dshx:@max-pane-compact:sr-only',
+            )}
+          >
+            {props.page.title}
+          </h2>
         )}
         {/* Without a title the view switch keeps its place at the row's end. */}
         {props.heading === 'none' && <span aria-hidden="true" />}
         <ToggleGroup
           aria-label={props.t('view.label')}
+          className="dshx:ml-auto"
           onValueChange={next => {
             if (next === 'form' || next === 'json') show(next)
           }}

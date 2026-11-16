@@ -289,7 +289,8 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-5" data-settings-entry={entry.id}>
       {ownHeading && (
-        <header>
+        // In a narrow pane the Sections select right above names the entry, so the title is not printed a second time.
+        <header className="dshx:@max-pane-compact:sr-only">
           <h2 className="dshx:m-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{entry.label}</h2>
         </header>
       )}
