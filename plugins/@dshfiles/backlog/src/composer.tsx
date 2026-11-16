@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { CaptureHints } from './capture-hints.js'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { Schema } from 'effect'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -17,7 +17,6 @@ import {
   LayoutTemplateIcon,
   CheckIcon,
   FolderIcon,
-  HashIcon,
   PaperclipIcon,
   SquareIcon,
   LinkIcon,
@@ -648,6 +647,7 @@ export const Composer = (props: {
         )}
 
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
+          {chat ? <CaptureHints /> : null}
           {recording ? <span className="dshx:text-2xs dshx:text-destructive">Recording…</span> : null}
           {transcribing ? <span className="dshx:text-2xs dshx:text-muted-foreground">Transcribing…</span> : null}
           {props.onDismiss === undefined ? null : (
@@ -698,20 +698,6 @@ export const Composer = (props: {
         </span>
       </div>
 
-      {chat ? (
-        <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
-          <span>
-            <Kbd>↵</Kbd> add · <Kbd>⇧↵</Kbd> new line · <Kbd>Tab</Kbd> complete
-          </span>
-          <span>
-            <code>bug:</code> <code>idea:</code> <code>note:</code> set the kind
-          </span>
-          <span>
-            <HashIcon aria-hidden className="dshx:inline dshx:size-3" /> tags · <code>@</code> items, threads and projects · <code>/project</code> ·{' '}
-            <code>/template</code> · paste or drop a file
-          </span>
-        </p>
-      ) : null}
 
       <ReferenceDialog
         mode={referenceMode}
