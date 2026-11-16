@@ -41,7 +41,7 @@ vi.mock('./use-jujutsu-api.js', () => ({
 }))
 vi.mock('./auto-refresh.js', () => ({ useAutoRefresh: () => ({ ref: () => undefined, queryOptions: {} }) }))
 
-import { ChangesPill, ProjectChangesSection, type ComposerJujutsuServices } from './composer-context.js'
+import { ChangesPill, ComposerChips, ProjectChangesSection, type ComposerJujutsuServices } from './composer-context.js'
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
 
@@ -130,5 +130,19 @@ describe('Project changes row of the workspace menu', () => {
       <ProjectChangesSection dismiss={() => undefined} sessionId={'session-1' as never} jujutsu={services('/work/sample-threads/thread-31057e', () => true)} />,
     )
     expect(view.querySelector('[data-project-changes]')).toBeNull()
+  })
+})
+
+describe('Location chip on the meter line', () => {
+  it('leaves the land count of an own workspace to the header', async () => {
+    host.workspace = 'thread-31057e'
+    const view = await mount(<ComposerChips sessionId={'session-1' as never} jujutsu={services('/work/sample-threads/thread-31057e', () => true)} />)
+    expect(view.querySelector('[data-composer-meta="location"]')?.textContent).toBe('Own workspace')
+  })
+
+  it('still says where the project checkout stands', async () => {
+    host.workspace = 'default'
+    const view = await mount(<ComposerChips sessionId={'session-1' as never} jujutsu={services('/work/sample', () => true)} />)
+    expect(view.querySelector('[data-composer-meta="location"]')?.textContent).toBe('In the project · 1 ahead of main')
   })
 })

@@ -16,6 +16,7 @@ import { useAutoRefresh } from './auto-refresh.js'
 import type { ComposerBase } from './composer-context-api.js'
 import { ComposerContextModel, composerBaseSetting } from './composer-context-core.js'
 import { composerSessionCwd } from './composer-context-session.js'
+import { ComposerViewModel } from './composer-view-model.js'
 import { ChatReferenceLinks } from './chat-reference-links.js'
 import { decodePreferences } from './preferences.js'
 import { jujutsuSettings } from './settings.js'
@@ -176,7 +177,7 @@ const ChangesPillContent = (props: ComposerSlotProps): JSX.Element | null => {
   if (repository === null) return null
   // H3 (unslop): the diff is read for the Session's folder. In the project checkout that is every thread's work plus
   // the user's own edits, so no pill claims it; the workspace menu states it as the project's (ProjectChangesSection).
-  const reading = ComposerContextModel.changesPill({
+  const reading = ComposerViewModel.changesPill({
     ownWorkspace: place.ownWorkspace,
     files: repository.totals?.files ?? repository.files.length,
     totals: repository.totals,
@@ -230,7 +231,7 @@ const ChangesPillContent = (props: ComposerSlotProps): JSX.Element | null => {
           </button>
         </TooltipTrigger>
         <TooltipContent className="dshx:whitespace-pre-line" side="bottom">
-          {heading + ' · ' + ComposerContextModel.changesSize(reading) + '\n' + revisionSummary}
+          {heading + ' · ' + ComposerViewModel.changesSize(reading) + '\n' + revisionSummary}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -247,7 +248,7 @@ export const ProjectChangesSection = (props: ComposerSlotProps & { readonly dism
   // The pill's own rule, so exactly one of the two ever states the diff.
   const place = useWorkspacePlace(props, repository)
   if (repository === null) return null
-  const reading = ComposerContextModel.projectChanges({
+  const reading = ComposerViewModel.projectChanges({
     ownWorkspace: place.ownWorkspace,
     files: repository.totals?.files ?? repository.files.length,
     totals: repository.totals,
@@ -271,7 +272,7 @@ export const ProjectChangesSection = (props: ComposerSlotProps & { readonly dism
     >
       <p className="dshx:min-w-0 dshx:flex-1">
         {context.base.kind === 'parent' ? 'The project has uncommitted changes' : `The project has changes that are not on ${repository.base.label}`}:{' '}
-        <span className="dshx:tabular-nums">{ComposerContextModel.changesSize(reading)}</span>
+        <span className="dshx:tabular-nums">{ComposerViewModel.changesSize(reading)}</span>
         {reading.conflict ? <span className="dshx:text-destructive"> · conflict</span> : null}. They can come from any thread working here.
       </p>
       <Button aria-label={'Review project changes: ' + revisionSummary} className="dshx:shrink-0" onClick={open} size="sm" type="button" variant="outline">
@@ -315,15 +316,8 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   // Composer follow-up b:gyk7: the composer's run summary already names the project, so the chip says only where the
   // working copy stands, with the count when the base is that bookmark ("2 ahead of main", "2 behind").
   const counts = bookmark !== undefined && repository.base.label === bookmark ? repository.revisionCounts : undefined
-  const ahead = counts === undefined || counts === null || counts.ahead === 0 ? '' : `${String(counts.ahead)} `
   // b:212a: the same two words the workspace picker uses, "Own workspace" or "In the project", never the folder name.
-  const location = [
-    ownWorkspace ? 'Own workspace' : 'In the project',
-    bookmark === undefined ? undefined : ownBookmark === undefined ? `${ahead}ahead of ${bookmark}` : `on ${bookmark}`,
-    counts === undefined || counts === null || counts.behind === 0 ? undefined : `${String(counts.behind)} behind`,
-  ]
-    .filter((value): value is string => value !== undefined)
-    .join(' · ')
+  const location = ComposerViewModel.locationLabel({ ownWorkspace, bookmark, onBookmark: ownBookmark !== undefined, counts })
   const label = location.length === 0 ? `@ ${repository.changeId}` : location
   const title = [
     'Toggle Jujutsu on ' + repository.root,

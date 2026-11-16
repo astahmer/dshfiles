@@ -329,12 +329,12 @@ Then('the workspace {string} exists and a session opens in it only when asked', 
   await finishJourneyAssertions(page)
 })
 
-/** The composer meter line's Jujutsu location entry: "Own workspace · 1 ahead of main" (b:gyk7, b:212a). */
+/** The composer meter line's Jujutsu location entry: "Own workspace" (b:gyk7, b:212a); the header owns the land count. */
 const locationChip = (page: Page) =>
   page
     .locator('[data-composer-meta="location"] button')
     .filter({ visible: true })
-    .filter({ hasText: /^Own workspace · (\d+ )?ahead of main$/u })
+    .filter({ hasText: /^Own workspace( · \d+ behind)?$/u })
     .first()
 
 When('the repository is registered and a thread is started in it', async ({ page }: { page: Page }) => {
@@ -522,17 +522,7 @@ Then('the composer dock names the project, thread workspace and bookmark in one 
 })
 
 Then('the composer summary shows an exact revision count against main', async ({ page }: { page: Page }) => {
-  // This thread works in the project checkout, so its header carries no Changes pill: the checkout's diff is the
-  // project's, stated in the workspace menu with the same way into the Changes view.
-  await recordAssertion(page, 'jujutsu-project-checkout-thread-has-no-changes-pill', () =>
-    expect(page.getByRole('button', { name: /^Review workspace changes: /u }).filter({ visible: true })).toHaveCount(0),
-  )
-  await page
-    .getByRole('button', { name: /^Workspace actions for /u })
-    .filter({ visible: true })
-    .first()
-    .click()
-  const summary = page.getByRole('button', { name: /^Review project changes: @ vs main: 1 only on @$/u })
+  const summary = page.getByRole('button', { name: /^Review workspace changes: @ vs main: 1 only on @$/u })
   await recordAssertion(page, 'jujutsu-composer-summary-shows-a-real-ahead-or-behind-count', () => expect(summary).toBeVisible())
   await summary.click()
   const review = page.getByTestId('changes-diffs')
