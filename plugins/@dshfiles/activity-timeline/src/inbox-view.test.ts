@@ -138,3 +138,24 @@ describe('InboxSwipe', () => {
     expect(InboxSwipe.verb({ verbs: ['Done', 'Snooze'] }, 'snoozed', 'left')).toBe('done')
   })
 })
+
+describe('a subagent question in its parent thread', () => {
+  const choices = [
+    { id: 'deploy', label: 'Deploy', recommended: true },
+    { id: 'wait', label: 'Wait' },
+  ]
+  const childQuestion = item({ id: 'child', subject: { kind: 'session', id: 'parent' }, reason: 'A subagent asks: Deploy the release now?', choices })
+
+  it('is answerable where Answer lands: the parent thread lists it with its options', () => {
+    expect(InboxView.threadQuestions([childQuestion, item({ id: 'elsewhere', choices })], 'parent')).toEqual([childQuestion])
+  })
+
+  it('leaves out what the thread already shows or cannot answer', () => {
+    // The native question card takes the composer seat in its own thread; a second copy would be noise.
+    const native = item({ id: 'native', source: 'agent-questions.native-question', subject: { kind: 'session', id: 'parent' }, choices })
+    const noChoices = item({ id: 'free-text', subject: { kind: 'session', id: 'parent' }, choices: [] })
+    const answered = item({ id: 'answered', subject: { kind: 'session', id: 'parent' }, choices, resolvedAt: 5 })
+    const done = item({ id: 'done', subject: { kind: 'session', id: 'parent' }, choices, doneAt: 5 })
+    expect(InboxView.threadQuestions([native, noChoices, answered, done], 'parent')).toEqual([])
+  })
+})

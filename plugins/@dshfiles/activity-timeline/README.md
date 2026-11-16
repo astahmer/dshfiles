@@ -23,10 +23,19 @@ choices, **Review thread** for a finished turn, **Open thread**, **Open backlog 
 Land, Done, Snooze (1 h, 4 h, tomorrow, until it changes) and Mute source. Row actions are 44 px on touch input. Every open item a provider marks resumable also gets one page-level **Resume all**, so a batch of
 usage-limit stops leaves the list in one click. The history tabs offer Reopen, Unsnooze and Unmute, so every user
 transition can be undone. Browser
-alerts for new Needs you items (questions and failures) are opt-in, per browser, below the list: the notification is
+alerts for new Needs you items (questions and failures) are opt-in, per browser, in the page menu: the notification is
 titled with the thread, its body is the question or the failure, and a click opens that item's thread (or the Inbox
 when nothing else can show it). An item that can Land asks before it lands, showing what will land, and offers
 **Review**, which opens the thread's Changes view.
+
+A question a subagent asked its parent thread also shows in that thread, above its composer, with the same options
+(`src/thread-question-dock.tsx`): **Answer** on a thread row opens the thread, and this is the answerable card it lands
+on. It reads the Needs you list the badge reads, so answering in either place clears both.
+
+An item that asks a question never offers the prompt library's quick replies, and a row prints a question as plain
+words: the first paragraph of its Markdown, at most two lines (`src/inbox-preview.ts`). **Start triage** shows one item
+at a time with a single action row (the bar): the item's answers or verb, Open, Done, Snooze, Skip and Exit. This
+device's alert settings open from the page menu (**More actions › Alerts on this device**).
 
 ### The attention contract
 

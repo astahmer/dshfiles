@@ -12,8 +12,9 @@ import { NextWaiting } from './next-waiting.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ActivityTimelinePanel } from './panel.js'
 import { InboxGlyph } from './inbox-glyph.js'
-import { INBOX_LOCALE_NAMESPACE, inboxLocale } from './inbox-locales.js'
+import { INBOX_LOCALE_NAMESPACE, inboxLocale, type InboxTranslate } from './inbox-locales.js'
 import { InboxPanel, openThread } from './inbox-panel.js'
+import { ThreadQuestionDock } from './thread-question-dock.js'
 import { ACTIVITY_TIMELINE_LOCALE_NAMESPACE, activityTimelineLocale } from './locales.js'
 
 const PANEL_ID = 'activity-timeline'
@@ -64,6 +65,23 @@ export default defineClient({
         decorate(props => (
           <PluginQueryProvider>
             <InboxPanel {...navigation} t={props.t} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    // A subagent's question is answerable in its parent thread, above the composer: where "Answer" on a thread row lands.
+    ctx.slots.inject('conversation.input.dock', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.input.dock',
+          id: 'dshfiles-attention-thread-questions',
+          order: 2,
+          locale: INBOX_LOCALE_NAMESPACE,
+          inject: (sessionId: string) => ({ sessionId }),
+        },
+        decorate((props: { readonly sessionId: string; readonly t: InboxTranslate }) => (
+          <PluginQueryProvider>
+            <ThreadQuestionDock sessionId={props.sessionId} t={props.t} />
           </PluginQueryProvider>
         )),
       ),

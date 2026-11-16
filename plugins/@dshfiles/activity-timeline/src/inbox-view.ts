@@ -114,7 +114,27 @@ const pageActions = (input: { readonly triagePrimary: boolean; readonly alertSet
   ...(input.alertSettings ? [{ id: 'alerts', placement: 'overflow' } as const] : []),
 ]
 
+/** Sources whose question the thread does not show itself: a subagent's question lives in the child, not in the parent. */
+const THREAD_QUESTION_SOURCES: ReadonlySet<string> = new Set(['agent-questions.child-question'])
+
+/**
+ * The open questions a thread shows above its composer, answerable there with their options: the place "Answer" on a
+ * thread row lands. A native question form is left out, since its own card already takes the composer seat.
+ */
+const threadQuestions = (items: readonly AttentionItem[], sessionId: string): readonly AttentionItem[] =>
+  items.filter(
+    item =>
+      item.subject.kind === 'session' &&
+      item.subject.id === sessionId &&
+      THREAD_QUESTION_SOURCES.has(item.source) &&
+      item.verbs.includes('Answer') &&
+      item.choices.length > 0 &&
+      item.resolvedAt === null &&
+      item.doneAt === null,
+  )
+
 export class InboxView {
+  static readonly threadQuestions = threadQuestions
   static readonly pageActions = pageActions
   static readonly TEXT_MEASURE = TEXT_MEASURE
   static readonly textOf = textOf
