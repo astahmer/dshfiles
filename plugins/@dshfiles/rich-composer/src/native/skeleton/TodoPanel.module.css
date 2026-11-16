@@ -5,6 +5,22 @@
   padding: 0 12px 6px;
 }
 
+.metaShort {
+  display: none;
+}
+
+/* Phone: the dock row is a chip (ConversationRoot.module.css), so the counts read as done / total. */
+@media (max-width: 639.98px) {
+  :global(html[data-shell-phone-nav]) .metaFull {
+    display: none;
+  }
+
+  :global(html[data-shell-phone-nav]) .metaShort {
+    display: inline;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 .chevron {
   display: grid;
   flex: none;
