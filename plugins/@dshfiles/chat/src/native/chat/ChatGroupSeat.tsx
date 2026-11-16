@@ -16,7 +16,7 @@ import { isRoutineContextNode, showsRoutineContext } from './context-rows.ts'
 import { hiddenOrCollapsing } from './flow-motion.ts'
 import { chatRenderKey } from './render-entry.ts'
 import { useRunFoldPlacements } from './RunFold.tsx'
-import { processTitle } from './step-process.ts'
+import { groupOwnsHeader, processTitle } from './step-process.ts'
 import { useDisclosure } from './use-disclosure.ts'
 import { useProcessScroll } from './use-process-scroll.ts'
 import css from './ChatGroupSeat.module.css'
@@ -154,9 +154,6 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
     const location = node?.location
     return location?.kind === 'turn' || location?.kind === 'step' ? location.turn : undefined
   })
-  // Detailed keeps the latest completed Turn flat, like a running one, until the next input.
-  const grouped = props.usePresentation(policy => policy.stepGrouping === 'collapsed'
-    || (policy.stepGrouping === 'history' && turnLocation?.status !== 'open' && !deferCollapse))
   const reason = turnLocation?.end?.data.reason.kind
   const alwaysOpen = presentation?.turnClosed === false || presentation?.hasInterleavedInput === true
     || reason === 'aborted' || reason === 'interrupted' || reason === 'error'
@@ -164,8 +161,14 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
   const selectOpen = useCallback((state: Readonly<ChatStoreState>) => spec !== undefined
     && turnProcessOpen(state, spec, deferCollapse), [spec, deferCollapse])
   const storedOpen = props.useStore(selectOpen)
-  const outerHidden = foldCompleted && presentation?.turnClosed === true && spec !== undefined
-    && !alwaysOpen && !storedOpen
+  // dshfiles (unslop T4): the Turn's "Worked for" row is this group's disclosure, so the group adds no second one.
+  const turnFolds = foldCompleted && presentation?.turnClosed === true && spec !== undefined && !alwaysOpen
+  const outerHidden = turnFolds && !storedOpen
+  // Detailed keeps the latest completed Turn flat, like a running one, until the next input.
+  const turnOpen = turnLocation?.status === 'open'
+  const grouped = props.usePresentation(policy => groupOwnsHeader({
+    stepGrouping: policy.stepGrouping, turnOpen, deferCollapse, turnFolds,
+  }))
   const revealOuter = useCallback(() => {
     if (spec !== undefined && !alwaysOpen) props.actions.setTurnProcessOpen(spec.turn, spec.answerStep ?? 0, true)
   }, [props.actions, spec, alwaysOpen])
@@ -180,9 +183,11 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
   }, [outerHidden, rootRef, setOpen])
   const reveal = useCallback(() => { setOpen(true) }, [setOpen])
   const bodyRef = props.useGroupAction(grouped && !open, reveal)
-  // A collapsed historical Turn keeps hundreds of tool rows hidden; mount them the first time the body shows.
-  const [membersMounted, setMembersMounted] = useState(!grouped || open)
-  if (!membersMounted && (!grouped || open)) setMembersMounted(true)
+  // A collapsed historical Turn keeps hundreds of tool rows hidden; mount them the first time the body shows:
+  // when the group's own header opens, or, for a group without one, when the Turn's "Worked for" row does.
+  const membersShown = grouped ? open : !outerHidden
+  const [membersMounted, setMembersMounted] = useState(membersShown)
+  if (!membersMounted && membersShown) setMembersMounted(true)
   const contentRef = useRef<HTMLDivElement>(null)
   const bodyId = useId()
   const { edges, events, initialize } = useProcessScroll(bodyRef, contentRef, open, grouped)

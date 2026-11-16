@@ -327,7 +327,7 @@ export const en = {
   'message.stepProcess.joinTwo': '{first} and {second}',
   'message.stepProcess.comma': ', ',
   'message.stepProcess.sharedPrefix': '',
-  'message.stepProcess.more': '{title}, etc.',
+  'message.stepProcess.more': '{title} and more',
   'message.trigger.request': 'Execution requested',
   'message.trigger.goal': 'Continuing goal',
   'message.trigger.agent': 'Task message received',

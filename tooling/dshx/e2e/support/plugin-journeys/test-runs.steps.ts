@@ -23,15 +23,17 @@ Then('the finished tool call shows a Vitest results card', async ({ page }: { pa
   const card = page.locator('[data-chat-call-id]').first()
   const commandGroup = page.getByText('Ran commands', { exact: true }).last()
   const testCardToggle = card.getByRole('button', { name: /^Ran tests\b/ })
-  if (!(await commandGroup.isVisible())) {
-    await page
-      .getByText(/^Worked for /)
-      .last()
-      .click()
-    await expect(commandGroup).toBeVisible({ timeout: 20_000 })
-  }
-  if (!(await testCardToggle.isVisible())) await commandGroup.click()
-  await expect(testCardToggle).toBeVisible({ timeout: 20_000 })
+  // A finished turn's rows sit directly under "Worked for"; a "Ran commands" header remains only where a turn does not fold.
+  await expect(async () => {
+    if (await testCardToggle.isVisible()) return
+    if (await commandGroup.isVisible()) await commandGroup.click()
+    else
+      await page
+        .getByText(/^Worked for /)
+        .last()
+        .click()
+    await expect(testCardToggle).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
   await testCardToggle.click()
   await recordAssertion(page, 'test-runs-card-shows-vitest-results', async () => {
     const results = card.locator('[data-test-runs-card]')
@@ -62,15 +64,16 @@ Then('the finished tool call shows a stack trace card', async ({ page }: { page:
   const card = page.locator('[data-chat-call-id]').first()
   const commandGroup = page.getByText('Ran commands', { exact: true }).last()
   const traceToggle = card.getByRole('button', { name: /^Stack trace\b/ })
-  if (!(await commandGroup.isVisible())) {
-    await page
-      .getByText(/^(Completed|Failed) in /)
-      .last()
-      .click()
-    await expect(commandGroup).toBeVisible({ timeout: 20_000 })
-  }
-  if (!(await traceToggle.isVisible())) await commandGroup.click()
-  await expect(traceToggle).toBeVisible({ timeout: 20_000 })
+  await expect(async () => {
+    if (await traceToggle.isVisible()) return
+    if (await commandGroup.isVisible()) await commandGroup.click()
+    else
+      await page
+        .getByText(/^(Worked for|Completed in|Failed in) /)
+        .last()
+        .click()
+    await expect(traceToggle).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
   if ((await card.locator('[data-stack-trace]').count()) === 0) await traceToggle.click()
   await recordAssertion(page, 'test-runs-card-shows-stack-trace', async () => {
     const trace = card.locator('[data-stack-trace]')
