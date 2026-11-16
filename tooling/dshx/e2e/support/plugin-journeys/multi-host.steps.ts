@@ -619,7 +619,8 @@ When('the native composer sends a prompt to the remote Session', async ({ page }
 
 const REMOTE_QUESTION = 'Which environment should the remote fixture deploy to?'
 const remoteQuestionCard = (page: Page) => page.locator('[data-question-key]').filter({ hasText: REMOTE_QUESTION })
-const remoteComposer = (page: Page) => page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/u })
+const remoteComposer = (page: Page) =>
+  page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/u })
 
 const askOnRemote = async (page: Page, timeout?: number): Promise<void> => {
   const directive = `[[title Remote question fixture]] [[once call ask_user_question ${JSON.stringify({
@@ -647,7 +648,11 @@ Then('the remote question opens in the controlling chat', async ({ page }: { rea
 
 Then('the remote question counts down with what its owner reports', async ({ page }: { readonly page: Page }) => {
   await recordAssertion(page, 'multi-host-remote-question-countdown', async () => {
-    await expect(remoteQuestionCard(page).locator('header span').filter({ hasText: /^Continuing in \d+s$/u })).toBeVisible({ timeout: 15_000 })
+    await expect(
+      remoteQuestionCard(page)
+        .locator('header span')
+        .filter({ hasText: /^Continuing in \d+s$/u }),
+    ).toBeVisible({ timeout: 15_000 })
   })
 })
 
@@ -707,7 +712,12 @@ When('another remote thread that is not open here asks a question', async ({ pag
     questions: [{ id: 'region', header: 'Region', question: UNOPENED_QUESTION, options: [{ label: 'Paris' }, { label: 'Tokyo' }] }],
   })}]]`
   const started = Schema.decodeUnknownSync(withUnknownProperties({ ok: Schema.Boolean, message: Schema.optional(Schema.String) }))(
-    await call('threadStart', { runtimeId: observation.runtimeId, cwd: observation.folderPath, text: directive, model: { provider: 'commandcode_work', model: 'gpt-6-luna' } }),
+    await call('threadStart', {
+      runtimeId: observation.runtimeId,
+      cwd: observation.folderPath,
+      text: directive,
+      model: { provider: 'commandcode_work', model: 'gpt-6-luna' },
+    }),
   )
   expect(started.ok, started.message).toBe(true)
 })
@@ -716,13 +726,20 @@ Then('the unopened thread reports it is waiting and its question opens with it',
   await recordAssertion(page, 'multi-host-unopened-thread-waiting', async () => {
     await page.getByRole('tab', { name: 'Threads', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Needs you (1)', exact: true })).toBeVisible({ timeout: 45_000 })
-    await page.getByRole('button', { name: new RegExp(UNOPENED_TITLE, 'u') }).first().click()
+    await page
+      .getByRole('button', { name: new RegExp(UNOPENED_TITLE, 'u') })
+      .first()
+      .click()
     const card = page.locator('[data-question-key]').filter({ hasText: UNOPENED_QUESTION })
     await expect(card).toBeVisible({ timeout: 30_000 })
     await card.getByRole('radio', { name: 'Tokyo', exact: true }).click()
     await card.getByRole('button', { name: 'Submit', exact: true }).click()
     const fake = fakeCommandCodeFor(page)
-    await expect.poll(() => fake.requests.flatMap(request => request.messages).some(message => message.text.includes('Tokyo') && message.text.includes('region')), { timeout: 30_000 }).toBe(true)
+    await expect
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.text.includes('Tokyo') && message.text.includes('region')), {
+        timeout: 30_000,
+      })
+      .toBe(true)
   })
   await finishJourneyAssertions(page)
 })
@@ -735,7 +752,9 @@ Then('the remote agent learns the question was dismissed', async ({ page }: { re
   await recordAssertion(page, 'multi-host-remote-question-dismissed', async () => {
     const fake = fakeCommandCodeFor(page)
     await expect
-      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && /cancel/iu.test(message.text)), { timeout: 30_000 })
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && /cancel/iu.test(message.text)), {
+        timeout: 30_000,
+      })
       .toBe(true)
     await expect(remoteQuestionCard(page).getByRole('button', { name: 'Submit', exact: true })).toHaveCount(0, { timeout: 30_000 })
   })
@@ -753,7 +772,10 @@ const runScratchJj = (cwd: string, ...args: readonly string[]): string => {
 }
 
 const remoteForks = new WeakMap<Page, string>()
-const remoteJjJourneys = new WeakMap<Page, { readonly repository: string; readonly threadPath: string; readonly sessionId: string; readonly description: string }>()
+const remoteJjJourneys = new WeakMap<
+  Page,
+  { readonly repository: string; readonly threadPath: string; readonly sessionId: string; readonly description: string }
+>()
 const jjCallResultSchema = Schema.Struct({
   ok: Schema.Boolean,
   code: Schema.optional(Schema.String),
@@ -764,9 +786,8 @@ const jjCallResultSchema = Schema.Struct({
 When('a thread on the remote has described work in its own JJ workspace', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
   const call = await hostApi(pair.manager)
-  const runtimeId = Schema.decodeUnknownSync(withUnknownProperties({ runtimes: Schema.Array(Schema.Struct({ id: Schema.String })) }))(
-    await call('list'),
-  ).runtimes[0]?.id
+  const runtimeId = Schema.decodeUnknownSync(withUnknownProperties({ runtimes: Schema.Array(Schema.Struct({ id: Schema.String })) }))(await call('list'))
+    .runtimes[0]?.id
   if (runtimeId === undefined) throw new Error('The scratch remote is not registered.')
   const repository = join(pair.remote.homeRoot, `jj-${randomUUID()}`)
   await mkdir(repository, { recursive: true })
@@ -786,9 +807,9 @@ When('a thread on the remote has described work in its own JJ workspace', async 
   await expect
     .poll(
       async () => {
-        const status = Schema.decodeUnknownSync(withUnknownProperties({ workspaces: Schema.optional(Schema.Array(withUnknownProperties({ workspaceId: Schema.String, path: Schema.String }))) }))(
-          await call('runtimeStatus', { runtimeId }),
-        )
+        const status = Schema.decodeUnknownSync(
+          withUnknownProperties({ workspaces: Schema.optional(Schema.Array(withUnknownProperties({ workspaceId: Schema.String, path: Schema.String }))) }),
+        )(await call('runtimeStatus', { runtimeId }))
         threadPath = status.workspaces?.find(workspace => workspace.workspaceId === provisioned.value.workspaceId)?.path
         return threadPath
       },
@@ -855,7 +876,10 @@ Then('the revision panel shows that thread from its owner', async ({ page }: { r
   await expect(page.getByText('Ready.', { exact: true })).toBeVisible({ timeout: 45_000 })
   await recordAssertion(page, 'multi-host-remote-jj-panel', async () => {
     await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
-    await page.getByRole('button', { name: /^Jujutsu/u }).first().click({ timeout: 15_000 })
+    await page
+      .getByRole('button', { name: /^Jujutsu/u })
+      .first()
+      .click({ timeout: 15_000 })
     await expect(page.getByText(journey.description).first()).toBeVisible({ timeout: 30_000 })
   })
 })
@@ -874,11 +898,17 @@ When('the thread is integrated from this client', async ({ page }: { readonly pa
 When('the thread is landed from the Land page', async ({ page }: { readonly page: Page }) => {
   const journey = remoteJjJourneys.get(page)
   if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
-  const row = page.locator('article, li').filter({ hasText: basename(journey.threadPath) }).first()
+  const row = page
+    .locator('article, li')
+    .filter({ hasText: basename(journey.threadPath) })
+    .first()
   await expect(async () => {
     await page.reload()
     await page.getByRole('tab', { name: 'Land', exact: true }).click()
-    await page.getByRole('button', { name: /^Workspaces/u }).first().click()
+    await page
+      .getByRole('button', { name: /^Workspaces/u })
+      .first()
+      .click()
     await expect(row).toBeVisible({ timeout: 6_000 })
   }).toPass({ timeout: 60_000 })
   await row.getByRole('button', { name: 'Land', exact: true }).click()
@@ -888,7 +918,9 @@ Then('the work reached the remote main bookmark', async ({ page }: { readonly pa
   const journey = remoteJjJourneys.get(page)
   if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
   await recordAssertion(page, 'multi-host-remote-land-page', async () => {
-    await expect.poll(() => runScratchJj(journey.repository, 'log', '--no-graph', '-r', 'main', '-T', 'description'), { timeout: 30_000 }).toContain(journey.description)
+    await expect
+      .poll(() => runScratchJj(journey.repository, 'log', '--no-graph', '-r', 'main', '-T', 'description'), { timeout: 30_000 })
+      .toContain(journey.description)
   })
 })
 
@@ -924,7 +956,10 @@ Then('landing is queued and undone from this client', async ({ page }: { readonl
   if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
   await recordAssertion(page, 'multi-host-remote-land-queue', async () => {
     await page.getByRole('button', { name: /^Current thread workspace: / }).click()
-    await page.getByRole('button', { name: /^Queue/u }).first().click({ timeout: 30_000 })
+    await page
+      .getByRole('button', { name: /^Queue/u })
+      .first()
+      .click({ timeout: 30_000 })
     await page.getByRole('button', { name: 'Cancel the queued landing on main', exact: true }).first().click({ timeout: 30_000 })
     await expect(page.getByRole('button', { name: /^Queue/u }).first()).toBeVisible({ timeout: 30_000 })
     expect(runScratchJj(journey.repository, 'log', '--no-graph', '-r', 'main', '-T', 'description')).not.toContain(journey.description)
@@ -946,7 +981,9 @@ When('the remote thread is forked', async ({ page }: { readonly page: Page }) =>
     })
     return await response.json()
   }, journey.sessionId)
-  const fork = Schema.decodeUnknownSync(withUnknownProperties({ result: withUnknownProperties({ ok: Schema.Literal(true), value: withUnknownProperties({ sessionId: Schema.String }) }) }))(created)
+  const fork = Schema.decodeUnknownSync(
+    withUnknownProperties({ result: withUnknownProperties({ ok: Schema.Literal(true), value: withUnknownProperties({ sessionId: Schema.String }) }) }),
+  )(created)
   remoteForks.set(page, fork.result.value.sessionId)
 })
 
@@ -1030,10 +1067,14 @@ Then('the owner refuses the child agent without asking anyone', async ({ page }:
   await recordAssertion(page, 'multi-host-remote-child-approval', async () => {
     const fake = fakeCommandCodeFor(page)
     await expect
-      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && message.text.includes('rejected escalating')), { timeout: 45_000 })
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && message.text.includes('rejected escalating')), {
+        timeout: 45_000,
+      })
       .toBe(true)
     const call = await hostApi(pairFor(page).manager)
-    expect(Schema.decodeUnknownSync(withUnknownProperties({ interactions: Schema.Array(Schema.Unknown) }))(await call('sessionInteractions', {})).interactions).toEqual([])
+    expect(
+      Schema.decodeUnknownSync(withUnknownProperties({ interactions: Schema.Array(Schema.Unknown) }))(await call('sessionInteractions', {})).interactions,
+    ).toEqual([])
     await expect(remoteApproval(page)).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
@@ -1047,8 +1088,14 @@ Then('the remote command does not run', async ({ page }: { readonly page: Page }
   await recordAssertion(page, 'multi-host-remote-approval-rejected', async () => {
     await expect(remoteApproval(page)).toHaveCount(0, { timeout: 30_000 })
     const fake = fakeCommandCodeFor(page)
-    await expect.poll(() => fake.requests.flatMap(request => request.messages).filter(message => message.role === 'tool').length, { timeout: 30_000 }).toBeGreaterThan(0)
-    const toolText = fake.requests.flatMap(request => request.messages).filter(message => message.role === 'tool').map(message => message.text).join('\n')
+    await expect
+      .poll(() => fake.requests.flatMap(request => request.messages).filter(message => message.role === 'tool').length, { timeout: 30_000 })
+      .toBeGreaterThan(0)
+    const toolText = fake.requests
+      .flatMap(request => request.messages)
+      .filter(message => message.role === 'tool')
+      .map(message => message.text)
+      .join('\n')
     expect(toolText).not.toMatch(new RegExp(`^${APPROVAL_MARKER}$`, 'mu'))
   })
   await finishJourneyAssertions(page)
@@ -1074,15 +1121,27 @@ Then('a host without the repository plugins says so', async ({ page }: { readonl
     const repositories = Schema.decodeUnknownSync(withUnknownProperties({ unreachable: Schema.Array(Schema.String) }))(await call('remoteRepositories', {}))
     expect(repositories.unreachable).toEqual([])
     const reply = Schema.decodeUnknownSync(jjCallResultSchema)(
-      await call('sessionRepositoryCall', { sessionId: observation.sessionId, api: 'jujutsu', method: 'registerRepository', input: { path: observation.folderPath } }),
+      await call('sessionRepositoryCall', {
+        sessionId: observation.sessionId,
+        api: 'jujutsu',
+        method: 'registerRepository',
+        input: { path: observation.folderPath },
+      }),
     )
-    expect(reply).toMatchObject({ ok: false, code: 'api-not-served', message: 'This host does not have the plugin for that. Update DSH there, or open the thread on its host.' })
+    expect(reply).toMatchObject({
+      ok: false,
+      code: 'api-not-served',
+      message: 'This host does not have the plugin for that. Update DSH there, or open the thread on its host.',
+    })
   })
 })
 
 When('a terminal is opened on the remote thread', async ({ page }: { readonly page: Page }) => {
   await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
-  await page.getByRole('button', { name: /^New terminal/u }).first().click({ timeout: 15_000 })
+  await page
+    .getByRole('button', { name: /^New terminal/u })
+    .first()
+    .click({ timeout: 15_000 })
 })
 
 Then('the terminal is offered on its host', async ({ page }: { readonly page: Page }) => {
@@ -1092,9 +1151,14 @@ Then('the terminal is offered on its host', async ({ page }: { readonly page: Pa
     const observation = autoDestinationObservations.get(page)
     if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
     const call = await hostApi(pairFor(page).manager)
-    const view = Schema.decodeUnknownSync(runtimeOpenViewSchema, { onExcessProperty: 'error' })(await call('runtimeOpenView', { runtimeId: observation.runtimeId }))
+    const view = Schema.decodeUnknownSync(runtimeOpenViewSchema, { onExcessProperty: 'error' })(
+      await call('runtimeOpenView', { runtimeId: observation.runtimeId }),
+    )
     allowLoopbackBrowserOrigin(page, view.launchUrl)
-    const [hostPage] = await Promise.all([page.context().waitForEvent('page'), panel.getByRole('button', { name: 'Open terminal on host', exact: true }).click()])
+    const [hostPage] = await Promise.all([
+      page.context().waitForEvent('page'),
+      panel.getByRole('button', { name: 'Open terminal on host', exact: true }).click(),
+    ])
     await expect.poll(() => hostPage.url(), { timeout: 30_000 }).not.toBe('about:blank')
     await expect(hostPage.getByRole('button', { name: 'New session', exact: true }).first()).toBeVisible({ timeout: 30_000 })
     expect(new URL(hostPage.url()).origin).not.toBe(new URL(page.url()).origin)
@@ -1122,7 +1186,8 @@ When('the Hosts page is opened', async ({ page }: { readonly page: Page }) => {
 
 Then('the Hosts page shows live resource metrics', async ({ page }: { readonly page: Page }) => {
   const hostsPage = page.getByTestId('dshfiles-hosts-page')
-  await expect(hostsPage.getByText('Auto destination', { exact: true })).toBeVisible()
+  // Auto destination is header meta now ("Auto destination: Build box", or "… unavailable").
+  await expect(hostsPage.getByText(/^Auto destination/u)).toBeVisible()
   await expect(hostsPage.getByText('Load · 1m', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
   await expect(hostsPage.getByText('Memory used', { exact: true }).first()).toBeVisible()
   await expect(hostsPage.getByTestId(/^host-resources-/).first()).toBeVisible()

@@ -313,8 +313,28 @@ const LinkedMachines = (props: { readonly api: MultiHostClient }) => {
   )
 }
 
-/** Hosts page section: this machine's link gateway, its pairing codes and the machines linked to it. */
-export const LinkThisMachine = (props: { readonly api: MultiHostClient; readonly onPair: () => void }) => {
+/**
+ * This machine's link gateway, its pairing codes and the machines linked to it. A dialog behind the Hosts header: a
+ * switched-off feature does not sit above the list, and its state shows as a header chip.
+ */
+export const LinkThisMachineDialog = (props: {
+  readonly api: MultiHostClient
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly onPair: () => void
+}) => (
+  <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+    <DialogContent className="dshx-root dshx:@container dshx:max-h-[calc(100dvh-2rem)] dshx:overflow-x-hidden dshx:overflow-y-auto dshx:sm:max-w-xl">
+      <DialogHeader className="dshx:min-w-0">
+        <DialogTitle>Link this machine</DialogTitle>
+        <DialogDescription>Let another machine run threads here, and pair this one with it.</DialogDescription>
+      </DialogHeader>
+      {props.open ? <LinkThisMachine api={props.api} onPair={props.onPair} /> : null}
+    </DialogContent>
+  </Dialog>
+)
+
+const LinkThisMachine = (props: { readonly api: MultiHostClient; readonly onPair: () => void }) => {
   const queryClient = useQueryClient()
   const status = useQuery(multiHostQueries.linkStatus(props.api, 30_000))
   const toggle = useMutation({
@@ -328,40 +348,23 @@ export const LinkThisMachine = (props: { readonly api: MultiHostClient; readonly
   const data = status.data
   const enabled = data?.settings.enabled ?? false
   return (
-    <section
-      data-testid="link-this-machine"
-      aria-labelledby="link-this-machine-heading"
-      className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4 dshx:rounded-lg dshx:border dshx:p-4 dshx:@max-pane-narrow:p-3"
-    >
+    <section data-testid="link-this-machine" aria-label="Link this machine" className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
+      {/* One control says the state: the switch. A gateway that is on but not listening is the one case that needs words. */}
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
-        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-          <h2 id="link-this-machine-heading" className="dshx:text-sm dshx:font-semibold">
-            Link this machine
-          </h2>
-          {data === undefined ? null : data.listening ? (
-            <Badge variant="secondary" className="dshx:text-2xs">
-              Listening
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="dshx:text-2xs">
-              {enabled ? 'Not listening' : 'Off'}
-            </Badge>
-          )}
-        </div>
-        <div className="dshx:flex dshx:items-center dshx:gap-2">
-          <Button type="button" size="sm" variant="outline" className="dshx:pointer-coarse:min-h-11" onClick={props.onPair}>
-            <LinkIcon className="dshx:size-3.5" />
-            Pair a machine
-          </Button>
-          <span className="dshx:flex dshx:items-center dshx:pointer-coarse:min-h-11">
-            <Switch
-              aria-label="Linking"
-              checked={enabled}
-              disabled={data === undefined || toggle.isPending}
-              onCheckedChange={checked => toggle.mutate(checked)}
-            />
-          </span>
-        </div>
+        <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:pointer-coarse:min-h-11">
+          <Switch
+            aria-label="Linking"
+            checked={enabled}
+            disabled={data === undefined || toggle.isPending}
+            onCheckedChange={checked => toggle.mutate(checked)}
+          />
+          Accept links from other machines
+          {data !== undefined && enabled && !data.listening ? <span className="dshx:text-xs dshx:text-muted-foreground">Not listening yet</span> : null}
+        </label>
+        <Button type="button" size="sm" variant="outline" className="dshx:pointer-coarse:min-h-11" onClick={props.onPair}>
+          <LinkIcon className="dshx:size-3.5" />
+          Pair a machine
+        </Button>
       </div>
       {status.isPending ? <Spinner aria-label="Loading link status" /> : null}
       {status.isError ? (
