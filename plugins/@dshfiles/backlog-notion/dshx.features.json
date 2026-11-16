@@ -148,7 +148,7 @@
           "testName": "records one notion request span per call, with the operation and status only"
         }
       ],
-      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Backlog settings\"", "expect button \"Add Notion connection\""]
+      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"More backlog actions\"", "click menuitem \"Settings\"", "expect button \"Add Notion connection\""]
     }
   ]
 }
