@@ -68,6 +68,8 @@ export interface ThreadStatusInput {
   readonly inbox: InboxThreadSignal | undefined
   /** Set while the thread's last finished turn is a failed one, read or not. */
   readonly failedTurn?: FailedTurnSignal | undefined
+  /** Revisions in the thread's own workspace that have not landed; 0 or undefined for none or no workspace. */
+  readonly unlanded?: number | undefined
   /** Last activity: the newest of its update, finish or mute time. */
   readonly activityAt: number
   /** When it was settled, when known. */
@@ -146,6 +148,9 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
       since: fromInbox ? Math.max(inbox.openedAt, input.activityAt) : input.activityAt,
     }
   }
+  // Finished, read, and its work still sits in its own workspace: Ready until it lands (§4.7), whatever its age. The
+  // Land verb comes from the inbox item above when a provider publishes one.
+  if ((input.unlanded ?? 0) > 0) return { status: 'ready', detail: undefined, verb: undefined, itemId: undefined, since: input.activityAt }
   if (input.now - input.activityAt >= DONE_AFTER_IDLE_MS) {
     return { status: 'done', detail: undefined, verb: undefined, itemId: undefined, since: input.activityAt + DONE_AFTER_IDLE_MS }
   }

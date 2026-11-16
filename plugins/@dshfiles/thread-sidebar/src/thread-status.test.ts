@@ -94,6 +94,19 @@ describe('thread status', () => {
     expect(ready).toMatchObject({ status: 'ready', verb: 'Land', itemId: 'i3' })
   })
 
+  it('keeps a finished thread Ready while its workspace holds work that has not landed', () => {
+    // Read, nothing pending, but 2 revisions wait in its own workspace: finished and not landed is Ready, not Idle.
+    const waiting = ThreadStatusModel.statusOf(input({ unlanded: 2 }))
+    expect(waiting).toMatchObject({ status: 'ready', group: 'ready', verb: undefined })
+    // It does not fold into Done by age: landing is still to do.
+    expect(ThreadStatusModel.statusOf(input({ unlanded: 1, activityAt: NOW - DONE_AFTER_IDLE_MS - 1 })).status).toBe('ready')
+    // A running turn, a question or a failure still come first, and done is done.
+    expect(ThreadStatusModel.statusOf(input({ unlanded: 1, running: true })).status).toBe('working')
+    expect(ThreadStatusModel.statusOf(input({ unlanded: 1, labels: ['threadSidebarInputNeeded'] })).status).toBe('needs-you')
+    expect(ThreadStatusModel.statusOf(input({ unlanded: 1, settled: true })).status).toBe('done')
+    expect(ThreadStatusModel.statusOf(input({ unlanded: 0 })).status).toBe('idle')
+  })
+
   it('rolls subagents up: a waiting or failed child lifts its parent, a running child keeps it Working', () => {
     const waitingChild = ThreadStatusModel.ownStatus(input({ labels: ['threadSidebarInputNeeded'] }))
     const failedChild = ThreadStatusModel.ownStatus(input({ inbox: { itemId: 'c', severity: 'failed', reason: 'x', verb: 'Retry', openedAt: NOW } }))
