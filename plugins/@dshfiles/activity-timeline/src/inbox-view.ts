@@ -100,7 +100,22 @@ const textOf = (item: AttentionItem) => {
 /** A page fills its pane (DESIGN.md); the words of a row keep a readable line length on a wide one. */
 const TEXT_MEASURE = 'dshx:max-w-[72ch]'
 
+export interface InboxPageAction {
+  readonly id: 'triage' | 'alerts'
+  readonly placement: 'inline' | 'overflow'
+}
+
+/**
+ * The header's actions besides the primary: Start triage (unless it is the primary, as on a phone), then this device's
+ * alert settings in the page menu. Settings never sit under the work list.
+ */
+const pageActions = (input: { readonly triagePrimary: boolean; readonly alertSettings: boolean }): readonly InboxPageAction[] => [
+  ...(input.triagePrimary ? [] : [{ id: 'triage', placement: 'inline' } as const]),
+  ...(input.alertSettings ? [{ id: 'alerts', placement: 'overflow' } as const] : []),
+]
+
 export class InboxView {
+  static readonly pageActions = pageActions
   static readonly TEXT_MEASURE = TEXT_MEASURE
   static readonly textOf = textOf
   static readonly asksQuestion = asksQuestion

@@ -55,7 +55,7 @@ are Ready, or Failed for an error or the token limit; opening the thread resolve
 
 ## Push for blocking items
 
-**Push blocking items to this device** (Inbox, under the in-tab alerts) sends each new Needs you or Failed item to a
+**Push blocking items to this device** (Inbox › More actions › Alerts on this device, under the in-tab alerts) sends each new Needs you or Failed item to a
 device even when no DSH tab is open; Ready items never push. Turning it on registers a service worker the Host serves
 from its own origin (`/dshfiles-web-push/sw.js`, scoped to its own folder so it controls no page), subscribes the
 browser with the Host's VAPID key and records the device. The Host keeps the keys and subscriptions in the

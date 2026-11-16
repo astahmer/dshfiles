@@ -508,11 +508,18 @@
     {
       "id": "inbox-push",
       "title": "Push blocking Inbox items to a device",
-      "summary": "Below the in-tab alerts, the Inbox offers Push blocking items to this device. Turning it on asks for notification permission, registers a service worker the Host serves from its own origin (/dshfiles-web-push/sw.js, scope its own folder, so it controls no page), subscribes the browser with the Host's VAPID key and records the device. The Host keeps its VAPID keys and every device's subscription in the dshfiles_web_push storage domain and pushes each new Needs you or Failed item once to every device (Ready items never push; the first read after a Host start only seeds, so a restart replays nothing), encrypted aes128gcm with Node crypto. A click opens the item's thread. A subscription the push service forgot (404/410) is dropped; another failure stays on the device with what to do. Send test proves the path. On an iPhone, push needs DSH on the Home Screen (iOS 16.4+); the Inbox says so. Agents list devices (inbox_push_devices), send a test (inbox_push_test) and remove a device with confirm: true (inbox_push_remove); a device subscribes only itself, so subscribing has no agent tool.",
+      "summary": "The Inbox page menu (More actions › Alerts on this device) offers Push blocking items to this device under the in-tab alerts. Turning it on asks for notification permission, registers a service worker the Host serves from its own origin (/dshfiles-web-push/sw.js, scope its own folder, so it controls no page), subscribes the browser with the Host's VAPID key and records the device. The Host keeps its VAPID keys and every device's subscription in the dshfiles_web_push storage domain and pushes each new Needs you or Failed item once to every device (Ready items never push; the first read after a Host start only seeds, so a restart replays nothing), encrypted aes128gcm with Node crypto. A click opens the item's thread. A subscription the push service forgot (404/410) is dropped; another failure stays on the device with what to do. Send test proves the path. On an iPhone, push needs DSH on the Home Screen (iOS 16.4+); the Inbox says so. Agents list devices (inbox_push_devices), send a test (inbox_push_test) and remove a device with confirm: true (inbox_push_remove); a device subscribes only itself, so subscribing has no agent tool.",
       "surface": "destinationSection",
       "destination": "inbox",
-      "currentSurface": "left-nav: Inbox › Push blocking items to this device",
-      "reach": ["click tab \"Inbox\"", "click button \"Needs you\"", "expect heading \"Inbox\"", "expect text \"Push blocking items to this device\""],
+      "currentSurface": "left-nav: Inbox › More actions › Alerts on this device",
+      "reach": [
+        "click tab \"Inbox\"",
+        "click button \"Needs you\"",
+        "expect heading \"Inbox\"",
+        "click button \"More actions\"",
+        "click menuitem \"Alerts on this device\"",
+        "expect text \"Push blocking items to this device\""
+      ],
       "surfaces": ["client", "host", "tool", "storage"],
       "configuration": [],
       "states": ["off", "on", "ios-needs-home-screen", "denied", "delivery-failed", "subscription-expired"],
