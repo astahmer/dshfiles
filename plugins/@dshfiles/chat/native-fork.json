@@ -99,6 +99,7 @@
     "src/native/chat/selection-action-placement.test.ts",
     "src/native/chat/selection-action-placement.ts",
     "src/native/chat/touch-input.ts",
+    "src/native/chat/turn-usage-action.ts",
     "src/native/chat/SinceYouLeftCard.module.css",
     "src/native/chat/SinceYouLeftCard.tsx",
     "src/native/chat/ThreadFindBar.module.css",
