@@ -41,7 +41,7 @@ export const PluginSettingsPageView = (props: {
    * (a narrow pane), the select reads the same words, so the page title stays for assistive technology only.
    */
   readonly namedByNavigation?: boolean
-  /** The plugin entry behind the page, drawn under its description. */
+  /** The plugin entry behind the page, drawn after its settings. */
   readonly entry?: ReactNode
 }): JSX.Element => {
   const memory = useContext(PageViewMemory)
@@ -88,7 +88,6 @@ export const PluginSettingsPageView = (props: {
         </ToggleGroup>
       </div>
       {props.page.description !== '' && <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">{props.page.description}</p>}
-      {props.entry}
       <div className="dshx:mt-3" hidden={view !== 'form'}>
         <SettingsForm
           fields={props.page.fields}
@@ -109,6 +108,7 @@ export const PluginSettingsPageView = (props: {
           />
         </div>
       )}
+      {props.entry}
     </section>
   )
 }
