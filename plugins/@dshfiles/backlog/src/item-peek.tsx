@@ -35,7 +35,6 @@ import {
   PlusIcon,
   QuoteIcon,
   SparklesIcon,
-  Trash2Icon,
   WandSparklesIcon,
   XIcon,
   type LucideIcon,
@@ -101,6 +100,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/p
 import { ItemTimeline } from './item-timeline.js'
 import { BacklogReference } from './backlog-reference.js'
 import { PeekHeading } from './peek-heading.js'
+import { DeleteReplyButton } from './delete-reply.js'
 
 type OpenThread = (sessionId: string) => void
 type ThreadLabel = (sessionId: string) => string
@@ -653,20 +653,15 @@ const TimelineRuns = (props: {
                             >
                               <PencilIcon aria-hidden className="dshx:size-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label="Delete reply"
-                              className="dshx:text-muted-foreground dshx:hover:text-destructive"
-                              onClick={() => {
-                                if (commentId === undefined || !window.confirm('Delete this reply? This cannot be undone.')) return
+                            <DeleteReplyButton
+                              text={run.event.detail}
+                              onDelete={() => {
+                                if (commentId === undefined) return
                                 void actions.deleteComment
                                   .mutateAsync({ id: props.itemId, commentId })
-                                  .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be deleted.')))
+                                  .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be deleted. Try again, or reload the item.')))
                               }}
-                            >
-                              <Trash2Icon aria-hidden className="dshx:size-4" />
-                            </Button>
+                            />
                           </div>
                         ) : null}
                       </div>

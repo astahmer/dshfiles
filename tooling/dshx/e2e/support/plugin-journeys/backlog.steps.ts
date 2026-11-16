@@ -1495,14 +1495,11 @@ Then('the edited reply has only its replacement attachment', async ({ page }: { 
 
 When('the user reply is deleted after confirmation', async ({ page }: { page: Page }) => {
   const activity = peek(page).getByRole('list', { name: 'Conversation' })
-  let confirmationMessage: string | undefined
-  page.once('dialog', dialog => {
-    confirmationMessage = dialog.message()
-    void dialog.accept()
-  })
   await activity.getByText('Edited reply', { exact: true }).hover()
   await activity.getByRole('button', { name: 'Delete reply', exact: true }).click()
-  expect(confirmationMessage).toBe('Delete this reply? This cannot be undone.')
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete this reply?', exact: true })
+  await expect(confirmation).toContainText('“Edited reply”')
+  await confirmation.getByRole('button', { name: 'Delete reply', exact: true }).click()
 })
 
 Then('the reply and its attachment are removed from the activity', async ({ page }: { page: Page }) => {
