@@ -28,7 +28,7 @@
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
         "press Enter",
-        "expect button \"Locate a landmark\"",
+        "expect button \"Locate Current\"",
         "click button \"Compare\"",
         "expect region \"Revision comparison\"",
         "click combobox \"Comparison target\"",
