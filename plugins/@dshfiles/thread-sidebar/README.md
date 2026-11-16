@@ -166,6 +166,11 @@ while no restart waits, so update-then-restart is one item, not two. Customize s
 rail** (`showRailRestart`, off by default) adds a Restart button to the rail's DSH actions (only while the supervisor
 offers a restart; amber with a slow pulse while updates or a restart wait); the strip then draws no restart item.
 
+**Palette rows.** The sidebar files one row per page ("Observe › Usage"; a page named like its destination is just
+"Inbox"), a "Go to" row for each destination that is more than one page, and its verbs (Toggle sidebar, Focus
+composer, Customize sidebar, Restart DSH, Pair a phone, Copy DSH URL) in the command group. It lists one row for the left-sidebar toggle (its own, not the built-in command beside it), and none per folder and panel: filing a panel in a folder is the
+folder's own **Add panel** and each row's menu (`src/sidebar-palette-rows.ts`).
+
 **Failed threads, one read.** `@dshfiles/thread-sidebar/failed-turns-client` is a dshx module: `useFailedTurns()` reads
 the Host's failed-turn record (re-read on every attention change) and `useFailedThreadIds(views)` /
 `FailedThreadsModel.ids` add the unread failed finish an older Host can only report. A surface that marks a failed
@@ -357,7 +362,7 @@ context menu's Move to group submenu performs the same moves from the keyboard.
 
 **The thread board page.** The sidebar only ever shows the list; the board is a
 full-width page opened from the thread board row in the sidebar's panel list (or
-the "Thread board" command in the palette). It renders the same thread rows with
+the "Threads › Board" row in the palette, which also answers to "thread board" and "kanban"). It renders the same thread rows with
 each section as a column: it defaults to the six status lanes (including empty
 ones), and can also group its columns by project, date, or no grouping. The board
 shows only columns: the list's Interrupted, Needs resume, Usage limit and attention

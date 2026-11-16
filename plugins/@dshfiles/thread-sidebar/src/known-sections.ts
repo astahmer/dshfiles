@@ -42,7 +42,8 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     destination: 'threads',
     label: 'Board',
     description: 'The same threads as columns.',
-    formerLabels: ['Thread Sidebar: Board'],
+    // "Thread board" was its own palette row beside this page's; the page row answers to both names.
+    formerLabels: ['Thread Sidebar: Board', 'Thread board', 'Kanban'],
   },
   {
     panelId: 'attention-inbox',
