@@ -318,7 +318,8 @@ export const useAutoArchive = (input: {
     }),
     [],
   )
-  const [, send, actor] = useMachine(autoArchiveMachine, { input: { client, intervalMs: input.intervalMs } })
+  const [snapshot, send, actor] = useMachine(autoArchiveMachine, { input: { client, intervalMs: input.intervalMs } })
+  const running = snapshot.matches('selecting') || snapshot.matches('archiving') || snapshot.matches('settling')
   const requestScan = useCallback((source: AutoArchiveSource = 'all') => send({ type: 'scan', source }), [send])
   const refreshCandidates = useCallback((source: AutoArchiveSource) => send({ type: 'refresh', source }), [send])
 
@@ -331,5 +332,5 @@ export const useAutoArchive = (input: {
     send({ type: 'configure', enabled: input.enabled, intervalMs: input.intervalMs })
   }, [input.enabled, input.intervalMs, send])
 
-  return { requestScan, refreshCandidates }
+  return { requestScan, refreshCandidates, running }
 }

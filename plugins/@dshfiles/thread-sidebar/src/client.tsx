@@ -2301,7 +2301,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }),
     [archiveSessionProp],
   )
-  const { requestScan, refreshCandidates } = useAutoArchive({
+  const {
+    requestScan,
+    refreshCandidates,
+    running: autoArchiveRunning,
+  } = useAutoArchive({
     client: archiveClient,
     enabled: isPrimarySurface && settledArchiveEnabled,
     intervalMs: preferences.scanIntervalMinutes * 60_000,
@@ -3306,11 +3310,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // instead of waiting for the archive delay that already fired. Covers every archive path, the Agent's included.
   useEffect(() => {
     if (!isPrimarySurface) return
-    const archivedStillSettled = preferences.settledSessionIds.filter(sessionId => archivedSessionIds.has(sessionId))
+    const archivedStillSettled = SettledThreadsModel.archivedStillSettled({
+      settledSessionIds: preferences.settledSessionIds,
+      archivedSessionIds,
+      autoArchiveRunning,
+    })
     if (archivedStillSettled.length === 0) return
     const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
     changePreferences(SettledThreadsModel.unsettle(status, archivedStillSettled))
-  }, [archivedSessionIds, changePreferences, isPrimarySurface, preferences.settledAt, preferences.settledSessionIds])
+  }, [archivedSessionIds, autoArchiveRunning, changePreferences, isPrimarySurface, preferences.settledAt, preferences.settledSessionIds])
 
   /** Both delay settings carry the same five choices, so one control renders each of them. */
   const threadDelayControl = (input: {
