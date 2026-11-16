@@ -21,3 +21,18 @@ describe('the header Land verb', () => {
     expect(WorkspaceControlModel.showsLand({ ...ready, unlanded: [{ description: '  ', conflict: false }] })).toBe(false)
   })
 })
+
+describe('the workspace path label', () => {
+  it('keeps the end of the path, where the workspace is named', () => {
+    expect(WorkspaceControlModel.pathTail('/private/var/folders/3k/k0xz2zs57sq25lq8bfg2yg480000gn/T/home/projects/sample-threads/thread-31057e')).toBe(
+      'sample-threads/thread-31057e',
+    )
+    expect(WorkspaceControlModel.pathTail('/Users/ada/dev/dshfiles/')).toBe('dev/dshfiles')
+    expect(WorkspaceControlModel.pathTail('C:\\Users\\ada\\dev\\sample')).toBe('dev\\sample')
+  })
+
+  it('leaves a short path whole', () => {
+    expect(WorkspaceControlModel.pathTail('/sample')).toBe('/sample')
+    expect(WorkspaceControlModel.pathTail('sample/thread-1')).toBe('sample/thread-1')
+  })
+})

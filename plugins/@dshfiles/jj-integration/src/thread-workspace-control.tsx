@@ -6,8 +6,19 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, ClockIcon, FolderGit2Icon, GitMergeIcon, PanelRightIcon, RefreshCwIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  CopyIcon,
+  FolderGit2Icon,
+  GitMergeIcon,
+  PanelRightIcon,
+  RefreshCwIcon,
+  Undo2Icon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -93,6 +104,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
   const bookmark = useProjectBookmark(cwd, props.bookmark)
   const toast = useToast()
+  const pathCopy = useCopyFeedback()
   const menuSections = arrangeWorkspaceMenuSections(useRegistry(WorkspaceMenuSections))
   const thread = useQuery({
     queryKey: threadQueryKeys.threadAt(cwd ?? '', props.sessionId),
@@ -269,6 +281,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     return props.t('upToDate')
   }
 
+  const workspacePath = current?.path ?? (cwd !== null && cwd.length > 0 ? cwd : null)
   const glyph = <FolderGit2Icon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0" />
   // b:czs9: the chip never shrinks below what it shows. A shrunk chip centred its count and chevron over the elapsed
   // time and the ⋯ beside it. It sheds parts instead, by the header row's width (an inline-size container): its label
@@ -329,14 +342,34 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                 <FolderGit2Icon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
                 <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{placeLabel}</span>
               </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
-                    {current?.path ?? cwd ?? props.t('unknownWorkspace')}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent className="dshx:max-w-96">{current?.path ?? cwd ?? ''}</TooltipContent>
-              </Tooltip>
+              {/* H6 (unslop): the end of the path names the workspace; the whole path is in the tooltip and behind Copy. */}
+              <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" data-workspace-path="" tabIndex={0}>
+                      {workspacePath === null ? props.t('unknownWorkspace') : WorkspaceControlModel.pathTail(workspacePath)}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="dshx:max-w-96 dshx:break-all">{workspacePath ?? props.t('unknownWorkspace')}</TooltipContent>
+                </Tooltip>
+                {workspacePath === null ? null : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label={props.t('copyWorkspacePath')}
+                        className="dshx-root dshx:shrink-0 dshx:text-muted-foreground"
+                        onClick={() => void pathCopy.copy(workspacePath)}
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      >
+                        {pathCopy.copied ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{pathCopy.copied ? props.t('copied') : props.t('copyWorkspacePath')}</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
             </div>
             {conflicted && isThread ? (
               <div className="dshx:px-3 dshx:pt-2 dshx:pb-3">
