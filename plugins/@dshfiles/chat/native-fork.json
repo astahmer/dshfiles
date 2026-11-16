@@ -54,6 +54,7 @@
     "src/native/chat/TurnProcessNodeView.module.css",
     "src/native/chat/TurnProcessNodeView.tsx",
     "src/native/chat/TurnTailNodeView.tsx",
+    "src/native/chat/TurnTriggerNodeView.module.css",
     "src/native/chat/TurnTriggerNodeView.tsx",
     "src/native/chat/TurnUsagePanel.tsx",
     "src/native/chat/UserContent.tsx",

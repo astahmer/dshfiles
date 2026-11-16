@@ -334,7 +334,7 @@ export const en = {
   'message.stepProcess.more': '{title} and more',
   'message.trigger.request': 'Execution requested',
   'message.trigger.goal': 'Continuing goal',
-  'message.trigger.agent': 'Task message received',
+  'message.trigger.agent': 'Message from another agent',
   'message.trigger.team': 'Team message received',
   'message.trigger.subagent': 'Subtask status updated',
   'message.trigger.subagent.completed': 'Subagent run completed',
