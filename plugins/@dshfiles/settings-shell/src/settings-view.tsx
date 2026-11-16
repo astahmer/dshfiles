@@ -116,6 +116,8 @@ const Kbd = (props: { readonly children: ReactNode }): JSX.Element => (
   </kbd>
 )
 
+const matchesText = (t: ShellTranslate, count: number): string => (count === 1 ? t('search.matchesOne') : t('search.matches', { count }))
+
 /** VS Code's results view: a flat list of matching settings grouped by the page that holds them. */
 const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSearchResult }): JSX.Element => {
   const { result, t } = props
@@ -155,7 +157,7 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
             <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">
               <Highlight query={props.query} text={group.label} />
             </h3>
-            <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.matches', { count: group.entries.length })}</span>
+            <span className="dshx:text-xs dshx:text-muted-foreground">{matchesText(t, group.entries.length)}</span>
           </button>
           {group.entries.map(entry => (
             <button
@@ -217,7 +219,7 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
             <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">
               <Highlight query={props.query} text={hit.page.title} />
             </h3>
-            <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.matches', { count: hit.fields.length })}</span>
+            <span className="dshx:text-xs dshx:text-muted-foreground">{matchesText(t, hit.fields.length)}</span>
           </button>
           {props.renderMatches(hit.page, hit.fields, SettingsSearch.highlightText(props.query))}
         </section>
