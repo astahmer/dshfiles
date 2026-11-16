@@ -93,6 +93,68 @@ describe('settings form rows', () => {
   })
 })
 
+describe('a setting edited as JSON', () => {
+  const schema = wire(Schemastery.object({ allowedModels: Schemastery.array(Schemastery.object({ provider: Schemastery.string() })).default([]) }))
+  const fields = SettingsSchemaModel.settingFields({ schema, secrets: [], text })
+  const snapshot: ConfigFormSnapshot<unknown> = {
+    status: 'ready',
+    value: { allowedModels: [] },
+    base: { allowedModels: [] },
+    user: {},
+    revision: 1,
+    writable: true,
+  }
+  const editor = (): HTMLTextAreaElement => {
+    const field = row('allowedModels')?.querySelector('textarea')
+    if (field === null || field === undefined) throw new Error('JSON field missing')
+    return field
+  }
+  const alertText = (): string | undefined => row('allowedModels')?.querySelector('[role="alert"]')?.textContent ?? undefined
+  const type = async (value: string): Promise<void> => {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+    await act(async () => {
+      setValue?.call(editor(), value)
+      editor().dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+
+  it('says what the value is before anything is typed', async () => {
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot)} namespace="example" t={t} />))
+    expect(row('allowedModels')?.textContent).toContain('form.jsonList')
+    expect(alertText()).toBeUndefined()
+  })
+
+  it('flags broken JSON while it is typed and never saves it', async () => {
+    const mutate = vi.fn<ConfigForm<unknown>['mutate']>(async () => true)
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot, mutate)} namespace="example" t={t} />))
+    await type('[{"provider": ')
+    expect(alertText()).toContain('form.invalidJson')
+    expect(editor().getAttribute('aria-invalid')).toBe('true')
+    await typeAndLeave(editor(), '[{"provider": ')
+    expect(mutate).not.toHaveBeenCalled()
+  })
+
+  it('refuses a value of the wrong shape and says which brackets the list needs', async () => {
+    const mutate = vi.fn<ConfigForm<unknown>['mutate']>(async () => true)
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot, mutate)} namespace="example" t={t} />))
+    await typeAndLeave(editor(), '{"provider": "deepseek"}')
+    expect(alertText()).toContain('form.invalidJsonList')
+    expect(mutate).not.toHaveBeenCalled()
+  })
+
+  it('restores the saved value on request, and saves a valid list', async () => {
+    const mutate = vi.fn<ConfigForm<unknown>['mutate']>(async () => true)
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot, mutate)} namespace="example" t={t} />))
+    await type('nope')
+    const restore = [...(row('allowedModels')?.querySelectorAll('button') ?? [])].find(button => button.textContent === 'form.restoreJson')
+    await act(async () => restore?.click())
+    expect(editor().value).toBe('[]')
+    expect(alertText()).toBeUndefined()
+    await typeAndLeave(editor(), '[{"provider": "deepseek"}]')
+    expect(mutate.mock.calls.map(([ops]) => ops)).toEqual([[{ op: 'set', path: ['allowedModels'], value: [{ provider: 'deepseek' }] }]])
+  })
+})
+
 describe('machine values', () => {
   const schema = wire(
     Schemastery.object({

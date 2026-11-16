@@ -63,7 +63,13 @@ export type SettingControl =
   | ScalarControl
   | { readonly kind: 'list'; readonly item: ScalarControl }
   | { readonly kind: 'record'; readonly value: ScalarControl }
-  | { readonly kind: 'json' }
+  | { readonly kind: 'json'; readonly shape?: JsonShape }
+
+/** What the schema says a JSON-edited value is at its top level: a list in `[ ]` or an object in `{ }`. */
+export type JsonShape = 'list' | 'object'
+
+/** A JSON draft as typed: the value to save, or why it cannot be saved. */
+export type JsonDraft = { readonly ok: true; readonly value: JsonValue } | { readonly ok: false; readonly reason: 'syntax' | JsonShape }
 
 export interface SettingField {
   readonly key: string
@@ -247,6 +253,8 @@ const controlOf = (walk: Walk, node: SchemaNode, key: string): SettingControl =>
     const item = inner === undefined ? undefined : scalarControl(walk, inner, key)
     if (item !== undefined && !(item.kind === 'text' && item.multiline)) return node.type === 'array' ? { kind: 'list', item } : { kind: 'record', value: item }
   }
+  if (node.type === 'array' || node.type === 'tuple') return { kind: 'json', shape: 'list' }
+  if (node.type === 'dict' || node.type === 'object') return { kind: 'json', shape: 'object' }
   return { kind: 'json' }
 }
 
@@ -354,6 +362,15 @@ const parseJsonDraft = (text: string): JsonValue | undefined => {
   }
 }
 
+/** Checks a JSON draft against the shape its schema declares, so a list never saves as an object or a bare word. */
+const checkJsonDraft = (text: string, shape: JsonShape | undefined): JsonDraft => {
+  const value = parseJsonDraft(text)
+  if (value === undefined) return { ok: false, reason: 'syntax' }
+  if (shape === 'list' && !Array.isArray(value)) return { ok: false, reason: 'list' }
+  if (shape === 'object' && (typeof value !== 'object' || value === null || Array.isArray(value))) return { ok: false, reason: 'object' }
+  return { ok: true, value }
+}
+
 /** The value a new list item or record entry starts with. */
 const blankValue = (control: ScalarControl): JsonValue => {
   switch (control.kind) {
@@ -377,5 +394,6 @@ export class SettingsSchemaModel {
   static readonly valueAt = valueAt
   static readonly hasValueAt = hasValueAt
   static readonly parseJsonDraft = parseJsonDraft
+  static readonly checkJsonDraft = checkJsonDraft
   static readonly blankValue = blankValue
 }
