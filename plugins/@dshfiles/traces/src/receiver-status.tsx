@@ -1,7 +1,6 @@
 import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
 import type { TracesLocaleKey, TracesTranslate } from './locales.js'
 import type { DiagnosisCode, ReceiverStatus } from './types.js'
@@ -10,21 +9,11 @@ import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 export const receiverEndpoint = (status: ReceiverStatus): string | null =>
   status.boundPort === null ? null : `http://${status.address.includes(':') ? `[${status.address}]` : status.address}:${String(status.boundPort)}`
 
-export const ReceiverBadge = (props: { readonly status: ReceiverStatus; readonly t: TracesTranslate }): JSX.Element => {
-  const endpoint = receiverEndpoint(props.status)
-  if (props.status.state === 'listening' && endpoint !== null)
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="dshx:inline-flex">
-            <Badge variant="success" data-testid="traces-receiver-state" data-state="listening" data-endpoint={endpoint}>
-              {props.t('receiverListening')} <span className="dshx:font-mono">{endpoint}</span>
-            </Badge>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{endpoint}</TooltipContent>
-      </Tooltip>
-    )
+/**
+ * A header badge only while the receiver needs you: a held port or a failed start. A listening, starting, disabled or
+ * external receiver is the healthy, quiet case; its endpoint is under the page menu (Copy endpoint) and in Settings.
+ */
+export const ReceiverBadge = (props: { readonly status: ReceiverStatus; readonly t: TracesTranslate }): JSX.Element | null => {
   if (props.status.state === 'port-in-use')
     return (
       <Badge variant="warning" data-testid="traces-receiver-state" data-state="port-in-use">
@@ -37,17 +26,7 @@ export const ReceiverBadge = (props: { readonly status: ReceiverStatus; readonly
         {props.t('receiverFailed')}
       </Badge>
     )
-  if (props.status.mode === 'external')
-    return (
-      <Badge variant="info" data-testid="traces-receiver-state" data-state="external">
-        {props.t('externalViewer')}
-      </Badge>
-    )
-  return (
-    <Badge variant="muted" data-testid="traces-receiver-state" data-state={props.status.state}>
-      {props.status.state === 'starting' ? props.t('receiverStarting') : props.t('receiverDisabled')}
-    </Badge>
-  )
+  return null
 }
 
 export const ReceiverMessage = (props: { readonly status: ReceiverStatus; readonly t: TracesTranslate }): JSX.Element | null => {

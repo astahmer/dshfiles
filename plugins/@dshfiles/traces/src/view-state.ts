@@ -37,3 +37,8 @@ export const tracesViewFor = (panelId?: string) =>
     fallback: defaultTracesView,
   })
 export const storedTracesView = tracesViewFor()
+
+/** Views for diagnosing the receiver's own telemetry: one click away under More, not beside Traces, Logs and Alerts. */
+export const MORE_TABS = ['map', 'metrics', 'operations', 'errors', 'boards'] as const
+export type MoreTab = (typeof MORE_TABS)[number]
+export const isMoreTab = (tab: string): tab is MoreTab => MORE_TABS.some(candidate => candidate === tab)

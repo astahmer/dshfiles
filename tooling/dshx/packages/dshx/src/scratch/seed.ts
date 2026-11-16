@@ -1282,16 +1282,18 @@ const tracesReceiverEndpoint = async (input: {
       .getByRole('button', { name: /^Traces(?::|$)/u })
       .first()
       .click({ timeout: timeoutMs })
-  const badge = page.getByTestId('traces-receiver-state')
-  await badge.waitFor({ state: 'visible', timeout: timeoutMs })
-  await page.waitForFunction(() => document.querySelector('[data-testid="traces-receiver-state"]')?.getAttribute('data-state') !== 'starting', undefined, {
+  // The header names the receiver only when it fails; its state and endpoint ride on the store summary.
+  const summary = page.getByTestId('traces-store-summary')
+  await summary.waitFor({ state: 'visible', timeout: timeoutMs })
+  await page.waitForFunction(() => document.querySelector('[data-testid="traces-store-summary"]')?.getAttribute('data-receiver-state') !== 'starting', undefined, {
     timeout: timeoutMs,
   })
-  const endpoint = (await badge.getAttribute('data-state')) === 'listening' ? await badge.getAttribute('data-endpoint') : null
+  const state = await summary.getAttribute('data-receiver-state')
+  const endpoint = state === 'listening' ? await summary.getAttribute('data-endpoint') : null
   if (endpoint === null) {
     throw new ScratchError(
       'seed-receiver-not-listening',
-      `The traces receiver is not listening (${(await badge.textContent()) ?? 'unknown state'}).`,
+      `The traces receiver is not listening (${state ?? 'unknown state'}).`,
       'Open the Traces panel for its message; a scratch binds a free port, so a failure here is a receiver bug.',
     )
   }

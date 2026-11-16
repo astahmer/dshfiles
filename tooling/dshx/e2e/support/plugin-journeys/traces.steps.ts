@@ -5,6 +5,12 @@ import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
 
+/** Opens one of the Traces views kept under More views (Service map, Metrics, Operations, Errors, Boards). */
+const openMoreTracesView = async (page: Page, name: string): Promise<void> => {
+  await page.getByRole('button', { name: 'More views', exact: true }).click()
+  await page.getByRole('menuitem', { name, exact: true }).click()
+}
+
 // Port 0 lets every scenario (and any parallel worker) bind its own free port; the panel shows which one it got.
 const freePortPatch = `- id: dshfiles-traces
   config:
@@ -19,9 +25,9 @@ const openTraces = async (page: Page): Promise<void> => {
 }
 
 const receiverEndpoint = async (page: Page): Promise<string> => {
-  const badge = page.getByTestId('traces-receiver-state')
-  await expect(badge).toHaveAttribute('data-state', 'listening', { timeout: 30_000 })
-  const endpoint = await badge.getAttribute('data-endpoint')
+  const summary = page.getByTestId('traces-store-summary')
+  await expect(summary).toHaveAttribute('data-receiver-state', 'listening', { timeout: 30_000 })
+  const endpoint = await summary.getAttribute('data-endpoint')
   expect(endpoint).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
   return endpoint ?? ''
 }
@@ -234,7 +240,7 @@ Then('the span detail panel stays visible while scrolling the trace view', async
 })
 
 Then('the Operations tab lists each operation with its count and error rate', async ({ page }: { page: Page }) => {
-  await page.getByRole('tab', { name: 'Operations', exact: true }).click()
+  await openMoreTracesView(page, 'Operations')
   const table = page.getByRole('table', { name: 'Operations' })
   await recordAssertion(page, 'traces-operations-summarize-spans', async () => {
     await expect(table.getByRole('row', { name: /charge card/ })).toContainText('100%', { timeout: 15_000 })
@@ -243,7 +249,7 @@ Then('the Operations tab lists each operation with its count and error rate', as
 })
 
 Then('the Errors tab groups the failing span with a sample trace', async ({ page }: { page: Page }) => {
-  await page.getByRole('tab', { name: 'Errors', exact: true }).click()
+  await openMoreTracesView(page, 'Errors')
   const groups = page.getByRole('list', { name: 'Errors' })
   await recordAssertion(page, 'traces-errors-group-failing-spans', async () => {
     await expect(groups.getByRole('listitem').filter({ hasText: 'charge card' })).toContainText('CardDeclined', { timeout: 15_000 })
@@ -336,7 +342,7 @@ Then('the failing span shows only its own logs', async ({ page }: { page: Page }
 })
 
 Then('the service map shows both services and the call between them', async ({ page }: { page: Page }) => {
-  await page.getByRole('tab', { name: 'Service map', exact: true }).click()
+  await openMoreTracesView(page, 'Service map')
   const map = page.getByRole('img', { name: 'Service map' })
   await recordAssertion(page, 'traces-service-map-draws-services-and-calls', async () => {
     await expect(map.locator('[data-service="e2e-checkout"]')).toBeVisible({ timeout: 15_000 })
@@ -402,7 +408,7 @@ When('two synthetic OTLP JSON metric exports are posted to the receiver', async 
 })
 
 Then('the Metrics tab lists each metric with its type and last value', async ({ page }: { page: Page }) => {
-  await page.getByRole('tab', { name: 'Metrics', exact: true }).click()
+  await openMoreTracesView(page, 'Metrics')
   const table = page.getByRole('table', { name: 'Metrics' })
   await recordAssertion(page, 'traces-metrics-list', async () => {
     await expect(table.locator('tr[data-metric="http.server.requests"]')).toContainText('17', { timeout: 15_000 })
