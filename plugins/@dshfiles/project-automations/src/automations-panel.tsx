@@ -12,7 +12,7 @@ import {
 import { RoutineList, type Routine, type RoutineRunStatus } from '@dshfiles/plugin-ui/components/motion/routine-list'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
@@ -218,12 +218,9 @@ export const AutomationsPanel = (props: {
           </div>
         ) : null}
         {list.data?.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>No automations yet</EmptyTitle>
-              <EmptyDescription>Create one to start a thread on a schedule or when a signed webhook arrives, such as a failed CI run.</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">
+            No automations yet. Create one to start a thread on a schedule or a signed webhook.
+          </EmptyState>
         ) : null}
         {list.data === undefined || list.data.length === 0 ? null : (
           <RoutineList
