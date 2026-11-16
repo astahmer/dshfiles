@@ -293,6 +293,8 @@ Then('the form shows Max tabs {int} marked modified', async ({ page }: { page: P
 Then('the page names its plugin entry, its bundle and a plugin switch', async ({ page }: { page: Page }) => {
   const entry = mainTabsPage(page).locator('[data-plugin-entry$=":dshfiles-main-tabs"]')
   await recordAssertion(page, 'settings-shell-plugin-entry-card', async () => {
+    // The entry is plumbing: it sits behind Plugin details, after the page's settings.
+    await mainTabsPage(page).getByRole('button', { name: 'Plugin details: Main tabs', exact: true }).click()
     await expect(entry).toContainText('dshfiles-main-tabs')
     await expect(entry).toContainText('from @dshfiles/main-tabs')
     await expect(entry.getByRole('switch', { name: 'Plugin enabled', exact: true })).toBeChecked()

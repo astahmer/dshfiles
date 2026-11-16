@@ -499,7 +499,7 @@ export default defineClient({
       pluginPages: SettingsGroups.searchablePages(input.groups),
       renderPluginPage: (page: PluginSettingsPage, heading: PluginPageHeading) => (
         <PluginSettingsPageView
-          entry={<PluginEntryCard namespace={page.ns} t={input.t} />}
+          entry={<PluginEntryCard namespace={page.ns} page={page.title} t={input.t} />}
           form={formFor(page.ns)}
           key={page.pageId}
           heading={heading}
@@ -617,7 +617,7 @@ export default defineClient({
       return (
         <PluginQueryProvider>
           <PluginSettingsPageView
-            entry={<PluginEntryCard namespace={props.page.ns} t={t} />}
+            entry={<PluginEntryCard namespace={props.page.ns} page={props.page.title} t={t} />}
             form={formFor(props.page.ns)}
             page={props.page}
             t={t}
