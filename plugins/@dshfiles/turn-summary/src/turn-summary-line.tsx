@@ -6,8 +6,8 @@ import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import { turnSummarySettings } from './settings.js'
 import { TURN_ACTIVITY_KEY } from './turn-activity-node.js'
 import { TurnActivity, type TurnActivitySummary, type TurnSegment } from './turn-activity.js'
-import { TurnFileChips } from './turn-file-chips.js'
-import { hasWalkthrough, TurnWalkthroughList, TurnWalkthroughToggle } from './turn-walkthrough.js'
+import { MAX_FILE_CHIPS, TurnFileChips } from './turn-file-chips.js'
+import { hasEditedFiles, hasWalkthrough, TurnWalkthroughList, TurnWalkthroughToggle } from './turn-walkthrough.js'
 
 type OpenList = 'files' | 'commands' | 'failures'
 
@@ -93,16 +93,18 @@ export const TurnSummaryLine = (props: {
   const [open, setOpen] = useState<OpenList | undefined>(undefined)
   const [walkthroughOpen, setWalkthroughOpen] = useState(false)
   if (summary === undefined || settings?.enabled === false || TurnActivity.isEmpty(summary)) return null
-  const walkthrough = settings?.walkthrough !== false && hasWalkthrough(summary)
+  // The chips name the edited files; the walkthrough is offered only where it says more than they do.
+  const chips = settings?.walkthrough !== false && hasEditedFiles(summary)
+  const walkthrough = chips && hasWalkthrough(summary, MAX_FILE_CHIPS)
   const segments = TurnActivity.segments(summary, {
     includeReads: settings?.includeReads !== false,
     lineCounts: settings?.lineCounts !== false,
     testResults: settings?.testResults !== false,
-    editedFiles: !walkthrough,
+    editedFiles: !chips,
   })
   const failures = TurnActivity.failedCommandsBeyondTests(summary, { testResults: settings?.testResults !== false })
   // A duration alone is no summary: a turn with nothing to name (one plan update, one page render) gets no line.
-  if (segments.length === 0 && failures === 0 && !walkthrough) return null
+  if (segments.length === 0 && failures === 0 && !chips) return null
   const canList = summary.failedCommands.length > 0 && settings?.listFailures !== false
   const openLists = settings?.openLists !== false
   const toggle = (list: OpenList) => () => setOpen(current => (current === list ? undefined : list))
@@ -111,10 +113,10 @@ export const TurnSummaryLine = (props: {
   const duration = settings?.duration !== false && start !== undefined && end !== undefined ? TurnActivity.shownDuration(end - start) : undefined
   const changesSeq = summary.changesSeq
   const openChanges = changesSeq === undefined ? undefined : () => props.openChanges({ seq: changesSeq, turn: props.turn.turn })
-  // With file chips the edits are named once (GitHub #47): `editedFiles: !walkthrough` above already leaves the
+  // With file chips the edits are named once (GitHub #47): `editedFiles: !chips` above already leaves the
   // "Edited N files" part out, and the chips lead the line, so no segment is capitalised as its first word.
   const label = (segment: TurnSegment, index: number): string =>
-    index === 0 && !walkthrough ? segment.text.charAt(0).toUpperCase() + segment.text.slice(1) : segment.text
+    index === 0 && !chips ? segment.text.charAt(0).toUpperCase() + segment.text.slice(1) : segment.text
   const segmentView = (segment: TurnSegment, index: number): ReactNode => {
     const list = segment.key === 'files' || segment.key === 'commands' ? segment.key : undefined
     if (list !== undefined && openLists)
@@ -140,7 +142,7 @@ export const TurnSummaryLine = (props: {
             first part of every wrapped line loses its separator instead of starting the line with one. */}
         <div className="dshx:min-w-0 dshx:flex-1 dshx:overflow-x-clip">
           <div className="dshx:-ml-3 dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-y-0.5">
-            {walkthrough && (
+            {chips && (
               <Part>
                 <TurnFileChips
                   files={summary.editedFileStats}

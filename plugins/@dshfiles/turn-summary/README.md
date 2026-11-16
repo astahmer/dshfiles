@@ -19,12 +19,13 @@ A footer under each finished turn that says what the agent did with tools:
 - The red **failure count** opens the failed commands and how each ended: `exit 1`, `signal SIGKILL`, `no exit code`, or `error` when the tool rejected the call.
 - **Duration** is the turn's wall time, from `turn/start` to `turn/end`.
 
-After a turn that edited files, a **Walkthrough** row opens a grouped view of the changed files by folder, each folder
-with a one-line summary (`Edited 2 files · +40 −3`); every file row opens that file in the editor, and **Review in
-Changes** opens that turn's changed-files review in the right pane: diffs-review's Changes facet when it is loaded, else
-the native review tab. It is a row in the turn footer, closed by default, so nothing floats above the composer. While
-the walkthrough is on, the footer leaves out its **Edited files** part: the native changed-files card above the turn
-and the walkthrough already summarize the edits, so the count is shown once.
+After a turn that edited files in several folders, or more files than the four chips show, a **Walkthrough** control
+opens the changed files grouped by folder: each folder with its file count and, for several files, its line total. Every
+file row opens that file in the editor, and **Review in Changes** opens that turn's changed-files review in the right
+pane: diffs-review's Changes facet when it is loaded, else the native review tab. A turn that edited one file, or a few
+files of one folder, gets no walkthrough: its chips already say all of it. The control sits in the turn footer, closed by
+default, so nothing floats above the composer. While the `walkthrough` setting is on, the footer leaves out its **Edited
+files** part: the chips already name the edits, so the count is shown once.
 
 Built with dshx (no port). Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 
@@ -32,16 +33,16 @@ Built with dshx (no port). Run `pnpm build`, `pnpm test` and `pnpm typecheck` fr
 
 All apply live.
 
-| Key            | Default | Meaning                                                        |
-| -------------- | ------- | -------------------------------------------------------------- |
-| `enabled`      | `true`  | Show the summary line under finished turns.                    |
-| `includeReads` | `true`  | Count file reads and searches as well as commands and edits.   |
-| `listFailures` | `true`  | Let the failed-command count open the list of failed commands. |
-| `lineCounts`   | `true`  | Show lines added and removed next to the edited-file count.    |
-| `testResults`  | `true`  | Show the test outcome from the last test-runner summary.       |
-| `duration`     | `true`  | Show how long the turn took.                                   |
-| `openLists`    | `true`  | Let the edited-file and command counts open their lists.       |
-| `walkthrough`  | `true`  | Show the walkthrough row after a turn that edited files.       |
+| Key            | Default | Meaning                                                          |
+| -------------- | ------- | ---------------------------------------------------------------- |
+| `enabled`      | `true`  | Show the summary line under finished turns.                      |
+| `includeReads` | `true`  | Count file reads and searches as well as commands and edits.     |
+| `listFailures` | `true`  | Let the failed-command count open the list of failed commands.   |
+| `lineCounts`   | `true`  | Show lines added and removed next to the edited-file count.      |
+| `testResults`  | `true`  | Show the test outcome from the last test-runner summary.         |
+| `duration`     | `true`  | Show how long the turn took.                                     |
+| `openLists`    | `true`  | Let the edited-file and command counts open their lists.         |
+| `walkthrough`  | `true`  | Name edited files as chips, with a walkthrough for larger turns. |
 
 ## How it works
 

@@ -6,7 +6,11 @@ import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
 const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/
-const WRITE_FILE = `[[call write ${JSON.stringify({ file_path: 'notes/walkthrough.md', content: 'one two' })}]]`
+// Two folders: for one file the chips already say everything, so no walkthrough is offered.
+const WRITE_FILES = [
+  `[[call write ${JSON.stringify({ file_path: 'notes/walkthrough.md', content: 'one two' })}]]`,
+  `[[call write ${JSON.stringify({ file_path: 'src/second.ts', content: 'export const second = 2' })}]]`,
+].join(' ')
 const FAILING_COMMAND = `[[call bash ${JSON.stringify({ command: 'printf "turn-summary-e2e"; exit 7', description: 'Run the failing summary fixture' })}]]`
 
 const runInFreshWorkspace = async (page: Page, message: string): Promise<void> => {
@@ -25,11 +29,11 @@ When('the fake model runs a failing bash command in a fresh workspace', async ({
   await runInFreshWorkspace(page, FAILING_COMMAND)
 })
 
-When('the fake model writes a file in a fresh workspace', async ({ page }: { page: Page }) => {
-  await runInFreshWorkspace(page, WRITE_FILE)
+When('the fake model writes files in two folders in a fresh workspace', async ({ page }: { page: Page }) => {
+  await runInFreshWorkspace(page, WRITE_FILES)
 })
 
-Then('the finished turn opens a walkthrough naming the written file', async ({ page }: { page: Page }) => {
+Then('the finished turn opens a walkthrough naming the written files by folder', async ({ page }: { page: Page }) => {
   const toggle = page.getByRole('button', { name: 'Walkthrough', exact: true })
   await recordAssertion(page, 'turn-summary-walkthrough-names-written-file', async () => {
     await expect(toggle).toBeVisible({ timeout: 60_000 })
@@ -38,6 +42,9 @@ Then('the finished turn opens a walkthrough naming the written file', async ({ p
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-expanded', 'true')
     await expect(page.locator('[data-dshfiles-turn-walkthrough]')).toContainText('walkthrough.md')
+    await expect(page.locator('[data-dshfiles-turn-walkthrough]')).toContainText('second.ts')
+    // The folder header counts its files; the walkthrough does not say "Edited 1 file" again under it.
+    await expect(page.locator('[data-dshfiles-turn-walkthrough]')).not.toContainText('Edited')
   })
   await recordAssertion(page, 'turn-summary-walkthrough-file-opens', async () => {
     const file = page.locator('[data-dshfiles-turn-walkthrough]').getByRole('button', { name: 'walkthrough.md' })
