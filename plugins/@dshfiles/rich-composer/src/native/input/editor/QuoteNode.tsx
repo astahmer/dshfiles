@@ -1,6 +1,9 @@
 /** Atomic composer quote node and whole-node removal command. */
 
-import type { JSX } from 'react'
+import { useRef, useState, useSyncExternalStore } from 'react'
+import type { JSX, KeyboardEvent, ReactNode } from 'react'
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@dshfiles/plugin-ui/components/ui/sheet'
 import { QuotePreview } from '@deepseek-ai/dsh-client-ui-primitives'
 import { formatQuoteText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { QuoteSummary } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -12,6 +15,8 @@ import { createCommand, DecoratorNode } from 'lexical'
 /** Localized non-persisted labels applied by the owning input shell. */
 export interface QuoteNodeLabels {
   readonly remove: string
+  /** Comment copy; present when the owner turns a commented quote into an annotation (COMMENT_QUOTE_COMMAND). */
+  readonly comment?: { readonly edit: string; readonly selected: string; readonly placeholder: string } | undefined
 }
 
 const EMPTY_LABELS: QuoteNodeLabels = { remove: '' }
@@ -25,6 +30,93 @@ export type SerializedQuoteNode = Spread<{
 /** Remove one quote occurrence by its Lexical identity. */
 export const REMOVE_QUOTE_COMMAND = createCommand<NodeKey>('REMOVE_QUOTE_COMMAND')
 
+/** Give one quote occurrence a comment: its owner moves it into the draft's annotations, which carry comments. */
+export const COMMENT_QUOTE_COMMAND = createCommand<{ readonly key: NodeKey; readonly comment: string }>('COMMENT_QUOTE_COMMAND')
+
+/** The phone shell's width: there the comment opens in a bottom sheet, not a popover. */
+const PHONE_QUERY = '(max-width: 639.98px)'
+const phoneWidth = {
+  subscribe: (listener: () => void): (() => void) => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => undefined
+    const media = window.matchMedia(PHONE_QUERY)
+    media.addEventListener('change', listener)
+    return () => { media.removeEventListener('change', listener) }
+  },
+  snapshot: (): boolean => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches,
+}
+
+/**
+ * dshfiles: a tap or click on a draft quote opens its text with a comment field, the annotation pill's editing
+ * flow; Enter or closing with a comment hands it to COMMENT_QUOTE_COMMAND, Escape drops it.
+ */
+const CommentableQuote = ({ editor, nodeKey, text, copy, children }: {
+  readonly editor: LexicalEditor
+  readonly nodeKey: NodeKey
+  readonly text: string
+  readonly copy: NonNullable<QuoteNodeLabels['comment']>
+  readonly children: ReactNode
+}): ReactNode => {
+  const [open, setOpen] = useState(false)
+  const [comment, setComment] = useState('')
+  const latest = useRef('')
+  const phone = useSyncExternalStore(phoneWidth.subscribe, phoneWidth.snapshot, () => false)
+  const write = (value: string): void => { latest.current = value; setComment(value) }
+  const openChange = (next: boolean): void => {
+    setOpen(next)
+    if (next) return
+    const value = latest.current
+    write('')
+    if (value.trim() !== '') editor.dispatchCommand(COMMENT_QUOTE_COMMAND, { key: nodeKey, comment: value })
+  }
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    event.stopPropagation()
+    if (event.key === 'Escape') write('')
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+    event.preventDefault()
+    openChange(false)
+  }
+  const body = (
+    <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-2" data-quote-comment="">
+      <span className="dshx:text-xs dshx:text-muted-foreground">{copy.selected}</span>
+      <span className="dshx:line-clamp-4 dshx:text-sm dshx:whitespace-pre-wrap dshx:wrap-anywhere dshx:text-foreground">{text}</span>
+      <textarea
+        autoFocus
+        rows={2}
+        className="dshx:box-border dshx:min-h-13 dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+        aria-label={copy.edit}
+        placeholder={copy.placeholder}
+        value={comment}
+        onChange={event => { write(event.currentTarget.value) }}
+        onKeyDown={onKeyDown}
+      />
+    </div>
+  )
+  if (phone) {
+    return (
+      <>
+        <span className="dshx:cursor-pointer" data-quote-comment-trigger="" onClick={() => { openChange(true) }}>{children}</span>
+        <Sheet open={open} onOpenChange={openChange}>
+          <SheetContent side="bottom" className="dshx-root dshx:gap-3 dshx:p-4 dshx:pb-[max(1rem,var(--dshx-safe-bottom))]">
+            <SheetTitle className="dshx:text-sm">{copy.edit}</SheetTitle>
+            <SheetDescription className="dshx:sr-only">{copy.placeholder}</SheetDescription>
+            {body}
+          </SheetContent>
+        </Sheet>
+      </>
+    )
+  }
+  return (
+    <Popover open={open} onOpenChange={openChange}>
+      <PopoverTrigger asChild>
+        <span className="dshx:cursor-pointer" data-quote-comment-trigger="">{children}</span>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="start" className="dshx-root dshx:w-[min(28rem,calc(100vw-2rem))] dshx:p-3">
+        {body}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 /** Pure React face of one quote node. */
 export function QuoteNodeView({ editor, nodeKey, text, summary, labels }: {
   readonly editor: LexicalEditor
@@ -33,7 +125,7 @@ export function QuoteNodeView({ editor, nodeKey, text, summary, labels }: {
   readonly summary?: QuoteSummary | undefined
   readonly labels: QuoteNodeLabels
 }) {
-  return (
+  const preview = (
     <QuotePreview
       text={text}
       summary={summary}
@@ -43,6 +135,9 @@ export function QuoteNodeView({ editor, nodeKey, text, summary, labels }: {
       }}
     />
   )
+  // A summarized quote (a line comment) already carries its own comment.
+  if (labels.comment === undefined || summary !== undefined) return preview
+  return <CommentableQuote editor={editor} nodeKey={nodeKey} text={text} copy={labels.comment}>{preview}</CommentableQuote>
 }
 
 /** One selected transcript range represented as an atomic inline decorator. */
@@ -140,7 +235,11 @@ export class QuoteNode extends DecoratorNode<JSX.Element> {
 
   /** Update the localized remove label without changing persisted quote data. */
   setLabels(labels: QuoteNodeLabels): void {
-    if (this.getLatest().__labels.remove !== labels.remove) this.getWritable().__labels = labels
+    const current = this.getLatest().__labels
+    if (current.remove !== labels.remove || current.comment?.edit !== labels.comment?.edit
+      || current.comment?.selected !== labels.comment?.selected || current.comment?.placeholder !== labels.comment?.placeholder) {
+      this.getWritable().__labels = labels
+    }
   }
 
   /** Render the quote body and its independent close control. */

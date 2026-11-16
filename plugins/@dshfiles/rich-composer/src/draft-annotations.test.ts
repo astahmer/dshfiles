@@ -4,6 +4,8 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SessionInputShell } from './native/input/facade.ts'
 import { DraftAnnotations } from './native/input/draft-annotations.ts'
+import { COMMENT_QUOTE_COMMAND, $isQuoteNode } from './native/input/editor/QuoteNode.tsx'
+import { $getRoot, $isElementNode } from 'lexical'
 import type { InputTriggerController, SubmitOutcome } from './native/contract/input.ts'
 
 vi.mock('./native/input/editor/ReferenceChip.tsx', () => ({ ReferenceChip: () => null }))
@@ -92,5 +94,36 @@ describe('draft annotations', () => {
 
   it('leaves a message without annotations unchanged', () => {
     expect(DraftAnnotations.compose({ annotations: [], text: 'plain' })).toBe('plain')
+  })
+
+  it('turns a commented quote chip into an annotation that carries the comment', async () => {
+    const sent: string[] = []
+    const shell = shellSendingTo(async text => {
+      sent.push(text)
+      return { kind: 'success' }
+    })
+    shell.actions.insertQuote('Four helpers are now running')
+    const quoteKey = (): string | undefined =>
+      shell.editor.getEditorState().read(() =>
+        $getRoot()
+          .getChildren()
+          .flatMap(node => ($isElementNode(node) ? node.getChildren() : []))
+          .find(node => $isQuoteNode(node))
+          ?.getKey(),
+      )
+    const key = quoteKey()
+    if (key === undefined) throw new Error('quote chip missing')
+    shell.editor.update(
+      () => {
+        shell.editor.dispatchCommand(COMMENT_QUOTE_COMMAND, { key, comment: '  phone too?  ' })
+      },
+      { discrete: true },
+    )
+
+    expect(shell.annotations.snapshot()).toEqual([{ id: 1, text: 'Four helpers are now running', comment: 'phone too?', source: '' }])
+    expect(quoteKey()).toBeUndefined()
+    shell.setDraft('Fix it')
+    shell.submit()
+    await vi.waitFor(() => expect(sent).toEqual(['Annotation 1 on your previous reply:\n> Four helpers are now running\n\nComment: phone too?\n\nFix it']))
   })
 })

@@ -28,6 +28,7 @@ import { serializeDraftPrompt } from './prompt.ts'
 import { SubmitMachine } from './machine.ts'
 import { resolveDraftInput, snapshotDraft } from '../draft.ts'
 import { DraftEditorRuntime } from './editor/runtime.ts'
+import type { QuoteNodeLabels } from './editor/QuoteNode.tsx'
 import { DraftAnnotations, type DraftAnnotation } from './draft-annotations.ts'
 import type { EditorProjection } from './editor/projection.ts'
 
@@ -74,8 +75,8 @@ export interface SessionInputDeps {
   ): Promise<SubmitOutcome>
   /** Live Session and composer-block policy for transcript insertion. */
   quoteInsertionAllowed?: () => boolean
-  /** Current localized quote removal copy. */
-  quoteRemoveLabel?: () => string
+  /** Current localized quote chip copy; with comment copy a chip offers a comment, which makes it an annotation. */
+  quoteLabels?: () => QuoteNodeLabels
   /** Command-plane attachment plumbing (the hub owns the conversation face and the copy). */
   commandAttachments: {
     /** Resolve ordered draft ids to wire payloads without sending them; rejects when an id no longer resolves. */
@@ -187,7 +188,8 @@ export class SessionInputShell implements SessionInput {
   constructor(private readonly deps: SessionInputDeps) {
     this.draftEditor = new DraftEditorRuntime({
       onUpdate: () => { this.onEditorUpdate() },
-      quoteLabels: () => ({ remove: this.deps.quoteRemoveLabel?.() ?? '' }),
+      quoteLabels: () => this.quoteLabels(),
+      commentQuote: input => { this.annotations.add({ text: input.text, source: '', comment: input.comment }) },
       openReference: (source, reference) =>
         this.deps.inputTriggers?.()?.openReference(source, reference) ?? false,
       lexicon: () => this.lexicon.getSnapshot(),
@@ -196,6 +198,10 @@ export class SessionInputShell implements SessionInput {
     this.unregister = this.draftEditor.register()
     this.state = createSnapshotStore<InputState>(this.compose())
     this.unsubscribeInbox = deps.inbox?.subscribe(() => { this.publish() })
+  }
+
+  private quoteLabels(): QuoteNodeLabels {
+    return this.deps.quoteLabels?.() ?? { remove: '' }
   }
 
   // ---- editor plumbing ----
@@ -231,7 +237,7 @@ export class SessionInputShell implements SessionInput {
     const draft = resolveDraftInput(text)
     this.dispatchRun(({ type: 'restore-cancel' }))
     if (draft.references.length === 0 && (draft.quotes?.length ?? 0) === 0) this.draftEditor.setDraft(draft.text)
-    else this.draftEditor.restoreDraft(draft.text, draft.references, draft.quotes, { remove: this.deps.quoteRemoveLabel?.() ?? '' })
+    else this.draftEditor.restoreDraft(draft.text, draft.references, draft.quotes, this.quoteLabels())
     if (draft.command === undefined) return
     this.dispatchRun({ type: 'restore-request', token: draft.command.token, rev: this.rev })
     this.restoreCommand()
@@ -244,7 +250,7 @@ export class SessionInputShell implements SessionInput {
    */
   insertQuote(text: string, summary?: QuoteSummary): boolean {
     if (this.disposed || this.snapshot.phase !== 'plain' || this.deps.quoteInsertionAllowed?.() === false || text.trim() === '') return false
-    const inserted = this.draftEditor.insertQuote(text.replace(/\r\n?/gu, '\n'), { remove: this.deps.quoteRemoveLabel?.() ?? '' }, summary)
+    const inserted = this.draftEditor.insertQuote(text.replace(/\r\n?/gu, '\n'), this.quoteLabels(), summary)
     if (inserted) this.focus()
     return inserted
   }

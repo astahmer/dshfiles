@@ -132,7 +132,10 @@ export class InputHub implements SessionInputResolver {
       popup: () => this.popup(actx),
       inbox: session.projections.faceOf('inbox') as ObservableSnapshot<InboxState | undefined>,
       defaultSink: (text, attachmentIds, mode, signal, accept) => this.sink(session, text, attachmentIds, mode, signal, accept),
-      quoteRemoveLabel: () => this.t('quote.remove'),
+      quoteLabels: () => ({
+        remove: this.t('quote.remove'),
+        comment: { edit: this.t('annotation.edit'), selected: this.t('annotation.selected'), placeholder: this.t('annotation.placeholder') },
+      }),
       quoteInsertionAllowed: () => {
         const state = session.getSnapshot()
         return !state.removed && (state.subagent === null
