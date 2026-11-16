@@ -855,9 +855,9 @@ const Conversation = (props: {
               aria-hidden
               className="dshx:z-10 dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border dshx:border-border dshx:bg-background"
             >
-              <StatusDot size="sm" tone="info" className="dshx:animate-pulse" />
+              <StatusDot size="sm" tone="info" className="dshx:animate-pulse dshx:motion-reduce:animate-none" />
             </span>
-            <span className="dshx:animate-pulse">Thinking…</span>
+            <span className="dshx:animate-pulse dshx:motion-reduce:animate-none">Thinking…</span>
           </li>
         ) : null}
       </TimelineRuns>
@@ -1118,7 +1118,7 @@ const LinkRow = (props: {
             props.thread.running ? 'dshx:text-info' : 'dshx:text-muted-foreground',
           )}
         >
-          <StatusDot size="sm" tone={props.thread.running ? 'info' : 'muted'} className={props.thread.running ? 'dshx:animate-pulse' : undefined} />
+          <StatusDot size="sm" tone={props.thread.running ? 'info' : 'muted'} className={props.thread.running ? 'dshx:animate-pulse dshx:motion-reduce:animate-none' : undefined} />
           {props.thread.running ? 'running' : 'idle'}
         </span>
       )}
@@ -1277,7 +1277,7 @@ const PeekBody = (props: {
                     aria-label="Run triage"
                     disabled={actions.triage.isPending}
                     onClick={() => actions.triage.mutate(item.id)}
-                    className={cn(actions.triage.isPending && 'dshx:animate-pulse')}
+                    className={cn(actions.triage.isPending && 'dshx:animate-pulse dshx:motion-reduce:animate-none')}
                   >
                     <WandSparklesIcon />
                   </Button>
@@ -1384,7 +1384,7 @@ const PeekBody = (props: {
             >
               {running.map(thread => (
                 <div key={thread.id} className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-xs">
-                  <StatusDot size="sm" tone="info" className="dshx:mt-1 dshx:animate-pulse" />
+                  <StatusDot size="sm" tone="info" className="dshx:mt-1 dshx:animate-pulse dshx:motion-reduce:animate-none" />
                   <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
                     <span className="dshx:text-muted-foreground">Running in</span>
                     <span className="dshx:truncate dshx:font-medium">{thread.title}</span>

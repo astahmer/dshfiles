@@ -469,12 +469,10 @@ export const ProjectsView = (props: {
                   key={project.key}
                   type="button"
                   onClick={() => props.setSelectedProject(project.key)}
-                  className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-4 dshx:text-left dshx:transition-[border-color,box-shadow,transform] dshx:duration-150 dshx:hover:-translate-y-px dshx:hover:border-input dshx:hover:shadow-md"
+                  className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-4 dshx:text-left dshx:outline-none dshx:transition-colors dshx:duration-150 dshx:hover:border-input dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
                 >
                   <div className="dshx:flex dshx:items-start dshx:gap-3">
-                    <span className="dshx:inline-flex dshx:size-8 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-lg dshx:bg-muted">
-                      <FolderGit2Icon className="dshx:size-4 dshx:text-muted-foreground" />
-                    </span>
+                    <FolderGit2Icon aria-hidden className="dshx:mt-0.5 dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
                     <div className="dshx:min-w-0 dshx:flex-1">
                       <p className="dshx:text-sm dshx:font-semibold">
                         <ProjectTitle projectKey={project.key} />

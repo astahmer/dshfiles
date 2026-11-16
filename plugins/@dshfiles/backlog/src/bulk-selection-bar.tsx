@@ -18,7 +18,8 @@ import { ItemGlyphs } from './item-glyphs.js'
 /** Space the list keeps below its last row so the bar (38px tall, 16px off the bottom) never hides it. */
 export const bulkSelectionBarClearance = 64
 
-const actionClass = 'dshx:inline-flex dshx:h-7 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent'
+const actionClass =
+  'dshx:inline-flex dshx:h-7 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50'
 const iconClass = 'dshx:size-3.5'
 const chevronClass = 'dshx:size-3 dshx:opacity-60'
 const menuItemClass = 'dshx:gap-2 dshx:text-sm'

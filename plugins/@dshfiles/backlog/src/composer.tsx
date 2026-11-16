@@ -676,7 +676,7 @@ export const Composer = (props: {
             {recording ? (
               <SquareIcon className="dshx:size-3.5 dshx:fill-current" />
             ) : transcribing ? (
-              <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin" />
+              <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin dshx:motion-reduce:animate-none" />
             ) : (
               <MicIcon className="dshx:size-4" />
             )}

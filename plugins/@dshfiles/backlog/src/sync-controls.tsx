@@ -329,7 +329,7 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
           disabled={actions.syncNow.isPending}
           onClick={() => actions.syncNow.mutate({ id: linked.itemId, ...(linked.bindingId !== undefined && { binding: linked.bindingId }) })}
         >
-          <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin')} />
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
           Sync now
         </Button>
         <Button
@@ -379,7 +379,7 @@ const CreateFailure = (props: { readonly providerKind: string; readonly text: st
       {hint === undefined ? null : <span className="dshx:text-muted-foreground">{hint.text}</span>}
       <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
         <Button size="xs" variant="outline" disabled={props.pending} onClick={props.retry}>
-          <RefreshCwIcon aria-hidden className={cn('dshx:size-3', props.pending && 'dshx:animate-spin')} />
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3', props.pending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
           Retry
         </Button>
         {hint?.command === undefined ? null : (
@@ -755,7 +755,7 @@ const ConnectionForm = (props: {
       )}
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <Button type="button" size="sm" variant="outline" disabled={test.isPending || !isReferenceOrEmpty(credential)} onClick={() => test.mutate(draft)}>
-          <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', test.isPending && 'dshx:animate-spin')} />
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', test.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
           Test connection
         </Button>
         <Button type="submit" size="sm" disabled={test.isPending || actions.saveConnection.isPending || label.trim() === '' || !isReferenceOrEmpty(credential)}>
@@ -1045,7 +1045,7 @@ const BindingRow = (props: {
           onClick={() => actions.syncNow.mutate({ binding: binding.id })}
           aria-label={`Sync ${binding.id} now`}
         >
-          <RefreshCwIcon aria-hidden className={cn('dshx:size-3', actions.syncNow.isPending && 'dshx:animate-spin')} />
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3', actions.syncNow.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
           Sync now
         </Button>
         {binding.direction === 'push' ? null : (
@@ -1126,7 +1126,7 @@ const ConnectionCard = (props: {
           {props.view.available ? null : <span className="dshx:text-xs dshx:text-destructive">Provider not loaded: enable its plugin</span>}
           <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
             <Button type="button" size="xs" variant="ghost" disabled={test.isPending} onClick={() => test.mutate(connection)}>
-              <RefreshCwIcon aria-hidden className={cn('dshx:size-3', test.isPending && 'dshx:animate-spin')} />
+              <RefreshCwIcon aria-hidden className={cn('dshx:size-3', test.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
               Test
             </Button>
             <Button
@@ -1259,7 +1259,7 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
             ))}
             {(data?.items.length ?? 0) === 0 ? null : (
               <Button type="button" size="sm" variant="outline" disabled={actions.syncNow.isPending} onClick={() => actions.syncNow.mutate({})}>
-                <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin')} />
+                <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
                 Sync all now ({String(data?.items.length ?? 0)})
               </Button>
             )}

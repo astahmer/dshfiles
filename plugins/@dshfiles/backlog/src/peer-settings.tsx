@@ -67,7 +67,7 @@ const PeerRow = (props: {
         ) : null}
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2">
           <Button type="button" size="xs" variant="ghost" disabled={!peer.enabled || props.busy} onClick={props.onSync}>
-            <RefreshCwIcon aria-hidden className={cn('dshx:size-3', props.busy && 'dshx:animate-spin')} />
+            <RefreshCwIcon aria-hidden className={cn('dshx:size-3', props.busy && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
             Sync now
           </Button>
           <Switch size="sm" checked={peer.enabled} aria-label={`Share the backlog with ${peer.name}`} onCheckedChange={props.onToggle} />
@@ -112,7 +112,7 @@ export const BacklogHostsSettings = (): JSX.Element => {
         </h3>
         {enabledCount > 0 ? (
           <Button type="button" size="xs" variant="outline" className="dshx:ml-auto" disabled={sync.isPending} onClick={() => sync.mutate(undefined)}>
-            <RefreshCwIcon aria-hidden className={cn('dshx:size-3', sync.isPending && 'dshx:animate-spin')} />
+            <RefreshCwIcon aria-hidden className={cn('dshx:size-3', sync.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
             Sync all
           </Button>
         ) : null}
