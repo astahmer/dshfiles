@@ -160,6 +160,20 @@ describe('installSheetDrag', () => {
     expect(clicked).toHaveBeenCalledOnce()
   })
 
+  it('grows a full-expand sheet to just under the phone top bar even when its content fits', () => {
+    const { sheet, handle } = mountSheet(0)
+    sheet.setAttribute('data-dshx-sheet-expand', 'full')
+    const topBar = document.createElement('header')
+    topBar.setAttribute('data-phone-top-bar', '')
+    topBar.getBoundingClientRect = () => DOMRect.fromRect({ x: 0, y: 0, width: 390, height: 44 })
+    document.body.append(topBar)
+    touch(handle, 'touchstart', 560, 0)
+    touch(handle, 'touchmove', 100, 400)
+    touch(handle, 'touchend', 100, 800)
+    vi.advanceTimersByTime(300)
+    expect(sheet.style.getPropertyValue('height')).toBe('800px')
+  })
+
   it('shares one listener between installs and keeps it until the last release', () => {
     const second = installSheetDrag(document)
     const { sheet, handle } = mountSheet(0)

@@ -751,7 +751,7 @@
           "kind": "unit-test",
           "id": "workbench.phone-sheet-drag",
           "file": "plugins/@dshfiles/workbench/src/phone-sheet.test.tsx",
-          "testName": "follows a header drag down and closes on a long pull, grows on a drag up, and keeps Close a tap"
+          "testName": "follows a header drag down and closes on a long pull, grows to just under the top bar on a drag up, and keeps Close a tap"
         },
         {
           "kind": "unit-test",

@@ -63,7 +63,7 @@ export const phoneAwareDockActions = (desktop: DockPaneActions, phone: () => boo
 /**
  * The thread panel on a phone (prior-art §3.2 rule 5: supporting panes become sheets, never a split under ~840px). The
  * same dock surface, with its facet tabs and Choose a view, rises from above the tab bar; the scrim and Close put it
- * away, and so does Escape, dragging its header down or the browser's Back; dragging it up grows it towards the top
+ * away, and so does Escape, dragging its header down or the browser's Back; dragging it up grows it to just under the top
  * bar (the shared plugin-ui sheet drag, which dismisses through the same Escape). Geometry comes from the phone shell's
  * published bar heights, with no-shell fallbacks.
  */
@@ -107,6 +107,7 @@ export const PhoneSheet = (props: {
         aria-label={props.heading}
         data-phone-sheet=""
         data-dshx-sheet=""
+        data-dshx-sheet-expand="full"
         hidden={!shown}
         className="dshx-root dshx:fixed dshx:inset-x-0 dshx:z-[43] dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-t-xl dshx:border-t dshx:border-border dshx:bg-background dshx:pr-[env(safe-area-inset-right,0px)] dshx:pl-[env(safe-area-inset-left,0px)] dshx:text-foreground dshx:shadow-[0_-8px_24px_rgb(0_0_0/0.18)]"
         style={{

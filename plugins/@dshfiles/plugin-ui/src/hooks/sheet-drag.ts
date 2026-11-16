@@ -72,10 +72,15 @@ const scrollersBetween = (target: Element, sheet: HTMLElement): HTMLElement[] =>
 
 /**
  * How tall the sheet would be with every scrollable box inside it shown whole, capped so its top stays below the
- * expanded share of the viewport (the sheet may sit above a tab bar).
+ * expanded share of the viewport (the sheet may sit above a tab bar). A `data-dshx-sheet-expand="full"` sheet (a panel
+ * whose own body scrolls) always grows to just under the phone top bar, or the viewport top without one.
  */
 const layoutOf = (sheet: HTMLElement, rest: number, bottom: number): SheetSnapLayout => {
   const viewport = sheet.ownerDocument.defaultView?.innerHeight ?? rest
+  if (sheet.getAttribute('data-dshx-sheet-expand') === 'full') {
+    const topBar = sheet.ownerDocument.querySelector('[data-phone-top-bar]')?.getBoundingClientRect().bottom ?? 0
+    return { rest, expanded: Math.max(rest, bottom - Math.max(0, topBar)) }
+  }
   let hidden = Math.max(0, sheet.scrollHeight - sheet.clientHeight)
   for (const inner of sheet.querySelectorAll<HTMLElement>('*')) {
     if (inner.scrollHeight > inner.clientHeight + 1) hidden = Math.max(hidden, inner.scrollHeight - inner.clientHeight)

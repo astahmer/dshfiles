@@ -48,7 +48,7 @@ describe('PhoneSheet', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
-  it('follows a header drag down and closes on a long pull, grows on a drag up, and keeps Close a tap', () => {
+  it('follows a header drag down and closes on a long pull, grows to just under the top bar on a drag up, and keeps Close a tap', () => {
     vi.useFakeTimers()
     const media = window.matchMedia
     window.matchMedia = (query: string): MediaQueryList =>
@@ -75,6 +75,11 @@ describe('PhoneSheet', () => {
       const ownHeight = sheet.style.height
       // jsdom lays nothing out: a 500px sheet above a 56px tab bar, over a list with 600px more to scroll.
       sheet.getBoundingClientRect = () => new DOMRect(0, 288, 390, 500)
+      // The phone shell's 44px top bar: the expanded sheet stops just under it.
+      const topBar = document.createElement('header')
+      topBar.setAttribute('data-phone-top-bar', '')
+      topBar.getBoundingClientRect = () => new DOMRect(0, 0, 390, 44)
+      document.body.append(topBar)
       const list = screen.getByTestId('list')
       Object.defineProperty(list, 'scrollHeight', { value: 1000 })
       Object.defineProperty(list, 'clientHeight', { value: 400 })
@@ -84,13 +89,13 @@ describe('PhoneSheet', () => {
       expect(sheet.style.getPropertyValue('height')).toBe('700px')
       touch(handle, 'touchend', 100, 800)
       vi.advanceTimersByTime(300)
-      expect(sheet.style.getPropertyValue('height')).toMatch(/^703\.6\d*px$/)
+      expect(sheet.style.getPropertyValue('height')).toBe('744px')
       expect(onClose).not.toHaveBeenCalled()
 
       touch(handle, 'touchstart', 100, 1000)
-      touch(handle, 'touchmove', 500, 1400)
-      expect(sheet.style.getPropertyValue('transform')).toMatch(/^translateY\(196\.(4|39)\d*px\)$/)
-      touch(handle, 'touchend', 500, 1800)
+      touch(handle, 'touchmove', 600, 1400)
+      expect(sheet.style.getPropertyValue('transform')).toBe('translateY(256px)')
+      touch(handle, 'touchend', 600, 1800)
       vi.advanceTimersByTime(300)
       expect(onClose).toHaveBeenCalledTimes(1)
       vi.advanceTimersByTime(500)
@@ -105,6 +110,7 @@ describe('PhoneSheet', () => {
       fireEvent.click(close)
       expect(onClose).toHaveBeenCalledTimes(2)
     } finally {
+      document.querySelector('[data-phone-top-bar]')?.remove()
       window.matchMedia = media
       vi.useRealTimers()
     }
