@@ -204,7 +204,7 @@ const DigestedThreadDetail = (props: {
           <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
             <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">Thread digest</h4>
             <Button size="xs" variant="outline" onClick={props.redigest} disabled={props.redigesting}>
-              <RefreshCwIcon className={props.redigesting ? 'dshx:animate-spin' : undefined} /> Regenerate
+              <RefreshCwIcon className={props.redigesting ? 'dshx:animate-spin dshx:motion-reduce:animate-none' : undefined} /> Regenerate
             </Button>
           </div>
           <p className="dshx:text-sm dshx:font-medium">{thread.decision}</p>
@@ -535,7 +535,7 @@ export const ThreadsTab = (props: {
                     Memory digests a thread once it has been idle for a minute. You can write the digest now if you do not want to wait.
                   </p>
                   <Button size="sm" variant="outline" className="dshx:w-fit" onClick={() => redigest.mutate(selected.id)} disabled={redigest.isPending}>
-                    <RefreshCwIcon className={redigest.isPending ? 'dshx:animate-spin' : undefined} /> Write digest now
+                    <RefreshCwIcon className={redigest.isPending ? 'dshx:animate-spin dshx:motion-reduce:animate-none' : undefined} /> Write digest now
                   </Button>
                   {redigest.isError ? (
                     <p className="dshx:text-xs dshx:text-destructive">{errorMessage(redigest.error, 'The digest failed. Try it again.')}</p>
