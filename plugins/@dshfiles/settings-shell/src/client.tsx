@@ -63,7 +63,7 @@ import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
 import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
-import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
+import { SettingsTab, type PluginPageHeading, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
 import {
@@ -491,12 +491,12 @@ export default defineClient({
       shortcuts: input.shortcuts,
       renderSlot: input.renderSlot,
       pluginPages: SettingsGroups.searchablePages(input.groups),
-      renderPluginPage: (page: PluginSettingsPage, nested: boolean) => (
+      renderPluginPage: (page: PluginSettingsPage, heading: PluginPageHeading) => (
         <PluginSettingsPageView
           entry={<PluginEntryCard namespace={page.ns} t={input.t} />}
           form={formFor(page.ns)}
           key={page.pageId}
-          nested={nested}
+          heading={heading}
           page={page}
           t={input.t}
           {...(input.field?.sectionId === page.pageId ? { focusPath: input.field.fieldPath } : {})}

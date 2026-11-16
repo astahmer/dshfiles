@@ -33,7 +33,7 @@ const choiceText = (description: string, value: JsonPrimitive): ChoiceText => {
   const separator = description.indexOf(': ')
   if (separator > 0 && separator <= MAX_CHOICE_LABEL) return { label: description.slice(0, separator), detail: description.slice(separator + 2) }
   if (description !== '' && description.length <= MAX_CHOICE_LABEL) return { label: description, detail: '' }
-  return { label: String(value), detail: description }
+  return { label: humanizeChoice(value), detail: description }
 }
 
 /** Controls a list item or a record value can use: one value per row. */
@@ -127,14 +127,39 @@ const resolve = (walk: Walk, reference: JsonValue | undefined): SchemaNode | und
   return node === undefined ? undefined : { ...node, meta: node.meta ?? {} }
 }
 
-/** `maxTabs` → "Max tabs", `archive-undo` → "Archive undo". */
-const humanizeKey = (key: string): string => {
+/** Words a sentence-cased label keeps in their own case. */
+const ACRONYMS: Readonly<Record<string, string>> = {
+  api: 'API',
+  cdp: 'CDP',
+  cpu: 'CPU',
+  dsh: 'DSH',
+  github: 'GitHub',
+  http: 'HTTP',
+  id: 'ID',
+  json: 'JSON',
+  mcp: 'MCP',
+  ram: 'RAM',
+  ui: 'UI',
+  url: 'URL',
+}
+
+/** `maxTabs` → "Max tabs", `archive-undo` → "Archive undo", `baseURL` → "Base URL". */
+function humanizeKey(key: string): string {
   const words = key
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/[-_.]+/g, ' ')
     .trim()
     .toLowerCase()
+    .split(' ')
+    .map(word => ACRONYMS[word] ?? word)
+    .join(' ')
   return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/** A choice the schema did not label: its value in words (`api-key` → "API key"), "None" for no value. */
+function humanizeChoice(value: JsonPrimitive): string {
+  if (value === null || value === '') return 'None'
+  return typeof value === 'string' ? humanizeKey(value) || value : String(value)
 }
 
 const UNIT_SUFFIXES: readonly (readonly [RegExp, string])[] = [

@@ -55,7 +55,7 @@ describe('settingFields', () => {
       options: [
         { value: 'preview', label: 'Preview', detail: 'what you open replaces the preview tab.' },
         { value: 'new', label: 'New tab', detail: '' },
-        { value: 'replace', label: 'replace', detail: '' },
+        { value: 'replace', label: 'Replace', detail: '' },
       ],
     })
     expect(byKey.get('notes')?.control).toEqual({ kind: 'text', multiline: true })
@@ -86,6 +86,26 @@ describe('labels and units', () => {
     expect(SettingsSchemaModel.unitOfKey('archiveUndoDurationSeconds')).toBe('s')
     expect(SettingsSchemaModel.unitOfKey('pollMs')).toBe('ms')
     expect(SettingsSchemaModel.unitOfKey('maxTabs')).toBeUndefined()
+  })
+
+  it('words a raw choice value and a key for a person, acronyms included', () => {
+    const raw = Schema.decodeUnknownSync(jsonValueSchema)(
+      Schemastery.object({
+        billing: Schemastery.union(['auto', 'api-key', 'last_used']).default('auto'),
+        purpose: Schemastery.union([Schemastery.const('office'), Schemastery.const(null)]),
+        baseURL: Schemastery.string(),
+        cdpPort: Schemastery.natural().default(9222),
+      }).toJSON(),
+    )
+    const byKey = new Map(SettingsSchemaModel.settingFields({ schema: raw, secrets: [], text }).map(field => [field.key, field]))
+    const labels = (key: string): readonly string[] => {
+      const control = byKey.get(key)?.control
+      return control?.kind === 'choice' ? control.options.map(option => option.label) : []
+    }
+    expect(labels('billing')).toEqual(['Auto', 'API key', 'Last used'])
+    expect(labels('purpose')).toEqual(['Office', 'None'])
+    expect(byKey.get('baseURL')?.title).toBe('Base URL')
+    expect(byKey.get('cdpPort')?.title).toBe('CDP port')
   })
 
   it('shows a few short choices as segments and the rest as a select', () => {
