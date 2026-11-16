@@ -387,12 +387,14 @@
       "summary": "Every pending, unexpired child-to-parent question is a blocking Inbox item about the parent thread, with the question options as answer choices. Choosing one answers as the parent thread (which must be running), wakes the waiting subagent, and resolves the item; a question answered, expired or cancelled elsewhere resolves by itself.",
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"commands, @ files or s*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+        "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
         "press Enter",
         "click tab \"Inbox\"",
+        "click button \"Needs you\"",
+        "expect heading \"Inbox\"",
         "expect text \"A subagent asks: Deploy the release now?\"",
-        "click button \"Deploy\"",
-        "expect text \"Nothing needs you right now.\""
+        "click button \"Deploy*\"",
+        "expect text \"Answered “Deploy”*\""
       ],
       "surface": "attentionProvider",
       "destination": "inbox",
