@@ -111,6 +111,7 @@
     "src/native/chat/follow-policy.ts",
     "src/native/chat/image-gallery.ts",
     "src/native/chat/markdown-image-links.ts",
+    "src/native/chat/older-rows-sentinel.tsx",
     "src/native/chat/prompt-fold.ts",
     "src/native/chat/session-sidebar.test.ts",
     "src/native/chat/session-sidebar.ts",

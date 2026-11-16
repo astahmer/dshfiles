@@ -2289,16 +2289,34 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const archiveSessionProp = props.archiveSession
   const archiveClient = useMemo<AutoArchiveClient>(
     () => ({
-      archiveSession: sessionId => archiveSessionProp(sessionId),
+      archiveSession: sessionId =>
+        archiveSessionProp(sessionId).then(
+          () => 'archived' as const,
+          (error: unknown) => {
+            if (SidebarOrganization.isMissingSessionRefusal(error)) return 'missing' as const
+            throw error
+          },
+        ),
       getCandidateSessionIds: () => archiveScan.current,
     }),
     [archiveSessionProp],
   )
-  const { requestScan, refreshCandidates } = useAutoArchive({
+  const {
+    requestScan,
+    refreshCandidates,
+    running: autoArchiveRunning,
+  } = useAutoArchive({
     client: archiveClient,
     enabled: isPrimarySurface && settledArchiveEnabled,
     intervalMs: preferences.scanIntervalMinutes * 60_000,
-    onSettled: () => refreshCandidates('all'),
+    onSettled: settled => {
+      // A Session the Host no longer has stays due forever, so it would be re-sent on every list mount.
+      if (settled.missingSessionIds.length > 0)
+        updatePreferences(
+          SettledThreadsModel.unsettle({ settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }, settled.missingSessionIds),
+        )
+      refreshCandidates('all')
+    },
   })
   const dueArchiveSessionIdsKey = dueSettledArchiveSessionIds.join(',')
   useEffect(() => {
@@ -3292,11 +3310,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // instead of waiting for the archive delay that already fired. Covers every archive path, the Agent's included.
   useEffect(() => {
     if (!isPrimarySurface) return
-    const archivedStillSettled = preferences.settledSessionIds.filter(sessionId => archivedSessionIds.has(sessionId))
+    const archivedStillSettled = SettledThreadsModel.archivedStillSettled({
+      settledSessionIds: preferences.settledSessionIds,
+      archivedSessionIds,
+      autoArchiveRunning,
+    })
     if (archivedStillSettled.length === 0) return
     const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
     changePreferences(SettledThreadsModel.unsettle(status, archivedStillSettled))
-  }, [archivedSessionIds, changePreferences, isPrimarySurface, preferences.settledAt, preferences.settledSessionIds])
+  }, [archivedSessionIds, autoArchiveRunning, changePreferences, isPrimarySurface, preferences.settledAt, preferences.settledSessionIds])
 
   /** Both delay settings carry the same five choices, so one control renders each of them. */
   const threadDelayControl = (input: {

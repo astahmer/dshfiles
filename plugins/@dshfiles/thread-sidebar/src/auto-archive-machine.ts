@@ -15,7 +15,7 @@ type AutoArchiveScan = {
 type AutoArchiveArchiveOutput = {
   readonly operationId: number
   readonly sessionId: AutoArchiveSessionId
-  readonly status: 'archived' | 'failed'
+  readonly status: AutoArchiveOutcome | 'failed'
 }
 
 type AutoArchiveContext = {
@@ -30,6 +30,7 @@ type AutoArchiveContext = {
   readonly currentSessionId: AutoArchiveSessionId | null
   readonly attemptedSessionIds: readonly AutoArchiveSessionId[]
   readonly failedSessionIds: readonly AutoArchiveSessionId[]
+  readonly missingSessionIds: readonly AutoArchiveSessionId[]
   readonly pendingScan: AutoArchiveScan | null
 }
 
@@ -53,10 +54,15 @@ export type AutoArchiveSettled = {
   readonly type: 'settled'
   readonly operationId: number
   readonly failedSessionIds: readonly AutoArchiveSessionId[]
+  /** Candidates the Host no longer knows: no later scan can archive them, so the owner drops them from its candidates. */
+  readonly missingSessionIds: readonly AutoArchiveSessionId[]
 }
 
+/** `missing`: the Host has no such Session, so archiving it can never succeed. */
+export type AutoArchiveOutcome = 'archived' | 'missing'
+
 export type AutoArchiveClient = {
-  readonly archiveSession: (sessionId: AutoArchiveSessionId) => Promise<void>
+  readonly archiveSession: (sessionId: AutoArchiveSessionId) => Promise<AutoArchiveOutcome>
   readonly getCandidateSessionIds: (source: AutoArchiveSource) => readonly AutoArchiveSessionId[]
 }
 
@@ -79,6 +85,7 @@ const beginAutoArchiveScan = (context: AutoArchiveContext, source: AutoArchiveSo
     currentSessionId: null,
     attemptedSessionIds: [],
     failedSessionIds: [],
+    missingSessionIds: [],
     pendingScan: null,
   }
 }
@@ -97,8 +104,8 @@ const autoArchiveMachineDefinition = setup({
   actors: {
     archive: fromPromise<AutoArchiveArchiveOutput, AutoArchiveArchiveInput>(async ({ input }) => {
       try {
-        await input.client.archiveSession(input.sessionId)
-        return { operationId: input.operationId, sessionId: input.sessionId, status: 'archived' }
+        const status = await input.client.archiveSession(input.sessionId)
+        return { operationId: input.operationId, sessionId: input.sessionId, status }
       } catch {
         return { operationId: input.operationId, sessionId: input.sessionId, status: 'failed' }
       }
@@ -154,6 +161,7 @@ const autoArchiveMachineDefinition = setup({
         remainingSessionIds: sessionIds.filter(sessionId => !attemptedSessionIds.has(sessionId)),
         currentSessionId: null,
         failedSessionIds: [],
+        missingSessionIds: [],
         pendingScan: null,
       }
     }),
@@ -173,7 +181,12 @@ const autoArchiveMachineDefinition = setup({
         failedSessionIds: [...context.failedSessionIds, sessionId],
       }
     }),
-    emitSettled: emit(({ context }) => ({ type: 'settled', operationId: context.operationId, failedSessionIds: context.failedSessionIds })),
+    emitSettled: emit(({ context }) => ({
+      type: 'settled',
+      operationId: context.operationId,
+      failedSessionIds: context.failedSessionIds,
+      missingSessionIds: context.missingSessionIds,
+    })),
     clearOperation: assign({
       operationId: 0,
       activeSource: 'all',
@@ -182,6 +195,7 @@ const autoArchiveMachineDefinition = setup({
       currentSessionId: null,
       attemptedSessionIds: [],
       failedSessionIds: [],
+      missingSessionIds: [],
       pendingScan: null,
     }),
     clearOperationPreservingPending: assign({
@@ -192,6 +206,7 @@ const autoArchiveMachineDefinition = setup({
       currentSessionId: null,
       attemptedSessionIds: [],
       failedSessionIds: [],
+      missingSessionIds: [],
     }),
   },
 }).createMachine({
@@ -208,6 +223,7 @@ const autoArchiveMachineDefinition = setup({
     currentSessionId: null,
     attemptedSessionIds: [],
     failedSessionIds: [],
+    missingSessionIds: [],
     pendingScan: null,
   }),
   initial: 'inactive',
@@ -267,6 +283,7 @@ const autoArchiveMachineDefinition = setup({
               currentSessionId: null,
               attemptedSessionIds: [...context.attemptedSessionIds, event.output.sessionId],
               failedSessionIds: event.output.status === 'failed' ? [...context.failedSessionIds, event.output.sessionId] : context.failedSessionIds,
+              missingSessionIds: event.output.status === 'missing' ? [...context.missingSessionIds, event.output.sessionId] : context.missingSessionIds,
             })),
           },
           { target: 'selecting', actions: 'clearCurrentSession' },
@@ -301,7 +318,8 @@ export const useAutoArchive = (input: {
     }),
     [],
   )
-  const [, send, actor] = useMachine(autoArchiveMachine, { input: { client, intervalMs: input.intervalMs } })
+  const [snapshot, send, actor] = useMachine(autoArchiveMachine, { input: { client, intervalMs: input.intervalMs } })
+  const running = snapshot.matches('selecting') || snapshot.matches('archiving') || snapshot.matches('settling')
   const requestScan = useCallback((source: AutoArchiveSource = 'all') => send({ type: 'scan', source }), [send])
   const refreshCandidates = useCallback((source: AutoArchiveSource) => send({ type: 'refresh', source }), [send])
 
@@ -314,5 +332,5 @@ export const useAutoArchive = (input: {
     send({ type: 'configure', enabled: input.enabled, intervalMs: input.intervalMs })
   }, [input.enabled, input.intervalMs, send])
 
-  return { requestScan, refreshCandidates }
+  return { requestScan, refreshCandidates, running }
 }

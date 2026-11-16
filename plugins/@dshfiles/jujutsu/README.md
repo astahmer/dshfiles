@@ -12,8 +12,6 @@
 
 ![Keep one repository per Jujutsu tab, thread and dock](docs/screenshots/panel-scopes.png)
 
-![The revision graph in a phone's thread panel: two-line rows, one toolbar row](docs/screenshots/revision-graph-phone.png)
-
 ![Preview cleanup with a custom inactivity threshold](docs/screenshots/workspace-cleanup.png)
 
 ![Keep a failed thread-workspace cleanup on its project's panel](docs/screenshots/workspace-cleanup-failure.png)
@@ -26,7 +24,7 @@ contracts.
 
 Two panels in navigation, the main view and the Workbench chooser: **Revision graph** and **Source control**. Each opens straight on its toolbar (repository, Fetch, Push, refresh, view settings, repository actions); only the narrow per-thread side panel switches between both views with tabs. Repository-scoped tabs keep their repository titles. Saved Workbench layouts keep `dshfiles-jujutsu.dock` for the graph; Source Control is `dshfiles-jujutsu.source-control`.
 
-On a phone (below 640 px) the panel keeps one header row (Graph / Source, repository, view settings, repository actions with Refresh, Fetch and Push) and one toolbar row (a **Jump to** landmark menu, Compare, dates, search); Mine and Hide immutable stay in view settings. Revision rows are 52 px with the description on its own line and one label (`+N` for the rest, never the colocated `@git` copy), age and change ID below it; a tap anywhere on the row opens it. Desktop keeps the density setting and its one-line rows.
+A phone keeps the same compact rows and toolbar. Under a touch pointer each toolbar button gets an invisible hit box 8 px past its edges, so a 28 px button takes a 44 px tap without growing the row; a narrow row also drops a bookmark's colocated `@git` copy when the bookmark itself is shown.
 
 ## What it provides
 

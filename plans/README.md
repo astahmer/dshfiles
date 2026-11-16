@@ -24,12 +24,14 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [ADE: remaining work](ade-ux/README.md)           | Native question forms in the Inbox, git-worktree scopes, a physical iPhone pass, e2e re-runs; design in [docs/ade-ux](../docs/ade-ux/README.md).         |
 | [Thread sharing](thread-share/README.md)          | v1 shipped as `@dshfiles/thread-share` (opt-in, not seeded); open: v2 collaborative threads (design only), opentunnel revisit.                           |
 | [Browser preview panel](browser-preview-panel.md) | Agent ↔ user hand-off (P5): an element highlight in the Agent browser and user annotations sent to the thread.                                           |
+| [Phone push notifications](phone-push-notifications/README.md) | Push finished turns and needs-you threads to the phone per category, with duplicate suppression and delivery health; nothing built. |
 | [t3code parity](t3code-parity.md)                 | Remaining t3code gaps (push, MCP Apps, preview recording, PR picker, other forges, OAuth); a closed-rows index maps shipped IDs to their plugin docs.    |
 
 ## Testing, research and housekeeping
 
 | Plan                                                                 | Open work                                                                                                                                                                                                 |
 | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Real-phone verification](real-phone-verification/README.md)         | adb over Tailscale to the owner's Redmi: attach to the live DSH tab over CDP, lock/resume and gallery journeys on real hardware; waits on phone-side setup and four questions. |
 | [Plugin E2E coverage](plugin-e2e-coverage.md)                        | First full nightly baseline and triage, run results in `features:report`, artifact size, catalog review, boot-state accessor upstream.                                                                    |
 | [Host gaps](dsh-host-gaps.md)                                        | Behaviors our plugins cannot build until DSH exposes a capability. A decision register (own / upstream / drop), not a task plan.                                                                          |
 | [Reference feature additions](reference-feature-additions.md)        | Evidence-gated feature and adoption backlog from reference products; shipped rows removed 2026-11-10.                                                                                                     |

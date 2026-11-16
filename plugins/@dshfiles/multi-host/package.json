@@ -24,6 +24,10 @@
       "types": "./src/interaction-feed.ts",
       "default": "./dist/interaction-feed.js"
     },
+    "./session-runtime-read": {
+      "types": "./src/session-runtime-read.ts",
+      "default": "./dist/session-runtime-read.js"
+    },
     "./destination": {
       "types": "./src/destination/index.ts",
       "default": "./src/destination/index.ts"

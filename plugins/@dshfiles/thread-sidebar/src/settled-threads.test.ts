@@ -108,3 +108,16 @@ describe('SettledThreadsModel.dueArchiveSessionIds', () => {
     expect(archive({ sessions: sessions({}) })).toEqual([])
   })
 })
+
+describe('archivedStillSettled', () => {
+  const settledSessionIds = ['session-a', 'session-b', 'session-c']
+  const archivedSessionIds = new Set(['session-a', 'session-c'])
+
+  it('waits for a running auto-archive scan, so its archives clear the settled status in one write', () => {
+    expect(SettledThreadsModel.archivedStillSettled({ settledSessionIds, archivedSessionIds, autoArchiveRunning: true })).toEqual([])
+  })
+
+  it('returns every archived settled thread at once when no scan runs', () => {
+    expect(SettledThreadsModel.archivedStillSettled({ settledSessionIds, archivedSessionIds, autoArchiveRunning: false })).toEqual(['session-a', 'session-c'])
+  })
+})

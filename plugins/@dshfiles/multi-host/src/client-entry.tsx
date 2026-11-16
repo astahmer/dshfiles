@@ -18,6 +18,7 @@ import { RemoteApprovalPanel } from './remote-approval-panel.js'
 import { PendingRemoteApproval, RemoteApprovals } from './remote-approvals.js'
 import { RemoteHostFallback } from './remote-host-fallback.js'
 import { RemoteTerminalPanel, RemoteTerminalTitle } from './remote-terminal-panel.js'
+import { readSessionRuntime } from './session-runtime-read.js'
 
 const REMOTE_TERMINAL_ENTRY = 'dshfiles-multi-host-remote-terminal'
 
@@ -86,7 +87,7 @@ export default defineClient({
       ctx.effect(
         () =>
           sidebarRight.substituteTab?.('terminal', async sessionId => {
-            const owner = await api.sessionRuntime({ sessionId })
+            const owner = await readSessionRuntime({ client: api, sessionId })
             return owner.ok && owner.runtimeId !== null ? REMOTE_TERMINAL_ENTRY : undefined
           }) ?? (() => undefined),
         'multi-host: remote terminals go to the host',

@@ -88,11 +88,21 @@ function graphNeedsReload(current: GuardState, frame: GraphFrame): boolean {
   return false
 }
 
+/** The packages a Host graph adds, drops or replaces; empty for an unreadable graph or one of another release. */
+function graphChanges(current: GuardState, frame: GraphFrame): readonly string[] {
+  const read = readGraph(frame)
+  if (read === undefined || read.release !== current.release) return []
+  const before = new Map(current.rows.map(row => [row.id, row.rev]))
+  const after = new Map(read.rows.map(row => [row.id, row.rev]))
+  return [...new Set([...before.keys(), ...after.keys()])].filter(id => before.get(id) !== after.get(id))
+}
+
 /** Live-swap safety for HMR frames. */
 export class SwapGuard {
   static readonly unsafeIds = unsafeIds
   static readonly rebuiltNeedsReload = rebuiltNeedsReload
   static readonly graphNeedsReload = graphNeedsReload
+  static readonly graphChanges = graphChanges
 }
 
 interface QuietPage {

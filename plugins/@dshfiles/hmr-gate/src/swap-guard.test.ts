@@ -43,6 +43,16 @@ describe('SwapGuard', () => {
     expect(SwapGuard.graphNeedsReload(current, graph({ '@dshfiles/session-controller': 'b' }, '2'))).toBe(false)
     expect(SwapGuard.graphNeedsReload(current, { type: 'graph', graph: { nope: true } })).toBe(false)
   })
+
+  it('names the packages a graph replaces, and none for the graph the page already runs or another release', () => {
+    const current = { rows, release: '1' }
+    expect(SwapGuard.graphChanges(current, graph({}))).toEqual([])
+    expect(SwapGuard.graphChanges(current, graph({ '@dshfiles/ui-styles': 'b', '@dshfiles/shared-runtime': 'c' }))).toEqual([
+      '@dshfiles/shared-runtime',
+      '@dshfiles/ui-styles',
+    ])
+    expect(SwapGuard.graphChanges(current, graph({ '@dshfiles/ui-styles': 'b' }, '2'))).toEqual([])
+  })
 })
 
 describe('quiet reload', () => {

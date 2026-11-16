@@ -2,7 +2,8 @@
 // DOM, requests and dshx calls. Taps rows and Back only; never types or sends.
 // Usage: RTT=100 CPU=4 ROWS=6 node phone-switch-probe.mjs
 //   env: LAUNCH_URL (default ~/.dsh/runtime/web-url), RTT (added latency in ms), CPU (throttle rate), ROWS,
-//   JSON=1 (every row), PATHS=1 (requests by endpoint), PROFILE_DIR=<dir> (one .cpuprofile per tap and Back)
+//   JSON=1 (every row), PATHS=1 (requests by endpoint), METHODS=1 (every call by API method, batched calls expanded,
+//   with how many distinct Sessions each read), PROFILE_DIR=<dir> (one .cpuprofile per tap and Back)
 import { createRequire } from 'node:module'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -13,6 +14,23 @@ const url = process.env.LAUNCH_URL ?? readFileSync(`${process.env.HOME}/.dsh/run
 const rtt = Number(process.env.RTT ?? 0)
 const cpu = Number(process.env.CPU ?? 1)
 const rowCount = Number(process.env.ROWS ?? 6)
+const channelOwners = process.env.METHODS === '1' ? await (await import('./har-summary.mjs')).buildChannelOwners() : new Map()
+const methodLabel = endpoint => {
+  const [channel = '', ...rest] = endpoint.split('/').filter(Boolean)
+  const owner = channelOwners.get(channel)
+  return owner === undefined ? endpoint : `${owner.apiId}/${rest.join('/')}`
+}
+/** A dshx batch body is `{ entries: [{ endpoint, payload }] }`; the Session a call reads, when it names one. */
+const batchCalls = postData => {
+  try {
+    return JSON.parse(postData).entries.map(entry => ({
+      method: methodLabel(entry.endpoint),
+      sessionId: entry.payload?.input?.sessionId ?? entry.payload?.sessionId ?? entry.payload?.input?.scope,
+    }))
+  } catch {
+    return [{ method: 'dshx-batch', sessionId: undefined }]
+  }
+}
 
 const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext({
@@ -107,9 +125,11 @@ let httpBytes = 0
 cdp.on('Network.requestWillBeSent', event => {
   if (event.request.url.includes('/api/')) {
     const path = new URL(event.request.url).pathname.replace('/api/', '')
-    let calls = 1
-    if (path === 'dshx-batch' && typeof event.request.postData === 'string') calls = event.request.postData.split('\n').filter(Boolean).length
-    requests.push({ path, calls })
+    const methods =
+      path === 'dshx-batch' && typeof event.request.postData === 'string'
+        ? batchCalls(event.request.postData)
+        : [{ method: methodLabel(path), sessionId: undefined }]
+    requests.push({ path, calls: methods.length, methods })
   }
 })
 cdp.on('Network.webSocketFrameSent', () => (wsSent += 1))
@@ -160,6 +180,12 @@ const summarize = async (longBefore, extra) => {
   )
   const byPath = {}
   for (const request of requests) byPath[request.path] = (byPath[request.path] ?? 0) + 1
+  const byMethod = {}
+  for (const call of requests.flatMap(request => request.methods)) {
+    const row = (byMethod[call.method] ??= { calls: 0, sessions: new Set() })
+    row.calls += 1
+    if (typeof call.sessionId === 'string') row.sessions.add(call.sessionId)
+  }
   return {
     ...extra,
     ...after.result,
@@ -172,6 +198,7 @@ const summarize = async (longBefore, extra) => {
     wsSent,
     kb: Math.round((httpBytes + wsRecvBytes) / 1024),
     byPath,
+    byMethod,
   }
 }
 for (const pick of picks) {
@@ -252,4 +279,19 @@ if (process.env.PATHS === '1') {
   const mergedBack = {}
   for (const row of backs) for (const [path, n] of Object.entries(row.byPath)) mergedBack[path] = (mergedBack[path] ?? 0) + n
   console.log('back paths', JSON.stringify(mergedBack))
+}
+if (process.env.METHODS === '1') {
+  for (const kind of ['open', 'back']) {
+    const merged = {}
+    const rows = out.filter(row => row.kind === kind)
+    for (const row of rows)
+      for (const [method, entry] of Object.entries(row.byMethod)) {
+        const total = (merged[method] ??= { calls: 0, sessions: 0 })
+        total.calls += entry.calls
+        total.sessions += entry.sessions.size
+      }
+    console.log(`${kind} calls per tap (sessions read per tap), ${rows.length} taps:`)
+    for (const [method, total] of Object.entries(merged).sort((a, b) => b[1].calls - a[1].calls))
+      console.log(`  ${(total.calls / rows.length).toFixed(1).padStart(5)}  (${(total.sessions / rows.length).toFixed(1)})  ${method}`)
+  }
 }

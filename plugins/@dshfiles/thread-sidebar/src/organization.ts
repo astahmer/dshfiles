@@ -648,6 +648,11 @@ const parkedRecoveryRefusal = Schema.Struct({
   }),
 })
 
+const missingSessionRefusal = Schema.Struct({ rpcError: Schema.Struct({ code: Schema.Literal('session/not-found') }) })
+
+/** The Host refused an archive because it has no such Session, so no retry can succeed. */
+const isMissingSessionRefusal = (error: unknown): boolean => SchemaHelpers.decodeUnknownSafe(missingSessionRefusal, error).success
+
 /**
  * Archive without stopping Host activity, except a parked quota recovery: it
  * only waits for a reset to resume the thread, and archiving means the user no
@@ -856,6 +861,7 @@ export class SidebarOrganization {
   static readonly orderSections = orderSections
   static readonly reorderSections = reorderSections
   static readonly archiveWithoutStopping = archiveWithoutStopping
+  static readonly isMissingSessionRefusal = isMissingSessionRefusal
   static readonly nextIdleTransitionAt = nextIdleTransitionAt
   static readonly isAutoSettleCandidate = isAutoSettleCandidate
   static readonly hasRunningDescendant = hasRunningDescendant

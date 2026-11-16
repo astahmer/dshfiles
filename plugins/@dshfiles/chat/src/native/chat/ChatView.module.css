@@ -456,3 +456,18 @@
   min-width: 44px;
   min-height: 44px;
 }
+
+/* dshfiles: the actions hold no message text. Phones that report a fine pointer miss the coarse-pointer
+   user-select rule, so a dragged selection handle could pull the action's label into the selection, which
+   dismissed or blanked it. On touch Annotate shares the row (AnnotateSelection), so one placement moves both. */
+.column > .textInteraction {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.column > .textInteraction[data-touch] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
