@@ -14,8 +14,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { MergeChecks, type MergeCheck, type MergeCheckStatus } from '@dshfiles/plugin-ui/components/motion/merge-checks'
-import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
+import { MergeChecks } from '@dshfiles/plugin-ui/components/motion/merge-checks'
 import { ClockIcon, GitMergeIcon, History, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -49,59 +48,6 @@ export interface LandCardProps {
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
 
 const landStatusQueryKey = (cwd: string) => ['diffs-review', 'land', cwd] as const
-
-const plural = (count: number, noun: string): string => `${String(count)} ${noun}${count === 1 ? '' : 's'}`
-
-const checkStatus = (status: WorkStatus): MergeCheckStatus => {
-  if (status === 'done') return 'passed'
-  if (status === 'failed') return 'failed'
-  return 'warning'
-}
-
-/** One chip per land precondition, in the order the card explains them. */
-const landChecks = (input: {
-  readonly thread: LandThread
-  readonly bookmark: string
-  readonly readiness: LandReadiness
-  readonly checkSummary: ReturnType<typeof LandCardModel.checks>
-}): MergeCheck[] => {
-  const revisions = input.thread.unlanded
-  const behind = (input.thread.behindCount ?? (input.thread.behind ? 1 : 0)) > 0
-  const rows: MergeCheck[] = [
-    revisions.length === 0
-      ? { id: 'revisions', label: 'Nothing to land', status: 'passed', summary: `${input.bookmark} has all of this work.` }
-      : { id: 'revisions', label: `${plural(revisions.length, 'revision')} to land`, status: 'passed' },
-    {
-      id: 'behind',
-      label: LandCardModel.behindText(input.thread, input.bookmark),
-      status: behind ? 'warning' : 'passed',
-      summary: behind ? 'Land moves this work onto its tip' : undefined,
-    },
-  ]
-  if (input.readiness.conflicts > 0)
-    rows.push({
-      id: 'conflicts',
-      label: `Conflicts in ${plural(input.readiness.conflicts, 'revision')}`,
-      status: 'failed',
-      summary: 'Resolve them in this workspace, or open History.',
-    })
-  if (input.readiness.undescribed > 0)
-    rows.push({
-      id: 'undescribed',
-      label: `${String(input.readiness.undescribed)} revision${input.readiness.undescribed === 1 ? ' needs' : 's need'} a description`,
-      status: 'warning',
-      summary: 'Ask the thread to describe its work, or describe it in History.',
-    })
-  else if (revisions.length > 0) rows.push({ id: 'described', label: 'Every revision is described', status: 'passed' })
-  if (input.checkSummary !== undefined)
-    rows.push({
-      id: 'checks',
-      label: input.checkSummary.text,
-      status: checkStatus(input.checkSummary.status),
-      summary: input.checkSummary.hint,
-    })
-  return rows
-}
 
 /**
  * The top of the Changes facet: where this thread's work would land and whether it can, with one primary Land. Land
@@ -218,6 +164,7 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
   const readiness: LandReadiness = LandCardModel.readiness({ thread, threadBusy: props.threadBusy, pending: landSnapshot.matches('landing') })
   const checkSummary = LandCardModel.checks(checks.data)
   const revisions = thread?.unlanded ?? []
+  const preconditions = thread === null ? { facts: [], attention: [] } : LandCardModel.preconditions({ thread, bookmark, readiness, checkSummary })
   const sizeData = size.data?.status === 'ok' ? size.data.files : undefined
   const summary = LandCardModel.changeSummary({ revisions, files: sizeData })
   const next =
@@ -281,7 +228,16 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
               </p>
             </div>
           )}
-          <MergeChecks checks={landChecks({ thread, bookmark, readiness, checkSummary })} />
+          {/* A2 #39 (unslop): what holds is one muted line; only a precondition that needs the user is a chip. */}
+          <p className={HINT} data-testid="land-card-facts">
+            {preconditions.facts.map((fact, index) => (
+              <span key={fact.id}>
+                {index === 0 ? null : <span aria-hidden> · </span>}
+                <span data-land-fact={fact.id}>{fact.text}</span>
+              </span>
+            ))}
+          </p>
+          {preconditions.attention.length === 0 ? null : <MergeChecks checks={[...preconditions.attention]} />}
         </>
       )}
       {thread !== null && thread.integrationQueuedAt !== undefined ? (
