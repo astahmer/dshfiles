@@ -73,7 +73,22 @@ const undoOf = (item: AttentionItem, view: AttentionView): 'reopen' | 'unsnooze'
 const resumableIds = (items: readonly AttentionItem[]): readonly string[] =>
   items.filter(item => item.doneAt === null && item.resolvedAt === null && item.verbs.includes('Resume')).map(item => item.id)
 
+/** Sources whose items wait on a question: only an answer moves the thread, so a queued prompt never does. */
+const QUESTION_SOURCES: ReadonlySet<string> = new Set(['agent-questions.child-question', 'agent-questions.native-question'])
+
+/** The item waits on a question, whether the Inbox can answer it in place or only its thread can. */
+const asksQuestion = (item: AttentionItem): boolean => QUESTION_SOURCES.has(item.source) || item.verbs.includes('Answer')
+
+/**
+ * Quick replies queue a canned prompt in a thread. They fit a thread that stopped (a failed turn, a usage limit), never
+ * one that asked a question: "Continue" does not answer "Which layout?".
+ */
+const offersQuickReplies = (item: AttentionItem, view: AttentionView): boolean =>
+  view !== 'closed' && view !== 'muted' && item.subject.kind === 'session' && item.severity !== 'ready' && !asksQuestion(item)
+
 export class InboxView {
+  static readonly asksQuestion = asksQuestion
+  static readonly offersQuickReplies = offersQuickReplies
   static readonly openActionOf = openActionOf
   static readonly subjectTitleOf = subjectTitleOf
   static readonly sourceLabel = sourceLabel
