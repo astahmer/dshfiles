@@ -144,7 +144,7 @@ describe('ThreadFacets', () => {
     expect(changes).toHaveBeenCalledTimes(4)
   })
 
-  it('disables Thread panels and refuses a pick once the mounted thread has no open tab', () => {
+  it('withdraws Thread panels and refuses a pick once the mounted thread has no open tab', () => {
     const registry = createWorkbenchPanelRegistry()
     const guide = observable<readonly SidebarRightGuideBox[]>([box('jobs', 60, 'Jobs')])
     const mounted = observable<string | undefined>('thread-a')
@@ -161,15 +161,15 @@ describe('ThreadFacets', () => {
     expect(screen.getByRole('button', { name: /^Jobs/u }).hasAttribute('disabled')).toBe(false)
 
     act(() => open.set([]))
-    expect(screen.getByRole('button', { name: /^Jobs/u }).hasAttribute('disabled')).toBe(true)
-    expect(screen.getByText('Open a thread to show its panels here.')).toBeDefined()
+    expect(screen.queryByRole('button', { name: /^Jobs/u })).toBeNull()
+    expect(screen.getByText('Open a thread to choose its panels here.')).toBeDefined()
     const jobs = registry.get(ThreadFacets.sourceId('jobs'))
     if (jobs === undefined) throw new Error('missing Jobs launcher')
     expect(source.open(jobs, surface())).toBe(false)
     expect(openPage).not.toHaveBeenCalled()
   })
 
-  it('lists facets under Thread panels with their description, disabled until a thread is on screen', () => {
+  it('lists facets under Thread panels with their description once a thread is on screen', () => {
     const registry = createWorkbenchPanelRegistry()
     const guide = observable<readonly SidebarRightGuideBox[]>([
       box('cost', 61, 'Cost', { description: () => "This thread's route and cost per turn." }),
@@ -181,15 +181,16 @@ describe('ThreadFacets', () => {
     registry.register({ id: 'backlog', title: 'Backlog', component: () => null })
     const select = vi.fn()
     const view = render(<NewViewChooser definitions={registry.list()} onSelect={select} />)
-    const group = screen.getByRole('group', { name: 'Thread panels' })
-    const rows = [...group.querySelectorAll('button')]
-    expect(rows.map(row => row.textContent)).toEqual(['Changes', "CostThis thread's route and cost per turn."])
-    expect(rows.every(row => row.disabled)).toBe(true)
-    expect(screen.getByText('Open a thread to show its panels here.')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Backlog' })).toBeDefined()
+    // Without a thread nothing can be picked: one line says so, and the views lead.
+    expect(screen.queryByRole('group', { name: 'Thread panels' })).toBeNull()
+    expect(screen.getByText('Open a thread to choose its panels here.')).toBeDefined()
+    expect(screen.getAllByRole('button').map(row => row.textContent)).toEqual(['Backlog'])
 
     onScreen.set('thread-a')
     view.rerender(<NewViewChooser definitions={registry.list()} onSelect={select} />)
+    const rows = [...screen.getByRole('group', { name: 'Thread panels' }).querySelectorAll('button')]
+    expect(rows.map(row => row.textContent)).toEqual(['Changes', "CostThis thread's route and cost per turn."])
+    expect(rows.every(row => !row.disabled)).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: /^Cost/u }))
     expect(select).toHaveBeenCalledWith(registry.get(ThreadFacets.sourceId('cost')))
     fireEvent.change(screen.getByRole('textbox', { name: 'Search views' }), { target: { value: 'route' } })
