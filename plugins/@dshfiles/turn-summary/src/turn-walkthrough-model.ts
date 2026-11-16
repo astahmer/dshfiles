@@ -24,11 +24,9 @@ const sharedPrefix = (directories: readonly (readonly string[])[]): number => {
   return length
 }
 
-const plural = (count: number, word: string): string => `${String(count)} ${word}${count === 1 ? '' : 's'}`
-
 /**
- * Groups a turn's edited files by folder, below the folder they all share, in first-edit order: "src · 2 files +40 −3".
- * Each file keeps only its name, since its group already names the folder.
+ * Groups a turn's edited files by folder, below the folder they all share, in first-edit order: "src · 2 files", then
+ * "+40 −3". Each file keeps only its name, since its group already names the folder.
  */
 const groups = (files: readonly EditedFile[]): readonly WalkthroughGroup[] => {
   const shared = sharedPrefix(files.map(file => directoryOf(file.path)))
@@ -43,13 +41,14 @@ const groups = (files: readonly EditedFile[]): readonly WalkthroughGroup[] => {
   return [...byDirectory].map(([directory, grouped]) => {
     const added = grouped.reduce((total, file) => total + file.added, 0)
     const removed = grouped.reduce((total, file) => total + file.removed, 0)
-    const lines = added + removed > 0 ? ` · +${String(added)} −${String(removed)}` : ''
     return {
       directory: directory === '' ? (root === '' ? '.' : (root.split('/').at(-1) ?? root)) : directory,
       files: grouped,
       added,
       removed,
-      summary: `Edited ${plural(grouped.length, 'file')}${lines}`,
+      // The card's header already counts the folder's files and each row carries its own lines, so the one thing left
+      // to say is the folder's total, and only where it adds rows up.
+      summary: grouped.length > 1 && added + removed > 0 ? `+${String(added)} −${String(removed)}` : '',
     }
   })
 }
@@ -58,7 +57,15 @@ const groups = (files: readonly EditedFile[]): readonly WalkthroughGroup[] => {
 const changesAddress = (input: { readonly sessionId: string; readonly seq: number; readonly turn: number }): string =>
   `dsh-resource://changes-review/session/${encodeURIComponent(input.sessionId)}/${String(input.seq)}/${String(input.turn)}`
 
+/**
+ * Whether the walkthrough says more than the file chips above it: files the chips fold into "+N more", or files in more
+ * than one folder. For one or two files of one folder it would repeat the chips line for line, so it is not offered.
+ */
+const addsDetail = (files: readonly EditedFile[], chipLimit: number): boolean =>
+  files.length > chipLimit || new Set(files.map(file => directoryOf(file.path).join('/'))).size > 1
+
 export class TurnWalkthroughModel {
   static readonly groups = groups
+  static readonly addsDetail = addsDetail
   static readonly changesAddress = changesAddress
 }

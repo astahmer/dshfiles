@@ -110,17 +110,15 @@
     {
       "id": "turn-walkthrough",
       "title": "A walkthrough under a turn that changed code",
-      "summary": "Under a finished turn that edited files, one row opens a walkthrough: the changed files grouped by folder, each folder with a one-line summary (\"Edited 2 files · +40 −3\"), and every file row opens that file in the editor. Review in Changes opens that turn's changed-files review in the right pane (the Changes facet when diffs-review is loaded, else the native review tab). It is a row in the turn footer, so a closed walkthrough never floats above the composer. While it is on, the footer leaves out its edited-files part, which the native changed-files card above the turn already shows.",
+      "summary": "Under a finished turn that edited files, one row opens a walkthrough: the changed files grouped by folder, each folder with its file count and line total, and every file row opens that file in the editor. Review in Changes opens that turn's changed-files review in the right pane (the Changes facet when diffs-review is loaded, else the native review tab). It is a row in the turn footer, so a closed walkthrough never floats above the composer. While it is on, the footer leaves out its edited-files part, which the native changed-files card above the turn already shows. It is offered only where it says more than the file chips: files in several folders, or more files than there are chips.",
       "reach": [
         "seed tool-call-thread",
         "expect text \"Tool finished.\"",
-        "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]]\"",
+        "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]] [[call write {\\\"file_path\\\":\\\"src/second.ts\\\",\\\"content\\\":\\\"export const second = 2\\\"}]]\"",
         "press Enter",
-        "expect text \"Walkthrough\"",
+        "expect button \"Walkthrough\"",
         "click button \"Walkthrough\"",
-        "expect text \"walkthrough.md\"",
-        "click button \"Open walkthrough.md\"",
-        "expect tab \"walkthrough.md\""
+        "expect button \"Open walkthrough.md\""
       ],
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",

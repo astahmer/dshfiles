@@ -21,16 +21,40 @@ describe('TurnWalkthroughModel.groups', () => {
           { path: 'one.ts', fullPath: '/repo/plugins/a/src/one.ts' },
           { path: 'two.ts', fullPath: '/repo/plugins/a/src/two.ts' },
         ],
-        summary: 'Edited 2 files · +11 −3',
+        summary: '+11 −3',
       },
-      { directory: 'a', files: [{ path: 'README.md', fullPath: '/repo/plugins/a/README.md' }], summary: 'Edited 1 file · +3 −0' },
+      { directory: 'a', files: [{ path: 'README.md', fullPath: '/repo/plugins/a/README.md' }], summary: '' },
     ])
   })
 
   test('names a lone relative file by its root and leaves line counts out when none were counted', () => {
     expect(TurnWalkthroughModel.groups([{ path: 'notes.md', added: 0, removed: 0 }])).toEqual([
-      { directory: '.', files: [{ path: 'notes.md', fullPath: 'notes.md', added: 0, removed: 0 }], added: 0, removed: 0, summary: 'Edited 1 file' },
+      { directory: '.', files: [{ path: 'notes.md', fullPath: 'notes.md', added: 0, removed: 0 }], added: 0, removed: 0, summary: '' },
     ])
+  })
+
+  test('never restates the file count the card header and the chips already give', () => {
+    const groups = TurnWalkthroughModel.groups([
+      { path: 'src/auth/session.ts', added: 5, removed: 3 },
+      { path: 'tests/session.test.ts', added: 5, removed: 0 },
+    ])
+    expect(groups.map(group => group.summary)).toEqual(['', ''])
+    for (const group of groups) expect(group.summary).not.toMatch(/Edited|file/)
+  })
+
+  test('is offered only where it says more than the file chips', () => {
+    const file = (path: string) => ({ path, added: 1, removed: 0 })
+    // One file, or a few files of one folder: the chips already say all of it.
+    expect(TurnWalkthroughModel.addsDetail([file('notes/walkthrough.md')], 4)).toBe(false)
+    expect(TurnWalkthroughModel.addsDetail([file('src/a.ts'), file('src/b.ts')], 4)).toBe(false)
+    // Several folders, or more files than there are chips.
+    expect(TurnWalkthroughModel.addsDetail([file('src/auth/session.ts'), file('tests/session.test.ts')], 4)).toBe(true)
+    expect(
+      TurnWalkthroughModel.addsDetail(
+        ['a', 'b', 'c', 'd', 'e'].map(name => file(`src/${name}.ts`)),
+        4,
+      ),
+    ).toBe(true)
   })
 
   test('addresses the native per-turn review', () => {
