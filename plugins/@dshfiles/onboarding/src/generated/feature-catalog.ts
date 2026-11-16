@@ -12,7 +12,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "activity-timeline",
       "description": "Unified chronological activity timeline across agents, sessions, communication, and jj workspaces.",
       "ui": true,
-      "features": 7
+      "features": 8
     },
     {
       "name": "agent-communication",
@@ -634,7 +634,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "tool-meta",
-      "description": "Start time and duration on every tool call in the chat transcript, counting live while the call runs.",
+      "description": "How long each tool call took, in the chat transcript, counting live while the call runs.",
       "ui": true,
       "features": 4
     },
@@ -855,10 +855,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Open Session\"",
+          "text": "expect button \"Open thread\"",
           "action": "expect",
           "by": "button",
-          "name": "Open Session",
+          "name": "Open thread",
           "value": null
         }
       ],
@@ -894,13 +894,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Needs you\"",
-          "action": "click",
-          "by": "button",
-          "name": "Needs you",
-          "value": null
-        },
-        {
           "text": "expect heading \"Inbox\"",
           "action": "expect",
           "by": "heading",
@@ -921,13 +914,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Inbox",
-          "value": null
-        },
-        {
-          "text": "click button \"Needs you\"",
-          "action": "click",
-          "by": "button",
-          "name": "Needs you",
           "value": null
         },
         {
@@ -1000,22 +986,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "activity-timeline",
       "id": "inbox-push",
       "title": "Push blocking Inbox items to a device",
-      "summary": "Below the in-tab alerts, the Inbox offers Push blocking items to this device. Turning it on asks for notification permission, registers a service worker the Host serves from its own origin (/dshfiles-web-push/sw.js, scope its own folder, so it controls no page), subscribes the b…",
+      "summary": "The Inbox page menu (More actions › Alerts on this device) offers Push blocking items to this device under the in-tab alerts. Turning it on asks for notification permission, registers a service worker the Host serves from its own origin (/dshfiles-web-push/sw.js, scope its own f…",
       "destination": "inbox",
-      "currentSurface": "left-nav: Inbox › Push blocking items to this device",
+      "currentSurface": "left-nav: Inbox › More actions › Alerts on this device",
       "reach": [
         {
           "text": "click tab \"Inbox\"",
           "action": "click",
           "by": "tab",
           "name": "Inbox",
-          "value": null
-        },
-        {
-          "text": "click button \"Needs you\"",
-          "action": "click",
-          "by": "button",
-          "name": "Needs you",
           "value": null
         },
         {
@@ -1026,10 +1005,79 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"More actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "More actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Alerts on this device\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Alerts on this device",
+          "value": null
+        },
+        {
           "text": "expect text \"Push blocking items to this device\"",
           "action": "expect",
           "by": "text",
           "name": "Push blocking items to this device",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "activity-timeline#thread-question-strip",
+      "plugin": "activity-timeline",
+      "id": "thread-question-strip",
+      "title": "Answer a subagent's question in its parent thread",
+      "summary": "A question a subagent asked its parent shows above the parent thread's composer with its options, so the Answer verb on a thread row lands on something answerable. It reads the same Needs you list as the Inbox, answers through the same provider verb, and leaves when the question…",
+      "destination": "transcript",
+      "currentSurface": "thread: above the composer while a subagent's question waits",
+      "reach": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Ship the hotfix now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022ship\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Ship\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022hold\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Hold\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022ship\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or threads*",
+          "value": "[[once call subagent {\"description\":\"Release check\",\"prompt\":\"\\u005b\\u005bonce call ask_parent_question \\u007b\\u0022question\\u0022:\\u0022Ship the hotfix now?\\u0022,\\u0022options\\u0022:\\u005b\\u007b\\u0022id\\u0022:\\u0022ship\\u0022,\\u0022label\\u0022:\\u0022Ship\\u0022\\u007d,\\u007b\\u0022id\\u0022:\\u0022hold\\u0022,\\u0022label\\u0022:\\u0022Hold\\u0022\\u007d\\u005d,\\u0022recommendedOptionId\\u0022:\\u0022ship\\u0022,\\u0022expiryBehavior\\u0022:\\u0022recommended\\u0022,\\u0022timeoutMs\\u0022:1800000\\u007d\\u005d\\u005d\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"A subagent asks: Ship the hotfix now?\"",
+          "action": "expect",
+          "by": "text",
+          "name": "A subagent asks: Ship the hotfix now?",
+          "value": null
+        },
+        {
+          "text": "click button \"Hold\"",
+          "action": "click",
+          "by": "button",
+          "name": "Hold",
+          "value": null
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
           "value": null
         }
       ],
@@ -1264,7 +1312,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-plan",
       "id": "pinned-step",
       "title": "Current plan step pinned beside the composer",
-      "summary": "While the latest turn's plan has steps left, a chip beside the native plan-mode control says \"Step 2 of 3 · Fix the rounding bug · 12s\" and opens the whole plan. It sits beside the native control rather than replacing it.",
+      "summary": "While the latest turn's plan has steps left, a chip beside the native plan-mode control says \"Step 2 of 3 · Fix the rounding bug · 12s\" and opens the whole plan. It sits beside the native control rather than replacing it. While the chip is on, the To-dos strip above the composer…",
       "destination": "composer",
       "currentSurface": "composer: plan chip beside plan mode",
       "reach": [
@@ -1345,10 +1393,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-plan#failure-card",
       "plugin": "agent-plan",
       "id": "failure-card",
-      "title": "Retry and Ask to fix under failed turns",
-      "summary": "Under a native turn-error row, and under a model-retry row once retrying gave up, a bar shows the retry count and two actions: Retry puts a retry request in the composer, Ask to fix inserts the failure with a request to fix it. Neither sends: the user reviews and sends. Stopped…",
+      "title": "Ask to fix on a failed turn",
+      "summary": "Adds Ask to fix beside Retry in the failed turn's one row of actions. It writes the failure and a request to fix it into the composer; the user reviews and sends. Stopped turns get no action.",
       "destination": "transcript",
-      "currentSurface": "transcript: turn error row",
+      "currentSurface": "transcript: failed turn action row",
       "reach": [
         {
           "text": "seed jev-setup-chat-thread",
@@ -1792,7 +1840,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-questions",
       "id": "cross-thread-question-inbox",
       "title": "List and answer thread questions",
-      "summary": "Root Agents can list timed native questions across Sessions or by id, plus direct-child durable questions, with recommendation, timeout, and answerability metadata. Continued native forms and parent-scoped child questions use their authorized answer tools.",
+      "summary": "Root Agents can list timed native questions across Sessions or by id, plus direct-child durable questions, with recommendation, timeout, and answerability metadata. Native forms that report canAnswer (continued, or still open and held on this Host) and parent-scoped child questi…",
       "destination": "inbox",
       "currentSurface": "agent tool: list_thread_questions / answer_thread_question",
       "reach": [
@@ -1895,10 +1943,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"commands, @ files or s*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or s*",
+          "name": "commands, @ files or threads*",
           "value": "[[once call subagent {\"description\":\"Release check\",\"prompt\":\"\\u005b\\u005bonce call ask_parent_question \\u007b\\u0022question\\u0022:\\u0022Deploy the release now?\\u0022,\\u0022options\\u0022:\\u005b\\u007b\\u0022id\\u0022:\\u0022deploy\\u0022,\\u0022label\\u0022:\\u0022Deploy\\u0022\\u007d,\\u007b\\u0022id\\u0022:\\u0022wait\\u0022,\\u0022label\\u0022:\\u0022Wait\\u0022\\u007d\\u005d,\\u0022recommendedOptionId\\u0022:\\u0022deploy\\u0022,\\u0022expiryBehavior\\u0022:\\u0022recommended\\u0022,\\u0022timeoutMs\\u0022:1800000\\u007d\\u005d\\u005d\"}]]"
         },
         {
@@ -1916,6 +1964,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        },
+        {
           "text": "expect text \"A subagent asks: Deploy the release now?\"",
           "action": "expect",
           "by": "text",
@@ -1923,17 +1978,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Deploy\"",
+          "text": "click button \"Deploy*\"",
           "action": "click",
           "by": "button",
-          "name": "Deploy",
+          "name": "Deploy*",
           "value": null
         },
         {
-          "text": "expect text \"Nothing needs you right now.\"",
+          "text": "expect text \"Answered “Deploy”*\"",
           "action": "expect",
           "by": "text",
-          "name": "Nothing needs you right now.",
+          "name": "Answered “Deploy”*",
           "value": null
         }
       ],
@@ -1945,10 +2000,38 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-questions",
       "id": "native-questions-inbox",
       "title": "Thread questions in the Inbox",
-      "summary": "Every native ask_user_question form waiting in a live root thread is a blocking Inbox item about that thread. A continued form with one single-select question is answerable in place with its options, through the same native answer API as answer_thread_question; any other form sa…",
+      "summary": "Every native ask_user_question form waiting in a live root thread is a blocking Inbox item about that thread. A form with one single-select question is answerable in place with its options: a continued form through the native answer API, a form still open through the question wa…",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › agent-questions.native-question",
       "reach": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[once call ask_user_question {\\\"questions\\\": [{\\\"id\\\": \\\"layout\\\", \\\"question\\\": \\\"Which layout should the release notes use?\\\", \\\"options\\\": [{\\\"label\\\": \\\"Grouped by plugin (Recommended)\\\"}, {\\\"label\\\": \\\"One flat list\\\"}]}], \\\"timeout\\\": -1}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or threads*",
+          "value": "[[once call ask_user_question {\"questions\": [{\"id\": \"layout\", \"question\": \"Which layout should the release notes use?\", \"options\": [{\"label\": \"Grouped by plugin (Recommended)\"}, {\"label\": \"One flat list\"}]}], \"timeout\": -1}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Which layout should the release notes use?\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Which layout should the release notes use?",
+          "value": null
+        },
         {
           "text": "click tab \"Inbox\"",
           "action": "click",
@@ -1957,10 +2040,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Inbox\"",
+          "text": "expect text \"Asks: Which layout should the release notes use?\"",
           "action": "expect",
-          "by": "heading",
-          "name": "Inbox",
+          "by": "text",
+          "name": "Asks: Which layout should the release notes use?",
+          "value": null
+        },
+        {
+          "text": "click button \"One flat list\"",
+          "action": "click",
+          "by": "button",
+          "name": "One flat list",
+          "value": null
+        },
+        {
+          "text": "expect text \"Answered “One flat list”*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Answered “One flat list”*",
           "value": null
         }
       ],
@@ -2123,10 +2220,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Open Traces\"",
+          "text": "click menuitem \"Open in\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Open Traces",
+          "name": "Open in",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Traces\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Traces",
           "value": null
         },
         {
@@ -2747,6 +2851,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "dialog: Add AI account",
       "reach": [
+        {
+          "text": "click group \"AI accounts usage*\"",
+          "action": "click",
+          "by": "group",
+          "name": "AI accounts usage*",
+          "value": null
+        },
         {
           "text": "click button \"Add AI account\"",
           "action": "click",
@@ -3426,24 +3537,31 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "settings: AI Accounts › Failure recovery › Fall back on stalled streams",
       "reach": [
         {
-          "text": "click text \"More\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
-          "by": "text",
-          "name": "More",
+          "by": "button",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click text \"Settings\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: AI accounts\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: AI accounts"
+        },
+        {
+          "text": "click option \"Settings: AI accounts*\"",
           "action": "click",
-          "by": "text",
-          "name": "Settings",
+          "by": "option",
+          "name": "Settings: AI accounts*",
           "value": null
         },
         {
-          "text": "click text \"AI Accounts\"",
+          "text": "click button \"Edit failure handling\"",
           "action": "click",
-          "by": "text",
-          "name": "AI Accounts",
+          "by": "button",
+          "name": "Edit failure handling",
           "value": null
         },
         {
@@ -11309,14 +11427,14 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "id": "component-gallery-page",
       "title": "Browse every shared component on one page",
       "summary": "A main panel that renders every @dshfiles/plugin-ui component live, animated ones included, in one tab per category, with a filter over titles and import paths, a per-card and page-wide Replay, and a reduced-motion indicator.",
-      "destination": "knowledge",
-      "currentSurface": "left-nav: Component gallery",
+      "destination": "settings",
+      "currentSurface": "rail: Settings › Developer › Component gallery",
       "reach": [
         {
-          "text": "click tab \"Knowledge\"",
+          "text": "click tab \"Settings\"",
           "action": "click",
           "by": "tab",
-          "name": "Knowledge",
+          "name": "Settings",
           "value": null
         },
         {
@@ -11336,7 +11454,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": null,
       "onboarding": {
-        "firstAction": "Open Knowledge › Component gallery and pick a tab.",
+        "firstAction": "Open Settings › Developer › Component gallery and pick a tab.",
         "doneWhen": "The shared components render live on the page.",
         "open": {
           "panel": "component-gallery"
@@ -11626,7 +11744,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "dialogs",
       "id": "app-toasts",
       "title": "App toasts for every plugin",
-      "summary": "Provide the dshx Toasts contract: a bottom-right stack with tone colors, an optional action, auto-dismiss after the duration (5 s by default, 0 keeps it) and a dismiss function.",
+      "summary": "Provide the dshx Toasts contract: one bottom-right toast at a time with a tone icon, an optional action, auto-dismiss after the duration (5 s by default, 0 keeps it) and a dismiss function. Later toasts queue; the toast sits above a composer it would cover.",
       "destination": "none",
       "currentSurface": "toast: app toast stack",
       "reach": [
@@ -12642,10 +12760,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Status bar\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Status bar",
+          "name": "Layout",
           "value": null
         },
         {
@@ -12684,10 +12802,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Status bar\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Status bar",
+          "name": "Layout",
           "value": null
         },
         {
@@ -13998,6 +14116,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
+          "text": "click button \"Land this thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land this thread",
+          "value": null
+        },
+        {
+          "text": "expect alertdialog \"Land 1 revision on main?\"",
+          "action": "expect",
+          "by": "alertdialog",
+          "name": "Land 1 revision on main?",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
           "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"/rebase\"",
           "action": "fill",
           "by": "textbox",
@@ -14012,10 +14151,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "expect text \"Landed 1 revision(s) on main.\"",
+          "text": "expect text \"Landed 1 revision on main.\"",
           "action": "expect",
           "by": "text",
-          "name": "Landed 1 revision(s) on main.",
+          "name": "Landed 1 revision on main.",
           "value": null
         },
         {
@@ -14060,10 +14199,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"1 revision(s) ready to land on main.*\"",
+          "text": "click button \"1 revision ready to land on main.*\"",
           "action": "click",
           "by": "button",
-          "name": "1 revision(s) ready to land on main.*",
+          "name": "1 revision ready to land on main.*",
           "value": null
         },
         {
@@ -14115,10 +14254,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         },
         {
@@ -14171,10 +14310,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         }
       ],
@@ -14215,10 +14354,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         },
         {
@@ -14312,10 +14451,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         },
         {
@@ -14360,10 +14499,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         },
         {
@@ -14397,10 +14536,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         },
         {
@@ -14901,24 +15040,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect checkbox \"Hide immutable\"",
-          "action": "expect",
-          "by": "checkbox",
-          "name": "Hide immutable",
-          "value": null
-        },
-        {
-          "text": "click checkbox \"Hide immutable\"",
+          "text": "click button \"Filter\"",
           "action": "click",
-          "by": "checkbox",
+          "by": "button",
+          "name": "Filter",
+          "value": null
+        },
+        {
+          "text": "click menuitemcheckbox \"Hide immutable\"",
+          "action": "click",
+          "by": "menuitemcheckbox",
           "name": "Hide immutable",
           "value": null
         },
         {
-          "text": "expect checkbox \"Hide immutable\"",
+          "text": "expect button \"Filter (1 on)\"",
           "action": "expect",
-          "by": "checkbox",
-          "name": "Hide immutable",
+          "by": "button",
+          "name": "Filter (1 on)",
           "value": null
         },
         {
@@ -15127,7 +15266,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "composer-context",
       "title": "See project and Jujutsu workspace context in the composer",
-      "summary": "The Changes pill in the thread header (and the phone top bar) reads the net file diff since branching from the selected base as +N −M, names the revisions present only on @ or only on that base in its tooltip, and opens the Changes view; the composer itself carries no changes ba…",
+      "summary": "For a thread in its own workspace, the Changes pill in the thread header (and the phone top bar) reads the net file diff since branching from the selected base as +N −M and opens the Changes view. A thread in the project checkout has no pill; its workspace menu states the checko…",
       "destination": "thread-panel",
       "currentSurface": "thread header: Changes pill",
       "reach": [
@@ -15139,10 +15278,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "rebase-ready-thread"
         },
         {
-          "text": "click button \"Changes since branching from main*\"",
+          "text": "click button \"Review workspace changes: *\"",
           "action": "click",
           "by": "button",
-          "name": "Changes since branching from main*",
+          "name": "Review workspace changes: *",
           "value": null
         },
         {
@@ -16174,10 +16313,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect tab \"Jujutsu · sample*\"",
+          "text": "expect tab \"History · sample*\"",
           "action": "expect",
           "by": "tab",
-          "name": "Jujutsu · sample*",
+          "name": "History · sample*",
           "value": null
         },
         {
@@ -16209,10 +16348,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Jujutsu · sample*\"",
+          "text": "click tab \"History · sample*\"",
           "action": "click",
           "by": "tab",
-          "name": "Jujutsu · sample*",
+          "name": "History · sample*",
           "value": null
         },
         {
@@ -16345,10 +16484,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "rightclick tab \"*\"",
+          "text": "rightclick tab \"Fake thread title*\"",
           "action": "rightclick",
           "by": "tab",
-          "name": "*",
+          "name": "Fake thread title*",
           "value": null
         },
         {
@@ -16394,10 +16533,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
-          "text": "rightclick tab \"*\"",
+          "text": "rightclick tab \"Fake thread title*\"",
           "action": "rightclick",
           "by": "tab",
-          "name": "*",
+          "name": "Fake thread title*",
           "value": null
         },
         {
@@ -16422,10 +16561,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
-          "text": "rightclick tab \"*\"",
+          "text": "rightclick tab \"Fake thread title*\"",
           "action": "rightclick",
           "by": "tab",
-          "name": "*",
+          "name": "Fake thread title*",
           "value": null
         },
         {
@@ -16457,45 +16596,52 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
-          "text": "expect radio \"left\"",
+          "text": "expect radio \"Left\"",
           "action": "expect",
           "by": "radio",
-          "name": "left",
+          "name": "Left",
           "value": null
         },
         {
-          "text": "click radio \"right\"",
+          "text": "click radio \"Right\"",
           "action": "click",
           "by": "radio",
-          "name": "right",
+          "name": "Right",
           "value": null
         },
         {
-          "text": "expect radio \"right\"",
+          "text": "expect radio \"Right\"",
           "action": "expect",
           "by": "radio",
-          "name": "right",
+          "name": "Right",
           "value": null
         }
       ],
@@ -16878,10 +17024,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Global MCP servers\"",
+          "text": "expect heading \"MCP servers\"",
           "action": "expect",
           "by": "heading",
-          "name": "Global MCP servers",
+          "name": "MCP servers",
+          "value": null
+        },
+        {
+          "text": "click button \"Add server\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add server",
           "value": null
         },
         {
@@ -16929,6 +17082,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "MCP servers",
+          "value": null
+        },
+        {
+          "text": "click button \"Add server\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add server",
           "value": null
         },
         {
@@ -16998,6 +17158,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "MCP servers",
+          "value": null
+        },
+        {
+          "text": "click button \"Add server\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add server",
           "value": null
         },
         {
@@ -17372,10 +17539,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Recall\"",
+          "text": "expect combobox \"Analytics window\"",
           "action": "expect",
-          "by": "text",
-          "name": "Recall",
+          "by": "combobox",
+          "name": "Analytics window",
           "value": null
         }
       ],
@@ -17409,10 +17576,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Recall\"",
+          "text": "expect combobox \"Analytics window\"",
           "action": "expect",
-          "by": "text",
-          "name": "Recall",
+          "by": "combobox",
+          "name": "Analytics window",
           "value": null
         }
       ],
@@ -18067,16 +18234,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Open host\"",
+          "text": "expect button \"Diagnose Build box\"",
           "action": "expect",
           "by": "button",
-          "name": "Open host",
+          "name": "Diagnose Build box",
           "value": null
         },
         {
-          "text": "click button \"Clone project\"",
+          "text": "click button \"Actions for Build box\"",
           "action": "click",
           "by": "button",
+          "name": "Actions for Build box",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Clone project\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Clone project",
           "value": null
         },
@@ -18272,9 +18446,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Sync checkout\"",
+          "text": "click button \"Actions for Build box\"",
           "action": "click",
           "by": "button",
+          "name": "Actions for Build box",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Sync checkout\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Sync checkout",
           "value": null
         },
@@ -18334,10 +18515,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Edit Build box\"",
+          "text": "click button \"Actions for Build box\"",
           "action": "click",
           "by": "button",
-          "name": "Edit Build box",
+          "name": "Actions for Build box",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Edit\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Edit",
           "value": null
         },
         {
@@ -18415,9 +18603,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Link this machine\"",
+          "text": "click button \"Link this machine\"",
+          "action": "click",
+          "by": "button",
+          "name": "Link this machine",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Link this machine\"",
           "action": "expect",
-          "by": "heading",
+          "by": "dialog",
           "name": "Link this machine",
           "value": null
         },
@@ -19347,7 +19542,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Browse where a plugin can extend DSH",
       "summary": "Settings › Plugin guide is a developer page over a static catalog generated at build time from public declarations: dshx SDK entry points (each checked against the dshx index it is imported from), the native Client slots of create-dshx's offline slot reference, every owned plugi…",
       "destination": "settings",
-      "currentSurface": "rail: Settings › Plugin guide (already on the rail)",
+      "currentSurface": "rail: Settings › Developer › Plugin guide",
       "reach": [
         {
           "text": "click tab \"Settings\"",
@@ -21793,20 +21988,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Native Settings shell, ported",
       "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
       "destination": "settings",
-      "currentSurface": "sidebar: Account menu › Settings",
+      "currentSurface": "rail: Settings; palette: Settings: General",
       "reach": [
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
@@ -21852,18 +22054,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "main-tabs: New tab › Settings",
       "reach": [
         {
-          "text": "click button \"Collapse sidebar\"",
+          "text": "click button \"New tab\"",
           "action": "click",
           "by": "button",
-          "name": "Collapse sidebar",
+          "name": "New tab",
           "value": null
-        },
-        {
-          "text": "press ControlOrMeta+Alt+KeyT",
-          "action": "press",
-          "by": null,
-          "name": null,
-          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
           "text": "click button \"Settings\"",
@@ -21893,17 +22088,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "sidebar: Settings trigger release mark › General",
       "reach": [
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
@@ -21985,7 +22187,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "settings-task-groups",
       "title": "Settings grouped by task, with deep links",
-      "summary": "Every native section and plugin settings page sits in one task group (General, Models & accounts, Agents, Tools & MCP, Projects & workspaces, Hosts & network, Security, Notifications, Plugins, About; unknown ones under Other) under a person's name, never a package id. AI account…",
+      "summary": "Every native section and plugin settings page sits in one task group (General, Models & accounts, Agents, Tools & MCP, Projects & workspaces, Hosts & network, Security, Notifications, Plugins, About) under a person's name, never a package id. Settings several plugins hold for on…",
       "destination": "settings",
       "currentSurface": "settings: task groups in the Settings navigation",
       "reach": [
@@ -22088,10 +22290,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "max tabs"
         },
         {
-          "text": "expect text \"1 Setting Found\"",
+          "text": "expect text \"1 setting found\"",
           "action": "expect",
           "by": "text",
-          "name": "1 Setting Found",
+          "name": "1 setting found",
           "value": null
         }
       ],
@@ -22118,10 +22320,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "max tabs"
         },
         {
-          "text": "expect text \"1 matching settings\"",
+          "text": "expect text \"1 matching setting\"",
           "action": "expect",
           "by": "text",
-          "name": "1 matching settings",
+          "name": "1 matching setting",
           "value": null
         },
         {
@@ -22180,10 +22382,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "coding view"
         },
         {
-          "text": "expect text \"1 Setting Found\"",
+          "text": "expect text \"1 setting found\"",
           "action": "expect",
           "by": "text",
-          "name": "1 Setting Found",
+          "name": "1 setting found",
           "value": null
         },
         {
@@ -22235,10 +22437,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
@@ -22272,10 +22474,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click option \"Main tabs\"",
+          "text": "click option \"Layout\"",
           "action": "click",
           "by": "option",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
@@ -22293,7 +22495,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "modified-settings",
       "title": "Modified settings and reset to default",
-      "summary": "A setting the user layer overrides carries a bar on its left; hovering it offers Reset to default, which unsets the override, also while the change that set it is still saving. Every row names where its value comes from (Override, Profile composition, Default or Source unknown)…",
+      "summary": "A setting the user layer overrides carries a bar on its left; hovering it offers Reset to default, which unsets the override, also while the change that set it is still saving. A row whose value is not the default names where it comes from (Override or Profile composition) and w…",
       "destination": "settings",
       "currentSurface": "settings: Reset to default",
       "reach": [
@@ -22319,10 +22521,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
@@ -22370,10 +22572,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click option \"Main tabs\"",
+          "text": "click option \"Layout\"",
           "action": "click",
           "by": "option",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
@@ -22410,24 +22612,31 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "settings: plugin page › JSON",
       "reach": [
         {
-          "text": "click text \"More\"",
-          "action": "click",
-          "by": "text",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Settings*\"",
-          "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
-          "value": null
-        },
-        {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "click button \"Layout\"",
+          "action": "click",
+          "by": "button",
+          "name": "Layout",
           "value": null
         },
         {
@@ -22489,10 +22698,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click option \"Main tabs\"",
+          "text": "click option \"Layout\"",
           "action": "click",
           "by": "option",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
@@ -22586,29 +22795,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "plugin-enablement-tools",
       "title": "List and switch plugin entries, from Settings or an Agent",
-      "summary": "Each plugin settings page shows its Loader entry: the bundle that declares the row, the bundles that reconfigure it, a Plugin enabled switch, a change waiting for a restart, and a note when pnpm profile:sync restores the row from the seed. plugin_inventory lists the same for eve…",
+      "summary": "Each plugin settings page ends with Plugin details, a closed fold holding its Loader entry: the bundle that declares the row, the bundles that reconfigure it, a Plugin enabled switch, a change waiting for a restart, and a note when pnpm profile:sync restores the row from the see…",
       "destination": "settings",
       "currentSurface": "settings: plugin page › entry card; agent tools: plugin_inventory, plugin_set_enabled",
       "reach": [
         {
-          "text": "click text \"More\"",
-          "action": "click",
-          "by": "text",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Settings*\"",
-          "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
-          "value": null
-        },
-        {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "click button \"Layout\"",
+          "action": "click",
+          "by": "button",
+          "name": "Layout",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugin details: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugin details: Main tabs",
           "value": null
         },
         {
@@ -22642,10 +22865,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click option \"Main tabs\"",
+          "text": "click option \"Layout\"",
           "action": "click",
           "by": "option",
-          "name": "Main tabs",
+          "name": "Layout",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugin details: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugin details: Main tabs",
           "value": null
         },
         {
@@ -22745,17 +22975,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "settings: Tools & MCP › Jev › Key",
       "reach": [
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
@@ -23369,10 +23606,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "thread-list: No folder row › Turn into project",
       "reach": [
         {
-          "text": "click button \"New session\"",
+          "text": "click button \"New thread\"",
           "action": "click",
           "by": "button",
-          "name": "New session",
+          "name": "New thread",
           "value": null
         },
         {
@@ -23401,6 +23638,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Thread actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
           "value": null
         },
         {
@@ -23676,7 +23920,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "working-status-item",
       "title": "See how many threads are working in the status strip",
-      "summary": "The status strip shows \"N working\" for top-level threads with a running turn, colourless, and hides it while nothing runs. On a phone it is one line in the Status chip's list.",
+      "summary": "The status strip shows \"N working\", colourless, and hides it while nothing runs. N is the thread list's one Working projection: the rows whose status is Working, with subagents rolled up into their parent and a thread that waits for your answer left out (it is Needs you). The \"W…",
       "destination": "none",
       "currentSurface": "status-strip: N working",
       "reach": [
@@ -23696,7 +23940,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "live-working-activity",
       "title": "See what a working thread is doing right now",
-      "summary": "A working thread's row trades its static meta line for a live one: its current step (\"Running pnpm test\", \"Editing 3 files\", \"Thinking\", or the subagent rollup) in the working shimmer, then the elapsed time (\"· 1m 12s\"); without a known step it reads \"Working · 1m 12s\". The thre…",
+      "summary": "A working thread's row trades its static meta line for a live one: its current step (\"Running pnpm test\", \"Editing 3 files\", \"Thinking\", or the subagent rollup) in the working shimmer, and the turn's elapsed time (\"1m 12s\") ticks in the row's time slot instead of the age. Withou…",
       "destination": "threads",
       "currentSurface": "thread-list: working row second line; session header utilities; document title",
       "reach": [
@@ -23812,17 +24056,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"New chat in sample\"",
+          "text": "expect button \"New thread in sample\"",
           "action": "expect",
           "by": "button",
-          "name": "New chat in sample",
+          "name": "New thread in sample",
           "value": null
         },
         {
-          "text": "click button \"New chat in sample\"",
+          "text": "click button \"New thread in sample\"",
           "action": "click",
           "by": "button",
-          "name": "New chat in sample",
+          "name": "New thread in sample",
           "value": null
         },
         {
@@ -23941,6 +24185,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "More thread actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
           "value": null
         },
         {
@@ -24177,7 +24428,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#idle-archive-policy",
       "plugin": "thread-sidebar",
       "id": "idle-archive-policy",
-      "title": "Automatically settle eligible idle threads",
+      "title": "Mark idle threads done automatically",
       "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, settled, and explicitly excluded sessions and workspaces. Subagent threads idle for `subagentSettleHours` (24 by default) settle on their own and their running background jobs ar…",
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › idle policy",
@@ -24232,17 +24483,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Auto-settle behavior\"",
+          "text": "click menuitem \"More\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Auto-settle behavior",
+          "name": "More",
           "value": null
         },
         {
-          "text": "expect menuitemradio \"Settle after idle threshold\"",
+          "text": "click menuitem \"Mark done when idle\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Mark done when idle",
+          "value": null
+        },
+        {
+          "text": "expect menuitemradio \"Mark done after the idle threshold\"",
           "action": "expect",
           "by": "menuitemradio",
-          "name": "Settle after idle threshold",
+          "name": "Mark done after the idle threshold",
           "value": null
         },
         {
@@ -24274,10 +24532,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect checkbox \"Settle inactive threads\"",
+          "text": "expect checkbox \"Mark idle threads done\"",
           "action": "expect",
           "by": "checkbox",
-          "name": "Settle inactive threads",
+          "name": "Mark idle threads done",
           "value": null
         }
       ],
@@ -24407,7 +24665,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#settled-auto-archive",
       "plugin": "thread-sidebar",
       "id": "settled-auto-archive",
-      "title": "Archive a settled thread once its delay passes",
+      "title": "Archive a done thread once its delay passes",
       "summary": "Archive a settled thread after a configurable delay counted from the instant it was settled. The settled composer banner withholds its settle age while that age is only \"now\", titles the thread with it once the age says more, shows when the delay will archive it, and offers Arch…",
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › settled archive delay",
@@ -24434,11 +24692,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Settled archive target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Done archive target\"",
           "action": "fill",
           "by": "textbox",
           "name": "Describe what you want to build, / commands, @ files or threads",
-          "value": "Settled archive target"
+          "value": "Done archive target"
         },
         {
           "text": "click button \"Send message\"",
@@ -24462,17 +24720,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Settle\"",
+          "text": "click menuitem \"Done\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Settle",
+          "name": "Done",
           "value": null
         },
         {
-          "text": "expect status \"This thread is settled.\"",
+          "text": "expect status \"This thread is done.\"",
           "action": "expect",
           "by": "status",
-          "name": "This thread is settled.",
+          "name": "This thread is done.",
           "value": null
         },
         {
@@ -24490,10 +24748,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect group \"Archive settled threads\"",
+          "text": "expect group \"Archive done threads\"",
           "action": "expect",
           "by": "group",
-          "name": "Archive settled threads",
+          "name": "Archive done threads",
           "value": null
         }
       ],
@@ -24556,6 +24814,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "rightclick",
           "by": "button",
           "name": "Mute target*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
           "value": null
         },
         {
@@ -24667,6 +24932,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "rightclick",
           "by": "button",
           "name": "Unread target*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
           "value": null
         },
         {
@@ -24870,17 +25142,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Move up: Settle\"",
+          "text": "click button \"Move up: Done\"",
           "action": "click",
           "by": "button",
-          "name": "Move up: Settle",
+          "name": "Move up: Done",
           "value": null
         },
         {
-          "text": "expect checkbox \"Settle\"",
+          "text": "expect checkbox \"Done\"",
           "action": "expect",
           "by": "checkbox",
-          "name": "Settle",
+          "name": "Done",
           "value": null
         }
       ],
@@ -24932,8 +25204,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#rail-actions",
       "plugin": "thread-sidebar",
       "id": "rail-actions",
-      "title": "Restart DSH, Copy DSH URL and Pair a phone on the rail above Settings",
-      "summary": "The DSH actions sit in a small group at the bottom of the rail, directly above Settings and below the folders and + New folder, expanded and collapsed alike: Restart DSH (only while the supervisor offers a restart; amber with a slow pulse while updates or a restart wait), a pend…",
+      "title": "Copy DSH URL, Pair a phone and a pending page reload on the rail above Settings",
+      "summary": "The DSH actions sit in a small group at the bottom of the rail, directly above Settings and below the folders and + New folder, expanded and collapsed alike: Restart DSH (off by default: the status strip's restart item is the one restart control; Show Restart DSH on the rail tur…",
       "destination": "none",
       "currentSurface": "rail: DSH actions above Settings; phone: More › DSH",
       "reach": [
@@ -25111,7 +25383,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "session-header-actions",
       "title": "Manage threads from the session header",
-      "summary": "Keep Pin as an icon button in the conversation header and put park, settle or unsettle, mute or snooze, archive, and restore in a More menu; Pin folds into the menu when the header is too narrow. Child-thread action preferences apply.",
+      "summary": "The conversation header draws one control, a More menu: find and turns, pin, park, settle or unsettle, mute or snooze, continue in a project, archive or restore, copy the thread ID or link, the header's own exports (copy as Markdown, download the log, open in an application, fee…",
       "destination": "threads",
       "currentSurface": "thread-header: Pin / More menu",
       "reach": [
@@ -25179,17 +25451,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "expect menuitem \"Done\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
+          "value": null
+        },
+        {
           "text": "expect menuitem \"Archive\"",
           "action": "expect",
           "by": "menuitem",
           "name": "Archive",
-          "value": null
-        },
-        {
-          "text": "expect menuitem \"Settle\"",
-          "action": "expect",
-          "by": "menuitem",
-          "name": "Settle",
           "value": null
         }
       ],
@@ -25201,7 +25480,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "pending-host-restart",
       "title": "Warn when a host restart is required",
-      "summary": "Detect pending host-side plugin updates and show them, with the bundles hmr-gate held back, as one Restart pending item in the status strip whose Restart DSH and Restart when idle verbs open the same confirmation; ask for explicit confirmation before handing off a restart when t…",
+      "summary": "Detect pending host-side plugin updates and show them, with the bundles hmr-gate held back, as one Restart pending item in the status strip (the seat it shares with the Update DSH notice, which shows only while no restart waits) whose Restart DSH and Restart when idle verbs open…",
       "destination": "none",
       "currentSurface": "status-strip: Restart pending",
       "reach": [
@@ -25227,10 +25506,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Restart DSH yourself to load them.\"",
+          "text": "expect text \"To load them, stop DSH in the terminal*\"",
           "action": "expect",
           "by": "text",
-          "name": "Restart DSH yourself to load them.",
+          "name": "To load them, stop DSH in the terminal*",
           "value": null
         }
       ],
@@ -25360,6 +25639,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
+          "value": null
+        },
+        {
           "text": "click menuitem \"@Mention thread\"",
           "action": "click",
           "by": "menuitem",
@@ -25378,6 +25664,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "rightclick",
           "by": "button",
           "name": "Mention source*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
           "value": null
         },
         {
@@ -25595,10 +25888,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Settle\"",
+          "text": "expect button \"Done\"",
           "action": "expect",
           "by": "button",
-          "name": "Settle",
+          "name": "Done",
           "value": null
         }
       ],
@@ -25648,7 +25941,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Edit a thread title from its row menu",
       "summary": "The thread row context menu has Edit title: it replaces the row title with a focused input, commits the trimmed title on Enter or blur through the Session rename API, and cancels on Escape without a Host call.",
       "destination": "threads",
-      "currentSurface": "thread-list: row menu › Edit title",
+      "currentSurface": "thread-list: row menu › Rename",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -25665,17 +25958,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Edit title\"",
+          "text": "click menuitem \"Rename\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Edit title",
+          "name": "Rename",
           "value": null
         },
         {
-          "text": "fill textbox \"Edit title\" \"Sidebar rename\"",
+          "text": "fill textbox \"Rename\" \"Sidebar rename\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Edit title",
+          "name": "Rename",
           "value": "Sidebar rename"
         },
         {
@@ -25717,6 +26010,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "rightclick",
           "by": "text",
           "name": "sample",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Open in\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Open in",
           "value": null
         },
         {
@@ -26129,22 +26429,22 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "waiting-threads-page",
       "title": "See the threads waiting on you in one page",
-      "summary": "Inbox › Waiting threads lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
+      "summary": "The Waiting threads page lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
       "destination": "inbox",
-      "currentSurface": "left-nav: Inbox › Waiting threads",
+      "currentSurface": "command palette and New tab page: Waiting threads (not a second row of the Inbox list)",
       "reach": [
         {
-          "text": "click tab \"Inbox\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
-          "by": "tab",
-          "name": "Inbox",
+          "by": "button",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click button \"Waiting threads\"",
+          "text": "click option \"*Waiting threads*\"",
           "action": "click",
-          "by": "button",
-          "name": "Waiting threads",
+          "by": "option",
+          "name": "*Waiting threads*",
           "value": null
         },
         {
@@ -26157,7 +26457,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": null,
       "onboarding": {
-        "firstAction": "Open Inbox › Waiting threads.",
+        "firstAction": "Open the command palette and choose Waiting threads.",
         "doneWhen": "Each thread waiting on you is listed once, with Open and Done.",
         "open": {
           "panel": "thread-sidebar-waiting"
@@ -26209,10 +26509,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"In bash*\"",
+          "text": "expect text \"Running a command*\"",
           "action": "expect",
           "by": "text",
-          "name": "In bash*",
+          "name": "Running a command*",
           "value": null
         }
       ],
@@ -26226,7 +26526,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Opt-in completion notices between threads",
       "summary": "A thread can subscribe to another thread's turn completions. While subscribed, that thread's turn end sends ONE compact notice into the subscriber (status: finished, landed, failed, blocked, stopped, truncated or waiting-on-question, plus a 320-character preview of the turn that…",
       "destination": "threads",
-      "currentSurface": "threads: row context menu → Notify…",
+      "currentSurface": "threads: row context menu → Notify when finished",
       "reach": [
         {
           "text": "click button \"All threads\"",
@@ -26334,10 +26634,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Notify…\"",
+          "text": "click menuitem \"More\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Notify…",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Notify when finished\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Notify when finished",
           "value": null
         },
         {
@@ -26380,10 +26687,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "click button \"New session\"",
+          "text": "click button \"New thread\"",
           "action": "click",
           "by": "button",
-          "name": "New session",
+          "name": "New thread",
           "value": null
         },
         {
@@ -26529,8 +26836,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "tool-meta#tool-call-timing",
       "plugin": "tool-meta",
       "id": "tool-call-timing",
-      "title": "Start time and duration on every tool call",
-      "summary": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took and when it started (\"1.2 s · 14:02:11\"). Wait calls also show elapsed time and an indeterminate bar, or a timeout countdown bar when an explicit limit is set. Users can i…",
+      "title": "How long each tool call took",
+      "summary": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took once it reaches one second (\"1.2 s\"); hovering the duration gives the start time. A card that draws its own header or prints its own duration gets no label. Wait calls als…",
       "destination": "transcript",
       "currentSurface": "transcript: tool call timing",
       "reach": [
@@ -26549,13 +26856,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click text \"Ran commands\"",
-          "action": "click",
-          "by": "text",
-          "name": "Ran commands",
-          "value": null
-        },
-        {
           "text": "expect note \"Took*\"",
           "action": "expect",
           "by": "note",
@@ -26569,7 +26869,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "account"
         ],
         "firstAction": "Ask the agent for a task that runs a tool.",
-        "doneWhen": "Each tool card shows when it started and how long it took."
+        "doneWhen": "A tool call that took a second or more shows its duration at the right of its row."
       }
     },
     {
@@ -26772,10 +27072,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Open Traces\"",
+          "text": "click menuitem \"Open in\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Open Traces",
+          "name": "Open in",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Traces\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Traces",
           "value": null
         },
         {
@@ -26793,10 +27100,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Open Requests\"",
+          "text": "click menuitem \"Open in\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Open Requests",
+          "name": "Open in",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Requests\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Requests",
           "value": null
         },
         {
@@ -27352,10 +27666,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Open Traces\"",
+          "text": "click menuitem \"Open in\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Open Traces",
+          "name": "Open in",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Traces\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Traces",
           "value": null
         },
         {
@@ -27440,7 +27761,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "turn-summary",
       "id": "turn-summary-line",
       "title": "A summary footer under each finished turn",
-      "summary": "Under each finished turn, one line says what the agent did with tools: files edited with lines added and removed, commands run, tests passed out of total from the last test-runner summary, files read and searches, and how long the turn took — \"Edited 3 files +42 −7 · ran 6 comma…",
+      "summary": "Under each finished turn, one line says what the agent did with tools: files edited with lines added and removed, commands run, the test outcome from the last test-runner summary, files read and searches, and how long the turn took — \"Edited 3 files +42 −7 · ran 6 commands · 1 f…",
       "destination": "transcript",
       "currentSurface": "transcript: turn summary footer",
       "reach": [
@@ -27473,7 +27794,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "turn-summary",
       "id": "turn-walkthrough",
       "title": "A walkthrough under a turn that changed code",
-      "summary": "Under a finished turn that edited files, one row opens a walkthrough: the changed files grouped by folder, each folder with a one-line summary (\"Edited 2 files · +40 −3\"), and every file row opens that file in the editor. Review in Changes opens that turn's changed-files review…",
+      "summary": "Under a finished turn that edited files, one row opens a walkthrough: the changed files grouped by folder, each folder with its file count and line total, and every file row opens that file in the editor. Review in Changes opens that turn's changed-files review in the right pane…",
       "destination": "transcript",
       "currentSurface": "transcript: turn walkthrough row",
       "reach": [
@@ -27492,11 +27813,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]]\"",
+          "text": "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]] [[call write {\\\"file_path\\\":\\\"src/second.ts\\\",\\\"content\\\":\\\"export const second = 2\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
           "name": "Message or run a task*",
-          "value": "[[call write {\"file_path\":\"notes/walkthrough.md\",\"content\":\"one two\"}]]"
+          "value": "[[call write {\"file_path\":\"notes/walkthrough.md\",\"content\":\"one two\"}]] [[call write {\"file_path\":\"src/second.ts\",\"content\":\"export const second = 2\"}]]"
         },
         {
           "text": "press Enter",
@@ -27506,9 +27827,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "expect text \"Walkthrough\"",
+          "text": "expect button \"Walkthrough\"",
           "action": "expect",
-          "by": "text",
+          "by": "button",
           "name": "Walkthrough",
           "value": null
         },
@@ -27520,24 +27841,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"walkthrough.md\"",
+          "text": "expect button \"Open walkthrough.md\"",
           "action": "expect",
-          "by": "text",
-          "name": "walkthrough.md",
-          "value": null
-        },
-        {
-          "text": "click button \"Open walkthrough.md\"",
-          "action": "click",
           "by": "button",
           "name": "Open walkthrough.md",
-          "value": null
-        },
-        {
-          "text": "expect tab \"walkthrough.md\"",
-          "action": "expect",
-          "by": "tab",
-          "name": "walkthrough.md",
           "value": null
         }
       ],
@@ -27751,6 +28058,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "left-nav: Usage › Charts",
       "reach": [
         {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
           "text": "click tab \"Observe\"",
           "action": "click",
           "by": "tab",
@@ -27762,6 +28076,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click button \"Re-index thread logs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Re-index thread logs",
           "value": null
         },
         {
@@ -27800,6 +28121,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"More numbers\"",
+          "action": "click",
+          "by": "button",
+          "name": "More numbers",
+          "value": null
+        },
+        {
           "text": "expect text \"Cache savings (estimate)\"",
           "action": "expect",
           "by": "text",
@@ -27808,6 +28136,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
         {
           "text": "click button \"More\"",
           "action": "click",
@@ -27862,6 +28197,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "text",
           "name": "Daily calendar",
+          "value": null
+        },
+        {
+          "text": "click button \"More numbers\"",
+          "action": "click",
+          "by": "button",
+          "name": "More numbers",
           "value": null
         },
         {
@@ -27882,87 +28224,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "The Cost tab shows DSH-origin Jev calls from Backlog and Memory grouped by configured secret-reference or environment-variable label, with provider-reported tokens, request counts, a TypeSafe list-price estimate and calendar month-to-date spend, requests and tokens per label. Ba…",
       "destination": "observe",
       "currentSurface": "left-nav: Usage › Charts › Jev",
-      "reach": [
-        {
-          "text": "click tab \"Observe\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Observe",
-          "value": null
-        },
-        {
-          "text": "click button \"Usage\"",
-          "action": "click",
-          "by": "button",
-          "name": "Usage",
-          "value": null
-        },
-        {
-          "text": "click tab \"Cost\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Cost",
-          "value": null
-        },
-        {
-          "text": "expect text \"Jev API usage\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Jev API usage",
-          "value": null
-        },
-        {
-          "text": "expect text \"Usage by API key · calendar month to date\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Usage by API key · calendar month to date",
-          "value": null
-        }
-      ],
-      "reachNarrow": [
-        {
-          "text": "click button \"More\"",
-          "action": "click",
-          "by": "button",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
-          "action": "click",
-          "by": "button",
-          "name": "Observe Usage, activity, traces, jobs and hosts.",
-          "value": null
-        },
-        {
-          "text": "click button \"Usage\"",
-          "action": "click",
-          "by": "button",
-          "name": "Usage",
-          "value": null
-        },
-        {
-          "text": "click tab \"Cost\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Cost",
-          "value": null
-        },
-        {
-          "text": "expect text \"Jev API usage\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Jev API usage",
-          "value": null
-        },
-        {
-          "text": "expect text \"Usage by API key · calendar month to date\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Usage by API key · calendar month to date",
-          "value": null
-        }
-      ],
+      "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -28473,10 +28736,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Open Traces\"",
+          "text": "click menuitem \"Open in\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Open in",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Traces\"",
           "action": "expect",
           "by": "menuitem",
-          "name": "Open Traces",
+          "name": "Traces",
           "value": null
         }
       ],
@@ -28590,6 +28860,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click menuitem \"Layout\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Layout",
+          "value": null
+        },
+        {
           "text": "click menuitem \"Hide tab row\"",
           "action": "click",
           "by": "menuitem",
@@ -28652,6 +28929,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click menuitem \"Layout\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Layout",
+          "value": null
+        },
+        {
           "text": "click menuitem \"Hide tab row\"",
           "action": "click",
           "by": "menuitem",
@@ -28683,6 +28967,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "rightclick",
           "by": "tab",
           "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Layout\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Layout",
           "value": null
         },
         {
@@ -28822,45 +29113,52 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
-          "text": "expect radio \"left\"",
+          "text": "expect radio \"Left\"",
           "action": "expect",
           "by": "radio",
-          "name": "left",
+          "name": "Left",
           "value": null
         },
         {
-          "text": "click radio \"right\"",
+          "text": "click radio \"Right\"",
           "action": "click",
           "by": "radio",
-          "name": "right",
+          "name": "Right",
           "value": null
         },
         {
-          "text": "expect radio \"right\"",
+          "text": "expect radio \"Right\"",
           "action": "expect",
           "by": "radio",
-          "name": "right",
+          "name": "Right",
           "value": null
         }
       ],
