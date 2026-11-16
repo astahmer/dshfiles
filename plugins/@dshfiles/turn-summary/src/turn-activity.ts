@@ -64,7 +64,7 @@ export interface TurnSegment {
   readonly key: 'files' | 'commands' | 'tests' | 'reads' | 'searches'
   readonly text: string
   readonly failed?: boolean
-  /** Set on a failed-tests part that stands for the one failed command, so the part opens the failures list. */
+  /** Set on the failed-tests part while commands failed: it is the one red part, and opens the failures list. */
   readonly opensFailures?: boolean
 }
 
@@ -195,8 +195,8 @@ export class TurnActivity {
   }
 
   /**
-   * The footer's parts, each naming the list it opens: "Edited 3 files +42 −7 · ran 6 commands · 2 tests failed · read
-   * 4 files". Line counts and tests are left out when their option is off or nothing was counted; `editedFiles: false`
+   * The footer's parts, each naming the list it opens: "Edited 3 files +42 −7 · ran 6 commands · 2 of 42 tests failed ·
+   * read 4 files". Line counts and tests are left out when their option is off or nothing was counted; `editedFiles: false`
    * leaves the edits to the file chips, which already name them. Calls that are neither a command, an edit, a read nor
    * a search get no part: "1 other tool call" says nothing a reader can act on.
    */
@@ -220,24 +220,34 @@ export class TurnActivity {
     return segments.filter(segment => segment !== undefined)
   }
 
-  /** The one test outcome: "2 tests failed" in red, else "40 tests passed". */
+  /** The one test outcome: "2 of 42 tests failed" in red, opening the failed commands; else "40 tests passed". */
   private static testsSegment(summary: TurnActivitySummary, tests: TestCounts): TurnSegment {
     if (tests.failed === 0) return { key: 'tests', text: `${tests.passed} ${tests.passed === 1 ? 'test' : 'tests'} passed` }
     return {
       key: 'tests',
-      text: `${tests.failed} ${tests.failed === 1 ? 'test' : 'tests'} failed`,
+      text: `${tests.failed} of ${tests.total} ${tests.total === 1 ? 'test' : 'tests'} failed`,
       failed: true,
-      opensFailures: TurnActivity.failedCommandsBeyondTests(summary, { testResults: true }) === 0 && summary.failedCommands.length > 0,
+      opensFailures: summary.failedCommands.length > 0,
     }
   }
 
   /**
-   * Failed commands the footer counts on their own. When tests failed and exactly one command failed, that command is
-   * the test run: "1 test failed" already says it, so a second red "1 failed" beside it would count one failure twice.
+   * Failed commands the footer counts as a part of their own. While the test outcome reads "N of M tests failed", that
+   * part is the turn's one red word and opens every failed command, so a second red "1 command failed" beside it would
+   * spend two warnings on one failure. Without failed tests (or with test results off) the count stands alone.
    */
   static failedCommandsBeyondTests(summary: TurnActivitySummary, options: { readonly testResults: boolean }): number {
     const testsFailed = options.testResults && summary.tests !== undefined && summary.tests.failed > 0
-    return testsFailed && summary.failedCommands.length === 1 ? 0 : summary.failedCommands.length
+    return testsFailed ? 0 : summary.failedCommands.length
+  }
+
+  /**
+   * Whether each footer part draws "·" before it: never the first part, and never a part right after one that ends in
+   * a chevron, which already separates the two ("ran 1 command › 5s", not "ran 1 command › · 5s").
+   * @param endsWithChevron - for each part in reading order, whether it ends in a disclosure chevron.
+   */
+  static separators(endsWithChevron: readonly boolean[]): readonly boolean[] {
+    return endsWithChevron.map((_chevron, index) => index > 0 && endsWithChevron[index - 1] !== true)
   }
 
   /** "1m 12s" for a finished turn's wall time. */
