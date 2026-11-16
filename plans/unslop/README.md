@@ -5,8 +5,8 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1 to 9 are done. Step 10 is built (16 revisions above this plan entry) but its journeys have
-not run. Steps 11–14 are open. See [Work list](#work-list).
+**Resume here:** steps 1 to 10 are done. Steps 12 and 13 were dispatched on 2026-11-16; steps 11 (copy) and 14
+(guardrails) wait for them, because they touch every plugin and re-baseline the ratchets. See [Work list](#work-list).
 
 ## Method and limits
 
@@ -197,7 +197,7 @@ before and passes after; see each revision's description for the reason.
 | 7 ✅ | Settings rows: key and source lines hidden, no package-description fallback, units and enums humanised, nav regrouped with no "Other". See [Settings lane](#settings-lane). | P1, P2, P3 | medium |
 | 8 ✅ | No zero-count chips, tiles and stat blocks on Usage, Memory and Processes. See [Pages lane](#pages-lane). | P6 | small |
 | 9 ✅ | AI accounts on the kit switch and the colour rule, one header row, no nested cards. See [Pages lane](#pages-lane). | P4 | small |
-| 10   | Developer pages behind the "Plugin development" pack; remove Capabilities hub; hide Plugin Market when absent.                                         | N9                | small  |
+| 10 ✅ | Developer pages in a "Developer" group at the end of Settings (setting to hide it, shown by default); Capabilities hub quiet and no longer first; Plugin Market says what to do. See [Destinations lane](#destinations-lane). | N9 | small |
 | 11   | Copy: catalog summary cap, error strings with a next step, `compactJson` renders, six status words, glossary in native forks.                          | C1–C8             | large  |
 | 12   | Backlog, History, Source control and Traces onto `Page`.                                                                                               | P5, P7, P8, P12   | large  |
 | 13   | Phone: type scale, landscape shell, thread panel sheet, palette as full-screen search, hide keyboard hints on touch.                                   | U7, U8, N12       | large  |
@@ -358,6 +358,34 @@ Unverified:
   checked.
 
 jj-integration's Host half changed (`/rebase` wording), so a running instance needs a restart.
+
+## Destinations lane
+
+16 revisions (`wqkuqryqtloy` … `pzwvrxmqtxyy`) in thread-sidebar, capabilities-hub, onboarding, plugin-guide and
+component-gallery, plus `vwyoxqyn`, which commits the two generated catalogs (stale since the upstream base, so every
+build rewrote them) and updates the onboarding test that pinned an old reach.
+
+- One thread menu for the row and the header `⋯`: Pin, Done, Snooze, Rename, Open in side panel, Copy thread link,
+  then Open in, Copy and More. Desktop-only entries and keyboard hints are hidden on the phone.
+- Labels follow the glossary: Settle → Done (Unsettle → Restore), Park → Snooze (Unsnooze). Mute (silences, for a
+  while or for good) and Archive (the Host verb that removes a thread from the list) keep their names. Keys, command
+  ids, Host methods and tool names keep the stored words.
+- Component gallery and Plugin guide sit in a "Developer" group at the end of the Settings list.
+- One name for the Inbox, with its count at the row's trailing edge. Unsent drafts list under "Drafts", not Idle.
+- The header shows Needs you while a thread waits on an approval; the subagent card says what the child does in
+  words, with one clock.
+- The failed-turns hook is published as a dshx module; one palette row per page; Settings choices use the kit
+  segmented control; What's new shows five features instead of 50 commit subjects.
+- `check:copy` findings in thread-sidebar: 36 at the base, 3 at the tip.
+
+Naming caveat: Snooze is the glossary's word for a timed or until-needed hide, but Park is neither (it holds until
+undone), while Mute already offers timed choices. The renames are labels only, so this is cheap to revisit.
+
+Journeys (`DSHX_E2E_WORKERS=2`, forced): thread-sidebar 45 / 16, onboarding 5 / 3, capabilities-hub 1 / 0, traces
+7 / 4, workbench 19 / 26. Every failure fails at the base at the same step, except `remote-row-verbs` and
+`skill-mentions`, which pass alone at the tip, and `usage-limit-group`, which flakes at the base too. The edited
+"Open in › Traces" journey step was never reached (its scenario stops earlier at the base too). Not verified: the
+phone, and the translations the lane added.
 
 ## Pages lane
 
