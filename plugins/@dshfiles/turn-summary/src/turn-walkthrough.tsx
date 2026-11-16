@@ -17,7 +17,7 @@ export const hasWalkthrough = (summary: TurnActivitySummary, chipLimit: number):
 export const TurnWalkthroughToggle = (props: { readonly open: boolean; readonly onToggle: () => void }): JSX.Element => (
   <button
     aria-expanded={props.open}
-    className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:hover:text-foreground"
+    className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:hover:text-foreground dshx:pointer-coarse:min-h-11"
     onClick={props.onToggle}
     type="button"
   >

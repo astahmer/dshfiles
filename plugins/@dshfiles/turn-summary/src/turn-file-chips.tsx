@@ -25,7 +25,7 @@ export const TurnFileChips = (props: {
       {shown.map(file => (
         <button
           aria-label={`${props.opensChanges ? 'Review' : 'Open'} ${file.path}${props.opensChanges ? ' in Changes' : ''}, ${String(file.added)} added, ${String(file.removed)} removed`}
-          className="dshx:flex dshx:h-5 dshx:min-w-0 dshx:max-w-full dshx:items-center dshx:gap-1 dshx:rounded-sm dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:font-mono dshx:text-foreground dshx:hover:bg-accent"
+          className="dshx:flex dshx:h-5 dshx:min-w-0 dshx:max-w-full dshx:items-center dshx:gap-1 dshx:rounded-sm dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:font-mono dshx:text-foreground dshx:hover:bg-accent dshx:pointer-coarse:h-11 dshx:pointer-coarse:px-3"
           data-dshfiles-turn-file-chip={file.path}
           key={file.path}
           onClick={() => props.onOpen(file)}
@@ -42,7 +42,7 @@ export const TurnFileChips = (props: {
       {hidden > 0 && (
         <button
           aria-expanded={props.moreOpen}
-          className="dshx:flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:hover:text-foreground"
+          className="dshx:flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:hover:text-foreground dshx:pointer-coarse:h-11 dshx:pointer-coarse:px-3"
           onClick={props.onMore}
           type="button"
         >
