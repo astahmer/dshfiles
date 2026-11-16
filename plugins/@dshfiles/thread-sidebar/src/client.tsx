@@ -125,6 +125,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
+  type CSSProperties,
   createContext,
   Fragment,
   memo,
@@ -1368,6 +1369,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     showAgent ||
     statusDetail !== undefined
   const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.integrationQueuedAt !== undefined || (props.subscriberCount ?? 0) > 0
+  // The inline verb sits at the end of the second line, so the title and the time keep the first (the rows that most
+  // need reading were the most truncated). A row with no second line keeps the verb beside its title.
+  const verbSeat = inlineVerb === undefined ? undefined : metaLine ? 'meta' : 'head'
   const openAside = useAsideOpen()
   /**
    * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
@@ -1485,6 +1489,18 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     )
   }
 
+  // The hover actions sit in the first line's time slot. While they show, that line gives them their width and the
+  // time steps aside, so the title truncates before them instead of being covered (each seat is a 24px button and a
+  // 2px gap; the last one is the row menu).
+  const hoverActions = nearViewport
+    ? props.rowActions.flatMap(action => {
+        const element = renderRowAction(action)
+        return element === null ? [] : [{ action, element }]
+      })
+    : []
+  const stripSeats = nearViewport ? hoverActions.length + 1 : 0
+  const stripStyle: CSSProperties & { readonly '--thread-row-strip': string } = { '--thread-row-strip': `${String(stripSeats * 1.625 + 0.25)}rem` }
+
   return (
     <ThreadContextMenu
       session={session}
@@ -1553,8 +1569,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
                 // Phone rows are 60pt two-line targets (T1.3), whatever the density preference.
                 'dshx:pointer-coarse:min-h-15 dshx:pointer-coarse:justify-center',
-                // Touch: the row's actions menu button takes the top-right corner, so the inline verb moves left of it.
-                inlineVerb !== undefined ? 'dshx:pr-20 dshx:pointer-coarse:pr-30' : 'dshx:pointer-coarse:pr-11',
+                // Touch: the row's actions menu button takes the top-right corner, so a verb on the first line moves left of it.
+                verbSeat === 'head' ? 'dshx:pr-20 dshx:pointer-coarse:pr-30' : 'dshx:pointer-coarse:pr-11',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
               )}
               data-thread-id={session.id}
@@ -1566,7 +1582,17 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               onDoubleClick={() => keepThreadTab(session.id)}
             >
               {headLine ? (
-                <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+                <span
+                  className={cn(
+                    'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2',
+                    // Wherever the strip can show (it hides on a coarse pointer, where the row menu button keeps its own corner).
+                    verbSeat !== 'head' &&
+                      stripSeats > 0 &&
+                      'dshx:not-pointer-coarse:group-hover/row:pr-(--thread-row-strip) dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:pr-(--thread-row-strip)',
+                  )}
+                  style={verbSeat !== 'head' && stripSeats > 0 ? stripStyle : undefined}
+                  data-thread-head=""
+                >
                   {(() => {
                     const status =
                       workStatus !== undefined ? (
@@ -1634,9 +1660,16 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                           {t('threadSidebarNotifySubscribers', { count: props.subscriberCount })}
                         </Badge>,
                       )}
-                  {rowStyle.time && inlineVerb === undefined ? (
+                  {rowStyle.time && verbSeat !== 'head' ? (
                     // The spinner and the live activity line say Working; the time stays colourless (DESIGN.md).
-                    <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground" data-thread-time="">
+                    <span
+                      className={cn(
+                        'dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
+                        stripSeats > 0 &&
+                          'dshx:not-pointer-coarse:group-hover/row:hidden dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:hidden',
+                      )}
+                      data-thread-time=""
+                    >
                       {liveStartedAt === undefined ? props.age : <LiveElapsed active={nearViewport} startedAt={liveStartedAt} />}
                     </span>
                   ) : null}
@@ -1646,7 +1679,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 <span
                   className={cn(
                     'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
-                    childCount > 0 && 'dshx:pr-16',
+                    // Room for what sits at the end of this line: the subagent counter, the inline verb, or both.
+                    childCount > 0 && verbSeat !== 'meta' && 'dshx:pr-16',
+                    verbSeat === 'meta' && (childCount > 0 ? 'dshx:pr-36' : 'dshx:pr-20'),
                   )}
                   data-thread-where=""
                 >
@@ -1669,7 +1704,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   {liveStep !== undefined || statusDetail === undefined ? null : (
                     <span
                       className={cn(
-                        'dshx:min-w-0 dshx:max-w-[60%] dshx:shrink dshx:truncate',
+                        'dshx:min-w-0 dshx:shrink dshx:truncate',
+                        // Beside the verb the reason has the line to itself; otherwise the project name follows it.
+                        verbSeat === 'meta' ? 'dshx:flex-1' : 'dshx:max-w-[60%]',
                         (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
                       )}
                       data-testid="thread-row-status-detail"
@@ -1677,7 +1714,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {statusDetail}
                     </span>
                   )}
-                  {showProject && liveStep === undefined ? (
+                  {showProject && liveStep === undefined && !(verbSeat === 'meta' && statusDetail !== undefined) ? (
                     <span
                       className={cn(
                         // The first text to give way on a short row: it truncates, then hides, before the mark does.
@@ -1751,18 +1788,43 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )}
             </button>
           ) : null}
-          {props.renaming || (inlineVerb === undefined && !nearViewport) ? null : (
-            // The inline verb and the hover strip share one corner: the strip opens to the left of the verb, so
-            // neither ever covers the other (the verb is the row's visible action, not a hover affordance).
+          {props.renaming || verbSeat !== 'meta' || inlineVerb === undefined || workStatus === undefined ? null : (
+            // The row's visible action, at the end of the second line: left of the subagent counter when the row has
+            // one, and left of the touch menu button's column.
+            <div
+              data-verb-seat="meta"
+              className={cn(
+                // 2px from the row's bottom: the hover actions end 2px above it, so the two never touch (a 50px row).
+                'dshx:absolute dshx:bottom-0.5 dshx:flex dshx:items-center',
+                childCount > 0 ? 'dshx:right-17' : 'dshx:right-1.5 dshx:pointer-coarse:right-11',
+              )}
+            >
+              <Button
+                type="button"
+                size="xs"
+                variant={workStatus.status === 'ready' ? 'outline' : 'default'}
+                className="dshx:h-5 dshx:px-2"
+                data-testid="thread-row-verb"
+                data-verb={inlineVerb}
+                onClick={() => props.actions.actOnStatus(session.id, workStatus)}
+              >
+                {t(inlineVerbLabelKeys[inlineVerb])}
+              </Button>
+            </div>
+          )}
+          {props.renaming || (verbSeat !== 'head' && !nearViewport) ? null : (
+            // The first line's corner: the hover actions in the time slot. A verb on a one-line row shares it, and the
+            // actions then open to its left, so neither ever covers the other.
             <div
               data-testid="thread-row-overlay"
+              data-verb-seat={verbSeat === 'head' ? 'head' : undefined}
               className={cn(
                 'dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:items-center',
                 // Touch: the row's actions menu button takes the top-right corner, so the verb moves left of it.
-                inlineVerb !== undefined && 'dshx:pointer-coarse:right-10',
+                verbSeat === 'head' && 'dshx:pointer-coarse:right-10',
               )}
             >
-              {inlineVerb === undefined || workStatus === undefined ? null : (
+              {verbSeat !== 'head' || inlineVerb === undefined || workStatus === undefined ? null : (
                 <Button
                   type="button"
                   size="xs"
@@ -1778,14 +1840,32 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               {nearViewport ? (
                 <div
                   data-testid="thread-row-actions"
+                  data-row-strip=""
                   className={cn(
-                    'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
-                    inlineVerb === undefined ? 'dshx:top-0 dshx:right-0' : 'dshx:top-1/2 dshx:right-full dshx:mr-1 dshx:-translate-y-1/2',
+                    'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:opacity-0 dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
+                    verbSeat !== 'head'
+                      ? 'dshx:-top-0.5 dshx:right-0'
+                      : // Beside a first-line verb the strip has no slot of its own: it floats over the title's end.
+                        'dshx:top-1/2 dshx:right-full dshx:mr-1 dshx:-translate-y-1/2 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:shadow-xs',
                   )}
                 >
-                  {props.rowActions.map(action => (
-                    <Fragment key={action}>{renderRowAction(action)}</Fragment>
+                  {hoverActions.map(({ action, element }) => (
+                    <Fragment key={action}>{element}</Fragment>
                   ))}
+                  {/* Every other verb of the row: the same menu a right-click opens. */}
+                  {withTooltip(
+                    t('threadSidebarContextMenu'),
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t('threadSidebarContextMenu')}
+                      aria-haspopup="menu"
+                      onClick={event => ThreadRowMenu.open(rowRef.current, event.currentTarget)}
+                    >
+                      <EllipsisIcon className="dshx:size-3.5" aria-hidden="true" />
+                    </Button>,
+                  )}
                 </div>
               ) : null}
             </div>
