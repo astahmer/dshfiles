@@ -136,8 +136,9 @@ describe('onboarding Host', () => {
       const settings = await client.reach({ key: 'settings-shell#settings-shell-port' })
       expect(settings.feature).toMatchObject({ walkable: true, unsupportedActions: [], destination: 'settings' })
       expect(settings.feature?.steps.map(step => [step.action, step.locator, step.unsupported])).toEqual([
-        ['click', { kind: 'role', role: 'button', name: 'Account menu', match: 'exact' }, null],
-        ['click', { kind: 'role', role: 'menuitem', name: 'Settings', match: 'substring' }, null],
+        ['click', { kind: 'role', role: 'button', name: 'Open command palette', match: 'exact' }, null],
+        ['fill', { kind: 'role', role: 'combobox', name: 'Search the command palette', match: 'exact' }, null],
+        ['click', { kind: 'role', role: 'option', name: 'Settings: General', match: 'substring' }, null],
         ['expect', { kind: 'role', role: 'button', name: 'General', match: 'exact' }, null],
       ])
       expect(settings.feature?.narrowSteps?.map(step => step.text)).toEqual([

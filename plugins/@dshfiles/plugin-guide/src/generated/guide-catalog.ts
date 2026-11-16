@@ -724,6 +724,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/background-jobs/running-threads",
+      "kind": "module",
+      "title": "@dshfiles/background-jobs/running-threads",
+      "summary": "Which threads run a background job now. A turn can end while its job keeps running, so a thread list that wants to show such a thread as working reads this on an interval (docs/ade-ux §4.7). Published as the `@dshfiles/background-jobs/running-threads` dshx module: the reader depends on background-jobs, never the rever…",
+      "publicSymbol": "RunningThreads",
+      "importFrom": "@dshfiles/background-jobs/running-threads",
+      "owner": "@dshfiles/background-jobs",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/background-jobs/src/running-threads.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "backlogApi",
       "importFrom": "@dshfiles/backlog/api",
       "owner": "@dshfiles/backlog",
@@ -814,7 +834,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "key": "module:@dshfiles/chat/turn-error-action",
       "kind": "module",
       "title": "@dshfiles/chat/turn-error-action",
-      "summary": "The seat the owned Chat fork adds beside Resume on a terminal turn error. Published as its own contract module (`@dshfiles/chat/turn-error-action`) so a feature plugin can fill it without importing the whole Chat contract.",
+      "summary": "The seat the owned Chat fork adds beside Retry on a terminal turn error: the one row of recovery actions. Published as its own contract module (`@dshfiles/chat/turn-error-action`) so a feature plugin can fill it without importing the whole Chat contract.",
       "publicSymbol": "TurnErrorActionOwnerProps",
       "importFrom": "@dshfiles/chat/turn-error-action",
       "owner": "@dshfiles/chat",
@@ -1593,6 +1613,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "WorkspaceMenuSections",
+      "importFrom": "@dshfiles/jj-integration/workspace-menu-sections",
+      "owner": "@dshfiles/jj-integration",
+      "source": "plugins/@dshfiles/jj-integration/src/workspace-menu-sections.ts:26",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/jj-integration.workspace-menu-section",
+      "kind": "registry",
+      "title": "WorkspaceMenuSections",
+      "summary": "Contribution registry owned by @dshfiles/jj-integration.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(WorkspaceMenuSections, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/jj-integration renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/jj-integration.workspace-menu-section"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/loopback-access/startup",
       "kind": "module",
       "title": "@dshfiles/loopback-access/startup",
@@ -2072,7 +2114,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/rich-composer/thread-views",
       "summary": "The thread's secondary views (Trajectory, Traces, Requests…) as thread-panel facets, published as the `@dshfiles/rich-composer/thread-views` dshx module. Importing it loads none of the composer's runtime. Productivity pass Q5 (E5): the stage always shows Chat; every other `conversation.view` opens as a facet of the th…",
-      "publicSymbol": "ThreadView, ThreadViewOpenRequest, ThreadViewsModel",
+      "publicSymbol": "ThreadView, ThreadViewOpenRequest, ThreadHeaderMenuAction, ThreadHeaderMenu, ThreadHeaderMenuResolver, ThreadViewsModel",
       "importFrom": "@dshfiles/rich-composer/thread-views",
       "owner": "@dshfiles/rich-composer",
       "scope": "client or host",
@@ -2433,7 +2475,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadSidebarAttentionApi",
       "importFrom": "@dshfiles/thread-sidebar/attention-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/attention-api.ts:117",
+      "source": "plugins/@dshfiles/thread-sidebar/src/attention-api.ts:139",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-sidebar-attention",
@@ -2446,8 +2488,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/thread-sidebar owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: state, changesSince, acknowledge, clearUnread, clearUnreadMany, markUnread, markUnreadMany, migrate, writeDelta, writeCapabilities",
-        "Agent tools: thread_attention_state (read-only), thread_attention_write_capabilities (read-only)"
+        "Methods: state, changesSince, acknowledge, clearUnread, clearUnreadMany, markUnread, markUnreadMany, migrate, writeDelta, failedTurns, writeCapabilities",
+        "Agent tools: thread_attention_state (read-only), thread_failed_turns (read-only), thread_attention_write_capabilities (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2456,7 +2498,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadSidebarAutoSettleApi",
       "importFrom": "@dshfiles/thread-sidebar/auto-settle-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/auto-settle-api.ts:89",
+      "source": "plugins/@dshfiles/thread-sidebar/src/auto-settle-api.ts:91",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-sidebar-auto-settle",
@@ -2587,7 +2629,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "DestinationSections",
       "importFrom": "@dshfiles/thread-sidebar/destinations",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:50",
+      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:51",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/thread-sidebar.destination-section",
@@ -2609,7 +2651,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "ThreadRowActions",
       "importFrom": "@dshfiles/thread-sidebar/thread-row-actions",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/thread-row-actions.ts:25",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-row-actions.ts:28",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/thread-sidebar.row-action",
@@ -2708,6 +2750,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/thread-sidebar/src/thread-directories.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/thread-sidebar/failed-turns-client",
+      "kind": "module",
+      "title": "@dshfiles/thread-sidebar/failed-turns-client",
+      "summary": "Which threads show Failed, for every surface that marks one (the thread list, a tab strip). Published as the `@dshfiles/thread-sidebar/failed-turns-client` dshx module, so a surface reads the Host's failed-turn record through this hook instead of restating the read, its cache times and the old-Host fallback.",
+      "publicSymbol": "FailedThreadsModel, useFailedTurns, useFailedThreadIds",
+      "importFrom": "@dshfiles/thread-sidebar/failed-turns-client",
+      "owner": "@dshfiles/thread-sidebar",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/thread-sidebar/src/failed-turns-client.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2946,6 +3008,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "Also exports: WorkbenchTabsActions, WorkbenchTabsProvider, WorkbenchTabAsideHandler, workbenchTabs, connectWorkbenchTabs, WorkbenchTabDocking"
       ],
       "source": "plugins/@dshfiles/workbench/src/tabs.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workbench/tab-status",
+      "kind": "module",
+      "title": "@dshfiles/workbench/tab-status",
+      "summary": "The one mapping from a thread tab's status onto the shared work-status vocabulary (DESIGN.md \"Status vocabulary\"). Both tab strips draw it, so a thread shows the same glyph on its tab as in the thread list: working is the colourless spinner, Needs you the indigo diamond, failed the red cross, an unseen finish the ink…",
+      "publicSymbol": "TAB_WORK_STATUS, TabStatusGlyph",
+      "importFrom": "@dshfiles/workbench/tab-status",
+      "owner": "@dshfiles/workbench",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workbench/src/tab-status.tsx",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -3444,13 +3526,13 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Catalog metadata only; features:check validates the surface/destination pair.",
       "occupancy": "static",
       "occupants": [
+        "@dshfiles/activity-timeline › thread-question-strip",
         "@dshfiles/agent-plan › plan-card",
         "@dshfiles/agent-plan › failure-card",
-        "@dshfiles/agent-questions › root-timed-questions",
-        "@dshfiles/agent-questions › question-card-layout"
+        "@dshfiles/agent-questions › root-timed-questions"
       ],
       "details": [
-        "Used by 41 catalog feature(s)",
+        "Used by 42 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
