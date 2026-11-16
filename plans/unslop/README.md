@@ -6,7 +6,7 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 [UX plan](../../docs/ade-ux/README.md).
 
 **Resume here:** steps 1, 2, 4 and 7 are done and step 3 is half done (the tab strips are open). Open follow-ups are
-listed under [Thread lane](#thread-lane) and [Settings lane](#settings-lane). Steps 5, 6 and 8–14 are open. See
+listed under [Thread lane](#thread-lane). Steps 5, 6 and 8–14 are open. See
 [Work list](#work-list).
 
 ## Method and limits
@@ -301,8 +301,17 @@ Not fixable from settings-shell:
   tool-meta, test-runs).
 - thread-sidebar's own section still uses a black segmented control and says "session" in three labels.
 
-Open in this lane: three secret-catalog scenarios fail and are not compared with the base; the settings-web-search
-journey expects the old row label; the workbench journey and the main-tabs and workbench reach walks were not run.
+Follow-ups, closed in two more revisions (`nktyxmlnqmrl`, `lzonzlnkllol`), each scenario run at the tip and at the
+lane's base:
+
+- secret-catalog: one of the three scenarios passes at both; "Set up Jev from the latest chat turn" and "Create and
+  bind from a marked secret-reference field" fail at the base too, at the same step.
+- settings-web-search: its journey failed at the base on a stale row label and now passes.
+- workbench: the journey holding the renamed Settings click fails at the base too, at a later step where the URL's
+  thread id does not change after New thread.
+- The `workbench/main-tab-parity` and `main-tabs/main-view-tabs` reach walks pass after their stale openings were
+  repaired.
+
 Phone layout was checked in Chromium at 390 px only.
 
 ## Open items
