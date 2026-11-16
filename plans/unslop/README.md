@@ -5,9 +5,10 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1 and 4 are done and step 2 is half done (transcript half). Three lanes were running on
-2026-11-16: thread list and header (rest of step 2, step 3), Settings (step 7), and the transcript follow-ups listed
-under [Transcript lane](#transcript-lane). Steps 5, 6 and 8–14 are not dispatched. See [Work list](#work-list).
+**Resume here:** steps 1, 4 and 7 are done and step 2 is half done (transcript half). Still running on 2026-11-16:
+the thread list and header lane (rest of step 2, step 3) and the follow-ups listed under
+[Transcript lane](#transcript-lane) and [Settings lane](#settings-lane). Steps 5, 6 and 8–14 are not dispatched. See
+[Work list](#work-list).
 
 ## Method and limits
 
@@ -195,7 +196,7 @@ before and passes after; see each revision's description for the reason.
 | 4 ✅ | Failure card: one sentence, one Retry, "Ask to fix" in the same row, code and payload under Details. No "Compact and retry": the over-long sentence names `/compact`. | M4 | medium |
 | 5    | Inbox question items render the question's own options; "Answer" lands on an answerable card; phone question card gets one scroll.                     | M1, M2, M3, M8    | medium |
 | 6    | A primary "Land" in the header and as the row's inline verb when there is work to land; settle what the "+N −N" chip counts.                           | M6, M7            | medium |
-| 7    | Settings rows: hide key and source lines, no package-description fallback, humanise units and enums, regroup the nav with no "Other".                  | P1, P2, P3        | medium |
+| 7 ✅ | Settings rows: key and source lines hidden, no package-description fallback, units and enums humanised, nav regrouped with no "Other". See [Settings lane](#settings-lane). | P1, P2, P3 | medium |
 | 8    | Do not render zero-count chips, tiles and stat blocks.                                                                                                 | P6                | small  |
 | 9    | AI accounts onto the kit switch and the colour rule.                                                                                                   | P4                | small  |
 | 10   | Developer pages behind the "Plugin development" pack; remove Capabilities hub; hide Plugin Market when absent.                                         | N9                | small  |
@@ -232,6 +233,37 @@ verb and route id (ai-accounts), the edited-file card with a coloured tile (owne
 
 Host-side settings text changed in chat, tool-meta, agent-plan and turn-summary, so a running instance shows those
 only after a restart.
+
+## Settings lane
+
+19 revisions (`ymyryuvqqtlp` … `pwxsxvlpyyxl`), all in settings-shell apart from reach and journey steps. Settings went
+from 62 navigation rows in 11 groups (General 15, Other 12) to 41 rows in 10 groups (General 8, no Other). A row is now
+label, description and control: the key and "Default" source lines are gone, a package description is never shown as a
+section description, byte and millisecond values show in one readable unit, a JSON-edited setting keeps its last valid
+value, and a schema's `collapse()` hint folds a field under Advanced. `settings-groups.test.ts` fails when a namespace
+would land in Other and says which table to edit.
+
+Deliberate differences from the audit's proposals:
+
+- Thread list stays its own entry (about 55 controls); Layout holds Main tabs, Docked panes, Thread panel, Status bar.
+- Extra merges: Web search and fetch, Checks and tests, Diagnostics; Command palette under Keyboard shortcuts.
+- The audit quoted "Max request files bytes 13421772"; the default is 134217728, shown as 128 MB.
+
+Not fixable from settings-shell:
+
+- The Built-in plugins card grid and the "new sessions" row are native core sections with no fork here.
+- 42 namespaces now show no description: each owned plugin needs a schema `.description()` or a `locale/en.json`
+  title and description. Nine are core rows.
+- Fields to mark `.collapse()`: traces (host, port, forward URL, retention, stall), agent-telemetry, annotations
+  (Chrome path, CDP port, profile dir), web-fetch-readable, worktree-memory, sidebar-right, project-automations,
+  workbench demo panels.
+- Five plugins keep a master `enabled` switch that repeats the Plugins page (main-tabs, turn-summary, agent-plan,
+  tool-meta, test-runs).
+- thread-sidebar's own section still uses a black segmented control and says "session" in three labels.
+
+Open in this lane: three secret-catalog scenarios fail and are not compared with the base; the settings-web-search
+journey expects the old row label; the workbench journey and the main-tabs and workbench reach walks were not run.
+Phone layout was checked in Chromium at 390 px only.
 
 ## Open items
 
