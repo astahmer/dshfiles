@@ -5,7 +5,7 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1, 2, 4 and 7 are done and step 3 is half done (the tab strips are open). Open follow-ups are
+**Resume here:** steps 1, 2, 4, 5 and 7 are done and step 3 is half done (the tab strips are open). Open follow-ups are
 listed under [Thread lane](#thread-lane). Steps 5, 6 and 8–14 are open. See
 [Work list](#work-list).
 
@@ -193,7 +193,7 @@ before and passes after; see each revision's description for the reason.
 | 2 ✅ | Deletions on the main surface: "Context injection" rows hidden, no timing overlay on card headers, one header `⋯` holding Copy link, Pin and the native More actions, one verb plus `⋯` on row hover. | U3, N3, N4, N5 | small |
 | 3 ◐  | Tab strips use the shared status glyph; one projection for working and needs-you counts; failed stays Failed. Done: N2, M5 (see [Thread lane](#thread-lane)). Open: N1 and N7 in main-tabs and workbench. | N1, N2, M5, N7 | medium |
 | 4 ✅ | Failure card: one sentence, one Retry, "Ask to fix" in the same row, code and payload under Details. No "Compact and retry": the over-long sentence names `/compact`. | M4 | medium |
-| 5    | Inbox question items render the question's own options; "Answer" lands on an answerable card; phone question card gets one scroll.                     | M1, M2, M3, M8    | medium |
+| 5 ✅ | Inbox question items show the question's own options and answer in place, open forms included; a subagent's question is answerable in its parent thread; the phone question card keeps its options in view; triage has one action row. See [Inbox lane](#inbox-lane). | M1, M2, M3, M8 | medium |
 | 6    | A primary "Land" in the header and as the row's inline verb when there is work to land; settle what the "+N −N" chip counts.                           | M6, M7            | medium |
 | 7 ✅ | Settings rows: key and source lines hidden, no package-description fallback, units and enums humanised, nav regrouped with no "Other". See [Settings lane](#settings-lane). | P1, P2, P3 | medium |
 | 8    | Do not render zero-count chips, tiles and stat blocks.                                                                                                 | P6                | small  |
@@ -273,6 +273,45 @@ Unverified:
 
 The Host half of thread-sidebar changed (failed turns, live-turn flag), so a running instance shows the failed and
 Needs you fixes only after a restart. Onboarding still says "Restart DSH (bottom of the sidebar)".
+
+## Inbox lane
+
+14 revisions (`wuzxwztzlrot` … `wvmqltyknsky`) in activity-timeline, agent-questions and user-questions.
+
+- An Inbox item that asks a question shows that question's options as its buttons and no canned replies; the body is
+  two plain lines instead of Markdown and HTML source.
+- A form that is still open (including a blocking one) can now be answered from the Inbox. agent-questions became one
+  more answerer on the `user-questions/request` waterfall: it holds each open request, races its own answer against
+  the browser's, and retracts the browser's form through the request's cancellation signal. The agent tool
+  `answer_thread_question` gained the same reach (root-only, "run only when the user asked"). The native `answer`
+  still takes continued forms only; `plans/dsh-host-gaps.md` row 16 says what is wanted from the Host.
+- A subagent's pending question shows above the composer of its parent thread with its options.
+- The question card keeps its options above Skip and Submit at every width, hides the pager for one question, and
+  words its second exit "Answer later".
+- Triage shows one action row. The Inbox fills its pane; its two alert switches moved behind the page `⋯`.
+- Activity rows show thread titles instead of `session-…` ids, one status tint, sentence case.
+
+The Inbox still cannot answer: forms with several questions, multi-select or free text only, more than 8 options,
+forms of a stopped or subagent thread, and an open form asked before the Host loaded the plugin. Those keep "Open
+thread" as the one action and say why.
+
+Not done: the duplicate "Ask question · waiting · Answer" row above an open card is drawn by core
+`@deepseek-ai/dsh-client-ui-tool`, which has no fork here.
+
+Unverified:
+
+- Journeys: activity-timeline 3 of 3. agent-questions 0 of 11 and the markdown-question journey 0 of 1, at the tip
+  and at the base alike (four stop at the new-thread composer, seven abort on "Use Node 22.23.3 for DSH acceptance",
+  one never finishes start-up), so the assertions this lane added to them have never run.
+- The open-form answerer is covered by unit tests and one reach walk; a timed form answered inside its countdown and
+  a browser disconnecting while a form is held were not exercised.
+- Phone checks used Playwright WebKit with an iPhone 14 descriptor, not a device.
+
+agent-questions and activity-timeline changed their Host halves, so a running instance needs a restart.
+
+For thread-sidebar, not started: "What needs you, answered in place" and the "Needs you" page label, merging Waiting
+threads into the Inbox, the count badge drawn over the Needs you icon, and the subagent card's "Working · In
+ask_parent_question" with a raw route id.
 
 ## Settings lane
 
