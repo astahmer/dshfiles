@@ -45,6 +45,10 @@
     "./repository-change": {
       "types": "./src/repository-change.ts",
       "default": "./dist/repository-change.js"
+    },
+    "./workspace-menu-sections": {
+      "types": "./src/workspace-menu-sections.ts",
+      "default": "./dist/workspace-menu-sections.js"
     }
   },
   "scripts": {

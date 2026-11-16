@@ -13,6 +13,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useRegistry } from '@dshfiles/dshx/client'
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
 import type { ThreadRevisionView, ThreadView } from './api.js'
@@ -29,6 +30,7 @@ import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { threadStatusPollMs } from './thread-status-poll.js'
 import { useToast } from './toast.js'
 import { useProjectBookmark } from './project-bookmark-query.js'
+import { arrangeWorkspaceMenuSections, WorkspaceMenuSections } from './workspace-menu-sections.js'
 
 export interface ThreadWorkspaceControlProps {
   readonly sessionId: SessionSummary['id']
@@ -89,6 +91,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
   const bookmark = useProjectBookmark(cwd, props.bookmark)
   const toast = useToast()
+  const menuSections = arrangeWorkspaceMenuSections(useRegistry(WorkspaceMenuSections))
   const thread = useQuery({
     queryKey: threadQueryKeys.threadAt(cwd ?? '', props.sessionId),
     enabled: cwd !== null && cwd.length > 0,
@@ -327,6 +330,16 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
             ) : (
               <p className="dshx:px-3 dshx:pt-2 dshx:pb-3 dshx:text-xs dshx:text-muted-foreground">{statusText()}</p>
             )}
+            {loading
+              ? null
+              : menuSections.map(section => (
+                  <section.Component
+                    dismiss={() => onWorkspaceMenuOpenChange(false)}
+                    key={section.id}
+                    ownWorkspace={ownWorkspace}
+                    sessionId={String(props.sessionId)}
+                  />
+                ))}
             {isThread &&
               (integrationQueued ? (
                 <div className="dshx:px-3 dshx:pb-3">
