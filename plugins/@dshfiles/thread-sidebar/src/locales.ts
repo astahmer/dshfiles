@@ -133,7 +133,7 @@ const en = {
   threadSidebarUnassigned: 'Unassigned',
   threadSidebarNewThread: 'New thread',
   threadSidebarNewChatInProject: 'New chat in {project}',
-  threadSidebarNewChat: 'New chat',
+  threadSidebarNewChat: 'New thread',
   threadSidebarUnsentDraft: 'Draft: {preview}',
   threadSidebarSearch: 'Search threads',
   threadSidebarSettings: 'Sidebar settings',

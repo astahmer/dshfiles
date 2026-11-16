@@ -10,3 +10,8 @@ test('an unfiltered status reads "Any", not "None"', () => {
   // "Status: None" read as an error, or as "threads with no status"; the filter is simply not narrowing the list.
   expect(english).toContain("threadSidebarFilterNone: 'Any',")
 })
+
+test('an unsent draft is a new thread, not a chat', () => {
+  // Glossary: thread, never chat. The row of the open blank draft read "New chat".
+  expect(english).toContain("threadSidebarNewChat: 'New thread',")
+})
