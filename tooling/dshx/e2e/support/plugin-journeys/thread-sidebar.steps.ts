@@ -507,14 +507,14 @@ Then(
     }
     try {
       await recordAssertion(page, 'thread-sidebar-phone-notify-submenu-fits', async () => {
-        await openRowSubmenu(/^Notify…$/u)
+        await openRowSubmenu(/^Notify when finished$/u)
         await expectSubmenuFitsThePhone()
         const path = $testInfo.outputPath('thread-subscription-notify-phone.png')
         await page.screenshot({ path, animations: 'disabled' })
         await $testInfo.attach('thread-subscription-notify-phone', { path, contentType: 'image/png' })
         await submenu.getByRole('menuitemradio', { name: 'Only when stuck', exact: true }).click()
         await expect(submenu).toBeHidden()
-        await openRowSubmenu(/^Notify…$/u)
+        await openRowSubmenu(/^Notify when finished$/u)
         await expect(submenu.getByRole('menuitemradio', { name: 'Only when stuck', exact: true })).toHaveAttribute('aria-checked', 'true')
         await page.keyboard.press('Escape')
         await page.keyboard.press('Escape')

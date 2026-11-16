@@ -20,3 +20,8 @@ test('the restart notice says what to do next when DSH cannot restart itself', (
   // "Restart DSH yourself to load them." named no step: the next action is in the terminal that runs DSH.
   expect(english).toMatch(/threadSidebarUpdatesManual: '[^']*stop DSH in the terminal[^']*start it again[^']*',/u)
 })
+
+test('row menu labels: a submenu has a chevron, not an ellipsis too, and no label says plugin', () => {
+  expect(english).toContain("threadSidebarNotifyOnFinish: 'Notify when finished',")
+  expect(english).toContain("threadSidebarOpenPluginInSidePanel: 'Open a view in side panel',")
+})

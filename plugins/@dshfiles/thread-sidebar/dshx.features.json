@@ -4383,10 +4383,10 @@
     {
       "id": "thread-subscriptions",
       "title": "Opt-in completion notices between threads",
-      "summary": "A thread can subscribe to another thread's turn completions. While subscribed, that thread's turn end sends ONE compact notice into the subscriber (status: finished, landed, failed, blocked, stopped, truncated or waiting-on-question, plus a 320-character preview of the turn that ended, never the transcript); compaction-only turns send nothing. An idle subscriber is woken; a running one gets the notice steered into its live turn at its next step (or queued behind it), and notices that arrive together merge into one, latest status per thread. Each subscription has a level (all, outcomes, stuck, never) with a default setting. Nothing is delivered without a subscription, so a thread started with thread_create/thread_fork stays silent by default. The state is durable Host storage, visible and reversible from a thread's context menu (Notify…, also for several selected threads; Never shows as Off there) and the N-notified row badge, and it ends when either thread is archived.",
+      "summary": "A thread can subscribe to another thread's turn completions. While subscribed, that thread's turn end sends ONE compact notice into the subscriber (status: finished, landed, failed, blocked, stopped, truncated or waiting-on-question, plus a 320-character preview of the turn that ended, never the transcript); compaction-only turns send nothing. An idle subscriber is woken; a running one gets the notice steered into its live turn at its next step (or queued behind it), and notices that arrive together merge into one, latest status per thread. Each subscription has a level (all, outcomes, stuck, never) with a default setting. Nothing is delivered without a subscription, so a thread started with thread_create/thread_fork stays silent by default. The state is durable Host storage, visible and reversible from a thread's context menu (Notify when finished, also for several selected threads; Never shows as Off there) and the N-notified row badge, and it ends when either thread is archived.",
       "surface": "rowDecorator",
       "destination": "threads",
-      "currentSurface": "threads: row context menu → Notify…",
+      "currentSurface": "threads: row context menu → Notify when finished",
       "surfaces": ["client", "host", "tool", "storage"],
       "configuration": [
         {
@@ -4537,7 +4537,7 @@
         "expect text \"This turn failed*\"",
         "hover tab \"Threads\"",
         "rightclick button \"Notify target*\" at 8,8",
-        "click menuitem \"Notify…\"",
+        "click menuitem \"Notify when finished\"",
         "expect menuitemradio \"Only when stuck\""
       ]
     },
