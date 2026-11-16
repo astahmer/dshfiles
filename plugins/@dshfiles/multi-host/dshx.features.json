@@ -535,7 +535,8 @@
         "click tab \"Observe\"",
         "click button \"Hosts\"",
         "expect heading \"Hosts\"",
-        "expect heading \"Link this machine\"",
+        "click button \"Link this machine\"",
+        "expect dialog \"Link this machine\"",
         "click button \"Pair a machine\"",
         "expect dialog \"Pair a machine\""
       ],

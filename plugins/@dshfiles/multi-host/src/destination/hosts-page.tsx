@@ -56,7 +56,8 @@ import { ConnectionDiagnostics } from './connection-diagnostics.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
 import { FleetUpdateDialog } from './fleet-update-dialog.js'
 import { hostTargetLabel } from './host-target.js'
-import { LinkThisMachine, PairMachineDialog } from './link-machines.js'
+import { HostsHeader } from './hosts-header.js'
+import { LinkThisMachineDialog, PairMachineDialog } from './link-machines.js'
 import { linkBackNeedsPlainHttpConsent } from './link-urls.js'
 import { DisconnectGrace } from './disconnect-grace.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
@@ -521,6 +522,9 @@ export const HostsPage = () => {
   const [syncHostId, setSyncHostId] = useState<string | null>(null)
   const [fleetOpen, setFleetOpen] = useState(false)
   const [pairOpen, setPairOpen] = useState(false)
+  const [linkOpen, setLinkOpen] = useState(false)
+  const linkStatus = useQuery(multiHostQueries.linkStatus(api, 30_000))
+  const linkChipStatus = linkStatus.data === undefined ? undefined : { enabled: linkStatus.data.settings.enabled, listening: linkStatus.data.listening }
   const [updateRequest, setUpdateRequest] = useState(0)
   const projectRuntime = directory.data?.runtimes.find(runtime => runtime.id === projectRuntimeId)
   const projectHost = projectRuntime === undefined ? undefined : hosts.find(host => host.id === projectRuntime.hostId)
@@ -599,10 +603,19 @@ export const HostsPage = () => {
         heading="Hosts"
         description="Machines threads can run on. Hidden hosts keep their records but leave the destination picker."
         meta={
-          <Badge variant="secondary" className="dshx:text-2xs dshx:font-normal">
-            {hosts.length === 0 ? 'none' : `${hosts.length} registered`}
-            {hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}
-          </Badge>
+          <>
+            <Badge variant="secondary" className="dshx:text-2xs dshx:font-normal">
+              {hosts.length === 0 ? 'none' : `${hosts.length} registered`}
+              {hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}
+            </Badge>
+            {[HostsHeader.autoChip(resourcePool.data?.selected), HostsHeader.linkChip(linkChipStatus)].map(chip =>
+              chip === null ? null : (
+                <Badge key={chip} role="status" variant="secondary" className="dshx:text-2xs dshx:font-normal">
+                  {chip}
+                </Badge>
+              ),
+            )}
+          </>
         }
         primaryAction={{ id: 'add-host', label: 'Add host', icon: <PlusIcon className="dshx:size-4" />, onSelect: () => setForm(blankDraft) }}
         actions={[
@@ -613,23 +626,13 @@ export const HostsPage = () => {
             disabled: hosts.length === 0,
             onSelect: () => setFleetOpen(true),
           },
+          { id: 'link-this-machine', label: 'Link this machine', icon: <LinkIcon className="dshx:size-4" />, onSelect: () => setLinkOpen(true) },
         ]}
       >
         {directory.isError ? retryAlert({ message: errorMessage(directory.error, 'Hosts are unavailable.'), retry: () => void directory.refetch() }) : null}
         {resourcePool.isError
           ? retryAlert({ message: errorMessage(resourcePool.error, 'Host resources are unavailable.'), retry: () => void resourcePool.refetch() })
           : null}
-        {resourcePool.data?.selected === null ? (
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:px-3 dshx:py-2 dshx:text-sm">
-            <span className="dshx:font-medium">Auto destination</span>
-            <Badge variant="secondary">Unavailable</Badge>
-          </div>
-        ) : resourcePool.data?.selected === undefined ? null : (
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:px-3 dshx:py-2 dshx:text-sm" role="status">
-            <span className="dshx:font-medium">Auto destination</span>
-            <Badge variant="secondary">{resourcePool.data.selected.hostName}</Badge>
-          </div>
-        )}
         {hide.isError
           ? retryAlert({
               message: errorMessage(hide.error, 'The host visibility could not be saved.'),
@@ -662,7 +665,6 @@ export const HostsPage = () => {
               },
             })
           : null}
-        <LinkThisMachine api={api} onPair={() => setPairOpen(true)} />
         {directory.isPending ? <Spinner aria-label="Loading hosts" /> : null}
         {!directory.isPending && ordered.length === 0 ? (
           <EntityList aria-label="Registered hosts">
@@ -744,6 +746,16 @@ export const HostsPage = () => {
         ) : null}
         <CheckoutSyncDialog api={api} host={hosts.find(host => host.id === syncHostId)} onClose={() => setSyncHostId(null)} />
         <HostDialog api={api} draft={form} onOpenChange={open => (open ? undefined : setForm(null))} />
+        <LinkThisMachineDialog
+          api={api}
+          open={linkOpen}
+          onOpenChange={setLinkOpen}
+          onPair={() => {
+            // One dialog at a time: pairing replaces the link dialog instead of stacking on it.
+            setLinkOpen(false)
+            setPairOpen(true)
+          }}
+        />
         <PairMachineDialog api={api} open={pairOpen} onOpenChange={setPairOpen} />
         <FleetUpdateDialog
           api={api}
