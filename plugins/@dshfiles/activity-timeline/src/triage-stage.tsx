@@ -136,7 +136,7 @@ export const TriageReply = (props: { readonly t: InboxTranslate; readonly reply:
   return (
     <section aria-label={props.t('peekLastReply')} className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3">
       <span className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.t('peekLastReply')}</span>
-      <p data-triage-reply="" className="dshx:text-sm dshx:break-words dshx:whitespace-pre-wrap">
+      <p data-triage-reply="" className="dshx:max-w-[72ch] dshx:text-sm dshx:break-words dshx:whitespace-pre-wrap">
         {replyText(props.t, reply)}
       </p>
     </section>

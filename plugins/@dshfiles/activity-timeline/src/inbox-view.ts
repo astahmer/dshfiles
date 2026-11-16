@@ -97,7 +97,11 @@ const textOf = (item: AttentionItem) => {
   return { reason: reason === '' ? sourceLabel(item.source) : reason, detail: detail === '' ? null : detail }
 }
 
+/** A page fills its pane (DESIGN.md); the words of a row keep a readable line length on a wide one. */
+const TEXT_MEASURE = 'dshx:max-w-[72ch]'
+
 export class InboxView {
+  static readonly TEXT_MEASURE = TEXT_MEASURE
   static readonly textOf = textOf
   static readonly asksQuestion = asksQuestion
   static readonly offersQuickReplies = offersQuickReplies
