@@ -1,8 +1,6 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { MergeConflictGraph, type MergeRevision } from '@dshfiles/plugin-ui/components/motion/merge-conflict-graph'
-import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
-import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
@@ -272,24 +270,25 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   }
 
   const glyph = <FolderGit2Icon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0" />
-  // b:czs9: the chip never shrinks below what it shows. A shrunk chip centred its badge and chevron over the elapsed
+  // b:czs9: the chip never shrinks below what it shows. A shrunk chip centred its count and chevron over the elapsed
   // time and the ⋯ beside it. It sheds parts instead, by the header row's width (an inline-size container): its label
   // below 32rem (after the live activity's elapsed time, 36rem), then its count below 26rem. The count stays in this
-  // chip's menu ("458 to rebase"), which the same tap opens.
-  const countBadge =
+  // chip's menu, which the same tap opens.
+  // H5 (unslop): the count is the phrase the thread list and the menu use ("1 to land"), never a bare number.
+  const countLabel =
     unlanded > 0 ? (
-      <Badge
-        className={cn('dshx:h-4 dshx:px-1.5 dshx:text-2xs dshx:@max-[26rem]:hidden', conflicted && 'dshx:bg-warning/20 dshx:text-warning')}
-        variant={conflicted ? 'ghost' : 'secondary'}
+      <span
+        className={cn('dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground dshx:@max-[26rem]:hidden', conflicted && 'dshx:text-warning')}
+        data-workspace-count=""
       >
-        <RollingNumber value={unlanded} />
-      </Badge>
+        {props.t('toRebase', { count: unlanded })}
+      </span>
     ) : null
 
   const trigger = (
     <Button
       aria-label={triggerLabel}
-      className="dshx-root dshx:max-w-44 dshx:gap-1.5 dshx:px-2"
+      className="dshx-root dshx:max-w-60 dshx:gap-1.5 dshx:px-2"
       data-workspace-name={isThread ? current.name : undefined}
       data-workspace-place={ownWorkspace ? 'own' : 'project'}
       size="sm"
@@ -298,7 +297,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     >
       {glyph}
       <span className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:@max-[32rem]:hidden">{placeLabel}</span>
-      {countBadge}
+      {countLabel}
       {integrationQueued ? <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
       <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
     </Button>
