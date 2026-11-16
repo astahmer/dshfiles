@@ -8,7 +8,7 @@ export type RepositoryView = 'graph' | 'source'
 const titles = { graph: 'History', source: 'Source control' } as const satisfies Record<RepositoryView, string>
 
 const descriptions = {
-  graph: 'The revisions of a project: what each thread and each person changed, and where every workspace stands.',
+  graph: 'Every revision of a project, and where each workspace stands.',
   source: 'The uncommitted changes of a project and its latest revisions, file by file.',
 } as const satisfies Record<RepositoryView, string>
 
