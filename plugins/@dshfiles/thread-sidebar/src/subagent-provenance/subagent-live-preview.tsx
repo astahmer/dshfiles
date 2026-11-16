@@ -4,6 +4,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from '../locales.js'
 import { createSubagentFeedStore, type SubagentFeed, type SubagentFeedStore, type SubagentPreviewState } from './subagent-feed.js'
+import { ToolSteps } from '../tool-steps.js'
 import { failureMessage, useSubagentStop } from './subagent-stop.js'
 
 export type SubagentPreviewTranslate = TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
@@ -106,7 +107,7 @@ const FeedLine = (props: {
       <p className="dshx:text-muted-foreground" data-dshfiles-live-preview-progress="">
         {feed.tool === undefined
           ? props.t('subagentPreviewToolCalls', { count: String(feed.toolCalls) })
-          : props.t('subagentPreviewInTool', { tool: feed.tool, count: String(feed.toolCalls) })}
+          : props.t('subagentPreviewInTool', { tool: ToolSteps.ofName(feed.tool).words, count: String(feed.toolCalls) })}
       </p>
       {feed.text === '' ? null : (
         <pre

@@ -56,6 +56,16 @@ export class SubagentRouteLabelModel {
     )
   }
 
+  /**
+   * The model's own name out of a route label ("openai/gpt-6.1-luna" → "gpt-6.1-luna"), as the model picker shows it.
+   * A label that names no model (a one-shot provider) has none: a provider id is not a name to show.
+   */
+  static readonly modelName = (routeLabel: string | undefined): string | undefined => {
+    if (routeLabel === undefined) return undefined
+    const separator = routeLabel.indexOf('/')
+    return separator <= 0 || separator === routeLabel.length - 1 ? undefined : routeLabel.slice(separator + 1)
+  }
+
   static readonly displayedAgentRouteLabel = (route: ThreadSidebarModelRoute | undefined, identity: SubagentIdentity | null | undefined): string | undefined =>
     SubagentRouteLabelModel.projectedRouteLabel(route) ?? SubagentRouteLabelModel.agentIdentityLabel(identity)
 }

@@ -22,8 +22,8 @@ const preview = (overrides: Partial<SubagentPreviewBindings> = {}): SubagentPrev
 })
 
 /** A child whose event window already reports one tool in flight. */
-const childInTool = (input: { readonly cancel?: () => Promise<{ readonly ok: true }> } = {}) => {
-  const entry = { type: 'event', event: { type: 'tool/call', data: { name: 'bash' }, seq: 2, time: 2 } }
+const childInTool = (input: { readonly cancel?: () => Promise<{ readonly ok: true }>; readonly tool?: string } = {}) => {
+  const entry = { type: 'event', event: { type: 'tool/call', data: { name: input.tool ?? 'bash' }, seq: 2, time: 2 } }
   const eventSource = {
     getSnapshot: () => ({ entries: [entry], hasMore: false, revision: 0, change: { kind: 'replace', entries: [entry] } }),
     subscribe: () => () => undefined,
@@ -78,7 +78,11 @@ const dockProps = (input: {
 }
 
 const rows = () => document.querySelectorAll('[data-dshfiles-live-preview="agent"]')
-const cardOf = () => screen.getByRole('region', { name: /^Agent run: Review/ })
+const cardOf = (): HTMLElement => {
+  const card = document.querySelector<HTMLElement>('[data-subagent-run-card]')
+  if (card === null) throw new Error('no subagent run card')
+  return card
+}
 const fold = () => document.querySelector('[data-dshfiles-live-preview-fold="subagents"]')
 
 describe('SubagentPreviewDock', () => {
@@ -125,10 +129,30 @@ describe('SubagentPreviewDock', () => {
   it('shows the compact run card for a working child whose turn, route and tool are known', async () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
-    expect((await screen.findByRole('region', { name: /^Agent run: Review/ })).textContent).toContain('subagentRunStepTool')
-    expect(cardOf().textContent).toContain('openai/gpt-6.1-luna')
-    expect(cardOf().textContent).toContain('subagentRunStep')
+    await screen.findByRole('button', { name: 'subagentPreviewStop' })
+    const card = cardOf()
+    // The step in words, never the tool's identifier ("In bash").
+    expect(card.querySelector('[data-subagent-run-step]')?.textContent).toBe('Running a command')
+    expect(card.textContent).not.toMatch(/\bbash\b/u)
+    // The model's name, never the route id with its provider ("openai/gpt-6.1-luna").
+    expect(card.querySelector('[data-subagent-run-model]')?.textContent).toBe('gpt-6.1-luna')
+    expect(card.textContent).not.toContain('openai/')
+    // The shared status glyph (no decorative ring) and one clock, not the same duration in two formats.
+    expect(card.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
+    expect(card.querySelectorAll('[data-live-elapsed]')).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull()
+  })
+
+  it('says a child held by a question waits for an answer, with the Needs-you glyph', async () => {
+    const bindings = preview({ retainChild: childInTool({ tool: 'ask_parent_question' }).retainChild })
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
+    await screen.findByRole('button', { name: 'subagentPreviewStop' })
+    const card = cardOf()
+    // It read "Working · In ask_parent_question" beside a spinner.
+    expect(card.querySelector('[data-subagent-run-step]')?.textContent).toBe('subagentRunWaiting')
+    expect(card.textContent).not.toContain('ask_parent_question')
+    expect(card.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('needs-you')
+    expect(card.hasAttribute('data-waiting')).toBe(true)
   })
 
   it('stops the child through its interrupt after a confirmation', async () => {
@@ -164,7 +188,7 @@ describe('SubagentPreviewDock', () => {
   it('expands the live progress without duplicating the card actions', async () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
-    await screen.findByRole('region', { name: /^Agent run:/ })
+    await screen.findByRole('button', { name: 'subagentPreviewStop' })
     fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewToggle' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'subagentPreviewToggle' }).getAttribute('aria-expanded')).toBe('true'))
     expect(screen.getAllByRole('button', { name: 'subagentPreviewStop' })).toHaveLength(1)
@@ -175,7 +199,7 @@ describe('SubagentPreviewDock', () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: false })} />)
     expect(screen.getByRole('button', { name: 'subagentPreviewToggle' })).not.toBeNull()
-    expect(screen.queryByRole('region', { name: /^Agent run:/ })).toBeNull()
+    expect(document.querySelector('[data-subagent-run-card]')).toBeNull()
     expect(bindings.retainChild).toHaveBeenCalled()
   })
 
@@ -183,6 +207,6 @@ describe('SubagentPreviewDock', () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: false, childTiming: true })} />)
     expect(bindings.retainChild).not.toHaveBeenCalled()
-    expect(screen.queryByRole('region', { name: /^Agent run:/ })).toBeNull()
+    expect(document.querySelector('[data-subagent-run-card]')).toBeNull()
   })
 })
