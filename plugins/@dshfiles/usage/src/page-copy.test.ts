@@ -17,3 +17,12 @@ describe('Usage page copy', () => {
     expect(indexedLogsLabel(1204)).toBe(`${(1204).toLocaleString()} logs indexed`)
   })
 })
+
+describe('Usage filters on a phone', () => {
+  it('scrolls the Purpose chips sideways instead of wrapping them into rows', () => {
+    const panel = readFileSync(new URL('panel.tsx', import.meta.url), 'utf8')
+    const row = panel.split('\n').find(line => line.includes('aria-label="Purpose"')) ?? ''
+    expect(row).toContain('dshx:overflow-x-auto')
+    expect(row).not.toContain('dshx:flex-wrap')
+  })
+})

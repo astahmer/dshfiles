@@ -289,8 +289,8 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
             </ToggleGroup>
           </div>
 
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5" role="group" aria-label="Purpose">
-            <span className="dshx:text-xs dshx:text-muted-foreground">Purpose</span>
+          <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:overflow-x-auto" role="group" aria-label="Purpose">
+            <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">Purpose</span>
             <Button
               size="xs"
               variant={purposes === undefined ? 'secondary' : 'ghost'}
