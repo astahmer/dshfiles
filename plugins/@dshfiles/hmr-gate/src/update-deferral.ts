@@ -23,6 +23,8 @@ export const IDLE_MS = 30_000
 export interface PageMoment {
   readonly now: number
   readonly hidden: boolean
+  /** The window has focus (`document.hasFocus()`): visible and in front of the reader. */
+  readonly focused: boolean
   readonly connected: boolean
   readonly phone: boolean
   /** When the page last became visible (load included). */
@@ -58,7 +60,11 @@ const canApply = (input: { readonly mode: ApplyUpdates; readonly page: PageMomen
   if (!page.connected) return false
   const policy = policyOf(input.mode, page.phone)
   if (policy === 'live' || page.hidden) return true
-  if (policy === 'live-except-thread' && !resuming(page) && !input.ids.some(id => THREAD_PACKAGES.includes(id))) return true
+  const drawsThread = input.ids.some(id => THREAD_PACKAGES.includes(id))
+  if (policy === 'live-except-thread' && !resuming(page) && !drawsThread) return true
+  // Swapping the thread's own packages remounts it: never in front of a reader, however idle; a window behind
+  // another one, or a background tab, still takes it once idle.
+  if (drawsThread && page.focused) return false
   return idle(page)
 }
 

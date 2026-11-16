@@ -3,10 +3,11 @@ import { HeldUpdates, IDLE_MS, RESUME_GRACE_MS, UpdateDeferral, type ApplyUpdate
 
 const NOW = 1_000_000
 
-/** A visible, connected desktop page whose reader came back long ago and is busy right now. */
+/** A visible, focused, connected desktop page whose reader came back long ago and is busy right now. */
 const page = (overrides: Partial<PageMoment> = {}): PageMoment => ({
   now: NOW,
   hidden: false,
+  focused: true,
   connected: true,
   phone: false,
   visibleSince: NOW - 10 * IDLE_MS,
@@ -39,7 +40,7 @@ describe('when a plugin code update may apply', () => {
     expect(canApply('auto', page({ phone: true, lastInputAt: NOW - 2 * IDLE_MS, pointerActive: true }))).toBe(false)
   })
 
-  it('applies a phone update once the reader has been idle since coming back', () => {
+  it('applies a phone update of another package once the reader has been idle since coming back', () => {
     expect(canApply('auto', page({ phone: true, lastInputAt: NOW - IDLE_MS }))).toBe(true)
     // Coming back is not idleness: a reader reads without touching the page.
     expect(canApply('auto', page({ phone: true, lastInputAt: 0, visibleSince: NOW - IDLE_MS + 1 }))).toBe(false)
@@ -49,7 +50,21 @@ describe('when a plugin code update may apply', () => {
     expect(canApply('auto', page())).toBe(true)
     for (const id of ['@dshfiles/chat', '@dshfiles/workbench', '@dshfiles/rich-composer', '@dshfiles/session-controller']) {
       expect(canApply('auto', page(), [id])).toBe(false)
-      expect(canApply('auto', page({ lastInputAt: NOW - IDLE_MS }), [id])).toBe(true)
+    }
+  })
+
+  it('never swaps the thread in front of a reader, however idle, until the window loses focus or hides', () => {
+    const idleReader = { lastInputAt: NOW - 2 * IDLE_MS }
+    for (const mode of ['auto', 'when-hidden-or-idle'] as const) {
+      for (const phone of [false, true]) {
+        for (const id of ['@dshfiles/chat', '@dshfiles/workbench', '@dshfiles/rich-composer', '@dshfiles/session-controller']) {
+          expect(canApply(mode, page({ ...idleReader, phone }), [id, '@dshfiles/usage'])).toBe(false)
+          expect(canApply(mode, page({ ...idleReader, phone, focused: false }), [id])).toBe(true)
+          expect(canApply(mode, page({ phone, focused: false }), [id])).toBe(false)
+          expect(canApply(mode, page({ phone, hidden: true }), [id])).toBe(true)
+        }
+      }
+      expect(canApply(mode, page({ ...idleReader, phone: true }))).toBe(true)
     }
   })
 

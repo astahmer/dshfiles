@@ -172,6 +172,7 @@ export default defineClient({
       return {
         now: Date.now(),
         hidden: document.visibilityState === 'hidden',
+        focused: document.hasFocus(),
         connected: state !== 'disconnected' && state !== 'connecting',
         phone,
         visibleSince,
@@ -238,6 +239,7 @@ export default defineClient({
       document.addEventListener('visibilitychange', visibility)
       document.addEventListener('focusout', flush)
       window.addEventListener('pagehide', flush)
+      window.addEventListener('blur', flush)
       const offConnection = connection.state.subscribe(flush)
       const idleCheck = setInterval(() => {
         if (held.size > 0) flush()
@@ -250,6 +252,7 @@ export default defineClient({
         document.removeEventListener('visibilitychange', visibility)
         document.removeEventListener('focusout', flush)
         window.removeEventListener('pagehide', flush)
+        window.removeEventListener('blur', flush)
         offConnection()
         clearInterval(idleCheck)
       }

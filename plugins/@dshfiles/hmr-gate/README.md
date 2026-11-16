@@ -58,15 +58,20 @@ moment the reader cannot see:
 3. While the page stays visible, only once the reader is idle: no pointer, key,
    wheel, touch or scroll for 30 s, counted from the page's return too, no
    pointer down, and no focused field (the composer included).
-4. Nothing applies in the 10 s after the page comes back.
+4. An update of a thread-drawing package never applies through rule 3 while the
+   window has focus, however idle the reader: the thread never remounts in front
+   of them. It waits for the page to hide, or for the window to lose focus
+   (`blur`, `document.hasFocus()` false) with the reader idle 30 s, so a
+   background tab or a window behind another one still updates.
+5. Nothing applies in the 10 s after the page comes back.
 
 The `applyUpdates` key on the `dshfiles-hmr-gate` Loader row picks the policy:
 
-| Value                 | Phone (touch or mobile browser)                | Desktop                                                                                  |
-| --------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `auto` (default)      | holds every update for a hidden or idle moment | live, as before, except updates of the thread-drawing packages and the 10 s after return |
-| `when-hidden-or-idle` | holds every update                             | holds every update                                                                       |
-| `immediately`         | live, as before                                | live, as before                                                                          |
+| Value                 | Phone (touch or mobile browser)                | Desktop                                                                                           |
+| --------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `auto` (default)      | holds every update for a hidden or idle moment | live, as before, except updates of the thread-drawing packages (rule 4) and the 10 s after return |
+| `when-hidden-or-idle` | holds every update                             | holds every update                                                                                |
+| `immediately`         | live, as before                                | live, as before                                                                                   |
 
 ```yaml
 # profile cordis.yml, the hmr-gate row

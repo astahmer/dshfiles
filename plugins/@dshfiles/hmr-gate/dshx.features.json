@@ -238,7 +238,7 @@
     {
       "id": "update-timing",
       "title": "Plugin updates wait for a hidden or idle moment",
-      "summary": "The browser half holds graph and rebuilt frames until the Host connection is live again and the page is hidden, or the reader has been idle for 30 s with no focused field; nothing applies in the 10 s after the page comes back. On a phone every update waits; on a desktop only updates of the thread-drawing packages (chat, workbench, rich-composer, session-controller) do. A held update that needs a reload takes it at that moment too.",
+      "summary": "The browser half holds graph and rebuilt frames until the Host connection is live again and the page is hidden, or the reader has been idle for 30 s with no focused field; nothing applies in the 10 s after the page comes back. Updates of the thread-drawing packages (chat, workbench, rich-composer, session-controller) never apply in front of a focused window: they wait for the page to hide, or for the window to lose focus with the reader idle. On a phone every update waits; on a desktop only thread-drawing ones do. A held update that needs a reload takes it at that moment too.",
       "reach": ["expect region \"Threads\""],
       "surfaces": ["client"],
       "surface": "infrastructure",
@@ -277,6 +277,12 @@
           "id": "hmr-gate.update-timing-unit-desktop",
           "file": "plugins/@dshfiles/hmr-gate/src/update-deferral.test.ts",
           "testName": "keeps live updates on a visible desktop, except for the packages that draw the thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.update-timing-unit-focused",
+          "file": "plugins/@dshfiles/hmr-gate/src/update-deferral.test.ts",
+          "testName": "never swaps the thread in front of a reader, however idle, until the window loses focus or hides"
         },
         {
           "kind": "unit-test",
