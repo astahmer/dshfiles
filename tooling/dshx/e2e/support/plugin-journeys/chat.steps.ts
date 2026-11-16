@@ -319,6 +319,36 @@ Then('each upward wheel step moves the rows under the reader by the wheel distan
   await finishJourneyAssertions(page)
 })
 
+When('a real thread with one hundred eighty transcript turns is opened on a phone', async ({ page }: { page: Page }) => {
+  await openTranscriptFixture(page, 180)
+  // The root reopens the last thread, so a reload opens it afresh in the phone layout, opening fill steps included.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.reload()
+  await expect(page.getByText('Transcript answer 180', { exact: true })).toBeVisible({ timeout: 20_000 })
+})
+
+Then('dragging the transcript down with a finger reaches its first turn', async ({ page }: { page: Page }) => {
+  const scrollport = page.locator('[data-conversation-scroll]').first()
+  const box = await scrollport.boundingBox()
+  if (box === null) throw new Error('The conversation scrollport is not laid out.')
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+  const x = box.x + box.width / 2
+  const from = box.y + 80
+  const to = Math.min(box.y + box.height - 40, from + 400)
+  const oldest = page.getByText('Transcript answer 1', { exact: true })
+  // A drag scrolls natively until the top; once there, only the drag itself can ask for the next page.
+  for (let drag = 0; drag < 80 && (await oldest.count()) === 0; drag++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: from }] })
+    for (let step = 1; step <= 8; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: from + ((to - from) * step) / 8 }] })
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await page.waitForTimeout(250)
+  }
+  await recordAssertion(page, 'chat-windowed-transcript-touch-reaches-first-turn', async () => await expect(oldest).toBeAttached({ timeout: 5_000 }))
+  await page.screenshot({ path: test.info().outputPath('chat-windowed-transcript-touch-390.png'), animations: 'disabled' })
+  await finishJourneyAssertions(page)
+})
+
 Then('find in thread jumps to an unmounted turn and steps through every match', async ({ page }: { page: Page }) => {
   await expect(page.getByText('Transcript answer 180', { exact: true })).toBeVisible()
   await expect(page.getByText('Transcript question 42', { exact: true })).toHaveCount(0)

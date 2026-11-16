@@ -22,6 +22,7 @@ const renderSentinel = () => {
     <OlderRowsSentinel
       listRef={{ current: list }}
       hidden={0}
+      firstSeq={100}
       onVisible={() => {
         calls += 1
       }}
@@ -50,6 +51,32 @@ describe('older rows on a transcript that does not fill the view', () => {
     sentinel.list.dispatchEvent(touch('touchstart', 100))
     sentinel.list.dispatchEvent(touch('touchmove', 160))
     expect(sentinel.calls()).toBe(1)
+  })
+
+  it('takes the next page once a Host page moves the first row while every row stays mounted', async () => {
+    const list = document.createElement('div')
+    document.body.append(list)
+    let calls = 0
+    const listRef = { current: list }
+    const onVisible = () => {
+      calls += 1
+    }
+    const sentinel = (firstSeq: number) => (
+      <OlderRowsSentinel listRef={listRef} hidden={0} firstSeq={firstSeq} onVisible={onVisible} fillSteps={{ current: 0 }} />
+    )
+    const view = render(sentinel(100), { container: list })
+    await act(async () => {})
+    const drag = () => {
+      list.dispatchEvent(touch('touchstart', 100))
+      list.dispatchEvent(touch('touchmove', 160))
+    }
+    drag()
+    drag()
+    expect(calls).toBe(1)
+    view.rerender(sentinel(60))
+    await act(async () => {})
+    drag()
+    expect(calls).toBe(2)
   })
 
   it('ignores a drag toward newer rows', async () => {
@@ -82,6 +109,7 @@ const renderInScrollport = (fillSteps: number) => {
     <OlderRowsSentinel
       listRef={{ current: list }}
       hidden={0}
+      firstSeq={100}
       onVisible={() => {
         calls += 1
       }}
