@@ -310,6 +310,28 @@ describe('fixed Conversation content factory composition', () => {
     expect(widthFallbacks.get('embedded')).not.toBe(ConversationWidthControls)
   })
 
+  it('draws its own More button only while no thread menu lists those actions', () => {
+    const { header } = fixture('header-more')
+    const renderFactorySlot = vi.fn<ConversationSessionHeaderSlotProps['renderFactorySlot']>(() => null)
+    const moreButtons = (): number => renderFactorySlot.mock.calls.filter(([name]) => name === 'contextMenu.button').length
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() => root.render(<ConversationSessionHeader {...header} renderFactorySlot={renderFactorySlot} />))
+    expect(moreButtons()).toBeGreaterThan(0)
+    // The thread menu takes the actions over (DESIGN.md: the thread header is one row with one ⋯).
+    let release: (() => void) | undefined
+    act(() => {
+      release = ThreadViewsModel.hostHeaderMenu()
+    })
+    renderFactorySlot.mockClear()
+    act(() => root.render(<ConversationSessionHeader {...header} renderFactorySlot={renderFactorySlot} />))
+    expect(moreButtons()).toBe(0)
+    act(() => release?.())
+    expect(moreButtons()).toBeGreaterThan(0)
+  })
+
   it('keeps the title editor responsive after a rename fails', async () => {
     const { header } = fixture('rename-a')
     const rename = vi.fn<ConversationSessionHeaderSlotProps['rename']>().mockRejectedValueOnce(new Error('Host refused')).mockResolvedValue(undefined)
