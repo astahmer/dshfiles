@@ -234,6 +234,68 @@
           "testName": "records a host-reload apply span naming the package and refuses without a Loader"
         }
       ]
+    },
+    {
+      "id": "update-timing",
+      "title": "Plugin updates wait for a hidden or idle moment",
+      "summary": "The browser half holds graph and rebuilt frames until the Host connection is live again and the page is hidden, or the reader has been idle for 30 s with no focused field; nothing applies in the 10 s after the page comes back. On a phone every update waits; on a desktop only updates of the thread-drawing packages (chat, workbench, rich-composer, session-controller) do. A held update that needs a reload takes it at that moment too.",
+      "reach": ["expect region \"Threads\""],
+      "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "client: hmr-gate frame handling",
+      "configuration": [
+        {
+          "key": "applyUpdates",
+          "defaultValue": "auto",
+          "constraints": "auto, immediately or when-hidden-or-idle on the dshfiles-hmr-gate Loader row; read by the browser through hmr_gate_status on page load.",
+          "coveredBy": ["hmr-gate.update-timing-unit-row-config"]
+        }
+      ],
+      "states": ["held", "applied-hidden", "applied-idle", "applied-live"],
+      "failureModes": [
+        "A Host that predates applyUpdates reads as auto.",
+        "A swap whose modules are still loading when the reader returns finishes in front of them.",
+        "Under immediately, updates apply live as before, still never before the connection is back."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.update-timing-unit-connection",
+          "file": "plugins/@dshfiles/hmr-gate/src/update-deferral.test.ts",
+          "testName": "never applies before the connection is live again, in any mode"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.update-timing-unit-phone",
+          "file": "plugins/@dshfiles/hmr-gate/src/update-deferral.test.ts",
+          "testName": "holds a phone update the reader would see: just back, busy, or typing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.update-timing-unit-desktop",
+          "file": "plugins/@dshfiles/hmr-gate/src/update-deferral.test.ts",
+          "testName": "keeps live updates on a visible desktop, except for the packages that draw the thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.update-timing-unit-row-config",
+          "file": "plugins/@dshfiles/hmr-gate/src/host-config.test.ts",
+          "testName": "accepts each applyUpdates policy and refuses another value"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "hmr-gate.update-timing-scratch",
+          "reason": "The scratch Host has no bundle watcher on a locked phone; the before/after was driven with scripted update frames and phone emulation (lock, unlock, hide), not a Gherkin scenario."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only frame handling; no Host work."
+        }
+      ]
     }
   ]
 }

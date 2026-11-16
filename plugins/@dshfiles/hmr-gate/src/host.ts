@@ -6,12 +6,13 @@ import * as Schema from 'effect/Schema'
 import type {} from '@deepseek-ai/dsh-client-modules'
 import type {} from '@deepseek-ai/dsh-hmr'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { hmrGateApi, type DeferredPackage, type HmrGateStatus } from './api.js'
+import { applyUpdatesSchema, hmrGateApi, type DeferredPackage, type HmrGateStatus } from './api.js'
 import { DeferredUpdateAttention } from './host/attention.js'
 import { BundleWatch, type BundleWatcherHandle } from './host/bundle-watcher-promise.js'
 import type { BundleRead, BundleStat } from './host/bundle-watcher.js'
 import { HmrGateModel, HostArtifacts } from './host/gate.js'
 import { HostReload, type HostReloadOutcome } from './host/host-reload.js'
+import type { ApplyUpdates } from './update-deferral.js'
 
 /**
  * The Web client's HMR transport, with one added rule: a rebuilt client bundle is
@@ -55,8 +56,13 @@ interface GateRuntime {
   deferred: () => readonly DeferredPackage[]
 }
 
-/** Loader row config. `hostReload` is the experimental in-process Host reload; off unless the profile row sets it. */
-const gateConfigSchema = Schema.Struct({ hostReload: Schema.optional(Schema.Boolean) }).pipe(Schema.withDecodingDefault(Effect.succeed({})))
+/**
+ * Loader row config. `hostReload` is the experimental in-process Host reload; off unless the profile row sets it.
+ * `applyUpdates` says when the browser takes a client update (README, "When updates apply"); `auto` by default.
+ */
+const gateConfigSchema = Schema.Struct({ hostReload: Schema.optional(Schema.Boolean), applyUpdates: Schema.optional(applyUpdatesSchema) }).pipe(
+  Schema.withDecodingDefault(Effect.succeed({})),
+)
 type GateConfig = typeof gateConfigSchema.Type
 const gateConfigStandardSchema = { '~standard': Schema.toStandardSchemaV1(gateConfigSchema)['~standard'] }
 
@@ -74,7 +80,7 @@ const isEnoent = (error: unknown): boolean => {
   return Option.isSome(parsed) && parsed.value.code === 'ENOENT'
 }
 
-const registerGate = (ctx: Context, hostReloadEnabled: boolean): GateRuntime => {
+const registerGate = (ctx: Context, hostReloadEnabled: boolean, applyUpdates: ApplyUpdates): GateRuntime => {
   const gate = new HmrGateModel()
   const hostReloads: { id: string; outcome: HostReloadOutcome['kind']; detail: string }[] = []
   let reloadQueue = Promise.resolve()
@@ -270,7 +276,12 @@ const registerGate = (ctx: Context, hostReloadEnabled: boolean): GateRuntime => 
   })
 
   return {
-    status: () => ({ deferred: [...deferredPackages()], watched: watched.size, hostReload: { enabled: hostReloadEnabled, recent: [...hostReloads] } }),
+    status: () => ({
+      deferred: [...deferredPackages()],
+      watched: watched.size,
+      hostReload: { enabled: hostReloadEnabled, recent: [...hostReloads] },
+      applyUpdates,
+    }),
     deferred: deferredPackages,
   }
 }
@@ -287,6 +298,10 @@ export default defineHost({
   setup: (ctx: Context, config: GateConfig) => {
     // Decoded again, so a row config that never went through the Config schema still reads as the default.
     const decoded = Schema.decodeUnknownOption(gateConfigSchema)(config)
-    runtime = registerGate(ctx, Option.isSome(decoded) && decoded.value.hostReload === true)
+    runtime = registerGate(
+      ctx,
+      Option.isSome(decoded) && decoded.value.hostReload === true,
+      Option.isSome(decoded) ? (decoded.value.applyUpdates ?? 'auto') : 'auto',
+    )
   },
 })

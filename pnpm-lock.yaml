@@ -3913,6 +3913,9 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.2-rc.2
         version: 0.2.2-rc.2(a4d0e48bd624cd4e5d586d94172d7bc1)
+      '@deepseek-ai/dsh-client-connection':
+        specifier: 'catalog:'
+        version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-scope@0.2.2-rc.2)
       '@deepseek-ai/dsh-client-modules':
         specifier: 'catalog:'
         version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)
