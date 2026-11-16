@@ -929,6 +929,24 @@ svg [class*='_spinnerArc_'] {
     background: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
   }
 
+  /*
+   * One sheet surface (unslop phone 33): a kit `Command` inside a sheet (a searchable picker such as the project
+   * picker) is the sheet's own list, not a white card inset in the grey sheet.
+   */
+  html[data-shell-phone-nav]:not([data-phone-keyboard])
+    :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content']
+    )
+    [data-slot='command'] {
+    background: transparent;
+    border-radius: 0;
+  }
+
   /* Rows in a sheet read at the comfortable size (15px) with 44pt rows (the touch rule above sets the height). */
   html[data-shell-phone-nav]:not([data-phone-keyboard])
     :is(

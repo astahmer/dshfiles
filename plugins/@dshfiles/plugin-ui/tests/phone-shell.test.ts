@@ -51,4 +51,11 @@ describe('phone shell media rule (unslop U8)', () => {
     expect(read('src/hooks/sheet-drag.ts')).toContain('const PHONE_QUERY = PHONE_SHELL_QUERY')
     expect(PHONE_SHELL_QUERY).toBe('(max-width: 639.98px), (pointer: coarse) and (max-height: 500px)')
   })
+
+  it('draws a kit Command inside a phone sheet as the sheet list, not an inset card (unslop phone 33)', () => {
+    const styles = read('src/styles.css')
+    const rule = /\[data-slot='popover-content'\]\s*\)\s*\[data-slot='command'\] \{([^}]*)\}/u.exec(styles)
+    expect(rule?.[1]).toContain('background: transparent')
+    expect(rule?.[1]).toContain('border-radius: 0')
+  })
 })
