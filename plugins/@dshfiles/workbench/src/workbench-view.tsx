@@ -34,6 +34,7 @@ import { WindowFloatingGeometry } from './window-floating.js'
 import { GroupMinimums } from './group-minimums.js'
 import { TabRows } from './tab-row-visibility.js'
 import { TabReveal } from './tab-reveal.js'
+import { TabStripEdges } from './tab-strip-edges.js'
 import { HiddenTabRowRestore, TabRowVoidMenu, type TabRowMenuTarget } from './tab-row-controls.js'
 import { PanelChromeContext, type PanelChrome } from './header-seat.js'
 import { usePhoneWidth } from './phone-sheet.js'
@@ -282,7 +283,12 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
 
   useEffect(() => {
     if (api === null) return
-    return TabReveal.retain(api)
+    const releaseReveal = TabReveal.retain(api)
+    const releaseEdges = TabStripEdges.retain(api)
+    return () => {
+      releaseEdges()
+      releaseReveal()
+    }
   }, [api])
 
   const emptyPane = useRef({ visible: props.visible, onClose: props.onClose })
