@@ -31,6 +31,7 @@ import type { ISessions, SessionTarget } from '@deepseek-ai/dsh-api-session-cont
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { useApi, useApiEvent } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { BoardView } from './board-view.js'
 import { backgroundJobsApi } from './api.js'
 import { jobCategoryValues, type JobCategory } from './classify.js'
 import { JobSelectionModel } from './job-selection.js'
@@ -348,6 +349,8 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
     (owner: string): string => (sessionTarget(props.sessions, owner) === undefined ? (briefs.get(owner)?.title ?? sessionLabel(owner)) : sessionLabel(owner)),
     [briefs, sessionLabel, props.sessions],
   )
+  const shownCategories = BoardView.shownCategories({ counts: value?.categoryCounts, selected: categories })
+  const nothingExists = BoardView.nothingExists({ board: value, search: debouncedSearch, categories })
   const toggleCategory = (category: JobCategory): void =>
     setCategories(current => (current.includes(category) ? current.filter(entry => entry !== category) : [...current, category]))
 
@@ -377,17 +380,18 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
       description={props.description ?? t('subtitle')}
       {...(props.tabs === undefined ? {} : { tabs: props.tabs })}
       meta={
-        <>
+        // One fact in the header: what runs now. Finished jobs are the list below.
+        value === undefined ? null : (
           <Badge variant="muted">
-            <RollingNumber value={value?.runningCount ?? 0} /> {t('running')}
+            {value.runningCount === 0 ? (
+              t('nothingRunning')
+            ) : (
+              <>
+                <RollingNumber value={value.runningCount} /> {t('running')}
+              </>
+            )}
           </Badge>
-          <Badge variant="muted">
-            <RollingNumber value={value?.finishedCount ?? 0} /> {t('finished')}
-          </Badge>
-          <Badge variant="muted">
-            {value?.indexing.historyRows ?? 0} {t('historyRows')}
-          </Badge>
-        </>
+        )
       }
       actions={
         props.otherTab === undefined
@@ -444,20 +448,23 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
             </Select>
           </div>
 
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1 dshx:@max-pane-compact:flex-nowrap dshx:@max-pane-compact:overflow-x-auto dshx:@max-pane-compact:pb-1">
-            <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{t('categories')}</span>
-            {jobCategoryValues.map(category => (
-              <Button key={category} size="sm" variant={categories.includes(category) ? 'secondary' : 'ghost'} onClick={() => toggleCategory(category)}>
-                {t(CATEGORY_KEY[category])}
-                <span className="dshx:ml-1 dshx:text-xs dshx:text-muted-foreground">{value?.categoryCounts[category] ?? 0}</span>
-              </Button>
-            ))}
-            {categories.length === 0 ? null : (
-              <Button size="sm" variant="ghost" onClick={() => setCategories([])}>
-                {t('clearCategories')}
-              </Button>
-            )}
-          </div>
+          {/* A chip per category that has jobs: fourteen filters reading 0 filter nothing. */}
+          {shownCategories.length === 0 ? null : (
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1 dshx:@max-pane-compact:flex-nowrap dshx:@max-pane-compact:overflow-x-auto dshx:@max-pane-compact:pb-1">
+              <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{t('categories')}</span>
+              {shownCategories.map(category => (
+                <Button key={category} size="sm" variant={categories.includes(category) ? 'secondary' : 'ghost'} onClick={() => toggleCategory(category)}>
+                  {t(CATEGORY_KEY[category])}
+                  <span className="dshx:ml-1 dshx:text-xs dshx:text-muted-foreground">{value?.categoryCounts[category] ?? 0}</span>
+                </Button>
+              ))}
+              {categories.length === 0 ? null : (
+                <Button size="sm" variant="ghost" onClick={() => setCategories([])}>
+                  {t('clearCategories')}
+                </Button>
+              )}
+            </div>
+          )}
 
           {stoppableIds.length === 0 ? null : (
             <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
@@ -482,7 +489,9 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
               <AlertDescription>{errorMessage(board.error, t('loadFailed'))}</AlertDescription>
             </Alert>
           ) : null}
-          {board.isSuccess && rows.length === 0 ? <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noJobs')}</EmptyState> : null}
+          {board.isSuccess && rows.length === 0 ? (
+            <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t(nothingExists ? 'noJobsAtAll' : 'noJobs')}</EmptyState>
+          ) : null}
           {value !== undefined && value.hasMore ? (
             <p className="dshx:text-xs dshx:text-muted-foreground">
               {value.total - rows.length} {t('moreMatched')}
