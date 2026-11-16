@@ -56,6 +56,7 @@ import { InboxNotifications } from './inbox-notifications.js'
 import { InboxPush } from './web-push-client.js'
 import { INBOX_CHIP, TriageBar, TriageReply, TriageZero } from './triage-stage.js'
 import { triageMachine, TriageModel, type TriageRequest } from './triage-machine.js'
+import type { PrimaryAction } from './inbox-keys.js'
 import type { InboxTranslate } from './inbox-locales.js'
 import { InboxSwipe, InboxView, type SnoozeChoice } from './inbox-view.js'
 import { ThreadReferences } from './thread-reference.js'
@@ -141,6 +142,12 @@ export const coarsePointer = (): boolean => {
   return coarsePointerMatch
 }
 
+/** What Open is called for an item: review a finished turn, open its thread, or the page its provider registered. */
+const openLabelOf = (item: AttentionItem, opener: AttentionSubjectOpener | undefined, t: InboxTranslate): string => {
+  const openAction = InboxView.openActionOf(item)
+  return openAction === 'review' ? t('reviewThread') : openAction === 'thread' ? t('openThread') : t('openSubject', { label: opener?.label ?? '' })
+}
+
 const InboxRow = (props: {
   readonly item: AttentionItem
   readonly view: AttentionView
@@ -170,6 +177,8 @@ const InboxRow = (props: {
   readonly quickReplies?: (sessionId: string) => React.ReactNode
   /** Bumped by Triage's Enter on a Land item: open the Land confirmation, never Land itself. */
   readonly landSignal?: number
+  /** Triage shows the item only: its bar is the one action row, so the card draws none of its own. */
+  readonly actionRow?: boolean
 }): JSX.Element => {
   const { item, t } = props
   const [confirmingLand, setConfirmingLand] = useState(false)
@@ -197,8 +206,7 @@ const InboxRow = (props: {
   const text = InboxView.textOf(item)
   const opener = item.subject.kind === 'session' ? undefined : props.openers.get(item.subject.kind)
   const openable = item.subject.kind === 'session' || opener !== undefined
-  const openAction = InboxView.openActionOf(item)
-  const openLabel = openAction === 'review' ? t('reviewThread') : openAction === 'thread' ? t('openThread') : t('openSubject', { label: opener?.label ?? '' })
+  const openLabel = openLabelOf(item, opener, t)
   const referencedThreadId =
     item.subject.kind === 'session'
       ? null
@@ -256,119 +264,121 @@ const InboxRow = (props: {
         </>
       }
     >
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pb-2 dshx:pl-9">
-        {open && item.verbs.includes('Answer') && item.choices.length > 0
-          ? item.choices.map((choice, index) => (
-              <Button
-                key={choice.id}
-                size="sm"
-                variant={choice.recommended === true ? 'default' : 'outline'}
-                className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP)}
-                disabled={props.busy}
-                onClick={() => props.onAct(item, 'Answer', choice.id)}
-              >
-                {props.showChoiceKeys === true && index < 9 ? <KeyHint keys={String(index + 1)} className="dshx:opacity-70" /> : null}
-                <span className="dshx:truncate">{choice.label}</span>
-                {choice.recommended === true ? <span className="dshx:sr-only"> ({t('recommended')})</span> : null}
-              </Button>
-            ))
-          : null}
-        {InboxView.offersQuickReplies(item, props.view) ? props.quickReplies?.(item.subject.id) : null}
-        {open
-          ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).map(verb =>
-              verb === 'Land' ? (
+      {props.actionRow === false ? null : (
+        <div data-inbox-row-actions="" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pb-2 dshx:pl-9">
+          {open && item.verbs.includes('Answer') && item.choices.length > 0
+            ? item.choices.map((choice, index) => (
                 <Button
-                  key={verb}
+                  key={choice.id}
                   size="sm"
-                  variant="outline"
-                  className={cn('dshx:shrink', INBOX_CHIP)}
+                  variant={choice.recommended === true ? 'default' : 'outline'}
+                  className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP)}
                   disabled={props.busy}
-                  onClick={() => setConfirmingLand(true)}
+                  onClick={() => props.onAct(item, 'Answer', choice.id)}
                 >
-                  {t('land')}
+                  {props.showChoiceKeys === true && index < 9 ? <KeyHint keys={String(index + 1)} className="dshx:opacity-70" /> : null}
+                  <span className="dshx:truncate">{choice.label}</span>
+                  {choice.recommended === true ? <span className="dshx:sr-only"> ({t('recommended')})</span> : null}
                 </Button>
-              ) : (
-                <Button
-                  key={verb}
-                  size="sm"
-                  variant="outline"
-                  className={cn('dshx:shrink', INBOX_CHIP)}
-                  disabled={props.busy}
-                  onClick={() => props.onAct(item, verb)}
-                >
-                  {verb}
+              ))
+            : null}
+          {InboxView.offersQuickReplies(item, props.view) ? props.quickReplies?.(item.subject.id) : null}
+          {open
+            ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).map(verb =>
+                verb === 'Land' ? (
+                  <Button
+                    key={verb}
+                    size="sm"
+                    variant="outline"
+                    className={cn('dshx:shrink', INBOX_CHIP)}
+                    disabled={props.busy}
+                    onClick={() => setConfirmingLand(true)}
+                  >
+                    {t('land')}
+                  </Button>
+                ) : (
+                  <Button
+                    key={verb}
+                    size="sm"
+                    variant="outline"
+                    className={cn('dshx:shrink', INBOX_CHIP)}
+                    disabled={props.busy}
+                    onClick={() => props.onAct(item, verb)}
+                  >
+                    {verb}
+                  </Button>
+                ),
+              )
+            : null}
+          {open && props.onReview !== undefined ? (
+            <Button size="sm" variant="outline" className={INBOX_CHIP} onClick={() => props.onReview?.(item)}>
+              {t('review')}
+            </Button>
+          ) : null}
+          {openable ? (
+            <Button
+              size="sm"
+              variant={open && !item.verbs.includes('Answer') ? 'default' : 'ghost'}
+              className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP)}
+              onClick={() => props.onOpen(item)}
+            >
+              <span className="dshx:truncate">{openLabel}</span>
+            </Button>
+          ) : null}
+          {open && item.verbs.includes('Done') ? (
+            <Button size="sm" variant="ghost" className={cn('dshx:shrink', INBOX_CHIP)} disabled={props.busy} onClick={() => props.onDone(item)}>
+              {t('done')}
+            </Button>
+          ) : null}
+          {open && props.view !== 'snoozed' && item.verbs.includes('Snooze') ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost" className={cn('dshx:shrink', INBOX_CHIP)} disabled={props.busy}>
+                  <ClockIcon aria-hidden />
+                  {t('snooze')}
                 </Button>
-              ),
-            )
-          : null}
-        {open && props.onReview !== undefined ? (
-          <Button size="sm" variant="outline" className={INBOX_CHIP} onClick={() => props.onReview?.(item)}>
-            {t('review')}
-          </Button>
-        ) : null}
-        {openable ? (
-          <Button
-            size="sm"
-            variant={open && !item.verbs.includes('Answer') ? 'default' : 'ghost'}
-            className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP)}
-            onClick={() => props.onOpen(item)}
-          >
-            <span className="dshx:truncate">{openLabel}</span>
-          </Button>
-        ) : null}
-        {open && item.verbs.includes('Done') ? (
-          <Button size="sm" variant="ghost" className={cn('dshx:shrink', INBOX_CHIP)} disabled={props.busy} onClick={() => props.onDone(item)}>
-            {t('done')}
-          </Button>
-        ) : null}
-        {open && props.view !== 'snoozed' && item.verbs.includes('Snooze') ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost" className={cn('dshx:shrink', INBOX_CHIP)} disabled={props.busy}>
-                <ClockIcon aria-hidden />
-                {t('snooze')}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem keys="H" onSelect={() => props.onSnooze(item, 'hour')}>
-                {t('snoozeHour')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => props.onSnooze(item, 'four-hours')}>{t('snoozeFourHours')}</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => props.onSnooze(item, 'tomorrow')}>{t('snoozeDay')}</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => props.onSnooze(item, 'change')}>{t('snoozeChange')}</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-        {undo === 'reopen' || undo === 'unsnooze' ? (
-          <Button size="sm" variant="outline" className="dshx:shrink dshx:pointer-coarse:min-h-11" disabled={props.busy} onClick={() => props.onReopen(item)}>
-            {undo === 'reopen' ? t('reopen') : t('unsnooze')}
-          </Button>
-        ) : null}
-        {undo === 'unmute' ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="dshx:shrink dshx:pointer-coarse:min-h-11"
-            disabled={props.busy}
-            onClick={() => props.onMute(item.source, false)}
-          >
-            {t('unmuteSource')}
-          </Button>
-        ) : null}
-        {open && item.verbs.includes('MuteSource') ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost" className="dshx:pointer-coarse:size-11" aria-label={t('more')}>
-                <EllipsisIcon aria-hidden />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => props.onMute(item.source, true)}>{t('muteSource')}</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-      </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem keys="H" onSelect={() => props.onSnooze(item, 'hour')}>
+                  {t('snoozeHour')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => props.onSnooze(item, 'four-hours')}>{t('snoozeFourHours')}</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => props.onSnooze(item, 'tomorrow')}>{t('snoozeDay')}</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => props.onSnooze(item, 'change')}>{t('snoozeChange')}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+          {undo === 'reopen' || undo === 'unsnooze' ? (
+            <Button size="sm" variant="outline" className="dshx:shrink dshx:pointer-coarse:min-h-11" disabled={props.busy} onClick={() => props.onReopen(item)}>
+              {undo === 'reopen' ? t('reopen') : t('unsnooze')}
+            </Button>
+          ) : null}
+          {undo === 'unmute' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="dshx:shrink dshx:pointer-coarse:min-h-11"
+              disabled={props.busy}
+              onClick={() => props.onMute(item.source, false)}
+            >
+              {t('unmuteSource')}
+            </Button>
+          ) : null}
+          {open && item.verbs.includes('MuteSource') ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost" className="dshx:pointer-coarse:size-11" aria-label={t('more')}>
+                  <EllipsisIcon aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => props.onMute(item.source, true)}>{t('muteSource')}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
+      )}
       {/* Land rebases the thread's work onto the bookmark and moves it: say what lands before it runs (never one click). */}
       <AlertDialog open={confirmingLand} onOpenChange={setConfirmingLand}>
         <AlertDialogContent className="dshx-root">
@@ -681,12 +691,16 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
     if (!triageBusy) sendTriage({ type: 'act', request })
   }
   const triagePrimary = triageItem === undefined ? undefined : InboxKeys.primaryOf(triageItem)
-  const runTriagePrimary = (): void => {
-    if (triageItem === undefined || triagePrimary === undefined) return
-    if (triagePrimary.kind === 'answer') triageAct({ kind: 'act', id: triageItem.id, verb: 'Answer', choiceId: triagePrimary.choiceId })
-    else if (triagePrimary.kind === 'verb') triageAct({ kind: 'act', id: triageItem.id, verb: triagePrimary.verb })
-    else if (triagePrimary.kind === 'land') setLandSignal(current => current + 1)
+  const runTriageAction = (action: PrimaryAction | { readonly kind: 'review' }): void => {
+    if (triageItem === undefined) return
+    if (action.kind === 'answer') triageAct({ kind: 'act', id: triageItem.id, verb: 'Answer', choiceId: action.choiceId })
+    else if (action.kind === 'verb') triageAct({ kind: 'act', id: triageItem.id, verb: action.verb })
+    else if (action.kind === 'land') setLandSignal(current => current + 1)
+    else if (action.kind === 'review') reviewOf(triageItem)?.(triageItem)
     else openItem(triageItem)
+  }
+  const runTriagePrimary = (): void => {
+    if (triagePrimary !== undefined) runTriageAction(triagePrimary)
   }
   const triageRegion = (): HTMLDivElement | null => triageRoot.current
   useCommands(triaging ? plugin : undefined, [
@@ -1168,10 +1182,14 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
                 index={progress.index}
                 total={progress.total}
                 item={triageItem}
-                primary={triagePrimary}
+                actions={InboxKeys.triageActions(triageItem, {
+                  openable: triageItem.subject.kind === 'session' || openers.has(triageItem.subject.kind),
+                  reviewable: reviewOf(triageItem) !== undefined,
+                })}
+                openLabel={openLabelOf(triageItem, triageItem.subject.kind === 'session' ? undefined : openers.get(triageItem.subject.kind), t)}
                 busy={triageBusy}
                 error={triage.context.error}
-                onPrimary={runTriagePrimary}
+                onAction={runTriageAction}
                 onDone={() => triageAct({ kind: 'done', id: triageItem.id })}
                 onSnooze={() => triageAct({ kind: 'snooze', id: triageItem.id })}
                 onSkip={() => sendTriage({ type: 'skip' })}
@@ -1187,9 +1205,8 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
                   sessionLabel={sessionLabel}
                   busy={triageBusy}
                   openers={openers}
-                  showChoiceKeys
+                  actionRow={false}
                   landSignal={landSignal}
-                  {...(quickReplies === undefined ? {} : { quickReplies })}
                   onOpen={openItem}
                   onReview={reviewOf(triageItem)}
                   onOpenThread={sessionId => {
