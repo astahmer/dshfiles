@@ -707,6 +707,15 @@ const agentPresetOf = (session: SessionSummary): string | undefined => {
   return typeof preset === 'string' && preset.length > 0 && !BUILT_IN_PRESETS.has(preset) ? preset : undefined
 }
 
+/**
+ * A subagent's row title: the name its parent gave it (the `description` of the subagent call, kept as the child's
+ * creation label), which is what its card and the mention list call it. Its Session title is the prompt it was sent.
+ */
+const subagentRowTitle = (session: SessionSummary): string => {
+  const label = session.projectionValues?.subagent?.label?.trim()
+  return label === undefined || label === '' ? session.displayTitle : label
+}
+
 const finishedSubagentsLabels = {
   show: 'threadSidebarFinishedSubagentsShow',
   collapse: 'threadSidebarFinishedSubagentsCollapse',
@@ -834,7 +843,7 @@ const ChildThreadList = (props: {
               childStatus?.status === 'done' && 'dshx:text-muted-foreground',
             )}
           >
-            {child.displayTitle}
+            {subagentRowTitle(child)}
           </span>
           {childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed') ? null : (
             <span className="dshx:shrink-0 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{t(workStatusLabelKeys[childStatus.status])}</span>

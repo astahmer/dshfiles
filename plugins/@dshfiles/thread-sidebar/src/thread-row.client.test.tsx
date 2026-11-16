@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import { cleanup, fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PREFERENCES } from './organization.js'
-import { renderRow, rowSession, rowStatus, VisibleObserver } from './thread-row.test-support.js'
+import { renderRow, rowProps, rowSession, rowStatus, VisibleObserver } from './thread-row.test-support.js'
 
 beforeEach(() => {
   vi.stubGlobal('IntersectionObserver', VisibleObserver)
@@ -99,5 +100,27 @@ describe('a row that needs you', () => {
     expect(row.querySelector('[data-thread-where]')).toBeNull()
     expect(row.querySelector('[data-testid="thread-row-verb"]')?.closest('[data-verb-seat]')?.getAttribute('data-verb-seat')).toBe('head')
     expect(row.querySelector('[data-thread-main-action]')?.className).toContain('dshx:pr-20')
+  })
+})
+
+describe('a subagent row under its parent', () => {
+  it('is titled with the name the parent gave the subagent, not with the prompt it was sent', async () => {
+    const child = rowSession({
+      id: SessionId('child-1'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      displayTitle: '[[once call bash {"command":"sleep 3000"}]] check the release',
+      projectionValues: { subagent: { mode: 'continuable', label: 'Release check', seq: SessionSeq(3) } },
+    })
+    const unnamed = rowSession({ id: SessionId('child-2'), parentId: SessionId('s1'), origin: 'subagent', displayTitle: 'Summarise the diff' })
+    // No time column: the age helper comes from the Host's primitives, which this environment does not load.
+    const row = await renderRow({
+      childThreads: [child, unnamed],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false },
+    })
+    const titles = Array.from(row.querySelectorAll('ul [data-thread-main-action]')).map(button => button.querySelector('span.dshx\\:truncate')?.textContent)
+    expect(titles).toEqual(['Release check', 'Summarise the diff'])
   })
 })
