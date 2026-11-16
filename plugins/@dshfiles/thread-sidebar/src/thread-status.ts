@@ -1,6 +1,7 @@
 /**
  * One status per thread row, in the ADE vocabulary (plan `docs/ade-ux` §4.7), and the groups the default thread list
- * shows: Pinned on top, then Needs you · Working · Ready · Idle · Done.
+ * shows: Pinned on top, then Needs you · Working · Ready · Idle · Done. An unsent draft is not a thread in any of those
+ * states yet: it is listed in its own Drafts group after Idle, so the Idle count is threads only.
  *
  * "Needs you" and "Failed" are a projection of the inbox (§4.8): an open inbox item about the thread (subject kind
  * `session`) with blocking or failed severity, plus the thread states this sidebar already classifies (a pending
@@ -12,7 +13,7 @@
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import type { ThreadAttentionLabel } from './attention-presentation.js'
 
-export const THREAD_STATUS_GROUPS = ['pinned', 'needs-you', 'working', 'ready', 'idle', 'done'] as const
+export const THREAD_STATUS_GROUPS = ['pinned', 'needs-you', 'working', 'ready', 'idle', 'draft', 'done'] as const
 export type ThreadStatusGroup = (typeof THREAD_STATUS_GROUPS)[number]
 
 /** A thread nobody touched for this long folds into Done on its own, unless it is pinned (§4.3). */
@@ -61,6 +62,8 @@ export interface ThreadStatusInput {
   readonly pinned: boolean
   readonly archived: boolean
   readonly settled: boolean
+  /** Nothing was sent yet: the composer's open draft, or one with text waiting. Listed under Drafts, not Idle. */
+  readonly draft?: boolean | undefined
   /** The Host still holds an unacknowledged finish (or a hand unread mark). */
   readonly unread: boolean
   /** The sidebar's own attention labels for this thread (not its children). */
@@ -197,11 +200,11 @@ const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus
   } else if (own.status === 'working' && working.length > 0 && own.detail === undefined) {
     rolled = { ...own, detail: `${plural(working.length, 'subagent', 'subagents')} working` }
   }
-  return { ...rolled, group: groupOf(rolled.status, input.pinned) }
+  return { ...rolled, group: input.draft === true && !input.pinned ? 'draft' : groupOf(rolled.status, input.pinned) }
 }
 
 /** Pinned threads keep their glyph but sit above every group; Failed shares the Needs you group (§4.8). */
-const groupOf = (status: WorkStatus, pinned: boolean): ThreadStatusGroup => {
+const groupOf = (status: WorkStatus, pinned: boolean): Exclude<ThreadStatusGroup, 'draft'> => {
   if (pinned) return 'pinned'
   if (status === 'failed') return 'needs-you'
   return status
