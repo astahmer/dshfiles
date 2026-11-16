@@ -38,8 +38,8 @@ describe('the +, @ and / lists on a phone (unslop phone 3, U7)', () => {
     }
   })
 
-  it('draws the list with the 16px sheet radius under the phone shell', () => {
-    const menu = inMedia('(max-width: 639.98px)', ':global(html[data-shell-phone-nav]) .menu').join(' ')
+  it('draws the list with the 16px sheet radius under the phone shell, sideways too', () => {
+    const menu = inMedia('(max-width: 639.98px), (pointer: coarse) and (max-height: 500px)', ':global(html[data-shell-phone-nav]) .menu').join(' ')
     expect(menu).toContain('border-radius: var(--dsw-radius-panel, 16px)')
   })
 })
