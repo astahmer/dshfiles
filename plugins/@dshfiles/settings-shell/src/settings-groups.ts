@@ -314,7 +314,7 @@ const pageTitle = (page: PluginSettingsPage): string => {
 const PROMOTED_FIELDS: ReadonlyArray<{ readonly ns: string; readonly key: string; readonly entry: string; readonly title: string }> = []
 
 /** The namespace holding the one Jev key (this plugin's own settings). */
-const SHARED_JEV_NAMESPACE = 'dshfiles-settings-shell'
+export const SHARED_JEV_NAMESPACE = 'dshfiles-settings-shell'
 
 /** Jev settings live together in Tools & MCP: every field whose key names Jev. */
 const isJevField = (field: SettingField): boolean => /^jev/iu.test(field.key)

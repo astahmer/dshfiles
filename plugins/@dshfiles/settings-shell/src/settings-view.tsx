@@ -14,7 +14,7 @@ import type { PluginSettingsPage } from './plugin-settings.js'
 import { PageViewMemoryProvider } from './plugin-settings-page.js'
 import { Highlight } from './schema-form/settings-form.js'
 import type { SettingField } from './schema-form/schema-model.js'
-import { JEV_ENTRY_ID, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
+import { JEV_ENTRY_ID, SHARED_JEV_NAMESPACE, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult, type ShortcutRow } from './settings-search.js'
 
 export interface SectionRow {
@@ -279,7 +279,9 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
   // A section draws its own rows; a plugin page that is the whole entry draws the entry's heading itself. A page that
   // is one block of a task entry (Layout › Main tabs) keeps the task's heading above it, even while it is the only one.
   const ownHeading = entry.sectionId !== undefined || entry.pages.length !== 1 || link !== undefined || entry.pages[0]?.pageId !== entry.id
-  const jevHere = entry.id === JEV_ENTRY_ID ? [] : entry.pages.filter(page => props.jevNamespaces.has(page.ns))
+  // A plugin whose Jev switches moved gets a pointer to them. The shell's own namespace only lends the shared key: its
+  // page (the release check, under Update DSH) is not about Jev, so it says nothing.
+  const jevHere = entry.id === JEV_ENTRY_ID ? [] : entry.pages.filter(page => props.jevNamespaces.has(page.ns) && page.ns !== SHARED_JEV_NAMESPACE)
   const section = useSingleTitle(entry.sectionLabel ?? entry.label)
   const pages = entry.pages.map(page => <Fragment key={page.pageId}>{props.renderPluginPage(page, headingOf(page))}</Fragment>)
   function headingOf(page: PluginSettingsPage): PluginPageHeading {
