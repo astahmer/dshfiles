@@ -85,7 +85,7 @@ describe('TurnActivity.summarize', () => {
     expect(TurnActivity.segments(summary, { includeReads: true, lineCounts: true, testResults: true }).map(segment => segment.text)).toEqual([
       'edited 2 files +4 −2',
       'ran 2 commands',
-      '2 tests failed',
+      '2 of 42 tests failed',
     ])
     expect(TurnActivity.segments(summary, { includeReads: true, lineCounts: false, testResults: false }).map(segment => segment.text)).toEqual([
       'edited 2 files',
@@ -93,7 +93,7 @@ describe('TurnActivity.summarize', () => {
     ])
     expect(
       TurnActivity.segments(summary, { includeReads: true, lineCounts: true, testResults: true, editedFiles: false }).map(segment => segment.text),
-    ).toEqual(['ran 2 commands', '2 tests failed'])
+    ).toEqual(['ran 2 commands', '2 of 42 tests failed'])
     expect(TurnActivity.testCounts('===== 3 failed, 12 passed in 1.20s =====')).toEqual({ passed: 12, failed: 3, total: 15 })
     expect(TurnActivity.duration(72_000)).toBe('1m 12s')
   })
@@ -115,21 +115,21 @@ describe('TurnActivity.summarize', () => {
       expect(TurnActivity.shownDuration(72_000)).toBe('1m 12s')
     })
 
-    it('reports a failed test run once, as the test outcome that opens the failed command', () => {
+    it('reports a failed test run once, as the one red part, which opens the failed command', () => {
       const summary = TurnActivity.summarize({
         calls: [call('a', 'bash', { command: 'pnpm vitest run' })],
-        results: [{ callId: 'a', isError: false, text: ' Tests  1 failed | 4 passed (5)\n[exit code: 1]' }],
+        results: [{ callId: 'a', isError: false, text: ' Tests  1 failed | 7 passed (8)\n[exit code: 1]' }],
       })
       expect(TurnActivity.segments(summary, options)).toEqual([
         { key: 'commands', text: 'ran 1 command' },
-        { key: 'tests', text: '1 test failed', failed: true, opensFailures: true },
+        { key: 'tests', text: '1 of 8 tests failed', failed: true, opensFailures: true },
       ])
       expect(TurnActivity.failedCommandsBeyondTests(summary, { testResults: true })).toBe(0)
       // With test results off, the failed command is the only word on the failure.
       expect(TurnActivity.failedCommandsBeyondTests(summary, { testResults: false })).toBe(1)
     })
 
-    it('still counts failed commands that are not the test run, and says passing tests without colour', () => {
+    it('keeps one red part when another command failed beside the test run', () => {
       const failing = TurnActivity.summarize({
         calls: [call('a', 'bash', { command: 'pnpm vitest run' }), call('b', 'bash', { command: 'pnpm build' })],
         results: [
@@ -137,12 +137,32 @@ describe('TurnActivity.summarize', () => {
           { callId: 'b', isError: false, text: 'boom\n[exit code: 2]' },
         ],
       })
-      expect(TurnActivity.failedCommandsBeyondTests(failing, { testResults: true })).toBe(2)
+      const parts = TurnActivity.segments(failing, options)
+      expect(parts.filter(part => part.failed === true)).toEqual([{ key: 'tests', text: '1 of 5 tests failed', failed: true, opensFailures: true }])
+      // The test outcome opens both failed commands, so no second red count stands beside it.
+      expect(TurnActivity.failedCommandsBeyondTests(failing, { testResults: true })).toBe(0)
+    })
+
+    it('counts failed commands on their own when no test failed, and says passing tests without colour', () => {
+      const build = TurnActivity.summarize({
+        calls: [call('a', 'bash', { command: 'pnpm build' })],
+        results: [{ callId: 'a', isError: false, text: 'boom\n[exit code: 2]' }],
+      })
+      expect(TurnActivity.failedCommandsBeyondTests(build, { testResults: true })).toBe(1)
       const passing = TurnActivity.summarize({
         calls: [call('a', 'bash', { command: 'pnpm vitest run' })],
         results: [{ callId: 'a', isError: false, text: ' Tests  5 passed (5)\n[exit code: 0]' }],
       })
       expect(TurnActivity.segments(passing, options).at(-1)).toEqual({ key: 'tests', text: '5 tests passed' })
+      expect(TurnActivity.segments(passing, options).some(part => part.failed === true)).toBe(false)
+    })
+
+    it('draws no separator first, nor right after a chevron', () => {
+      // "ran 1 command ›" "1 of 8 tests failed ›" "6s" "Walkthrough ›": the chevrons already separate.
+      expect(TurnActivity.separators([true, true, false, true])).toEqual([false, false, false, true])
+      // chips, "ran 1 command ›", "5s"
+      expect(TurnActivity.separators([false, true, false])).toEqual([false, true, false])
+      expect(TurnActivity.separators([false])).toEqual([false])
     })
   })
 })
