@@ -127,6 +127,11 @@ One control in the conversation header carries the workspace state:
   waiting to rebase, or the shared project checkout when the thread runs beside
   the other threads. It never disappears while the state loads, so the header
   cannot lose the only way to the thread's workspace actions.
+- While the workspace holds described, conflict-free work and no thread in it
+  is busy, the header shows one primary **Land** button beside the control. It
+  opens a confirmation that lists the revisions before anything moves; the
+  menu's **Land on main** opens the same confirmation. With nothing to land, or
+  while landing cannot start, there is no button and the menu says why.
 - Its menu shows the workspace path, what the workspace state is (ready to
   integrate, up to date, behind `main`, conflicted, shared checkout, or blocked),
   **Integrate into the configured bookmark** (main by default), **Open thread workspaces in side panel**, and

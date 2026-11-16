@@ -867,6 +867,8 @@ When('the thread is integrated from this client', async ({ page }: { readonly pa
   await expect(workspace).toBeVisible({ timeout: 30_000 })
   await workspace.click()
   await page.getByRole('button', { name: 'Land this thread on main', exact: true }).click()
+  // The workspace control asks first: its dialog lists the revisions, then one confirm lands.
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Land on main', exact: true }).click()
 })
 
 When('the thread is landed from the Land page', async ({ page }: { readonly page: Page }) => {

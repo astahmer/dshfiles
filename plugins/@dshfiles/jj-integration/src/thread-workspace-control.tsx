@@ -8,19 +8,21 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, ClockIcon, FolderGit2Icon, PanelRightIcon, RefreshCwIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ClockIcon, FolderGit2Icon, GitMergeIcon, PanelRightIcon, RefreshCwIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useRegistry } from '@dshfiles/dshx/client'
-import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
 import type { ThreadRevisionView, ThreadView } from './api.js'
 import { useSessionThreadApi } from './use-session-thread-api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { IntegrationRecovery } from './integration-recovery.js'
+import { LandConfirmDialog } from './land-confirm-dialog.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
+import { REPOSITORY_CHANGED_EVENT } from './repository-change.js'
 import { threadQueryKeys } from './panel.js'
 import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
 import { RevisionGraphHoverCard, revisionGraphQueryKey } from './revision-graph-hover-card.js'
@@ -30,6 +32,7 @@ import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { threadStatusPollMs } from './thread-status-poll.js'
 import { useToast } from './toast.js'
 import { useProjectBookmark } from './project-bookmark-query.js'
+import { WorkspaceControlModel } from './workspace-control-model.js'
 import { arrangeWorkspaceMenuSections, WorkspaceMenuSections } from './workspace-menu-sections.js'
 
 export interface ThreadWorkspaceControlProps {
@@ -86,6 +89,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const api = useSessionThreadApi(props.sessionId)
   const queryClient = useQueryClient()
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
+  const [confirmingLand, setConfirmingLand] = useState(false)
   const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const read = useCallback(() => props.sessions.list.getSnapshot().byId[props.sessionId]?.cwd ?? null, [props.sessions, props.sessionId])
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
@@ -158,6 +162,15 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     },
     onError: error => toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false }),
   })
+  // The header shows a live verb, so a land made anywhere in this browser (the Changes view, the Land page) updates it
+  // at once instead of on the idle poll. A read already in flight is left alone: it announces the change itself.
+  useEffect(() => {
+    if (cwd === null || cwd.length === 0) return
+    const refresh = (): void =>
+      void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(cwd, props.sessionId), exact: true }, { cancelRefetch: false })
+    window.addEventListener(REPOSITORY_CHANGED_EVENT, refresh)
+    return () => window.removeEventListener(REPOSITORY_CHANGED_EVENT, refresh)
+  }, [cwd, props.sessionId, queryClient])
   /** Opening the menu reads the status again: work landed outside this browser has no mutation to invalidate it. */
   const onWorkspaceMenuOpenChange = (open: boolean): void => {
     setWorkspaceMenuOpen(open)
@@ -223,6 +236,20 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const rebaseDisabled = rebasesPending || !isThread || unlanded === 0 || !canRebase
   const integrationQueued = current?.integrationQueuedAt !== undefined
   const canQueueIntegration = isThread && unlanded > 0 && !canRebase && !rebasesPending
+  // H4 (unslop): landing finishes a thread, so the header carries it as its one primary verb while it can run.
+  const showsLand = WorkspaceControlModel.showsLand({ isThread, unlanded: current?.unlanded ?? [], canLand: canRebase, queued: integrationQueued })
+  // A dialog left without revisions (the work landed elsewhere meanwhile) closes for good, not until the next change.
+  useEffect(() => {
+    if (unlanded === 0) setConfirmingLand(false)
+  }, [unlanded])
+  /** Both Land buttons of this control ask first: the dialog lists the revisions that move. */
+  const askToLand = (): void => {
+    setWorkspaceMenuOpen(false)
+    setConfirmingLand(true)
+    // Work landed outside this browser (a terminal, the agent's own land) has no event: the dialog lists what is left.
+    if (cwd !== null && cwd.length > 0)
+      void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(cwd, props.sessionId), exact: true }, { cancelRefetch: false })
+  }
   const blockedReason =
     isThread && !canRebase
       ? clientCanRebase === undefined
@@ -396,7 +423,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                         aria-label={label}
                         className="dshx-root dshx:w-full"
                         disabled={rebaseDisabled}
-                        onClick={() => rebase.mutate({ path: current.path })}
+                        onClick={askToLand}
                         size="sm"
                         type="button"
                         variant="outline"
@@ -434,7 +461,28 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
             </div>
           </PopoverContent>
         </Popover>
+        {showsLand ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button aria-label={props.t('landThreadLabel')} data-workspace-land="" disabled={rebasesPending} onClick={askToLand} size="sm" type="button">
+                {rebasesPending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5 dshx:@max-[26rem]:hidden" />}
+                {props.t('landThreadVerb')}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{`${label} (${props.t('toRebase', { count: unlanded })})`}</TooltipContent>
+          </Tooltip>
+        ) : null}
       </span>
+      {isThread ? (
+        <LandConfirmDialog
+          bookmark={bookmark}
+          onConfirm={() => rebase.mutate({ path: current.path })}
+          onOpenChange={setConfirmingLand}
+          open={confirmingLand && unlanded > 0}
+          revisions={current.unlanded}
+          t={props.t}
+        />
+      ) : null}
       {toast.element}
     </TooltipProvider>
   )

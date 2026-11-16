@@ -56,6 +56,8 @@ export const LandPreview = (props: {
               onClick={props.onLand}
               size="sm"
               type="button"
+              // The thread header holds the one primary Land; this is the same verb next to the answer.
+              variant="outline"
             >
               {props.pending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5" />}
               {props.pending ? props.t('rebasing') : props.t('rebaseOnto', { bookmark: props.bookmark })}

@@ -280,6 +280,10 @@ const closeSettings = async (page: Page): Promise<void> => {
 }
 
 const rebaseButton = (page: Page) => page.getByRole('button', { name: 'Land this thread on main', exact: true })
+/** Both Land buttons of the header's workspace control ask first: the dialog lists the revisions, then one confirm lands. */
+const confirmLand = async (page: Page): Promise<void> => {
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Land on main', exact: true }).click()
+}
 /** The same land action, one click from the answer: the row the newest completed turn renders. */
 const turnEndIntegrateOffer = (page: Page) => page.getByTestId('jj-inline-integrate-offer')
 /** The one header control: it names a thread workspace, or the shared checkout the thread runs in. */
@@ -1297,6 +1301,7 @@ Then('Rebase refuses the placeholder description and leaves main in place', asyn
   await expect(workspaceMenu(page)).toContainText('1 to land', { timeout: 10_000 })
   await expect(rebaseButton(page)).toBeEnabled()
   await rebaseButton(page).click()
+  await confirmLand(page)
   await recordAssertion(page, 'jj-integration-rebase-asks-for-a-description', async () => {
     await expect(page.getByRole('alert').filter({ hasText: /^Describe these revisions before landing: \w+\./ })).toBeVisible()
     expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
@@ -1308,9 +1313,15 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
   await openWorkspaceMenu(page)
   await expect(workspaceMenu(page)).toContainText('1 to land')
   await rebaseButton(page).click()
+  await recordAssertion(page, 'jj-integration-land-asks-before-it-moves-main', async () => {
+    await expect(page.getByRole('alertdialog', { name: 'Land 1 revision on main?', exact: true })).toContainText(description)
+    expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
+  })
+  await confirmLand(page)
   await recordAssertion(page, 'jj-integration-rebase-moves-the-bookmark', async () => {
     const rebasedToast = page.getByRole('alert').filter({ hasText: 'Landed 1 revision(s) on main:' })
     await expect(rebasedToast).toContainText(description)
+    await openWorkspaceMenu(page)
     await expect(rebaseButton(page)).toBeDisabled()
     const notice = page.getByTestId('jj-thread-rebased-notice')
     await expect(notice).toHaveCount(1)
