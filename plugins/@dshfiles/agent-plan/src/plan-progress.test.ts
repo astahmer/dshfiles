@@ -18,6 +18,14 @@ describe('PlanProgress', () => {
     expect(PlanProgress.formatDuration(64_000)).toBe('1m 04s')
   })
 
+  it('shows no time for a step that never started or took under a second', () => {
+    expect(PlanProgress.shownDuration(undefined)).toBeUndefined()
+    expect(PlanProgress.shownDuration(0)).toBeUndefined()
+    expect(PlanProgress.shownDuration(400)).toBeUndefined()
+    expect(PlanProgress.shownDuration(1_400)).toBe('1s')
+    expect(PlanProgress.shownDuration(64_000)).toBe('1m 04s')
+  })
+
   it('times a step that jumped straight to completed from the write before and reports a finished plan', () => {
     const history = [write(1, 0, [item('A', 'in_progress'), item('B', 'pending')]), write(2, 4_000, [item('A', 'completed'), item('B', 'completed')])]
     const progress = PlanProgress.progress(history[1]?.todos ?? [], history)
