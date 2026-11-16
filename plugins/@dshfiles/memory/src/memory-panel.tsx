@@ -18,16 +18,11 @@ import { MemoryFocusModel } from './memory-focus.ts'
 import { NotesTab } from './notes-tab.tsx'
 import { PanelFormat } from './panel-format.ts'
 import { ThreadsTab } from './threads-tab.tsx'
+import { MemoryCopy } from './memory-copy.ts'
 
 type MemoryTab = 'notes' | 'threads' | 'analytics'
 
 const memoryTabOf = (value: string): MemoryTab => (value === 'threads' || value === 'analytics' || value === 'notes' ? value : 'notes')
-
-const subtitleOf = (tab: MemoryTab): string => {
-  if (tab === 'threads') return 'View and explore thread digests, what was extracted, and which memories were created.'
-  if (tab === 'analytics') return 'Usage, performance, and quality metrics for memory extraction and retrieval.'
-  return 'What your agents remember, where it comes from, and how it is used.'
-}
 
 const projectTrigger =
   'dshx:h-8 dshx:min-w-32 dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-transparent dshx:px-3 dshx:text-xs dshx:font-normal dshx:shadow-none'
@@ -206,28 +201,25 @@ export const MemoryPanel = (props: { readonly openThread: (sessionId: string) =>
     setTab('notes')
     setSelectedNoteId(id)
   }
+  const searchNotice = usage.data === undefined ? null : MemoryCopy.searchNotice(usage.data.retrieval)
   return (
     <TooltipProvider delayDuration={500}>
       <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground">
         <Page
           heading="Memory"
-          description={subtitleOf(tab)}
+          description={MemoryCopy.description(tab)}
           meta={
             <>
-              {usage.data === undefined ? null : (
+              {searchNotice === null ? null : (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="dshx:inline-flex">
                       <Badge variant="secondary" className="dshx:text-xs dshx:font-normal">
-                        {usage.data.retrieval.active === 'hybrid'
-                          ? `Retrieval: hybrid (${usage.data.retrieval.model ?? 'embeddings'})`
-                          : usage.data.retrieval.requested === 'hybrid'
-                            ? 'Retrieval: BM25 (hybrid unavailable)'
-                            : 'Retrieval: BM25'}
+                        {searchNotice.label}
                       </Badge>
                     </span>
                   </TooltipTrigger>
-                  {usage.data.retrieval.reason === null ? null : <TooltipContent>{usage.data.retrieval.reason}</TooltipContent>}
+                  <TooltipContent className="dshx:max-w-72">{searchNotice.detail}</TooltipContent>
                 </Tooltip>
               )}
               <Select value={project === '' ? 'all' : project} onValueChange={value => chooseProject(value === 'all' ? '' : value)}>
