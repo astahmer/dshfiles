@@ -6,7 +6,8 @@
  * Plugins do not add rail entries. Their existing `sidebar.panellist` pages are re-homed here as sections: the table
  * below maps every page id the mounted profile registers today, and a plugin that ships a new page adds one
  * `DestinationSections` entry (`api.add(DestinationSections, { panelId, destination, label })`). A page nobody mapped
- * still shows, under Settings › Other pages, so nothing becomes unreachable.
+ * still shows, under Settings › Other pages, so nothing becomes unreachable. A page for plugin authors declares
+ * `group: 'developer'`: it is listed in the Developer group at the end of Settings, never among the user's pages.
  */
 import { defineRegistry } from '@dshfiles/dshx/client'
 import { DESTINATION_IDS, type DestinationId } from './destination-ids.js'
@@ -92,12 +93,15 @@ const resolve = (panels: readonly DestinationPanel[], contributed: readonly Dest
             formerLabels: [panel.label],
             unmapped: true,
           }
-        : { ...section, unmapped: false }
+        : // A developer page lives in Settings whatever destination its plugin named: the rail keeps user pages only.
+          { ...section, destination: section.group === 'developer' ? 'settings' : section.destination, unmapped: false }
     byDestination.get(resolved.destination)?.push(resolved)
   }
   return DESTINATIONS.map(destination => ({
     ...destination,
-    sections: [...(byDestination.get(destination.id) ?? [])].sort((left, right) => (left.order ?? 0) - (right.order ?? 0)),
+    sections: [...(byDestination.get(destination.id) ?? [])].sort(
+      (left, right) => Number(left.group === 'developer') - Number(right.group === 'developer') || (left.order ?? 0) - (right.order ?? 0),
+    ),
   }))
 }
 

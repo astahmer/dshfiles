@@ -136,6 +136,8 @@ export interface SidebarPreferences {
   showRailActions: boolean
   /** Restart DSH among the rail's DSH actions; off leaves it to the status strip's restart item. */
   showRailRestart: boolean
+  /** The Developer group at the end of Settings (pages for plugin authors); off hides it, the palette still opens them. */
+  showDeveloperPages: boolean
   headerRegionHeight: number | null
   headerOrder: string[]
   hiddenHeaderIds: string[]
@@ -242,6 +244,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   showRailActions: true,
   // One restart control (DESIGN.md): the status strip's item. The rail button is for someone who asks for it.
   showRailRestart: false,
+  showDeveloperPages: true,
   headerRegionHeight: null,
   headerOrder: [],
   hiddenHeaderIds: [],

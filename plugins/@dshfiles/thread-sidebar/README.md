@@ -166,6 +166,12 @@ while no restart waits, so update-then-restart is one item, not two. Customize s
 rail** (`showRailRestart`, off by default) adds a Restart button to the rail's DSH actions (only while the supervisor
 offers a restart; amber with a slow pulse while updates or a restart wait); the strip then draws no restart item.
 
+**Developer pages.** A page for people who write plugins declares `group: 'developer'` in its destination section
+(Component gallery and Plugin guide do). Such a page is never listed among a destination's own pages: it sits in a
+labelled **Developer** group at the end of the Settings list, whatever destination its plugin named. Customize sidebar ›
+**Show developer pages in Settings** (`showDeveloperPages`, on by default) hides the group; the command palette and the
+New tab page still open those pages. A page a person filed in a folder of their own stays where they put it.
+
 **Rail and destinations.** The left column is a labelled rail of eight destinations (plan
 `docs/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread
 list with **Search threads**, the Sidebar settings gear and an icon for each of its sections beside them (Board);

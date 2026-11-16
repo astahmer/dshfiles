@@ -90,6 +90,11 @@ export const threadSidebarSettings = defineSettings({
       .description(
         'Show Restart DSH among the DSH actions on the rail. Off (the default): the status strip shows the restart notice and its Restart buttons while updates wait, and ⌘K keeps Restart DSH.',
       ),
+    showDeveloperPages: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.showDeveloperPages)
+      .description(
+        'List the pages for plugin authors (Component gallery, Plugin guide) in a Developer group at the end of Settings. Off: ⌘K still opens them.',
+      ),
     navigationDensity: Schema.union(['compact', 'comfortable'] as const)
       .default(DEFAULT_PREFERENCES.navigationDensity)
       .description('Row height of the expanded navigation list.'),

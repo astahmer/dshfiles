@@ -1369,6 +1369,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}
             edgeSwipePanels={preferences.phoneEdgeSwipePanels}
             phoneNavigation={preferences.phoneNavigation}
+            showDeveloperPages={preferences.showDeveloperPages}
             railActions={railActions}
           />,
           columnElement,
@@ -1418,6 +1419,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                   onCheckedChange={checked => updatePreferences({ showRailRestart: checked === true })}
                 />
                 {text(props.t, 'threadSidebarShowRailRestart')}
+              </label>
+              <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:pt-1 dshx:text-sm">
+                <Checkbox checked={preferences.showDeveloperPages} onCheckedChange={checked => updatePreferences({ showDeveloperPages: checked === true })} />
+                {text(props.t, 'threadSidebarShowDeveloperPages')}
               </label>
             </div>
             <section className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:px-2" aria-labelledby={`${headerRegionId}-rows`}>
