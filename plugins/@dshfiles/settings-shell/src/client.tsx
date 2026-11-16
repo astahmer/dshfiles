@@ -52,7 +52,7 @@ import { SHELL_CHILDREN, type ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import { WELCOME_LOCALE_NAMESPACE, WELCOME_STEP_ID, WelcomeNotice, WelcomeNoticeStore, welcomeLocale, type WelcomeTranslate } from './native/welcome-notice.js'
 import { settingsShellApi } from './shell-api.js'
-import { bundleLabelsOf, type BundleLabel } from './bundle-labels.js'
+import { bundleLabelsOf, namespaceLabelOf, type BundleLabel } from './bundle-labels.js'
 import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
@@ -224,14 +224,7 @@ export default defineClient({
     const labels = createSnapshotStore<ReadonlyMap<string, NamespaceLabel>>(new Map())
     const installLabels = (rows: readonly BundleLabel[]): void => {
       const next = new Map<string, NamespaceLabel>()
-      for (const row of rows) {
-        // A package name is no title; without manifest text the page falls back to the schema or the id.
-        const resolvedTitle = row.title === undefined ? '' : ctx.locale.resolveText(row.title)
-        next.set(row.rowId, {
-          title: resolvedTitle === row.bundleName || resolvedTitle === row.moduleName ? '' : resolvedTitle,
-          description: row.description === undefined ? (row.bundleDescription ?? '') : ctx.locale.resolveText(row.description),
-        })
-      }
+      for (const row of rows) next.set(row.rowId, namespaceLabelOf(row, text => ctx.locale.resolveText(text)))
       labels.set(next)
     }
     const labelsApi = createApiClient(ctx, settingsShellApi, metadata?.packageId)
