@@ -163,6 +163,8 @@ describe('Settings workbench sources', () => {
       expect(modalNavigation).not.toHaveBeenCalled()
       expect(host.querySelector('[role="dialog"]')).toBeNull()
       expect(host.querySelectorAll('[data-settings-view="tab"]')).toHaveLength(2)
+      // The pane's own tab closes a docked hub: its header draws no second close button.
+      expect(host.querySelectorAll('[data-settings-close]')).toHaveLength(0)
       expect(fields.every(field => field === undefined)).toBe(true)
 
       await act(async () => {
