@@ -22,7 +22,7 @@ A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
 with this repository's local `@dshfiles/dshx` fork and DSH 0.2 client/host
 contracts.
 
-Two panels in navigation, the main view and the Workbench chooser: **Revision graph** and **Source control**. Each opens straight on its toolbar (repository, Fetch, Push, refresh, view settings, repository actions); only the narrow per-thread side panel switches between both views with tabs. Repository-scoped tabs keep their repository titles. Saved Workbench layouts keep `dshfiles-jujutsu.dock` for the graph; Source Control is `dshfiles-jujutsu.source-control`.
+Two pages in navigation, the main view and the Workbench chooser: **History** (the revision graph) and **Source control**. As pages they carry the kit page header: the title, one line of description and the project select beside the title, which opens on the current project; the toolbar row below holds Fetch, Push, refresh, view settings and repository actions, and the graph's secondary filters (Mine, Hide immutable, date) sit in one **Filter** menu. Only the narrow per-thread side panel switches between both views with tabs. Project-scoped tabs are titled "History · project". Saved Workbench layouts keep `dshfiles-jujutsu.dock` for the graph; Source Control is `dshfiles-jujutsu.source-control`.
 
 A phone keeps the same compact rows and toolbar. Under a touch pointer each toolbar button gets an invisible hit box 8 px past its edges, so a 28 px button takes a 44 px tap without growing the row; a narrow row also drops a bookmark's colocated `@git` copy when the bookmark itself is shown.
 

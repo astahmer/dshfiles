@@ -29,6 +29,7 @@ import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { ChatReferenceTitleStore } from './chat-reference-titles.js'
 import { sessionProjectPath } from './session-project-path.js'
 import { JujutsuPanel } from './client.js'
+import { HistoryPage } from './history-page.js'
 import type {} from '@dshfiles/rich-composer/conversation-contract'
 import {
   ChangesPill,
@@ -199,14 +200,21 @@ export default defineClient({
         defaultPath: defaultPath === undefined || defaultPath.length === 0 ? null : defaultPath,
       }
     }
+    /** The project of the thread last on screen: where the History and Source control pages open before any choice. */
+    const currentProjectPath = (): string | null => {
+      const sessionId = ctx.sidebarRight.mounted.getSnapshot() ?? lastThread
+      if (sessionId === undefined) return null
+      const projectPath = sessionProjectPath(sessionId, ctx.sessions.list.getSnapshot().byId, ctx.workspaces.list.getSnapshot().items)
+      return projectPath === undefined || projectPath.length === 0 ? null : projectPath
+    }
     const MainSurfacePanel = decorate((props: PropsRuntime<'main'>) => {
       const scope = useActiveJujutsuScope()
       const visible = SurfaceVisibility.useMainPanelVisible({ usePanelInfo: props.usePanelInfo, panelId: PANEL_ID })
-      return panel({ surface: 'main', scope, visible, view: 'graph' })
+      return panel({ surface: 'main', scope, visible, view: 'graph', defaultPath: currentProjectPath() })
     })
     const MainSourceControlPanel = decorate((props: PropsRuntime<'main'>) => {
       const visible = SurfaceVisibility.useMainPanelVisible({ usePanelInfo: props.usePanelInfo, panelId: SOURCE_CONTROL_PANEL_ID })
-      return panel({ surface: 'main', scope: DEFAULT_PANEL_SCOPE, visible, view: 'source' })
+      return panel({ surface: 'main', scope: DEFAULT_PANEL_SCOPE, visible, view: 'source', defaultPath: currentProjectPath() })
     })
     const SideSurfacePanel = decorate((props: PropsRuntime<'sidebar.right.pane.tab'>) => {
       const target = useMountedSession()
@@ -223,9 +231,9 @@ export default defineClient({
       panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph' }),
     )
     ctx.effect(() => PanelScopes.listen(), 'dshfiles-jujutsu: the scope each main tab shows')
-    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Revision graph' }, PanelGlyph))
+    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: HistoryPage.titles.graph }, PanelGlyph))
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: SOURCE_CONTROL_PANEL_ID, order: 3, label: 'Source control' }, SourceControlGlyph),
+      ctx.slots.register({ name: 'sidebar.panellist', id: SOURCE_CONTROL_PANEL_ID, order: 3, label: HistoryPage.titles.source }, SourceControlGlyph),
     )
     ctx.effect(
       () =>
@@ -436,7 +444,7 @@ export default defineClient({
       () =>
         workbenchPanels().register({
           id: DOCK_PANEL_ID,
-          title: 'Revision graph',
+          title: HistoryPage.titles.graph,
           dockDefault: true,
           // The same feature's full main-view page, so the workbench offers "Move to main view" for the panel.
           mainPanelId: PANEL_ID,
@@ -449,7 +457,7 @@ export default defineClient({
       () =>
         workbenchPanels().register({
           id: SOURCE_CONTROL_DOCK_PANEL_ID,
-          title: 'Source control',
+          title: HistoryPage.titles.source,
           mainPanelId: SOURCE_CONTROL_PANEL_ID,
           component: DockSourceControlPanel,
         }),

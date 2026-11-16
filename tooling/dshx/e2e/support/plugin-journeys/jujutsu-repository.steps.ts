@@ -198,9 +198,10 @@ Then('searching, filtering by author and hiding immutable revisions narrow the g
   const rootCommitId = jj(repository, ['--ignore-working-copy', 'log', '--no-graph', '-r', 'root()', '-T', 'commit_id']).trim()
   const rootRow = revisionsRegion(page).locator(`article[data-commit-id="${rootCommitId}"]`)
   await expect(rootRow).toHaveCount(1)
-  const hideImmutable = page.getByRole('checkbox', { name: 'Hide immutable', exact: true })
-  await hideImmutable.click()
-  await expect(hideImmutable).toBeChecked()
+  // Mine, Hide immutable and the date filter share the toolbar's Filter menu.
+  await page.getByRole('button', { name: 'Filter', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Hide immutable', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Filter (1 on)', exact: true })).toBeVisible()
   await recordAssertion(page, 'jujutsu-hide-immutable-drops-the-root', async () => {
     await expect(rootRow).toHaveCount(0)
     await expect(revisionRow(page, 'Feature work by Ada')).toBeVisible()
