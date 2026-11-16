@@ -199,7 +199,7 @@ When('the turn is stopped while the question counts down', async ({ page }: { pa
   await expect(questionCard(page).getByRole('radio', { name: 'Staging', exact: true })).toBeVisible()
   await expect(countdown(page)).toBeVisible()
   // The open card takes the composer's place; closing its panel brings back the composer and its Stop control.
-  await questionCard(page).getByRole('button', { name: 'Close the panel — reopen it from the tool call', exact: true }).click()
+  await questionCard(page).getByRole('button', { name: 'Answer later', exact: true }).click()
   await page.getByLabel('Stop generating', { exact: true }).click()
 })
 

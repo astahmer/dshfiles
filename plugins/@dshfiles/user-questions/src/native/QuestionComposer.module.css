@@ -713,6 +713,33 @@
   }
 }
 
+/* Owned delta (unslop T17): the way out of a pending question is a word, not a second bare icon beside Collapse. */
+.exitButton {
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 999px;
+  corner-shape: round;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 24px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .exitButton:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
+  }
+}
+
+.exitButton:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: default;
+}
+
 /* Owned delta (unslop M3): the answers of a question with a rich body were below the fold of the card's own scroll,
    under a pinned Skip and Submit (a table and a chart fill the seat on a phone, and on a desktop too). The answers now
    stick to the bottom of that scroll seat, on the card's surface, and the body scrolls above them. Their height is

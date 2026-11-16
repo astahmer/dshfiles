@@ -133,6 +133,10 @@ Then('the question form fits a phone-width viewport', async ({ page }: { page: P
       expect(optionBox?.y ?? -1).toBeGreaterThanOrEqual(seatTop)
       expect((optionBox?.y ?? 0) + (optionBox?.height ?? 0)).toBeLessThanOrEqual(footerTop + 1)
     }
+    // One question has nowhere to page to.
+    await expect(card.getByRole('button', { name: 'Next question' })).toHaveCount(0)
+    // The way out of a pending question is a word, not a second bare icon.
+    await expect(card.getByRole('button', { name: 'Answer later', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
