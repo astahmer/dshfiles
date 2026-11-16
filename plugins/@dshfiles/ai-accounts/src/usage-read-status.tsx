@@ -35,7 +35,7 @@ export const UsageRefreshNotice = (props: {
         type="button"
         variant="outline"
       >
-        <RefreshCwIcon aria-hidden className={props.refreshing ? 'dshx:animate-spin' : undefined} />
+        <RefreshCwIcon aria-hidden className={props.refreshing ? 'dshx:animate-spin dshx:motion-reduce:animate-none' : undefined} />
         Retry
       </Button>
     </div>
