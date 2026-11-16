@@ -5,9 +5,8 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1 to 7 are done. Open follow-ups are
-listed under [Thread lane](#thread-lane). Steps 5, 6 and 8–14 are open. See
-[Work list](#work-list).
+**Resume here:** steps 1 to 9 are done. Step 10 is built (16 revisions above this plan entry) but its journeys have
+not run. Steps 11–14 are open. See [Work list](#work-list).
 
 ## Method and limits
 
@@ -196,8 +195,8 @@ before and passes after; see each revision's description for the reason.
 | 5 ✅ | Inbox question items show the question's own options and answer in place, open forms included; a subagent's question is answerable in its parent thread; the phone question card keeps its options in view; triage has one action row. See [Inbox lane](#inbox-lane). | M1, M2, M3, M8 | medium |
 | 6 ✅ | A primary "Land" in the header when there is work to land, behind one confirmation; the "+N −N" chip shows only for a thread's own workspace. See [Land lane](#land-lane). | M6, M7 | medium |
 | 7 ✅ | Settings rows: key and source lines hidden, no package-description fallback, units and enums humanised, nav regrouped with no "Other". See [Settings lane](#settings-lane). | P1, P2, P3 | medium |
-| 8    | Do not render zero-count chips, tiles and stat blocks.                                                                                                 | P6                | small  |
-| 9    | AI accounts onto the kit switch and the colour rule.                                                                                                   | P4                | small  |
+| 8 ✅ | No zero-count chips, tiles and stat blocks on Usage, Memory and Processes. See [Pages lane](#pages-lane). | P6 | small |
+| 9 ✅ | AI accounts on the kit switch and the colour rule, one header row, no nested cards. See [Pages lane](#pages-lane). | P4 | small |
 | 10   | Developer pages behind the "Plugin development" pack; remove Capabilities hub; hide Plugin Market when absent.                                         | N9                | small  |
 | 11   | Copy: catalog summary cap, error strings with a next step, `compactJson` renders, six status words, glossary in native forks.                          | C1–C8             | large  |
 | 12   | Backlog, History, Source control and Traces onto `Page`.                                                                                               | P5, P7, P8, P12   | large  |
@@ -359,6 +358,33 @@ Unverified:
   checked.
 
 jj-integration's Host half changed (`/rebase` wording), so a running instance needs a restart.
+
+## Pages lane
+
+24 revisions (`smxssuywlkvo` … `stvukouuzryv`) in ai-accounts, usage, memory, background-jobs, multi-host,
+mcp-servers, whiteboard and project-automations.
+
+- AI accounts is colourless when healthy: kit switches, no green dots or "Connected" badge, no indigo side border;
+  one header row with hairline sections instead of nested cards; the failure options in Settings sit behind one
+  disclosure. One status-strip item for quota, with a plain plan name and one duration format.
+- Usage leads its Cost tab with three numbers and one empty sentence when there is no usage; one-line description;
+  the Purpose filter scrolls sideways on a phone.
+- Memory analytics is one sentence and a plain table instead of ten icon tiles; no tool names and no filters over
+  an empty list.
+- Processes shows no zero-count chips; a job strip is titled by the call's description.
+- Hosts: one inline verb and a `⋯` per row, "Link this machine" from a header action, plain error copy, shared
+  status glyphs.
+- MCP servers: one name, the list is the page, adding a server is a dialog.
+- Whiteboards and Automations use the kit empty state.
+- background-jobs publishes `@dshfiles/background-jobs/running-threads`; thread-sidebar does not read it yet.
+
+Not done: cost charted in three places (#24); the retry row's route id (`chat`); the amber "10%" on model rows
+(`model-effort-picker`); Secrets (#44). Agent avatars stay emoji: they are user-chosen data.
+
+Unverified: full journey suites after the fixes (only the failed scenarios were re-run; every remaining failure fails
+at the base too, except `multi-host.auto-destination` and `remote-land-page`, which stop at a harness seeding
+error); the quota popover at 390 px. The multi-host and ai-accounts Host halves carry two changed strings, so a
+running instance shows those only after a restart.
 
 ## Tabs lane
 
