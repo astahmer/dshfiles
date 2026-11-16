@@ -197,7 +197,7 @@
         "click tab \"Observe\"",
         "click button \"Activity\"",
         "click button \"Agent started work*\"",
-        "expect button \"Open Session\""
+        "expect button \"Open thread\""
       ],
       "surfaces": ["client", "host", "integration", "storage"],
       "surface": "destinationSection",

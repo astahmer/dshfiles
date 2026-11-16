@@ -55,7 +55,9 @@ Then('search and the source filter narrow the feed, and it survives a reload', a
 
 Then('only the error carries the failure badge', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'activity-timeline-only-failures-use-the-destructive-badge', async () => {
-    const failureRows = feedRows(page).filter({ has: page.locator('[data-slot="badge"][data-variant="destructive"]') })
+    // Attention is the row's tinted tile, named for a screen reader; no row carries a solid red badge.
+    const failureRows = feedRows(page).filter({ has: page.locator('[data-activity-attention]') })
+    await expect(page.locator('[data-slot="badge"][data-variant="destructive"]')).toHaveCount(0)
     await expect(failureRows).toHaveCount(1)
     await expect(failureRows).toContainText('Agent reported an error')
   })
@@ -68,13 +70,13 @@ Then('routine events stay condensed while the error stays visible on its own', a
     expect(titles).not.toContain('Agent became running')
     expect(titles).not.toContain('Agent became idle')
   })
-  await page.getByRole('button', { name: 'Detailed (no condensation)', exact: true }).click()
+  await page.getByRole('button', { name: 'Every event', exact: true }).click()
   await recordAssertion(page, 'activity-timeline-detailed-mode-expands-every-event', async () => {
     await expect.poll(() => rowTitles(page)).toContain('Agent became running')
     expect(await rowTitles(page)).toContain('Agent became idle')
     expect(await rowTitles(page)).toContain('Agent reported an error')
   })
-  await page.getByRole('button', { name: 'Detailed (no condensation)', exact: true }).click()
+  await page.getByRole('button', { name: 'Every event', exact: true }).click()
   await page.getByRole('button', { name: 'Attention only', exact: true }).click()
   await recordAssertion(page, 'activity-timeline-attention-filter-keeps-only-the-error', () =>
     expect.poll(() => rowTitles(page)).toEqual(['Agent reported an error']),
