@@ -95,7 +95,7 @@ const isPhone = (view: Window): boolean => typeof view.matchMedia === 'function'
  * the close every owner already handles (Radix layers, the Host menu, the workbench and composer sheets).
  * Touch only: desktop pointers and wide viewports keep the anchored layers unchanged.
  */
-export const installSheetDrag = (doc: Document): (() => void) => {
+const listen = (doc: Document): (() => void) => {
   const view = doc.defaultView
   if (view === null) return () => {}
   const saved = new WeakMap<HTMLElement, Saved>()
@@ -243,5 +243,28 @@ export const installSheetDrag = (doc: Document): (() => void) => {
     doc.removeEventListener('touchmove', onMove, active)
     doc.removeEventListener('touchend', onEnd, passive)
     doc.removeEventListener('touchcancel', onEnd, passive)
+  }
+}
+
+const installs = new WeakMap<Document, { count: number; readonly stop: () => void }>()
+
+/**
+ * Starts the shared sheet drag on `doc` and returns its release. Installs share one listener per document, so a
+ * surface that needs the drag (the workbench sheet) installs it too and still works where `@dshfiles/ui-styles` is
+ * absent; the last release removes it.
+ */
+export const installSheetDrag = (doc: Document): (() => void) => {
+  const known = installs.get(doc)
+  const entry = known ?? { count: 0, stop: listen(doc) }
+  entry.count += 1
+  installs.set(doc, entry)
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    entry.count -= 1
+    if (entry.count > 0) return
+    entry.stop()
+    installs.delete(doc)
   }
 }

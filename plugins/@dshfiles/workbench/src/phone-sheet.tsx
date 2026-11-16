@@ -1,9 +1,9 @@
 import type { DockPaneActions } from '@dshfiles/frame-layout/regions'
 import { useDialogFocus } from '@dshfiles/plugin-ui/hooks/dialog-focus'
+import { installSheetDrag } from '@dshfiles/plugin-ui/hooks/sheet-drag'
 import { XIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 import { usePhoneHistoryLayer } from './phone-history.js'
-import { useSheetDrag } from './sheet-drag.js'
 
 /** The frame's phone rule (`@dshfiles/frame-layout` AppFrame.module.css): below it the right column has no width. */
 const PHONE_QUERY = '(max-width: 639.98px)'
@@ -63,7 +63,9 @@ export const phoneAwareDockActions = (desktop: DockPaneActions, phone: () => boo
 /**
  * The thread panel on a phone (prior-art §3.2 rule 5: supporting panes become sheets, never a split under ~840px). The
  * same dock surface, with its facet tabs and Choose a view, rises from above the tab bar; the scrim and Close put it
- * away, and so does Escape, dragging its header down or the browser's Back. Geometry comes from the phone shell's published bar heights, with no-shell fallbacks.
+ * away, and so does Escape, dragging its header down or the browser's Back; dragging it up grows it towards the top
+ * bar (the shared plugin-ui sheet drag, which dismisses through the same Escape). Geometry comes from the phone shell's
+ * published bar heights, with no-shell fallbacks.
  */
 export const PhoneSheet = (props: {
   readonly shown: boolean
@@ -74,7 +76,8 @@ export const PhoneSheet = (props: {
   const { shown, onClose } = props
   const sheetRef = useRef<HTMLElement>(null)
   useDialogFocus({ open: shown, container: sheetRef, trap: true })
-  const dragHandlers = useSheetDrag({ sheet: sheetRef, onClose })
+  // ui-styles installs the same listener for every sheet; installing it here too keeps the drag where it is absent.
+  useEffect(() => (shown ? installSheetDrag(document) : undefined), [shown])
   // The open sheet is one history entry, so the Android back gesture puts it away before it leaves the screen below.
   usePhoneHistoryLayer({ key: 'dshfilesPhoneSheet', depth: shown ? 1 : 0, enabled: true, pop: onClose })
   useEffect(() => {
@@ -103,6 +106,7 @@ export const PhoneSheet = (props: {
         aria-modal={shown}
         aria-label={props.heading}
         data-phone-sheet=""
+        data-dshx-sheet=""
         hidden={!shown}
         className="dshx-root dshx:fixed dshx:inset-x-0 dshx:z-[43] dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-t-xl dshx:border-t dshx:border-border dshx:bg-background dshx:pr-[env(safe-area-inset-right,0px)] dshx:pl-[env(safe-area-inset-left,0px)] dshx:text-foreground dshx:shadow-[0_-8px_24px_rgb(0_0_0/0.18)]"
         style={{
@@ -114,7 +118,7 @@ export const PhoneSheet = (props: {
       >
         <header
           data-phone-sheet-handle=""
-          {...dragHandlers}
+          data-dshx-sheet-handle=""
           className="dshx:relative dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:pl-4"
           // The header drags the sheet: the browser must not claim the pull as a scroll or a page refresh.
           style={{ touchAction: 'none' }}

@@ -751,7 +751,7 @@
           "kind": "unit-test",
           "id": "workbench.phone-sheet-drag",
           "file": "plugins/@dshfiles/workbench/src/phone-sheet.test.tsx",
-          "testName": "follows a header drag down, closes on a long pull and springs back from one that returns"
+          "testName": "follows a header drag down and closes on a long pull, grows on a drag up, and keeps Close a tap"
         },
         {
           "kind": "unit-test",
@@ -762,8 +762,8 @@
         {
           "kind": "unit-test",
           "id": "workbench.phone-sheet-drag-flick",
-          "file": "plugins/@dshfiles/workbench/src/sheet-drag.test.ts",
-          "testName": "closes on a downward flick however short, and keeps the sheet on an upward one however long"
+          "file": "plugins/@dshfiles/plugin-ui/src/hooks/sheet-drag.test.ts",
+          "testName": "dismisses on a fast downward flick however short"
         },
         {
           "kind": "unit-test",

@@ -160,6 +160,25 @@ describe('installSheetDrag', () => {
     expect(clicked).toHaveBeenCalledOnce()
   })
 
+  it('shares one listener between installs and keeps it until the last release', () => {
+    const second = installSheetDrag(document)
+    const { sheet, handle } = mountSheet(0)
+    touch(handle, 'touchstart', 560, 0)
+    touch(handle, 'touchmove', 620, 400)
+    expect(sheet.style.getPropertyValue('transform')).toBe('translateY(60px)')
+    touch(handle, 'touchend', 620, 800)
+    vi.advanceTimersByTime(300)
+    dispose()
+    dispose()
+    touch(handle, 'touchstart', 560, 1000)
+    expect(touch(handle, 'touchmove', 620, 1400).defaultPrevented).toBe(true)
+    touch(handle, 'touchend', 620, 1800)
+    vi.advanceTimersByTime(300)
+    second()
+    touch(handle, 'touchstart', 560, 2000)
+    expect(touch(handle, 'touchmove', 620, 2400).defaultPrevented).toBe(false)
+  })
+
   it('does nothing on a wide viewport', () => {
     stubMedia(false)
     const { sheet, handle } = mountSheet(0)
