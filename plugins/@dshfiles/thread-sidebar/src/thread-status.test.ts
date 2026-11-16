@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { DONE_AFTER_IDLE_MS, DONE_GROUP_KEY, DONE_GROUP_OPEN_KEY, FINISHED_TURN_SOURCE, ThreadStatusModel, type ThreadStatusInput } from './thread-status.js'
+import {
+  DONE_AFTER_IDLE_MS,
+  DONE_GROUP_KEY,
+  DONE_GROUP_OPEN_KEY,
+  FINISHED_TURN_SOURCE,
+  THREAD_STATUS_GROUPS,
+  ThreadStatusModel,
+  type ThreadStatusInput,
+} from './thread-status.js'
 
 const NOW = 10_000_000_000
 
@@ -154,5 +162,24 @@ describe('thread status', () => {
     expect(clock('s', 'idle', 120, 2_000)).toBe(120)
     expect(clock('s', 'needs-you', 150, 3_000)).toBe(3_000)
     expect(clock('s', 'needs-you', 150, 4_000)).toBe(3_000)
+  })
+
+  it('lists an unsent draft under Drafts, so the Idle count is threads only', () => {
+    // The composer's open draft ("New thread") was counted as an idle thread: "Idle (2)" for one thread.
+    const draft = ThreadStatusModel.statusOf(input({ draft: true }))
+    expect(draft.group).toBe('draft')
+    // It keeps the idle glyph: nothing runs and nothing waits.
+    expect(draft.status).toBe('idle')
+    expect(ThreadStatusModel.statusOf(input()).group).toBe('idle')
+    const groups = ThreadStatusModel.groupEntries([
+      { thread: 'sent', status: ThreadStatusModel.statusOf(input()), cameBackAt: 2 },
+      { thread: 'unsent', status: draft, cameBackAt: 3 },
+    ])
+    expect(groups.map(group => [group.group, group.threads])).toEqual([
+      ['idle', ['sent']],
+      ['draft', ['unsent']],
+    ])
+    // Drafts sit after Idle and before the folded Done group.
+    expect(THREAD_STATUS_GROUPS.indexOf('draft')).toBe(THREAD_STATUS_GROUPS.indexOf('idle') + 1)
   })
 })

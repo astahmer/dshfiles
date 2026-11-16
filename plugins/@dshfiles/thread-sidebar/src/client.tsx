@@ -688,6 +688,7 @@ const statusGroupLabelKeys = {
   working: 'threadSidebarStateWorking',
   ready: 'threadSidebarStateReady',
   idle: 'threadSidebarStateIdle',
+  draft: 'threadSidebarStateDrafts',
   done: 'threadSidebarStateDone',
 } as const satisfies Record<ThreadStatusGroup, Parameters<ThreadSidebarTranslate>[0]>
 
@@ -3996,6 +3997,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {
             running: entry.session.running,
             pinned: pinnedSessionIds.has(entry.session.id),
+            // Nothing sent yet: the row is listed (the journey of a saved draft finds it), under Drafts, not Idle.
+            draft: entry.session.blank,
             archived: archivedSessionIds.has(entry.session.id),
             settled: settledSessionIds.has(entry.session.id),
             unread: attention.records.has(entry.session.id),
