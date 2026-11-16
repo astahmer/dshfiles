@@ -50,3 +50,31 @@ test('no label, banner or setting text says settle or park', () => {
   // The other locale carries the same rename (沉淀 was Settle, 搁置 was Park).
   expect(values(chinese).filter(value => /沉淀|搁置|停驻/u.test(value))).toEqual([])
 })
+
+test('the settings section says thread, never session, and DSH for the server process', () => {
+  expect(values(english).filter(value => /\bsessions?\b/iu.test(value))).toEqual([])
+  expect(descriptions.filter(value => /\bsessions?\b/iu.test(value))).toEqual([])
+  // "Host" names where a thread runs (the glossary's host); the process the user restarts is DSH.
+  expect(values(english).filter(value => /\bHost\b/u.test(value))).toEqual([])
+  expect(descriptions.filter(value => /\bHost\b/u.test(value))).toEqual([])
+  expect(english).toContain("threadSidebarExcludedSessions: 'Excluded threads',")
+  expect(english).toContain("threadSidebarNewChatInProject: 'New thread in {project}',")
+})
+
+test('status words come from the six states', () => {
+  // Starting, Finished, Interrupted, Inactive, Input needed and Needs attention were a second vocabulary.
+  expect(english).toContain("subagentPreviewStarting: 'Working',")
+  expect(english).toContain("subagentPreviewFinished: 'Done',")
+  expect(english).toContain("subagentPreviewInterrupted: 'Stopped',")
+  expect(english).toContain("threadSidebarInactive: 'Idle',")
+  expect(english).toContain("threadSidebarFilterAttention: 'Needs you',")
+  expect(english).toContain("threadSidebarInputNotificationTitle: 'Needs you',")
+  expect(values(english).filter(value => /^(Starting|Finished|Inactive|Input needed|Needs attention)$/u.test(value))).toEqual([])
+})
+
+test('a setting description is one or two sentences', () => {
+  // The automatic-restart description ran to four sentences: trigger, off state, cost and dependency in one field.
+  const sentences = (text: string): number => text.split(/[.!?](?:\s|$)/u).filter(part => part.trim() !== '').length
+  expect(descriptions.filter(text => sentences(text) > 3)).toEqual([])
+  expect(descriptions.some(text => text.startsWith('Restart DSH by itself when idle to apply updates.'))).toBe(true)
+})
