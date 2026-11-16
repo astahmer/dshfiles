@@ -12,6 +12,8 @@ const reusableViewNames = new Map([
   ['Backlog', 'Backlog'],
   ['Editor', 'Files'],
   ['Jujutsu', 'History'],
+  // The Workspaces page was titled Land; journeys written before the rename still open it by that fixture name.
+  ['Land', 'Workspaces'],
   // The page's former name; journeys written before the rename still open it by this fixture name.
   ['Revision graph', 'History'],
   ['Scratchpad', 'Workbench: Scratchpad'],
@@ -104,7 +106,7 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   // Plain labels the page-kit migration (docs/ade-ux Phase 1b) gave these pages.
   ['Review', { destination: 'Land', section: 'Review' }],
   ['Backlog', { destination: 'Work', section: 'Backlog' }],
-  ['Land', { destination: 'Land', section: 'Workspaces' }],
+  ['Workspaces', { destination: 'Land', section: 'Workspaces' }],
   ['History', { destination: 'Land', section: 'History' }],
   ['Source control', { destination: 'Land', section: 'Source control' }],
   ['Board', { destination: 'Threads', section: 'Board' }],

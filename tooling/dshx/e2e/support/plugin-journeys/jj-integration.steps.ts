@@ -1442,9 +1442,13 @@ When('the All integration view is selected', async ({ page }: { page: Page }) =>
 })
 
 Then('the Thread integration panel keeps its counts visible', async ({ page }: { page: Page }) => {
-  await expect(page.getByRole('button', { name: /^Needs you/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Completed/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Conflicts/ })).toBeVisible()
+  const filters = page.getByRole('navigation', { name: 'Filter thread workspaces', exact: true })
+  await expect(filters.getByRole('button', { name: /^Needs you\s*\d+$/ })).toBeVisible()
+  await expect(filters.getByRole('button', { name: /^Ready to land\s*\d+$/ })).toBeVisible()
+  await expect(filters.getByRole('button', { name: /^All\s*\d+$/ })).toHaveAttribute('aria-pressed', 'true')
+  // A filter that counts nothing takes no seat.
+  await expect(filters.getByRole('button', { name: /^Conflicts/ })).toHaveCount(0)
+  await expect(filters.getByRole('button', { name: /^Blocked/ })).toHaveCount(0)
 })
 
 Then('the thread row details show revisions, sessions, path and preview', async ({ page }: { page: Page }) => {
