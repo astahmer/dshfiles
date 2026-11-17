@@ -56,7 +56,7 @@ export default defineClient({
       try {
         sessionId = await ctx.sessions.create(creation)
       } catch (cause) {
-        return { ok: false, reason: `The thread could not be created: ${cause instanceof Error ? cause.message : String(cause)}` }
+        return { ok: false, reason: `The thread was not created. Retry. ${cause instanceof Error ? cause.message : String(cause)}` }
       }
       const route = request.agent.route
       if (route !== null) {

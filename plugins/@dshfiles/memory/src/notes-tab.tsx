@@ -636,7 +636,7 @@ export const NotesTab = (props: {
     forgetSnapshot.context.failure === null
       ? null
       : forgetSnapshot.context.failure.kind === 'partial'
-        ? `${String(forgetSnapshot.context.failure.forgotten)} forgotten; ${String(forgetSnapshot.context.failure.failed)} could not be forgotten.`
+        ? `${String(forgetSnapshot.context.failure.forgotten)} forgotten. ${String(forgetSnapshot.context.failure.failed)} could not be forgotten: try Forget selected again.`
         : errorMessage(forgetSnapshot.context.failure.error, 'The selected notes could not be forgotten. Try Forget selected again.')
   const forgetPending = forgetSnapshot.matches('forgetting')
   const confirmingForget = forgetSnapshot.matches('confirming') || forgetPending

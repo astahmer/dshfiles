@@ -144,7 +144,7 @@ export default defineClient({
         const text =
           failed.length === 0
             ? `Started ${String(started.length)} threads for ${StartThreadForm.refs(request.items)}`
-            : `Started ${String(started.length)} of ${String(requests.length)} threads; ${String(failed.length)} failed.`
+            : `Started ${String(started.length)} of ${String(requests.length)} threads. ${String(failed.length)} failed: start them again.`
         if (report) BacklogNotices.show({ text, kind: failed.length === 0 ? 'success' : 'failure', sessionId: null })
         const last = started.at(-1)
         return failed.length === 0 && last !== undefined ? { ok: true, sessionId: last.sessionId } : { ok: false, reason: text }
@@ -203,12 +203,12 @@ export default defineClient({
           agent = found.agent
         } catch {
           return automatic
-            ? { kind: 'failed', reason: 'The agent list is unavailable, so the reply was not routed.' }
+            ? { kind: 'failed', reason: 'The agent list did not load, so the reply was not routed. Reply again.' }
             : { kind: 'skipped', reason: 'agents-unavailable' }
         }
         if (agent === null)
           return automatic
-            ? { kind: 'failed', reason: 'The @dsh agent is unavailable, so the reply was not routed.' }
+            ? { kind: 'failed', reason: 'The @dsh agent was not found, so the reply was not routed. Check the handle and reply again.' }
             : { kind: 'skipped', reason: 'unknown-agent' }
         if (!agent.enabled)
           return automatic
@@ -216,7 +216,7 @@ export default defineClient({
             : { kind: 'skipped', reason: 'disabled-agent' }
         if (mention !== null) {
           const candidates = await api.safe.agentContinuationCandidates({ id: item.id, handle })
-          if (!candidates.ok) return { kind: 'failed', reason: `Existing threads could not be checked: ${candidates.error.message}` }
+          if (!candidates.ok) return { kind: 'failed', reason: `Existing threads could not be checked. Reply again. ${candidates.error.message}` }
           if (candidates.value.length > 0) {
             const selection = await chooseContinuation({ agent: AgentComments.choice(agent), threads: candidates.value })
             if (selection.kind === 'cancel') return { kind: 'skipped', reason: 'continuation-cancelled' }

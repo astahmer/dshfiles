@@ -122,7 +122,7 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
             <Button disabled={busy} onClick={() => dismiss.mutate()} size="xs" type="button" variant="ghost">
               {dismiss.isPending ? 'Dismissing…' : 'Dismiss'}
             </Button>
-            {catalogQuery.isError ? <span className="dshx:text-xs dshx:text-muted-foreground">Model options are unavailable.</span> : null}
+            {catalogQuery.isError ? <span className="dshx:text-xs dshx:text-muted-foreground">Model options did not load. Reopen the thread to retry.</span> : null}
           </div>
           {showSelector && selection !== undefined && catalogQuery.data !== undefined ? (
             <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:p-2.5">

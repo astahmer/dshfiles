@@ -351,7 +351,7 @@ const BodyField = (props: {
       />
       {autosave.error === null ? null : (
         <p role="alert" className="dshx:text-2xs dshx:text-destructive">
-          {errorMessage(autosave.error, 'That attachment could not be saved.')}
+          {errorMessage(autosave.error, 'That attachment was not saved. Add it again.')}
         </p>
       )}
     </div>
@@ -499,7 +499,7 @@ const ReplyEditor = (props: {
   if (failedRead)
     return (
       <p role="alert" className="dshx:text-xs dshx:text-destructive">
-        A reply attachment could not be loaded.
+        A reply attachment did not load. Reopen the item.
       </p>
     )
   return (
@@ -535,7 +535,7 @@ const ReplyComposer = (props: {
     try {
       await props.onSave(ImageAttachmentReferenceModel.markdownImageReferences(submittedText, attachments.files), attachments.files)
     } catch (error) {
-      setFailed(errorMessage(error, 'The reply could not be saved.'))
+      setFailed(errorMessage(error, 'The reply was not saved. Send it again.'))
     } finally {
       setPending(false)
     }

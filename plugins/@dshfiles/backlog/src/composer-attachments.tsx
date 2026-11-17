@@ -59,7 +59,7 @@ export const useComposerFiles = (props: {
         replaceFiles(allFiles)
         return { added, firstImageNumber }
       } catch (error) {
-        onError(errorMessage(error, 'That file could not be read.'))
+        onError(errorMessage(error, 'That file could not be read. Add it again.'))
         return { added: [], firstImageNumber: composerDraftFiles.get(draftKey).filter(file => file.kind === 'image').length }
       }
     },

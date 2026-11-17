@@ -36,7 +36,7 @@ export const NativeProviderDetail = (props: {
   if (provider === undefined)
     return (
       <section className={cn(DETAIL_PANE_CLASS, 'dshx:p-4 dshx:text-sm dshx:text-muted-foreground')}>
-        <p role="status">{query.isError ? 'Built-in provider information is unavailable.' : 'Reading provider…'}</p>
+        <p role="status">{query.isError ? 'Built-in provider information did not load. Reopen this provider to retry.' : 'Reading provider…'}</p>
       </section>
     )
   const activeRoute = route !== null && provider.routes.includes(route) ? route : provider.routes[0]

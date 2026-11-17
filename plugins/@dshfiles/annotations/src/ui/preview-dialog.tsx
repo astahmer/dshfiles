@@ -45,7 +45,7 @@ export const PreviewDialog = ({
       setPicked(null)
       setDocument({ path: result.path, html: buildPreviewDocument({ html: result.html, nonce }) })
     },
-    onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not read that file.'),
+    onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not read that file. Open it again.'),
   })
 
   const create = useMutation({

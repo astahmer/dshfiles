@@ -31,7 +31,7 @@ export type HostDraft = {
 const WEIGHTS = [1, 2, 4] as const
 
 const failure = (result: { readonly ok: boolean; readonly code?: string; readonly message?: string }): Error =>
-  new Error(result.message === undefined ? 'The host request failed.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
+  new Error(result.message === undefined ? 'The host did not answer. Check it is running, then retry.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
 
 export { hostState } from './host-status.js'
 
@@ -301,7 +301,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
       {[discover, save, copyDiagnostics].map((mutation, index) =>
         mutation.isError ? (
           <Alert key={index} variant="destructive">
-            <AlertDescription>{errorMessage(mutation.error, 'The host request failed.')}</AlertDescription>
+            <AlertDescription>{errorMessage(mutation.error, 'The host did not answer. Check it is running, then retry.')}</AlertDescription>
           </Alert>
         ) : null,
       )}

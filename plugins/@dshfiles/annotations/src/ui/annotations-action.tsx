@@ -56,7 +56,7 @@ const pickFailureMessage = ({
   if (reason === 'no-page') return noPage
   if (reason === 'timeout') return 'The pick timed out; click Pick again.'
   if (reason === 'cancelled') return null
-  return 'Could not reach that tab.'
+  return 'Could not reach that tab. Pick again.'
 }
 
 export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
@@ -215,12 +215,12 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
   }, [rows, stale])
 
   const actionErrors = [
-    describeError(attach.error, 'Could not attach that annotation.'),
-    describeError(armPairing.error, 'Could not open the pairing window.'),
-    describeError(launchChrome.error, 'Could not start Chrome.'),
-    describeError(pickActiveTab.error, 'Could not pick in that tab.'),
-    describeError(pickOnChrome.error, 'Could not pick in that tab.'),
-    describeError(resolve.error, 'Could not resolve that annotation.'),
+    describeError(attach.error, 'Could not attach that annotation. Retry.'),
+    describeError(armPairing.error, 'Could not open the pairing window. Retry.'),
+    describeError(launchChrome.error, 'Could not start Chrome. Check its path in Settings, then retry.'),
+    describeError(pickActiveTab.error, 'Could not pick in that tab. Pick again.'),
+    describeError(pickOnChrome.error, 'Could not pick in that tab. Pick again.'),
+    describeError(resolve.error, 'Could not resolve that annotation. Retry.'),
   ].filter((message): message is string => message !== null)
 
   const pick = ({ mode }: { readonly mode: 'element' | 'region' }): void => {

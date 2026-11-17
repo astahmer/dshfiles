@@ -490,7 +490,7 @@ const PairForm = (props: { readonly api: MultiHostClient; readonly onClose: () =
       ) : null}
       {pair.isError ? (
         <Alert variant="destructive">
-          <AlertDescription>{errorMessage(pair.error, 'Pairing failed.')}</AlertDescription>
+          <AlertDescription>{errorMessage(pair.error, 'Pairing failed. Check the code, then pair again.')}</AlertDescription>
         </Alert>
       ) : null}
       <DialogFooter>

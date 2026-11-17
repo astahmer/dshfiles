@@ -285,7 +285,7 @@ const DigestedThreadDetail = (props: {
       </TabsContent>
       <TabsContent value="raw">
         {raw.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Reading the thread excerpt…</p> : null}
-        {raw.isError ? <p className="dshx:text-xs dshx:text-destructive">The thread excerpt could not be read.</p> : null}
+        {raw.isError ? <p className="dshx:text-xs dshx:text-destructive">The thread excerpt could not be read. Reopen the thread to retry.</p> : null}
         {raw.isSuccess ? (
           <pre className="dshx:max-h-96 dshx:overflow-auto dshx:whitespace-pre-wrap dshx:rounded-lg dshx:bg-muted/50 dshx:p-3 dshx:font-mono! dshx:text-2xs">
             {raw.data.summary}

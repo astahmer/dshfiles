@@ -196,7 +196,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
       </div>
       <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain dshx:pb-4">
         {filesQuery.error !== null && (
-          <p className="dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-destructive">{errorMessage(filesQuery.error, 'Could not load changed files.')}</p>
+          <p className="dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-destructive">{errorMessage(filesQuery.error, 'Could not load changed files. Refresh.')}</p>
         )}
         {groups.map(group => {
           const revision = group.revision

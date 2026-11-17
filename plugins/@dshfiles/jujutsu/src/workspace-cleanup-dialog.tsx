@@ -209,7 +209,7 @@ export const WorkspaceCleanupDialog = (props: {
         )}
         <div aria-busy={preview.isFetching} className="dshx:max-h-[min(55vh,28rem)] dshx:overflow-y-auto">
           {preview.isError && (
-            <p className="dshx:px-5 dshx:py-3 dshx:text-sm dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed.')}</p>
+            <p className="dshx:px-5 dshx:py-3 dshx:text-sm dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed. Close and reopen this dialog.')}</p>
           )}
           <div className="dshx:flex dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:bg-muted/30 dshx:px-5 dshx:py-3">
             <Checkbox

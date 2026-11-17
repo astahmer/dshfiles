@@ -226,6 +226,6 @@ export const prepareRemoteFolder = async (api: MultiHostClient, destination: Run
   const workspaceId = Schema.decodeUnknownSync(provisionedSchema)(provisioned.value).workspaceId
   const status = await api.runtimeStatus({ runtimeId: destination.runtimeId })
   const path = status.ok ? status.workspaces.find(workspace => workspace.workspaceId === workspaceId)?.path : undefined
-  if (path === undefined) throw new Error('The host created the thread workspace but did not report its folder.')
+  if (path === undefined) throw new Error('The host created the workspace but did not report its folder. Send again.')
   return path
 }
