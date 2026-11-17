@@ -33,9 +33,9 @@ From the onboarding feature catalog: 14 features, the 0 curated ones first.
 3. **Open file links in the editor** (`editor`, thread-panel) — A file link in a thread opens the file in the editor, reusing its tab when it is already open.
 4. **Index workspace files with bounded traversal** (`editor`) — The workspace's file list loads in steps and skips version control and dependency folders.
 5. **Open thread and workspace files for other plugins** (`editor`) — Other features can read which thread is on screen and list or search its workspace files.
-6. **Project whiteboards** (`whiteboard`, knowledge) — Excalidraw boards stored per project on the Host: create, draw with autosave, rename, delete to Recently deleted and restore; the editor bundle loads only when a board opens.
-7. **Agent-drawn diagrams** (`whiteboard`) — whiteboard_write queues Mermaid or Excalidraw skeleton source; the editor converts it into editable shapes the next time the board opens, and whiteboard_read returns the scene and its texts.
-8. **xstate machine diagrams** (`whiteboard`) — The xstate-diagram module turns any xstate v5 machine into a Mermaid flowchart for whiteboard_write or a stateDiagram-v2 for Markdown.
+6. **Project whiteboards** (`whiteboard`, knowledge) — Draw on whiteboards kept per project, with autosave and a Recently deleted list.
+7. **Agent-drawn diagrams** (`whiteboard`) — The agent can draw diagrams on a whiteboard that you can then edit.
+8. **State machine diagrams** (`whiteboard`) — A state machine can be drawn as a diagram on a whiteboard or in Markdown.
 9. **Share a thread as a read-only link** (`thread-share`, settings) — Share a thread as a read-only link, live or frozen, with an optional passphrase and expiry.
 10. **Freeze a snapshot or download a self-contained HTML export** (`thread-share`, settings) — Freeze a shared thread as a snapshot, or download it as one HTML file.
 11. **Publish share pages through a time-bounded tunnel** (`thread-share`, settings) — Publish share pages outside your network through a tunnel that closes after a set time.

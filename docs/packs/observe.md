@@ -64,8 +64,8 @@ From the onboarding feature catalog: 34 features, the 22 curated ones first.
 8. **Waiting updates join the restart notice** (`hmr-gate`) — Plugin updates that need a restart are named in the one Restart pending item in the status bar.
 9. **Reload a plugin without restarting DSH** (`hmr-gate`) — Off by default: a plugin marked safe can reload inside the running DSH without a restart.
 10. **Plugin updates wait for a hidden or idle moment** (`hmr-gate`) — Plugin updates apply only when the page is hidden or you have been idle for a while.
-11. **Process memory and Node origins** (`worktree-memory`, observe) — The RAM tab of Observe › Processes (and this thread's share in the thread panel's Jobs facet): One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate par…
-12. **Orphaned scratch DSH Hosts** (`worktree-memory`, observe) — Scratch DSH Hosts (--profile dshx-boot) are listed on the RAM tab by the owner their dshx record names (E2E or dshx dev, workspace, owner pid), with CPU and resident memory. A Host whose owner exited, or a pre-record Host init adopted more than 2 h ago, is flagged Orphan; one St…
+11. **Process RAM** (`worktree-memory`, observe) — The RAM tab of Processes shows how much memory DSH and other Node processes use, by workspace.
+12. **Leftover test copies of DSH** (`worktree-memory`, observe) — Test copies of DSH left running are listed with their memory, and Stop orphans ends them.
 
 ## Enable it
 

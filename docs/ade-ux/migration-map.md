@@ -315,15 +315,15 @@ rail destination; 29 features.
 | usage/usage-activity-report: Tool and skill analytics | destinationSection | left-nav: Usage › Tools & Jev |
 | usage/usage-charts: Usage charts | destinationSection | left-nav: Usage › Charts |
 | usage/usage-jev-card: Jev API usage card | destinationSection | left-nav: Usage › Charts › Jev |
-| usage/usage-quota-tab: Usage › Quota: account quota, history and forecast in the Usage page | destinationSection | observe: Usage › Quota |
+| usage/usage-quota-tab: Quota in the Usage page | destinationSection | observe: Usage › Quota |
 | usage/usage-request-log: Request log | destinationSection | left-nav: Usage › Requests |
-| worktree-memory/memory-board: Process memory and Node origins | destinationSection | left-nav: Worktree Memory: RAM |
+| worktree-memory/memory-board: Process RAM | destinationSection | left-nav: Worktree Memory: RAM |
 | multi-host/host-settings: Weight Auto placement and fetch before new threads | detail | left-nav: Hosts › Edit host |
 | multi-host/linked-machines: Link machines without SSH, both ways | detail | left-nav: Hosts › Link this machine, Pair a machine |
 | background-jobs/batch-stop-jobs: Stop a selection of running jobs | rowAction | left-nav: Background Jobs: Jobs › batch stop |
 | background-jobs/outlived-jobs: Jobs that outlived their turn | rowAction | left-nav: Background Jobs: Jobs › outlived its turn |
 | multi-host/isolated-runtime-views: Open the host's own DSH UI | rowAction | left-nav: Hosts › Open host UI |
-| worktree-memory/orphan-scratch-hosts: Orphaned scratch DSH Hosts | statusItem | status-strip: Orphans warning; Observe › Processes › RAM: Scratch DSH Hosts |
+| worktree-memory/orphan-scratch-hosts: Leftover test copies of DSH | statusItem | status-strip: Orphans warning; Observe › Processes › RAM: Scratch DSH Hosts |
 
 ### Knowledge
 
@@ -415,8 +415,8 @@ rail destination (bottom); 67 features.
 | thread-sidebar/settled-auto-archive: Archive a done thread once its delay passes | settingsSection | settings: Thread sidebar › settled archive delay |
 | ui-styles/appearance-theme: Appearance theme: presets, palette and fonts | settingsSection | Settings › General › Appearance; agent tools theme_get / theme_set |
 | ui-styles/saved-themes: Saved and gallery themes | settingsSection | Agent tools theme_define / theme_set (customTheme) / theme_remove / theme_get; Settings › General › Appearance (Custom theme id, Dracula preset) |
-| web-fetch-readable/readable-web-fetch: Answer ctx.web fetches across redirects with the readable article | settingsSection | settings: dshfiles-web-fetch-readable |
-| web-search-brave/brave-web-search: Answer ctx.web searches with Brave Web Search | settingsSection | settings: Brave web search |
+| web-fetch-readable/readable-web-fetch: Fetch pages as readable articles | settingsSection | settings: dshfiles-web-fetch-readable |
+| web-search-brave/brave-web-search: Search the web with Brave | settingsSection | settings: Brave web search |
 | workbench/dockable-panel-layouts: Arrange plugin panels in independent layouts | settingsSection | workbench: Pane options › Layouts |
 | workspace-folder-picker/project-settings-section: Read a project's declared settings | settingsSection | settings: Projects |
 
@@ -454,7 +454,7 @@ facets of the active thread; 32 features.
 | project-checks/native-hook-receipts: Show hook runs | threadFacet | composer: Project checks › hook events |
 | traces/span-cost: List-price cost on traces | threadFacet | conversation-view: Traces tab › cost |
 | traces/thread-traces-tab: Traces tab in the thread panel | threadFacet | thread-panel: Traces / Requests facets |
-| usage/thread-cost-facet: Thread panel Cost facet | threadFacet | workbench: Choose a view › Thread panels › Cost |
+| usage/thread-cost-facet: Cost tab in the thread panel | threadFacet | workbench: Choose a view › Thread panels › Cost |
 | workbench/phone-thread-panel-sheet: Open the thread panel as a bottom sheet on a phone | threadFacet | workbench: right pane as a narrow column; phone reached facets only through the main pane's New tab |
 | workbench/terminal-pages: Open native terminals from any pane's view chooser | threadFacet | main-tabs: New tab › Terminal |
 | workbench/thread-facets: Open thread facets from any pane's view chooser | threadFacet | workbench: Choose a view › Thread panels |
@@ -525,16 +525,16 @@ run row, chips, `/` and `@` sources; 70 features.
 | thread-sidebar/hero-suggestions: Resume, Review and Inbox cards on the new-thread screen | composerContribution | new-thread screen: suggestion cards |
 | thread-sidebar/skill-mentions: Find human-invocable skills from @ autocomplete | composerContribution | composer: @ skills |
 | tool-meta/approval-card: Approval requests as a risk card | composerContribution | composer: pending approval request |
-| workspace-folder-picker/directory-only-mode: Start directly in the Host folder browser | composerContribution | Hosts › Add folder (directory-only picker) |
+| workspace-folder-picker/directory-only-mode: Start in the folder browser | composerContribution | Hosts › Add folder (directory-only picker) |
 | workspace-folder-picker/keyboard-folder-selection: Select project folders with keyboard navigation | composerContribution | composer: Choose project › keyboard rows |
 | workspace-folder-picker/project-clone: Add a project by cloning a repository | composerContribution | composer: Choose project › Add folder › Clone repository |
 | workspace-folder-picker/project-create: Create a new project | composerContribution | composer: Choose project › Add folder › New project |
-| workspace-folder-picker/project-registration-removal: Remove a project registration | composerContribution | composer: Choose project › Remove |
+| workspace-folder-picker/project-registration-removal: Remove a project | composerContribution | composer: Choose project › Remove |
 | workspace-folder-picker/registered-project-search: Search projects and browse folder paths | composerContribution | composer: Choose project › search |
 | workspace-folder-picker/unregistered-recent-folders: Offer recent folders not yet registered as projects | composerContribution | composer: Choose project › Recent |
-| workspace-folder-picker/workspace-folder-add-flow: Add workspaces from the folder browser | composerContribution | composer: Choose project › Add folder |
+| workspace-folder-picker/workspace-folder-add-flow: Add projects from the folder browser | composerContribution | composer: Choose project › Add folder |
 | workspace-folder-picker/workspace-folder-setup: Inspect a folder before adding it | composerContribution | Add workspace › setup step |
-| workspace-nav/new-thread-composer: Open a New thread's composer before the Host creates its Session | composerContribution | composer: New thread draft |
+| workspace-nav/new-thread-composer: Open a new thread's composer at once | composerContribution | composer: New thread draft |
 
 ### Transcript
 
@@ -617,7 +617,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | tool-fs/file-tools: Read, write and edit files | agentToolOnly | agent tools: read, write, edit, read_image |
 | tool-subagent/live-model-selection-policy: Subagent models follow your setting | agentToolOnly | agent tools: subagent, subagent_fork, list_subagent_models |
 | tweet-context/public-post-context: Fetch public X post, photos, video samples, and thread posts | agentToolOnly | agent tool: tweet_context |
-| usage/usage-otel-export: OTLP metrics export | agentToolOnly | agent tool: usage_otel_metrics |
+| usage/usage-otel-export: Export usage as metrics | agentToolOnly | agent tool: usage_otel_metrics |
 | whiteboard/agent-diagrams: Agent-drawn diagrams | agentToolOnly | agent tools: whiteboard_list, whiteboard_read, whiteboard_write, whiteboard_rename, whiteboard_delete, whiteboard_restore |
 | agent-toolkit/agent-toolkit-palette: Open the agent toolkit from the command palette | command | palette: Open the agent toolkit |
 | btw/btw-side-question-entry-points: Open a side question from the palette, a shortcut or the composer | command | palette: Ask a side question (btw) |
@@ -757,22 +757,22 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | turn-summary/turn-marks-projection: Turn facts for the turn map and Since you left | infrastructure | host: session projection |
 | ui-styles/one-shared-stylesheet: One shared plugin stylesheet | infrastructure | client: shared stylesheet |
 | ui-styles/touch-platform-baseline: Touch platform baseline | infrastructure | client: shared stylesheet |
-| usage/usage-index: Incremental request and tool index from session logs | infrastructure | host: usage ledger |
+| usage/usage-index: Usage index from thread logs | infrastructure | host: usage ledger |
 | vcs-provider-port/vcs-detection: Which VCS owns a path | infrastructure | host: library |
 | vcs-provider-port/vcs-provider-resolution: One port for version-control providers | infrastructure | host: library |
-| whiteboard/xstate-diagram: xstate machine diagrams | infrastructure | module: @dshfiles/whiteboard/xstate-diagram |
+| whiteboard/xstate-diagram: State machine diagrams | infrastructure | module: @dshfiles/whiteboard/xstate-diagram |
 | workbench/all-region-drag: Drag panels across centre right and bottom | infrastructure | workbench: panel drag |
-| workbench/conversation-header: Keep the original conversation toolbar and child views inside each thread | infrastructure | thread-header: conversation toolbar |
+| workbench/conversation-header: Keep the thread header inside each thread | infrastructure | thread-header: conversation toolbar |
 | workbench/early-panel-registration: Queue panel-open requests before mount | infrastructure | workbench: panel registration |
 | workbench/global-dock: Keep one docking surface in the right column and a bottom panel | infrastructure | workbench: right pane and bottom panel |
 | workbench/last-right-tab-close: Close the right pane when its final tab closes | infrastructure | workbench: right pane |
 | workbench/layout-recovery: Recover all panes and semantic tabs | infrastructure | workbench: Pane options › Reset layout |
-| workbench/main-conversation: Workbench as the main conversation surface | infrastructure | workbench: main conversation tab |
+| workbench/main-conversation: Workbench as the main thread view | infrastructure | workbench: main conversation tab |
 | workbench/main-panel-sources: Choose plugin views and one Settings hub | infrastructure | main-tabs: New tab chooser |
 | workbench/main-tab-parity: Keep preview pin unread and close semantics in Dockview tabs | infrastructure | workbench: tab semantics |
-| workbench/native-resource-panels: Host native preview diff and terminal resources as panels | infrastructure | right-pane: native preview, diff and terminal resources |
+| workbench/native-resource-panels: Previews, diffs and terminals as panels | infrastructure | right-pane: native preview, diff and terminal resources |
 | workbench/nested-surfaces: Split panes into Dockview groups and restore legacy layouts | infrastructure | workbench: Pane options › Split |
-| workbench/sidebar-preview-tab: Account Preview is a regular movable docked view | infrastructure | workbench: Quota tab |
+| workbench/sidebar-preview-tab: Account preview is a movable tab | infrastructure | workbench: Quota tab |
 | workbench/single-tab-rows: Hide a single tab row without hiding its view | infrastructure | workbench: Hide tab row |
 | workbench/window-floating: Root-pane windows float across the application | infrastructure | workbench: Float panel |
 | ai-accounts/active-chat-account: See which account serves this thread | statusItem | status-strip: Quota meters |

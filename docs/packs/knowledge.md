@@ -53,8 +53,8 @@ From the onboarding feature catalog: 21 features, the 6 curated ones first.
 10. **Search every prompt sent across threads** (`prompt-stash`, composer) — Search every prompt you sent in any thread with Ctrl+R, and insert one without sending.
 11. **Keep draft attachments across thread navigation** (`prompt-stash`, composer) — Files and images in a draft stay with it when you switch threads and come back.
 12. **Faster grep and glob for agents** (`fff-search`) — The agent's grep and glob tools answer from a file index kept in memory.
-13. **Answer ctx.web fetches across redirects with the readable article** (`web-fetch-readable`, settings) — A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.
-14. **Source chips under web_search and web_fetch results** (`web-fetch-readable`, transcript) — Each web_search and web_fetch row in the transcript keeps the native view and gains one chip per page it returned, under the card through tool-meta's tool.call.sections seat: the host and the page title (web_search's source titles, web_fetch's article heading), the URL in a tool…
+13. **Fetch pages as readable articles** (`web-fetch-readable`, settings) — Fetched web pages arrive as the readable article, safely across redirects.
+14. **Source chips under web_search and web_fetch results** (`web-fetch-readable`, transcript) — Web search and fetch results show a chip for each page they returned.
 15. **Typed packs on referenced resources** (`resource-packs`, knowledge) — Attach reusable sets of typed properties to resources without changing them.
 
 ## Enable it

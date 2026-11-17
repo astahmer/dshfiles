@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "workspace-folder-add-flow",
-      "title": "Add workspaces from the folder browser",
-      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it. Choosing a folder first reports what it is: no repository, a Git checkout with its origin and default branch, or a Jujutsu repository. A Git checkout offers Enable Jujutsu and add, which runs the same guarded colocated init the graph uses; a folder without a repository offers Initialize repository, which starts Jujutsu in place and keeps the files already in it. The project_inspect and project_init agent tools drive the same read and write. A repository can also check in dsh.project.json, read by project_config_read: icon path, default thread workspace, bookmark, trusted check ids and suggested scripts, where a missing or invalid file is reported instead of thrown. A repository with no origin says so and offers Publish privately or Publish publicly, which creates the GitHub repository, adds it as origin and pushes the bookmark. Settings › Projects shows the same file for a registered project: the declared values, the tier that wins for each key, and a Copy entry button per suggested script, which copies the trusted project-checks profile entry because nothing is imported automatically.",
+      "title": "Add projects from the folder browser",
+      "summary": "Add a project by browsing folders, or open your system's folder dialog.",
+      "details": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it. Choosing a folder first reports what it is: no repository, a Git checkout with its origin and default branch, or a Jujutsu repository. A Git checkout offers Enable Jujutsu and add, which runs the same guarded colocated init the graph uses; a folder without a repository offers Initialize repository, which starts Jujutsu in place and keeps the files already in it. The project_inspect and project_init agent tools drive the same read and write. A repository can also check in dsh.project.json, read by project_config_read: icon path, default thread workspace, bookmark, trusted check ids and suggested scripts, where a missing or invalid file is reported instead of thrown. A repository with no origin says so and offers Publish privately or Publish publicly, which creates the GitHub repository, adds it as origin and pushes the bookmark. Settings › Projects shows the same file for a registered project: the declared values, the tier that wins for each key, and a Copy entry button per suggested script, which copies the trusted project-checks profile entry because nothing is imported automatically.",
       "reach": ["click button \"New session\"", "click button \"Choose project\"", "click menuitem \"Add folder*\"", "expect textbox \"Enter a folder path\""],
       "surfaces": ["client", "integration"],
       "surface": "composerContribution",
@@ -133,7 +134,8 @@
     {
       "id": "project-clone",
       "title": "Add a project by cloning a repository",
-      "summary": "Clone repository… in the Add a project dialog (also in ⌘K) clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. A failed or cancelled job can be retried into the same folder as a new job; a clone that failed after git started checking files out keeps that partial tree, and its retry clears it first. Closing the dialog does not hide a running or failed clone: a shell overlaid notice keeps its phase, Cancel and Retry on screen. The project_clone, project_clone_jobs, project_clone_cancel and project_clone_retry agent tools drive the same jobs.",
+      "summary": "Add a project by cloning a repository, with progress and Cancel.",
+      "details": "Clone repository… in the Add a project dialog (also in ⌘K) clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. A failed or cancelled job can be retried into the same folder as a new job; a clone that failed after git started checking files out keeps that partial tree, and its retry clears it first. Closing the dialog does not hide a running or failed clone: a shell overlaid notice keeps its phase, Cancel and Retry on screen. The project_clone, project_clone_jobs, project_clone_cancel and project_clone_retry agent tools drive the same jobs.",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose project\"",
@@ -215,8 +217,9 @@
     },
     {
       "id": "project-registration-removal",
-      "title": "Remove a project registration",
-      "summary": "Remove a project from the New thread picker without deleting its folder or files; threads lose their project grouping.",
+      "title": "Remove a project",
+      "summary": "Remove a project from the picker without deleting its folder or files.",
+      "details": "Remove a project from the New thread picker without deleting its folder or files; threads lose their project grouping.",
       "reach": ["click button \"Choose project\"", "expect textbox \"Search projects or enter a folder path\""],
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
@@ -247,7 +250,8 @@
     {
       "id": "project-create",
       "title": "Create a new project",
-      "summary": "New project… (the composer's and the thread list's project pickers, ⌘K, or the Add a project dialog; productivity pass Q5) creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs. The same remote creation is available for an existing checkout through project_publish: it refuses no-repository, an existing origin, and a repository without commits, then pushes the bookmark with jj (git for a plain checkout).",
+      "summary": "Create a new project folder with a Jujutsu repository and a first commit.",
+      "details": "New project… (the composer's and the thread list's project pickers, ⌘K, or the Add a project dialog; productivity pass Q5) creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs. The same remote creation is available for an existing checkout through project_publish: it refuses no-repository, an existing origin, and a repository without commits, then pushes the bookmark with jj (git for a plain checkout).",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose project\"",
@@ -329,7 +333,8 @@
     {
       "id": "registered-project-search",
       "title": "Search projects and browse folder paths",
-      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host (drive and UNC paths too on a Windows Host), automatically enter one unique matching folder, open on a Projects scope that leaves JJ thread workspaces out, offer Everything (recents, then projects, then workspaces), Recents and Workspaces scopes, and preserve project identity in returned choices.",
+      "summary": "Search your projects and browse folder paths, including ones under your home folder.",
+      "details": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host (drive and UNC paths too on a Windows Host), automatically enter one unique matching folder, open on a Projects scope that leaves JJ thread workspaces out, offer Everything (recents, then projects, then workspaces), Recents and Workspaces scopes, and preserve project identity in returned choices.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["empty", "matched", "selected"],
@@ -399,7 +404,8 @@
     {
       "id": "keyboard-folder-selection",
       "title": "Select project folders with keyboard navigation",
-      "summary": "Move through result rows with wrapped selection and handle empty lists without selecting an invalid row.",
+      "summary": "Move through folders with the arrow keys.",
+      "details": "Move through result rows with wrapped selection and handle empty lists without selecting an invalid row.",
       "surfaces": ["client"],
       "configuration": [],
       "states": ["focused", "next", "previous", "empty"],
@@ -431,7 +437,8 @@
     {
       "id": "unregistered-recent-folders",
       "title": "Offer recent folders not yet registered as projects",
-      "summary": "List recent folders in order on their own scope and first on Everything (before projects, then JJ thread workspaces, each folder once), show a registered recent as its project, and keep an unregistered folder's canonical path distinct from registered project identity.",
+      "summary": "Recent folders that are not projects yet are offered first.",
+      "details": "List recent folders in order on their own scope and first on Everything (before projects, then JJ thread workspaces, each folder once), show a registered recent as its project, and keep an unregistered folder's canonical path distinct from registered project identity.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
       "states": ["registered-match", "recent-unregistered", "selected"],
@@ -468,8 +475,9 @@
     },
     {
       "id": "directory-only-mode",
-      "title": "Start directly in the Host folder browser",
-      "summary": "Consumers can open the picker with directory browsing active while omitting registered-project choices and registration actions.",
+      "title": "Start in the folder browser",
+      "summary": "Some pickers open straight on the folder browser, without your projects.",
+      "details": "Consumers can open the picker with directory browsing active while omitting registered-project choices and registration actions.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["projects-default", "directory-browsing"],
@@ -501,7 +509,8 @@
     {
       "id": "workspace-folder-setup",
       "title": "Inspect a folder before adding it",
-      "summary": "Choosing a folder opens a step that says what it is — no repository, a Git checkout with its origin, or a Jujutsu repository, and whether its .jj metadata is broken — before anything is registered. A Git checkout offers Enable Jujutsu and add, a plain folder offers Initialize repository or Add without a repository, and a repository with no origin offers Publish privately or Publish publicly. Nothing is written without the click, and the plain add stays available for every folder.",
+      "summary": "Choosing a folder first says what it is, such as a git or Jujutsu repository, before you add it.",
+      "details": "Choosing a folder opens a step that says what it is — no repository, a Git checkout with its origin, or a Jujutsu repository, and whether its .jj metadata is broken — before anything is registered. A Git checkout offers Enable Jujutsu and add, a plain folder offers Initialize repository or Add without a repository, and a repository with no origin offers Publish privately or Publish publicly. Nothing is written without the click, and the plain add stays available for every folder.",
       "reach": [
         "click button \"Add workspace\"",
         "fill textbox \"Enter a folder path\" \"~/projects/sample\"",
@@ -546,7 +555,8 @@
     {
       "id": "project-settings-section",
       "title": "Read a project's declared settings",
-      "summary": "Settings › Projects lists the Host's registered projects, shows the panels other plugins register for the chosen project (`project-settings-panels`, such as its main branch), leaving out jj thread workspaces, and reads the chosen project's dsh.project.json. Each declared key shows its value and the tier that wins: the file when it declares the key, the profile setting for the new-thread workspace and bookmark, and a built-in default otherwise. A missing or invalid file is reported without changing anything. Each suggested script offers Copy entry, which puts the exact trusted project-checks profile entry on the clipboard for an operator to paste; nothing is imported automatically and the file never runs a command. The project_projects agent tool lists the same projects.",
+      "summary": "Settings › Projects lists your projects and the settings other features add for each one.",
+      "details": "Settings › Projects lists the Host's registered projects, shows the panels other plugins register for the chosen project (`project-settings-panels`, such as its main branch), leaving out jj thread workspaces, and reads the chosen project's dsh.project.json. Each declared key shows its value and the tier that wins: the file when it declares the key, the profile setting for the new-thread workspace and bookmark, and a built-in default otherwise. A missing or invalid file is reported without changing anything. Each suggested script offers Copy entry, which puts the exact trusted project-checks profile entry on the clipboard for an operator to paste; nothing is imported automatically and the file never runs a command. The project_projects agent tool lists the same projects.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Projects\"", "expect region \"Declared project settings\""],
       "reachNarrow": [
         "click button \"More\"",
