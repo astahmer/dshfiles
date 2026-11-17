@@ -179,6 +179,12 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   const focusFileSearch = useCallback(() => {
     searchInputRef.current?.focus()
   }, [])
+  /** Open Monaco find widget if a file is open */
+  const triggerSearch = useCallback(() => {
+    if (editable) {
+      handleRef.current?.triggerFind()
+    }
+  }, [editable])
   
   const [viewedDocuments, setViewedDocuments] = useState<ReadonlySet<string>>(new Set())
   const viewing = viewer !== undefined && active !== undefined && viewedDocuments.has(active.id)
@@ -336,10 +342,11 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           </Button>
         )}
         <Button
-          aria-label="Search files"
-          onClick={focusFileSearch}
+          aria-label="Find in file"
+          disabled={!editable}
+          onClick={triggerSearch}
           size="icon-xs"
-          title="Search files"
+          title="Find in file (⌘F)"
           variant="ghost"
         >
           <SearchIcon />
