@@ -54,12 +54,12 @@ From the onboarding feature catalog: 45 features, the 32 curated ones first.
 24. **Let an agent ask the user to store a secret** (`secret-catalog`, transcript) — The agent can ask you to store a secret, and only gets a reference to it back.
 25. **Add a Jev key from the Backlog setting** (`secret-catalog`, settings) — Add a Jev key from the Backlog setting, stored as a secret.
 26. **Set up a Jev key from chat** (`secret-catalog`, transcript) — When Jev has no key, the latest turn offers a short form to add one.
-27. **Request log** (`usage`, observe) — The Requests tab of Observe › Usage, with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose fil…
-28. **Usage charts** (`usage`, observe) — The Cost tab of Observe › Usage (formerly Charts): Headline tiles with a previous-period comparison (cost, per day, requests, failures, tokens, cache hit, estimated cache savings and cost per turn), usage over time switchable between cost, tokens and requests and grouped by mode…
-29. **Jev API usage card** (`usage`, observe) — The Cost tab shows DSH-origin Jev calls from Backlog and Memory grouped by configured secret-reference or environment-variable label, with provider-reported tokens, request counts, a TypeSafe list-price estimate and calendar month-to-date spend, requests and tokens per label. Ba…
-30. **Tool and skill analytics** (`usage`, observe) — The Tools tab of Observe › Usage (formerly Tools & Jev): Tool charts over the selected range: calls over time stacked by source category, the ten most-used tools by calls, wall time or estimated returned tokens, a per-category share of returned tokens with success rates, tiles f…
-31. **Usage › Quota: account quota, history and forecast in the Usage page** (`usage`, observe) — Observe › Usage has four tabs, Cost · Quota · Requests · Tools (docs/ade-ux §6). Quota hosts ai-accounts' views through the `@dshfiles/ai-accounts/quota-views` contract: Accounts (one account's current limits and its recorded requests and cost), History (quota snapshots, pace, b…
-32. **Thread panel Cost facet** (`usage`, thread-panel) — A Cost tab in the thread panel (the right pane's tab chooser): the account route and model of the thread's last request, list-price cost per turn with tokens, models and failures, side requests apart, and links to this thread's requests (Usage › Requests filtered to the thread),…
+27. **Request log** (`usage`, observe) — The Requests tab lists every model request with its tokens, cost, time and status.
+28. **Usage charts** (`usage`, observe) — The Cost tab charts cost, tokens and requests over time, against the previous period.
+29. **Jev API usage card** (`usage`, observe) — See how many Jev calls Backlog and Memory made and what they cost this month.
+30. **Tool and skill analytics** (`usage`, observe) — The Tools tab charts how often each tool and skill runs and how long it takes.
+31. **Quota in the Usage page** (`usage`, observe) — The Quota tab of Usage shows each account's limits, their history and a forecast.
+32. **Cost tab in the thread panel** (`usage`, thread-panel) — The thread panel's Cost tab shows what each turn of this thread cost.
 
 ### More
 
@@ -67,8 +67,8 @@ From the onboarding feature catalog: 45 features, the 32 curated ones first.
 2. **See which account serves this thread** (`ai-accounts`) — The usage strip highlights the account the open thread is using right now.
 3. **Stop at the plan limits instead of drawing paid extra usage** (`ai-accounts`) — Off by default: an account stops at its plan limit instead of paying for extra usage.
 4. **Expose safe secret catalog tools to agents** (`secret-catalog`) — Agents list your secrets without their values and read one value only when asked by name.
-5. **Incremental request and tool index from session logs** (`usage`) — Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, plus privacy-reduced tool execution durations, outcomes and returned-text sizes. Read…
-6. **OTLP metrics export** (`usage`) — The read-only usage_otel_metrics Agent tool returns an OTLP/HTTP JSON metrics request from the local SQLite usage ledger. It includes model requests and token use, tool category/source counts and Jev requests per calling plugin with token counters and duration histograms. It nev…
+5. **Usage index from thread logs** (`usage`) — Every model request and tool call in your threads is counted for the Usage page.
+6. **Export usage as metrics** (`usage`) — The agent can export your usage as OpenTelemetry metrics.
 7. **Bounded compaction summaries** (`context-compaction`) — Long histories are summarized in pieces small enough for the model to accept.
 8. **Background compaction summaries** (`context-compaction`) — Off by default: a thread near its limit prepares its summary in the background so compaction is instant.
 9. **Loaded skills kept in compaction checkpoints** (`context-compaction`) — Off by default: compaction keeps the skills a thread loaded, so it does not load them again.

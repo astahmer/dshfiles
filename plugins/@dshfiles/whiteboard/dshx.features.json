@@ -21,7 +21,8 @@
         }
       ],
       "title": "Project whiteboards",
-      "summary": "Excalidraw boards stored per project on the Host: create, draw with autosave, rename, delete to Recently deleted and restore; the editor bundle loads only when a board opens.",
+      "summary": "Draw on whiteboards kept per project, with autosave and a Recently deleted list.",
+      "details": "Excalidraw boards stored per project on the Host: create, draw with autosave, rename, delete to Recently deleted and restore; the editor bundle loads only when a board opens.",
       "reach": ["click tab \"Knowledge\"", "click button \"Whiteboard\"", "expect heading \"Whiteboards\""],
       "surfaces": ["client", "host", "tool", "api", "storage"],
       "surface": "destinationSection",
@@ -77,7 +78,8 @@
         }
       ],
       "title": "Agent-drawn diagrams",
-      "summary": "whiteboard_write queues Mermaid or Excalidraw skeleton source; the editor converts it into editable shapes the next time the board opens, and whiteboard_read returns the scene and its texts.",
+      "summary": "The agent can draw diagrams on a whiteboard that you can then edit.",
+      "details": "whiteboard_write queues Mermaid or Excalidraw skeleton source; the editor converts it into editable shapes the next time the board opens, and whiteboard_read returns the scene and its texts.",
       "surfaces": ["client", "host", "tool", "api"],
       "surface": "agentToolOnly",
       "destination": "none",
@@ -111,8 +113,9 @@
           "reason": "A pure function over a machine's state-node tree; it does no Host I/O."
         }
       ],
-      "title": "xstate machine diagrams",
-      "summary": "The xstate-diagram module turns any xstate v5 machine into a Mermaid flowchart for whiteboard_write or a stateDiagram-v2 for Markdown.",
+      "title": "State machine diagrams",
+      "summary": "A state machine can be drawn as a diagram on a whiteboard or in Markdown.",
+      "details": "The xstate-diagram module turns any xstate v5 machine into a Mermaid flowchart for whiteboard_write or a stateDiagram-v2 for Markdown.",
       "surfaces": ["api"],
       "surface": "infrastructure",
       "destination": "none",

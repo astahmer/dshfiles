@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "usage-index",
-      "title": "Incremental request and tool index from session logs",
-      "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, plus privacy-reduced tool execution durations, outcomes and returned-text sizes. Reads only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
+      "title": "Usage index from thread logs",
+      "summary": "Every model request and tool call in your threads is counted for the Usage page.",
+      "details": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, plus privacy-reduced tool execution durations, outcomes and returned-text sizes. Reads only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
       "surfaces": ["host", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -116,7 +117,8 @@
     {
       "id": "usage-request-log",
       "title": "Request log",
-      "summary": "The Requests tab of Observe › Usage, with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose filter and a date range. Each row opens the thread that made the request. A thread's Cost facet opens it filtered to that thread (Show every thread clears the filter).",
+      "summary": "The Requests tab lists every model request with its tokens, cost, time and status.",
+      "details": "The Requests tab of Observe › Usage, with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose filter and a date range. Each row opens the thread that made the request. A thread's Cost facet opens it filtered to that thread (Show every thread clears the filter).",
       "reach": [
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Seed a usage request\"",
@@ -169,7 +171,8 @@
     {
       "id": "usage-charts",
       "title": "Usage charts",
-      "summary": "The Cost tab of Observe › Usage (formerly Charts): Headline tiles with a previous-period comparison (cost, per day, requests, failures, tokens, cache hit, estimated cache savings and cost per turn), usage over time switchable between cost, tokens and requests and grouped by model, exact provider/account route, project or purpose, a spend map (Where it went) that fans the range total out to models, accounts, projects and purposes by cost, tokens or requests, picks the grouping and opens an entry's requests, a sortable usage distribution table with requests, sessions, average tokens per request, token types, cache share, cost share and estimated cost, and a daily heatmap switchable between tokens, estimated cost and requests for up to a year. Tokens by type, cache hit ratio, requests and failures, TTFT and duration percentiles, and top threads by cost remain available. Missing token and price totals are shown as incomplete. Vendor is not guessed from a route slug and machine is omitted because neither is a reliable captured request dimension.",
+      "summary": "The Cost tab charts cost, tokens and requests over time, against the previous period.",
+      "details": "The Cost tab of Observe › Usage (formerly Charts): Headline tiles with a previous-period comparison (cost, per day, requests, failures, tokens, cache hit, estimated cache savings and cost per turn), usage over time switchable between cost, tokens and requests and grouped by model, exact provider/account route, project or purpose, a spend map (Where it went) that fans the range total out to models, accounts, projects and purposes by cost, tokens or requests, picks the grouping and opens an entry's requests, a sortable usage distribution table with requests, sessions, average tokens per request, token types, cache share, cost share and estimated cost, and a daily heatmap switchable between tokens, estimated cost and requests for up to a year. Tokens by type, cache hit ratio, requests and failures, TTFT and duration percentiles, and top threads by cost remain available. Missing token and price totals are shown as incomplete. Vendor is not guessed from a route slug and machine is omitted because neither is a reliable captured request dimension.",
       "reach": [
         "seed tool-call-thread",
         "click tab \"Observe\"",
@@ -248,7 +251,8 @@
     {
       "id": "usage-jev-card",
       "title": "Jev API usage card",
-      "summary": "The Cost tab shows DSH-origin Jev calls from Backlog and Memory grouped by configured secret-reference or environment-variable label, with provider-reported tokens, request counts, a TypeSafe list-price estimate and calendar month-to-date spend, requests and tokens per label. Bars compare each label's input-token volume with the busiest label this month; they do not represent quota remaining. Labels are local, not provider-verified identity, and usage excludes calls outside DSH.",
+      "summary": "See how many Jev calls Backlog and Memory made and what they cost this month.",
+      "details": "The Cost tab shows DSH-origin Jev calls from Backlog and Memory grouped by configured secret-reference or environment-variable label, with provider-reported tokens, request counts, a TypeSafe list-price estimate and calendar month-to-date spend, requests and tokens per label. Bars compare each label's input-token volume with the busiest label this month; they do not represent quota remaining. Labels are local, not provider-verified identity, and usage excludes calls outside DSH.",
       "surfaces": ["host", "storage", "integration", "client"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -316,7 +320,8 @@
     {
       "id": "usage-activity-report",
       "title": "Tool and skill analytics",
-      "summary": "The Tools tab of Observe › Usage (formerly Tools & Jev): Tool charts over the selected range: calls over time stacked by source category, the ten most-used tools by calls, wall time or estimated returned tokens, a per-category share of returned tokens with success rates, tiles for calls, success rate, interruptions, wall time, returned tokens and the busiest category, plus the per-tool table with outcomes, latency and returned tokens, the top normalized command and test-runner wall-clock distributions, Jev request totals per calling plugin, and recent tool/Jev events. Returned tokens are a characters / 4 estimate of tool result text: only the text length is stored, never the text, and rows indexed before this measurement show as unmeasured. Grouping by category covers skills, plugin API, plugin, MCP, DSH and other tools. Command arguments, paths, outputs, prompts and secrets are never stored; compound or ambiguous shell commands are omitted.",
+      "summary": "The Tools tab charts how often each tool and skill runs and how long it takes.",
+      "details": "The Tools tab of Observe › Usage (formerly Tools & Jev): Tool charts over the selected range: calls over time stacked by source category, the ten most-used tools by calls, wall time or estimated returned tokens, a per-category share of returned tokens with success rates, tiles for calls, success rate, interruptions, wall time, returned tokens and the busiest category, plus the per-tool table with outcomes, latency and returned tokens, the top normalized command and test-runner wall-clock distributions, Jev request totals per calling plugin, and recent tool/Jev events. Returned tokens are a characters / 4 estimate of tool result text: only the text length is stored, never the text, and rows indexed before this measurement show as unmeasured. Grouping by category covers skills, plugin API, plugin, MCP, DSH and other tools. Command arguments, paths, outputs, prompts and secrets are never stored; compound or ambiguous shell commands are omitted.",
       "reach": [
         "click tab \"Observe\"",
         "click button \"Usage\"",
@@ -396,8 +401,9 @@
     },
     {
       "id": "usage-otel-export",
-      "title": "OTLP metrics export",
-      "summary": "The read-only usage_otel_metrics Agent tool returns an OTLP/HTTP JSON metrics request from the local SQLite usage ledger. It includes model requests and token use, tool category/source counts and Jev requests per calling plugin with token counters and duration histograms. It never makes a network request; quota and Fast-mode history remain in AI Accounts storage.",
+      "title": "Export usage as metrics",
+      "summary": "The agent can export your usage as OpenTelemetry metrics.",
+      "details": "The read-only usage_otel_metrics Agent tool returns an OTLP/HTTP JSON metrics request from the local SQLite usage ledger. It includes model requests and token use, tool category/source counts and Jev requests per calling plugin with token counters and duration histograms. It never makes a network request; quota and Fast-mode history remain in AI Accounts storage.",
       "surfaces": ["host", "storage", "integration"],
       "surface": "agentToolOnly",
       "destination": "none",
@@ -448,8 +454,9 @@
     },
     {
       "id": "usage-quota-tab",
-      "title": "Usage › Quota: account quota, history and forecast in the Usage page",
-      "summary": "Observe › Usage has four tabs, Cost · Quota · Requests · Tools (docs/ade-ux §6). Quota hosts ai-accounts' views through the `@dshfiles/ai-accounts/quota-views` contract: Accounts (one account's current limits and its recorded requests and cost), History (quota snapshots, pace, banked resets) and Forecast (forecast, pace, table, coverage, hand-off). Usage provides `UsageNavigation`, so the quota status item, the account Usage tab, saved tabs of the former Usage history and Quota forecast pages and the palette rows (by their old names too) land on the right view and account. Without ai-accounts the tab says to turn it on.",
+      "title": "Quota in the Usage page",
+      "summary": "The Quota tab of Usage shows each account's limits, their history and a forecast.",
+      "details": "Observe › Usage has four tabs, Cost · Quota · Requests · Tools (docs/ade-ux §6). Quota hosts ai-accounts' views through the `@dshfiles/ai-accounts/quota-views` contract: Accounts (one account's current limits and its recorded requests and cost), History (quota snapshots, pace, banked resets) and Forecast (forecast, pace, table, coverage, hand-off). Usage provides `UsageNavigation`, so the quota status item, the account Usage tab, saved tabs of the former Usage history and Quota forecast pages and the palette rows (by their old names too) land on the right view and account. Without ai-accounts the tab says to turn it on.",
       "reach": ["click tab \"Observe\"", "click button \"Usage\"", "click tab \"Quota\"", "click radio \"Forecast\"", "expect radio \"Accounts\""],
       "reachNarrow": [
         "click button \"More\"",
@@ -498,8 +505,9 @@
     },
     {
       "id": "thread-cost-facet",
-      "title": "Thread panel Cost facet",
-      "summary": "A Cost tab in the thread panel (the right pane's tab chooser): the account route and model of the thread's last request, list-price cost per turn with tokens, models and failures, side requests apart, and links to this thread's requests (Usage › Requests filtered to the thread), Usage › Quota for that route, and Traces. A thread with subagents heads the facet with its family cost (the thread plus every subagent session below it) and lists each subagent's cost; Thread / With subagents switches the headline. The read-only `usage_thread_family_cost` Agent tool returns the same totals. Registered as a right-pane page tab type, so it follows the thread on stage without changing sidebar-right.",
+      "title": "Cost tab in the thread panel",
+      "summary": "The thread panel's Cost tab shows what each turn of this thread cost.",
+      "details": "A Cost tab in the thread panel (the right pane's tab chooser): the account route and model of the thread's last request, list-price cost per turn with tokens, models and failures, side requests apart, and links to this thread's requests (Usage › Requests filtered to the thread), Usage › Quota for that route, and Traces. A thread with subagents heads the facet with its family cost (the thread plus every subagent session below it) and lists each subagent's cost; Thread / With subagents switches the headline. The read-only `usage_thread_family_cost` Agent tool returns the same totals. Registered as a right-pane page tab type, so it follows the thread on stage without changing sidebar-right.",
       "reach": ["seed tool-call-thread", "press ControlOrMeta+Alt+KeyT", "click button \"route, cost per turn*\"", "expect text \"Per turn\""],
       "surfaces": ["client"],
       "surface": "threadFacet",
