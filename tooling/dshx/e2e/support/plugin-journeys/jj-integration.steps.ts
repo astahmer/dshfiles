@@ -415,7 +415,7 @@ Then('the New thread workspace starts from the project\'s main branch {string}',
 })
 
 When('the {string} bookmark is picked in the destination bar and refused', async ({ page }: { page: Page }, bookmark: string) => {
-  const refusal = page.getByText(`"${bookmark}" points at more than one revision, so no workspace was created.`, { exact: false })
+  const refusal = page.getByText(`The bookmark "${bookmark}" is conflicted`, { exact: false })
   await workspaceToggle(page).click()
   await page.getByPlaceholder('Search workspaces and bookmarks').fill(bookmark)
   await page.getByRole('option', { name: bookmark, exact: true }).click()
