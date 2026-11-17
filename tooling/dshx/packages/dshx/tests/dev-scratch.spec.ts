@@ -120,7 +120,7 @@ describe('dshx dev scratch commands', () => {
     expect(NEW_THREAD_START_BUTTON_NAME.test('Settings')).toBe(false)
   })
 
-  it('posts synthetic OTLP data to the endpoint carried by the receiver badge', async () => {
+  it('posts synthetic OTLP data to the endpoint carried by the store summary', async () => {
     const browser = await chromium.launch({ headless: true })
     const page = await browser.newPage()
     const postedUrls: string[] = []
@@ -131,7 +131,7 @@ describe('dshx dev scratch commands', () => {
     try {
       await page.setContent(`
         <nav aria-label="Global panels"><button type="button">Traces</button></nav>
-        <div data-testid="traces-receiver-state" data-state="listening" data-endpoint="http://127.0.0.1:4318">listening</div>
+        <div data-testid="traces-store-summary" data-receiver-state="listening" data-endpoint="http://127.0.0.1:4318">3 traces</div>
         <button role="tab">Chat</button>
       `)
       const cwd = process.cwd()
