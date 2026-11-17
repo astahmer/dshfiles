@@ -104,3 +104,9 @@ test('viewport-variant: window breakpoints, not container queries or dialog widt
     'dshx:hover:lg:flex',
   ])
 })
+
+test('solid-status-fill: a solid info, success or warning fill outside the kit', () => {
+  const line = "cn('dshx:bg-success dshx:hover:bg-warning dshx:bg-info/10 dshx:bg-success-foreground dshx:text-success dshx:bg-destructive')"
+  assert.deepEqual(ruleHits('solid-status-fill', line), ['dshx:bg-success', 'dshx:hover:bg-warning'])
+  assert.deepEqual(ruleHits('solid-status-fill', line, 'plugins/@dshfiles/plugin-ui/src/components/ui/badge.tsx'), [])
+})

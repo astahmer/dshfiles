@@ -115,6 +115,13 @@ export const designTokenRules: readonly DesignTokenRule[] = [
     matches: (line, file) =>
       classes(line, file, token => token.variants.some(variant => /^(?:max-)?(?:sm|md|lg|xl|2xl)$/.test(variant)) && !/^max-w-/.test(token.utility)),
   },
+  {
+    // Status colour belongs to the kit's StatusGlyph and badges; a plugin's own solid fill invents a tone table.
+    id: 'solid-status-fill',
+    use: 'StatusGlyph / Badge from the kit, or the tinted trio (dshx:bg-info/10 with var(--dshx-tone-*))',
+    matches: (line, file) =>
+      file.startsWith('plugins/@dshfiles/plugin-ui/') ? [] : classes(line, file, token => /^bg-(?:info|success|warning)$/.test(token.utility)),
+  },
 ]
 
 /** Files that define the tokens: colour literals there are the palette itself. */
