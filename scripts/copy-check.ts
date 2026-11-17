@@ -230,8 +230,8 @@ const isLabel = (text: string): boolean => {
 export interface CopyRule {
   readonly id: string
   readonly use: string
-  /** `prose` rules read strings of two or more words; `label` rules read one-word labels too. */
-  readonly scope: 'prose' | 'label'
+  /** `prose` rules read strings of two or more words, `label` rules one-word labels too, `any` every string (the rule gates itself). */
+  readonly scope: 'prose' | 'label' | 'any'
   /** Whether one string breaks the rule; `raw` keeps each template hole as `${…}`. */
   readonly test: (text: string, raw: string) => boolean
 }
@@ -252,9 +252,23 @@ const hostAsProcess = (text: string): boolean => {
   return false
 }
 
+/**
+ * A package name (`@dshfiles/backlog`, `@deepseek-ai/dsh`) in a sentence. A bare specifier is code (`import … from`),
+ * so the string must hold a space and no import shape. One that starts with the name counts only as a sentence:
+ * `@dshfiles/chat code fences` is a reporter's debug name, `@dshfiles/backlog is not installed.` is copy.
+ */
+const packageNameInCopy = (text: string): boolean => {
+  const trimmed = text.trim()
+  if (!/(?:^|[\s(`'"“])@(?:dshfiles|deepseek-ai)\/[\w-]/.test(trimmed) || !/\s/.test(trimmed)) return false
+  if (/\bimport\b|\bfrom\s+['"]|\brequire\(|^\s*(?:pnpm|npm|node|dsh|dshx)\s/.test(trimmed)) return false
+  return !trimmed.startsWith('@') || /[.!?]/.test(trimmed)
+}
+
 /** Copy rules beyond the glossary, from the copy audit's systemic patterns; each is counted and ratcheted like a term. */
 export const copyRules: readonly CopyRule[] = [
   { id: 'host-process', use: 'what the user sees (DSH, the app, a restart) or a lower-case host for a machine', scope: 'prose', test: hostAsProcess },
+  // `any`: a sentence that starts with `@dshfiles/…` is neither prose nor a label to the code-shape filter.
+  { id: 'package-name', use: 'the plugin or feature name users see', scope: 'any', test: packageNameInCopy },
 ]
 
 export interface CopyComparison {
@@ -280,11 +294,14 @@ const findingsInStrings = (input: { readonly file: string; readonly strings: rea
     const raw = string.raw ?? string.text
     const prefixed = input.prefix.test(raw)
     const prose = isProse(string.text)
-    if (!prose && !prefixed && !isLabel(string.text)) continue
+    const label = prose || isLabel(string.text)
     const at = { plugin, file: input.file, line: string.line, text: raw.trim().slice(0, 120) }
     if (prefixed) findings.push({ term: 'plugin-prefix', ...at })
     if (prose) for (const term of copyTerms) if (term.pattern.test(string.text)) findings.push({ term: term.id, ...at })
-    for (const rule of copyRules) if ((rule.scope === 'label' || prose) && rule.test(string.text, raw)) findings.push({ term: rule.id, ...at })
+    for (const rule of copyRules) {
+      const inScope = rule.scope === 'any' || (rule.scope === 'label' ? label : prose)
+      if (inScope && rule.test(string.text, raw)) findings.push({ term: rule.id, ...at })
+    }
   }
   return findings
 }
