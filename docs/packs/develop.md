@@ -31,11 +31,11 @@ From the onboarding feature catalog: 7 features, the 1 curated ones first.
 ### More
 
 1. **Browse every shared component on one page** (`component-gallery`, settings) — Browse every shared UI component live on one page, filtered by name.
-2. **Plugin updates waiting for a Host restart** (`hmr-gate`) — A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.
-3. **Plugin updates waiting for a restart in the Inbox** (`hmr-gate`, inbox) — While any rebuilt plugin is held back because its new Host code is not loaded, the Inbox shows one Ready item about this DSH naming the waiting packages and how to apply them (restart when no agent is working). It offers no restart verb: restarting stays the user's decision. A c…
-4. **Held-back bundles join the one restart notice** (`hmr-gate`) — While a rebuilt plugin waits for a Host restart, hmr-gate lists it in thread-sidebar's restart sources, so the status strip's one Restart pending item names it beside the Host files thread-sidebar watches. thread-sidebar owns that item and its Restart DSH / Restart when idle ver…
-5. **Experimental in-process Host reload for opted-in plugins** (`hmr-gate`) — With the hmr-gate row's hostReload config on, a rebuilt Host half of a plugin whose package.json declares dshx.hostReload "safe" is replaced inside the running DSH: its own modules are evicted from the ESM cache and imported again, the Loader contract (name, inject, Config) is c…
-6. **Plugin updates wait for a hidden or idle moment** (`hmr-gate`) — The browser half holds graph and rebuilt frames until the Host connection is live again and the page is hidden, or the reader has been idle for 30 s with no focused field; nothing applies in the 10 s after the page comes back. Updates of the thread-drawing packages (chat, workbe…
+2. **Plugin updates waiting for a restart** (`hmr-gate`) — The Plugins page lists plugin updates that wait for a DSH restart, and the page keeps working meanwhile.
+3. **Plugin updates waiting for a restart in the Inbox** (`hmr-gate`, inbox) — The Inbox shows one item naming plugin updates that wait for a restart, and when to restart.
+4. **Waiting updates join the restart notice** (`hmr-gate`) — Plugin updates that need a restart are named in the one Restart pending item in the status bar.
+5. **Reload a plugin without restarting DSH** (`hmr-gate`) — Off by default: a plugin marked safe can reload inside the running DSH without a restart.
+6. **Plugin updates wait for a hidden or idle moment** (`hmr-gate`) — Plugin updates apply only when the page is hidden or you have been idle for a while.
 
 ## Enable it
 

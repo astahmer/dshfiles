@@ -214,14 +214,14 @@ rail destination; 16 features.
 | --- | --- | --- |
 | jj-integration/workspace-process-stop: Stop processes left in a thread workspace before removing it | command | left-nav: Revision graph › Clean up workspaces (row meta) |
 | jujutsu/workspace-cleanup: Clean up idle JJ workspaces | command | left-nav: Revision graph › Clean up workspaces |
-| jj-integration/thread-integration-attention-view: Thread integration prioritises what needs attention | destinationSection | left-nav: Land › Needs you |
-| jj-integration/thread-integration-empty: Thread integration with no thread workspaces | destinationSection | left-nav: Land › empty state |
-| jj-integration/thread-workspaces-panel: Thread integration control center | destinationSection | left-nav: Land |
+| jj-integration/thread-integration-attention-view: Workspaces that need you come first | destinationSection | left-nav: Land › Needs you |
+| jj-integration/thread-integration-empty: No thread workspaces yet | destinationSection | left-nav: Land › empty state |
+| jj-integration/thread-workspaces-panel: Workspaces page | destinationSection | left-nav: Land |
 | jujutsu/graph-navigation: Locate landmarks and compare revision ancestry | destinationSection | left-nav: Revision graph › landmarks |
 | jujutsu/review-selection: Select revisions in the graph to review them together | destinationSection | left-nav: Revision graph › selection strip |
 | jujutsu/revision-graph: Browse and filter the revision graph | destinationSection | left-nav: Revision graph |
 | jujutsu/source-control: Describe and review the working copy in Source Control | destinationSection | left-nav: Source control |
-| jj-integration/thread-integration-row-details: Thread integration row details | detail | left-nav: Land › row details |
+| jj-integration/thread-integration-row-details: Workspace row details | detail | left-nav: Land › row details |
 | jujutsu/revision-detail-and-diff: Inspect revisions and changed files | detail | left-nav: Revision graph › revision detail |
 | jujutsu/chat-references: Open Jujutsu references from a chat message | entityProvider | transcript: jj: reference links |
 | jujutsu/previewed-revision-mutations: Preview and confirm repository mutations | rowAction | left-nav: Revision graph › revision menu |
@@ -434,7 +434,7 @@ facets of the active thread; 32 features.
 | diff-viewed/review-file-markers: Mark review files as viewed | threadFacet | right-pane: native review tab › Viewed |
 | diffs-review/ai-scope-summaries: Summarize review scopes with the thread's own model | threadFacet | left-nav: Review › Summarize |
 | diffs-review/batch-reviewed-marks: Mark a selection of changed files reviewed | threadFacet | left-nav: Review › reviewed marks |
-| diffs-review/changed-image-preview: See changed images in a review instead of a dropped binary file | threadFacet | right-pane: Changes, Review page |
+| diffs-review/changed-image-preview: See changed images in a review | threadFacet | right-pane: Changes, Review page |
 | diffs-review/changes-facet: Review a thread's changes in its Changes facet | threadFacet | right-pane: Changes |
 | diffs-review/combined-revisions: Review several selected revisions together | threadFacet | right-pane: Changes › Revisions |
 | diffs-review/diff-line-comments: Comment on diff lines as chips in the next message | threadFacet | right-pane: Changes › diff line selection |
@@ -445,8 +445,8 @@ facets of the active thread; 32 features.
 | editor/file-links: Open file links in the editor | threadFacet | main-tabs: New tab › Workspace files › file row |
 | editor/thread-artifacts: Edit thread artifacts | threadFacet | main-tabs: New tab › Artifacts |
 | editor/workspace-editor: Browse and edit workspace files | threadFacet | main-tabs: New tab › Files |
-| jj-integration/rebase: Integrate a thread into the bookmark | threadFacet | thread-header: Own workspace › Integrate |
-| jj-integration/thread-workspace-menu: Thread workspace control in the conversation header | threadFacet | thread-header: Own workspace menu |
+| jj-integration/rebase: Land a thread on its bookmark | threadFacet | thread-header: Own workspace › Integrate |
+| jj-integration/thread-workspace-menu: Workspace control in the thread header | threadFacet | thread-header: Own workspace menu |
 | jujutsu/composer-context: See project and Jujutsu workspace context in the composer | threadFacet | thread header: Changes pill |
 | preview/agent-browser: Agent browser | threadFacet | thread panel: Agent browser |
 | preview/preview-browser: Agent preview browser | threadFacet | agent tool: preview_open / preview_screenshot |
@@ -477,9 +477,9 @@ run row, chips, `/` and `@` sources; 70 features.
 | annotations/pick-element: Pick an element and add it to the draft | composerContribution | composer: ⋯ › Point at UI… (/annotate); a count chip while annotations are open |
 | backlog/backlog-mentions: Mention backlog items with @ | composerContribution | composer: @b: mentions |
 | btw/btw-command-chip: Keep a /btw draft after a reload | composerContribution | composer: /btw chip |
-| input-trigger/codex-at-tokens: Codex-style @ token targeting | composerContribution | composer: @ menu |
+| input-trigger/codex-at-tokens: Pick what an @ mention targets | composerContribution | composer: @ menu |
 | input-trigger/command-chip-restore: Restore a persisted command chip | composerContribution | composer: command chips |
-| input-trigger/command-slash-entries: Slash entries for dshx commands | composerContribution | composer: / menu |
+| input-trigger/command-slash-entries: Slash entries for commands | composerContribution | composer: / menu |
 | jj-integration/git-thread-workspaces: Thread workspaces in git-only repositories | composerContribution | composer: run row Workspace segment |
 | jj-integration/new-thread-preparation: New thread prepares its destination while the draft is written | composerContribution | composer: New thread draft |
 | jj-integration/new-thread-project-default: New thread returns to its project | composerContribution | composer: new-thread destination bar |
@@ -565,9 +565,9 @@ cards inline in the active thread; 42 features.
 | chat/windowed-transcript: Open a thread on its latest messages | transcriptCard | transcript: windowed rendering |
 | deliverables/changed-files-card: Changed-files card and review tab | transcriptCard | chat transcript: the card under a turn that edited files, and the review tab it opens |
 | deliverables/changed-image-preview: Changed images preview instead of the binary placeholder | transcriptCard | chat transcript: a changed image row's hover preview in the Edited files card, and the review tab |
-| html-render/html-page-card: Agent-published HTML page as a sandboxed card | transcriptCard | transcript: html_render card |
+| html-render/html-page-card: HTML page from the agent as a card | transcriptCard | transcript: html_render card |
 | html-render/html-preview-card: Workspace HTML file shown as a sandboxed card | transcriptCard | transcript: html_preview card |
-| jj-integration/turn-end-integrate: Integrate from the end of a turn | transcriptCard | transcript: turn tail › Land on main › revisions |
+| jj-integration/turn-end-integrate: Land from the end of a turn | transcriptCard | transcript: turn tail › Land on main › revisions |
 | mermaid-diagrams/chat-diagram: Mermaid diagrams in the conversation | transcriptCard | transcript: mermaid code fence |
 | secret-catalog/agent-secret-request: Let an agent ask the user to store a secret | transcriptCard | transcript: turn tail › Secret request |
 | secret-catalog/backlog-jev-chat-setup: Set up a Jev key from chat | transcriptCard | transcript: turn tail › Set up missing secrets |
@@ -599,7 +599,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | annotations/source-resolution: Resolve an element to its source | agentToolOnly | agent tool: annotations_source |
 | apply-patch/apply-patch-tool: Edit a file with literal replacements | agentToolOnly | agent tool: apply_patch |
 | backlog/agent-write-confirmation: Agents confirm bulk and destructive backlog writes | agentToolOnly | agent tools: backlog_revert, backlog_triage_backfill, backlog_sync_now, backlog_delete |
-| fff-search/resident-grep-glob: Answer agent grep and glob from a resident fff index | agentToolOnly | agent tool: grep / glob |
+| fff-search/resident-grep-glob: Faster grep and glob for agents | agentToolOnly | agent tool: grep / glob |
 | goal-stall-guard/bounded-goal-continuation: Extend or close goals within bounded policy | agentToolOnly | agent tool: extend_goal_budget / complete_blocked_goal |
 | html-render/page-screenshot: Agent screenshot of its own published page | agentToolOnly | agent tool: html_render_screenshot |
 | memory/memory-tools: Search, read and note memory from any agent | agentToolOnly | agent tool: memory_search / memory_read / memory_note |
@@ -675,25 +675,25 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | diff-viewed/host-owned-view-state: Keep viewed marks across browsers | infrastructure | host: diff_viewed storage |
 | diff-viewed/revision-range-marks: One viewed-marks store for turns and revision ranges | infrastructure | host: diff_viewed storage |
 | diffs-review/review-marks-migration: Move the Review page's marks into the one viewed-marks store | infrastructure | host: diffs-review reviewed record |
-| editor/session-screen-contract: Session screen and workspace files for other plugins | infrastructure | client: SessionScreen contract |
+| editor/session-screen-contract: Open thread and workspace files for other plugins | infrastructure | client: SessionScreen contract |
 | editor/workspace-file-index: Index workspace files with bounded traversal | infrastructure | host: workspace file index |
 | frame-layout/collapsed-state-persistence: Persist the collapsed sidebar | infrastructure | shell: collapsed sidebar |
-| frame-layout/panel-seats: Hand the frame's regions to plugin surfaces | infrastructure | shell: frame regions |
+| frame-layout/panel-seats: Main area and side panels | infrastructure | shell: frame regions |
 | frame-layout/panel-width-persistence: Persist the frame's dragged panel widths | infrastructure | shell: panel widths |
 | frame-layout/phone-navigation-seat: Give the stage the full width on a phone | infrastructure | shell: frame columns at phone width |
 | frame-layout/status-strip: One status strip at the bottom of the frame | infrastructure | shell: status strip |
 | frame-layout/status-strip-restore: Bring back hidden status items in place | infrastructure | status-strip: Show hidden status items |
-| git-cli/git-cli-run: One Effect service that runs the git CLI | infrastructure | host: library |
+| git-cli/git-cli-run: Run git safely | infrastructure | host: library |
 | git-worktrees/git-file-snapshots: Snapshot and restore a git workspace's files | infrastructure | host: git file snapshots |
-| git-worktrees/git-thread-worktrees: Isolate threads in git worktrees | infrastructure | settings: git worktree isolation (opt-in) |
+| git-worktrees/git-thread-worktrees: Give threads a workspace in plain git projects | infrastructure | settings: git worktree isolation (opt-in) |
 | goal-stall-guard/pause-stalled-goals: Pause goals after consecutive empty rounds | infrastructure | host: goal rounds |
-| goal-tool/continued-form-goal-authority: Accept admitted continued-form answers as direct goal authority | infrastructure | host: goal tool fork |
-| hmr-gate/host-reload: Experimental in-process Host reload for opted-in plugins | infrastructure | host: hmr-gate deferral |
+| goal-tool/continued-form-goal-authority: Answers to a timed question count as your request | infrastructure | host: goal tool fork |
+| hmr-gate/host-reload: Reload a plugin without restarting DSH | infrastructure | host: hmr-gate deferral |
 | hmr-gate/update-timing: Plugin updates wait for a hidden or idle moment | infrastructure | client: hmr-gate frame handling |
-| image-preview/image-preview-response: One guarded way to serve and show a changed image | infrastructure | host and client: library |
-| jev/jev-ask: Ask Jev one Noul question and record its usage | infrastructure | host: library |
-| jj-cli/jj-cli-run: One Effect service that runs the Jujutsu CLI | infrastructure | host: library |
-| jj-cli/jj-cli-view-reads: Operation-head cache for jj view reads | infrastructure | host: library |
+| image-preview/image-preview-response: Show a changed image safely | infrastructure | host and client: library |
+| jev/jev-ask: Ask Jev a yes or no question | infrastructure | host: library |
+| jj-cli/jj-cli-run: Run Jujutsu safely | infrastructure | host: library |
+| jj-cli/jj-cli-view-reads: Cache repeated Jujutsu reads | infrastructure | host: library |
 | jujutsu/panel-scopes: Keep one repository per Jujutsu tab, thread and dock | infrastructure | left-nav: Revision graph › per-tab repository |
 | loopback-access/localhost-with-lan: Keep localhost available when LAN access is enabled | infrastructure | host: loopback listeners |
 | main-tabs/backlog-capture-with-thread-tab: Typing in Backlog with a kept thread tab | infrastructure | main-tabs: kept thread tab focus |
@@ -779,8 +779,8 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | ai-accounts/disabled-account-preview: Turn an account on or off from the usage popover | statusItem | status-strip: Quota popover |
 | ai-accounts/extra-usage-guard: Stop at the plan limits instead of drawing paid extra usage | statusItem | status-strip: Quota popover › account card › Use extra usage |
 | frame-layout/status-item-open: Click a status item to open its page | statusItem | shell: status strip |
-| hmr-gate/plugins-row: Plugin updates waiting for a Host restart | statusItem | plugins-page: View HMR updates |
-| hmr-gate/restart-status-item: Held-back bundles join the one restart notice | statusItem | status-strip: Restart pending |
+| hmr-gate/plugins-row: Plugin updates waiting for a restart | statusItem | plugins-page: View HMR updates |
+| hmr-gate/restart-status-item: Waiting updates join the restart notice | statusItem | status-strip: Restart pending |
 | thread-sidebar/auto-restart-when-idle: Restart by itself to apply updates when idle | statusItem | status-strip: Restarting to apply updates |
 | thread-sidebar/client-reload-banner: Offer a page reload when the running client bundles are behind | statusItem | sidebar-footer: client reload banner |
 | thread-sidebar/pending-host-restart: Warn when a host restart is required | statusItem | status-strip: Restart pending |

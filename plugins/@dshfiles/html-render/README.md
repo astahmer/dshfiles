@@ -1,6 +1,6 @@
 # @dshfiles/html-render
 
-![Agent-published HTML page as a sandboxed card](docs/screenshots/html-page-card.png)
+![HTML page from the agent as a card](docs/screenshots/html-page-card.png)
 
 The `html_render` agent tool publishes a self-contained HTML page — a chart, a mockup, a table — and `html_preview` shows
 an HTML file from the thread's workspace; the chat transcript shows either as a card instead of a tool row:

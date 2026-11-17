@@ -92,7 +92,7 @@ From the onboarding feature catalog: 61 features, the 54 curated ones first.
 4. **Agents confirm bulk and destructive backlog writes** (`backlog`) — Agents must confirm before they revert, delete or change many items at once.
 5. **Sync backlog items with a Jira Cloud project** (`backlog-jira`) — Sync backlog items with a Jira Cloud project, both ways, through a remote sync connection.
 6. **Sync backlog items with a Notion data source** (`backlog-notion`) — Sync backlog items with a Notion database, both ways, through a remote sync connection.
-7. **Accept admitted continued-form answers as direct goal authority** (`goal-tool`) — The native goal-tool fork recognizes only an answered root-turn reply whose call id the user-question projection settled with a valid answer batch.
+7. **Answers to a timed question count as your request** (`goal-tool`) — An answer you gave to a timed question counts as your own request for a goal.
 
 ## Enable it
 
