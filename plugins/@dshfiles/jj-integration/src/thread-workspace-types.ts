@@ -131,6 +131,11 @@ export interface SnapshotRevision {
   readonly changeId: string
 }
 
+export interface BookmarkConflict {
+  readonly bookmark: string
+  readonly targets: readonly { readonly commitId: string; readonly summary: string }[]
+}
+
 /** One VCS backend for thread workspaces. Every method is the same contract whichever backend serves it. */
 export interface ThreadWorkspacesBackend {
   readonly vcs: VcsKind
@@ -187,6 +192,14 @@ export interface ThreadWorkspacesBackend {
   readonly removeUntrackedEntry: (input: { readonly repoRoot: string; readonly name: string }) => Effect.Effect<void, ThreadWorkspaceError>
   /** Local bookmarks (git: branches), and the nearest one the workspace at `path` builds on. */
   readonly bookmarks: (target: string) => Effect.Effect<{ readonly current: string | null; readonly names: readonly string[] }, ThreadWorkspaceError>
+  /** The revisions a local bookmark points at while it is conflicted; empty when it points at one (git: always empty). */
+  readonly bookmarkConflict: (input: { readonly repoRoot: string; readonly bookmark: string }) => Effect.Effect<BookmarkConflict, ThreadWorkspaceError>
+  /** Point a conflicted bookmark at one of its own revisions; refuses a resolved bookmark or any other revision. */
+  readonly resolveBookmarkConflict: (input: {
+    readonly repoRoot: string
+    readonly bookmark: string
+    readonly commitId: string
+  }) => Effect.Effect<{ readonly bookmark: string; readonly commitId: string }, ThreadWorkspaceError>
   /**
    * Fetched remote bookmarks a thread can start from, written as `provision` takes them as a base (jj `main@origin`,
    * git `origin/main`), the project's main branch first. `provision` fetches such a base before it starts from it.

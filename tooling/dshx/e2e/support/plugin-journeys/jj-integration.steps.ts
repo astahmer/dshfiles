@@ -1,5 +1,5 @@
 import { ThreadListFilter } from '../thread-list-filter.js'
-import { expect, type Page, type Request } from '@playwright/test'
+import { expect, test, type Page, type Request } from '@playwright/test'
 import { openGlobalPanel } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
@@ -430,6 +430,31 @@ Then('the refusal names how to recover and left no thread workspace', async ({ p
     expect(rawWorkspaceNames(repository)).toEqual([])
     expect(existsSync(repository.threadsPath) ? await threadFolders(repository) : []).toEqual([])
   })
+})
+
+When('the refusal keeps {string} as the revision of {string}', async ({ page }: { page: Page }, kept: string, bookmark: string) => {
+  const repository = repositoryFor(page)
+  const revision = commitIdOf(repository, kept).slice(0, 12)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: `Choose ${bookmark}’s revision…` }).click()
+  const dialog = page.getByRole('alertdialog')
+  await recordAssertion(page, 'jj-integration-conflicted-bookmark-waits-for-a-confirmed-choice', async () => {
+    await expect(dialog.getByRole('radio')).toHaveCount(2)
+    await expect(dialog.getByRole('radio', { checked: true })).toHaveCount(0)
+    await expect(dialog.getByRole('button', { name: 'Choose a revision' })).toBeDisabled()
+    expect(rawWorkspaceNames(repository)).toEqual([])
+    const box = await dialog.boundingBox()
+    expect(box === null ? Number.POSITIVE_INFINITY : box.x + box.width).toBeLessThanOrEqual(390)
+    for (const target of [dialog.getByRole('button', { name: 'Cancel' }), dialog.locator('label').first()]) {
+      // Layout height, not the box: the dialog opens with a zoom, so its box is smaller until the animation ends.
+      expect(await target.evaluate(element => (element instanceof HTMLElement ? element.offsetHeight : 0))).toBeGreaterThanOrEqual(44)
+    }
+  })
+  await dialog.locator('label', { hasText: revision }).click()
+  await page.screenshot({ path: test.info().outputPath('jj-integration-conflicted-bookmark-390.png'), animations: 'disabled' })
+  await dialog.getByRole('button', { name: `Point ${bookmark} at ${revision}` }).click()
+  await expect(dialog).toHaveCount(0)
+  await page.setViewportSize({ width: 1280, height: 800 })
 })
 
 Then('exactly one thread workspace exists on {string}', async ({ page }: { page: Page }, bookmark: string) => {

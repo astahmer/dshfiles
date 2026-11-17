@@ -53,6 +53,14 @@ Feature: jj thread workspaces
     When the "main" bookmark is picked in the destination bar
     Then exactly one thread workspace exists on "main"
 
+  @scenario:jj-integration.resolve-conflicted-bookmark-browser-journey
+  Scenario: A conflicted bookmark is resolved from its refusal and the workspace is created from the kept revision
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository with a conflicted "forked" bookmark is chosen as the New thread project
+    And the "forked" bookmark is picked in the destination bar and refused
+    And the refusal keeps "release" as the revision of "forked"
+    Then exactly one thread workspace exists on "release"
+
   @scenario:jj-integration.configured-base-browser-journey
   Scenario: New chat uses configured main instead of the project checkout feature bookmark
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/thread-sidebar, @dshfiles/multi-host, @dshfiles/ai-accounts, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/settings-shell" is booted

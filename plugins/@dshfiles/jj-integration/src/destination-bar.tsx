@@ -19,6 +19,7 @@ import { HostChip, multiHostApi } from '@dshfiles/multi-host/destination'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
 import { jjIntegrationApi, threadWorkspaceNameEffect, type DestinationView } from './api.js'
+import { BookmarkConflictAction } from './bookmark-conflict-dialog.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { mainViewSessionId, mainViewSessionVisitId } from './main-view-session.js'
 import { resolveNewThreadWorkspaceId } from './new-thread-workspace.js'
@@ -369,6 +370,7 @@ export const DestinationBar = (props: {
     services.pickWorkspace(current.projectWorkspaceId)
   }, [current, newThreadId, rootSelectionVisitId, services, showsSentThread, toggle.busy, workspaceId])
   const projectId = current?.projectWorkspaceId ?? workspaceId ?? ''
+  const refusedPath = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === projectId)?.path
   const localProjectPath = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === projectId)?.path
   // jj and git repositories both offer isolation and a bookmark (git: branch) to start from.
   const isJj = current !== undefined && current.vcs !== 'none'
@@ -378,7 +380,14 @@ export const DestinationBar = (props: {
   const bookmark = current === undefined ? null : WorkspaceToggle.startingBookmark({ destination: current, isolated, defaultBookmark })
   const [segmentOpen, setSegmentOpen] = useState(false)
   const remoteBookmarks = current?.remoteBookmarks ?? []
+  // The move a refusal answered: once the user resolves a conflicted bookmark, it runs again as asked.
+  const lastMove = useRef<{ readonly isolate: boolean; readonly base?: string } | null>(null)
+  // A move that went through is not one to run again after a later refusal.
+  useEffect(() => {
+    if (!toggle.busy && toggle.error === null) lastMove.current = null
+  }, [toggle.busy, toggle.error])
   const move = (request: { readonly isolate: boolean; readonly base?: string }): void => {
+    lastMove.current = request
     const leavingPath =
       current?.isolated === true ? services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)?.path : undefined
     const leavingName = threadNameOf(leavingPath)
@@ -558,6 +567,19 @@ export const DestinationBar = (props: {
           </span>
         ) : null}
         {toggle.error === null ? null : <span className="dshx:text-xs dshx:text-destructive">{toggle.error}</span>}
+        {toggle.error !== null && refusedPath !== undefined ? (
+          <BookmarkConflictAction
+            path={refusedPath}
+            bookmark={lastMove.current?.base}
+            refusal={toggle.error}
+            t={t}
+            onResolved={() => {
+              void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'destination', workspaceId ?? ''] })
+              const again = lastMove.current
+              if (again !== null) move(again)
+            }}
+          />
+        ) : null}
       </div>
     </TooltipProvider>
   )
