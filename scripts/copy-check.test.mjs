@@ -248,3 +248,7 @@ test('status-word: a non-canonical state word as a whole label, not inside a sen
     ['Running', 'In progress', 'Needs attention'],
   )
 })
+
+test('try-again: the whole label, not the phrase inside a sentence', () => {
+  assert.deepEqual(ruleHits('try-again', ['Try again', 'Try again.', 'Retry', 'Check the path, then try again.']), ['Try again', 'Try again.'])
+})
