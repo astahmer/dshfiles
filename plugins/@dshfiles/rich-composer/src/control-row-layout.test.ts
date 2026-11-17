@@ -2,11 +2,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { observeControlRow } from './native/skeleton/control-row-layout.ts'
 
+const LINE = 28
+const ROW_GAP = 4
+
 /**
  * A row of fixed-width items whose widths shrink as the collapse steps apply, as the real CSS does: the compact step
- * drops labels, the icon step drops the model name.
+ * drops labels, the icon step drops the model name. The row reports the height a browser would give it — one line, or
+ * two lines plus the row gap when the simulated layout wraps.
  */
-const rowOf = (input: { readonly available: number; readonly expanded: number[]; readonly compact: number[]; readonly icon: number[] }) => {
+const rowOf = (input: {
+  readonly available: number
+  readonly expanded: number[]
+  readonly compact: number[]
+  readonly icon: number[]
+  /** Whether the laid-out row takes a second line (default: never). */
+  readonly wraps?: (row: HTMLElement) => boolean
+}) => {
   const row = document.createElement('div')
   row.style.padding = '0px'
   row.style.columnGap = '4px'
@@ -17,9 +28,10 @@ const rowOf = (input: { readonly available: number; readonly expanded: number[];
       : row.hasAttribute('data-model-compact')
         ? (input.compact[index] ?? 0)
         : (input.expanded[index] ?? 0)
-  row.getBoundingClientRect = () => new DOMRect(0, 0, input.available, 0)
+  const wraps = input.wraps ?? (() => false)
+  row.getBoundingClientRect = () => new DOMRect(0, 0, input.available, wraps(row) ? 2 * LINE + ROW_GAP : LINE)
   items.forEach((item, index) => {
-    item.getBoundingClientRect = () => new DOMRect(0, 0, widthOf(index), 0)
+    item.getBoundingClientRect = () => new DOMRect(0, 0, widthOf(index), LINE)
   })
   document.body.append(row)
   return row
@@ -51,7 +63,13 @@ describe('the composer control row collapse (b:gyk7)', () => {
   })
 
   it('drops labels first and keeps the model name while that is enough', () => {
-    const row = rowOf({ available: 260, expanded: [28, 90, 28, 140, 32], compact: [28, 28, 28, 90, 32], icon: [28, 28, 28, 28, 32] })
+    const row = rowOf({
+      available: 260,
+      expanded: [28, 90, 28, 140, 32],
+      compact: [28, 28, 28, 90, 32],
+      icon: [28, 28, 28, 28, 32],
+      wraps: row => !row.hasAttribute('data-model-compact'),
+    })
     const stop = observeControlRow(row)
     expect(row.hasAttribute('data-model-compact')).toBe(true)
     expect(row.hasAttribute('data-model-icon')).toBe(false)
@@ -59,7 +77,13 @@ describe('the composer control row collapse (b:gyk7)', () => {
   })
 
   it('shows the model as an icon in a pane too narrow for its name', () => {
-    const row = rowOf({ available: 170, expanded: [28, 90, 28, 140, 32], compact: [28, 28, 28, 90, 32], icon: [28, 28, 28, 28, 32] })
+    const row = rowOf({
+      available: 170,
+      expanded: [28, 90, 28, 140, 32],
+      compact: [28, 28, 28, 90, 32],
+      icon: [28, 28, 28, 28, 32],
+      wraps: () => true,
+    })
     const stop = observeControlRow(row)
     expect(row.hasAttribute('data-model-compact')).toBe(true)
     expect(row.hasAttribute('data-model-icon')).toBe(true)
@@ -69,7 +93,13 @@ describe('the composer control row collapse (b:gyk7)', () => {
 
 describe('the new-thread bar (b:gyk7)', () => {
   it('stops at the compact step and wraps instead of showing the model as an icon', () => {
-    const row = rowOf({ available: 170, expanded: [28, 90, 28, 140, 32], compact: [28, 28, 28, 90, 32], icon: [28, 28, 28, 28, 32] })
+    const row = rowOf({
+      available: 170,
+      expanded: [28, 90, 28, 140, 32],
+      compact: [28, 28, 28, 90, 32],
+      icon: [28, 28, 28, 28, 32],
+      wraps: () => true,
+    })
     const stop = observeControlRow(row, { iconStep: () => false })
     expect(row.hasAttribute('data-model-compact')).toBe(true)
     expect(row.hasAttribute('data-model-icon')).toBe(false)
@@ -86,6 +116,24 @@ describe('an item on a line of its own (b:4qjm)', () => {
     place.style.flexBasis = '100%'
     const stop = observeControlRow(row)
     expect(row.hasAttribute('data-model-compact')).toBe(false)
+    stop()
+  })
+})
+
+describe('a bar the browser wraps while the summed widths still read as fitting', () => {
+  it('collapses on the laid-out wrap instead of trusting the sum', () => {
+    // A real new-thread bar at ~780px: the visible items sum to 656.92 + 4 gaps, but the empty plugin anchors still
+    // cost a gap each and the + control carries a 4px margin, so the browser wraps at 674px of content width. The
+    // summed estimate said "fits"; the collapse then fought the wrap and the bar swapped lines on every pass.
+    const row = rowOf({
+      available: 674,
+      expanded: [28, 111.86, 90.86, 138.84, 287.36],
+      compact: [28, 107.86, 83.02, 131, 248.48],
+      icon: [28, 28, 28, 28, 28],
+      wraps: row => !row.hasAttribute('data-model-compact'),
+    })
+    const stop = observeControlRow(row)
+    expect(row.hasAttribute('data-model-compact')).toBe(true)
     stop()
   })
 })
@@ -113,7 +161,13 @@ describe('a resize the collapse caused itself', () => {
   }
 
   it('keeps the collapsed controls instead of expanding and collapsing them again, which shook the composer', () => {
-    const row = rowOf({ available: 260, expanded: [28, 90, 28, 140, 32], compact: [28, 28, 28, 90, 32], icon: [28, 28, 28, 28, 32] })
+    const row = rowOf({
+      available: 260,
+      expanded: [28, 90, 28, 140, 32],
+      compact: [28, 28, 28, 90, 32],
+      icon: [28, 28, 28, 28, 32],
+      wraps: row => !row.hasAttribute('data-model-compact'),
+    })
     const { resized, stop } = observeWithResizes(row)
     expect(row.hasAttribute('data-model-compact')).toBe(true)
     const removed = vi.spyOn(row, 'removeAttribute')
@@ -125,14 +179,42 @@ describe('a resize the collapse caused itself', () => {
     stop()
   })
 
-  it('still measures again when the row really changes width', () => {
-    const row = rowOf({ available: 260, expanded: [28, 90, 28, 140, 32], compact: [28, 28, 28, 90, 32], icon: [28, 28, 28, 28, 32] })
+  it('ignores sub-pixel jitter instead of re-deciding the collapse on every frame', () => {
+    const row = rowOf({
+      available: 674,
+      expanded: [28, 111.86, 90.86, 138.84, 287.36],
+      compact: [28, 107.86, 83.02, 131, 248.48],
+      icon: [28, 28, 28, 28, 28],
+      wraps: row => !row.hasAttribute('data-model-compact'),
+    })
     const { resized, stop } = observeWithResizes(row)
     expect(row.hasAttribute('data-model-compact')).toBe(true)
-    row.getBoundingClientRect = () => new DOMRect(0, 0, 600, 0)
+    const item = row.children[1]
+    if (item === undefined) throw new Error('the row has no second item')
+    // The line re-flowed: an item's fractional width drifted and the row's height changed with it, while the row's own
+    // width stayed put. Re-measuring on that drift re-decided the collapse every frame and the bar swapped lines.
+    item.getBoundingClientRect = () => new DOMRect(0, 0, 108.26, LINE)
+    row.getBoundingClientRect = () => new DOMRect(0, 0, 674, 2 * LINE + ROW_GAP)
+    const removed = vi.spyOn(row, 'removeAttribute')
+    resized()
+    expect(removed).not.toHaveBeenCalled()
+    stop()
+  })
+
+  it('still measures again when the row really changes width', () => {
+    const row = rowOf({
+      available: 260,
+      expanded: [28, 90, 28, 140, 32],
+      compact: [28, 28, 28, 90, 32],
+      icon: [28, 28, 28, 28, 32],
+      wraps: row => !row.hasAttribute('data-model-compact'),
+    })
+    const { resized, stop } = observeWithResizes(row)
+    expect(row.hasAttribute('data-model-compact')).toBe(true)
+    row.getBoundingClientRect = () => new DOMRect(0, 0, 600, LINE)
     resized()
     expect(row.hasAttribute('data-model-compact')).toBe(false)
-    row.getBoundingClientRect = () => new DOMRect(0, 0, 170, 0)
+    row.getBoundingClientRect = () => new DOMRect(0, 0, 170, 2 * LINE + ROW_GAP)
     resized()
     expect(row.hasAttribute('data-model-icon')).toBe(true)
     stop()
