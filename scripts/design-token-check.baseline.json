@@ -6,7 +6,8 @@
     "native-icons": 70,
     "default-shadow": 92,
     "numeric-duration": 47,
-    "viewport-variant": 46
+    "viewport-variant": 46,
+    "solid-status-fill": 32
   },
   "counts": {
     "arbitrary-radius/attachment-gallery": 1,
@@ -73,6 +74,17 @@
     "raw-colour/user-questions": 4,
     "raw-colour/whiteboard": 2,
     "raw-colour/workspace-nav": 4,
+    "solid-status-fill/ai-accounts": 4,
+    "solid-status-fill/backlog": 10,
+    "solid-status-fill/diff-viewed": 1,
+    "solid-status-fill/diffs-review": 2,
+    "solid-status-fill/memory": 2,
+    "solid-status-fill/model-effort-picker": 3,
+    "solid-status-fill/settings-shell": 1,
+    "solid-status-fill/test-runs": 1,
+    "solid-status-fill/thread-sidebar": 5,
+    "solid-status-fill/traces": 1,
+    "solid-status-fill/worktree-memory": 2,
     "viewport-variant/ai-accounts": 3,
     "viewport-variant/jujutsu": 11,
     "viewport-variant/mcp-servers": 2,
