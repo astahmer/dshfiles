@@ -145,7 +145,7 @@ needs me". Like an aircraft cockpit, a healthy system is quiet. Working is colou
 is spent only where a human must act (Needs you) or recover (Failed). Everything else is ink on warm paper, dense,
 legible and calm, so a single indigo diamond or red cross is impossible to miss.
 
-The product is ~80 plugins mounted into one DSH Host. Its look is borrowed from the Host theme (`--dsw-*` tokens,
+The product is 105 plugins (the default `profiles/web` composition) mounted into one DSH Host. Its look is borrowed from the Host theme (`--dsw-*` tokens,
 light and dark) and expressed through one kit, `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4 with the `dshx:`
 prefix). Plugins never bring their own chrome, palette or header style; they fill one page template. Density is
 "BB density": 13px body text, 28–32px controls, 6px radius; touch devices switch to a comfortable density.
@@ -235,15 +235,16 @@ than size:
 | ------------- | ------------------------------- | ------------ | ----------------------------------------------- |
 | Display       | 26/32 (`text-display`)          | 600, -0.02em | Hero headline (new thread)                      |
 | Page title    | 20/28 (`text-title`, `text-xl`) | 600, -0.01em | The page `h1`, exactly one per page             |
-| Section title | 13px (`text-sm`)                | 600          | `PageSection` `h2`, card titles                 |
-| Body / UI     | 13px (`text-sm`) / 1.45         | 400          | Rows, descriptions, forms                       |
-| Prose         | 14px (`text-base`)              | 400          | Assistant messages, long descriptions           |
-| Label / meta  | 12px (`text-xs`) / 1.35         | 400–500      | Chips, timestamps, helper text, badges          |
+| Section title | 13px, 15px phone (`text-sm`)    | 600          | `PageSection` `h2`, card titles                 |
+| Body / UI     | 13px, 15px phone (`text-sm`) / 1.45 | 400      | Rows, descriptions, forms                       |
+| Prose         | 14px, 15px phone (`text-base`)  | 400          | Assistant messages, long descriptions           |
+| Label / meta  | 12px, 13px phone (`text-xs`) / 1.35 | 400–500  | Chips, timestamps, helper text, badges          |
 | Dense meta    | 11px, 12px phone (`text-2xs`)   | 400–500      | Counters, kbd hints, graph and chart labels     |
 | Code          | 12–12.5px mono                  | 400          | Commands, paths, ids that must be read verbatim |
 
-The minimum is 11px; nothing smaller. `text-2xs` is that minimum as a token: it reads `--dshx-density-text-min`, so it
-grows to 12px on a phone. Never write `text-[Npx]`; `node --run check:design-tokens` ratchets it. Descriptions cap at 72ch. Labels are sentence case; ALL-CAPS form labels are
+The minimum is 11px; nothing smaller. Every kit text step reads a density token (`text-2xs` the minimum,
+`--dshx-density-text-min`; `text-xs` `-meta`; `text-sm` `-ui`; `text-base` `-prose`), and so does `.dshx-root`, so kit
+text takes the phone sizes without a phone class (see Density). Never write `text-[Npx]`; `node --run check:design-tokens` ratchets it. Descriptions cap at 72ch. Labels are sentence case; ALL-CAPS form labels are
 retired. Numbers in counters, times, token counts and tables use `tabular-nums`.
 
 ### Density
@@ -252,13 +253,17 @@ Two densities, switched by pointer and width, never by user agent (`plugin-ui/sr
 
 | Token                               | Compact (desktop) | Comfortable (coarse pointer)                  |
 | ----------------------------------- | ----------------- | --------------------------------------------- |
-| `--dshx-density-text-ui` / `-prose` | 13 / 14px         | 15 / 15px (phone width or `@max-pane-narrow`) |
-| `--dshx-density-text-meta` / `-min` | 12 / 11px         | 13 / 12px (phone width or `@max-pane-narrow`) |
+| `--dshx-density-text-ui` / `-prose` | 13 / 14px         | 15 / 15px (phone width, a sideways phone, or `@max-pane-narrow`) |
+| `--dshx-density-text-meta` / `-min` | 12 / 11px         | 13 / 12px (phone width, a sideways phone, or `@max-pane-narrow`) |
 | `--dshx-density-text-input`         | 13px              | 16px (every coarse pointer: no Safari zoom)   |
 | `--dshx-density-target`             | 28px              | 44px (every coarse pointer)                   |
 
 Safe areas: `--dshx-safe-top|right|bottom|left` (`env(safe-area-inset-*)`) on the phone top bar, tab bar, composer and
 sheets. Kit buttons, toggles and menu rows already get 44px hit areas on a coarse pointer.
+
+The phone shell (top bar, tab bar and status pill instead of the desktop rail) follows one rule,
+`PHONE_SHELL_QUERY` in `plugin-ui/src/lib/phone-shell.ts`: a viewport under 640px, or a coarse pointer under 500px tall.
+A phone turned sideways (844×390) keeps it. Key phone layout on that rule, not on width alone.
 
 ## Layout
 
@@ -294,6 +299,9 @@ shadow. Four elevation levels, and only the composer floats at rest:
 | s2    | `shadow-s2`        | Menus, popovers, selects, floating Dockview groups |
 | s3    | `shadow-s3`        | Dialogs and phone bottom sheets                    |
 
+Tailwind's own step names resolve to these levels in the kit `@theme` (`shadow-xs` none, `sm` s1, `md`/`lg` s2,
+`xl`/`2xl` s3), so a shadcn default draws a level, but new code writes the s-step.
+
 Dark adds a 1px inner top highlight (`inset 0 1px 0`) to every level so raised layers read against near-black. Only
 s2/s3 may add a backdrop blur. Declare depth once — a bordered card has no shadow. Stacking bands: Host modals 1000,
 kit dialogs/sheets 1050, floating layers (select, popover, menu, tooltip) 1100.
@@ -310,9 +318,15 @@ One enter curve, one exit curve, five durations (`--dshx-duration-*`, `ease-ente
 | 220ms    | panels          |
 | 280ms    | phone sheets    |
 
-Enter with `cubic-bezier(0.2, 0, 0, 1)`; exits take 100ms with `cubic-bezier(0.4, 0, 1, 1)`. Working state is a
-2.2s shimmer, not a spinner, and it pauses off-screen. Under `prefers-reduced-motion` animate opacity only. The
-Motion presets in `@dshfiles/plugin-ui/motion` are the code path for anything beyond a CSS transition.
+Enter with `cubic-bezier(0.2, 0, 0, 1)`; exits take 100ms with `cubic-bezier(0.4, 0, 1, 1)`. Under
+`prefers-reduced-motion` animate opacity only. The Motion presets in `@dshfiles/plugin-ui/motion` are the code path for
+anything beyond a CSS transition.
+
+**Working** is the one looping state. Its mark is the `StatusGlyph` spinner: a faint ring with a turning arc, no colour,
+one 900ms turn, every spinner on the page phase-locked to the same clock, paused off screen and still under reduced
+motion. A working thread row may also sweep a 2.2s shimmer over its live activity line (`.dshx-live-shimmer`), which
+pauses off screen too and is plain text under reduced motion. Any other spin or pulse carries
+`motion-reduce:animate-none`.
 
 ## Shapes
 
@@ -343,7 +357,7 @@ item — thread, subagent, job, check, workspace, host. Plugins map onto them an
 
 | State     | Meaning                              | Glyph                 | Row title |
 | --------- | ------------------------------------ | --------------------- | --------- |
-| Working   | progressing without you              | ring spinner, no colour, phase-synced, paused off screen | normal |
+| Working   | progressing without you              | turning ring (Motion) | normal    |
 | Needs you | cannot continue without you          | indigo filled diamond | normal    |
 | Failed    | broke, with a recovery verb          | red cross             | normal    |
 | Ready     | finished, not yet seen or landed     | solid ink dot         | **bold**  |
@@ -366,6 +380,8 @@ card with hairline dividers. In narrow panes meta wraps under the title and trai
 - **Do** map plugin states onto the six `WorkStatus` values; put nuance in the detail text.
 - **Do** use the glossary: thread, project, workspace, host, land, done, agent, Needs you, usage, memory
   ([plan §3](docs/ade-ux/README.md#glossary-enforced-in-copy)). `node --run check:copy` ratchets banned terms.
+- **Do** write Retry (not Try again), the ellipsis character (not three dots), and an error that says what to do next
+  instead of ending in the raw cause (`Could not save: {message}`).
 - **Don't** colour working or healthy states; don't add a second attention colour.
 - **Don't** put plugin names in labels ("pulls.review: Reviews", "Thread Sidebar: Navigation").
 - **Don't** use an indigo or blue primary button, an icon-tile header, underline page tabs or ALL-CAPS labels.
@@ -377,3 +393,11 @@ card with hairline dividers. In narrow panes meta wraps under the title and trai
   (a pending count). Every upstream batch merged on 2026-11-11 broke this rule at least once.
 - **Don't** draw a second control for something that already has one (restart, find, Since you left, notifications):
   feed the existing control instead.
+
+Two ratchets in `check:green` and CI hold these rules: they count findings per rule and plugin and fail only when a
+count rises ([repository checks](docs/repository-checks.md#design-and-copy-ratchets)). `check:design-tokens` counts
+arbitrary text sizes and radii, raw colours, native icons, Tailwind's shadow step names, numeric durations, viewport
+variants, solid status fills outside the kit, numbered palette colours, `uppercase`, spin or pulse without a
+reduced-motion variant, and a control's `outline-none` with no focus ring. `check:copy` counts the glossary terms,
+`Plugin Name:` prefixes, "Host" as the server process, package names, raw error echoes, the non-canonical status
+words, "Try again" and three-dot ellipses.
