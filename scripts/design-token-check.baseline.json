@@ -4,7 +4,8 @@
     "arbitrary-radius": 19,
     "raw-colour": 91,
     "native-icons": 70,
-    "default-shadow": 92
+    "default-shadow": 92,
+    "numeric-duration": 47
   },
   "counts": {
     "arbitrary-radius/attachment-gallery": 1,
@@ -48,6 +49,10 @@
     "native-icons/thread-sidebar": 2,
     "native-icons/user-questions": 10,
     "native-icons/workspace-nav": 3,
+    "numeric-duration/activity-timeline": 1,
+    "numeric-duration/backlog": 7,
+    "numeric-duration/plugin-ui": 36,
+    "numeric-duration/thread-sidebar": 3,
     "raw-colour/ai-accounts": 7,
     "raw-colour/annotations": 8,
     "raw-colour/backlog": 2,

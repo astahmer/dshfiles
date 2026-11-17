@@ -89,3 +89,10 @@ test('default-shadow: Tailwind shadow steps, not the elevation steps', () => {
     'dshx:shadow-md/20',
   ])
 })
+
+test('numeric-duration: a number or an arbitrary time, not a motion token', () => {
+  assert.deepEqual(ruleHits('numeric-duration', "cn('dshx:duration-200 dshx:hover:duration-[350ms] dshx:duration-(--dshx-duration-fade) dshx:transition-opacity')"), [
+    'dshx:duration-200',
+    'dshx:hover:duration-[350ms]',
+  ])
+})
