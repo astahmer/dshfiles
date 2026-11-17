@@ -43,3 +43,19 @@ Feature: Rich composer references
     Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/session-controller, @dshfiles/input-trigger, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
     When a new thread shows its run row
     Then the run row holds project, host, workspace and model, and sending with the defaults collapses it to a summary chip
+
+  @scenario:rich-composer.held-send
+  Scenario: Send during an upload waits and sends once it finishes, and an edit or a second press cancels it
+    Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    When a thread composer holds its file uploads
+    And "deferred hello" is typed with a held file attached and Send is pressed
+    Then the composer shows the held send and keeps the draft
+    When the held upload finishes
+    Then "deferred hello" is sent by itself
+    When "second try" is typed with a held file attached and Enter is pressed
+    And the held draft is edited
+    Then the held send is dropped and "second try!" is not sent after the upload
+    When "third try" is typed with a held file attached and Send is pressed
+    And the waiting Send is pressed again
+    Then the held send is dropped and "third try" is not sent after the upload
+    And the held-send journey is complete

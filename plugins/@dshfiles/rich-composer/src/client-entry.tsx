@@ -6,6 +6,7 @@ import { agentWarmupApi } from './agent-warmup-api.ts'
 import type {} from './agent-warmup.ts'
 import { AgentPresetVisibility } from './agent-preset-visibility.ts'
 import { composerControlsSettings } from './composer-controls-settings.ts'
+import { SendWhenUploaded } from './held-send.ts'
 import { createComposerService } from './composer-service.ts'
 import { ComposerSnippets } from './composer-snippets.ts'
 import { PhoneThreadMenu } from './phone-thread-menu.tsx'
@@ -70,6 +71,8 @@ export default defineClient({
     let disposeShadow: (() => void) | undefined
     const sync = (): void => {
       AgentPresetVisibility.set(controls.getSnapshot().value?.showAgentPresetPicker === true)
+      // An older Host without this field reads as on, the default.
+      SendWhenUploaded.set(controls.getSnapshot().value?.sendWhenUploaded !== false)
       const hide = controls.getSnapshot().value?.hidePermissionSelector === true
       if (hide && disposeShadow === undefined) {
         // Below the mode chip's -1: the hidden seat wins over every occupant, the chip included.

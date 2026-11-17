@@ -16,6 +16,11 @@ export const composerControlsSettings = defineSettings({
       .description(
         'Show the agent mode picker in the composer (Standard mode, Creator, …). Off: it shows only when a new thread will start with a non-default agent mode; ⌘K “Agent mode” and the composer’s ⋯ menu still choose one.',
       ),
+    sendWhenUploaded: Schema.boolean()
+      .default(true)
+      .description(
+        'Send pressed while attachments upload waits and sends once they finish; editing the message, a failed upload or pressing Send again cancels it. Off: Send refuses with a notice until the uploads finish.',
+      ),
   }),
   applies: 'live',
 })

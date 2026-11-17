@@ -221,6 +221,14 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* The held send's Cancel is the phone's way out besides the waiting Send: a full touch target. */
+@media (pointer: coarse) {
+  .heldSend .largePasteAction {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .card {
   box-sizing: border-box;
   position: relative; /* overlay anchor positioning context */
