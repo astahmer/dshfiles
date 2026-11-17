@@ -17,7 +17,6 @@ export const FORMER_NAVIGATION: readonly FormerNavigationEntry[] = [
   { entry: 'Background Jobs: Jobs', destinations: ['observe'] },
   { entry: 'Backlog', destinations: ['inbox', 'work', 'settings'] },
   { entry: 'Backlog: Items', destinations: ['work', 'settings'] },
-  { entry: 'Component gallery', destinations: ['knowledge'] },
   { entry: 'Hosts', destinations: ['observe'] },
   { entry: 'Inbox', destinations: ['inbox'] },
   { entry: 'Land', destinations: ['land'] },
