@@ -19,8 +19,8 @@
 #   types     pnpm run typecheck:scripts, plugin contract, the whole plugin typecheck, dshx typecheck
 #   units     4 shards of the plugins build+test (`scripts/ci/plugin-shard.mjs unit`); typecheck runs once in `types`
 #   dshx      pnpm run check:dshx
-#   repo      check:cycles, check:native-forks, test:scripts, verify:web-profile-contract, check:repo,
-#             check:effect-native, knip, check:screenshots
+#   repo      check:cycles, check:native-forks, check:design-tokens, check:copy, test:scripts,
+#             verify:web-profile-contract, check:repo, check:effect-native, knip, check:screenshots
 #   boot      4 shards of pnpm run check:plugin-boot (`scripts/ci/plugin-shard.mjs boot`)
 #   e2e-smoke pnpm run check:e2e:smoke
 name: Required checks
@@ -116,6 +116,8 @@ jobs:
       - run: pnpm --dir tooling/dshx run build
       - run: pnpm run check:cycles
       - run: pnpm run check:native-forks
+      - run: pnpm run check:design-tokens
+      - run: pnpm run check:copy
       - run: pnpm run test:scripts
       - run: pnpm run verify:web-profile-contract
       - run: pnpm run check:repo

@@ -1,10 +1,10 @@
 {
   "counts": {
     "plugin-prefix": 0,
-    "session": 37,
-    "conversation": 12,
-    "new-chat": 5,
+    "session": 21,
+    "conversation": 6,
+    "new-chat": 2,
     "integrate": 0,
-    "settle": 26
+    "settle": 1
   }
 }
