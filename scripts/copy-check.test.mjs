@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { CopyCheck } from './copy-check.ts'
 
-const { compare, countByTermAndPlugin, extractStrings, findingsInStrings, isProse, pluginOf, pluginPrefixPattern, totalsByTerm } = CopyCheck
+const { compare, copyInPlainTs, countByTermAndPlugin, extractStrings, findingsInStrings, isProse, pluginOf, pluginPrefixPattern, totalsByTerm } = CopyCheck
 
 const prefix = pluginPrefixPattern(['jj-integration', 'pulls-review', 'thread-sidebar', 'mcp-servers'])
 
@@ -76,6 +76,29 @@ test('skips non-English locale tables, declared or keyed', () => {
   ].join('\n')
   const texts = extractStrings(source).map(entry => entry.text)
   assert.deepEqual(texts, ['Open the thread', 'English', 'After the tables'])
+})
+
+test('reads settings-schema descriptions from plain .ts files that define settings', () => {
+  const source = [
+    "import { defineSettings, Schema } from '@dshfiles/dshx'",
+    'export const settings = defineSettings({',
+    "  namespace: 'demo',",
+    '  schema: Schema.object({',
+    "    keep: Schema.boolean().default(true).description('Keep each session open'),",
+    "    other: Schema.string().role('secret-ref'),",
+    '  }),',
+    '})',
+  ].join('\n')
+  const strings = extractStrings(source)
+  assert.equal(strings.find(entry => entry.text === 'Keep each session open')?.key, 'description()')
+  assert.equal(strings.find(entry => entry.text === 'demo')?.key, 'namespace')
+  assert.deepEqual(
+    copyInPlainTs(source, strings).map(entry => entry.text),
+    ['Keep each session open'],
+  )
+  // A tool parameter description outside a settings file is model-facing, not Settings copy.
+  const tool = "const params = Schema.object({ id: Schema.string().description('The session id') })"
+  assert.deepEqual(copyInPlainTs(tool, extractStrings(tool)), [])
 })
 
 test('only prose counts; identifiers and class strings do not', () => {

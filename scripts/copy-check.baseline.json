@@ -5,7 +5,7 @@
     "conversation": 10,
     "new-chat": 2,
     "integrate": 0,
-    "settle": 1
+    "settle": 2
   },
   "counts": {
     "conversation/agent-preset": 1,
@@ -46,6 +46,7 @@
     "session/thread-sidebar": 2,
     "session/workspace-folder-picker": 1,
     "session/workspace-nav": 2,
+    "settle/test-runs": 1,
     "settle/tool-meta": 1
   }
 }
