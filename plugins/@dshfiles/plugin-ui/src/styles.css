@@ -109,6 +109,18 @@
   --shadow-s1: var(--dshx-elevation-1);
   --shadow-s2: var(--dshx-elevation-2);
   --shadow-s3: var(--dshx-elevation-3);
+  /*
+   * Tailwind's own steps, which shadcn components and older plugin code still name, draw the same levels instead of
+   * Tailwind's grey defaults: xs (bordered controls at rest) is s0, sm s1, md/lg (menus, popovers, dialogs) s2, xl/2xl
+   * s3. `check:design-tokens` still counts the names (default-shadow) so new code writes the s-steps.
+   */
+  --shadow-2xs: none;
+  --shadow-xs: none;
+  --shadow-sm: var(--dshx-elevation-1);
+  --shadow-md: var(--dshx-elevation-2);
+  --shadow-lg: var(--dshx-elevation-2);
+  --shadow-xl: var(--dshx-elevation-3);
+  --shadow-2xl: var(--dshx-elevation-3);
 
   /* One enter curve and one exit curve for every animated surface. */
   --ease-enter: var(--dshx-motion-ease-enter);
