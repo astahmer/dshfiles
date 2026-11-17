@@ -27,7 +27,7 @@ const en = {
   deleted: 'Deleted',
   skipped: 'Skipped',
   failed: 'Failed',
-  error: 'Cleanup is unavailable. Load the matching Host plugin, then retry the preview.',
+  error: 'Cleanup is not running. Restart DSH, then retry the preview.',
 } as const
 const fr = {
   title: 'Nettoyage des fils',
@@ -56,7 +56,7 @@ const fr = {
   deleted: 'Supprimé',
   skipped: 'Ignoré',
   failed: 'Échec',
-  error: 'Nettoyage indisponible. Chargez le plugin Host correspondant puis relancez l’aperçu.',
+  error: 'Le nettoyage ne fonctionne pas. Redémarrez DSH, puis relancez l’aperçu.',
 } satisfies Record<keyof typeof en, string>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

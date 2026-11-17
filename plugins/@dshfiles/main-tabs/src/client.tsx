@@ -652,7 +652,7 @@ export default defineClient({
           window.removeEventListener('keydown', onKeyDown, true)
           display.dispose()
         }
-      }, 'main-tabs: PWA shortcuts')
+      }, 'main-tabs: install shortcuts for the PWA')
 
     interface TabCommand {
       readonly id: string

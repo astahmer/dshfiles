@@ -75,7 +75,7 @@ const FilePreview = (props: { readonly document: OpenDocument; readonly remote: 
   })
   const openExternally = useMutation({
     mutationFn: async (action: 'default' | 'reveal') => {
-      if (absolutePath === null) throw new Error('The file has no Host path yet.')
+      if (absolutePath === null) throw new Error('Save the file first, then open it.')
       const result = await props.remote.session.openWorkspacePath(action === 'reveal' ? { path: absolutePath, action } : { path: absolutePath })
       if (!result.ok) throw new Error(result.error.message)
     },
