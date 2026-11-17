@@ -1062,7 +1062,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const inlineDiff =
     fullDiff === null ? null : (
       <InlineRevisionDiff
-        error={fullDiffQuery.error === null ? null : errorMessage(fullDiffQuery.error, 'Could not load the revision diff.')}
+        error={fullDiffQuery.error === null ? null : errorMessage(fullDiffQuery.error, 'Could not load the revision diff. Close it and open it again.')}
         focusPath={fullDiff.focusPath}
         layout={diffLayout}
         onCancel={closeFullDiff}
@@ -1103,7 +1103,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     if (reviewQuery.data === undefined) {
       const next = applyLocalReviewChanges({ store: localReviewStore, changes, repositoryRoot, commitId })
       const fallbackSaved = changes.some(change => change.reviewed) ? 'Review progress saved in this browser.' : 'Review mark cleared.'
-      setReviewNotice(writeLocalReviewStore(next) ? fallbackSaved : 'Browser storage is unavailable. Review progress could not be persisted.')
+      setReviewNotice(writeLocalReviewStore(next) ? fallbackSaved : 'Browser storage is blocked, so review progress was not saved. Allow site storage in this browser.')
       return
     }
 

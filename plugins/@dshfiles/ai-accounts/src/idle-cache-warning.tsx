@@ -123,7 +123,7 @@ const IdleCacheWarning = (props: {
   const compact = useMutation({
     mutationFn: async () => {
       const result = await sessions.compact({ sessionId })
-      if (result.kind === 'error') throw new Error(result.text ?? 'Compaction failed.')
+      if (result.kind === 'error') throw new Error(result.text ?? 'Compaction failed. Retry.')
     },
   })
   const continueElsewhere = useMutation({

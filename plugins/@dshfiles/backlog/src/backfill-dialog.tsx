@@ -35,7 +35,7 @@ export const BackfillDialog = (props: {
     try {
       await props.run({ retriage })
     } catch (caught) {
-      props.onError(errorMessage(caught, 'The backfill could not be started.'))
+      props.onError(errorMessage(caught, 'The backfill did not start. Retry.'))
     }
   }
   const busy = job !== null && (job.state === 'queued' || job.state === 'running')

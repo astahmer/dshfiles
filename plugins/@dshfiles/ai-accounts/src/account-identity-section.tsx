@@ -85,7 +85,7 @@ export const AccountIdentitySection = (props: {
             if (draft.kind !== 'codex') {
               void load()
                 .then(() => setNotice('Account identity refreshed.'))
-                .catch(() => setNotice('Could not read the account identity.'))
+                .catch(() => setNotice('Could not read the account identity. Sign in again, then refresh.'))
               return
             }
             void accounts

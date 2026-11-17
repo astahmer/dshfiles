@@ -347,7 +347,7 @@ export const Composer = (props: {
       }
       appendText(`${result.text.trim()} `)
     } catch (error) {
-      setFailed(errorMessage(error, 'The recording could not be transcribed.'))
+      setFailed(errorMessage(error, 'The recording was not transcribed. Record again.'))
     }
   }
 

@@ -67,7 +67,7 @@ type DirectoryData = { readonly hosts: readonly HostSummary[]; readonly runtimes
 const blankDraft: HostDraft = { name: '', sshTarget: '', remoteHome: '' }
 
 const failure = (result: { readonly ok: boolean; readonly code?: string; readonly message?: string }): Error =>
-  new Error(result.message === undefined ? 'The host request failed.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
+  new Error(result.message === undefined ? 'The host did not answer. Check it is running, then retry.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
 
 const ResourceUsage = (props: { readonly hostName: string; readonly resource: ResourcePoolEntry }) => {
   if (!props.resource.probe.ok) {

@@ -209,7 +209,7 @@ export const BacklogPanel = (props: {
   const backfillJobState = backfillJob?.state
   const backfillError =
     backfillStartError ??
-    (backfill.error === null ? null : errorMessage(backfill.error, 'Could not read backfill progress.')) ??
+    (backfill.error === null ? null : errorMessage(backfill.error, 'Could not read backfill progress. Reopen Backlog to check again.')) ??
     (backfillJobId !== null && backfill.isSuccess && backfill.data === null ? 'This backfill ended when DSH restarted. Start it again.' : null)
   const scopeKey = useWorkbenchScopeKey()
   const preferences = useMemo(() => panelPreferences(props.panelId, scopeKey), [props.panelId, scopeKey])

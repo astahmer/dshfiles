@@ -32,7 +32,7 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
       }
       if (input.duration === undefined) {
         const result = await accounts.resumeQuotaContinuation({ continuationId: input.continuationId })
-        return result.accepted ? 'Recovery prompt queued.' : 'This recovery was superseded or its thread is unavailable.'
+        return result.accepted ? 'Recovery prompt queued.' : 'This recovery was replaced or its thread is gone. Nothing was queued.'
       }
       const result = await accounts.snoozeQuotaContinuation({ continuationId: input.continuationId, duration: input.duration })
       return result.updated ? 'Recovery timing updated.' : 'This recovery is already queued or no longer active.'

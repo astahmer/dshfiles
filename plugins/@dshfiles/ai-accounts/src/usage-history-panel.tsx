@@ -189,7 +189,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void; readonly
       queryClient.setQueryData(aiAccountsKeys.historySettings, next)
       setNotice('Usage history settings saved.')
     },
-    onError: () => setNotice('Usage history settings could not be saved.'),
+    onError: () => setNotice('Usage history settings were not saved. Change them again to retry.'),
   })
   const changeSettings = (patch: Partial<Pick<UsageHistoryMeta, 'intervalMinutes' | 'retentionDays'>>): void => {
     if (settings === null) return

@@ -65,7 +65,7 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   noDescription: 'No description.',
   brokenBadge: 'Failed to load',
 
-  switchRefused: 'Could not switch to {name}: {reason}',
+  switchRefused: 'Did not switch to {name}. Pick it again. {reason}',
   standardUnavailable: 'Standard mode is unavailable. Restore it or choose another available mode.',
 
   close: 'Close',
@@ -106,7 +106,7 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   noDescription: '暂无描述。',
   brokenBadge: '加载失败',
 
-  switchRefused: '无法切换到「{name}」：{reason}',
+  switchRefused: '未切换到「{name}」。请重新选择。{reason}',
   standardUnavailable: '标准模式不可用，请恢复该模式或选择其他可用模式。',
 
   close: '关闭',
@@ -148,7 +148,7 @@ export const ja = {
   'inUse': '新しいタスクの既定',
   'noDescription': '説明はありません。',
   'brokenBadge': '読み込みに失敗',
-  'switchRefused': '{name} に切り替えられませんでした: {reason}',
+  'switchRefused': '{name} に切り替わりませんでした。もう一度選んでください。{reason}',
   'standardUnavailable': '標準モードは利用できません。復元するか、利用可能な別のモードを選択してください。',
   'close': '閉じる',
   'creatorDraft': 'エージェントにプリセット作成を手伝ってもらう',
@@ -190,7 +190,7 @@ export const es = {
   noDescription: 'Sin descripción.',
   brokenBadge: 'No se pudo cargar',
 
-  switchRefused: 'No se pudo cambiar a {name}: {reason}',
+  switchRefused: 'No se cambió a {name}. Elígelo de nuevo. {reason}',
   standardUnavailable: 'El modo estándar no está disponible. Restáuralo o elige otro modo disponible.',
 
   close: 'Cerrar',
@@ -235,7 +235,7 @@ export const fr = {
   noDescription: 'Aucune description.',
   brokenBadge: 'Échec du chargement',
 
-  switchRefused: 'Impossible de passer à {name} : {reason}',
+  switchRefused: 'Pas de passage à {name}. Choisissez-le à nouveau. {reason}',
   standardUnavailable: "Le mode standard n'est pas disponible. Restaurez-le ou choisissez un autre mode disponible.",
 
   close: 'Fermer',
@@ -280,7 +280,7 @@ export const de = {
   noDescription: 'Keine Beschreibung.',
   brokenBadge: 'Laden fehlgeschlagen',
 
-  switchRefused: 'Konnte nicht zu {name} wechseln: {reason}',
+  switchRefused: 'Nicht zu {name} gewechselt. Wählen Sie es erneut. {reason}',
   standardUnavailable: 'Der Standardmodus ist nicht verfügbar. Stellen Sie es wieder her oder wählen Sie einen anderen verfügbaren Modus.',
 
   close: 'Schließen',
@@ -325,7 +325,7 @@ export const ru = {
   noDescription: 'Нет описания.',
   brokenBadge: 'Не удалось загрузить',
 
-  switchRefused: 'Не удалось переключиться на {name}: {reason}',
+  switchRefused: 'Переключение на {name} не выполнено. Выберите его снова. {reason}',
   standardUnavailable: 'Стандартный режим недоступен. Восстановите его или выберите другой доступный режим.',
 
   close: 'Закрыть',
@@ -370,7 +370,7 @@ export const pt = {
   noDescription: 'Nenhuma descrição.',
   brokenBadge: 'Falha ao carregar',
 
-  switchRefused: 'Não foi possível mudar para {name}: {reason}',
+  switchRefused: 'Não mudou para {name}. Escolha-o de novo. {reason}',
   standardUnavailable: 'O modo padrão não está disponível. Restaure-o ou escolha outro modo disponível.',
 
   close: 'Fechar',

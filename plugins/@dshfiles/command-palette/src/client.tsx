@@ -359,9 +359,9 @@ export default defineClient({
         return client.findThreads === undefined ? undefined : client.findThreads(input, { signal })
       },
       native: async (query, signal) => {
-        if (typeof ctx.sessions.search !== 'function') throw new Error('Thread content search is unavailable.')
+        if (typeof ctx.sessions.search !== 'function') throw new Error('This DSH cannot search thread content. Update DSH to turn it on.')
         const result = await ctx.sessions.search(query, signal)
-        if (!result.ok) throw new Error('Thread content search failed.')
+        if (!result.ok) throw new Error('Thread content search failed. Search again.')
         return result.value.items.map(item => ({ sessionId: item.sessionId, snippet: item.snippet }))
       },
     })

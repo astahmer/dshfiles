@@ -177,7 +177,7 @@ const BlockedBadge = (props: { readonly blockedBy: readonly string[] }): JSX.Ele
 const runStateLabels = {
   working: 'Working',
   'awaiting-input': 'Awaiting input',
-  error: 'Error',
+  error: 'Failed',
   done: 'Done',
   stale: 'Stale',
 } satisfies Record<AgentRunState, string>
