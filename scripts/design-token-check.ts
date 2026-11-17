@@ -141,6 +141,83 @@ export const designTokenRules: readonly DesignTokenRule[] = [
   },
 ]
 
+export interface ClassGroup {
+  /** Offset of the group's first literal in the file. */
+  readonly index: number
+  /** The literals' bodies joined by a space. */
+  readonly text: string
+}
+
+/**
+ * The class lists of a file: each string literal (a template's `${…}` holes included, so their nested strings belong to
+ * it), merged with its neighbours when only `,` or `+` separates them, as in `cn('dshx:a', 'dshx:b')`. A line-based
+ * check over-reports, because a cn() call spreads one class list over several lines.
+ */
+const classGroups = (text: string): readonly ClassGroup[] => {
+  const literals: { readonly start: number; readonly end: number; readonly body: string }[] = []
+  let index = 0
+  while (index < text.length) {
+    const quote = text[index]
+    if (quote !== "'" && quote !== '"' && quote !== '`') {
+      index += 1
+      continue
+    }
+    const start = index
+    let depth = 0
+    index += 1
+    while (index < text.length) {
+      const char = text[index]
+      if (char === '\\') {
+        index += 2
+        continue
+      }
+      if (quote === '`') {
+        if (char === '$' && text[index + 1] === '{') {
+          depth += 1
+          index += 2
+          continue
+        }
+        if (char === '}' && depth > 0) depth -= 1
+        else if (char === '`' && depth === 0) break
+      } else if (char === quote || char === '\n') break
+      index += 1
+    }
+    literals.push({ start, end: index + 1, body: text.slice(start + 1, index) })
+    index += 1
+  }
+  const groups: { index: number; text: string; end: number }[] = []
+  for (const literal of literals) {
+    const last = groups.at(-1)
+    if (last !== undefined && /^\s*[,+]\s*$/.test(text.slice(last.end, literal.start))) {
+      last.text += ` ${literal.body}`
+      last.end = literal.end
+    } else groups.push({ index: literal.start, text: literal.body, end: literal.end })
+  }
+  return groups.map(group => ({ index: group.index, text: group.text }))
+}
+
+export interface DesignTokenGroupRule {
+  readonly id: string
+  readonly use: string
+  /** The offending classes of one class group, as excerpts. */
+  readonly matches: (group: ClassGroup, file: string) => readonly string[]
+}
+
+/** Rules that need a whole class list, not one class: a class is fine only when another in its list compensates. */
+export const designTokenGroupRules: readonly DesignTokenGroupRule[] = [
+  {
+    // DESIGN.md Motion: loops stop under reduced motion. The kit Spinner carries motion-reduce:animate-none.
+    id: 'unguarded-loop-animation',
+    use: 'the kit Spinner, or add dshx:motion-reduce:animate-none (or write the loop as dshx:motion-safe:animate-*)',
+    matches: (group, file) => {
+      if (isCss(file) || !/animate-(?:spin|pulse)/.test(group.text)) return []
+      const tokens = classTokens(group.text)
+      if (tokens.some(token => token.variants.some(variant => variant === 'motion-reduce' || variant === 'motion-safe'))) return []
+      return tokens.filter(token => /^animate-(?:spin|pulse)$/.test(token.utility)).map(token => token.text)
+    },
+  },
+]
+
 /** Files that define the tokens: colour literals there are the palette itself. */
 const isTokenFile = (rel: string): boolean =>
   /^plugins\/@dshfiles\/ui-styles\/src\//.test(rel) ||
@@ -165,10 +242,13 @@ export interface DesignTokenFinding {
 const findingsInText = (input: { readonly plugin: string; readonly file: string; readonly text: string }): readonly DesignTokenFinding[] => {
   const findings: DesignTokenFinding[] = []
   const lines = input.text.split('\n')
+  // The comment-free text, line for line, for the group rules.
+  const code: string[] = []
   // An icon counts once per file (one import), however often it is drawn.
   const iconsSeen = new Set<string>()
   let inBlockComment = false
   lines.forEach((raw, index) => {
+    code.push('')
     let line = raw
     if (inBlockComment) {
       const end = line.indexOf('*/')
@@ -184,6 +264,7 @@ const findingsInText = (input: { readonly plugin: string; readonly file: string;
       inBlockComment = true
     }
     if (/^\s*\/\//.test(line)) return
+    code[index] = line
     for (const rule of designTokenRules) {
       if (rule.id === 'raw-colour' && isTokenFile(input.file)) continue
       for (const match of rule.matches(line, input.file)) {
@@ -195,6 +276,17 @@ const findingsInText = (input: { readonly plugin: string; readonly file: string;
       }
     }
   })
+  if (!isCss(input.file)) {
+    const text = code.join('\n')
+    // Groups come in file order, so the line number advances with them.
+    let line = 1
+    let counted = 0
+    for (const group of classGroups(text)) {
+      for (; counted < group.index; counted += 1) if (text.charCodeAt(counted) === 10) line += 1
+      for (const rule of designTokenGroupRules)
+        for (const match of rule.matches(group, input.file)) findings.push({ rule: rule.id, plugin: input.plugin, file: input.file, line, text: match.slice(0, 80) })
+    }
+  }
   return findings
 }
 
@@ -248,8 +340,10 @@ const countByRuleAndPlugin = (findings: readonly DesignTokenFinding[]): Readonly
   return Object.fromEntries(Object.entries(counts).toSorted(([left], [right]) => left.localeCompare(right)))
 }
 
+const ruleIds = (): readonly string[] => [...designTokenRules, ...designTokenGroupRules].map(rule => rule.id)
+
 const totalsByRule = (findings: readonly DesignTokenFinding[]): Readonly<Record<string, number>> =>
-  Object.fromEntries(designTokenRules.map(rule => [rule.id, findings.filter(finding => finding.rule === rule.id).length]))
+  Object.fromEntries(ruleIds().map(rule => [rule, findings.filter(finding => finding.rule === rule).length]))
 
 export interface DesignTokenComparison {
   readonly increased: readonly string[]
@@ -273,7 +367,9 @@ const baselineSchema = Schema.Struct({ totals: Schema.Record(Schema.String, Sche
 /** The design-token check's pure parts, exported for its tests. */
 export class DesignTokenCheck {
   static readonly rules = designTokenRules
+  static readonly groupRules = designTokenGroupRules
   static readonly classTokens = classTokens
+  static readonly classGroups = classGroups
   static readonly isTokenFile = isTokenFile
   static readonly isSource = isSource
   static readonly findingsInText = findingsInText
@@ -300,7 +396,7 @@ const main = (): void => {
   }
   const baseline = ScriptJson.decodeJson(baselineSchema, readFileSync(baselineUrl, 'utf8')).counts
   const { increased, decreased } = compare({ baseline, current })
-  const use = new Map(designTokenRules.map(rule => [rule.id, rule.use]))
+  const use = new Map([...designTokenRules, ...designTokenGroupRules].map(rule => [rule.id, rule.use]))
   if (increased.length > 0) {
     console.error('design-token-check: off-scale styling increased (DESIGN.md tokens; visual refresh T4.1):')
     for (const line of increased) console.error(`  ${line} — use ${use.get(line.split('/')[0] ?? '') ?? 'a token'}`)
