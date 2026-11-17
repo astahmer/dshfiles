@@ -99,3 +99,63 @@ for the pass before landing or when a binary outside the repository changed.
 
 After adding or retagging a feature file, run
 `node tooling/dshx/scripts/browser-tasks.mjs --write`.
+
+## Design and copy ratchets
+
+Two scripts hold [DESIGN.md](../DESIGN.md) and the copy glossary
+([ADE plan §3](ade-ux/README.md#glossary-enforced-in-copy)) against drift. Both
+count findings per `rule/plugin` against a checked-in baseline and fail only when
+one count rises, so a fix in one plugin cannot hide a regression in another.
+Both run in `check:green` and in CI's `repo` job, each in about a second.
+
+```sh
+node --run check:design-tokens              # or check:copy: compare with the baseline
+node --run check:design-tokens -- --report  # list every finding: rule, file:line, excerpt
+node --run check:design-tokens -- --update  # rewrite the baseline at today's counts
+```
+
+Run `--update` after a fix, to ratchet the counts down, and review the baseline
+diff: it rewrites every key, so an unnoticed rise elsewhere would be accepted
+too. Never raise a count to land new code; fix the code. A rule that
+misfires is fixed in the script, with a test.
+
+`scripts/design-token-check.ts` reads every plugin's `src` (vendored forks
+included; tests, `.d.ts` and comment lines excluded) and parses each `dshx:`
+class into its variants and utility:
+
+| Rule                       | Counts                                                                                                   |
+| -------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `arbitrary-text`           | `text-[…]`                                                                                               |
+| `arbitrary-radius`         | `rounded-[…]`, and a CSS `border-radius` literal other than 0, pills and variables                      |
+| `raw-colour`               | hex, `rgb()`, `hsl()` and `oklch()` literals outside the token files                                     |
+| `native-icons`             | `Icon…OutlineRegular` imports, once per icon per file                                                    |
+| `default-shadow`           | `shadow-2xs..2xl` (the kit maps them onto the levels; new code writes `shadow-s0..s3`)                    |
+| `numeric-duration`         | `duration-<number>` and `duration-[<time>]` instead of `duration-(--dshx-duration-*)`                    |
+| `viewport-variant`         | a `sm:`/`md:`/`lg:`/`xl:`/`2xl:` (or `max-*`) variant, except a dialog's `max-w-*` width                 |
+| `solid-status-fill`        | solid `bg-info`/`bg-success`/`bg-warning` outside `plugin-ui`                                             |
+| `palette-colour`           | numbered Tailwind palette classes (`bg-emerald-500`)                                                     |
+| `uppercase`                | the `uppercase` class and CSS `text-transform: uppercase`                                                |
+| `unguarded-loop-animation` | `animate-spin`/`animate-pulse` when no class in the same list has a `motion-reduce:`/`motion-safe:` variant |
+| `outline-without-focus`    | `outline-none` on a button, link, summary, `*Trigger` or widget-role element with no `focus-visible:`/`focus-within:` class in the same list |
+
+The last two read a whole class list: a string literal, template holes
+included, joined with its neighbours when only `,` or `+` separates them, as
+in a `cn()` call over several lines.
+
+`scripts/copy-check.ts` reads `.tsx` files and locale tables (non-English
+tables skipped), the `.description(…)` text of `defineSettings` schemas,
+label-keyed values in plain `.ts` tables (`label`, `title`, `placeholder`, …;
+`description` and `summary` only in files that define no tool, API or schema),
+each plugin's `locale/en.json`, and the catalog's `title`, `summary`,
+`onboarding.firstAction`, `onboarding.doneWhen` and quoted `reach` labels:
+
+| Rule                                                       | Counts                                                                                         |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `session`, `conversation`, `new-chat`, `integrate`, `settle` | the glossary's banned words in prose                                                           |
+| `plugin-prefix`                                            | a `Plugin Name: View` label, template literals included (`` `AI Accounts: ${…}` ``)             |
+| `host-process`                                             | a capital "Host" inside a sentence (the server process); lower-case host is a machine           |
+| `package-name`                                             | `@dshfiles/…` or `@deepseek-ai/…` in a sentence                                                |
+| `raw-error-echo`                                           | a message ending in `: {message}` or `: ${error…}` with no next step                           |
+| `status-word`                                              | Running, Completed, In progress, Finished, Succeeded, Inactive, Input needed or Needs attention as a whole label |
+| `try-again`                                                | "Try again" as a whole label (use Retry)                                                       |
+| `ascii-ellipsis`                                           | three dots after a word instead of …                                                           |
