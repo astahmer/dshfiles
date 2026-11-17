@@ -1005,7 +1005,7 @@ const ImageTitleNotice = (props: { readonly id: number; readonly job: BacklogIma
       </span>
       {pending ? null : (
         <Button size="xs" variant="ghost" disabled={actions.regenerateImageTitle.isPending} onClick={() => actions.regenerateImageTitle.mutate(props.id)}>
-          Try again
+          Retry
         </Button>
       )}
     </div>

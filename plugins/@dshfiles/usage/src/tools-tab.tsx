@@ -182,7 +182,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
       <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-destructive">
         {errorMessage(query.error, 'Could not load tool activity.')}
         <Button variant="outline" size="xs" disabled={query.isFetching} onClick={() => void query.refetch()}>
-          Try again
+          Retry
         </Button>
       </p>
     )

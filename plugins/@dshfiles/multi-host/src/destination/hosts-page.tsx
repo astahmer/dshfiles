@@ -360,7 +360,7 @@ const HostRow = (props: {
             <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-destructive">
               {errorMessage(reconnect.error, 'Reconnect failed.')}
               <Button size="xs" variant="outline" onClick={() => reconnect.mutate()} disabled={reconnect.isPending}>
-                Try again
+                Retry
               </Button>
             </span>
           ) : null}
@@ -389,7 +389,7 @@ const HostRow = (props: {
             <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-destructive">
               {errorMessage(linkBack.error, 'Link back failed.')}
               <Button size="xs" variant="outline" onClick={startLinkBack} disabled={linkBack.isPending}>
-                Try again
+                Retry
               </Button>
             </span>
           ) : null}
@@ -588,7 +588,7 @@ export const HostsPage = () => {
       <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
         <span className="dshx:min-w-0">{input.message}</span>
         <Button size="xs" variant="outline" onClick={input.retry}>
-          {input.label ?? 'Try again'}
+          {input.label ?? 'Retry'}
         </Button>
       </AlertDescription>
     </Alert>

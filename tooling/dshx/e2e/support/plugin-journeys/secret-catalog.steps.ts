@@ -579,7 +579,7 @@ When('the alias {string} is removed while its vault item stays', async ({ page }
     .click()
   const dialog = page.getByRole('alertdialog', { name: `Remove ${alias}`, exact: true })
   await dialog.getByRole('button', { name: 'Remove alias and all environment overrides', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Confirm remove alias', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Remove alias', exact: true }).click()
   await expect(dialog).toBeHidden()
 })
 

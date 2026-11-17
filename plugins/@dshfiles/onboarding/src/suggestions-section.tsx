@@ -119,7 +119,7 @@ export const SuggestionsSection = (props: SuggestionsSectionProps): ReactNode =>
         </p>
         <div>
           <Button onClick={() => void query.refetch()} size="sm" variant="outline">
-            Try again
+            Retry
           </Button>
         </div>
       </PageSection>
@@ -131,7 +131,7 @@ export const SuggestionsSection = (props: SuggestionsSectionProps): ReactNode =>
         <p className="dshx:text-sm dshx:text-muted-foreground">{value.reason}</p>
         <div>
           <Button onClick={() => void query.refetch()} size="sm" variant="outline">
-            Try again
+            Retry
           </Button>
         </div>
       </PageSection>

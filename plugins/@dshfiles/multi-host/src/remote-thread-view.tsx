@@ -74,7 +74,7 @@ export const RemoteThreadView = (props: { readonly onOpenSession: (sessionId: Se
             {host.hostName} is unavailable: {host.message}
           </span>
           <Button size="xs" variant="outline" onClick={host.retry}>
-            Try again
+            Retry
           </Button>
         </p>
       ))}

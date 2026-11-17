@@ -521,7 +521,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
         <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive" role="alert">
           <span className="dshx:min-w-0">{failure}</span>
           <Button onClick={refreshDiff} size="xs" variant="outline">
-            Try again
+            Retry
           </Button>
         </p>
       ) : null}

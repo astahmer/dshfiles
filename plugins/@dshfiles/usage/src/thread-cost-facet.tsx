@@ -162,7 +162,7 @@ export const ThreadCostFacet = (props: {
           <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             <span className="dshx:min-w-0 dshx:flex-1">{errorMessage(page.error, 'Usage could not be read.')}</span>
             <Button size="xs" variant="outline" onClick={() => void page.refetch()}>
-              Try again
+              Retry
             </Button>
           </AlertDescription>
         </Alert>

@@ -221,7 +221,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
             <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
               <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
               <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
-                Try again
+                Retry
               </Button>
             </AlertDescription>
           </Alert>

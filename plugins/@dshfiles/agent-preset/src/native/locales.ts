@@ -62,7 +62,7 @@ export const en: Record<AgentPresetSettingsKey, string> = {
 
   inUse: 'New task default',
 
-  noDescription: 'No description.',
+  noDescription: 'No description',
   brokenBadge: 'Failed to load',
 
   switchRefused: 'Did not switch to {name}. Pick it again. {reason}',

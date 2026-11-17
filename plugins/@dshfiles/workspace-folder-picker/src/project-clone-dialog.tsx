@@ -153,7 +153,7 @@ export const ProjectCloneDialog = (props: {
               </Button>
             )}
             <Button disabled={running || start.isPending} type="submit">
-              {job?.state === 'failed' || job?.state === 'cancelled' ? 'Try again' : 'Clone'}
+              {job?.state === 'failed' || job?.state === 'cancelled' ? 'Retry' : 'Clone'}
             </Button>
           </DialogFooter>
         </form>

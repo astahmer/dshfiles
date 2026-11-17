@@ -106,7 +106,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive" role="alert">
         <span className="dshx:min-w-0">{message}</span>
         <Button onClick={() => void query.refetch()} size="xs" variant="outline">
-          Try again
+          Retry
         </Button>
       </p>
     )

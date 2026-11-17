@@ -239,7 +239,7 @@ const LinkedMachines = (props: { readonly api: MultiHostClient }) => {
           <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
             <span className="dshx:min-w-0">{errorMessage(peers.error, 'Linked machines are unavailable.')}</span>
             <Button size="xs" variant="outline" onClick={() => void peers.refetch()}>
-              Try again
+              Retry
             </Button>
           </AlertDescription>
         </Alert>
@@ -372,7 +372,7 @@ const LinkThisMachine = (props: { readonly api: MultiHostClient; readonly onPair
           <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
             <span className="dshx:min-w-0">{errorMessage(status.error, 'The link status is unavailable.')}</span>
             <Button size="xs" variant="outline" onClick={() => void status.refetch()}>
-              Try again
+              Retry
             </Button>
           </AlertDescription>
         </Alert>

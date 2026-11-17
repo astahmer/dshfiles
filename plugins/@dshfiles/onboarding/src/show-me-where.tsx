@@ -173,7 +173,7 @@ export const WalkUnreadable = (props: { readonly onRetry: () => void; readonly o
       <p className="dshx:text-sm">Show me where could not load this feature's steps. Try again, or end the walk and open the feature from Getting started.</p>
       <div className="dshx:flex dshx:justify-end dshx:gap-2">
         <Button onClick={props.onRetry} size="sm">
-          Try again
+          Retry
         </Button>
         <Button onClick={props.onEnd} size="sm" variant="ghost">
           End

@@ -560,7 +560,7 @@ Then('Suggestions shows a suggestion or an honest empty state with 44 pixel cont
     await expect(suggestionsSection(page)).toHaveAttribute('data-suggestions', /^(ready|no-usage)$/u)
     const state = await suggestionsSection(page).getAttribute('data-suggestions')
     const suggested = await suggestionsSection(page).locator('[data-suggestion]').count()
-    if (state === 'no-usage') await expect(suggestionsSection(page).getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
+    if (state === 'no-usage') await expect(suggestionsSection(page).getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
     if (state === 'ready' && suggested === 0) await expect(suggestionsSection(page).locator('[data-suggestions-empty]')).toBeVisible()
     const fits = await suggestionsSection(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)
     expect(fits).toBe(true)

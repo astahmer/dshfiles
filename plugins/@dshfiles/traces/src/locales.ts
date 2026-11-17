@@ -8,7 +8,7 @@ const en = {
   viewExplorer: 'Explorer',
   subtitle: 'OpenTelemetry traces, logs and metrics any OTLP/HTTP exporter sends here, stored locally.',
   refresh: 'Refresh',
-  retry: 'Try again',
+  retry: 'Retry',
   clear: 'Clear stored traces',
   clearTitle: 'Clear all stored traces?',
   clearDescription: 'This deletes the stored traces, spans and logs. The receiver keeps running and new telemetry is stored as it arrives.',

@@ -106,7 +106,7 @@ describe('onboarding_reach output', () => {
 describe('WalkUnreadable', () => {
   afterEach(cleanup)
 
-  it('says what failed in plain words and offers Try again and End', () => {
+  it('says what failed in plain words and offers Retry and End', () => {
     const onRetry = vi.fn()
     const onEnd = vi.fn()
     render(<WalkUnreadable onEnd={onEnd} onRetry={onRetry} />)
@@ -117,7 +117,7 @@ describe('WalkUnreadable', () => {
     expect(card.className).toContain('dshx:rounded-xl')
     expect(card.className).toContain('dshx:shadow-s2')
     expect(card.className).not.toMatch(/max-sm:|z-\[/u)
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     fireEvent.click(screen.getByRole('button', { name: 'End' }))
     expect(onRetry).toHaveBeenCalledOnce()
     expect(onEnd).toHaveBeenCalledOnce()

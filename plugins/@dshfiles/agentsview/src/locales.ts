@@ -9,7 +9,7 @@ const en = {
   refresh: 'Refresh',
   loading: 'Loading…',
   loadFailed: 'Agent CLI threads could not be loaded.',
-  retry: 'Try again',
+  retry: 'Retry',
   allAgents: 'All agents',
   agentFilter: 'Agent',
   search: 'Search agent CLI threads',

@@ -10,7 +10,7 @@ const en = {
   loadFailed: 'The process table could not be read.',
   unsupported: 'Process memory is only read on macOS and Linux. Use the system monitor of this host instead.',
   refresh: 'Refresh',
-  retry: 'Try again',
+  retry: 'Retry',
   processTrees: 'Processes',
   group: 'group',
   groups: 'groups',

@@ -449,7 +449,7 @@ export const en = {
   'settings.collapse.description': 'Choose when to automatically collapse work details',
   'settings.collapse.completion': 'On completion',
   'settings.collapse.nextInput': 'On next message',
-  'settings.foldedReplies.title': 'Replies After Collapse',
+  'settings.foldedReplies.title': 'Replies after collapse',
   'settings.foldedReplies.description': 'Choose which assistant replies stay visible when work details collapse',
   'settings.foldedReplies.all': 'All replies',
   'settings.foldedReplies.final': 'Final answer only',
