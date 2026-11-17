@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { CopyCheck } from './copy-check.ts'
 
-const { compare, countByTerm, extractStrings, findingsInStrings, isProse, pluginPrefixPattern } = CopyCheck
+const { compare, countByTermAndPlugin, extractStrings, findingsInStrings, isProse, pluginOf, pluginPrefixPattern, totalsByTerm } = CopyCheck
 
 const prefix = pluginPrefixPattern(['jj-integration', 'pulls-review', 'thread-sidebar', 'mcp-servers'])
 
@@ -45,9 +45,9 @@ test('only prose counts; identifiers and class strings do not', () => {
   assert.equal(isProse('@dshfiles/thread-sidebar'), false)
 })
 
-test('counts findings per term and ratchets on increases only', () => {
+test('counts findings per term and plugin and ratchets on increases only', () => {
   const findings = findingsInStrings({
-    file: 'x.tsx',
+    file: 'plugins/@dshfiles/demo/src/x.tsx',
     prefix,
     strings: [
       { text: 'Open session', line: 1 },
@@ -56,12 +56,21 @@ test('counts findings per term and ratchets on increases only', () => {
       { text: 'Land this thread', line: 4 },
     ],
   })
-  const counts = countByTerm(findings)
-  assert.equal(counts.session, 1)
-  assert.equal(counts['new-chat'], 1)
-  assert.equal(counts['plugin-prefix'], 1)
-  assert.equal(counts.integrate, 0)
+  const totals = totalsByTerm(findings)
+  assert.equal(totals.session, 1)
+  assert.equal(totals['new-chat'], 1)
+  assert.equal(totals['plugin-prefix'], 1)
+  assert.equal(totals.integrate, 0)
+  const counts = countByTermAndPlugin(findings)
+  assert.deepEqual(counts, { 'new-chat/demo': 1, 'plugin-prefix/demo': 1, 'session/demo': 1 })
   assert.deepEqual(compare({ baseline: counts, current: counts }), { increased: [], decreased: [] })
-  assert.equal(compare({ baseline: { ...counts, session: 0 }, current: counts }).increased.length, 1)
-  assert.equal(compare({ baseline: { ...counts, session: 5 }, current: counts }).decreased.length, 1)
+  assert.deepEqual(compare({ baseline: { ...counts, 'session/demo': 0 }, current: counts }).increased, ['session/demo: 1 > baseline 0'])
+  // A drop in one plugin does not leave room for a rise in another.
+  assert.deepEqual(compare({ baseline: { ...counts, 'session/other': 3 }, current: counts }).decreased, ['session/other: 0 < baseline 3'])
+  assert.equal(compare({ baseline: { ...counts, 'session/demo': 0, 'session/other': 3 }, current: counts }).increased.length, 1)
+})
+
+test('attributes a file to its plugin directory', () => {
+  assert.equal(pluginOf('plugins/@dshfiles/thread-sidebar/src/locales.ts'), 'thread-sidebar')
+  assert.equal(pluginOf('plugins/@dshfiles/chat/dshx.features.json'), 'chat')
 })
