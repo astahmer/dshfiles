@@ -230,7 +230,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
         {discover.data !== undefined ? (
           discover.data.length === 0 ? (
             <span className="dshx:text-xs dshx:text-muted-foreground">
-              No running DSH found under the remote home. Start DSH there with @dshfiles/multi-host installed, then Find again.
+              No running DSH found under the remote home. Start DSH there with the multi-host plugin enabled, then Find again.
             </span>
           ) : (
             <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
@@ -242,7 +242,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
                   variant={home.path === draft.remoteHome ? 'secondary' : 'ghost'}
                   className="dshx:h-6 dshx:font-mono dshx:text-xs"
                   onClick={() => setDraft({ ...draft, remoteHome: home.path })}
-                  title={home.source === 'web-url' ? 'Started through dsh-web; needs @dshfiles/multi-host to be added' : undefined}
+                  title={home.source === 'web-url' ? 'Started through dsh-web. Enable the multi-host plugin there.' : undefined}
                 >
                   {home.path}
                 </Button>

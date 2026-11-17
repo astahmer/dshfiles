@@ -57,7 +57,7 @@ export const jjIntegrationSettings = defineSettings({
     syncWorkspaceAfterLand: Schema.string()
       .default('default')
       .description(
-        'After Land advances the bookmark, bring this jj workspace (the checkout running DSH) onto it in the background with `dshx checkout sync`, keeping its local edits and rebuilding what changed. Empty disables it.',
+        'After Land, move this workspace (the one running DSH) onto the new bookmark, keeping local edits and rebuilding what changed. Empty turns it off.',
       ),
     updateCheckout: Schema.string()
       .default('')

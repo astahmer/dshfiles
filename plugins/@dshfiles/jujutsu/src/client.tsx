@@ -397,7 +397,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       return input.successNotice
     },
     onSuccess: successNotice => setReviewNotice(successNotice),
-    onError: () => setReviewNotice('Review progress could not be saved to the Host.'),
+    onError: () => setReviewNotice('Review progress was not saved. Mark the file again to retry.'),
   })
   const [describeDrafts, setDescribeDrafts] = useState<Readonly<Record<string, string>>>({})
   const [remote, setRemote] = useState('')
@@ -1742,7 +1742,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </Button>
             {reviewOpenFailed && (
               <span className="dshx:basis-full dshx:text-destructive" role="alert">
-                The review could not open. Select at most 30 revisions, and add @dshfiles/diffs-review to the profile if it is missing.
+                The review could not open. Select at most 30 revisions, and enable the diffs-review plugin in Plugins if it is off.
               </span>
             )}
           </div>

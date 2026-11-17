@@ -33,8 +33,8 @@ const Status = (props: { readonly loading: boolean; readonly error: unknown; rea
     return (
       <span className="dshx:text-xs dshx:text-muted-foreground">
         {props.error instanceof Error && isApiOwnerMissing(props.error)
-          ? `Counts need ${props.ownerName}; add it to the profile to see them here.`
-          : 'Could not read the count; open the manager to see it.'}
+          ? `Counts need ${props.ownerName}. Enable it in Plugins, then restart DSH.`
+          : 'Could not read the count. Open the manager to see it.'}
       </span>
     )
   return <span className="dshx:text-xs dshx:text-muted-foreground">{props.children}</span>
@@ -157,7 +157,7 @@ export const CapabilitiesHubPanel = (props: CapabilitiesHubPanelProps): ReactNod
                   onOpen={open(section)}
                   section={section}
                   status={
-                    <Status error={skills.error} loading={skills.isPending} ownerName="a dshx Host plugin">
+                    <Status error={skills.error} loading={skills.isPending} ownerName="the skill registry">
                       {skillTotal === 0
                         ? 'No skills found for the current folder.'
                         : `${String(skillTotal)} installed: ${skillCounts.map(count => `${String(count.count)} ${GROUP_LABEL[count.group]}`).join(', ')}`}
@@ -175,7 +175,7 @@ export const CapabilitiesHubPanel = (props: CapabilitiesHubPanelProps): ReactNod
                   onOpen={open(section)}
                   section={section}
                   status={
-                    <Status error={servers.error} loading={servers.isPending} ownerName="@dshfiles/mcp-servers">
+                    <Status error={servers.error} loading={servers.isPending} ownerName="the MCP servers plugin">
                       {`${String(servers.data?.length ?? 0)} configured, ${String(enabledServers)} enabled`}
                     </Status>
                   }

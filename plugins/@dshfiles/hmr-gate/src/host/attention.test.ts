@@ -16,7 +16,7 @@ describe('hmr-gate inbox provider', () => {
       subject: { kind: 'host', id: 'local', label: 'This DSH' },
       reason: '2 plugin updates wait for a DSH restart.',
       detail:
-        'Waiting: @dshfiles/backlog, @dshfiles/traces. Their new Host code is built but not loaded, so their pages keep the last matching version. Restart DSH when no agent is working (Restart when idle in the sidebar when the supervisor runs it, or your own launcher); nothing restarts by itself.',
+        'Waiting: @dshfiles/backlog, @dshfiles/traces. Their new version is built but not loaded, so their pages keep the previous one. Restart DSH when no agent is working. Nothing restarts by itself.',
       severity: 'ready',
       verbs: ['Done', 'Snooze', 'MuteSource'],
     })

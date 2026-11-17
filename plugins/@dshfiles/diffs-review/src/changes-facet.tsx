@@ -554,7 +554,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
           {diff.truncated ? <p className={HINT}>This diff is too large to show whole; only the first files are listed.</p> : null}
           {marks.unavailable ? (
             <p className={HINT} role="status">
-              Viewed marks are kept by the diff-viewed plugin, which is not loaded. Add @dshfiles/diff-viewed to the profile to mark files.
+              To mark files viewed, enable the diff-viewed plugin in Plugins and restart DSH.
             </p>
           ) : null}
           {marks.error === null || marks.error === undefined ? null : (

@@ -54,7 +54,7 @@ export const memorySettings = defineSettings({
     jevEnabled: Schema.boolean()
       .default(false)
       .description(
-        "Ask TypeSafe's Jev classifier which user messages carry a durable signal, whether a new thread likely needs memory, and (on demand) whether saved notes may be outdated. Needs the Jev key in Settings › Tools & MCP › Jev, or TYPESAFE_API_KEY in the Host environment. Signal failures fall back to heuristics; note-review failures stay unknown and never change notes.",
+        "Ask TypeSafe's Jev which messages are worth remembering and whether saved notes are outdated. Needs the Jev key in Settings › Tools & MCP › Jev.",
       ),
     // Moved to the one shared key in Settings › Tools & MCP › Jev (settings-shell). Kept, hidden, as the fallback while
     // the shared key is empty, so moving it loses nothing and clearing the shared key restores this value.

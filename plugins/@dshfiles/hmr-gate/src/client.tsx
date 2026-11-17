@@ -69,8 +69,8 @@ const snapshot = (): readonly DeferredPackage[] => current
 /** One line that says what a restart would apply; undefined while nothing is pending. */
 const summaryText = (packages: readonly DeferredPackage[]): string | undefined => {
   if (packages.length === 0) return undefined
-  if (packages.length === 1) return `${packages[0]?.id ?? 'A plugin'} waits for a Host restart to apply.`
-  return `${String(packages.length)} plugins wait for a Host restart to apply.`
+  if (packages.length === 1) return `${packages[0]?.id ?? 'A plugin'} applies after DSH restarts.`
+  return `${String(packages.length)} plugins apply after DSH restarts.`
 }
 
 const HmrGateRow = (props: { readonly view: 'summary' | 'page' }): JSX.Element | null => {
@@ -84,22 +84,21 @@ const HmrGateRow = (props: { readonly view: 'summary' | 'page' }): JSX.Element |
   return (
     <section className="dshx-root dshx:flex dshx:flex-col dshx:gap-3">
       <p className="dshx:min-w-0 dshx:text-muted-foreground dshx:text-sm">
-        A plugin's browser half rebuilt while its Host half still runs from before the rebuild. The browser keeps the last-good code until the Host loads the
-        new half, so nothing runs out of step.
+        These plugins were rebuilt. The page keeps their previous version until DSH restarts, so both sides stay in step.
       </p>
       {packages.length === 0 ? (
-        <p className="dshx:text-muted-foreground dshx:text-sm">Nothing is waiting. Every rebuilt plugin is in step with the Host.</p>
+        <p className="dshx:text-muted-foreground dshx:text-sm">Nothing is waiting for a restart.</p>
       ) : (
         <ul className="dshx:flex dshx:flex-col dshx:gap-1">
           {packages.map(entry => (
             <li className="dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-2 dshx:text-sm" key={entry.id}>
               <span className="dshx:font-mono dshx:text-xs">{entry.id}</span>
-              <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">Host half changed</span>
+              <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">Needs a DSH restart</span>
             </li>
           ))}
         </ul>
       )}
-      {packages.length === 0 ? null : <p className="dshx:text-muted-foreground dshx:text-sm">Restart DSH to load the new Host code, then reload this page.</p>}
+      {packages.length === 0 ? null : <p className="dshx:text-muted-foreground dshx:text-sm">Restart DSH, then refresh this page.</p>}
     </section>
   )
 }
