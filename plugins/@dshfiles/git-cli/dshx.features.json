@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "git-cli-run",
-      "title": "One Effect service that runs the git CLI",
-      "summary": "Run git non-interactively with bounded stdout and stderr, a timeout that kills the process and one git <verb> span; return a non-zero exit as a value or fail with redacted arguments and stderr.",
+      "title": "Run git safely",
+      "summary": "Git runs without prompts, with a time limit and capped output, and errors hide secrets.",
+      "details": "Run git non-interactively with bounded stdout and stderr, a timeout that kills the process and one git <verb> span; return a non-zero exit as a value or fail with redacted arguments and stderr.",
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: library",

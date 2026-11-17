@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "continued-form-goal-authority",
-      "title": "Accept admitted continued-form answers as direct goal authority",
-      "summary": "The native goal-tool fork recognizes only an answered root-turn reply whose call id the user-question projection settled with a valid answer batch.",
+      "title": "Answers to a timed question count as your request",
+      "summary": "An answer you gave to a timed question counts as your own request for a goal.",
+      "details": "The native goal-tool fork recognizes only an answered root-turn reply whose call id the user-question projection settled with a valid answer batch.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",

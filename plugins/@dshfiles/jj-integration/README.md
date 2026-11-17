@@ -2,13 +2,13 @@
 
 ![Pick a New-thread project](docs/screenshots/new-thread-project-picker.png)
 
-![Thread integration control center](docs/screenshots/thread-workspaces-panel.png)
+![Workspaces page](docs/screenshots/thread-workspaces-panel.png)
 
 ![New thread destination and workspace isolation](docs/screenshots/thread-destination.png)
 
 ![Start a thread workspace from a remote bookmark](docs/screenshots/thread-destination-remote.png)
 
-![Integrate from the end of a turn](docs/screenshots/turn-end-integrate.png)
+![Land from the end of a turn](docs/screenshots/turn-end-integrate.png)
 
 ![Choose a project's main branch](docs/screenshots/project-main-branch.png)
 

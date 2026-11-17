@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "jj-cli-run",
-      "title": "One Effect service that runs the Jujutsu CLI",
-      "summary": "Resolve jj once, run it with --color=never --no-pager, bounded stdout and stderr, a timeout and kill-on-interrupt; return a non-zero exit as a value or fail with redacted arguments and stderr.",
+      "title": "Run Jujutsu safely",
+      "summary": "Jujutsu runs without colour or pager, with a time limit and capped output, and errors hide secrets.",
+      "details": "Resolve jj once, run it with --color=never --no-pager, bounded stdout and stderr, a timeout and kill-on-interrupt; return a non-zero exit as a value or fail with redacted arguments and stderr.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -55,8 +56,9 @@
     },
     {
       "id": "jj-cli-view-reads",
-      "title": "Operation-head cache for jj view reads",
-      "summary": "Answer repeated --ignore-working-copy view reads from the same operation head without spawning jj, share one in-flight read between callers, and miss as soon as an operation lands; a diff over full commit ids is kept across operations.",
+      "title": "Cache repeated Jujutsu reads",
+      "summary": "Repeated Jujutsu reads come from a cache until the repository changes.",
+      "details": "Answer repeated --ignore-working-copy view reads from the same operation head without spawning jj, share one in-flight read between callers, and miss as soon as an operation lands; a diff over full commit ids is kept across operations.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",

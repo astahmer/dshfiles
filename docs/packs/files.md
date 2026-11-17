@@ -28,11 +28,11 @@ From the onboarding feature catalog: 14 features, the 0 curated ones first.
 
 ### More
 
-1. **Edit thread artifacts** (`editor`, thread-panel) — Create and edit durable Markdown and HTML documents owned by a thread, with revision-checked saves shared with agent tools.
-2. **Browse and edit workspace files** (`editor`, thread-panel) — Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview whose code fences go through Chat's registry (a ```mermaid block is a diagram with @dshfiles/mermaid-diagrams), and save through Host fil…
-3. **Open file links in the editor** (`editor`, thread-panel) — A file row in the native Workspace files page, a tool-call path or a composer reference opens that file in the editor surface, focusing its existing tab instead of opening a second one. The editor shows the session the file belongs to, and keeps the last thread's files while a N…
-4. **Index workspace files with bounded traversal** (`editor`) — Traverse breadth-first with concurrency and entry limits, skipping VCS and dependency directories while surfacing partial results.
-5. **Session screen and workspace files for other plugins** (`editor`) — Provides dshx's SessionScreen contract: the session the main view shows and the one side panels follow, the mounted session's workspace file index (indexing, then ready, kept fresh while followed), one tree level per call, and the Host's file search. The command palette's file s…
+1. **Edit thread artifacts** (`editor`, thread-panel) — Create and edit Markdown and HTML documents that belong to a thread, which the agent can edit too.
+2. **Browse and edit workspace files** (`editor`, thread-panel) — Browse and edit the workspace's files in tabs, with search, go to line and Markdown preview.
+3. **Open file links in the editor** (`editor`, thread-panel) — A file link in a thread opens the file in the editor, reusing its tab when it is already open.
+4. **Index workspace files with bounded traversal** (`editor`) — The workspace's file list loads in steps and skips version control and dependency folders.
+5. **Open thread and workspace files for other plugins** (`editor`) — Other features can read which thread is on screen and list or search its workspace files.
 6. **Project whiteboards** (`whiteboard`, knowledge) — Excalidraw boards stored per project on the Host: create, draw with autosave, rename, delete to Recently deleted and restore; the editor bundle loads only when a board opens.
 7. **Agent-drawn diagrams** (`whiteboard`) — whiteboard_write queues Mermaid or Excalidraw skeleton source; the editor converts it into editable shapes the next time the board opens, and whiteboard_read returns the scene and its texts.
 8. **xstate machine diagrams** (`whiteboard`) — The xstate-diagram module turns any xstate v5 machine into a Mermaid flowchart for whiteboard_write or a stateDiagram-v2 for Markdown.

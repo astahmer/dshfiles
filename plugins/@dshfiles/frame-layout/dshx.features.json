@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "panel-seats",
-      "title": "Hand the frame's regions to plugin surfaces",
-      "summary": "The owned stack always gives shell.main to Workbench tabs, without a user-selectable native layout. The frame supplies its authorized keyed-main renderer, recursion guard and an absent-occupant native fallback. shell.dock owns a fullheight right pane across both grid rows; collapsing it hides persistent mounted tabs and a separate native resource carrier, never reveals native chrome. Registered DockPaneActions serve the main Pane options Open right pane item (closed only), pane-local Close pane icons and original keyboard control; the centre never offers Close right pane. Workbench owns quiet group chrome and real split groups; the frame adds no toolbar. ctx.frameBottom opens only the left/centre bottom row, preserving right-pane geometry.",
+      "title": "Main area and side panels",
+      "summary": "The main area holds the open tabs, and the right panel spans the full height.",
+      "details": "The owned stack always gives shell.main to Workbench tabs, without a user-selectable native layout. The frame supplies its authorized keyed-main renderer, recursion guard and an absent-occupant native fallback. shell.dock owns a fullheight right pane across both grid rows; collapsing it hides persistent mounted tabs and a separate native resource carrier, never reveals native chrome. Registered DockPaneActions serve the main Pane options Open right pane item (closed only), pane-local Close pane icons and original keyboard control; the centre never offers Close right pane. Workbench owns quiet group chrome and real split groups; the frame adds no toolbar. ctx.frameBottom opens only the left/centre bottom row, preserving right-pane geometry.",
       "reach": ["expect button \"New session\""],
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
@@ -115,7 +116,8 @@
     {
       "id": "panel-width-persistence",
       "title": "Persist the frame's dragged panel widths",
-      "summary": "The layout bundle keeps dragged sidebar and right-panel widths in the browser, so a reload restores the sidebar's last open width and the right panel's px preference. Workbench separately owns visibility of its persistent fullheight right-pane tabs; frame geometry does not select native chrome.",
+      "summary": "The sidebar and right panel keep the widths you dragged them to after a reload.",
+      "details": "The layout bundle keeps dragged sidebar and right-panel widths in the browser, so a reload restores the sidebar's last open width and the right panel's px preference. Workbench separately owns visibility of its persistent fullheight right-pane tabs; frame geometry does not select native chrome.",
       "reach": ["expect button \"New session\""],
       "surfaces": ["client", "storage"],
       "surface": "infrastructure",
@@ -163,7 +165,8 @@
     {
       "id": "collapsed-state-persistence",
       "title": "Persist the collapsed sidebar",
-      "summary": "Closing the left sidebar is remembered: a reload boots it collapsed, and reopening restores the last open width instead of the 280px contract default. The owned frameSidebar.show presentation port reveals it idempotently from live frame state, so repeated Reset layout calls cannot toggle it closed again.",
+      "summary": "A closed sidebar stays closed after a reload and reopens at its last width.",
+      "details": "Closing the left sidebar is remembered: a reload boots it collapsed, and reopening restores the last open width instead of the 280px contract default. The owned frameSidebar.show presentation port reveals it idempotently from live frame state, so repeated Reset layout calls cannot toggle it closed again.",
       "reach": ["expect button \"New session\""],
       "surfaces": ["client", "storage"],
       "surface": "infrastructure",
@@ -229,7 +232,8 @@
     {
       "id": "phone-navigation-seat",
       "title": "Give the stage the full width on a phone",
-      "summary": "When the left-column occupant marks the document with data-shell-phone-nav, a frame narrower than 640px drops the sidebar and right tracks, hides the sidebar drag handle and shortens itself by --dsh-phone-nav-height so the occupant's bottom tab bar never covers the composer. Without the mark the frame keeps upstream behaviour.",
+      "summary": "On a phone, the thread takes the full width and the bottom tab bar never covers the composer.",
+      "details": "When the left-column occupant marks the document with data-shell-phone-nav, a frame narrower than 640px drops the sidebar and right tracks, hides the sidebar drag handle and shortens itself by --dsh-phone-nav-height so the occupant's bottom tab bar never covers the composer. Without the mark the frame keeps upstream behaviour.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -255,7 +259,8 @@
     {
       "id": "status-strip",
       "title": "One status strip at the bottom of the frame",
-      "summary": "A thin row under every column where plugins add at most one text-first item each through the @dshfiles/frame-layout/status-strip registry: global items on the left, items about the open thread on the right. It stays empty (zero height) until an item is added, an item that throws hides only itself, and on a phone-width frame it collapses to one pill that names its first two items in their own words (\"1 working · Quota 56%\") and opens the items as a list, hidden while the software keyboard is up; with the phone shell present (docs/ade-ux §8 phase 6) that chip is a 44px dot in the top bar's trailing corner and the list drops below the bar, so no strip row sits between the stage and the tab bar.",
+      "summary": "One thin status bar along the bottom holds short items, with this thread's on the right.",
+      "details": "A thin row under every column where plugins add at most one text-first item each through the @dshfiles/frame-layout/status-strip registry: global items on the left, items about the open thread on the right. It stays empty (zero height) until an item is added, an item that throws hides only itself, and on a phone-width frame it collapses to one pill that names its first two items in their own words (\"1 working · Quota 56%\") and opens the items as a list, hidden while the software keyboard is up; with the phone shell present (docs/ade-ux §8 phase 6) that chip is a 44px dot in the top bar's trailing corner and the list drops below the bar, so no strip row sits between the stage and the tab bar.",
       "reach": ["expect region \"Threads\""],
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
@@ -303,7 +308,8 @@
     {
       "id": "status-bar-settings",
       "title": "Show, hide and reorder status bar items",
-      "summary": "Settings › General › Status bar lists every registered status item with a show switch and up/down buttons; right-clicking an item in the strip offers Hide this item and Status bar settings…. The choice is stored in the dshfiles-frame-layout settings namespace as hiddenStatusItems and statusItemOrder (so settings_set covers agent writes); ids nobody registers are ignored and a newly added item appears at its default place.",
+      "summary": "Show, hide and reorder status bar items in Settings or from an item's right-click menu.",
+      "details": "Settings › General › Status bar lists every registered status item with a show switch and up/down buttons; right-clicking an item in the strip offers Hide this item and Status bar settings…. The choice is stored in the dshfiles-frame-layout settings namespace as hiddenStatusItems and statusItemOrder (so settings_set covers agent writes); ids nobody registers are ignored and a newly added item appears at its default place.",
       "reach": ["click tab \"Settings\"", "click button \"Layout\"", "expect button \"Move Quota up\""],
       "surfaces": ["client", "integration"],
       "surface": "settingsSection",
@@ -376,7 +382,8 @@
     {
       "id": "status-strip-restore",
       "title": "Bring back hidden status items in place",
-      "summary": "When every status item is hidden the strip keeps one small control (Show hidden status items) that offers Show <item> for each hidden item and Status bar settings; each visible item's context menu also lists the hidden ones.",
+      "summary": "When every status item is hidden, one small control brings them back.",
+      "details": "When every status item is hidden the strip keeps one small control (Show hidden status items) that offers Show <item> for each hidden item and Status bar settings; each visible item's context menu also lists the hidden ones.",
       "reach": [
         "click tab \"Settings\"",
         "click button \"Layout\"",
@@ -417,7 +424,8 @@
     {
       "id": "status-item-open",
       "title": "Click a status item to open its page",
-      "summary": "A status item may declare open: the strip renders it as a button that opens its full page (Working: the thread list on its Working view; Restart: the Plugins page with the HMR updates row) and its context menu offers Open <label>. An item that draws its own buttons (Quota) declares controls, so its meters keep their popover and Open Quota (Usage › Quota) stays in the context menu.",
+      "summary": "Click a status item to open its full page.",
+      "details": "A status item may declare open: the strip renders it as a button that opens its full page (Working: the thread list on its Working view; Restart: the Plugins page with the HMR updates row) and its context menu offers Open <label>. An item that draws its own buttons (Quota) declares controls, so its meters keep their popover and Open Quota (Usage › Quota) stays in the context menu.",
       "reach": ["rightclick button \"AI accounts usage\"", "expect menuitem \"Hide this item\"", "click menuitem \"Open Quota\"", "expect radio \"Accounts\""],
       "surfaces": ["client", "integration"],
       "surface": "statusItem",
@@ -444,7 +452,8 @@
     {
       "id": "zen-mode",
       "title": "Zen mode: only the thread and its composer",
-      "summary": "The Zen mode command (⌘K, or Mod+Shift+. from anywhere) hides the sidebar, the right panel, the status strip and the main tabs, so only the thread and its composer stay; the same command, the chord, Escape outside a text field, menu or dialog, the Leave zen mode button in the top-left corner, or asking for the sidebar (Mod+B) leaves it. The frame drops the sidebar and right tracks in its own column math and sets <html data-dshfiles-zen=\"on\"> so Workbench hides its main tab rows. It never writes another owner's setting (showMainTabs, hiddenStatusItems, the sidebar width), so leaving restores the exact layout. The choice is browser-local (dshfiles.frame-layout.zen.v1) and survives a reload. Below 768 px the frame keeps its drawer, phone tab bar and right sheet, and zen hides only the status pill. Questions and approvals render in the thread, so they stay on screen. Presentation-only state, so there is no agent tool.",
+      "summary": "Zen mode hides everything but the thread and its composer, and Escape brings it all back.",
+      "details": "The Zen mode command (⌘K, or Mod+Shift+. from anywhere) hides the sidebar, the right panel, the status strip and the main tabs, so only the thread and its composer stay; the same command, the chord, Escape outside a text field, menu or dialog, the Leave zen mode button in the top-left corner, or asking for the sidebar (Mod+B) leaves it. The frame drops the sidebar and right tracks in its own column math and sets <html data-dshfiles-zen=\"on\"> so Workbench hides its main tab rows. It never writes another owner's setting (showMainTabs, hiddenStatusItems, the sidebar width), so leaving restores the exact layout. The choice is browser-local (dshfiles.frame-layout.zen.v1) and survives a reload. Below 768 px the frame keeps its drawer, phone tab bar and right sheet, and zen hides only the status pill. Questions and approvals render in the thread, so they stay on screen. Presentation-only state, so there is no agent tool.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Zen mode\"",

@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "git-thread-worktrees",
-      "title": "Isolate threads in git worktrees",
-      "summary": "As a VCS provider for plain git repositories, create a thread worktree on its own dsh/thread-… branch beside the repository when isolation is switched on, register it as a DSH project, list and remove it.",
+      "title": "Give threads a workspace in plain git projects",
+      "summary": "In a git project, each thread can work in its own workspace on its own branch.",
+      "details": "As a VCS provider for plain git repositories, create a thread worktree on its own dsh/thread-… branch beside the repository when isolation is switched on, register it as a DSH project, list and remove it.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -67,7 +68,8 @@
     {
       "id": "git-file-snapshots",
       "title": "Snapshot and restore a git workspace's files",
-      "summary": "Record every tracked and untracked, non-ignored file as a commit kept under refs/dsh/snapshots/ without moving HEAD or the index, and put the files back to it, returning a snapshot of what they were.",
+      "summary": "Save a snapshot of a git workspace's files and restore it later, without touching its branch.",
+      "details": "Record every tracked and untracked, non-ignored file as a commit kept under refs/dsh/snapshots/ without moving HEAD or the index, and put the files back to it, returning a snapshot of what they were.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
