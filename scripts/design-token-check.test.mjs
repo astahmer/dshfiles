@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { DesignTokenCheck } from './design-token-check.ts'
 
-const { classTokens, compare, countByRuleAndPlugin, findingsInText, isSource, isTokenFile } = DesignTokenCheck
+const { classGroups, classTokens, compare, countByRuleAndPlugin, findingsInText, isSource, isTokenFile } = DesignTokenCheck
 
 const rulesIn = (file, text) => findingsInText({ plugin: 'demo', file, text }).map(finding => `${finding.rule}:${finding.text}`)
 
@@ -124,4 +124,35 @@ test('uppercase: the class and the CSS declaration, not other text transforms', 
   assert.deepEqual(ruleHits('uppercase', '.a { text-transform: uppercase; }\n.b { text-transform: none; }', 'plugins/@dshfiles/demo/src/a.module.css'), [
     'text-transform: uppercase',
   ])
+})
+
+test('class groups join the literals of one cn() call across lines, holes included', () => {
+  const source = [
+    'cn(',
+    "  'dshx:animate-spin',",
+    "  'dshx:motion-reduce:animate-none',",
+    ')',
+    "const other = 'dshx:size-4'",
+    'const t = `dshx:flex ${open ? "dshx:block" : ""}`',
+  ].join('\n')
+  assert.deepEqual(
+    classGroups(source).map(group => group.text),
+    ['dshx:animate-spin dshx:motion-reduce:animate-none', 'dshx:size-4', 'dshx:flex ${open ? "dshx:block" : ""}'],
+  )
+})
+
+test('unguarded-loop-animation: spin or pulse with no motion variant in the same class list', () => {
+  const source = [
+    "const a = cn('dshx:animate-spin dshx:size-4')",
+    "const b = cn('dshx:animate-pulse',",
+    "  'dshx:motion-reduce:animate-none')",
+    "const c = 'dshx:motion-safe:animate-spin'",
+    "// const d = 'dshx:animate-spin'",
+  ].join('\n')
+  assert.deepEqual(
+    findingsInText({ plugin: 'demo', file: 'plugins/@dshfiles/demo/src/a.tsx', text: source })
+      .filter(finding => finding.rule === 'unguarded-loop-animation')
+      .map(finding => `${finding.line}:${finding.text}`),
+    ['1:dshx:animate-spin'],
+  )
 })
