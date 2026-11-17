@@ -16416,10 +16416,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Open Jujutsu refs from chat\"",
+          "text": "expect text \"Open Jujutsu refs from threads\"",
           "action": "expect",
           "by": "text",
-          "name": "Open Jujutsu refs from chat",
+          "name": "Open Jujutsu refs from threads",
           "value": null
         },
         {
@@ -17860,10 +17860,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Native client loaded · 1 Host tools registered\"",
+          "text": "expect text \"Native client loaded · 1 DSH tools registered\"",
           "action": "expect",
           "by": "text",
-          "name": "Native client loaded · 1 Host tools registered",
+          "name": "Native client loaded · 1 DSH tools registered",
           "value": null
         },
         {
@@ -18450,10 +18450,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "expect link \"Referenced session*\"",
+          "text": "expect link \"Referenced thread*\"",
           "action": "expect",
           "by": "link",
-          "name": "Referenced session*",
+          "name": "Referenced thread*",
           "value": null
         }
       ],
@@ -21846,10 +21846,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Generate on this Host\"",
+          "text": "expect menuitem \"Generate on this host\"",
           "action": "expect",
           "by": "menuitem",
-          "name": "Generate on this Host",
+          "name": "Generate on this host",
           "value": null
         }
       ],
