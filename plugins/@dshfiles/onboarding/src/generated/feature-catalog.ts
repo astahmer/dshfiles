@@ -462,7 +462,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "rich-composer",
       "description": "Owned fork of DSH's native Conversation plugin with structured session-reference paste.",
       "ui": true,
-      "features": 11
+      "features": 12
     },
     {
       "name": "schedule",
@@ -475,12 +475,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "description": "Browse and manage secret CLI aliases for the selected project, without values crossing to the Client.",
       "ui": true,
       "features": 10
-    },
-    {
-      "name": "send-after-upload",
-      "description": "Queue the send when Enter or Send is pressed while an attachment is still uploading.",
-      "ui": true,
-      "features": 1
     },
     {
       "name": "session-controller",
@@ -20689,6 +20683,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "rich-composer#held-send",
+      "plugin": "rich-composer",
+      "id": "held-send",
+      "title": "Send once the attachments finish uploading",
+      "summary": "Send or Enter while a file or image still uploads holds the message instead of refusing it: Send shows a filling ring, a status line above the composer reads 'Sending when uploads finish (40%)' with Cancel, and the message goes out by itself, in the queue or steer mode it was pr…",
+      "destination": "composer",
+      "currentSurface": "composer: held Send and its status line",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "rich-composer#composer-run-row",
       "plugin": "rich-composer",
       "id": "composer-run-row",
@@ -21366,21 +21372,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": null,
       "onboarding": null
-    },
-    {
-      "key": "send-after-upload#send-after-upload",
-      "plugin": "send-after-upload",
-      "id": "send-after-upload",
-      "title": "Send when the attachment upload finishes",
-      "summary": "Enter, or a press on the disabled Send button, while a file attachment is still uploading queues the send behind a 'Sending when upload finishes…' composer pill whose menu has Cancel. Editing the text or the attachments, Escape or Cancel drops it; it sends on its own once every…",
-      "destination": "composer",
-      "currentSurface": "composer: Sending when upload finishes pill",
-      "reach": [],
-      "reachNarrow": null,
-      "onboarding": {
-        "firstAction": "Attach a large file and press Enter before it finishes uploading.",
-        "doneWhen": "The message sends by itself once the upload ends."
-      }
     },
     {
       "key": "session-controller#live-model-catalog",

@@ -7262,61 +7262,6 @@ importers:
         specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2)
 
-  plugins/@dshfiles/send-after-upload:
-    dependencies:
-      '@dshfiles/dshx':
-        specifier: workspace:*
-        version: link:../../../tooling/dshx/packages/dshx
-      '@dshfiles/plugin-ui':
-        specifier: workspace:*
-        version: link:../plugin-ui
-      '@dshfiles/shared-runtime':
-        specifier: workspace:*
-        version: link:../shared-runtime
-      effect:
-        specifier: 'catalog:'
-        version: 4.1.2
-    devDependencies:
-      '@deepseek-ai/cordis':
-        specifier: 4.1.0
-        version: 4.1.0(@deepseek-ai/cordis-plugin-include@1.1.0)(@deepseek-ai/cordis-plugin-loader@1.1.0)
-      '@deepseek-ai/dsh':
-        specifier: 0.2.2-rc.2
-        version: 0.2.2-rc.2(34f92283d9066be3c40d7129a4797a0c)
-      '@deepseek-ai/dsh-api-session-controller':
-        specifier: 'catalog:'
-        version: 0.2.2-rc.2(1f43b3d9dd1e6635893db5959cc68ec6)
-      '@deepseek-ai/dsh-client-connection':
-        specifier: 'catalog:'
-        version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-scope@0.2.2-rc.2)
-      '@deepseek-ai/dsh-client-locale':
-        specifier: 'catalog:'
-        version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)
-      '@deepseek-ai/dsh-client-ui-conversation':
-        specifier: 'catalog:'
-        version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)
-      '@deepseek-ai/dsh-client-ui-slots':
-        specifier: 'catalog:'
-        version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)
-      '@deepseek-ai/dsh-session':
-        specifier: 'catalog:'
-        version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-error@0.2.2-rc.2)(@deepseek-ai/dsh-scope@0.2.2-rc.2)
-      '@types/node':
-        specifier: 22.20.5
-        version: 22.20.5
-      '@types/react':
-        specifier: 'catalog:'
-        version: 18.3.31
-      react:
-        specifier: 'catalog:'
-        version: 18.3.1
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2)
-
   plugins/@dshfiles/session-controller:
     dependencies:
       '@deepseek-ai/dsh-tools':
