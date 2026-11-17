@@ -596,7 +596,7 @@ When('the vault item behind {string} in {string} is deleted', async ({ page }: {
 When('a thread in the seeded project asks the fake model to {string}', async ({ page }: { page: Page }, directive: string) => {
   const project = fixtureFor(page).project
   if ((await page.getByRole('treeitem', { name: 'secret-project', exact: true }).count()) === 0) await registerWorkspaceFolder(page, project)
-  if ((await page.getByRole('navigation', { name: 'Thread hierarchy', exact: true }).count()) === 0) {
+  if ((await page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ }).count()) === 0) {
     await startThreadWithModel(page, { project: 'secret-project', model: 'commandcode_work/gpt-6-luna' })
   }
   await sendMessage(page, directive)
@@ -830,7 +830,7 @@ const allModelText = (page: Page): string => JSON.stringify(fakeCommandCodeFor(p
 When('a thread in the seeded project asks the agent to request the secret {string}', async ({ page }: { page: Page }, alias: string) => {
   const project = fixtureFor(page).project
   if ((await page.getByRole('treeitem', { name: 'secret-project', exact: true }).count()) === 0) await registerWorkspaceFolder(page, project)
-  if ((await page.getByRole('navigation', { name: 'Thread hierarchy', exact: true }).count()) === 0) {
+  if ((await page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ }).count()) === 0) {
     await startThreadWithModel(page, { project: 'secret-project', model: 'commandcode_work/gpt-6-luna' })
   }
   // The tool call waits for the user, so the turn stays open: send without waiting for it to settle.

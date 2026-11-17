@@ -68,7 +68,7 @@ When('a disposable workspace with source, dependency and version-control files h
     await expect(composer).toHaveText('editor e2e thread', { timeout: 500 })
   }).toPass({ timeout: 15_000 })
   await composer.press('Enter')
-  await expect(page.getByRole('navigation', { name: 'Thread hierarchy', exact: true })).toContainText('editor e2e thread', { timeout: 45_000 })
+  await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('editor e2e thread', { timeout: 45_000 })
 })
 
 When('{string} is opened with Go to file', async ({ page }: { page: Page }, fileName: string) => {
@@ -114,7 +114,7 @@ When('the editor placement is set to {string} in the plugin settings', async ({ 
   // Leaving a global panel can land on the panel shown before it, so the thread is reopened until its view is on screen.
   await expect(async () => {
     await page.getByRole('treeitem', { name: /^editor e2e thread/ }).click()
-    await expect(page.getByRole('navigation', { name: 'Thread hierarchy', exact: true })).toContainText('editor e2e thread', { timeout: 2_000 })
+    await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('editor e2e thread', { timeout: 2_000 })
   }).toPass({ timeout: 20_000 })
 })
 
@@ -184,7 +184,7 @@ Then('{string} opens in the {string} editor with its disk content', async ({ pag
         .click()
       return
     }
-    await expect(page.getByRole('navigation', { name: 'Thread hierarchy', exact: true })).toContainText('editor e2e thread')
+    await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('editor e2e thread')
     // The owned right sidebar names its tab after the view; its Close control is a separate button.
     await expect(page.getByRole('tab', { name: 'Editor', exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(workbenchEditor).toHaveCount(0)
