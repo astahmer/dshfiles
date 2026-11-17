@@ -41,7 +41,7 @@ const KEY_FIELD = {
   codex: null,
   'github-copilot': null,
   claude: {
-    label: 'SETUP TOKEN',
+    label: 'Setup token',
     hint: 'Optional `claude setup-token` reference. The value stays in DSH credentials or DSH’s environment.',
     placeholder: 'CLAUDE_WORK_API_KEY',
   },

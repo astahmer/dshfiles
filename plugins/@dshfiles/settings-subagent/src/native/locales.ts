@@ -36,7 +36,7 @@ export const en: Record<SubagentSettingsLocaleKey, string> = {
   subagentMaxDepth: 'Maximum recursion depth',
   subagentDepthHelpLabel: 'About maximum recursion depth',
   subagentDepthHelp: 'Limits how many levels of Subagents an Agent can create.',
-  subagentDepthZero: 'Disable Subagents',
+  subagentDepthZero: 'Disable subagents',
   subagentDepthOne: 'Only the main Agent can create Subagents',
   subagentDepthOverride: 'If a tool defines its own maximum recursion depth, that setting takes precedence.',
   subagentMaxActive: 'Subagent parallelism limit',

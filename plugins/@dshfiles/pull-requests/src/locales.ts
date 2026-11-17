@@ -8,7 +8,7 @@ const en = {
   description: 'From “{thread}”. Nothing is pushed until you confirm.',
   loading: 'Reading the workspace and drafting a title…',
   previewFailed: 'The preview could not be read. Reopen this dialog to retry. {reason}',
-  retry: 'Try again',
+  retry: 'Retry',
   refresh: 'Refresh preview',
   cancel: 'Cancel',
   close: 'Close',

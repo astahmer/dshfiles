@@ -13,8 +13,8 @@ const en = {
   deleting: 'Deleting…',
   confirmTitle: 'Permanently delete these threads?',
   confirmDescription:
-    'Only the threads in this preview are processed. Changed or loaded threads are skipped. DSH cannot restore deleted logs. Export anything you need before continuing.',
-  confirm: 'Permanently delete',
+    'DSH cannot restore deleted logs. Only the threads in this preview are deleted, and changed or loaded threads are skipped. Export anything you need first.',
+  confirm: 'Delete threads',
   cancel: 'Cancel',
   empty: 'No threads to clean up in this preview.',
   candidates: 'Threads to delete',
@@ -42,8 +42,8 @@ const fr = {
   deleting: 'Suppression…',
   confirmTitle: 'Supprimer définitivement ces fils ?',
   confirmDescription:
-    'Seuls les fils de cet aperçu seront traités. Fils modifiés ou chargés ignorés. DSH ne peut pas restaurer les journaux supprimés. Exportez ce que vous souhaitez conserver avant de continuer.',
-  confirm: 'Supprimer définitivement',
+    'DSH ne peut pas restaurer les journaux supprimés. Seuls les fils de cet aperçu sont supprimés, et les fils modifiés ou chargés sont ignorés. Exportez d’abord ce dont vous avez besoin.',
+  confirm: 'Supprimer les fils',
   cancel: 'Annuler',
   empty: 'Aucun fil à nettoyer dans cet aperçu.',
   candidates: 'Fils à supprimer',

@@ -226,7 +226,7 @@ export const AccountDetail = (props: {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {removeSnapshot.context.target?.displayName ?? selected?.displayName ?? draft.displayName}?</AlertDialogTitle>
             <AlertDialogDescription>The route leaves the model picker. Credentials stay on disk.</AlertDialogDescription>
-            {removeSnapshot.matches('error') ? <p role="alert">Could not remove this profile. Try again or cancel.</p> : null}
+            {removeSnapshot.matches('error') ? <p role="alert">Could not remove this profile. Retry or cancel.</p> : null}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
@@ -235,7 +235,7 @@ export const AccountDetail = (props: {
               onClick={() => sendRemove({ type: removeSnapshot.matches('error') ? 'retry' : 'confirm' })}
               variant="destructive"
             >
-              {removing ? 'Removing…' : removeSnapshot.matches('error') ? 'Try again' : 'Remove profile'}
+              {removing ? 'Removing…' : removeSnapshot.matches('error') ? 'Retry' : 'Remove profile'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -57,7 +57,7 @@ const en = {
   markThreads: 'Mark its threads unread',
   markThreadsHint: 'Threads whose spans tripped the rule get the unread mark in the thread list.',
   saveRule: 'Save rule',
-  retry: 'Try again',
+  retry: 'Retry',
   editRule: 'Edit',
   createRuleTitle: 'New alert rule',
   editRuleTitle: 'Edit alert rule',

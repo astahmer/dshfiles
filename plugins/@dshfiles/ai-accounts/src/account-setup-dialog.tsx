@@ -299,7 +299,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
         {snapshot.matches('error') ? (
           <div className="dshx:flex dshx:flex-col dshx:gap-3">
             <p role="alert">Setup could not be prepared. No account was added. Update DSH and restart it, then retry.</p>
-            <Button onClick={() => send({ type: 'retry' })}>Try again</Button>
+            <Button onClick={() => send({ type: 'retry' })}>Retry</Button>
           </div>
         ) : null}
         {resultUnknown || snapshot.matches('failed') || connection.isError || connection.data?.status === 'discarded' ? (

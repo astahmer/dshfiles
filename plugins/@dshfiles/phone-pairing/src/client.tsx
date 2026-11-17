@@ -75,7 +75,7 @@ const PairingQrButton = (props: { readonly offer: () => Promise<PairingOffer> })
           <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2">
             <p className="dshx:text-center dshx:text-sm dshx:text-muted-foreground">The pairing code could not be created.</p>
             <Button size="sm" variant="outline" onClick={request}>
-              Try again
+              Retry
             </Button>
           </div>
         ) : null}

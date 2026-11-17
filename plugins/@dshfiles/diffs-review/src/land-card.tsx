@@ -153,7 +153,7 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
         <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive" role="alert">
           {errorMessage(status.error, 'Could not read this workspace.')}
           <Button onClick={() => void status.refetch()} size="xs" variant="outline">
-            Try again
+            Retry
           </Button>
         </p>
       </section>

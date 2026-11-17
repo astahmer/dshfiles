@@ -283,7 +283,7 @@ export const ShippedView = (props: {
             <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
               <span className="dshx:min-w-0">{errorMessage(shipped.error, 'What shipped could not be read.')}</span>
               <Button size="xs" variant="outline" onClick={() => void shipped.refetch()}>
-                Try again
+                Retry
               </Button>
             </p>
           )

@@ -139,7 +139,7 @@ When('the selected Echo server is removed after confirmation', async ({ page }: 
   await selectEchoForBatch(page)
   await page.getByRole('button', { name: 'Remove selected', exact: true }).click()
   const dialog = page.getByRole('alertdialog')
-  await expect(dialog).toContainText('Remove this server and stop its native client?')
+  await expect(dialog).toContainText('Remove this server?')
   await dialog.getByRole('button', { name: 'Remove', exact: true }).click()
 })
 

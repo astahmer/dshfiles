@@ -36,7 +36,7 @@ const en = {
   reviewUnavailable: 'The Changes view is not available. Open the thread and review its changes from its side panel.',
   landConfirmTitle: 'Land this work?',
   landConfirmHint:
-    'The thread’s revisions are rebased onto the bookmark and the bookmark moves to them. Nothing is pushed; a busy or conflicted thread is refused.',
+    'Adds this thread’s work to the project. Nothing is pushed.',
   cancel: 'Cancel',
   done: 'Done',
   jumpNextWaiting: 'Jump to next waiting',
@@ -155,7 +155,7 @@ const zh = {
   review: '审阅',
   reviewUnavailable: '“更改”视图不可用。请打开线程，在其侧边栏中审阅更改。',
   landConfirmTitle: '合入这些工作？',
-  landConfirmHint: '线程的修订会变基到书签上，书签随后移到这些修订。不会推送；忙碌或有冲突的线程会被拒绝。',
+  landConfirmHint: '把此对话的工作加入项目。不会推送任何内容。',
   cancel: '取消',
   done: '完成',
   jumpNextWaiting: '跳到下一个待处理项',

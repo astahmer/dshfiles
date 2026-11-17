@@ -95,6 +95,6 @@ describe('SuggestionsSection', () => {
     render(<Harness enabled load={() => undefined} showWhere={() => undefined} value={{ state: 'no-usage', reason: 'Usage is not running.' }} />)
     const section = await screen.findByText('Usage is not running.')
     expect(section.closest('[data-suggestions]')?.getAttribute('data-suggestions')).toBe('no-usage')
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
   })
 })

@@ -304,7 +304,7 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
         scroll
       >
         {overview.isError && data === undefined ? (
-          <EmptyState action={{ label: 'Try again', onSelect: () => void overview.refetch() }}>
+          <EmptyState action={{ label: 'Retry', onSelect: () => void overview.refetch() }}>
             The checklist, packs and features could not be loaded. Try again; if it keeps failing, restart DSH: choose Restart DSH in the command palette, or
             stop DSH in its terminal and start it again.
           </EmptyState>

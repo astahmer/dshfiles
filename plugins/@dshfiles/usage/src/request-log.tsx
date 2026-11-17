@@ -137,7 +137,7 @@ export const RequestLog = (props: {
         <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
           {errorMessage(page.error, 'Requests could not be loaded.')}
           <Button variant="outline" size="xs" disabled={page.isFetching} onClick={() => void page.refetch()}>
-            Try again
+            Retry
           </Button>
         </p>
       ) : null}

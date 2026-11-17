@@ -32,7 +32,7 @@ const Side = (props: { readonly side: ImageSide; readonly alt: string }): JSX.El
         <p className={NOTE} role="alert">
           <span>This image could not be read.</span>
           <Button onClick={retry} size="xs" type="button" variant="outline">
-            Try again
+            Retry
           </Button>
         </p>
       )

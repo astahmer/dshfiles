@@ -71,7 +71,7 @@ const ConfirmBody = (props: TryItDialogProps & { readonly target: TryItTarget })
         {refused === null ? (
           <Button disabled={start.isPending} onClick={() => start.mutate()}>
             {start.isPending ? <Spinner className="dshx:size-4" /> : null}
-            {start.isError ? 'Try again' : 'Start demo'}
+            {start.isError ? 'Retry' : 'Start demo'}
           </Button>
         ) : (
           <Button

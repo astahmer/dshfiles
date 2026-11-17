@@ -651,7 +651,7 @@ export const BacklogPanel = (props: {
           <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-destructive">
             <span className="dshx:min-w-0">{errorMessage(list.error, 'The backlog is unavailable.')}</span>
             <Button size="xs" variant="outline" onClick={() => void list.refetch()}>
-              Try again
+              Retry
             </Button>
           </p>
         ) : null}

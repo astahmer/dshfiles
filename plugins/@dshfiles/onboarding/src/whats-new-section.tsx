@@ -119,7 +119,7 @@ export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
         </p>
         <div>
           <Button onClick={() => void history.refetch()} size="sm" variant="outline">
-            Try again
+            Retry
           </Button>
         </div>
       </PageSection>
@@ -133,7 +133,7 @@ export const WhatsNewSection = (props: WhatsNewSectionProps): ReactNode => {
           <CommitsLink href={value.commitsUrl} />
           {value.state === 'unreadable' ? (
             <Button onClick={() => void history.refetch()} size="sm" variant="ghost">
-              Try again
+              Retry
             </Button>
           ) : null}
         </div>

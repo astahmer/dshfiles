@@ -25,7 +25,7 @@ export const networkEnglish = {
   saveFailed: 'Could not save network preferences.',
   loading: 'Reading network access…',
   unavailable: 'Network settings did not load. Update DSH or restart it, then reopen this page.',
-  retry: 'Try again',
+  retry: 'Retry',
   readOnly: 'Network preferences are read-only in this deployment.',
   unsupported: 'This launcher does not support managed network preferences.',
   setup: 'This profile has custom network configuration. Update its startup wiring and restart DSH to use these controls.',
