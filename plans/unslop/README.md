@@ -5,8 +5,8 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1 to 13 are done. Step 14 (guardrails) is next, then one pass over the follow-ups the lanes
-left for plugins outside their scope. See [Work list](#work-list).
+**Resume here:** all 14 steps are done. What is left is under [Follow-ups](#follow-ups): items the lanes found
+outside their scope, none started. See [Work list](#work-list).
 
 ## Method and limits
 
@@ -201,7 +201,7 @@ before and passes after; see each revision's description for the reason.
 | 11 ✅ | Copy: catalog summaries one sentence, errors with a next step, six status words, glossary, short settings descriptions, Retry. C3 dropped. See [Catalog copy lane](#catalog-copy-lane) and [UI copy lane](#ui-copy-lane). | C1–C8 | large |
 | 12 ✅ | Backlog and Traces on the kit `Page` (History and Source control were done in the Land lane). See [Backlog lane](#backlog-lane). | P5, P7, P8, P12 | large |
 | 13 ✅ | Phone: kit text follows the density tokens (15/13 px), a sideways phone keeps the phone shell, full-screen palette, no keyboard hints on touch, page titles printed once. See [Phone lane](#phone-lane). | U7, U8, N12 | large |
-| 14   | Guardrails: both ratchets into `check:green` after re-baselining, widen `copy-check`, add rules for shadows, durations, viewport variants and solid status fills, repair the catalog walks. | G1–G7 | medium |
+| 14 ✅ | Guardrails: both ratchets in `check:green` and CI, `copy-check` widened, new rules for shadows, durations, viewport variants, solid status fills and more. G6 (catalog walks) dropped. See [Guardrails lane](#guardrails-lane). | G1–G7 | medium |
 
 ## Transcript lane
 
@@ -358,6 +358,34 @@ Unverified:
   checked.
 
 jj-integration's Host half changed (`/rebase` wording), so a running instance needs a restart.
+
+## Guardrails lane
+
+27 revisions (`ktusqnvlsxyo` … `ysuqqxmoznzz`) in scripts, CI, plugin-ui and the docs.
+
+- `check:design-tokens` (541 findings) and `check:copy` (138) run in `check:green` and in CI's `repo` job, and exit 0.
+  The copy baseline is keyed by term and plugin. 13 design-token keys were raised to their current counts, because
+  the check was already over its baseline (194 against 178) before this work; two of those are new since the audit
+  (`text-[15px]` in thread-sidebar's phone shell, one radius in a chat native CSS file).
+- New design-token rules, each with a unit test: default shadow steps (92), numeric durations (47), viewport variants
+  in plugin code (46; dialog `max-w-*` allowed), solid status fills outside the kit (32), numbered palette colours
+  (2), `uppercase` (20), spin or pulse without a reduced-motion variant (10), `outline-none` on a control with no
+  focus style (4). The four forks it used to skip are now counted (96).
+- `copy-check` now reads native directories (30 new), settings descriptions (1), catalog text (15), `locale/en.json`
+  (1), label tables in plain `.ts` (5) and template-literal prefixes (11). New rules: "Host" as the server process
+  (9), package names (2), messages ending in a raw error (13), non-canonical status words (21), "Try again" (0),
+  "..." (0). Non-English tables are skipped.
+- The kit maps Tailwind's `shadow-xs..2xl` onto the elevation levels, so 92 default shadows draw the design's
+  elevation. Compared on the component gallery; an open popover or dialog was not screenshotted.
+- DESIGN.md: 105 plugins; the working glyph is a turning ring and the 2.2 s shimmer is only the activity line; phone
+  text sizes and the sideways-phone shell. `docs/repository-checks.md` lists every ratchet rule.
+
+Dropped: G6. A static check finds every reach label in source, because the native forks carry core labels; the stale
+steps are stale because the default composition hides those rows, which only a browser walk shows.
+
+`check:green` parts that fail identically at the base: `test:scripts` (one `profile-sync` test), `check:effect-native`
+(two multi-host mocks), `knip` (two unused files). Not run: `check:dshx`, full `check:plugins`, `check:plugin-boot`,
+`check:e2e:smoke`.
 
 ## UI copy lane
 
@@ -599,6 +627,32 @@ lane's base:
   repaired.
 
 Phone layout was checked in Chromium at 390 px only.
+
+## Follow-ups
+
+Found by the lanes, outside their scope; none started. Grouped by owner.
+
+- **jj-integration:** "Land" as a header button on a phone (fill `conversation.session.header.changes`, which the
+  phone bar already shows); the thread list's inline Land runs without the confirmation the header button has; two
+  black Land buttons when the Changes view is open; "Download thread log" in two menus; Host strings still say
+  "revision(s)" and "rebased".
+- **thread-sidebar:** read `@dshfiles/background-jobs/running-threads` so a thread with a running job is Working; the
+  "Restart" status item renders an empty button when there is nothing to restart; three "session" strings left.
+- **plugin-ui:** the cost and trace waterfall summaries use ALL-CAPS truncated labels; `ToolCard` draws a green check
+  on a passed card; `DialogContent` defaults to 8 px corners; `Page` tabs cannot act as navigation links; no duration
+  utilities.
+- **chat and dshx:** a transcript-only tool label (`tool.label(output)` in `presentationMeta`) so a tool row can say a
+  sentence without hiding data from the model; the retry row shows a route id instead of the account name; the
+  duplicate "Ask question · waiting · Answer" row is core (`dsh-client-ui-tool`).
+- **Phone width rules:** workbench (`dockview-theme.css`, `phone-sheet.tsx`, `header-seat.ts`), four rich-composer
+  components and onboarding's `reach-model.ts` key on width alone instead of the kit's phone-shell rule. 11 px text
+  remains in Usage chart axes, the question card header and the failure card's code.
+- **Other:** Backlog's status groups colour Done green and In progress amber; the model picker's amber "10%" per row
+  and its bordered card in the sheet; package descriptions shown in Getting started; durations read "120ms" where
+  traces journeys expect "120 ms"; cost charted in three places; the row menu's Snooze label for Park (see
+  [Destinations lane](#destinations-lane)).
+- **Harness:** many journeys fail at the base on the shared "start a second thread" and "Add a project" steps;
+  catalog `reach` walks drift silently and need a periodic browser walk.
 
 ## Open items
 
