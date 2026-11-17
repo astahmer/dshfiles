@@ -118,3 +118,10 @@ test('palette-colour: numbered Tailwind palette classes, not semantic colours or
     'dshx:border-l-amber-300',
   ])
 })
+
+test('uppercase: the class and the CSS declaration, not other text transforms', () => {
+  assert.deepEqual(ruleHits('uppercase', "cn('dshx:uppercase dshx:md:uppercase dshx:capitalize dshx:normal-case')"), ['dshx:uppercase', 'dshx:md:uppercase'])
+  assert.deepEqual(ruleHits('uppercase', '.a { text-transform: uppercase; }\n.b { text-transform: none; }', 'plugins/@dshfiles/demo/src/a.module.css'), [
+    'text-transform: uppercase',
+  ])
+})

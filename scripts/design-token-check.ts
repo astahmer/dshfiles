@@ -133,6 +133,12 @@ export const designTokenRules: readonly DesignTokenRule[] = [
         ),
       ),
   },
+  {
+    // DESIGN.md: labels are sentence case; ALL-CAPS labels are banned. A keyboard key cap is drawn by Kbd.
+    id: 'uppercase',
+    use: 'sentence case in the copy itself (a type token for the overline style), or Kbd for a key',
+    matches: (line, file) => (isCss(file) ? all(/text-transform:\s*uppercase\b/g, line) : classes(line, file, token => token.utility === 'uppercase')),
+  },
 ]
 
 /** Files that define the tokens: colour literals there are the palette itself. */
