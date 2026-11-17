@@ -234,7 +234,7 @@ const saveAndReturnToThread = async (page: Page): Promise<void> => {
       .getByRole('treeitem', { name: /^Fake thread title/ })
       .first()
       .click()
-    await expect(page.getByRole('navigation', { name: 'Thread hierarchy', exact: true })).toContainText('Fake thread title', { timeout: 2_000 })
+    await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('Fake thread title', { timeout: 2_000 })
   }).toPass({ timeout: 20_000 })
 }
 
