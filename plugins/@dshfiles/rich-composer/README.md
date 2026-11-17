@@ -164,6 +164,12 @@ In the new-thread bar the agent preset and the chip sit side by side under one h
 seat is a single Slot: the mode chip holds it at priority -1, and an empty occupant at -2 shadows it while the setting
 is on and is disposed when it turns off; the change applies live.
 
+`showComposerExtras` shows undo, history and saved prompts (with the side-question button) in the composer bar. Off,
+they are rows of the bar's More (⋯) menu, with their keys.
+
+`showAgentPresetPicker` always shows the agent mode picker (Standard mode, Creator, …). Off, it shows only when a new
+thread will start with a non-default agent mode; ⌘K "Agent mode" and the composer's ⋯ menu still choose one.
+
 ## Updating from DSH
 
 When the installed DSH package changes:

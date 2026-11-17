@@ -7,12 +7,12 @@ export const modelEffortPickerSettings = defineSettings({
     accountSwap: Schema.boolean()
       .default(false)
       .description(
-        'Also show a swap button beside the model picker that moves the thread to the next account offering the same model. Off: the model menu’s Account section switches accounts.',
+        'Show a button beside the model picker that moves the thread to the next account with the same model.',
       ),
     accountSwapRoutes: Schema.array(Schema.string())
       .default([])
       .description(
-        'Provider routes the swap button rotates through, in model catalog order (for example codex-alex1). Leave empty to rotate through every route that offers the selected model.',
+        'Routes the swap button rotates through, in catalog order (empty: every route with the model).',
       ),
   }),
   applies: 'live',

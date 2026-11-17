@@ -28,7 +28,7 @@ export const tracesSettings = defineSettings({
     redactGenAiContent: Schema.boolean()
       .default(true)
       .description(
-        'Store GenAI message, prompt and tool-payload attributes (gen_ai.input.messages, gen_ai.tool.call.arguments, …) as their size only. Exporters send them only when content capture is opted into.',
+        'Store GenAI messages, prompts and tool payloads as their size only.',
       ),
     retentionHours: Schema.natural().min(1).max(720).default(72).collapse().description('Drop stored telemetry older than this many hours.'),
     retentionSpans: Schema.natural().min(1_000).max(1_000_000).default(30_000).collapse().description('Keep at most this many spans; the oldest whole traces go first.'),

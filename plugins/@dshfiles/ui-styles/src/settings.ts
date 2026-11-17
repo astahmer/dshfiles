@@ -60,12 +60,12 @@ export const appearanceSettings = defineSettings({
       .max(SCENE_FRAME_RATE.max)
       .default(SCENE_FRAME_RATE.default)
       .description(
-        `Most frames per second an animated backdrop scene is drawn at (${SCENE_FRAME_RATE.min}–${SCENE_FRAME_RATE.max}, default ${SCENE_FRAME_RATE.default}; the display's rate caps it). The scene is drawn on a canvas off the page's main thread; 0 shows a still picture. The backdrop only moves in the focused tab; every other tab holds its frame.`,
+        `Most frames per second for an animated backdrop, from ${SCENE_FRAME_RATE.min} to ${SCENE_FRAME_RATE.max} (0 shows a still picture).`,
       ),
     customTheme: Schema.string()
       .default('')
       .description(
-        'Id of a saved theme to use instead of the preset. Ask the agent for any theme ("a Nord theme", "Tokyo Night with falling snow"); it saves it and switches to it. Empty uses the preset.',
+        'Id of a saved theme to use instead of the preset (ask the agent to make one).',
       ),
     customThemes: Schema.array(Schema.any())
       .default([])

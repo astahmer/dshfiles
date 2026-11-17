@@ -40,7 +40,7 @@ export const jujutsuSettings = defineSettings({
     composerBar: Schema.boolean()
       .default(true)
       .description(
-        'Show the Changes pill (net file diff, opens the Changes view) in the thread header and the phone top bar when the thread runs in a JJ workspace.',
+        'Show the Changes pill in the thread header when the thread runs in a JJ workspace.',
       ),
     composerChips: Schema.boolean().default(true).description('Show workspace, folder and working-copy chips below the composer.'),
     headerToggle: Schema.boolean()
@@ -60,7 +60,7 @@ export const jujutsuSettings = defineSettings({
     composerBarBase: Schema.string()
       .default('project')
       .description(
-        'Default base of the composer bar: `project` (since the fork point with the project’s main branch, Settings › Projects; `main` without one), `parent` (working copy vs @-), `trunk` (since trunk()), a local bookmark such as `main`, or a selected remote bookmark.',
+        'What the composer bar diffs against: project, parent, trunk, or a bookmark.',
       ),
   }),
   applies: 'live',
