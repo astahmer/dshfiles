@@ -2243,7 +2243,7 @@ Then('the composer contains the native mention chip at the captured cursor', asy
   if (journey === undefined) throw new Error('No thread mention journey was recorded for this browser page.')
   const composer = page.getByRole('textbox').first()
   const chip = composer.locator('[data-composer-chip="reference"]')
-  const failureNotice = page.getByText('Could not resolve this thread mention.', { exact: true })
+  const failureNotice = page.getByText('Could not find this thread. Check the link, or search for it.', { exact: true })
   const unavailableNotice = page.getByText('This thread cannot be mentioned from the current conversation.', { exact: true })
 
   await recordAssertion(page, 'thread-sidebar-mention-inserts-native-chip-at-captured-cursor', async () => {

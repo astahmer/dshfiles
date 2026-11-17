@@ -14,7 +14,7 @@ const threadHeader = (page: Page, title: string) =>
   page
     .locator('[data-conversation-session]:visible')
     .getByText(title, { exact: true })
-    .or(page.getByRole('navigation', { name: 'Session hierarchy' }).getByText(title, { exact: true }))
+    .or(page.getByRole('navigation', { name: 'Thread hierarchy' }).getByText(title, { exact: true }))
     .first()
 
 // A click while the previous turn settles can be dropped, so the New-thread screen is awaited and the click retried.

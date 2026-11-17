@@ -204,7 +204,7 @@
         "fill textbox \"New secret name\" \"STRIPE_API_KEY\"",
         "fill textbox \"New secret value\" \"scratch-fake-typed-value\"",
         "click button \"Actions for STRIPE_API_KEY\"",
-        "expect menuitem \"Generate on this Host\""
+        "expect menuitem \"Generate on this host\""
       ],
       "surfaces": ["client", "host"],
       "surface": "settingsSection",

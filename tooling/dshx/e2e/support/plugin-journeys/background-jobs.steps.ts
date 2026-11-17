@@ -75,7 +75,7 @@ When('a thread starts a running bash job whose label exceeds the wire bound', as
 
 Then('the board shows that job with its label clamped to the bound', async ({ page }: { page: Page }) => {
   await openJobs(page)
-  await page.getByRole('radio', { name: 'Running', exact: true }).click()
+  await page.getByRole('radio', { name: 'Working', exact: true }).click()
   await recordAssertion(page, 'background-jobs-clamps-an-oversized-live-label', async () => {
     const row = page.locator('[data-job-id]').filter({ hasText: 'oversized-label' }).first()
     await expect(row).toBeVisible({ timeout: 45_000 })
@@ -111,7 +111,7 @@ When('a thread starts two running bash jobs', async ({ page }: { page: Page }) =
 
 When('the Jobs panel lists both batch jobs in the Running scope', async ({ page }: { page: Page }) => {
   await openJobs(page)
-  await page.getByRole('radio', { name: 'Running', exact: true }).click()
+  await page.getByRole('radio', { name: 'Working', exact: true }).click()
   await expect(page.locator('[data-job-id]').filter({ hasText: 'batch-stop' })).toHaveCount(2, { timeout: 45_000 })
 })
 
@@ -139,7 +139,7 @@ Then('the category filter, the scope and the search narrow the board', async ({ 
   })
 
   await recordAssertion(page, 'background-jobs-finished-scope-excludes-interrupted-records', async () => {
-    await page.getByRole('radio', { name: 'Finished', exact: true }).click()
+    await page.getByRole('radio', { name: 'Done', exact: true }).click()
     await expect.poll(() => fixtureRows(page).count()).toBe(4)
     await expect(fixtureRows(page).filter({ hasText: 'sleep 600' })).toHaveCount(0)
   })
