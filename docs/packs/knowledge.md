@@ -32,18 +32,18 @@ From the onboarding feature catalog: 21 features, the 6 curated ones first.
 
 ### Curated
 
-1. **Browse and clean up memory in the Memory panel** (`memory`, knowledge) — A full Memory page with Notes, Threads and Analytics tabs: a searchable, filterable note list with a source-and-evidence detail pane (edit, forget, reversible archive, restore, superseded history, related memories), on-demand Jev relevance suggestions with explicit per-note arch…
-2. **Preview cited memory inline** (`memory`, knowledge) — Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens a compact, scrollable inline card that mirrors the Memory panel — tone and status badges, the note as its title, Source & evidence with the source thread, the…
-3. **Show what memory costs and whether it holds up** (`memory`, knowledge) — Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the use…
-4. **Forget a selection of notes** (`memory`, knowledge) — Valid notes carry a checkbox; Shift/Cmd select ranges and toggles, select-all covers the visible valid notes, and one confirmed action forgets the selection with a shared reason. Superseded and forgotten notes never get a checkbox.
+1. **Browse and clean up memory in the Memory panel** (`memory`, knowledge) — Browse, edit, archive and forget notes, and read thread digests, on the Memory page.
+2. **Preview cited memory inline** (`memory`, knowledge) — Click a memory citation in a thread to see the note and where it came from.
+3. **Show what memory costs and whether it holds up** (`memory`, knowledge) — See what memory costs in tokens and whether answers that cite it hold up.
+4. **Forget a selection of notes** (`memory`, knowledge) — Select several notes and forget them with one confirmation.
 5. **Attach named outside directories and git repositories to a thread** (`references`, knowledge) — Save a reference (a directory read in place, or a git URL shallow-cloned under $DSH_HOME/references), attach it to a Session with /reference or the reference_* tools, and name every attached reference with its absolute path in that Session's runtime context.
 6. **Claude Code and Codex history** (`agentsview`, knowledge) — Browse what Claude Code and Codex recorded on this machine and read any run as a transcript.
 
 ### More
 
-1. **Digest idle threads from DSH's own session logs** (`memory`) — Once a thread has been idle for idleMs, build its digest from the session log (user requests, verbatim corrections and decisions, todos, goal, jj revision descriptions, final answer) without a model call; only a thread with no trail of its own gets one cheap call. Blank and triv…
-2. **Start every thread with one frozen memory block** (`memory`) — At the first prompt assembly of each agent (subagents included), append a byte-bounded block to the end of the system prompt: a fixed instruction, notes, and thread pointers grouped by project and ranked by citations then recency. Jujutsu workspace paths resolve to their shared…
-3. **Search, read and note memory from any agent** (`memory`) — memory_search ranks (BM25, or hybrid with a configured local embedding provider) digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a…
+1. **Digest idle threads from DSH's own session logs** (`memory`) — An idle thread gets a short digest of its requests, decisions and answer, mostly without a model call.
+2. **Start every thread with one frozen memory block** (`memory`) — Each thread starts with a short memory block of notes and past threads for its project.
+3. **Search, read and note memory from any agent** (`memory`) — Agents search memory, read a digest or note, and save new notes.
 4. **Serve session search from a worker-owned index** (`session-search`) — Replace the stock sessionQuery backend: searches are pure reads forwarded to a worker that owns the SQLite FTS5 index and ingests session logs incrementally, while list, read and title reads stay core's own code with cached folds.
 5. **Find every match in one thread** (`session-search`) — Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the session_find_in_thread agent tool. An archived Session is indexed for that request.
 6. **Search the prompts sent across threads** (`session-search`) — Serve the newest prompts a person sent across every top-level thread, newest first and each text once, from a time-ordered user_prompts table beside the FTS index: bounded by a window of newest prompts and a size cap, optionally narrowed to prompts holding every typed word. Suba…

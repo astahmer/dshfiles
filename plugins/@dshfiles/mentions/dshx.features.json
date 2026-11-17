@@ -5,7 +5,8 @@
     {
       "id": "ranked-mentions",
       "title": "Ranked @ mentions for files and threads",
-      "summary": "One @ menu that interleaves local files and threads plus this DSH's remote threads by match quality, recency, and workspace or project; @thread: / @t: and @file: / @f: narrow results, and picks insert native reference chips.",
+      "summary": "One @ menu ranks files and threads, here and on other hosts, by how well they match.",
+      "details": "One @ menu that interleaves local files and threads plus this DSH's remote threads by match quality, recency, and workspace or project; @thread: / @t: and @file: / @f: narrow results, and picks insert native reference chips.",
       "reach": [
         "click button \"New session\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Seed a mention target\"",
@@ -97,7 +98,8 @@
     {
       "id": "session-mention-links",
       "title": "Referenced threads open on click",
-      "summary": "A thread chip in the composer, the thread chip in a sent message (a higher-priority renderer of the native user-text session node), its \"Referenced session \u00b7 \u2026\" line (a Chat inline reference) and an Agent-written `@[label](dsh-session:\u2026)` link (a `dsh-session` link handler) open that thread. With @dshfiles/main-tabs the thread opens per the tabs openMode setting, and Cmd/Ctrl-click always opens a new tab.",
+      "summary": "A thread you mention opens when you click it, in the composer or in a sent message.",
+      "details": "A thread chip in the composer, the thread chip in a sent message (a higher-priority renderer of the native user-text session node), its \"Referenced session \u00b7 \u2026\" line (a Chat inline reference) and an Agent-written `@[label](dsh-session:\u2026)` link (a `dsh-session` link handler) open that thread. With @dshfiles/main-tabs the thread opens per the tabs openMode setting, and Cmd/Ctrl-click always opens a new tab.",
       "reach": [
         "seed tool-call-thread",
         "click button \"New session\"",

@@ -5,7 +5,8 @@
     {
       "id": "mcp-endpoint",
       "title": "Drive DSH threads from an outside agent over MCP",
-      "summary": "Serve an MCP server (streamable HTTP, stateless, JSON responses) at /mcp on the DSH Web server. Claude Code, Codex or any MCP client with the bearer token can list projects and threads, read a thread's recent messages, create a thread with a first prompt and model, queue or steer a message, wait for the turn to end (at most 5 minutes) and stop a turn. Every tool is a sessions API call made as @dshfiles/mcp-endpoint.",
+      "summary": "Let Claude Code, Codex or any MCP client list, start and follow DSH threads.",
+      "details": "Serve an MCP server (streamable HTTP, stateless, JSON responses) at /mcp on the DSH Web server. Claude Code, Codex or any MCP client with the bearer token can list projects and threads, read a thread's recent messages, create a thread with a first prompt and model, queue or steer a message, wait for the turn to end (at most 5 minutes) and stop a turn. Every tool is a sessions API call made as @dshfiles/mcp-endpoint.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -68,7 +69,8 @@
     {
       "id": "mcp-endpoint-plugin-tools",
       "title": "Expose plugin tools to MCP clients",
-      "summary": "Expose existing plugin agent tools through the authenticated MCP endpoint, subject to an off-by-default read-only or read-write setting.",
+      "summary": "Off by default: MCP clients can also use agent tools, read-only or read and write.",
+      "details": "Expose existing plugin agent tools through the authenticated MCP endpoint, subject to an off-by-default read-only or read-write setting.",
       "surfaces": ["host", "integration", "api", "tool"],
       "surface": "infrastructure",
       "destination": "none",
@@ -114,7 +116,8 @@
     {
       "id": "mcp-endpoint-settings",
       "title": "Issue an MCP token and connect a client",
-      "summary": "Settings › MCP endpoint and the MCP endpoint: connect a client palette command open copyable setup instructions for Claude Code, Codex, Cursor, VS Code and generic JSON. The section generates, rotates and revokes a bearer token and controls LAN access; a freshly issued token appears once and only its SHA-256 is stored. The agent can read status, revoke a token and switch LAN access but cannot issue a token.",
+      "summary": "Create an MCP token and copy setup steps for Claude Code, Codex, Cursor or VS Code.",
+      "details": "Settings › MCP endpoint and the MCP endpoint: connect a client palette command open copyable setup instructions for Claude Code, Codex, Cursor, VS Code and generic JSON. The section generates, rotates and revokes a bearer token and controls LAN access; a freshly issued token appears once and only its SHA-256 is stored. The agent can read status, revoke a token and switch LAN access but cannot issue a token.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"MCP endpoint\"", "expect tab \"Claude Code\""],
       "reachNarrow": [
         "click button \"Account menu\"",
