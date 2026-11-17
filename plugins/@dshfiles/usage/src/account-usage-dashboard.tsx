@@ -363,7 +363,7 @@ const AccountUsagePeriodPanel = (props: AccountUsageViewProps & { readonly perio
         <p>Account usage unavailable.</p>
         <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">
           {isApiOwnerMissing(usage.error)
-            ? 'The Usage plugin is not active on this Host. Enable it to view recorded account usage.'
+            ? 'The Usage plugin is off. Enable it in Plugins to see recorded account usage.'
             : errorMessage(usage.error, 'Could not load recorded account usage.')}
         </p>
         <Button

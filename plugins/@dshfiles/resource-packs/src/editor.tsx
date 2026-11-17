@@ -116,7 +116,7 @@ export function ResourceEditor(props: {
       {query.isPending && <p role="status">Loading resource…</p>}
       {query.error !== null && (
         <p role="alert">
-          {isApiOwnerMissing(query.error) ? 'Resources unavailable: the Host plugin is not active.' : errorMessage(query.error, 'Could not load resource.')}
+          {isApiOwnerMissing(query.error) ? 'Resources did not load. Restart DSH, then reopen this page.' : errorMessage(query.error, 'Could not load resource.')}
         </p>
       )}
       {resource !== undefined && (

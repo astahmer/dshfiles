@@ -24,7 +24,7 @@ type PromptSource = 'saved' | 'recent' | 'history'
 
 const sourceTitle = { saved: 'Saved prompts', recent: 'Recent messages', history: 'Prompt history' } satisfies Record<PromptSource, string>
 const sourceNote = {
-  saved: 'Saved text is shared through the Host. Files and attachments are not included.',
+  saved: 'Saved text is shared across your threads. Files and attachments are not included.',
   recent: 'Recent text from this thread only. Attachments are not included.',
   history: 'Every prompt you sent, across threads. Star one to keep it in Saved.',
 } satisfies Record<PromptSource, string>

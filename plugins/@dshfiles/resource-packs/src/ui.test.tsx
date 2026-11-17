@@ -314,7 +314,7 @@ describe('Resources UI', () => {
     const view = provider(<ResourcesPanel api={absent} openConversation={() => null} />)
     expect(await screen.findByRole('alert')).toHaveProperty(
       'textContent',
-      'Resources unavailable: the Host plugin is not active. No background retries will run. Reopen this page after the plugin is activated.',
+      'Resources did not load. Restart DSH, then reopen this page.',
     )
     const cache = view.queryClient.getQueryCache()
     const catalogQuery = cache.find({ queryKey: ['resource-packs', 'catalog'] })

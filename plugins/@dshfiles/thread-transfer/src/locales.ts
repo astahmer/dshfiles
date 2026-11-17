@@ -9,7 +9,7 @@ const en = {
   exportTitle: 'Export thread',
   exportDescription:
     'Saves every message, tool call and result, attachment, the title and the model in one .dshthread file. Another DSH imports it as a new thread; it needs none of this machine’s folders or credentials.',
-  exportPreparing: 'Preparing the bundle…',
+  exportPreparing: 'Preparing the file…',
   exportReady: 'Saved {file}',
   exportStats: '{messages} messages · {events} events · {attachments}',
   attachmentsNone: 'no attachments',
@@ -19,7 +19,7 @@ const en = {
   importTitle: 'Import thread',
   importDescription: 'Pick a .dshthread file exported from DSH. It becomes a new thread here; the original stays untouched.',
   importPick: 'Choose a .dshthread file',
-  importUploading: 'Reading the bundle…',
+  importUploading: 'Reading the file…',
   importModel: 'Model {model}',
   importFolderHint: 'Exported from a folder named {folder}',
   importDestination: 'Run it in',

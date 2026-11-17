@@ -16,10 +16,10 @@ export const onboardingSettings = defineSettings({
       ),
     checklist: Schema.boolean()
       .default(true)
-      .description('Show the self-ticking setup checklist on Getting started. Off skips every Host check, the GitHub one included.'),
+      .description('Show the setup checklist on Getting started. Off skips every check, GitHub included.'),
     githubCheck: Schema.boolean()
       .default(true)
-      .description('Tick the GitHub item by running `gh auth status` on the Host, at most once a minute while Getting started or the agent asks.'),
+      .description('Tick the GitHub item by running `gh auth status` on this host, at most once a minute.'),
     packs: Schema.boolean().default(true).description('Show plugin packs on Getting started with each plugin enabled, disabled or not installed.'),
     curatedOnly: Schema.boolean().default(true).description('List only the curated major features on Getting started until you search.'),
     whatsNew: Schema.boolean()

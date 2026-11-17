@@ -47,7 +47,7 @@ function NewBoardDialog(props: {
         >
           <DialogHeader>
             <DialogTitle>New whiteboard</DialogTitle>
-            <DialogDescription>The board is saved on this DSH Host under the selected project.</DialogDescription>
+            <DialogDescription>The board is saved by this DSH under the selected project.</DialogDescription>
           </DialogHeader>
           <Input aria-label="Board title" autoFocus maxLength={120} value={title} onChange={event => setTitle(event.currentTarget.value)} />
           <DialogFooter>
@@ -130,9 +130,9 @@ function BoardsBody(props: {
   if (isApiOwnerMissing(list.error instanceof Error ? list.error : null))
     return (
       <Alert variant="warning">
-        <AlertTitle>The whiteboard Host plugin is not running</AlertTitle>
+        <AlertTitle>Whiteboards are not running</AlertTitle>
         <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          Retry once DSH is back; if it keeps failing, restart DSH so the updated @dshfiles/whiteboard Host bundle loads, then reload this page.
+          Retry once DSH is back. If it keeps failing, restart DSH, then refresh this page.
           <Button variant="outline" size="sm" onClick={() => void list.refetch()}>
             Retry
           </Button>
@@ -144,7 +144,7 @@ function BoardsBody(props: {
       <Alert variant="destructive">
         <AlertTitle>Whiteboards could not be listed</AlertTitle>
         <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          {errorMessage(list.error, 'The Host did not answer.')}
+          {errorMessage(list.error, 'DSH did not answer.')}
           <Button variant="outline" size="sm" onClick={() => void list.refetch()}>
             Retry
           </Button>
