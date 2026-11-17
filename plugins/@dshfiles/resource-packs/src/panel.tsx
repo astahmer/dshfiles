@@ -105,8 +105,8 @@ export function ResourcesPanel(props: { api: ResourcePacksClient; openConversati
             </Button>
           </div>
           {catalog.isPending && <p role="status">Loading property packs…</p>}
-          {catalog.error !== null && <p role="alert">{errorMessage(catalog.error, 'Could not load packs.')}</p>}
-          {list.error !== null && <p role="alert">{errorMessage(list.error, 'Could not load resources.')}</p>}
+          {catalog.error !== null && <p role="alert">{errorMessage(catalog.error, 'Could not load packs. Reopen this page to retry.')}</p>}
+          {list.error !== null && <p role="alert">{errorMessage(list.error, 'Could not load resources. Reopen this page to retry.')}</p>}
           {references.error !== null && (
             <p role="alert">{errorMessage(references.error, 'Reference choices could not be loaded. You can still enter a source reference.')}</p>
           )}

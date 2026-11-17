@@ -22,16 +22,16 @@ export default defineClient({
       if (ref.provider !== 'dsh' || ref.kind !== 'conversation') return 'This source has no native opener. Its reference is shown as text.'
       const workspaces = ctx.workspaces.list.getSnapshot()
       if (workspaces.phase !== 'ready' || workspaces.archivedSessionIds.some(id => id === ref.id))
-        return 'This conversation is unavailable or archived. It was not opened or restored.'
+        return 'This thread is gone or archived. Nothing was opened.'
       const sessions = ctx.sessions.list.getSnapshot()
       const id = sessions.ids.find(candidate => candidate === ref.id)
       const session = id === undefined ? undefined : sessions.byId[id]
-      if (session === undefined) return 'This conversation is not available in the current session list. Its reference has been preserved.'
+      if (session === undefined) return 'This thread is not in the thread list. Its reference is kept.'
       try {
         ctx.uiWorkspace.openSession(session.id)
         return null
       } catch {
-        return 'This conversation could not be opened. Its reference has been preserved.'
+        return 'This thread could not be opened. Its reference is kept, so you can retry.'
       }
     }
     ctx.slots.inject('sidebar.panellist', () =>

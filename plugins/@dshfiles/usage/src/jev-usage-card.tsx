@@ -39,7 +39,7 @@ export const JevUsageCard = (props: { readonly usage: JevUsageView | undefined; 
   return (
     <Panel title="Jev API usage" description="DSH-local estimated usage · $0.042 per 1M input tokens · output free. Not provider account balance.">
       {props.failed ? (
-        <p className="dshx:text-xs dshx:text-destructive">{errorMessage(props.error, 'Jev usage could not be loaded.')}</p>
+        <p className="dshx:text-xs dshx:text-destructive">{errorMessage(props.error, 'Jev usage did not load. Reopen this page to retry.')}</p>
       ) : props.usage === undefined ? (
         <p className="dshx:text-xs dshx:text-muted-foreground">Loading…</p>
       ) : (
