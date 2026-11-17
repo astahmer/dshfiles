@@ -298,10 +298,10 @@ rail destination; 29 features.
 | activity-timeline/activity-feed: Activity feed | destinationSection | left-nav: Activity Timeline: Activity |
 | activity-timeline/verification-receipts: Check results in the activity feed | destinationSection | left-nav: Activity Timeline: Activity › receipt detail |
 | ai-accounts/quota-dashboard: Read provider quota and usage status | destinationSection | status-strip: Quota › usage popover |
-| ai-accounts/quota-forecast: Forecast when each account runs out, whether a kind kept an account free, and the order to use them in | destinationSection | left-nav: AI Accounts: Quota forecast |
+| ai-accounts/quota-forecast: Forecast when each account runs out | destinationSection | left-nav: AI Accounts: Quota forecast |
 | ai-accounts/usage-history-and-pricing: Review usage history and cost forecasts | destinationSection | left-nav: AI Accounts: Usage history |
-| background-jobs/jobs-board: Cross-Session background jobs board | destinationSection | left-nav: Background Jobs: Jobs |
-| background-jobs/processes-page: Observe › Processes: jobs, dev servers and RAM on one page | destinationSection | observe: Processes |
+| background-jobs/jobs-board: Background jobs across threads | destinationSection | left-nav: Background Jobs: Jobs |
+| background-jobs/processes-page: Processes: jobs, dev servers and RAM | destinationSection | observe: Processes |
 | multi-host/checkout-sync: Sync a jj checkout on another host | destinationSection | left-nav: Hosts › Sync checkout |
 | multi-host/fleet-update: Update every host from the Hosts page | destinationSection | left-nav: Hosts › Update hosts |
 | multi-host/host-management: Manage hosts on a dedicated page | destinationSection | left-nav: Hosts |
@@ -356,7 +356,7 @@ rail destination (bottom); 67 features.
 | component-gallery/component-gallery-page: Browse every shared component on one page | destinationSection | rail: Settings › Developer › Component gallery |
 | plugin-guide/plugin-guide: Browse where a plugin can extend DSH | destinationSection | rail: Settings › Developer › Plugin guide |
 | mcp-servers/batch-server-actions: Batch enable, disable and remove MCP servers | rowAction | left-nav: MCP Servers: Servers › batch actions |
-| ai-accounts/account-lifecycle: Manage provider account drafts | settingsSection | left-nav: AI Accounts: Accounts |
+| ai-accounts/account-lifecycle: Edit and remove accounts | settingsSection | left-nav: AI Accounts: Accounts |
 | ai-accounts/failure-recovery: Recover failed account requests per failure kind | settingsSection | settings: AI Accounts › failure recovery |
 | ai-accounts/luna-reserve-routing: Route exhausted Luna accounts through Reserve | settingsSection | settings: AI Accounts › failure recovery |
 | ai-accounts/model-routing: Curate models and choose account routes | settingsSection | left-nav: AI Accounts: Accounts › Models |
@@ -429,7 +429,7 @@ facets of the active thread; 32 features.
 | agent-toolkit/agent-toolkit-page: Agent toolkit page | threadFacet | left-nav: Agent Toolkit: Capabilities |
 | agent-toolkit/thread-context-facet: See what a thread loads into its context | threadFacet | thread panel: Context tab |
 | annotations/preview-file: Annotate an HTML preview | threadFacet | dialog: annotate an HTML preview |
-| background-jobs/thread-jobs-facet: Thread panel Jobs facet | threadFacet | workbench: Choose a view › Thread panels › Jobs |
+| background-jobs/thread-jobs-facet: Jobs tab in the thread panel | threadFacet | workbench: Choose a view › Thread panels › Jobs |
 | btw/btw-side-chat: /btw side chat | threadFacet | right-pane: btw tab |
 | diff-viewed/review-file-markers: Mark review files as viewed | threadFacet | right-pane: native review tab › Viewed |
 | diffs-review/ai-scope-summaries: Summarize review scopes with the thread's own model | threadFacet | left-nav: Review › Summarize |
@@ -471,7 +471,7 @@ run row, chips, `/` and `@` sources; 70 features.
 | agent-preset/draft-preset-selection: Choose an agent preset before typing | composerContribution | composer: agent mode chip, shown for a non-default preset or from ⋯ › Agent mode… (b:4v6p) |
 | agents/agent-mentions: Mention an agent where a thread starts | composerContribution | composer: @agent mention |
 | ai-accounts/idle-cache-warning: Warn before re-sending an idle thread past its prompt-cache lifetime | composerContribution | composer: meter line |
-| ai-accounts/thread-account-switch: Use a sidebar account for this thread without reselecting its model | composerContribution | status-strip: Quota › Use this account for this thread |
+| ai-accounts/thread-account-switch: Use another account for this thread | composerContribution | status-strip: Quota › Use this account for this thread |
 | annotations/backlog-composers: Annotate from Backlog composers | composerContribution | Backlog composer: Annotate an element |
 | annotations/chrome-picker: Pick on any page in a DSH-owned Chrome | composerContribution | composer: ⋯ › Point at UI… › DSH-owned Chrome |
 | annotations/pick-element: Pick an element and add it to the draft | composerContribution | composer: ⋯ › Point at UI… (/annotate); a count chip while annotations are open |
@@ -595,9 +595,9 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | agent-questions/bounded-batch-resolution: Resolve feedback in bounded batches | agentToolOnly | agent tool: resolve_parent_feedback |
 | agent-questions/question-expiry: Handle an expired question | agentToolOnly | agent tool: ask_parent_question expiry |
 | agent-questions/revision-pinned-feedback: Give anchored feedback on a document | agentToolOnly | agent tool: submit_markdown_feedback |
-| annotations/extension-intake: Intake annotations from the browser extension | agentToolOnly | agent tool: annotations_intake (browser extension) |
+| annotations/extension-intake: Receive annotations from the browser extension | agentToolOnly | agent tool: annotations_intake (browser extension) |
 | annotations/source-resolution: Resolve an element to its source | agentToolOnly | agent tool: annotations_source |
-| apply-patch/apply-patch-tool: Edit a file the Agent inspected without the native read tool | agentToolOnly | agent tool: apply_patch |
+| apply-patch/apply-patch-tool: Edit a file with literal replacements | agentToolOnly | agent tool: apply_patch |
 | backlog/agent-write-confirmation: Agents confirm bulk and destructive backlog writes | agentToolOnly | agent tools: backlog_revert, backlog_triage_backfill, backlog_sync_now, backlog_delete |
 | fff-search/resident-grep-glob: Answer agent grep and glob from a resident fff index | agentToolOnly | agent tool: grep / glob |
 | goal-stall-guard/bounded-goal-continuation: Extend or close goals within bounded policy | agentToolOnly | agent tool: extend_goal_budget / complete_blocked_goal |
@@ -775,8 +775,8 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | workbench/sidebar-preview-tab: Account Preview is a regular movable docked view | infrastructure | workbench: Quota tab |
 | workbench/single-tab-rows: Hide a single tab row without hiding its view | infrastructure | workbench: Hide tab row |
 | workbench/window-floating: Root-pane windows float across the application | infrastructure | workbench: Float panel |
-| ai-accounts/active-chat-account: See which account serves the active chat | statusItem | status-strip: Quota meters |
-| ai-accounts/disabled-account-preview: Keep disabled accounts visible and toggle routing from the usage popover | statusItem | status-strip: Quota popover |
+| ai-accounts/active-chat-account: See which account serves this thread | statusItem | status-strip: Quota meters |
+| ai-accounts/disabled-account-preview: Turn an account on or off from the usage popover | statusItem | status-strip: Quota popover |
 | ai-accounts/extra-usage-guard: Stop at the plan limits instead of drawing paid extra usage | statusItem | status-strip: Quota popover › account card › Use extra usage |
 | frame-layout/status-item-open: Click a status item to open its page | statusItem | shell: status strip |
 | hmr-gate/plugins-row: Plugin updates waiting for a Host restart | statusItem | plugins-page: View HMR updates |
