@@ -4,7 +4,8 @@
     {
       "id": "capture-and-triage",
       "title": "Capture anything and let it sort itself",
-      "summary": "One capture box and one agent tool take free text; kind, title, tags and links (items, threads, jj revisions, branches, URLs) are derived from it, and an agent capture links its thread and project. With its setting on, an image-only capture is named by the vision model of the triage route; a slow answer never replaces a title edited meanwhile.",
+      "summary": "Type anything into one capture box, and its kind, title, tags and links are worked out for you.",
+      "details": "One capture box and one agent tool take free text; kind, title, tags and links (items, threads, jj revisions, branches, URLs) are derived from it, and an agent capture links its thread and project. With its setting on, an image-only capture is named by the vision model of the triage route; a slow answer never replaces a title edited meanwhile.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -182,7 +183,8 @@
     {
       "id": "jev-settings",
       "title": "Configure Jev from the Backlog panel",
-      "summary": "Configure the backlog's Jev switch, automatic triage and TypeSafe secret reference in a dedicated panel tab; the same settings remain available in DSH Settings.",
+      "summary": "Set up Jev, automatic triage and its key from a tab in the Backlog panel or in Settings.",
+      "details": "Configure the backlog's Jev switch, automatic triage and TypeSafe secret reference in a dedicated panel tab; the same settings remain available in DSH Settings.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -238,7 +240,8 @@
     {
       "id": "activity-feed-and-freshness",
       "title": "Feed ordered by activity, with idle items sinking",
-      "summary": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Each entry's activity line names the actor of its last change and links an Agent to the thread it worked in. Status chips narrow the feed and the Items list to one status or several at once. From an empty capture box, ArrowUp focuses the nearest visible item and arrow keys follow the list's visual order. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item. The open panel stays current from the Host's `changed` event (a write, delete or peer pull re-reads the revision at once); without the event it polls the revision every 5 s, and only while it is visible.",
+      "summary": "The feed shows pinned items, then recent activity, and items left idle sink out of the way.",
+      "details": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Each entry's activity line names the actor of its last change and links an Agent to the thread it worked in. Status chips narrow the feed and the Items list to one status or several at once. From an empty capture box, ArrowUp focuses the nearest visible item and arrow keys follow the list's visual order. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item. The open panel stays current from the Host's `changed` event (a write, delete or peer pull re-reads the revision at once); without the event it polls the revision every 5 s, and only while it is visible.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -370,7 +373,8 @@
     {
       "id": "inline-title-edit",
       "title": "Rename an item in place",
-      "summary": "Double-clicking an item in the feed, an Items row or a board card swaps its title for an inline editor; Enter or a click elsewhere saves, Escape leaves the item untouched, and the quick gesture never opens the peek or card detail.",
+      "summary": "Double-click an item's title to rename it in place, Enter to save and Escape to cancel.",
+      "details": "Double-clicking an item in the feed, an Items row or a board card swaps its title for an inline editor; Enter or a click elsewhere saves, Escape leaves the item untouched, and the quick gesture never opens the peek or card detail.",
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "work",
@@ -399,7 +403,8 @@
     {
       "id": "board-links-and-history",
       "title": "Board, links, backlinks and history",
-      "summary": "A board groups the same items into Inbox, Todo, In progress, Done and Dropped columns in that order. Titles and descriptions render Markdown and URLs as clickable links in the feed, board and detail. An item's detail links it to threads, revisions, branches, workspaces, URLs or other items; URL references offer browser-open and copy actions in a popover. The detail also lists the items that link to it and shows every event with its actor; agent actors show their configured name and open the thread they worked in when that thread is available; fields the user set are recorded as theirs.",
+      "summary": "See items on a board by status, link them to threads, revisions and other items, and read their history.",
+      "details": "A board groups the same items into Inbox, Todo, In progress, Done and Dropped columns in that order. Titles and descriptions render Markdown and URLs as clickable links in the feed, board and detail. An item's detail links it to threads, revisions, branches, workspaces, URLs or other items; URL references offer browser-open and copy actions in a popover. The detail also lists the items that link to it and shows every event with its actor; agent actors show their configured name and open the thread they worked in when that thread is available; fields the user set are recorded as theirs.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -475,7 +480,8 @@
     {
       "id": "board-column-preferences",
       "title": "Customize Backlog board columns",
-      "summary": "Reorder or hide status columns on the board without changing item states; the preference stays in this browser across Host restarts, and the Items view still contains every item.",
+      "summary": "Reorder or hide board columns in this browser without changing any item.",
+      "details": "Reorder or hide status columns on the board without changing item states; the preference stays in this browser across Host restarts, and the Items view still contains every item.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -513,7 +519,8 @@
     {
       "id": "multi-select-items",
       "title": "Select items in ranges and batch-edit them",
-      "summary": "Feed, Inbox, Items, Board, search results and project item groups support click-to-open, Shift-click ranges and Cmd/Ctrl-click toggles. Context-menu actions batch the visible selection; filters and collapsed groups remove hidden targets. Items also offers select-all-visible and an action bar that stays on one line above the last row: below 42rem its buttons keep only their icon, and below 28rem Set kind, Pin and Unpin move into More actions. Dragging a selected board card moves its whole selection, including cards from other columns; dragging an unselected card moves only that card.",
+      "summary": "Select items with Shift and Cmd clicks, then edit or move them all at once.",
+      "details": "Feed, Inbox, Items, Board, search results and project item groups support click-to-open, Shift-click ranges and Cmd/Ctrl-click toggles. Context-menu actions batch the visible selection; filters and collapsed groups remove hidden targets. Items also offers select-all-visible and an action bar that stays on one line above the last row: below 42rem its buttons keep only their icon, and below 28rem Set kind, Pin and Unpin move into More actions. Dragging a selected board card moves its whole selection, including cards from other columns; dragging an unselected card moves only that card.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -631,7 +638,8 @@
     {
       "id": "selection-context-menu",
       "title": "Apply every context-menu action to the selection",
-      "summary": "Right-clicking an item that belongs to a selection applies every repeatable action to all selected items, and each action shows the count as \"(N)\": start thread, copy IDs and links (Copy submenu), status, kind, attention, project, pin, triage and permanent deletion, which confirms with the count and the item references. Cmd/Ctrl- or Shift-clicking while an item is open includes the open item.",
+      "summary": "Right-click a selected item to apply an action to the whole selection.",
+      "details": "Right-clicking an item that belongs to a selection applies every repeatable action to all selected items, and each action shows the count as \"(N)\": start thread, copy IDs and links (Copy submenu), status, kind, attention, project, pin, triage and permanent deletion, which confirms with the count and the item references. Cmd/Ctrl- or Shift-clicking while an item is open includes the open item.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -703,7 +711,8 @@
     {
       "id": "auto-triage",
       "title": "Triage new items automatically",
-      "summary": "With autoTriage on, each capture is triaged in the background and keeps the status it was captured with: Jev answers whether it is work to do (only when no kind was chosen) and whether it repeats the closest open item, and a configured cheap model, when set, is the sole judge and proposes kind, title, tags and duplicates using the user's past corrections as examples. A duplicate is recorded as a directional relation to its canonical item; when completed, it resolves that canonical item too unless the user set the canonical status by hand. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
+      "summary": "Each new item can be sorted in the background, with its kind, title, tags and duplicates suggested.",
+      "details": "With autoTriage on, each capture is triaged in the background and keeps the status it was captured with: Jev answers whether it is work to do (only when no kind was chosen) and whether it repeats the closest open item, and a configured cheap model, when set, is the sole judge and proposes kind, title, tags and duplicates using the user's past corrections as examples. A duplicate is recorded as a directional relation to its canonical item; when completed, it resolves that canonical item too unless the user set the canonical status by hand. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
       "surfaces": ["client", "host", "settings", "tool"],
       "surface": "destinationSection",
       "destination": "work",
@@ -833,7 +842,8 @@
     {
       "id": "backfill-triage",
       "title": "Backfill triage on items captured before it was set up",
-      "summary": "Triage only runs on capture, so the wand in the panel header backfills it: the oldest inbox/todo tasks no triage has looked at yet, 25 per run, one at a time. The dialog reports what it applied, left as suggestions, found unchanged and how many items remain, so a second run continues where it stopped. An agent runs the same pass with backlog_triage_backfill, optionally re-triaging inbox/todo tasks triage already looked at.",
+      "summary": "Triage older items in batches of 25 from the wand in the Backlog header.",
+      "details": "Triage only runs on capture, so the wand in the panel header backfills it: the oldest inbox/todo tasks no triage has looked at yet, 25 per run, one at a time. The dialog reports what it applied, left as suggestions, found unchanged and how many items remain, so a second run continues where it stopped. An agent runs the same pass with backlog_triage_backfill, optionally re-triaging inbox/todo tasks triage already looked at.",
       "surfaces": ["client", "host", "tool"],
       "surface": "command",
       "destination": "work",
@@ -931,7 +941,8 @@
     {
       "id": "lifecycle-signals",
       "title": "Move items from thread and revision signals",
-      "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished turn clears that same flag; a request for input that thread raised is settled as soon as its question is answered, by the user or by another Agent answering for them; with threadResolution on, Jev reads a finished reply and leaves a Done suggestion on the items it resolved, never a silent close. An unclaimed In progress item whose every linked thread settled before a revision was linked returns to To do. Apart from that, signals only move forward and never over a status or attention the user set by hand.",
+      "summary": "Items move on their own when a thread mentions them, a revision closes them or a turn gets stuck.",
+      "details": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished turn clears that same flag; a request for input that thread raised is settled as soon as its question is answered, by the user or by another Agent answering for them; with threadResolution on, Jev reads a finished reply and leaves a Done suggestion on the items it resolved, never a silent close. An unclaimed In progress item whose every linked thread settled before a revision was linked returns to To do. Apart from that, signals only move forward and never over a status or attention the user set by hand.",
       "surfaces": ["host", "settings", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -1099,7 +1110,8 @@
     {
       "id": "backlog-mentions",
       "title": "Mention backlog items with @",
-      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; \u2026)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text. Dragging an item's `b:<id>` label (feed, board, list, inbox, search, shipped, the item header, its parent and sub-issues) onto a thread composer inserts the same chip at the caret; dropped anywhere else it is plain `b:<id>` text.",
+      "summary": "Type @b: in the composer to mention a backlog item, or drag an item's label into a thread.",
+      "details": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; \u2026)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text. Dragging an item's `b:<id>` label (feed, board, list, inbox, search, shipped, the item header, its parent and sub-issues) onto a thread composer inserts the same chip at the caret; dropped anywhere else it is plain `b:<id>` text.",
       "surfaces": ["client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -1172,7 +1184,8 @@
     {
       "id": "backlinks",
       "title": "See the backlog items that link to a thread or revision",
-      "summary": "A thread's header ⋯ menu has Linked backlog items (N) when items link to it; its submenu lists each item by title and reference, and choosing one opens it in Backlog. A revision's details in the jj panel list the items that link to it under Backlog, where a `jj:` change or commit id prefix of four or more characters counts as a link. Nothing renders when no item links there or when the backlog plugin is absent.",
+      "summary": "A thread or revision lists the backlog items that link to it.",
+      "details": "A thread's header ⋯ menu has Linked backlog items (N) when items link to it; its submenu lists each item by title and reference, and choosing one opens it in Backlog. A revision's details in the jj panel list the items that link to it under Backlog, where a `jj:` change or commit id prefix of four or more characters counts as a link. Nothing renders when no item links there or when the backlog plugin is absent.",
       "surfaces": ["client", "integration"],
       "surface": "detail",
       "destination": "work",
@@ -1210,7 +1223,8 @@
     {
       "id": "quote-reply",
       "title": "Quote a finished reply into a new backlog item",
-      "summary": "A finished reply's More actions menu offers Add to backlog: the Backlog capture opens with the reply's first line as the title, the reply as a Markdown quote and the thread's session id, which capture turns into a thread link. The user edits it and presses Enter as with any capture.",
+      "summary": "Turn a finished reply into a backlog item from its More actions menu.",
+      "details": "A finished reply's More actions menu offers Add to backlog: the Backlog capture opens with the reply's first line as the title, the reply as a Markdown quote and the thread's session id, which capture turns into a thread link. The user edits it and presses Enter as with any capture.",
       "surfaces": ["client", "integration"],
       "surface": "rowAction",
       "destination": "work",
@@ -1242,7 +1256,8 @@
     {
       "id": "reference-preview",
       "title": "Preview a referenced item from a conversation",
-      "summary": "An Agent writing `b:<id>` in its markdown gets a link: clicking it opens an inline card with the item's title, kind, status, project and body. A mention the user sent renders as the composer's chip, hiding the serialized title and tool hint. Image attachments appear as thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. Open in Backlog selects that item in the Backlog panel. Prose and inline code are linked; fenced code examples, existing links and text that only contains the token stay as written.",
+      "summary": "Click a backlog item reference in a thread to preview the item without leaving.",
+      "details": "An Agent writing `b:<id>` in its markdown gets a link: clicking it opens an inline card with the item's title, kind, status, project and body. A mention the user sent renders as the composer's chip, hiding the serialized title and tool hint. Image attachments appear as thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. Open in Backlog selects that item in the Backlog panel. Prose and inline code are linked; fenced code examples, existing links and text that only contains the token stay as written.",
       "reach": [
         "seed tool-call-thread",
         "click tab \"Work\"",
@@ -1333,7 +1348,8 @@
     {
       "id": "search-and-views",
       "title": "Search with reasons and saved views",
-      "summary": "Relevance-ranked search (a trigram index narrows which items are scored; ranking is the token scorer's) over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators, `created:` for who captured an item and a leading `-` that negates any operator, word or phrase; each result says where it matched. Typing filters the current view in place (Feed, Items, Board, Inbox, Projects); Enter opens the ranked results view. Multi-select status chips show counts for the current search and narrow results. Views save a view and search to the plugin settings.",
+      "summary": "Search items with filters, see why each result matched, and save the views you use.",
+      "details": "Relevance-ranked search (a trigram index narrows which items are scored; ranking is the token scorer's) over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators, `created:` for who captured an item and a leading `-` that negates any operator, word or phrase; each result says where it matched. Typing filters the current view in place (Feed, Items, Board, Inbox, Projects); Enter opens the ranked results view. Multi-select status chips show counts for the current search and narrow results. Views save a view and search to the plugin settings.",
       "surfaces": ["client", "host", "settings", "tool"],
       "surface": "destinationSection",
       "destination": "work",
@@ -1436,8 +1452,9 @@
     },
     {
       "id": "attention-inbox",
-      "title": "Attention Inbox across items and threads",
-      "summary": "A filter view of open backlog items: attention, triage suggestions and (setting inboxThreads) linked unread thread reasons, with separate open and acknowledge actions for every thread. Filters and counts use unique items. It keeps no counter of its own: the view tab carries no badge, and a line links to the one Inbox, where needs-input, blocked and waiting items also appear. Thread acknowledgement never resolves item attention or suggestions; answering a thread question does settle its own request for input; done/dropped historical thread items stay excluded, and snoozed items return later.",
+      "title": "Items that need you",
+      "summary": "A filtered view of open items that need you, with triage suggestions and unread linked threads.",
+      "details": "A filter view of open backlog items: attention, triage suggestions and (setting inboxThreads) linked unread thread reasons, with separate open and acknowledge actions for every thread. Filters and counts use unique items. It keeps no counter of its own: the view tab carries no badge, and a line links to the one Inbox, where needs-input, blocked and waiting items also appear. Thread acknowledgement never resolves item attention or suggestions; answering a thread question does settle its own request for input; done/dropped historical thread items stay excluded, and snoozed items return later.",
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
@@ -1527,7 +1544,8 @@
     {
       "id": "shared-activity",
       "title": "Backlog work in the Activity timeline",
-      "summary": "Item creation, moves, links, comments, triage and requests for input are published as backlog.* events to @dshfiles/activity-timeline (setting publishActivity); the item log stays the source of truth and each item shows one condensed activity line.",
+      "summary": "Backlog changes show up in the activity feed alongside thread events.",
+      "details": "Item creation, moves, links, comments, triage and requests for input are published as backlog.* events to @dshfiles/activity-timeline (setting publishActivity); the item log stays the source of truth and each item shows one condensed activity line.",
       "surfaces": ["host", "settings", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -1571,7 +1589,8 @@
     {
       "id": "rich-capture",
       "title": "A chat-sized capture box with files, properties and references",
-      "summary": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, or links a backlog item or a thread; the project chip picks the item's project (see project-scope); status and kind chips are editable before sending; images can be pasted, dropped or picked, are scaled in the browser, other files keep their bytes, and all are kept with the item; the microphone records through the Host voice-input bundle and inserts the transcript into the same draft; mentioning an image as `@Image N` turns it into an inline Markdown context-image reference when submitted. Images render as a thumbnail grid, other files as download rows, and feed cards show a paperclip count; clicking any image opens the same keyboard-navigable gallery as the thread composer, both for pending attachments and for the images kept with an item.",
+      "summary": "The capture box takes files, images, voice and references, with project, status and kind set before you send.",
+      "details": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, or links a backlog item or a thread; the project chip picks the item's project (see project-scope); status and kind chips are editable before sending; images can be pasted, dropped or picked, are scaled in the browser, other files keep their bytes, and all are kept with the item; the microphone records through the Host voice-input bundle and inserts the transcript into the same draft; mentioning an image as `@Image N` turns it into an inline Markdown context-image reference when submitted. Images render as a thumbnail grid, other files as download rows, and feed cards show a paperclip count; clicking any image opens the same keyboard-navigable gallery as the thread composer, both for pending attachments and for the images kept with an item.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -1651,7 +1670,8 @@
     {
       "id": "rich-item-text",
       "title": "Write descriptions and replies like a capture",
-      "summary": "The description and reply editor share mentions, Markdown, images and files; descriptions keep files and project references, and reply images stay on their comment. Smart routing uses Jev to send work to linked threads and generate AI answers for text-only discussion; answer authors and thread-start notices are configurable.",
+      "summary": "Write descriptions and replies with mentions, Markdown, images and files, as in a capture.",
+      "details": "The description and reply editor share mentions, Markdown, images and files; descriptions keep files and project references, and reply images stay on their comment. Smart routing uses Jev to send work to linked threads and generate AI answers for text-only discussion; answer authors and thread-start notices are configurable.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -1785,7 +1805,8 @@
     {
       "id": "project-scope",
       "title": "File and scope items by project",
-      "summary": "The searchable project filter selects several projects at once and presets the capture box when exactly one project is selected; project paths under a home directory display as `~/...`. The same single-project picker sets the project on the capture chip, on the item's details line, and in each right-click menu; every feed entry, Inbox row, Items row, board card and search result labels the item project. A capture remembers the project it just used unless reuseCaptureProject is off, `/project` picks one inline, and isolated thread workspaces are left out of the candidates.",
+      "summary": "File items under a project and filter every view by one project or several.",
+      "details": "The searchable project filter selects several projects at once and presets the capture box when exactly one project is selected; project paths under a home directory display as `~/...`. The same single-project picker sets the project on the capture chip, on the item's details line, and in each right-click menu; every feed entry, Inbox row, Items row, board card and search result labels the item project. A capture remembers the project it just used unless reuseCaptureProject is off, `/project` picks one inline, and isolated thread workspaces are left out of the candidates.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -1879,7 +1900,8 @@
     {
       "id": "hide-agent-items",
       "title": "Hide items agents captured",
-      "summary": "A toggle in the header of every view (Feed, Inbox, Items, Board, Projects and the search results), on by default and remembered per view, hides items an agent captured that the user never touched. An item the user edited, moved, commented on or pinned shows again, and so does one asking for attention or waiting on a triage suggestion. The toggle counts what the current view hides. The Host filters the list (`hideAgentItems`); `backlog_list` keeps listing every item unless an agent asks for the filter. The Projects cards count only what the view shows: `backlog_projects` takes the same optional `hideAgentItems`.",
+      "summary": "Hide items an agent captured that you never touched, with a count of what is hidden.",
+      "details": "A toggle in the header of every view (Feed, Inbox, Items, Board, Projects and the search results), on by default and remembered per view, hides items an agent captured that the user never touched. An item the user edited, moved, commented on or pinned shows again, and so does one asking for attention or waiting on a triage suggestion. The toggle counts what the current view hides. The Host filters the list (`hideAgentItems`); `backlog_list` keeps listing every item unless an agent asks for the filter. The Projects cards count only what the view shows: `backlog_projects` takes the same optional `hideAgentItems`.",
       "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Backlog view options\"", "click button \"Hide agent items\"", "expect button \"Hide agent items\""],
       "reachNarrow": [
         "click button \"More\"",
@@ -1939,7 +1961,8 @@
     {
       "id": "capture-project-target",
       "title": "File a thread capture under its project",
-      "summary": "A capture made from a jj thread workspace is filed under the project checkout that workspace was cut from, not under the workspace folder. The Host asks jj-integration which project owns the workspace, so a custom threads directory or a legacy workspace name folds the same way; without jj-integration the path stays as given.",
+      "summary": "An item captured from a thread's workspace is filed under that workspace's project.",
+      "details": "A capture made from a jj thread workspace is filed under the project checkout that workspace was cut from, not under the workspace folder. The Host asks jj-integration which project owns the workspace, so a custom threads directory or a legacy workspace name folds the same way; without jj-integration the path stays as given.",
       "surfaces": ["host", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -1996,7 +2019,8 @@
     {
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
-      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; copy the item ID, its clickable `b:<id>` reference or its Markdown from the Copy submenu; change status, kind, attention or project; pin or unpin; run triage when Jev or a triage model is configured; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named and linked. The Host adds every full item description and current reply in order, with every item and reply attachment; missing, unreadable or oversized context fails rather than silently omitting it, and upload or prompt failure reports the created Session id. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the banner says the work is under way, the thread opens only when the startThreadOpensCreated setting asks for it, or when the dialog's open box overrides it for one thread; an @agent comment follows the same setting, and the report carries an Open action otherwise. The Host verb behind it is the tool `backlog_start_thread`, which does not navigate the calling thread.",
+      "summary": "Right-click an item to start a linked thread, copy its link or change its status, kind or project.",
+      "details": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; copy the item ID, its clickable `b:<id>` reference or its Markdown from the Copy submenu; change status, kind, attention or project; pin or unpin; run triage when Jev or a triage model is configured; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named and linked. The Host adds every full item description and current reply in order, with every item and reply attachment; missing, unreadable or oversized context fails rather than silently omitting it, and upload or prompt failure reports the created Session id. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the banner says the work is under way, the thread opens only when the startThreadOpensCreated setting asks for it, or when the dialog's open box overrides it for one thread; an @agent comment follows the same setting, and the report carries an Open action otherwise. The Host verb behind it is the tool `backlog_start_thread`, which does not navigate the calling thread.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2183,7 +2207,8 @@
     {
       "id": "jev-secret-setup",
       "title": "Set up a missing Jev key from chat",
-      "summary": "When Jev is enabled but its Host-resolved key is missing or invalid, the chat turn tail offers an opt-in Secret Catalog form. Values stay on the Host and Backlog persists only the bound secret reference.",
+      "summary": "When Jev's key is missing, the thread offers a form to add it to your secrets.",
+      "details": "When Jev is enabled but its Host-resolved key is missing or invalid, the chat turn tail offers an opt-in Secret Catalog form. Values stay on the Host and Backlog persists only the bound secret reference.",
       "reach": [
         "seed fake-secret-cli",
         "seed backlog-jev-enabled",
@@ -2243,8 +2268,9 @@
     },
     {
       "id": "tweet-context-enrichment",
-      "title": "Retrieve public tweet context into a backlog item",
-      "summary": "Capturing or editing tweet links automatically retrieves the first unimported public X post; older items can use the row-menu action. Text is quoted as untrusted content, images are saved as attachments, and repeated imports do not duplicate data.",
+      "title": "Bring a tweet's text into an item",
+      "summary": "A tweet link in an item brings in the post's text and images, once.",
+      "details": "Capturing or editing tweet links automatically retrieves the first unimported public X post; older items can use the row-menu action. Text is quoted as untrusted content, images are saved as attachments, and repeated imports do not duplicate data.",
       "reach": [
         "click button \"Backlog\"",
         "click button \"New\"",
@@ -2317,7 +2343,8 @@
     {
       "id": "backlog-inbox-items",
       "title": "Backlog requests in the Inbox",
-      "summary": "Every open, unsnoozed backlog item whose attention is needs-input or blocked is a blocking Inbox item (Needs you); waiting is a ready item (Other). Each names the item as b:<id> with its last activity as detail. Clearing the attention, closing or snoozing the item resolves it. Triage suggestions stay in the backlog filter view.",
+      "summary": "Items that need input or are blocked show in the Inbox, and clearing them there resolves the item.",
+      "details": "Every open, unsnoozed backlog item whose attention is needs-input or blocked is a blocking Inbox item (Needs you); waiting is a ready item (Other). Each names the item as b:<id> with its last activity as detail. Clearing the attention, closing or snoozing the item resolves it. Triage suggestions stay in the backlog filter view.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2384,8 +2411,9 @@
     },
     {
       "id": "remote-sync",
-      "title": "Mirror backlog items in Linear, GitHub Issues, markdown files or a plugin provider",
-      "summary": "Link an item to a remote item through any binding that serves its project, create one from it, or create one for each of several selected items at once, or unlink it from its row menu or its sync chips in the item detail; an item may be linked through several bindings, one chip each. Each binding's field map decides which of title, description, status, labels, priority, parent and relations flow which way, with remote status names mapped per status; a field both sides changed is settled by the binding's conflict policy (last change wins, backlog wins, remote wins, or flag) with a conflict note on the item. Statuses compare by equivalence so an item in progress stays in progress against an open GitHub issue. A binding pass pulls what changed since its cursor (Linear updatedAt pages, GitHub since= with ETags, a full scan of a markdown folder), writes remote changes as remote:<bindingId> ops, pushes local changes, carries new comments once each way when the provider supports them, drops items whose remote file is gone, and can import every open remote item. Agents read the same state with backlog_sync_status and act with backlog_sync_now, backlog_link_remote and backlog_sync_import_all when the user asked. Comments agents write stay local unless the binding pushes them.",
+      "title": "Sync items with Linear, GitHub Issues or Markdown files",
+      "summary": "Link items to Linear, GitHub Issues or Markdown files and keep the fields you choose in sync both ways.",
+      "details": "Link an item to a remote item through any binding that serves its project, create one from it, or create one for each of several selected items at once, or unlink it from its row menu or its sync chips in the item detail; an item may be linked through several bindings, one chip each. Each binding's field map decides which of title, description, status, labels, priority, parent and relations flow which way, with remote status names mapped per status; a field both sides changed is settled by the binding's conflict policy (last change wins, backlog wins, remote wins, or flag) with a conflict note on the item. Statuses compare by equivalence so an item in progress stays in progress against an open GitHub issue. A binding pass pulls what changed since its cursor (Linear updatedAt pages, GitHub since= with ETags, a full scan of a markdown folder), writes remote changes as remote:<bindingId> ops, pushes local changes, carries new comments once each way when the provider supports them, drops items whose remote file is gone, and can import every open remote item. Agents read the same state with backlog_sync_status and act with backlog_sync_now, backlog_link_remote and backlog_sync_import_all when the user asked. Comments agents write stay local unless the binding pushes them.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2636,8 +2664,9 @@
     },
     {
       "id": "remote-sync-settings",
-      "title": "Configure remote sync connections and bindings, and import remote items",
-      "summary": "Backlog settings \u203a Remote sync lists connections (one account of one provider each: a name, a secret:ALIAS key reference with the provider's Host-variable fallback, an optional API base URL) with Test, reorder, edit and remove, and under each its bindings: a container picked from what the connection discovers (or derived from the project), a project scope, a direction, a per-field flow with remote status names, a conflict policy, an interval (every 15 minutes for a new binding; saved bindings keep theirs), Push agent comments and Import new remote items, with Sync now, Import all open, an on/off switch, edit and remove. Removing a connection or binding asks first and drops its item links. Import reads the provider from the pasted id or URL. Rows saved in the earlier syncBackends setting move into connections and bindings on the first start, keeping every item link. Agents list with backlog_sync_connections, change with backlog_sync_connection_save/move/remove and backlog_sync_binding_save/remove, discover with backlog_sync_discover, test with backlog_sync_test_connection and backlog_sync_test_all, and import with backlog_import_remote and backlog_sync_import_all when the user asked; removals and import-all take confirm: true.",
+      "title": "Set up remote sync and import items",
+      "summary": "Add sync connections in Backlog settings, choose what syncs each way, and import remote items.",
+      "details": "Backlog settings \u203a Remote sync lists connections (one account of one provider each: a name, a secret:ALIAS key reference with the provider's Host-variable fallback, an optional API base URL) with Test, reorder, edit and remove, and under each its bindings: a container picked from what the connection discovers (or derived from the project), a project scope, a direction, a per-field flow with remote status names, a conflict policy, an interval (every 15 minutes for a new binding; saved bindings keep theirs), Push agent comments and Import new remote items, with Sync now, Import all open, an on/off switch, edit and remove. Removing a connection or binding asks first and drops its item links. Import reads the provider from the pasted id or URL. Rows saved in the earlier syncBackends setting move into connections and bindings on the first start, keeping every item link. Agents list with backlog_sync_connections, change with backlog_sync_connection_save/move/remove and backlog_sync_binding_save/remove, discover with backlog_sync_discover, test with backlog_sync_test_connection and backlog_sync_test_all, and import with backlog_import_remote and backlog_sync_import_all when the user asked; removals and import-all take confirm: true.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2839,7 +2868,8 @@
     {
       "id": "secret-link-reveal",
       "title": "Reveal an item's secret link in place",
-      "summary": "An item that names a credential as `secret:ALIAS[@env]` shows a Reveal button beside that link in its Relationships. The Secret Catalog provides the control through the backlog's secret-link-reveal contract and reveals through its own reveal verb and policy (explicit click, hidden on Hide, Esc or after the configured seconds); the backlog never stores or receives the value. An alias the Catalog does not hold, or holds in several scopes, offers Open in Secrets instead of guessing.",
+      "summary": "An item that names a secret shows a Reveal button beside it, and the value never reaches the backlog.",
+      "details": "An item that names a credential as `secret:ALIAS[@env]` shows a Reveal button beside that link in its Relationships. The Secret Catalog provides the control through the backlog's secret-link-reveal contract and reveals through its own reveal verb and policy (explicit click, hidden on Hide, Esc or after the configured seconds); the backlog never stores or receives the value. An alias the Catalog does not hold, or holds in several scopes, offers Open in Secrets instead of guessing.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2890,7 +2920,8 @@
     {
       "id": "short-item-references",
       "title": "Name new items with a short alias",
-      "summary": "A new item is b:k3f9: four random Crockford characters with a letter, fixed for life and five once a fifth of the space is used. Legacy b:12 numbers keep resolving, digit-only means legacy, and every reference surface, search, signal and agent tool takes either form.",
+      "summary": "New items get a short name such as b:k3f9, and old numbered references still work.",
+      "details": "A new item is b:k3f9: four random Crockford characters with a letter, fixed for life and five once a fifth of the space is used. Legacy b:12 numbers keep resolving, digit-only means legacy, and every reference surface, search, signal and agent tool takes either form.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2961,7 +2992,8 @@
     {
       "id": "revert-field-change",
       "title": "Revert a field change from the item history",
-      "summary": "Each field change under an event's Show changes has Revert: it writes the typed value the field held before, read from the op log, as a new change; a field that changed again since is refused with who changed it. Agents call backlog_revert only when the user asked, with `confirm: true`; without it the call is refused.",
+      "summary": "Undo any field change from the item's history with Revert.",
+      "details": "Each field change under an event's Show changes has Revert: it writes the typed value the field held before, read from the op log, as a new change; a field that changed again since is refused with who changed it. Agents call backlog_revert only when the user asked, with `confirm: true`; without it the call is refused.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3009,7 +3041,8 @@
     {
       "id": "item-timeline-lanes",
       "title": "Conversation and work log in the item timeline",
-      "summary": "An item's activity reads in two lanes. The Conversation holds everything the user did and said, attention requests, reverts, comments carried over from Linear or GitHub, smart-reply answers and the agent comment that answers the user (the one right after their comment, or the first from a thread they started or linked). Agent progress comments, moves, links, triage, system and sync events fold into a Work log line such as \"2 agents \u00b7 14 updates \u00b7 last 2h\" that opens in place; Show changes and Revert work in both lanes. Every event and comment records its origin once (user, agent:<sessionId>, system, remote:<backend>); older events derive it on read, and backlog_get serves it.",
+      "summary": "An item's history shows the conversation first, with agent progress folded into one work log line.",
+      "details": "An item's activity reads in two lanes. The Conversation holds everything the user did and said, attention requests, reverts, comments carried over from Linear or GitHub, smart-reply answers and the agent comment that answers the user (the one right after their comment, or the first from a thread they started or linked). Agent progress comments, moves, links, triage, system and sync events fold into a Work log line such as \"2 agents \u00b7 14 updates \u00b7 last 2h\" that opens in place; Show changes and Revert work in both lanes. Every event and comment records its origin once (user, agent:<sessionId>, system, remote:<backend>); older events derive it on read, and backlog_get serves it.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3074,7 +3107,8 @@
     {
       "id": "agent-write-confirmation",
       "title": "Agents confirm bulk and destructive backlog writes",
-      "summary": "An agent call that reverts a field (backlog_revert), triages more than 5 items in one backfill (backlog_triage_backfill, 25 by default), or syncs every linked item (backlog_sync_now without an id) needs an explicit `confirm: true`, with no default; backlog_delete always needs it. Without it the tool is refused with a message telling the agent to ask the user and call again with confirm: true. The panel never passes it and is unchanged.",
+      "summary": "Agents must confirm before they revert, delete or change many items at once.",
+      "details": "An agent call that reverts a field (backlog_revert), triages more than 5 items in one backfill (backlog_triage_backfill, 25 by default), or syncs every linked item (backlog_sync_now without an id) needs an explicit `confirm: true`, with no default; backlog_delete always needs it. Without it the tool is refused with a message telling the agent to ask the user and call again with confirm: true. The panel never passes it and is unchanged.",
       "surfaces": ["host", "tool"],
       "surface": "agentToolOnly",
       "destination": "none",
@@ -3117,8 +3151,9 @@
     },
     {
       "id": "export-backlog",
-      "title": "Export the backlog to JSONL or an SQLite copy",
-      "summary": "Backlog settings \u203a Export\u2026 writes a new file on the Host: JSON Lines with one folded item per line (optionally the op log after it) or a consistent SQLite copy. A relative, existing or folderless path is refused, so nothing is overwritten. Agents call backlog_export.",
+      "title": "Export the backlog to a file",
+      "summary": "Export the backlog to a new JSON Lines or SQLite file from Backlog settings.",
+      "details": "Backlog settings \u203a Export\u2026 writes a new file on the Host: JSON Lines with one folded item per line (optionally the op log after it) or a consistent SQLite copy. A relative, existing or folderless path is refused, so nothing is overwritten. Agents call backlog_export.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3186,7 +3221,8 @@
     {
       "id": "shipped-digest",
       "title": "See what shipped per hour, day, week, month or year",
-      "summary": "The Shipped view lists items that reached done per period (Hour, Day, Week, Month, Year), newest first, as a timeline with each period's count and its change against the period before, grouped by project, each item with its kind, linked revisions and pull requests. Only items done now count, once, at their last move to done; dropped items never count; items an agent captured count with an Agent badge. Empty periods fold into one quiet line, and the header project filter applies. Agents call backlog_shipped (also with a custom from\u2013to range).",
+      "summary": "The Shipped view lists what was done in each hour, day, week, month or year, grouped by project.",
+      "details": "The Shipped view lists items that reached done per period (Hour, Day, Week, Month, Year), newest first, as a timeline with each period's count and its change against the period before, grouped by project, each item with its kind, linked revisions and pull requests. Only items done now count, once, at their last move to done; dropped items never count; items an agent captured count with an Agent badge. Empty periods fold into one quiet line, and the header project filter applies. Agents call backlog_shipped (also with a custom from\u2013to range).",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3270,7 +3306,8 @@
     {
       "id": "shipped-summary",
       "title": "Summarize a shipped period with the triage model",
-      "summary": "Each period in the Shipped view with done items has Summarize: the triage model (Backlog settings \u203a Triage) writes a short overview, cached in the backlog database per period, bucket and project filter, so reopening the view never calls the model again. A summary whose items changed since shows Out of date; Regenerate calls the model again. Without a triage model the view says where to pick one. Agents call backlog_summarize_shipped only when the user asked.",
+      "summary": "Ask the triage model to write a short summary of what shipped in a period.",
+      "details": "Each period in the Shipped view with done items has Summarize: the triage model (Backlog settings \u203a Triage) writes a short overview, cached in the backlog database per period, bucket and project filter, so reopening the view never calls the model again. A summary whose items changed since shows Out of date; Regenerate calls the model again. Without a triage model the view says where to pick one. Agents call backlog_summarize_shipped only when the user asked.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3386,7 +3423,8 @@
     {
       "id": "item-priority",
       "title": "Set an item's priority",
-      "summary": "Every item has a Linear priority: none, urgent, high, medium or low. Set it from the row's priority glyph, the inspector, or the Priority submenu of any item menu (keys 0 to 4 while the menu is open), or write `!1` (urgent) to `!4` (low) anywhere in a capture. Items can be sorted and grouped by priority, searched with `priority:high` or `-priority:none`, and a priority change can be reverted from the item history. Agents pass `priority` to backlog_capture and backlog_update.",
+      "summary": "Give an item a priority from urgent to low, then sort, group and search by it.",
+      "details": "Every item has a Linear priority: none, urgent, high, medium or low. Set it from the row's priority glyph, the inspector, or the Priority submenu of any item menu (keys 0 to 4 while the menu is open), or write `!1` (urgent) to `!4` (low) anywhere in a capture. Items can be sorted and grouped by priority, searched with `priority:high` or `-priority:none`, and a priority change can be reverted from the item history. Agents pass `priority` to backlog_capture and backlog_update.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3444,7 +3482,8 @@
     {
       "id": "sub-issues",
       "title": "Break an item into sub-issues with a progress roll-up",
-      "summary": "An item can sit under a parent as a sub-issue, three levels deep at most. The inspector lists sub-issues with a done/total progress bar, adds one with Sub-issue, and links back to the parent (Set parent takes a `b:<ref>`, the cross removes it). Rows and cards show the roll-up as 2/5. A loop, an item under itself or a fourth level is refused with the reason. Search with `parent:b:k3f9` and `has:children`; group the Items view by parent. In Shipped a parent counts only itself. Agents pass `parent` to backlog_capture and backlog_update.",
+      "summary": "Break an item into sub-issues, up to three levels deep, with a progress count on the parent.",
+      "details": "An item can sit under a parent as a sub-issue, three levels deep at most. The inspector lists sub-issues with a done/total progress bar, adds one with Sub-issue, and links back to the parent (Set parent takes a `b:<ref>`, the cross removes it). Rows and cards show the roll-up as 2/5. A loop, an item under itself or a fourth level is refused with the reason. Search with `parent:b:k3f9` and `has:children`; group the Items view by parent. In Shipped a parent counts only itself. Agents pass `parent` to backlog_capture and backlog_update.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3506,7 +3545,8 @@
     {
       "id": "ready-queue",
       "title": "Pull the next ready item from the Ready view",
-      "summary": "The Ready view lists open items (Inbox or Todo) that are not snoozed, wait on no open item (a `depends-on` link, or another item's `blocks` link), have no open sub-issue and are not claimed, grouped by priority, urgent first then oldest. `is:ready` and `is:blocked-by-deps` search the same states. Agents read it with backlog_ready (read-only, project filter and limit) and claim the first item before working on it.",
+      "summary": "The Ready view lists open items nothing blocks, most urgent and oldest first.",
+      "details": "The Ready view lists open items (Inbox or Todo) that are not snoozed, wait on no open item (a `depends-on` link, or another item's `blocks` link), have no open sub-issue and are not claimed, grouped by priority, urgent first then oldest. `is:ready` and `is:blocked-by-deps` search the same states. Agents read it with backlog_ready (read-only, project filter and limit) and claim the first item before working on it.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3578,7 +3618,8 @@
     {
       "id": "agent-claims",
       "title": "Agents claim items with a lease; you release them",
-      "summary": "backlog_claim hands an item to the calling agent thread in one write: it becomes the delegate (the owner stays whoever captured it), moves to In progress, links the thread and starts a lease. Another agent's claim is refused with the holder named. Every write by the holder renews the lease; it ends after the idle time in Backlog settings (30 minutes by default), when the holder's thread is archived, settled or gone, when the item is done or dropped, or with backlog_release; a lapsed or abandoned claim returns the item to Todo. The inspector shows Owner \u00b7 Delegate and the claim with a Release action; rows and cards show a lock chip. `is:claimed`, `is:delegated` and `delegate:agent` search them. Starting a thread from an item also makes that thread its delegate.",
+      "summary": "An agent claims an item while it works on it, and the claim lapses when the agent goes idle.",
+      "details": "backlog_claim hands an item to the calling agent thread in one write: it becomes the delegate (the owner stays whoever captured it), moves to In progress, links the thread and starts a lease. Another agent's claim is refused with the holder named. Every write by the holder renews the lease; it ends after the idle time in Backlog settings (30 minutes by default), when the holder's thread is archived, settled or gone, when the item is done or dropped, or with backlog_release; a lapsed or abandoned claim returns the item to Todo. The inspector shows Owner \u00b7 Delegate and the claim with a Release action; rows and cards show a lock chip. `is:claimed`, `is:delegated` and `delegate:agent` search them. Starting a thread from an item also makes that thread its delegate.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3656,7 +3697,8 @@
     {
       "id": "agent-run-state",
       "title": "See what the agent on an item is doing",
-      "summary": "Open items worked on by an agent thread (its delegate, else its most recent linked thread) show the agent's run state on rows, cards and the inspector: Working while its turn runs, Awaiting input when the turn stopped on a question, Error when it failed, Stale after half an hour idle, Done otherwise. Shipped rows say who did the work for whom (done by an agent for You).",
+      "summary": "Items an agent works on show whether that agent is working, waiting for you, failed or done.",
+      "details": "Open items worked on by an agent thread (its delegate, else its most recent linked thread) show the agent's run state on rows, cards and the inspector: Working while its turn runs, Awaiting input when the turn stopped on a question, Error when it failed, Stale after half an hour idle, Done otherwise. Shipped rows say who did the work for whom (done by an agent for You).",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3721,7 +3763,8 @@
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
       "currentSurface": "left-nav: Backlog \u203a item detail",
-      "summary": "An item carries an acceptance checklist that rolls up as 3/5 on the item and its row, a plan an agent writes and may ask the user to approve (the item asks for input until approved; only the user approves), and a final summary written when it closes, which the Shipped view and its AI digest show. They are fields in the op log, revertible, edited in the item detail and through backlog_update (criteria, criteriaChecks, plan, planApproval, summary), and searchable with has:criteria, has:plan, has:summary and is:plan-pending.",
+      "summary": "Give an item a checklist, a plan the agent writes for your approval, and a final summary.",
+      "details": "An item carries an acceptance checklist that rolls up as 3/5 on the item and its row, a plan an agent writes and may ask the user to approve (the item asks for input until approved; only the user approves), and a final summary written when it closes, which the Shipped view and its AI digest show. They are fields in the op log, revertible, edited in the item detail and through backlog_update (criteria, criteriaChecks, plan, planApproval, summary), and searchable with has:criteria, has:plan, has:summary and is:plan-pending.",
       "states": ["no-sections", "criteria-partial", "criteria-complete", "plan-pending", "plan-approved", "summary-written", "host-predates-sections"],
       "failureModes": [
         "A Host older than the sections refuses the new update keys: the notice says to restart the DSH Host process.",
@@ -3800,7 +3843,8 @@
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
       "currentSurface": "left-nav: Backlog \u203a capture box",
-      "summary": "Named templates in Backlog settings (Bug report, Feature spec and Research question ship by default) carry a title prefix, kind, priority, tags, a body to fill in and acceptance criteria. A capture picks one with the Template chip, by writing /template <name> in its text, or with backlog_capture template; the Host fills only what the capture left out. An unknown name is refused with the names that exist.",
+      "summary": "Start a capture from a template such as Bug report, with its fields filled in.",
+      "details": "Named templates in Backlog settings (Bug report, Feature spec and Research question ship by default) carry a title prefix, kind, priority, tags, a body to fill in and acceptance criteria. A capture picks one with the Template chip, by writing /template <name> in its text, or with backlog_capture template; the Host fills only what the capture left out. An unknown name is refused with the names that exist.",
       "states": ["no-template", "template-picked", "template-command", "unknown-template", "host-predates-templates"],
       "failureModes": [
         "An unknown template name is refused with the configured names and where to add one.",
@@ -3868,7 +3912,8 @@
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
       "currentSurface": "left-nav: Backlog \u203a item detail, Items, Inbox",
-      "summary": "A date-only due date set from the item detail, the item menu, backlog_capture or backlog_update. Rows and cards show a chip that warns when it is close and turns red once an open item is past it; the list sorts by due date and groups into Overdue, Today, Next 7 days, Later and No due date. Overdue is derived on read from the Host calendar, never stored: an open overdue item lands in the Inbox with its own reason and Overdue tab. Search: has:due, is:overdue, due:<7d, due:>30d.",
+      "summary": "Give an item a due date, and overdue items turn red and show in the Inbox.",
+      "details": "A date-only due date set from the item detail, the item menu, backlog_capture or backlog_update. Rows and cards show a chip that warns when it is close and turns red once an open item is past it; the list sorts by due date and groups into Overdue, Today, Next 7 days, Later and No due date. Overdue is derived on read from the Host calendar, never stored: an open overdue item lands in the Inbox with its own reason and Overdue tab. Search: has:due, is:overdue, due:<7d, due:>30d.",
       "states": ["no-due-date", "due-later", "due-soon", "overdue", "closed-after-due"],
       "failureModes": ["A date that does not exist (2026-02-30) is refused with an example of a valid one."],
       "configuration": [],
@@ -3915,7 +3960,8 @@
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
       "currentSurface": "left-nav: Backlog \u203a item detail \u203a Repeat",
-      "summary": "An item with recurrence daily, weekly, monthly or cron:<expr> creates its next occurrence on the Host when it reaches done: same title, body, kind, priority, tags, project and parent, criteria unchecked, due one step after the previous due date and past today. The rule moves to the new item, so reopening and closing the old one never makes a second occurrence. Set from the Repeat picker, Make recurring on the item menu, backlog_capture or backlog_update.",
+      "summary": "Make an item repeat daily, weekly or monthly, so a new copy appears when it is done.",
+      "details": "An item with recurrence daily, weekly, monthly or cron:<expr> creates its next occurrence on the Host when it reaches done: same title, body, kind, priority, tags, project and parent, criteria unchecked, due one step after the previous due date and past today. The rule moves to the new item, so reopening and closing the old one never makes a second occurrence. Set from the Repeat picker, Make recurring on the item menu, backlog_capture or backlog_update.",
       "states": ["not-repeating", "repeating", "next-occurrence-created", "cron-never-matches"],
       "failureModes": [
         "A malformed cron rule is refused with an example of a valid one.",
@@ -3978,7 +4024,8 @@
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
       "currentSurface": "left-nav: Backlog \u203a item menu \u203a Merge into\u2026, triage duplicate suggestion",
-      "summary": "Merge into\u2026 on the item menu (for one item or a selection) and on a triage duplicate suggestion, and backlog_merge (an agent must pass confirm: true), move each duplicate's comments (quoted, keeping who wrote them), links, tags, files and sub-issues into the survivor, rewrite links other items held to it, move its remote links where the survivor has none on that binding, and drop it with a duplicates link. An alias redirect makes b:<duplicate> keep opening the survivor; its number still opens the duplicate. Every step is an event on the items it touched.",
+      "summary": "Merge duplicate items into one, keeping their comments, links and files.",
+      "details": "Merge into\u2026 on the item menu (for one item or a selection) and on a triage duplicate suggestion, and backlog_merge (an agent must pass confirm: true), move each duplicate's comments (quoted, keeping who wrote them), links, tags, files and sub-issues into the survivor, rewrite links other items held to it, move its remote links where the survivor has none on that binding, and drop it with a duplicates link. An alias redirect makes b:<duplicate> keep opening the survivor; its number still opens the duplicate. Every step is an event on the items it touched.",
       "states": ["merged", "already-merged", "self-merge-refused", "agent-unconfirmed"],
       "failureModes": [
         "Merging an item into itself, or a duplicate merged before, is refused with what to do instead.",
@@ -4030,7 +4077,8 @@
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
       "currentSurface": "left-nav: Backlog \u203a item detail \u203a Waits on, Pull requests",
-      "summary": "Gates hold an item out of the ready queue until a pull request merges, a jj revision lands on main, a project check passes in a thread linked to the item, or a date arrives (is:gated, has:gate, a chip on rows and cards). A Host gate watch resolves them on the revision poll cadence from the pull-requests contract, one jj read per repository and project-check receipts; a date gate follows the calendar. GitHub pull and GitLab merge-request URLs are PR links: Link PR in the detail or backlog_link_pr links one as fixes. Every open item watches each PR it links (any relation) and each PR gate through the pull-requests contract with no thread needed (backfilled on the first pass after a start, released when the item is done or dropped, at most 300), and its newest thread watches it too; GitHub issue URLs are read in batches through the same contract. The detail and backlog_pull_requests show open, merged or closed, checks, linked issues open or closed, and how long ago each state was read; a fixing PR that merges closes its item unless its status was set by hand; a merged PR's description also closes every item it names with Closes/Fixes/Resolves b:k3f9, read from its first 16,384 characters, and a fixes issue closed as completed closes its item the same way (not planned or duplicate leaves it open). Without the pull-requests plugin they stay plain URLs.",
+      "summary": "Hold an item until a pull request merges, a revision lands, a check passes or a date arrives.",
+      "details": "Gates hold an item out of the ready queue until a pull request merges, a jj revision lands on main, a project check passes in a thread linked to the item, or a date arrives (is:gated, has:gate, a chip on rows and cards). A Host gate watch resolves them on the revision poll cadence from the pull-requests contract, one jj read per repository and project-check receipts; a date gate follows the calendar. GitHub pull and GitLab merge-request URLs are PR links: Link PR in the detail or backlog_link_pr links one as fixes. Every open item watches each PR it links (any relation) and each PR gate through the pull-requests contract with no thread needed (backfilled on the first pass after a start, released when the item is done or dropped, at most 300), and its newest thread watches it too; GitHub issue URLs are read in batches through the same contract. The detail and backlog_pull_requests show open, merged or closed, checks, linked issues open or closed, and how long ago each state was read; a fixing PR that merges closes its item unless its status was set by hand; a merged PR's description also closes every item it names with Closes/Fixes/Resolves b:k3f9, read from its first 16,384 characters, and a fixes issue closed as completed closes its item the same way (not planned or duplicate leaves it open). Without the pull-requests plugin they stay plain URLs.",
       "states": [
         "no-gates",
         "gated",
@@ -4163,7 +4211,8 @@
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
       "currentSurface": "left-nav: Backlog \u203a item menu \u203a Schedule nightly triage; Projects \u203a overview",
-      "summary": "backlog_schedule_rule and Schedule nightly triage (item menu, project overview) create a project automation through the project-automations contract whose prompt calls backlog tools: triage runs backlog_triage_backfill and reports what still waits on the user; recreate captures a fresh copy of an item. No backlog scheduler: automations run them, and automation_list / automation_delete manage them.",
+      "summary": "Schedule nightly triage or other backlog rules as project automations.",
+      "details": "backlog_schedule_rule and Schedule nightly triage (item menu, project overview) create a project automation through the project-automations contract whose prompt calls backlog tools: triage runs backlog_triage_backfill and reports what still waits on the user; recreate captures a fresh copy of an item. No backlog scheduler: automations run them, and automation_list / automation_delete manage them.",
       "states": ["scheduled", "automations-absent", "project-unregistered"],
       "failureModes": [
         "Without the Project automations plugin, or for a project DSH has not registered, the rule is refused with how to enable it or to use automation_save."
@@ -4229,7 +4278,8 @@
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
       "currentSurface": "left-nav: Backlog \u203a Projects \u203a project overview \u203a Agent guidance",
-      "summary": "Each project can hold markdown guidance for agents, edited in the project overview or with backlog_set_project_guidance. A thread started from items opens its first message with their projects' guidance; backlog_get returns it with the item and backlog_ready with the queue. A thread workspace folds to its project, so guidance for the checkout applies there.",
+      "summary": "Write guidance for agents per project, and threads started from its items begin with it.",
+      "details": "Each project can hold markdown guidance for agents, edited in the project overview or with backlog_set_project_guidance. A thread started from items opens its first message with their projects' guidance; backlog_get returns it with the item and backlog_ready with the queue. A thread workspace folds to its project, so guidance for the checkout applies there.",
       "states": ["no-guidance", "guidance-set", "guidance-cleared"],
       "failureModes": ["A Host older than guidance answers without it: the overview editor saves nothing and the notice says to restart the DSH Host process."],
       "configuration": [
@@ -4276,8 +4326,9 @@
     },
     {
       "id": "peer-hosts",
-      "title": "Share one backlog across Hosts",
-      "summary": "Every Host serves its op log read-only to peers (peerInfo, peerOpsSince after a cursor, peerFiles) and pulls each multi-host runtime turned on in Backlog settings \u203a Hosts every peerPullSeconds, or now with Sync now or backlog_peer_sync. A Host serves every op it holds, so A \u2194 B \u2194 C converges; ingest skips ops it has and folds only the touched items in one total order; an offline Host is skipped and caught up from its cursor. Another Host's item gets a private local number; a ref two Hosts minted stays on the older item and the newer gets a derived ref with a note; another Host's legacy item shows under a derived ref that resolves on both; merge redirects travel as ops; a recurring item finished on two Hosts spawns one next occurrence. Attachment bytes come from a peer when an item is opened, or ahead after each pass, kept only when they match their SHA-256. Gate checks and main polling run only on the chosen automation Host. The section lists each runtime with a switch, last pull, ops to pull, its error, Sync now and where that Host runs automation, names each Host that picked a different automation Host, and shows the automation Host picker; the work log names the Host that wrote an event. Agents read backlog_peer_status and, when the user asked, call backlog_peer_sync and backlog_peers_configure.",
+      "title": "Share one backlog across hosts",
+      "summary": "Turn on other hosts in Backlog settings to share and merge one backlog across them.",
+      "details": "Every Host serves its op log read-only to peers (peerInfo, peerOpsSince after a cursor, peerFiles) and pulls each multi-host runtime turned on in Backlog settings \u203a Hosts every peerPullSeconds, or now with Sync now or backlog_peer_sync. A Host serves every op it holds, so A \u2194 B \u2194 C converges; ingest skips ops it has and folds only the touched items in one total order; an offline Host is skipped and caught up from its cursor. Another Host's item gets a private local number; a ref two Hosts minted stays on the older item and the newer gets a derived ref with a note; another Host's legacy item shows under a derived ref that resolves on both; merge redirects travel as ops; a recurring item finished on two Hosts spawns one next occurrence. Attachment bytes come from a peer when an item is opened, or ahead after each pass, kept only when they match their SHA-256. Gate checks and main polling run only on the chosen automation Host. The section lists each runtime with a switch, last pull, ops to pull, its error, Sync now and where that Host runs automation, names each Host that picked a different automation Host, and shows the automation Host picker; the work log names the Host that wrote an event. Agents read backlog_peer_status and, when the user asked, call backlog_peer_sync and backlog_peers_configure.",
       "reach": ["seed multi-host-hosts", "click tab \"Work\"", "click button \"Backlog\"", "click button \"More backlog actions\"", "click menuitem \"Settings\"", "expect region \"Hosts\""],
       "surfaces": ["client", "host", "settings", "storage", "tool", "integration"],
       "surface": "settingsSection",
