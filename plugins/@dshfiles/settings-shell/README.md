@@ -1,6 +1,6 @@
 # @dshfiles/settings-shell
 
-![DSH release notice and TL;DR](docs/screenshots/dsh-release-notice.png)
+![DSH release notice and summary](docs/screenshots/dsh-release-notice.png)
 
 ![Settings shell](docs/screenshots/settings-shell-port.png)
 

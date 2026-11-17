@@ -4,7 +4,7 @@
   "features": [
     {
       "id": "thread-digests",
-      "title": "Digest idle threads from DSH's own session logs",
+      "title": "Digest idle threads from their logs",
       "summary": "An idle thread gets a short digest of its requests, decisions and answer, mostly without a model call.",
       "details": "Once a thread has been idle for idleMs, build its digest from the session log (user requests, verbatim corrections and decisions, todos, goal, jj revision descriptions, final answer) without a model call; only a thread with no trail of its own gets one cheap call. Blank and trivial threads get no digest, identical digests are stored once, and message text is indexed without being copied.",
       "surfaces": ["host", "storage", "integration"],

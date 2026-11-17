@@ -65,7 +65,7 @@ From the onboarding feature catalog: 61 features, the 54 curated ones first.
 34. **Set an item's priority** (`backlog`, work) — Give an item a priority from urgent to low, then sort, group and search by it.
 35. **Break an item into sub-issues with a progress roll-up** (`backlog`, work) — Break an item into sub-issues, up to three levels deep, with a progress count on the parent.
 36. **Pull the next ready item from the Ready view** (`backlog`, work) — The Ready view lists open items nothing blocks, most urgent and oldest first.
-37. **Agents claim items with a lease; you release them** (`backlog`, work) — An agent claims an item while it works on it, and the claim lapses when the agent goes idle.
+37. **Agents claim items while they work on them** (`backlog`, work) — An agent claims an item while it works on it, and the claim lapses when the agent goes idle.
 38. **See what the agent on an item is doing** (`backlog`, work) — Items an agent works on show whether that agent is working, waiting for you, failed or done.
 39. **Check off acceptance criteria, write a plan and a final summary** (`backlog`, work) — Give an item a checklist, a plan the agent writes for your approval, and a final summary.
 40. **Start a capture from a template** (`backlog`, work) — Start a capture from a template such as Bug report, with its fields filled in.
