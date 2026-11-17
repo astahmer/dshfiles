@@ -190,7 +190,7 @@ rail destination; 23 features.
 | agent-questions/parent-child-question: Ask and answer a subagent's question | attentionProvider | agent tool: ask_parent_question / answer_parent_question |
 | ai-accounts/quota-auto-retry: Retry exhausted quota when its reset arrives | attentionProvider | transcript: usage-limit turn tail › Resume |
 | ai-accounts/quota-inbox-items: Quota-blocked threads in the Inbox, resumable in place | attentionProvider | left-nav: Inbox › ai-accounts.quota-continuation |
-| backlog/attention-inbox: Attention Inbox across items and threads | attentionProvider | left-nav: Backlog › Inbox filter (links to the Inbox) |
+| backlog/attention-inbox: Items that need you | attentionProvider | left-nav: Backlog › Inbox filter (links to the Inbox) |
 | backlog/backlog-inbox-items: Backlog requests in the Inbox | attentionProvider | left-nav: Inbox › backlog.attention |
 | hmr-gate/deferred-update-inbox-item: Plugin updates waiting for a restart in the Inbox | attentionProvider | left-nav: Inbox › hmr-gate.deferred-update |
 | jj-integration/land-inbox-items: Blocked and ready-to-land workspaces in the Inbox | attentionProvider | left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land |
@@ -272,10 +272,10 @@ rail destination; 41 features.
 | backlog/inline-title-edit: Rename an item in place | rowAction | left-nav: Backlog › rows |
 | backlog/multi-select-items: Select items in ranges and batch-edit them | rowAction | left-nav: Backlog › rows |
 | backlog/quote-reply: Quote a finished reply into a new backlog item | rowAction | conversation.chat.assistant-actions: Add to backlog |
-| backlog/remote-sync: Mirror backlog items in Linear, GitHub Issues, markdown files or a plugin provider | rowAction | left-nav: Backlog: Items › row menu › Link to … / Create in … / row selection › Create in… per binding / item detail › sync chips |
+| backlog/remote-sync: Sync items with Linear, GitHub Issues or Markdown files | rowAction | left-nav: Backlog: Items › row menu › Link to … / Create in … / row selection › Create in… per binding / item detail › sync chips |
 | backlog/selection-context-menu: Apply every context-menu action to the selection | rowAction | left-nav: Backlog › row menu |
 | backlog/start-thread-from-item: Start a thread from an item | rowAction | left-nav: Backlog › Start thread |
-| backlog/tweet-context-enrichment: Retrieve public tweet context into a backlog item | rowAction | left-nav: Backlog › row menu › tweet context |
+| backlog/tweet-context-enrichment: Bring a tweet's text into an item | rowAction | left-nav: Backlog › row menu › tweet context |
 
 ### Agents
 
@@ -364,10 +364,10 @@ rail destination (bottom); 67 features.
 | ai-accounts/reference-dashboard: Manage account Models, Settings and Usage | settingsSection | left-nav: AI Accounts: Accounts › Models / Settings / Usage tabs |
 | ai-accounts/stalled-stream-fallback-setting: Turn on the fallback chain for stalled streams | settingsSection | settings: AI Accounts › Failure recovery › Fall back on stalled streams |
 | ai-accounts/strip-short-names: Short names in the sidebar usage strip | settingsSection | settings: AI Accounts › strip short names |
-| backlog/export-backlog: Export the backlog to JSONL or an SQLite copy | settingsSection | left-nav: Backlog › Backlog settings › Export |
+| backlog/export-backlog: Export the backlog to a file | settingsSection | left-nav: Backlog › Backlog settings › Export |
 | backlog/jev-settings: Configure Jev from the Backlog panel | settingsSection | left-nav: Backlog › Backlog settings |
-| backlog/peer-hosts: Share one backlog across Hosts | settingsSection | left-nav: Backlog › Backlog settings › Hosts |
-| backlog/remote-sync-settings: Configure remote sync connections and bindings, and import remote items | settingsSection | left-nav: Backlog: Items › Backlog settings › Remote sync |
+| backlog/peer-hosts: Share one backlog across hosts | settingsSection | left-nav: Backlog › Backlog settings › Hosts |
+| backlog/remote-sync-settings: Set up remote sync and import items | settingsSection | left-nav: Backlog: Items › Backlog settings › Remote sync |
 | chat/view-mode: Choose Summary, Normal or Verbose for tool work | settingsSection | settings: general › view mode |
 | conversation-cleanup/conversation-cleanup: Permanently clean up done or archived threads | settingsSection | Settings: Thread cleanup |
 | frame-layout/status-bar-settings: Show, hide and reorder status bar items | settingsSection | Settings › General › Status bar |
