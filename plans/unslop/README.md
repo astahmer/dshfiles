@@ -5,8 +5,8 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1 to 10, 12 and 13 are done. Step 11 is half done (catalog summaries); its UI-string half
-is running. Step 14 (guardrails) waits for it. See [Work list](#work-list).
+**Resume here:** steps 1 to 13 are done. Step 14 (guardrails) is next, then one pass over the follow-ups the lanes
+left for plugins outside their scope. See [Work list](#work-list).
 
 ## Method and limits
 
@@ -198,7 +198,7 @@ before and passes after; see each revision's description for the reason.
 | 8 ✅ | No zero-count chips, tiles and stat blocks on Usage, Memory and Processes. See [Pages lane](#pages-lane). | P6 | small |
 | 9 ✅ | AI accounts on the kit switch and the colour rule, one header row, no nested cards. See [Pages lane](#pages-lane). | P4 | small |
 | 10 ✅ | Developer pages in a "Developer" group at the end of Settings (setting to hide it, shown by default); Capabilities hub quiet and no longer first; Plugin Market says what to do. See [Destinations lane](#destinations-lane). | N9 | small |
-| 11 ◐ | Copy: catalog summary cap, error strings with a next step, `compactJson` renders, six status words, glossary in native forks. Done: C1 (see [Catalog copy lane](#catalog-copy-lane)). C3 dropped: see there. Open: C2, C4–C8. | C1–C8 | large |
+| 11 ✅ | Copy: catalog summaries one sentence, errors with a next step, six status words, glossary, short settings descriptions, Retry. C3 dropped. See [Catalog copy lane](#catalog-copy-lane) and [UI copy lane](#ui-copy-lane). | C1–C8 | large |
 | 12 ✅ | Backlog and Traces on the kit `Page` (History and Source control were done in the Land lane). See [Backlog lane](#backlog-lane). | P5, P7, P8, P12 | large |
 | 13 ✅ | Phone: kit text follows the density tokens (15/13 px), a sideways phone keeps the phone shell, full-screen palette, no keyboard hints on touch, page titles printed once. See [Phone lane](#phone-lane). | U7, U8, N12 | large |
 | 14   | Guardrails: both ratchets into `check:green` after re-baselining, widen `copy-check`, add rules for shadows, durations, viewport variants and solid status fills, repair the catalog walks. | G1–G7 | medium |
@@ -358,6 +358,31 @@ Unverified:
   checked.
 
 jj-integration's Host half changed (`/rebase` wording), so a running instance needs a restart.
+
+## UI copy lane
+
+15 revisions (`mpnzysmnrzzs` … `oxlvynrm`) across about 65 plugins' locale tables and UI strings, plus `knxtpzlm`
+(regenerated onboarding catalog). Counts from a scanner built on `copy-check`'s extractor, English only:
+
+| Pattern | Before → after |
+| --- | --- |
+| "Host" for the DSH process, package names, "bundle" | 146 → 7 |
+| Errors with no next step / ending in a bare `{message}` | 363 → 264 / 19 → 8 |
+| Status words outside the six states | 119 → 84 |
+| session / conversation / chat / settle / integrate | 132 → 71 / 27 → 14 / 22 → 14 / 11 → 5 / 3 → 1 |
+| Settings descriptions over 140 characters / semicolon chains | 75 → 0 / 200 → 47 |
+| "Try again" labels / "..." / Title Case | 38 → 0 / 1 → 0 / 85 → 74 |
+
+107 of the 264 remaining errors sit next to a Retry or Refresh control. `check:copy` passes (30 findings, all within
+its baseline); it failed before.
+
+Left as is: strings in native-fork files the fork does not already declare as changed (schedule's 80 "task" strings,
+"Close Tabs to the Right", the 21 raw plugin titles in `locale/en.json`); labels journeys navigate by ("New session",
+"Queue Reorder", "Thread Sidebar"). Translations of changed keys were not reviewed by a native speaker.
+
+Unverified: jj-integration and thread-sidebar journeys and one workbench scenario were not run; secret-catalog and
+background-jobs failures were compared with earlier lanes' base runs, not a fresh one. Settings descriptions and Host
+strings changed in about 25 plugins, so a running instance needs a restart.
 
 ## Catalog copy lane
 
