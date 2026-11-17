@@ -10,7 +10,8 @@
     "package-name": 2,
     "raw-error-echo": 13,
     "status-word": 21,
-    "try-again": 0
+    "try-again": 0,
+    "ascii-ellipsis": 0
   },
   "counts": {
     "conversation/agent-preset": 1,

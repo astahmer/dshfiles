@@ -252,3 +252,10 @@ test('status-word: a non-canonical state word as a whole label, not inside a sen
 test('try-again: the whole label, not the phrase inside a sentence', () => {
   assert.deepEqual(ruleHits('try-again', ['Try again', 'Try again.', 'Retry', 'Check the path, then try again.']), ['Try again', 'Try again.'])
 })
+
+test('ascii-ellipsis: three dots after a word, not a range or the ellipsis character', () => {
+  assert.deepEqual(
+    ruleHits('ascii-ellipsis', ['Loading...', 'Search threads...', 'Saving... please wait', 'Loading…', 'Compare main...HEAD', 'Wait.']),
+    ['Loading...', 'Search threads...', 'Saving... please wait'],
+  )
+})
