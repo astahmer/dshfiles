@@ -171,11 +171,15 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   const editable = active?.status === 'ready' && active.content.kind === 'text'
   const viewers = useRegistry(FileViewer)
   const viewer = editable ? viewers.find(candidate => candidate.matches(active.path)) : undefined
-  /** Trigger command palette in files mode by simulating Mod+Shift+P */
-  const openGlobalSearch = useCallback(() => {
-    const isMac = navigator.platform.toLowerCase().includes('mac')
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP', shiftKey: true, metaKey: isMac, ctrlKey: !isMac, bubbles: true }))
+  
+  // File search filter state
+  const [fileFilter, setFileFilter] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  /** Focus the file search input */
+  const focusFileSearch = useCallback(() => {
+    searchInputRef.current?.focus()
   }, [])
+  
   const [viewedDocuments, setViewedDocuments] = useState<ReadonlySet<string>>(new Set())
   const viewing = viewer !== undefined && active !== undefined && viewedDocuments.has(active.id)
   const toggleViewer = (documentId: string): void =>
@@ -333,9 +337,9 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         )}
         <Button
           aria-label="Search files"
-          onClick={openGlobalSearch}
+          onClick={focusFileSearch}
           size="icon-xs"
-          title="Search files (⌘⇧P)"
+          title="Search files"
           variant="ghost"
         >
           <SearchIcon />
@@ -378,13 +382,14 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
             </div>
             <div className="dshx:px-2 dshx:py-1">
               <SearchInput
+                ref={searchInputRef}
                 className="dshx:h-7"
                 placeholder="Search files…"
-                onFocus={openGlobalSearch}
-                readOnly
+                value={fileFilter}
+                onChange={e => setFileFilter(e.target.value)}
               />
             </div>
-            <FileTree activePath={active?.path ?? null} onOpen={path => props.store.open(sessionId, { path })} remote={props.remote} sessionId={sessionId} />
+            <FileTree activePath={active?.path ?? null} filter={fileFilter} onOpen={path => props.store.open(sessionId, { path })} remote={props.remote} sessionId={sessionId} />
           </div>
         )}
         <div className="dshx:relative dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
