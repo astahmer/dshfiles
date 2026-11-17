@@ -857,7 +857,7 @@ const Conversation = (props: {
             >
               <StatusDot size="sm" tone="info" className="dshx:animate-pulse dshx:motion-reduce:animate-none" />
             </span>
-            <span className="dshx:animate-pulse dshx:motion-reduce:animate-none">Thinking…</span>
+            <span className="dshx:animate-pulse dshx:motion-reduce:animate-none">Working…</span>
           </li>
         ) : null}
       </TimelineRuns>

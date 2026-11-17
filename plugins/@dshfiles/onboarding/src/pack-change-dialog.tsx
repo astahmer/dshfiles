@@ -55,7 +55,7 @@ const SUMMARY_TITLE = {
   'restart-required': 'Saved; waits for a restart',
   partial: 'Partly done',
   manual: 'Install by hand',
-  cancelled: 'Cancelled',
+  cancelled: 'Stopped',
   failed: 'Not changed',
 } as const satisfies Record<PackSummary['kind'], string>
 
@@ -243,7 +243,7 @@ const ChangeBody = (props: Omit<PackChangeDialogProps, 'target'> & { readonly ta
           {verb} {target.title}
         </DialogTitle>
         <DialogDescription>
-          {state.phase === 'reviewing' ? 'Nothing changes until you confirm.' : state.phase === 'applying' ? 'Working one plugin at a time.' : 'Finished.'}
+          {state.phase === 'reviewing' ? 'Nothing changes until you confirm.' : state.phase === 'applying' ? 'Working one plugin at a time.' : 'Done.'}
         </DialogDescription>
       </DialogHeader>
       {state.phase === 'reviewing' ? (

@@ -277,7 +277,7 @@ const RecentRequests = (props: { requests: RequestPage; onViewAll: () => void })
                 <td className={cellClass}>
                   <span className="dshx:inline-flex dshx:items-center dshx:gap-1.5">
                     <StatusGlyph decorative status={REQUEST_STATUS_GLYPH[row.status]} />
-                    {row.status === 'ok' ? 'Success' : row.status === 'failed' ? 'Failed' : 'Aborted'}
+                    {row.status === 'ok' ? 'Done' : row.status === 'failed' ? 'Failed' : 'Stopped'}
                   </span>
                 </td>
               </tr>
