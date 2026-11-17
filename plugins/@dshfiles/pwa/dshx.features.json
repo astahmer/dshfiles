@@ -5,7 +5,8 @@
     {
       "id": "installable-app",
       "title": "Install the Web UI as an app on the phone",
-      "summary": "The Host serves its own manifest with PNG icons (any and maskable) and a splash color, and injects the head tags Safari on iOS needs for a standalone home-screen launch with its own icon instead of a page screenshot. Registered on the Host Web server, so the Tailscale tunnel, the LAN listener and the desktop URL all get it. No service worker: Chrome has not required one for installation since 108, and a cache in front of a live agent client only risks stale code.",
+      "summary": "Add DSH to a phone's Home Screen to open it as an app with its own icon.",
+      "details": "The Host serves its own manifest with PNG icons (any and maskable) and a splash color, and injects the head tags Safari on iOS needs for a standalone home-screen launch with its own icon instead of a page screenshot. Registered on the Host Web server, so the Tailscale tunnel, the LAN listener and the desktop URL all get it. No service worker: Chrome has not required one for installation since 108, and a cache in front of a live agent client only risks stale code.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",

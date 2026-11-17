@@ -259,7 +259,7 @@ rail destination; 41 features.
 | backlog/shipped-summary: Summarize a shipped period with the triage model | destinationSection | left-nav: Backlog › Shipped › Summarize |
 | backlog/short-item-references: Name new items with a short alias | destinationSection | left-nav: Backlog (every item label, reference card, mention chip and agent tool) |
 | project-automations/project-automations: Start threads in a project on a schedule | destinationSection | rail: Work › Automations (already on the rail) |
-| schedule/catalog-read-reuse: Tasks and reminder catalogs keep their read until a schedule change | destinationSection | sidebar: Tasks page, task tabs and the Session header's reminders |
+| schedule/catalog-read-reuse: Tasks and reminders load once | destinationSection | sidebar: Tasks page, task tabs and the Session header's reminders |
 | backlog/agent-claims: Agents claim items with a lease; you release them | detail | left-nav: Backlog › item detail › Owner · Delegate › Release |
 | backlog/backlinks: See the backlog items that link to a thread or revision | detail | thread header ⋯ submenu (thread-sidebar ThreadMenuSections); jj panel revision details (jj-integration RevisionSections) |
 | backlog/board-links-and-history: Board, links, backlinks and history | detail | left-nav: Backlog › Board / item detail |
@@ -335,7 +335,7 @@ rail destination; 14 features.
 | memory/memory-panel: Browse and clean up memory in the Memory panel | destinationSection | left-nav: Memory |
 | memory/usage-telemetry: Show what memory costs and whether it holds up | destinationSection | left-nav: Memory › Analytics |
 | onboarding/getting-started: See what this setup can do and what it still needs on one page | destinationSection | rail: Knowledge › Getting started; palette: Getting started |
-| references/session-references: Attach named outside directories and git repositories to a thread | destinationSection | agent tool: reference_* and /reference (no UI) |
+| references/session-references: Attach outside folders and repositories to a thread | destinationSection | agent tool: reference_* and /reference (no UI) |
 | resource-packs/local-properties: Typed packs on referenced resources | destinationSection | left-nav: Resource Packs: Resources (not mounted) |
 | whiteboard/project-whiteboards: Project whiteboards | destinationSection | left-nav: Whiteboard |
 | onboarding/pack-change: Enable or disable a plugin pack after an exact preview | detail | rail: Knowledge › Getting started › Packs › Enable pack / Disable pack |
@@ -381,13 +381,13 @@ rail destination (bottom); 67 features.
 | multi-host/runtime-directory: Add and identify hosts | settingsSection | composer: Run on Local › Add host |
 | opencode-compat/plugin-loader: Load OpenCode server plugins | settingsSection | settings: dshfiles-opencode-compat |
 | policies/deny-policies: Deny tool calls outright, after permissions | settingsSection | agent tool: policies_list (no UI) |
-| secret-catalog/alias-mutations: Create, edit, rename, and remove aliases safely | settingsSection | left-nav: Secrets › Add with details |
+| secret-catalog/alias-mutations: Create, edit, rename and remove secrets | settingsSection | left-nav: Secrets › Add with details |
 | secret-catalog/backlog-jev-setup: Add a Jev key from the Backlog setting | settingsSection | plugins-page: View @dshfiles/backlog › Jev secret |
 | secret-catalog/bounded-secret-reveal: Reveal on click and copy without revealing | settingsSection | left-nav: Secrets › reveal |
 | secret-catalog/inline-quick-add: Add a secret inline under the list | settingsSection | left-nav: Secrets › Add secret |
 | secret-catalog/inline-reference-setup: Create and bind from a secret-reference field | settingsSection | settings: secret-reference fields › Bind |
 | secret-catalog/reference-repair: Repair a secret reference that does not resolve | settingsSection | settings: secret-reference fields › repair |
-| secret-catalog/scoped-alias-catalog: Browse aliases by scope and environment | settingsSection | left-nav: Secrets |
+| secret-catalog/scoped-alias-catalog: Browse secrets by scope and environment | settingsSection | left-nav: Secrets |
 | settings-models/models-settings: Models settings and provider onboarding | settingsSection | settings: Models section |
 | settings-shell/dsh-release-notice: DSH release notice and TL;DR | settingsSection | sidebar: Settings trigger release mark › General |
 | settings-shell/modified-settings: Modified settings and reset to default | settingsSection | settings: Reset to default |
@@ -515,8 +515,8 @@ run row, chips, `/` and `@` sources; 70 features.
 | rich-composer/image-attachment-reference: Add inline references for image attachments | composerContribution | composer: image references |
 | rich-composer/image-reference-mentions: Reuse image references and open the selected image | composerContribution | composer: image reference chips |
 | rich-composer/large-paste-file: Attach a large paste as a text file | composerContribution | composer: large paste as file |
-| rich-composer/paste-session-mentions: Paste session mentions as reference chips | composerContribution | composer: pasted thread mentions |
-| rich-composer/phone-thread-menu: Open a scoped phone thread menu | composerContribution | phone top bar: Thread menu |
+| rich-composer/paste-session-mentions: Paste thread mentions as chips | composerContribution | composer: pasted thread mentions |
+| rich-composer/phone-thread-menu: Thread menu on a phone | composerContribution | phone top bar: Thread menu |
 | rich-composer/prompt-recall: Recall earlier prompts with ArrowUp | composerContribution | composer: ArrowUp recall |
 | send-after-upload/send-after-upload: Send when the attachment upload finishes | composerContribution | composer: Sending when upload finishes pill |
 | session-controller/turn-admission: Limit how many threads run at once | composerContribution | composer dock: Waiting for a free slot; Settings › General: Running threads limit |
@@ -724,9 +724,9 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | project-automations/project-automation-webhooks: Start threads from signed webhooks | infrastructure | host: /automations/webhook/<id> route |
 | project-checks/activity-projection: Project check receipts appear safely in the Activity Timeline | infrastructure | host: receipts into left-nav: Activity Timeline: Activity |
 | pwa/installable-app: Install the Web UI as an app on the phone | infrastructure | host: served manifest, icon routes and index head |
-| request-messages/dispatch-request-messages: Dispatch agent/request-messages on stock DSH | infrastructure | host: no UI |
+| request-messages/dispatch-request-messages: Let plugins adjust each model request | infrastructure | host: no UI |
 | rich-composer/composer-contract: Composer contract for other plugins | infrastructure | client: Composer contract |
-| rich-composer/workbench-conversation-views: Dock an independently bound Conversation view | infrastructure | workbench: docked Conversation views |
+| rich-composer/workbench-conversation-views: Dock a thread view | infrastructure | workbench: docked Conversation views |
 | session-controller/drive-threads: Drive threads from another plugin | infrastructure | host: sessions API |
 | session-controller/lean-session-follow: Send the browser only what a thread renders | infrastructure | host: session event stream |
 | session-controller/live-model-catalog: The model picker follows connected account changes | infrastructure | host: model catalog cache |

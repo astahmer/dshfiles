@@ -3,8 +3,9 @@
   "features": [
     {
       "id": "scoped-alias-catalog",
-      "title": "Browse aliases by scope and environment",
-      "summary": "Search metadata-only aliases across all, project, global, and local scopes; choose projects through the shared picker, which opens on Projects and offers confirmed secondary JJ workspaces in a separate scope, and identify the current host-local scope.",
+      "title": "Browse secrets by scope and environment",
+      "summary": "Search your secrets across project, global and local scopes, without seeing their values.",
+      "details": "Search metadata-only aliases across all, project, global, and local scopes; choose projects through the shared picker, which opens on Projects and offers confirmed secondary JJ workspaces in a separate scope, and identify the current host-local scope.",
       "reach": [
         "seed fake-secret-cli",
         "seed rebase-ready-thread",
@@ -112,7 +113,8 @@
     {
       "id": "bounded-secret-reveal",
       "title": "Reveal on click and copy without revealing",
-      "summary": "Hovering a masked value offers \"Click to reveal\"; a click reveals that one alias and environment through the Host, and it masks again after the configured timeout, on blur, Esc, scope change, refresh, or unmount. Copy goes through the Host CLI without revealing.",
+      "summary": "Click a masked secret to reveal it for a short time, or copy it without revealing it.",
+      "details": "Hovering a masked value offers \"Click to reveal\"; a click reveals that one alias and environment through the Host, and it masks again after the configured timeout, on blur, Esc, scope change, refresh, or unmount. Copy goes through the Host CLI without revealing.",
       "surfaces": ["client", "host", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -192,7 +194,8 @@
     {
       "id": "inline-quick-add",
       "title": "Add a secret inline under the list",
-      "summary": "Add secret appends an editable row: an env-var style name and a masked value (or Generate on this Host from the row menu, which also offers Copy and Delete). Enter or leaving the row saves it to the viewed scope (the selected project under All) and the default environment; the split arrow opens the detailed dialog.",
+      "summary": "Add a secret in a new row under the list with a name and a value, or generate one.",
+      "details": "Add secret appends an editable row: an env-var style name and a masked value (or Generate on this Host from the row menu, which also offers Copy and Delete). Enter or leaving the row saves it to the viewed scope (the selected project under All) and the default environment; the split arrow opens the detailed dialog.",
       "reach": [
         "seed fake-secret-cli",
         "click tab \"Settings\"",
@@ -268,8 +271,9 @@
     },
     {
       "id": "alias-mutations",
-      "title": "Create, edit, rename, and remove aliases safely",
-      "summary": "Add through a required-first dialog (alias, scope defaulting to the selected project, environment prod, generated or masked value, Advanced fold for item metadata), edit metadata/value, rename aliases, remove one alias without deleting the vault item, or explicitly delete the vault entry.",
+      "title": "Create, edit, rename and remove secrets",
+      "summary": "Add, edit, rename or remove a secret, and delete its stored value only when you ask.",
+      "details": "Add through a required-first dialog (alias, scope defaulting to the selected project, environment prod, generated or masked value, Advanced fold for item metadata), edit metadata/value, rename aliases, remove one alias without deleting the vault item, or explicitly delete the vault entry.",
       "reach": [
         "seed fake-secret-cli",
         "click tab \"Settings\"",
@@ -372,7 +376,8 @@
     {
       "id": "inline-reference-setup",
       "title": "Create and bind from a secret-reference field",
-      "summary": "A marked controlled input opens a compact masked create-and-bind form. The Secret Catalog Host stores the value, the consumer receives only a reference, and a duplicate alias can bind the existing record instead of failing creation.",
+      "summary": "A secret field can create a new secret in place and keep only a reference to it.",
+      "details": "A marked controlled input opens a compact masked create-and-bind form. The Secret Catalog Host stores the value, the consumer receives only a reference, and a duplicate alias can bind the existing record instead of failing creation.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings*\"",
@@ -442,7 +447,8 @@
     {
       "id": "reference-repair",
       "title": "Repair a secret reference that does not resolve",
-      "summary": "A configured secret:ALIAS[@env] that the Host cannot resolve names the reference and the typed reason (alias missing from every scope or only in a project, environment missing, several scopes, unreadable or empty vault value, secret CLI missing, locked or failing) and offers Set value in the right scope, Pick another secret, Open in Secret Catalog on that alias, and Re-check. It warns before a global write lands in a symlinked config.",
+      "summary": "A secret reference that does not work says why and offers the fix, such as setting its value.",
+      "details": "A configured secret:ALIAS[@env] that the Host cannot resolve names the reference and the typed reason (alias missing from every scope or only in a project, environment missing, several scopes, unreadable or empty vault value, secret CLI missing, locked or failing) and offers Set value in the right scope, Pick another secret, Open in Secret Catalog on that alias, and Re-check. It warns before a global write lands in a symlinked config.",
       "reach": [
         "seed fake-secret-cli",
         "click button \"Account menu\"",
@@ -540,7 +546,8 @@
     {
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
-      "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value. secret_remove_alias removes one alias (keeping its vault item) only with confirm: true.",
+      "summary": "Agents list your secrets without their values and read one value only when asked by name.",
+      "details": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value. secret_remove_alias removes one alias (keeping its vault item) only with confirm: true.",
       "surfaces": ["tool", "host"],
       "surface": "agentToolOnly",
       "destination": "none",
@@ -576,7 +583,8 @@
     {
       "id": "agent-secret-request",
       "title": "Let an agent ask the user to store a secret",
-      "summary": "request_secret shows a card on the thread's latest turn with the alias, environment, scope and the agent's stated purpose. The user types the value into the Catalog's masked form (stored by the secret CLI on the Host) or declines; the waiting tool call receives only the secret:ALIAS reference, or a declined, expired or cancelled result. secret_requests_pending lists waiting requests; secret_list and secret_remove_alias see and remove the stored alias.",
+      "summary": "The agent can ask you to store a secret, and only gets a reference to it back.",
+      "details": "request_secret shows a card on the thread's latest turn with the alias, environment, scope and the agent's stated purpose. The user types the value into the Catalog's masked form (stored by the secret CLI on the Host) or declines; the waiting tool call receives only the secret:ALIAS reference, or a declined, expired or cancelled result. secret_requests_pending lists waiting requests; secret_list and secret_remove_alias see and remove the stored alias.",
       "reach": [
         "seed fake-secret-cli",
         "seed tool-call-thread",
@@ -647,7 +655,8 @@
     {
       "id": "backlog-jev-setup",
       "title": "Add a Jev key from the Backlog setting",
-      "summary": "Open a masked setup popover on the Backlog Jev setting, store the key as a global Secret Catalog alias, and bind only its reference.",
+      "summary": "Add a Jev key from the Backlog setting, stored as a secret.",
+      "details": "Open a masked setup popover on the Backlog Jev setting, store the key as a global Secret Catalog alias, and bind only its reference.",
       "reach": [
         "seed fake-secret-cli",
         "click tab \"Settings\"",
@@ -709,7 +718,8 @@
     {
       "id": "backlog-jev-chat-setup",
       "title": "Set up a Jev key from chat",
-      "summary": "The latest completed chat turn offers the compact masked setup form only when Jev is enabled, no key resolves, and no reference is already configured. A bound but unresolvable reference gets a repair warning instead of a duplicate-create form.",
+      "summary": "When Jev has no key, the latest turn offers a short form to add one.",
+      "details": "The latest completed chat turn offers the compact masked setup form only when Jev is enabled, no key resolves, and no reference is already configured. A bound but unresolvable reference gets a repair warning instead of a duplicate-create form.",
       "reach": [
         "seed fake-secret-cli",
         "seed backlog-jev-enabled",

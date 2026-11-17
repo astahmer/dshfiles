@@ -36,7 +36,7 @@ From the onboarding feature catalog: 21 features, the 6 curated ones first.
 2. **Preview cited memory inline** (`memory`, knowledge) — Click a memory citation in a thread to see the note and where it came from.
 3. **Show what memory costs and whether it holds up** (`memory`, knowledge) — See what memory costs in tokens and whether answers that cite it hold up.
 4. **Forget a selection of notes** (`memory`, knowledge) — Select several notes and forget them with one confirmation.
-5. **Attach named outside directories and git repositories to a thread** (`references`, knowledge) — Save a reference (a directory read in place, or a git URL shallow-cloned under $DSH_HOME/references), attach it to a Session with /reference or the reference_* tools, and name every attached reference with its absolute path in that Session's runtime context.
+5. **Attach outside folders and repositories to a thread** (`references`, knowledge) — Attach a folder or git repository to a thread with /reference so the agent can read it.
 6. **Claude Code and Codex history** (`agentsview`, knowledge) — Browse what Claude Code and Codex recorded on this machine and read any run as a transcript.
 
 ### More
@@ -55,7 +55,7 @@ From the onboarding feature catalog: 21 features, the 6 curated ones first.
 12. **Faster grep and glob for agents** (`fff-search`) — The agent's grep and glob tools answer from a file index kept in memory.
 13. **Answer ctx.web fetches across redirects with the readable article** (`web-fetch-readable`, settings) — A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.
 14. **Source chips under web_search and web_fetch results** (`web-fetch-readable`, transcript) — Each web_search and web_fetch row in the transcript keeps the native view and gains one chip per page it returned, under the card through tool-meta's tool.call.sections seat: the host and the page title (web_search's source titles, web_fetch's article heading), the URL in a tool…
-15. **Typed packs on referenced resources** (`resource-packs`, knowledge) — Register resources and attach reusable typed property packs, without modifying native content or running agents.
+15. **Typed packs on referenced resources** (`resource-packs`, knowledge) — Attach reusable sets of typed properties to resources without changing them.
 
 ## Enable it
 

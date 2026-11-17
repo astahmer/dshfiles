@@ -2,7 +2,7 @@
 
 ![The original header and child-view navigation hosted inside fixed Workbench conversations](docs/screenshots/conversation-header.png)
 
-![Paste session mentions as reference chips](docs/screenshots/paste-session-mentions.png)
+![Paste thread mentions as chips](docs/screenshots/paste-session-mentions.png)
 
 ![Recall earlier prompts with ArrowUp](docs/screenshots/prompt-recall.png)
 
