@@ -296,6 +296,8 @@ export const copyRules: readonly CopyRule[] = [
   },
   // The retry verb is Retry; "try again" inside a sentence ("Check the path, then try again.") is fine.
   { id: 'try-again', use: 'Retry', scope: 'label', test: text => /^Try again[.!]?$/i.test(text.trim()) },
+  // Three dots after a word, at a word end (`Loading...`, `Search... `); a range (`main...HEAD`) or spread is code.
+  { id: 'ascii-ellipsis', use: 'the ellipsis character …', scope: 'label', test: text => /[\p{L}\d)]\.\.\.(?=$|[\s"'”)\]])/u.test(text.trim()) },
 ]
 
 export interface CopyComparison {
