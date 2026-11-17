@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "settings-shell-port",
-      "title": "Native Settings shell, ported",
-      "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
+      "title": "Settings shell",
+      "summary": "The Settings button, its sections, the General page and the Cmd+, shortcut.",
+      "details": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
       "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "expect button \"General\""],
       "reachNarrow": ["click button \"More\"", "click button \"Settings Accounts, tools, secrets and plugins.\"", "expect combobox \"Sections\""],
       "surfaces": ["client", "settings", "integration"],
@@ -59,8 +60,9 @@
     },
     {
       "id": "settings-workbench-panels",
-      "title": "One dockable Settings hub with real navigation and forms",
-      "summary": "The New tab chooser offers one Settings hub with actual section navigation, search and native/plugin forms. Leaf sections remain registered for saved layouts and explicit links but are hidden from primary suggestions. The authorized shell renderer and ConfigForm remain the owners. Workbench pane chrome is mandatory; hidden right-pane tabs retain their state. It is the same grouped page as the stage page, for free-docking layouts.",
+      "title": "Dock Settings as one panel",
+      "summary": "Open all of Settings as one dockable panel with its sections, search and forms.",
+      "details": "The New tab chooser offers one Settings hub with actual section navigation, search and native/plugin forms. Leaf sections remain registered for saved layouts and explicit links but are hidden from primary suggestions. The authorized shell renderer and ConfigForm remain the owners. Workbench pane chrome is mandatory; hidden right-pane tabs retain their state. It is the same grouped page as the stage page, for free-docking layouts.",
       "reach": ["click button \"New tab\"", "click button \"Settings\"", "expect button \"General\""],
       "surfaces": ["client", "integration"],
       "surface": "settingsSection",
@@ -103,7 +105,8 @@
     {
       "id": "dsh-release-notice",
       "title": "DSH release notice and TL;DR",
-      "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, links both versions to their GitHub releases with how long ago each shipped and how many releases behind the install is, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
+      "summary": "Settings marks a new DSH release and sums up what changed since your version.",
+      "details": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, links both versions to their GitHub releases with how long ago each shipped and how many releases behind the install is, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
       "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "expect button \"Check for DSH updates\""],
       "reachNarrow": ["click button \"More\"", "click button \"Settings Accounts, tools, secrets and plugins.\"", "expect button \"Check for DSH updates\""],
       "surfaces": ["client", "host", "api", "tool", "storage"],
@@ -170,7 +173,8 @@
     {
       "id": "settings-tab",
       "title": "One Settings page in the stage",
-      "summary": "Settings has one place: a page in the stage (docs/ade-ux §4.6). The rail, the gear, the palette, Mod+, and other plugins' open requests all open it; the former dialog, expanded dialog and side-panel presentations are gone, and a request that still names one opens the page. With main-tabs it gets a tab like any other page; picking that tab or reloading onto it reopens Settings, leaving it closes Settings.",
+      "summary": "Settings opens as one page in the main view, from the rail, the gear, the palette or Cmd+,.",
+      "details": "Settings has one place: a page in the stage (docs/ade-ux §4.6). The rail, the gear, the palette, Mod+, and other plugins' open requests all open it; the former dialog, expanded dialog and side-panel presentations are gone, and a request that still names one opens the page. With main-tabs it gets a tab like any other page; picking that tab or reloading onto it reopens Settings, leaving it closes Settings.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -211,7 +215,8 @@
     {
       "id": "settings-task-groups",
       "title": "Settings grouped by task, with deep links",
-      "summary": "Every native section and plugin settings page sits in one task group (General, Models & accounts, Agents, Tools & MCP, Projects & workspaces, Hosts & network, Security, Notifications, Plugins, About) under a person's name, never a package id. Settings several plugins hold for one task share one entry (General › Layout, Composer and Transcript; Tools & MCP › Web search and fetch; Projects & workspaces › Checks and tests; About › Diagnostics), each plugin's fields under a subheading. Every namespace and section this repository ships is placed; only an unknown third-party one shows under Other. AI accounts appears once: its section, its plugin settings and a link to the accounts page. MCP servers, Secrets, Hosts and the AI accounts page are entries that open the page their plugin owns. Every Jev setting sits under Tools & MCP › Jev, and Layout (fixed or free docking) under General. Plugin pages carry no scope line: every setting applies to every project and thread until one stores a narrower value.",
+      "summary": "Settings are grouped by task, such as Models and accounts or Projects and workspaces, with direct links.",
+      "details": "Every native section and plugin settings page sits in one task group (General, Models & accounts, Agents, Tools & MCP, Projects & workspaces, Hosts & network, Security, Notifications, Plugins, About) under a person's name, never a package id. Settings several plugins hold for one task share one entry (General › Layout, Composer and Transcript; Tools & MCP › Web search and fetch; Projects & workspaces › Checks and tests; About › Diagnostics), each plugin's fields under a subheading. Every namespace and section this repository ships is placed; only an unknown third-party one shows under Other. AI accounts appears once: its section, its plugin settings and a link to the accounts page. MCP servers, Secrets, Hosts and the AI accounts page are entries that open the page their plugin owns. Every Jev setting sits under Tools & MCP › Jev, and Layout (fixed or free docking) under General. Plugin pages carry no scope line: every setting applies to every project and thread until one stores a narrower value.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -301,7 +306,8 @@
     {
       "id": "settings-search",
       "title": "Search Settings inline",
-      "summary": "One search field at the top: matching settings replace the section as a flat list grouped by page, highlighted and editable in place, with a count; the tree shows matches per entry. Titles, descriptions, key paths, page and group names match, and key bindings by command name or keys; hidden and secret fields never do.",
+      "summary": "Search all settings from one field and change matches in place.",
+      "details": "One search field at the top: matching settings replace the section as a flat list grouped by page, highlighted and editable in place, with a count; the tree shows matches per entry. Titles, descriptions, key paths, page and group names match, and key bindings by command name or keys; hidden and secret fields never do.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -364,7 +370,8 @@
     {
       "id": "settings-search-entries",
       "title": "Search section controls and open them at the control",
-      "summary": "Controls that live Settings sections publish as search entries (dshx settings.section metadata.searchEntries) are found while their sections stay unmounted, listed under their section; picking one opens that section with target set to the entry id, and the section scrolls to and focuses it. General publishes its coding-view switch. The read-only settings_list tool searches the same entries for the Agent.",
+      "summary": "Search finds controls inside Settings sections and opens the section at that control.",
+      "details": "Controls that live Settings sections publish as search entries (dshx settings.section metadata.searchEntries) are found while their sections stay unmounted, listed under their section; picking one opens that section with target set to the entry id, and the section scrolls to and focuses it. General publishes its coding-view switch. The read-only settings_list tool searches the same entries for the Agent.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -430,7 +437,8 @@
     {
       "id": "plugin-settings-controls",
       "title": "Plugin settings with real controls",
-      "summary": "Every plugin's settings render from its schema with titles, descriptions, grouping and a control per type (switch, segments or select, bounded number with unit, list and key/value editors, JSON only as a fallback), in Settings and on its Plugins page.",
+      "summary": "Each plugin's settings show real controls such as switches, menus and number fields.",
+      "details": "Every plugin's settings render from its schema with titles, descriptions, grouping and a control per type (switch, segments or select, bounded number with unit, list and key/value editors, JSON only as a fallback), in Settings and on its Plugins page.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -476,7 +484,8 @@
     {
       "id": "modified-settings",
       "title": "Modified settings and reset to default",
-      "summary": "A setting the user layer overrides carries a bar on its left; hovering it offers Reset to default, which unsets the override, also while the change that set it is still saving. A row whose value is not the default names where it comes from (Override or Profile composition) and what an override would re-inherit; the config key shows on hover, in the JSON view and when a search matches it. The Modified toggle beside search (the @modified filter) lists only overridden settings.",
+      "summary": "Settings you changed are marked, and Reset to default puts them back.",
+      "details": "A setting the user layer overrides carries a bar on its left; hovering it offers Reset to default, which unsets the override, also while the change that set it is still saving. A row whose value is not the default names where it comes from (Override or Profile composition) and what an override would re-inherit; the config key shows on hover, in the JSON view and when a search matches it. The Modified toggle beside search (the @modified filter) lists only overridden settings.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -537,7 +546,8 @@
     {
       "id": "settings-json-editor",
       "title": "Edit plugin settings as JSON",
-      "summary": "Each plugin settings page switches between the form and its overrides as JSON: Insert setting completes keys from the schema with their descriptions, every unknown key or wrong value is listed with its line and blocks Save, Save sends only the fields the draft changed fenced by the revision it started from, and read-only Defaults and Effective tabs show what each field inherits and resolves to. A concurrent change or a refusal keeps the draft with a recovery. A field opened from search or a link while JSON shows stays in JSON with its key selected, and type diagnostics name the expected type in the active language.",
+      "summary": "Edit a plugin's settings as JSON with completion and checks before you save.",
+      "details": "Each plugin settings page switches between the form and its overrides as JSON: Insert setting completes keys from the schema with their descriptions, every unknown key or wrong value is listed with its line and blocks Save, Save sends only the fields the draft changed fenced by the revision it started from, and read-only Defaults and Effective tabs show what each field inherits and resolves to. A concurrent change or a refusal keeps the draft with a recovery. A field opened from search or a link while JSON shows stays in JSON with its key selected, and type diagnostics name the expected type in the active language.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -635,7 +645,8 @@
     {
       "id": "settings-inspect-tool",
       "title": "Inspect a setting's default, override and source",
-      "summary": "The read-only settings_inspect Agent tool reports each visible field of a namespace with its schema default, user override (also when it equals the default), inherited value, effective value and source, the same model the Settings rows draw.",
+      "summary": "The agent can read a setting's default, your change and where its value comes from.",
+      "details": "The read-only settings_inspect Agent tool reports each visible field of a namespace with its schema default, user override (also when it equals the default), inherited value, effective value and source, the same model the Settings rows draw.",
       "reach": [
         "click tab \"Agents\"",
         "click button \"Capabilities\"",
@@ -678,7 +689,8 @@
     {
       "id": "plugin-enablement-tools",
       "title": "List and switch plugin entries, from Settings or an Agent",
-      "summary": "Each plugin settings page ends with Plugin details, a closed fold holding its Loader entry: the bundle that declares the row, the bundles that reconfigure it, a Plugin enabled switch, a change waiting for a restart, and a note when pnpm profile:sync restores the row from the seed. plugin_inventory lists the same for every entry; plugin_set_enabled enables or disables one through the plugin manager and relays its verdict: applied live, waiting for a user restart (with the reason), or overridden by a higher-priority layer. It never restarts DSH; the opposite value reverses it.",
+      "summary": "Turn a plugin on or off from its settings page, and the agent can do the same when you ask.",
+      "details": "Each plugin settings page ends with Plugin details, a closed fold holding its Loader entry: the bundle that declares the row, the bundles that reconfigure it, a Plugin enabled switch, a change waiting for a restart, and a note when pnpm profile:sync restores the row from the seed. plugin_inventory lists the same for every entry; plugin_set_enabled enables or disables one through the plugin manager and relays its verdict: applied live, waiting for a user restart (with the reason), or overridden by a higher-priority layer. It never restarts DSH; the opposite value reverses it.",
       "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "click button \"Layout\"", "click button \"Plugin details: Main tabs\"", "expect switch \"Plugin enabled\""],
       "reachNarrow": [
         "click button \"More\"",
@@ -745,7 +757,8 @@
     {
       "id": "open-config-menu",
       "title": "Open the configuration file elsewhere",
-      "summary": "The primary action opens an existing configuration file with the Session Remote's configured default app; the menu offers associated apps, the Editor plugin, copy and reveal actions.",
+      "summary": "Open a configuration file in your default app or the editor, or copy or reveal its path.",
+      "details": "The primary action opens an existing configuration file with the Session Remote's configured default app; the menu offers associated apps, the Editor plugin, copy and reveal actions.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -787,7 +800,8 @@
     {
       "id": "shared-jev-key",
       "title": "Set the Jev key once",
-      "summary": "Settings › Tools & MCP › Jev leads with one Key: a secret:ALIAS reference (Secret Catalog picker) that Backlog triage and Memory's signal gates both resolve on the Host. Each plugin's earlier key stays stored but hidden as the fallback while the shared key is empty, and is copied into an empty shared key once, never over a set one. Backlog's Jev section and Memory's review link here.",
+      "summary": "Set one Jev key in Settings for Backlog and Memory to share.",
+      "details": "Settings › Tools & MCP › Jev leads with one Key: a secret:ALIAS reference (Secret Catalog picker) that Backlog triage and Memory's signal gates both resolve on the Host. Each plugin's earlier key stays stored but hidden as the fallback while the shared key is empty, and is copied into an empty shared key once, never over a set one. Backlog's Jev section and Memory's review link here.",
       "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "fill searchbox \"Search settings\" \"Jev\"", "expect text \"Key\""],
       "reachNarrow": [
         "click button \"More\"",

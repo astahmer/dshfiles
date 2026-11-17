@@ -2,7 +2,7 @@
 
 ![DSH release notice and TL;DR](docs/screenshots/dsh-release-notice.png)
 
-![Native Settings shell, ported](docs/screenshots/settings-shell-port.png)
+![Settings shell](docs/screenshots/settings-shell-port.png)
 
 ![One Settings hub inside the tabbed workspace](docs/screenshots/settings-workbench-panels.png)
 

@@ -44,9 +44,9 @@ From the onboarding feature catalog: 21 features, the 6 curated ones first.
 1. **Digest idle threads from DSH's own session logs** (`memory`) — An idle thread gets a short digest of its requests, decisions and answer, mostly without a model call.
 2. **Start every thread with one frozen memory block** (`memory`) — Each thread starts with a short memory block of notes and past threads for its project.
 3. **Search, read and note memory from any agent** (`memory`) — Agents search memory, read a digest or note, and save new notes.
-4. **Serve session search from a worker-owned index** (`session-search`) — Replace the stock sessionQuery backend: searches are pure reads forwarded to a worker that owns the SQLite FTS5 index and ingests session logs incrementally, while list, read and title reads stay core's own code with cached folds.
-5. **Find every match in one thread** (`session-search`) — Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the session_find_in_thread agent tool. An archived Session is indexed for that request.
-6. **Search the prompts sent across threads** (`session-search`) — Serve the newest prompts a person sent across every top-level thread, newest first and each text once, from a time-ordered user_prompts table beside the FTS index: bounded by a window of newest prompts and a size cap, optionally narrowed to prompts holding every typed word. Suba…
+4. **Search threads in the background** (`session-search`) — Thread search runs from a background index, so searching never slows DSH down.
+5. **Find every match in one thread** (`session-search`) — Find every match for your words in one thread, in order, with a short snippet.
+6. **Search the prompts sent across threads** (`session-search`) — Find the prompts you sent across threads, newest first, each one once.
 7. **Manage reusable prompt snippets** (`prompt-stash`, composer) — Save, edit and search prompt snippets that every browser shares, and insert one into the composer.
 8. **Insert prompt text without submitting** (`prompt-stash`, composer) — Inserting a prompt adds its text at the cursor, keeps your attachments and never sends.
 9. **Browse recent text-only user messages** (`prompt-stash`, composer) — Pick from the messages you recently sent in this thread.

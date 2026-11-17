@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "bounded-session-log-window",
-      "title": "Read a stored Session log by its window, not its whole event list",
-      "summary": "Serve the newest events, the first events and the events a predicate selects from one bounded byte window of the JSONL zstd log, so a reader that needs a few events never decodes 86 MB of a large Session; the tail also folds the projection cache's checkpoint over the window.",
+      "title": "Read part of a thread log without loading all of it",
+      "summary": "Readers that need a few events from a large thread log read only that part, so big threads open faster.",
+      "details": "Serve the newest events, the first events and the events a predicate selects from one bounded byte window of the JSONL zstd log, so a reader that needs a few events never decodes 86 MB of a large Session; the tail also folds the projection cache's checkpoint over the window.",
       "surfaces": ["host", "storage"],
       "surface": "infrastructure",
       "destination": "none",

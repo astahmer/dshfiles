@@ -5,7 +5,8 @@
     {
       "id": "subagent-settings",
       "title": "Subagent settings",
-      "summary": "The native Subagent plugin page (recursion depth, concurrent count and subagent model selection) from one owned fork of the stock row. Behaviour is the native one; the model catalog read waits for the page's first connected generation instead of being repeated by its first reset, and joins any other page-wide read of the catalog in flight.",
+      "summary": "Set how deep subagents can nest, how many run at once and which model they use.",
+      "details": "The native Subagent plugin page (recursion depth, concurrent count and subagent model selection) from one owned fork of the stock row. Behaviour is the native one; the model catalog read waits for the page's first connected generation instead of being repeated by its first reset, and joins any other page-wide read of the catalog in flight.",
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",

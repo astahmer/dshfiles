@@ -5,7 +5,8 @@
     {
       "id": "shared-client-runtime",
       "title": "Share the client UI runtime",
-      "summary": "Load one shared copy of the Client UI modules and stylesheet before dependent UI plugins mount.",
+      "summary": "Plugin views share one copy of the UI code and styles, so the page loads less.",
+      "details": "Load one shared copy of the Client UI modules and stylesheet before dependent UI plugins mount.",
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",

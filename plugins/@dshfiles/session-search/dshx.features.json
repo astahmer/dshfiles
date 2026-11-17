@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "worker-session-search",
-      "title": "Serve session search from a worker-owned index",
-      "summary": "Replace the stock sessionQuery backend: searches are pure reads forwarded to a worker that owns the SQLite FTS5 index and ingests session logs incrementally, while list, read and title reads stay core's own code with cached folds.",
+      "title": "Search threads in the background",
+      "summary": "Thread search runs from a background index, so searching never slows DSH down.",
+      "details": "Replace the stock sessionQuery backend: searches are pure reads forwarded to a worker that owns the SQLite FTS5 index and ingests session logs incrementally, while list, read and title reads stay core's own code with cached folds.",
       "surfaces": ["host", "storage"],
       "surface": "infrastructure",
       "destination": "none",
@@ -58,7 +59,8 @@
     {
       "id": "find-in-thread",
       "title": "Find every match in one thread",
-      "summary": "Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the session_find_in_thread agent tool. An archived Session is indexed for that request.",
+      "summary": "Find every match for your words in one thread, in order, with a short snippet.",
+      "details": "Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the session_find_in_thread agent tool. An archived Session is indexed for that request.",
       "surfaces": ["host", "storage", "api", "tool"],
       "surface": "infrastructure",
       "destination": "none",
@@ -103,7 +105,8 @@
     {
       "id": "prompt-history",
       "title": "Search the prompts sent across threads",
-      "summary": "Serve the newest prompts a person sent across every top-level thread, newest first and each text once, from a time-ordered user_prompts table beside the FTS index: bounded by a window of newest prompts and a size cap, optionally narrowed to prompts holding every typed word. Subagent threads and plugin- or agent-sent messages are left out.",
+      "summary": "Find the prompts you sent across threads, newest first, each one once.",
+      "details": "Serve the newest prompts a person sent across every top-level thread, newest first and each text once, from a time-ordered user_prompts table beside the FTS index: bounded by a window of newest prompts and a size cap, optionally narrowed to prompts holding every typed word. Subagent threads and plugin- or agent-sent messages are left out.",
       "surfaces": ["host", "storage", "api"],
       "surface": "infrastructure",
       "destination": "none",
