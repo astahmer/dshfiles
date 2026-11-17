@@ -5,7 +5,8 @@
     {
       "id": "localhost-with-lan",
       "title": "Keep localhost available when LAN access is enabled",
-      "summary": "Add loopback-only TCP listeners to the existing concrete LAN-bound Web server without replacing routing, authentication or origin checks. Print the actual localhost launch URL first and the available LAN/advertised addresses after startup settles. Native loopback-only binds remain unchanged.",
+      "summary": "DSH stays reachable on localhost when you turn on access from your network.",
+      "details": "Add loopback-only TCP listeners to the existing concrete LAN-bound Web server without replacing routing, authentication or origin checks. Print the actual localhost launch URL first and the available LAN/advertised addresses after startup settles. Native loopback-only binds remain unchanged.",
       "surfaces": ["host", "integration", "api", "tool"],
       "surface": "infrastructure",
       "destination": "none",
@@ -58,7 +59,8 @@
         { "kind": "automatic", "source": "agent-tool" }
       ],
       "title": "Choose how DSH is reachable",
-      "summary": "Choose LAN access and a concrete interface address, and set an advanced port. Localhost stays enabled independently of LAN access. Save desired preferences without interrupting current connections; a later user-controlled restart loads them. Explicit CLI flags keep priority.",
+      "summary": "Choose whether DSH is reachable from your network, on which address and port, from the next restart.",
+      "details": "Choose LAN access and a concrete interface address, and set an advanced port. Localhost stays enabled independently of LAN access. Save desired preferences without interrupting current connections; a later user-controlled restart loads them. Explicit CLI flags keep priority.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Network access\"", "expect switch \"LAN access\""],
       "surfaces": ["client", "host", "settings"],
       "surface": "settingsSection",

@@ -213,7 +213,7 @@ rail destination; 16 features.
 | Feature | Surface | Today |
 | --- | --- | --- |
 | jj-integration/workspace-process-stop: Stop processes left in a thread workspace before removing it | command | left-nav: Revision graph › Clean up workspaces (row meta) |
-| jujutsu/workspace-cleanup: Clean up idle JJ workspaces | command | left-nav: Revision graph › Clean up workspaces |
+| jujutsu/workspace-cleanup: Clean up idle workspaces | command | left-nav: Revision graph › Clean up workspaces |
 | jj-integration/thread-integration-attention-view: Workspaces that need you come first | destinationSection | left-nav: Land › Needs you |
 | jj-integration/thread-integration-empty: No thread workspaces yet | destinationSection | left-nav: Land › empty state |
 | jj-integration/thread-workspaces-panel: Workspaces page | destinationSection | left-nav: Land |
@@ -224,7 +224,7 @@ rail destination; 16 features.
 | jj-integration/thread-integration-row-details: Workspace row details | detail | left-nav: Land › row details |
 | jujutsu/revision-detail-and-diff: Inspect revisions and changed files | detail | left-nav: Revision graph › revision detail |
 | jujutsu/chat-references: Open Jujutsu references from a chat message | entityProvider | transcript: jj: reference links |
-| jujutsu/previewed-revision-mutations: Preview and confirm repository mutations | rowAction | left-nav: Revision graph › revision menu |
+| jujutsu/previewed-revision-mutations: Preview and confirm repository changes | rowAction | left-nav: Revision graph › revision menu |
 | jujutsu/workspace-at-revision: Create a workspace at a revision | rowAction | left-nav: Revision graph › New workspace here |
 | jujutsu/workspace-overflow: Move a workspace from a shared revision | rowAction | left-nav: Revision graph › workspace overflow chip |
 | jujutsu/workspace-removal: Remove a workspace from the graph | rowAction | left-nav: Revision graph › Remove workspace |
@@ -376,9 +376,9 @@ rail destination (bottom); 67 features.
 | mcp-endpoint/mcp-endpoint-settings: Issue an MCP token and connect a client | settingsSection | settings: MCP endpoint |
 | mcp-servers/oauth-authorization: Authorize remote OAuth servers | settingsSection | left-nav: MCP Servers: Servers › OAuth |
 | mcp-servers/registry-catalog: Search curated providers and the MCP Registry | settingsSection | left-nav: MCP Servers: Servers › registry |
-| mcp-servers/secret-catalog-credential-bindings: Bind server headers and environment to Secret Catalog references | settingsSection | left-nav: MCP Servers: Servers › Add MCP server › Advanced: request headers |
+| mcp-servers/secret-catalog-credential-bindings: Use secrets for MCP server credentials | settingsSection | left-nav: MCP Servers: Servers › Add MCP server › Advanced: request headers |
 | mcp-servers/server-configuration: Manage local and remote MCP server definitions | settingsSection | left-nav: MCP Servers: Servers |
-| multi-host/runtime-directory: Register and identify local DSH runtimes | settingsSection | composer: Run on Local › Add host |
+| multi-host/runtime-directory: Add and identify hosts | settingsSection | composer: Run on Local › Add host |
 | opencode-compat/plugin-loader: Load OpenCode server plugins | settingsSection | settings: dshfiles-opencode-compat |
 | policies/deny-policies: Deny tool calls outright, after permissions | settingsSection | agent tool: policies_list (no UI) |
 | secret-catalog/alias-mutations: Create, edit, rename, and remove aliases safely | settingsSection | left-nav: Secrets › Add with details |
@@ -447,7 +447,7 @@ facets of the active thread; 32 features.
 | editor/workspace-editor: Browse and edit workspace files | threadFacet | main-tabs: New tab › Files |
 | jj-integration/rebase: Land a thread on its bookmark | threadFacet | thread-header: Own workspace › Integrate |
 | jj-integration/thread-workspace-menu: Workspace control in the thread header | threadFacet | thread-header: Own workspace menu |
-| jujutsu/composer-context: See project and Jujutsu workspace context in the composer | threadFacet | thread header: Changes pill |
+| jujutsu/composer-context: See a thread's changes in its header | threadFacet | thread header: Changes pill |
 | preview/agent-browser: Agent browser | threadFacet | thread panel: Agent browser |
 | preview/preview-browser: Agent preview browser | threadFacet | agent tool: preview_open / preview_screenshot |
 | preview/thread-dev-servers: Thread dev servers | threadFacet | thread-header: Dev servers and previews |
@@ -493,7 +493,7 @@ run row, chips, `/` and `@` sources; 70 features.
 | model-effort-picker/model-fallbacks: Edit the model fallback chain from the composer picker | composerContribution | composer: model picker › Fallback chain |
 | model-effort-picker/model-fan-out-gesture: Select several models to fan out | composerContribution | composer: model picker fan-out selection |
 | model-effort-picker/model-selection: Search and select account models | composerContribution | composer: model picker |
-| model-selection/draft-model-selection: Choose a model before typing in a new conversation | composerContribution | composer: draft model selection |
+| model-selection/draft-model-selection: Choose a model before typing in a new thread | composerContribution | composer: draft model selection |
 | multi-host/remote-interactions: Answer a remote agent's questions and approvals in this client | composerContribution | conversation composer seat of a mirrored thread |
 | multi-host/remote-thread-references: Mention remote threads safely | composerContribution | composer: @t: remote threads |
 | multi-host/session-routing: Use the native composer for remote threads | composerContribution | composer: Run on Local chip |
@@ -603,7 +603,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | goal-stall-guard/bounded-goal-continuation: Extend or close goals within bounded policy | agentToolOnly | agent tool: extend_goal_budget / complete_blocked_goal |
 | html-render/page-screenshot: Agent screenshot of its own published page | agentToolOnly | agent tool: html_render_screenshot |
 | memory/memory-tools: Search, read and note memory from any agent | agentToolOnly | agent tool: memory_search / memory_read / memory_note |
-| multi-host/remote-delegation: Delegate a task to another machine | agentToolOnly | agent tool: multi_host_delegate |
+| multi-host/remote-delegation: Delegate a task to another host | agentToolOnly | agent tool: multi_host_delegate |
 | onboarding/feature-reach: Ask how to get to a feature | agentToolOnly | agent tool: onboarding_reach; read by Show me where on Knowledge › Getting started |
 | pull-requests/github-pull-request-links: Link and watch GitHub pull requests from DSH threads | agentToolOnly | agent tools: pull_request_link, pull_request_watch, pull_request_list |
 | secret-catalog/metadata-only-agent-tools: Expose safe secret catalog tools to agents | agentToolOnly | agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias |
@@ -694,17 +694,17 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | jev/jev-ask: Ask Jev a yes or no question | infrastructure | host: library |
 | jj-cli/jj-cli-run: Run Jujutsu safely | infrastructure | host: library |
 | jj-cli/jj-cli-view-reads: Cache repeated Jujutsu reads | infrastructure | host: library |
-| jujutsu/panel-scopes: Keep one repository per Jujutsu tab, thread and dock | infrastructure | left-nav: Revision graph › per-tab repository |
+| jujutsu/panel-scopes: Keep one repository per Jujutsu tab | infrastructure | left-nav: Revision graph › per-tab repository |
 | loopback-access/localhost-with-lan: Keep localhost available when LAN access is enabled | infrastructure | host: loopback listeners |
-| main-tabs/backlog-capture-with-thread-tab: Typing in Backlog with a kept thread tab | infrastructure | main-tabs: kept thread tab focus |
+| main-tabs/backlog-capture-with-thread-tab: Typing in Backlog keeps the current tab | infrastructure | main-tabs: kept thread tab focus |
 | main-tabs/main-view-tabs: Browser-like tabs above the main view | infrastructure | main-tabs: tab strip |
 | main-tabs/tab-persistence: Keep tabs across reloads, per project or globally | infrastructure | main-tabs: tab persistence |
-| main-tabs/workbench-semantics-provider: One tab semantics provider for Workbench and standalone fallback | infrastructure | main-tabs: tab semantics |
+| main-tabs/workbench-semantics-provider: Tabs shared with the Workbench | infrastructure | main-tabs: tab semantics |
 | mcp-endpoint/mcp-endpoint: Drive DSH threads from an outside agent over MCP | infrastructure | host: /mcp endpoint |
 | mcp-endpoint/mcp-endpoint-plugin-tools: Expose plugin tools to MCP clients | infrastructure | host: /mcp endpoint |
 | memory/start-block: Start every thread with one frozen memory block | infrastructure | host: memory start block in the system prompt |
 | memory/thread-digests: Digest idle threads from DSH's own session logs | infrastructure | host: memory digests |
-| multi-host/ssh-runtime-connection: Connect to an SSH-managed runtime | infrastructure | host: SSH runtime tunnels |
+| multi-host/ssh-runtime-connection: Connect to a host over SSH | infrastructure | host: SSH runtime tunnels |
 | opencode-compat/plugin-tools: Run OpenCode plugin tools and tool hooks | infrastructure | agent tools contributed by configured plugins |
 | opencode-compat/skills-context-storage: OpenCode skills, context hooks and storage | infrastructure | settings: dshfiles-opencode-compat |
 | optmem-core/bounded-utf8-text: Count, clip, and paginate UTF-8 text by bytes | infrastructure | host: library |

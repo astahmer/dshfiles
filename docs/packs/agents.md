@@ -50,30 +50,30 @@ From the onboarding feature catalog: 52 features, the 42 curated ones first.
 16. **Processes: jobs, dev servers and RAM** (`background-jobs`, observe) — One Processes page holds jobs, dev servers and RAM, each in its own tab.
 17. **Jobs tab in the thread panel** (`background-jobs`, thread-panel) — The thread panel's Jobs tab shows this thread's jobs, dev servers and RAM, with Stop.
 18. **Live job preview in the transcript and above the composer** (`background-jobs`, transcript) — A running job shows its progress and output under the tool call that started it and above the composer.
-19. **Register and identify local DSH runtimes** (`multi-host`, settings) — Maintain a bounded host/runtime directory with stable runtime identity; add hosts with a searchable SSH destination picker, then edit, test, reconnect and remove them on the Hosts page.
-20. **Manage hosts on a dedicated page** (`multi-host`, observe) — The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users open or copy a temporary remote-host link. Users can add existing folders or clone Git repositories with optional individually selected local-file copy…
-21. **Group remote threads under matching local projects** (`multi-host`, threads) — Read normalized Git origins on local projects and remote workspaces so matching clones share one thread-sidebar project group while remote rows keep their host badge.
-22. **Update every host from the Hosts page** (`multi-host`, observe) — Update hosts checks every visible SSH host: it fetches the host repository and dry-runs that host's own dshx checkout sync, then lists incoming and unpushed revisions and what would rebuild. Update all syncs each host that has changes (rebase onto main@origin, install, rebuild)…
-23. **Sync a jj checkout on another host** (`multi-host`, observe) — Sync checkout on a host row compares one jj checkout with its bookmark on origin: it fetches, simulates the rebase off disk and lists incoming and unpushed revisions, the bookmark state, which workspace this is and the others sharing the repository with the threads running in th…
-24. **Weight Auto placement and fetch before new threads** (`multi-host`, observe) — Edit host sets an Auto weight (x1, x2, x4: Auto divides the host's resource pressure by it) and whether a thread started there first runs jj git fetch in its folder. A failed fetch never blocks the thread; the start result says why. Hiding a host also takes its threads out of th…
-25. **Link machines without SSH, both ways** (`multi-host`, observe) — Linking turns on a gateway in front of this DSH, on its Tailscale address by default. It makes single-use pairing codes (ten minutes) that another machine redeems for its own revocable credential. A paired machine becomes a direct host there: threads, remote views and multi_host…
-26. **Use the native composer for remote threads** (`multi-host`, composer) — The one-shot Auto destination selects the least-pressured visible remote host from fresh CPU and memory snapshots, then pins that runtime before folder selection; keep its model catalog, reasoning-effort picker, file attachments, and @ file references bound to the owning runtime…
-27. **Open the host's own DSH UI** (`multi-host`, observe) — Lease the pooled tunnel for a stable loopback origin and open the remote runtime's UI in a new tab.
-28. **Mention remote threads safely** (`multi-host`, composer) — Remote thread references resolve only from recorded, authorized hosts; the host retrieves a bounded text-only snapshot and inserts it as explicitly untrusted read-only context before the native resolver handles local references.
-29. **Every thread on every host** (`multi-host`, threads) — The remote threads panel merges threads started from this DSH with the sessions each host reports, grouped by host: threads started on the host itself carry a muted badge, an offline host shows one unavailable line, and status is polled only while the list is open.
-30. **Open a mirrored thread on its host** (`multi-host`, threads) — The mirrored-thread header resolves its remote owner and opens that runtime's own DSH on the same thread, for what the mirror does not reach.
-31. **Answer a remote agent's questions and approvals in this client** (`multi-host`, composer) — While a mirrored thread is followed, this Host opens the owning runtime's forwarded-event stream as an owner client, holds what the runtime waits on, and shows it in the native question card or an approval panel in the same seat. Answers go back to that runtime, which stays the…
-32. **Work a remote thread's repository from this client** (`multi-host`, threads) — The thread workspace control, the integrate offer, the JJ side panel and the composer's changes bar of a mirrored thread read from the runtime that owns it, and land, queue, undo and prepared jujutsu actions run there. Each call is authorized for that Session and limited to its…
-33. **Open a remote thread's terminal on its host** (`multi-host`, threads) — A terminal tab on a mirrored thread replaces the native body, which has no agent to run against here, with a button that opens that thread in the host's own DSH. Every route into a terminal lands on it: the start page, the shortcut and a restored tab.
+19. **Add and identify hosts** (`multi-host`, settings) — Add a host over SSH, then test, reconnect, edit or remove it on the Hosts page.
+20. **Manage hosts on a dedicated page** (`multi-host`, observe) — The Hosts page lists your hosts with their load and memory, and adds projects to them.
+21. **Group remote threads under matching local projects** (`multi-host`, threads) — Threads on another host group under the matching local project, with a host badge.
+22. **Update every host from the Hosts page** (`multi-host`, observe) — Check every host for updates and update them all from the Hosts page.
+23. **Sync a jj checkout on another host** (`multi-host`, observe) — Compare a host's checkout with its bookmark on origin, then sync it after a preview.
+24. **Weight Auto placement and fetch before new threads** (`multi-host`, observe) — Weight how often Auto picks a host and whether new threads fetch first.
+25. **Link machines without SSH, both ways** (`multi-host`, observe) — Link another machine with a short pairing code, without SSH, so threads can run on it.
+26. **Use the native composer for remote threads** (`multi-host`, composer) — Start a thread on another host from the normal composer, or let Auto pick the least busy one.
+27. **Open the host's own DSH UI** (`multi-host`, observe) — Open another host's own DSH in a new tab.
+28. **Mention remote threads safely** (`multi-host`, composer) — Mention a thread on another host, and its text arrives as read-only context.
+29. **Every thread on every host** (`multi-host`, threads) — One panel lists the threads on every host, grouped by host.
+30. **Open a mirrored thread on its host** (`multi-host`, threads) — Open a thread from another host in that host's own DSH.
+31. **Answer a remote agent's questions and approvals in this client** (`multi-host`, composer) — Answer questions and approvals from a thread on another host right here.
+32. **Work a remote thread's repository from this client** (`multi-host`, threads) — Land, undo and other workspace actions on a thread from another host run on that host.
+33. **Open a remote thread's terminal on its host** (`multi-host`, threads) — A terminal tab on another host's thread opens that thread in the host's own DSH.
 34. **Agent toolkit page** (`agent-toolkit`, thread-panel) — See every tool, skill, plugin and MCP server the agent can use in a thread.
 35. **See what a thread loads into its context** (`agent-toolkit`, thread-panel) — The Context tab lists what a thread loads into its context, with an estimated token cost for each.
 36. **Open the manager for skills, MCP servers or plugins from one page** (`capabilities-hub`, settings) — One Settings page counts your skills, MCP servers and plugins and opens the page that manages each.
-37. **Manage local and remote MCP server definitions** (`mcp-servers`, settings) — Create, edit, enable, connect, disconnect, refresh, and remove bounded stdio or Streamable HTTP server definitions while keeping credentials as references; each environment variable or header is a name → reference row whose reference field offers the Secret Catalog picker and ac…
-38. **Bind server headers and environment to Secret Catalog references** (`mcp-servers`, settings) — Each environment variable or request header of a server is a name → reference row. The reference input carries data-secret-input="reference", so the Secret Catalog's key button lists global aliases and writes secret:ALIAS[@env]; a DSH credential name still works. The Host resolv…
-39. **Reference configured MCP servers and tools in the composer** (`mcp-servers`, composer) — Search enabled MCP server namespaces and the current Session's registered MCP tools from @ autocomplete; selection inserts a structured prompt reference without directly executing tools.
-40. **Search curated providers and the MCP Registry** (`mcp-servers`, settings) — Browse curated provider documentation and search the official Registry while handling unavailable or malformed catalog responses safely.
-41. **Authorize remote OAuth servers** (`mcp-servers`, settings) — Discover OAuth metadata, register a client, run PKCE/state validation, exchange and refresh grants, and clear grant state on sign-out.
-42. **Batch enable, disable and remove MCP servers** (`mcp-servers`, settings) — Registered servers take checkbox selection with ranges and visible-only select-all; enabled or disabled servers change in one pass, and removing a selection always goes through a count-named confirmation that stops its native clients and drops their grants.
+37. **Manage local and remote MCP server definitions** (`mcp-servers`, settings) — Add, edit, connect and remove local or remote MCP servers, with credentials kept as secret references.
+38. **Use secrets for MCP server credentials** (`mcp-servers`, settings) — Pick a secret for each MCP server header or environment variable, and its value stays on DSH.
+39. **Reference configured MCP servers and tools in the composer** (`mcp-servers`, composer) — Mention an MCP server or tool in the composer with @.
+40. **Search curated providers and the MCP Registry** (`mcp-servers`, settings) — Find MCP servers in a curated list or the official MCP Registry.
+41. **Authorize remote OAuth servers** (`mcp-servers`, settings) — Sign in to remote MCP servers that use OAuth, and sign out again.
+42. **Batch enable, disable and remove MCP servers** (`mcp-servers`, settings) — Select several MCP servers to turn on, turn off or remove them at once.
 
 ### More
 
@@ -81,12 +81,12 @@ From the onboarding feature catalog: 52 features, the 42 curated ones first.
 2. **Handle an expired question** (`agent-questions`) — An expired question returns its recommended choice or is saved for later, never taken as an answer.
 3. **Give anchored feedback on a document** (`agent-questions`) — Leave line-anchored feedback on a subagent's document and send back what was accepted or rejected.
 4. **Resolve feedback in bounded batches** (`agent-questions`) — Resolve up to twenty feedback items at once, all or nothing.
-5. **Delegate a task to another machine** (`multi-host`) — The multi_host_delegate agent tool runs a task as a thread on a named host, or on the least-loaded visible SSH host through Auto, waits for its turn and returns the final answer, like a subagent on that machine. A pending question on the host, a failed turn and a wait that runs…
-6. **Connect to an SSH-managed runtime** (`multi-host`) — Discover a remote DSH through its launch file over SSH, verify pinned identity/capabilities, keep one pooled tunnel per runtime, and never accept unknown host keys or forward the agent.
+5. **Delegate a task to another host** (`multi-host`) — The agent can run a task as a thread on another host and get its answer back.
+6. **Connect to a host over SSH** (`multi-host`) — DSH reaches a host over SSH with a verified identity and never accepts an unknown host key.
 7. **Open the agent toolkit from the command palette** (`agent-toolkit`) — The command palette's “Open the agent toolkit” opens the page about the thread the palette was opened from.
-8. **Drive DSH threads from an outside agent over MCP** (`mcp-endpoint`) — Serve an MCP server (streamable HTTP, stateless, JSON responses) at /mcp on the DSH Web server. Claude Code, Codex or any MCP client with the bearer token can list projects and threads, read a thread's recent messages, create a thread with a first prompt and model, queue or stee…
-9. **Expose plugin tools to MCP clients** (`mcp-endpoint`) — Expose existing plugin agent tools through the authenticated MCP endpoint, subject to an off-by-default read-only or read-write setting.
-10. **Issue an MCP token and connect a client** (`mcp-endpoint`, settings) — Settings › MCP endpoint and the MCP endpoint: connect a client palette command open copyable setup instructions for Claude Code, Codex, Cursor, VS Code and generic JSON. The section generates, rotates and revokes a bearer token and controls LAN access; a freshly issued token app…
+8. **Drive DSH threads from an outside agent over MCP** (`mcp-endpoint`) — Let Claude Code, Codex or any MCP client list, start and follow DSH threads.
+9. **Expose plugin tools to MCP clients** (`mcp-endpoint`) — Off by default: MCP clients can also use agent tools, read-only or read and write.
+10. **Issue an MCP token and connect a client** (`mcp-endpoint`, settings) — Create an MCP token and copy setup steps for Claude Code, Codex, Cursor or VS Code.
 
 ## Enable it
 

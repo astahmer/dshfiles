@@ -10,7 +10,7 @@
 
 ![Locate landmarks and compare revision ancestry](docs/screenshots/graph-navigation.png)
 
-![Keep one repository per Jujutsu tab, thread and dock](docs/screenshots/panel-scopes.png)
+![Keep one repository per Jujutsu tab](docs/screenshots/panel-scopes.png)
 
 ![Preview cleanup with a custom inactivity threshold](docs/screenshots/workspace-cleanup.png)
 
