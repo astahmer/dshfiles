@@ -4,7 +4,8 @@
     {
       "id": "prompt-library",
       "title": "Manage reusable prompt snippets",
-      "summary": "Save, edit, delete, search, and insert bounded prompt snippets from one Host-owned library every browser shares, with revision checks against concurrent writers.",
+      "summary": "Save, edit and search prompt snippets that every browser shares, and insert one into the composer.",
+      "details": "Save, edit, delete, search, and insert bounded prompt snippets from one Host-owned library every browser shares, with revision checks against concurrent writers.",
       "reach": ["click button \"Prompts\"", "expect heading \"Saved prompts\""],
       "surfaces": ["client", "host", "storage"],
       "surface": "composerContribution",
@@ -84,7 +85,8 @@
     {
       "id": "guarded-composer-insertion",
       "title": "Insert prompt text without submitting",
-      "summary": "Insert into the captured composer cursor span, preserve existing attachments, and reject stale composer state without sending the message.",
+      "summary": "Inserting a prompt adds its text at the cursor, keeps your attachments and never sends.",
+      "details": "Insert into the captured composer cursor span, preserve existing attachments, and reject stale composer state without sending the message.",
       "surfaces": ["client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -113,7 +115,8 @@
     {
       "id": "recent-user-prompts",
       "title": "Browse recent text-only user messages",
-      "summary": "Offer bounded recent loaded user text while excluding agent, tool, archived, and unsupported content.",
+      "summary": "Pick from the messages you recently sent in this thread.",
+      "details": "Offer bounded recent loaded user text while excluding agent, tool, archived, and unsupported content.",
       "surfaces": ["client", "storage"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -160,7 +163,8 @@
     {
       "id": "prompt-history",
       "title": "Search every prompt sent across threads",
-      "summary": "Search the prompts you sent in every top-level thread from the Prompts menu's All threads tab, Ctrl+R in a focused composer, or the Search prompt history palette entry; Enter inserts one at the cursor without sending and the star saves it to the shared library. The prompt_history_search agent tool reads the same Host method.",
+      "summary": "Search every prompt you sent in any thread with Ctrl+R, and insert one without sending.",
+      "details": "Search the prompts you sent in every top-level thread from the Prompts menu's All threads tab, Ctrl+R in a focused composer, or the Search prompt history palette entry; Enter inserts one at the cursor without sending and the star saves it to the shared library. The prompt_history_search agent tool reads the same Host method.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Deploy the quartz service to staging\"",
@@ -247,7 +251,8 @@
     {
       "id": "draft-attachment-retention",
       "title": "Keep draft attachments across thread navigation",
-      "summary": "While a thread's composer holds draft attachments, keep that thread's session scope retained so leaving the thread and coming back (sidebar Back, another thread) keeps the files and images with the draft text.",
+      "summary": "Files and images in a draft stay with it when you switch threads and come back.",
+      "details": "While a thread's composer holds draft attachments, keep that thread's session scope retained so leaving the thread and coming back (sidebar Back, another thread) keeps the files and images with the draft text.",
       "reach": [
         "seed tool-call-thread",
         "click button \"New thread\"",

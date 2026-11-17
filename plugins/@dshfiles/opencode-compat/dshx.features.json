@@ -5,7 +5,8 @@
     {
       "id": "plugin-loader",
       "title": "Load OpenCode server plugins",
-      "summary": "Loads configured OpenCode v2 server plugins in the Host and records unsupported APIs.",
+      "summary": "Load OpenCode server plugins in DSH and see which of their features are not supported.",
+      "details": "Loads configured OpenCode v2 server plugins in the Host and records unsupported APIs.",
       "surfaces": ["host", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -64,7 +65,8 @@
     {
       "id": "plugin-tools",
       "title": "Run OpenCode plugin tools and tool hooks",
-      "summary": "Tools an OpenCode plugin adds through ctx.tool.transform become DSH agent tools; its execute.before and execute.after hooks run on every DSH tool call, denying calls or replacing result content.",
+      "summary": "Tools from OpenCode plugins become agent tools, and their hooks run around every tool call.",
+      "details": "Tools an OpenCode plugin adds through ctx.tool.transform become DSH agent tools; its execute.before and execute.after hooks run on every DSH tool call, denying calls or replacing result content.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -99,7 +101,8 @@
     {
       "id": "skills-context-storage",
       "title": "OpenCode skills, context hooks and storage",
-      "summary": "Maps plugin-owned skills, prompt assembly hooks and durable JSON storage into DSH.",
+      "summary": "OpenCode plugins' skills, prompt hooks and stored data work in DSH.",
+      "details": "Maps plugin-owned skills, prompt assembly hooks and durable JSON storage into DSH.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",

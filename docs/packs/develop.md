@@ -26,7 +26,7 @@ From the onboarding feature catalog: 7 features, the 1 curated ones first.
 
 ### Curated
 
-1. **Browse where a plugin can extend DSH** (`plugin-guide`, settings) — Settings › Plugin guide is a developer page over a static catalog generated at build time from public declarations: dshx SDK entry points (each checked against the dshx index it is imported from), the native Client slots of create-dshx's offline slot reference, every owned plugi…
+1. **Browse where a plugin can extend DSH** (`plugin-guide`, settings) — A developer page in Settings that lists every place a plugin can extend DSH.
 
 ### More
 

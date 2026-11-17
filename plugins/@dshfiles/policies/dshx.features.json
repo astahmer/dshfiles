@@ -5,7 +5,8 @@
     {
       "id": "deny-policies",
       "title": "Deny tool calls outright, after permissions",
-      "summary": "A global tool guard refuses any call whose tool name matches a rule's glob and whose JSON arguments match its pattern, whatever the approval policy or sandbox mode allowed; the agent can list and dry-run the rules but never change them.",
+      "summary": "Block matching tool calls whatever the approval settings allow, and the agent cannot change the rules.",
+      "details": "A global tool guard refuses any call whose tool name matches a rule's glob and whose JSON arguments match its pattern, whatever the approval policy or sandbox mode allowed; the agent can list and dry-run the rules but never change them.",
       "surfaces": ["host", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
