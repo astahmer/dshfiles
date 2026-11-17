@@ -49,6 +49,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-web-links": "0.11.0",
     "@xterm/xterm": "6.0.0",
     "jsdom": "catalog:",
     "react": "catalog:",
