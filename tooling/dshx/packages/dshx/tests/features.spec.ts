@@ -57,6 +57,14 @@ describe('plugin feature metadata', () => {
     expect(withText({ details: '' })).toEqual([expect.stringContaining('details')])
   })
 
+  it('keeps a summary to one plain sentence of at most 160 characters', () => {
+    const withSummary = (summary: string) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, summary }] })
+    expect(withSummary('x'.repeat(160))).toEqual([])
+    expect(withSummary('x'.repeat(161))).toEqual([expect.stringContaining('at most 160 characters (this one has 161)')])
+    expect(withSummary('Move a pending message; its identity stays.')).toEqual([expect.stringContaining('no semicolon')])
+    expect(withSummary('Call `queue_move` to move it.')).toEqual([expect.stringContaining('no backticked identifier')])
+  })
+
   it('requires telemetry on every feature and agent-tool on tool surfaces', () => {
     const withTelemetry = (patch: Record<string, unknown>) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, ...patch }] })
     expect(withTelemetry({ telemetry: [] })).toEqual(expect.arrayContaining([expect.stringContaining('telemetry')]))
