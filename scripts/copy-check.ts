@@ -3,8 +3,8 @@
 // The ADE plan glossary (docs/ade-ux/README.md §3) names one word per concept: thread (not session, chat or
 // conversation), land (not integrate), done (not settle), and labels never carry a plugin name. This script scans
 // client copy — string literals and JSX text in plugin `.tsx` files, locale tables, and the UI labels quoted in
-// `dshx.features.json` `reach` steps — and counts findings per term. It fails only when a term's count rises above
-// `scripts/copy-check.baseline.json`, so it can land while the copy pass is still under way.
+// `dshx.features.json` `reach` steps — and counts findings per term and plugin. It fails only when one `term/plugin`
+// count rises above `scripts/copy-check.baseline.json`, so a fix in one plugin cannot hide a regression in another.
 //
 //   node --run check:copy             # compare with the baseline; fail on an increase
 //   node --run check:copy -- --report # list every finding
@@ -162,18 +162,23 @@ export interface CopyComparison {
 
 export interface CopyFinding {
   readonly term: string
+  readonly plugin: string
   readonly file: string
   readonly line: number
   readonly text: string
 }
 
+/** The plugin directory a repository path belongs to (`plugins/@dshfiles/<plugin>/…`). */
+const pluginOf = (file: string): string => /^plugins\/@dshfiles\/([^/]+)\//.exec(file)?.[1] ?? 'other'
+
 const findingsInStrings = (input: { readonly file: string; readonly strings: readonly CopyString[]; readonly prefix: RegExp }): readonly CopyFinding[] => {
   const findings: CopyFinding[] = []
+  const plugin = pluginOf(input.file)
   for (const string of input.strings) {
     if (!isProse(string.text) && !input.prefix.test(string.text)) continue
-    const excerpt = string.text.trim().slice(0, 120)
-    if (input.prefix.test(string.text)) findings.push({ term: 'plugin-prefix', file: input.file, line: string.line, text: excerpt })
-    for (const term of copyTerms) if (term.pattern.test(string.text)) findings.push({ term: term.id, file: input.file, line: string.line, text: excerpt })
+    const at = { plugin, file: input.file, line: string.line, text: string.text.trim().slice(0, 120) }
+    if (input.prefix.test(string.text)) findings.push({ term: 'plugin-prefix', ...at })
+    for (const term of copyTerms) if (term.pattern.test(string.text)) findings.push({ term: term.id, ...at })
   }
   return findings
 }
@@ -228,27 +233,40 @@ const scanRepository = (root: string): readonly CopyFinding[] => {
     // Reach labels are UI names even when they are one word, so only the prefix and glossary terms apply.
     const rel = relative(root, catalog)
     for (const label of labels) {
-      if (prefix.test(label)) findings.push({ term: 'plugin-prefix', file: rel, line: 0, text: label })
-      for (const term of copyTerms) if (term.pattern.test(label)) findings.push({ term: term.id, file: rel, line: 0, text: label })
+      if (prefix.test(label)) findings.push({ term: 'plugin-prefix', plugin, file: rel, line: 0, text: label })
+      for (const term of copyTerms) if (term.pattern.test(label)) findings.push({ term: term.id, plugin, file: rel, line: 0, text: label })
     }
   }
   return findings.toSorted((left, right) => left.term.localeCompare(right.term) || left.file.localeCompare(right.file) || left.line - right.line)
 }
 
-const countByTerm = (findings: readonly CopyFinding[]) =>
-  Object.fromEntries(['plugin-prefix', ...copyTerms.map(entry => entry.id)].map(term => [term, findings.filter(finding => finding.term === term).length]))
+const termIds = (): readonly string[] => ['plugin-prefix', ...copyTerms.map(entry => entry.id)]
 
-const baselineSchema = Schema.Struct({ counts: Schema.Record(Schema.String, Schema.Number) })
+/** Counts keyed `term/plugin`, so a fix in one plugin cannot hide a regression in another. */
+const countByTermAndPlugin = (findings: readonly CopyFinding[]): Readonly<Record<string, number>> => {
+  const counts: Record<string, number> = {}
+  for (const finding of findings) {
+    const key = `${finding.term}/${finding.plugin}`
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+  return Object.fromEntries(Object.entries(counts).toSorted(([left], [right]) => left.localeCompare(right)))
+}
+
+const totalsByTerm = (findings: readonly CopyFinding[]): Readonly<Record<string, number>> =>
+  Object.fromEntries(termIds().map(term => [term, findings.filter(finding => finding.term === term).length]))
+
+const baselineSchema = Schema.Struct({ totals: Schema.Record(Schema.String, Schema.Number), counts: Schema.Record(Schema.String, Schema.Number) })
 
 const compare = (input: { readonly baseline: Readonly<Record<string, number>>; readonly current: Readonly<Record<string, number>> }): CopyComparison => {
   const increased: string[] = []
   const decreased: string[] = []
-  for (const [term, count] of Object.entries(input.current)) {
-    const cap = input.baseline[term] ?? 0
-    if (count > cap) increased.push(`${term}: ${count} > baseline ${cap}`)
-    else if (count < cap) decreased.push(`${term}: ${count} < baseline ${cap}`)
+  for (const key of new Set([...Object.keys(input.baseline), ...Object.keys(input.current)])) {
+    const count = input.current[key] ?? 0
+    const cap = input.baseline[key] ?? 0
+    if (count > cap) increased.push(`${key}: ${count} > baseline ${cap}`)
+    else if (count < cap) decreased.push(`${key}: ${count} < baseline ${cap}`)
   }
-  return { increased, decreased }
+  return { increased: increased.toSorted(), decreased: decreased.toSorted() }
 }
 
 /** The copy check's pure parts, exported for its tests. */
@@ -259,7 +277,9 @@ export class CopyCheck {
   static readonly isProse = isProse
   static readonly findingsInStrings = findingsInStrings
   static readonly scanRepository = scanRepository
-  static readonly countByTerm = countByTerm
+  static readonly pluginOf = pluginOf
+  static readonly countByTermAndPlugin = countByTermAndPlugin
+  static readonly totalsByTerm = totalsByTerm
   static readonly compare = compare
 }
 
@@ -267,11 +287,11 @@ const main = (): void => {
   const root = fileURLToPath(new URL('..', import.meta.url))
   const baselineUrl = new URL('./copy-check.baseline.json', import.meta.url)
   const findings = scanRepository(root)
-  const current = countByTerm(findings)
+  const current = countByTermAndPlugin(findings)
   const args = new Set(process.argv.slice(2))
   if (args.has('--report')) for (const finding of findings) console.log(`${finding.term}\t${finding.file}:${finding.line}\t${finding.text}`)
   if (args.has('--update')) {
-    writeFileSync(baselineUrl, `${JSON.stringify({ counts: current }, null, 2)}\n`)
+    writeFileSync(baselineUrl, `${JSON.stringify({ totals: totalsByTerm(findings), counts: current }, null, 2)}\n`)
     console.log(`copy-check: baseline written (${findings.length} findings).`)
     return
   }
@@ -281,12 +301,13 @@ const main = (): void => {
   use.set('plugin-prefix', 'the view name alone')
   if (increased.length > 0) {
     console.error('copy-check: banned glossary terms increased in UI copy (docs/ade-ux/README.md §3 Glossary):')
-    for (const line of increased) console.error(`  ${line} — use "${use.get(line.split(':')[0] ?? '') ?? ''}"`)
+    for (const line of increased) console.error(`  ${line} — use "${use.get(line.split('/')[0] ?? '') ?? ''}"`)
     console.error('Run `node --run check:copy -- --report` to list findings and fix the new copy.')
     process.exitCode = 1
     return
   }
-  console.log(`copy-check: ${findings.length} findings, none above the baseline.`)
+  const totals = Object.entries(totalsByTerm(findings)).filter(([, count]) => count > 0)
+  console.log(`copy-check: ${findings.length} findings (${totals.map(([term, count]) => `${term} ${count}`).join(', ')}), none above the baseline.`)
   if (decreased.length > 0) {
     console.log('Fewer findings than the baseline; ratchet it down with `node --run check:copy -- --update`:')
     for (const line of decreased) console.log(`  ${line}`)
