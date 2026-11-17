@@ -5,7 +5,8 @@
     {
       "id": "agent-toolkit-page",
       "title": "Agent toolkit page",
-      "summary": "A main panel (sidebar → Agent Toolkit: Capabilities; main-tabs opens it as a tab) showing what the agent can use in one thread: tools with source, owner, read-only marker and preset restrictions; plugin API methods and agent tools; loaded plugins with versions, state and settings links; MCP servers with status and tools; skills with Host-reported origin, provider and invocation mode; and Memory's start block and note counts. Search and source filters narrow every section. Skill origin is never inferred from filesystem paths, and Host paths are not sent to the browser. It replaces the Tools tab of Settings › Built-in plugins.",
+      "summary": "See every tool, skill, plugin and MCP server the agent can use in a thread.",
+      "details": "A main panel (sidebar → Agent Toolkit: Capabilities; main-tabs opens it as a tab) showing what the agent can use in one thread: tools with source, owner, read-only marker and preset restrictions; plugin API methods and agent tools; loaded plugins with versions, state and settings links; MCP servers with status and tools; skills with Host-reported origin, provider and invocation mode; and Memory's start block and note counts. Search and source filters narrow every section. Skill origin is never inferred from filesystem paths, and Host paths are not sent to the browser. It replaces the Tools tab of Settings › Built-in plugins.",
       "reach": [
         "click tab \"Agents\"",
         "click button \"Capabilities\"",
@@ -173,7 +174,8 @@
     {
       "id": "thread-context-facet",
       "title": "See what a thread loads into its context",
-      "summary": "The thread panel Context tab lists what is loaded for the thread on the stage, each with an estimated token cost at four characters per token: the AGENTS.md-compatible instruction files DSH's own loader finds for its folder, the agent that started it, the memory start block, the skill catalog lines, enabled MCP servers costed by their tools, and attached references. Read-only; a source whose plugin is not loaded is left out.",
+      "summary": "The Context tab lists what a thread loads into its context, with an estimated token cost for each.",
+      "details": "The thread panel Context tab lists what is loaded for the thread on the stage, each with an estimated token cost at four characters per token: the AGENTS.md-compatible instruction files DSH's own loader finds for its folder, the agent that started it, the memory start block, the skill catalog lines, enabled MCP servers costed by their tools, and attached references. Read-only; a source whose plugin is not loaded is left out.",
       "reach": [
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"context check\"",

@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "settled-stream-size",
-      "title": "Store a settled attempt's replay metadata once",
-      "summary": "Owned fork of the native agent loop. A settled assistant message carries the provider's replay envelope on its message source; the same envelope's per-block list was also written into the durable compact stream, so every assistant message kept its block signatures twice. This fork stores the stream copy without the block list, leaving the response-level envelope and the message source untouched. Everything else is the pinned upstream code.",
+      "title": "Store reply metadata once",
+      "summary": "Each finished reply's replay data is stored once instead of twice, so thread logs stay smaller.",
+      "details": "Owned fork of the native agent loop. A settled assistant message carries the provider's replay envelope on its message source; the same envelope's per-block list was also written into the durable compact stream, so every assistant message kept its block signatures twice. This fork stores the stream copy without the block list, leaving the response-level envelope and the message source untouched. Everything else is the pinned upstream code.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",
@@ -53,7 +54,8 @@
     {
       "id": "tool-argument-limit",
       "title": "Stop a runaway tool call",
-      "summary": "A model that keeps streaming one tool call's arguments past a size or time bound (2026-11-11: an apply_patch call streamed 199 KB of whitespace for 15 minutes until the provider dropped the connection and the step failed) is stopped at the stream read. The provider request is aborted, the cut call is recorded with empty arguments and never runs, and its error result tells the model to resend smaller calls. The turn continues with the next step.",
+      "summary": "A tool call whose arguments keep streaming past a limit is stopped, and the agent is told to resend smaller calls.",
+      "details": "A model that keeps streaming one tool call's arguments past a size or time bound (2026-11-11: an apply_patch call streamed 199 KB of whitespace for 15 minutes until the provider dropped the connection and the step failed) is stopped at the stream read. The provider request is aborted, the cut call is recorded with empty arguments and never runs, and its error result tells the model to resend smaller calls. The turn continues with the next step.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",
@@ -101,7 +103,8 @@
     {
       "id": "output-limit-continuation",
       "title": "Continue a reply cut at the output-token limit",
-      "summary": "Off by default. When a reply stops on the output-token limit (finish max-tokens), the turn runs up to maxOutputLimitContinuations extra steps instead of ending. The cut reply stays in history once, exactly as streamed; each extra step adds only a short note asking the model to continue where it stopped without repeating itself, quoting the last 200 characters and naming any tool call the limit cut (the native assembler drops those, so nothing ran). Past the bound the turn ends with max-tokens as before.",
+      "summary": "Off by default: a reply cut at the output limit carries on in extra steps instead of ending the turn.",
+      "details": "Off by default. When a reply stops on the output-token limit (finish max-tokens), the turn runs up to maxOutputLimitContinuations extra steps instead of ending. The cut reply stays in history once, exactly as streamed; each extra step adds only a short note asking the model to continue where it stopped without repeating itself, quoting the last 200 characters and naming any tool call the limit cut (the native assembler drops those, so nothing ran). Past the bound the turn ends with max-tokens as before.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",

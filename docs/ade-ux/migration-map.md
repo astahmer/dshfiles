@@ -182,12 +182,12 @@ rail destination; 23 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| activity-timeline/activity-condensation: Deterministic condensation and attention visibility | attentionProvider | left-nav: Activity Timeline: Activity › attention filter |
+| activity-timeline/activity-condensation: Grouped activity, errors kept visible | attentionProvider | left-nav: Activity Timeline: Activity › attention filter |
 | activity-timeline/attention-inbox: One attention inbox for everything that needs you | attentionProvider | Host contract: attention-api module and attention_* agent tools |
 | agent-questions/child-questions-inbox: Subagent questions in the Inbox, answerable in place | attentionProvider | left-nav: Inbox › Subagent question |
 | agent-questions/cross-thread-question-inbox: List and answer thread questions | attentionProvider | agent tool: list_thread_questions / answer_thread_question |
 | agent-questions/native-questions-inbox: Thread questions in the Inbox | attentionProvider | left-nav: Inbox › agent-questions.native-question |
-| agent-questions/parent-child-question: Ask and answer a child-agent question | attentionProvider | agent tool: ask_parent_question / answer_parent_question |
+| agent-questions/parent-child-question: Ask and answer a subagent's question | attentionProvider | agent tool: ask_parent_question / answer_parent_question |
 | ai-accounts/quota-auto-retry: Retry exhausted quota when its reset arrives | attentionProvider | transcript: usage-limit turn tail › Resume |
 | ai-accounts/quota-inbox-items: Quota-blocked threads in the Inbox, resumable in place | attentionProvider | left-nav: Inbox › ai-accounts.quota-continuation |
 | backlog/attention-inbox: Attention Inbox across items and threads | attentionProvider | left-nav: Backlog › Inbox filter (links to the Inbox) |
@@ -283,10 +283,10 @@ rail destination; 5 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| agent-communication/agent-directory: Discover Agents and workspace channels | destinationSection | left-nav: Messages |
+| agent-communication/agent-directory: Find running agents | destinationSection | left-nav: Messages |
 | agent-communication/human-browser: Post messages from the communication browser | destinationSection | left-nav: Messages › post |
-| agent-communication/passive-messaging: Store and browse passive messages | destinationSection | left-nav: Messages |
-| agents/agent-registry: Manage persistent agents | destinationSection | left-nav: Agents |
+| agent-communication/passive-messaging: Store and browse agent messages | destinationSection | left-nav: Messages |
+| agents/agent-registry: Manage agents | destinationSection | left-nav: Agents |
 | agents/agent-mention-preview: Preview an agent from its mention | entityProvider | overlay: shared reference preview card (input-trigger entity registry), agent kind |
 
 ### Observe
@@ -295,8 +295,8 @@ rail destination; 29 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| activity-timeline/activity-feed: Unified agent activity feed | destinationSection | left-nav: Activity Timeline: Activity |
-| activity-timeline/verification-receipts: Inspect verification receipts in the Activity Timeline | destinationSection | left-nav: Activity Timeline: Activity › receipt detail |
+| activity-timeline/activity-feed: Activity feed | destinationSection | left-nav: Activity Timeline: Activity |
+| activity-timeline/verification-receipts: Check results in the activity feed | destinationSection | left-nav: Activity Timeline: Activity › receipt detail |
 | ai-accounts/quota-dashboard: Read provider quota and usage status | destinationSection | status-strip: Quota › usage popover |
 | ai-accounts/quota-forecast: Forecast when each account runs out, whether a kind kept an account free, and the order to use them in | destinationSection | left-nav: AI Accounts: Quota forecast |
 | ai-accounts/usage-history-and-pricing: Review usage history and cost forecasts | destinationSection | left-nav: AI Accounts: Usage history |
@@ -331,7 +331,7 @@ rail destination; 14 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| agentsview/agent-sessions-panel: Agent CLI sessions browser | destinationSection | left-nav: Agent CLI threads |
+| agentsview/agent-sessions-panel: Claude Code and Codex history | destinationSection | left-nav: Agent CLI threads |
 | memory/memory-panel: Browse and clean up memory in the Memory panel | destinationSection | left-nav: Memory |
 | memory/usage-telemetry: Show what memory costs and whether it holds up | destinationSection | left-nav: Memory › Analytics |
 | onboarding/getting-started: See what this setup can do and what it still needs on one page | destinationSection | rail: Knowledge › Getting started; palette: Getting started |
@@ -544,9 +544,9 @@ cards inline in the active thread; 42 features.
 | --- | --- | --- |
 | activity-timeline/thread-question-strip: Answer a subagent's question in its parent thread | transcriptCard | thread: above the composer while a subagent's question waits |
 | agent-plan/failure-card: Ask to fix on a failed turn | transcriptCard | transcript: failed turn action row |
-| agent-plan/plan-card: Plan card for todo_write | transcriptCard | transcript: todo_write tool card |
-| agent-questions/question-card-layout: Steady countdown and compact native question card | transcriptCard | transcript: native question card |
-| agent-questions/root-timed-questions: Root timed questions keep the Agent working | transcriptCard | transcript: native question card |
+| agent-plan/plan-card: Plan card for the agent's to-do list | transcriptCard | transcript: todo_write tool card |
+| agent-questions/question-card-layout: Steady countdown on question cards | transcriptCard | transcript: native question card |
+| agent-questions/root-timed-questions: Timed questions keep the agent working | transcriptCard | transcript: native question card |
 | ai-accounts/credential-recovery: Open credential setup from failed turns | transcriptCard | transcript: failed turn › Open AI Accounts |
 | ai-accounts/stalled-stream-recovery: Explain turns stopped by a stalled model stream | transcriptCard | transcript: failed turn › stalled-stream advice |
 | attachment-gallery/image-gallery-navigation: Navigate image previews | transcriptCard | transcript: image previews (and composer attachments) |
@@ -593,8 +593,8 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | --- | --- | --- |
 | agent-communication/durable-inbox: Read and acknowledge direct messages | agentToolOnly | agent tool: dshx_comm_inbox / dshx_comm_ack |
 | agent-questions/bounded-batch-resolution: Resolve feedback in bounded batches | agentToolOnly | agent tool: resolve_parent_feedback |
-| agent-questions/question-expiry: Resolve question expiry safely | agentToolOnly | agent tool: ask_parent_question expiry |
-| agent-questions/revision-pinned-feedback: Submit and resolve anchored Markdown feedback | agentToolOnly | agent tool: submit_markdown_feedback |
+| agent-questions/question-expiry: Handle an expired question | agentToolOnly | agent tool: ask_parent_question expiry |
+| agent-questions/revision-pinned-feedback: Give anchored feedback on a document | agentToolOnly | agent tool: submit_markdown_feedback |
 | annotations/extension-intake: Intake annotations from the browser extension | agentToolOnly | agent tool: annotations_intake (browser extension) |
 | annotations/source-resolution: Resolve an element to its source | agentToolOnly | agent tool: annotations_source |
 | apply-patch/apply-patch-tool: Edit a file the Agent inspected without the native read tool | agentToolOnly | agent tool: apply_patch |
@@ -643,10 +643,10 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | thread-transfer/thread-import: Import a .dshthread bundle as a new thread | command | command palette: Import thread… |
 | input-trigger/entity-registry: One mention and reference-preview registry | entityProvider | overlay: shared reference preview card; composer: @ menu groups |
 | agent-loop/output-limit-continuation: Continue a reply cut at the output-token limit | infrastructure | host: no UI |
-| agent-loop/settled-stream-size: Store a settled attempt's replay metadata once | infrastructure | host: no UI |
+| agent-loop/settled-stream-size: Store reply metadata once | infrastructure | host: no UI |
 | agent-loop/tool-argument-limit: Stop a runaway tool call | infrastructure | host: no UI |
-| agent-telemetry/agent-turn-spans: GenAI spans for every agent turn | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
-| agent-telemetry/auxiliary-and-wait-spans: Purpose model calls and wait spans | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
+| agent-telemetry/agent-turn-spans: Traces for every agent turn | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
+| agent-telemetry/auxiliary-and-wait-spans: Spans for side model calls and waits | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
 | agent-telemetry/content-capture: Metadata only unless content capture is switched on | infrastructure | settings: Agent telemetry › capture content |
 | agent-telemetry/nested-tool-spans: Plugin work nests under the tool and model call that caused it | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
 | agent-telemetry/span-cost: List-price cost on model spans | infrastructure | host: OTel spans (read in transcript: Traces view) |
