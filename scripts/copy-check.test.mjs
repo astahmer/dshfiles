@@ -2,7 +2,19 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { CopyCheck } from './copy-check.ts'
 
-const { catalogCopy, compare, copyInPlainTs, countByTermAndPlugin, extractStrings, findingsInStrings, isProse, jsonStrings, pluginOf, pluginPrefixPattern, totalsByTerm } = CopyCheck
+const {
+  catalogCopy,
+  compare,
+  copyInPlainTs,
+  countByTermAndPlugin,
+  extractStrings,
+  findingsInStrings,
+  isProse,
+  jsonStrings,
+  pluginOf,
+  pluginPrefixPattern,
+  totalsByTerm,
+} = CopyCheck
 
 const prefix = pluginPrefixPattern(['jj-integration', 'pulls-review', 'thread-sidebar', 'mcp-servers'])
 
@@ -133,21 +145,24 @@ test('reads label-keyed values of plain .ts label tables, not tool or API descri
     copyInPlainTs(table, extractStrings(table), 'plugins/@dshfiles/demo/src/groups.ts').map(entry => entry.text),
     ['General session', 'Each conversation and its tabs.', 'No sessions yet'],
   )
-  const tools = [
-    "const tool = defineTool({ name: 'list_sessions', description: 'List every live session.' })",
-    "const row = { label: 'Open session' }",
-  ].join('\n')
+  const tools = ["const tool = defineTool({ name: 'list_sessions', description: 'List every live session.' })", "const row = { label: 'Open session' }"].join(
+    '\n',
+  )
   assert.deepEqual(
     copyInPlainTs(tools, extractStrings(tools), 'plugins/@dshfiles/demo/src/tools.ts').map(entry => entry.text),
     ['Open session'],
   )
 })
 
-test('reads every string of a locale/en.json table', () => {
-  const table = { meta: { title: 'Conversation cleanup', description: 'Delete cold sessions.' }, labels: ['One', { two: 'Two' }], count: 3 }
+test('reads every string value of a locale/en.json table, with its line', () => {
+  const table = JSON.stringify(
+    { meta: { title: 'Conversation cleanup', description: 'Delete cold sessions.' }, labels: ['One', { two: 'Two "2"' }], count: 3 },
+    null,
+    2,
+  )
   assert.deepEqual(
-    jsonStrings(table).map(entry => entry.text),
-    ['Conversation cleanup', 'Delete cold sessions.', 'One', 'Two'],
+    jsonStrings(table).map(entry => `${entry.line}:${entry.text}`),
+    ['3:Conversation cleanup', '4:Delete cold sessions.', '7:One', '9:Two "2"'],
   )
 })
 
@@ -243,10 +258,11 @@ test('raw-error-echo: a message that ends by echoing an error, not a labelled va
 })
 
 test('status-word: a non-canonical state word as a whole label, not inside a sentence or as an enum value', () => {
-  assert.deepEqual(
-    ruleHits('status-word', ['Running', 'In progress', 'Needs attention', 'Running tests', 'running', '3 completed', 'Working', 'Done']),
-    ['Running', 'In progress', 'Needs attention'],
-  )
+  assert.deepEqual(ruleHits('status-word', ['Running', 'In progress', 'Needs attention', 'Running tests', 'running', '3 completed', 'Working', 'Done']), [
+    'Running',
+    'In progress',
+    'Needs attention',
+  ])
 })
 
 test('try-again: the whole label, not the phrase inside a sentence', () => {
@@ -254,8 +270,9 @@ test('try-again: the whole label, not the phrase inside a sentence', () => {
 })
 
 test('ascii-ellipsis: three dots after a word, not a range or the ellipsis character', () => {
-  assert.deepEqual(
-    ruleHits('ascii-ellipsis', ['Loading...', 'Search threads...', 'Saving... please wait', 'Loading…', 'Compare main...HEAD', 'Wait.']),
-    ['Loading...', 'Search threads...', 'Saving... please wait'],
-  )
+  assert.deepEqual(ruleHits('ascii-ellipsis', ['Loading...', 'Search threads...', 'Saving... please wait', 'Loading…', 'Compare main...HEAD', 'Wait.']), [
+    'Loading...',
+    'Search threads...',
+    'Saving... please wait',
+  ])
 })
