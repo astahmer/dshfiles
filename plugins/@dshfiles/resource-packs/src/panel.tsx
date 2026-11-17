@@ -73,7 +73,7 @@ export function ResourcesPanel(props: { api: ResourcePacksClient; openConversati
       </header>
       {unavailable ? (
         <p role="alert">
-          Resources unavailable: the Host plugin is not active. No background retries will run. Reopen this page after the plugin is activated.
+          Resources did not load. Restart DSH, then reopen this page.
         </p>
       ) : (
         <>

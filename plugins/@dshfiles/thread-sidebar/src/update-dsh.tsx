@@ -129,7 +129,7 @@ const JobState = (props: { readonly check: UpdateCheck; readonly restartAvailabl
       {job.sync === null || job.sync.pluginsRebuilt.length === 0 ? null : <p className={HINT}>Rebuilt: {job.sync.pluginsRebuilt.join(', ')}</p>}
       {job.state === 'done' && job.sync?.restartNeeded === true ? (
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" data-testid="update-dsh-restart">
-          <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">DSH needs a restart to load the new Host code. It waits for running turns.</p>
+          <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">Restart DSH to finish the update. It waits for running turns.</p>
           {props.restartAvailable ? (
             <Button disabled={props.waitingLabel !== null} onClick={() => RestartBridge.request('restart-when-idle')} size="sm" type="button" variant="outline">
               <RotateCcwIcon aria-hidden className="dshx:size-3.5" />

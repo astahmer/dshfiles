@@ -145,8 +145,8 @@ export const PluginGuidePanel = (props: PluginGuidePanelProps): ReactNode => {
             <AlertTitle>The guide catalog could not be read</AlertTitle>
             <AlertDescription>
               {isApiOwnerMissing(guide.error)
-                ? 'The Plugin Guide Host half is not running. Restart DSH after adding @dshfiles/plugin-guide to the profile.'
-                : 'Reload the page; if it keeps failing, rebuild @dshfiles/plugin-guide and restart DSH.'}
+                ? 'The plugin guide is not running. Enable it in Plugins, then restart DSH.'
+                : 'Reload the page. If it keeps failing, restart DSH.'}
             </AlertDescription>
           </Alert>
         ) : null}

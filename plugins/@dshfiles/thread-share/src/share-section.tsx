@@ -29,7 +29,7 @@ const keys = {
   publish: ['thread-share', 'publish'] as const,
 }
 
-const RESTART_HINT = 'The Thread sharing Host plugin did not answer. Restart DSH after installing it, then retry.'
+const RESTART_HINT = 'Thread sharing did not answer. Restart DSH, then retry.'
 
 const decodeRows = Schema.decodeUnknownSync(Schema.Struct({ shares: Schema.Array(shareRowSchema), routePath: Schema.String }))
 const decodeThreads = Schema.decodeUnknownSync(Schema.Struct({ threads: Schema.Array(threadOptionSchema) }))

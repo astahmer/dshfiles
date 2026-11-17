@@ -28,7 +28,7 @@ const keys = { all: ['project-automations'] as const, list: ['project-automation
 const decodeViews = Schema.decodeUnknownSync(Schema.Struct({ automations: Schema.Array(automationViewSchema) }))
 const decodeRuns = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(runRecordSchema) }))
 const decodeRun = Schema.decodeUnknownSync(runRecordSchema)
-const HOST_DOWN = 'The automations Host plugin did not answer. Restart DSH after installing @dshfiles/project-automations, then retry.'
+const HOST_DOWN = 'Automations did not answer. Restart DSH, then retry.'
 
 const when = (value: string | number | null | undefined): string => {
   if (value === null || value === undefined) return '—'

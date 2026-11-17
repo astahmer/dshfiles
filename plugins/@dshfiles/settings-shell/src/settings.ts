@@ -25,7 +25,7 @@ export const settingsShellSettings = defineSettings({
       .role('secret-ref')
       .default('')
       .description(
-        "Secret Catalog alias holding the TypeSafe key that Backlog triage and Memory's signal gates use, written as secret:ALIAS or secret:ALIAS@env. The value never leaves the Host. Leave blank to use each plugin's earlier key, then TYPESAFE_API_KEY from the Host environment.",
+        "The TypeSafe key Backlog triage and Memory use, as secret:ALIAS. Blank uses TYPESAFE_API_KEY from DSH’s environment.",
       ),
   }),
   applies: 'live',

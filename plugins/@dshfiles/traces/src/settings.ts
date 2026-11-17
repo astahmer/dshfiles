@@ -45,7 +45,7 @@ export const tracesSettings = defineSettings({
       .max(10_000)
       .default(100)
       .collapse().description(
-        'Record a "host event-loop stall" span whenever the DSH Host event loop is blocked at least this many milliseconds (a 100 ms probe, about 0.6 ms of CPU per second). 0 turns the probe off.',
+        'Record a "host event-loop stall" span when DSH is blocked at least this many milliseconds. 0 turns it off.',
       ),
   }),
   applies: 'live',

@@ -148,7 +148,7 @@ export const AutomationDialog = (props: {
                           onChange={event => field.handleChange(event.currentTarget.value)}
                         />
                         <FieldDescription>
-                          A global Secret Catalog alias. DSH stores only this reference and reads the value on the Host for each request.
+                          A global Secret Catalog alias. DSH stores only this reference and reads the value on this host for each request.
                         </FieldDescription>
                       </Field>
                     )}

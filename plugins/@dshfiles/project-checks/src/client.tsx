@@ -325,7 +325,7 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
           Native hook results
         </h3>
         <p className="dshx:text-xs dshx:text-muted-foreground">
-          The Host records hooks that ran. It has no durable skipped-hook event, so skipped and unsupported hooks cannot be attributed here.
+          Only hooks that ran are listed.
         </p>
         {hooks.length === 0 ? <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No native hook records are available for this thread.</p> : null}
         <ItemGroup className="dshx:divide-y dshx:rounded-md dshx:border dshx:empty:hidden">

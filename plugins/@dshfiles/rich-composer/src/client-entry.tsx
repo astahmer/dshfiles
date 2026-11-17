@@ -112,7 +112,7 @@ export default defineClient({
         run: async (sessionId, line) => {
           const result = await remote.commands.execute(SessionId(sessionId), line, [])
           if (!result.ok) return `${result.error.message} (${result.error.code})`
-          return result.value === undefined ? `this Host has no ${line.split(' ')[0] ?? line} command` : null
+          return result.value === undefined ? `this DSH has no ${line.split(' ')[0] ?? line} command` : null
         },
       }
       const catalog = new ModeChipCatalog(host)
