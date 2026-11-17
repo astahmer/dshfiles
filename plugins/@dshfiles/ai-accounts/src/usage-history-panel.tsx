@@ -38,7 +38,7 @@ const formatForecast = (forecast: ReturnType<typeof QuotaHistoryAnalysis.forecas
     case 'insufficient-history':
       return 'Need at least three snapshots spanning 30 minutes in this reset window.'
     case 'reset-due':
-      return 'The provider reset time has passed; wait for its next quota reading.'
+      return 'The provider reset time has passed. Wait for its next quota reading.'
     case 'no-depletion':
       return 'No depletion trend appears in the recent snapshots.'
     case 'estimated-depletion':

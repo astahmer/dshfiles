@@ -294,7 +294,7 @@ export const WorkspaceCleanupDialog = (props: {
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:px-5 dshx:py-4">
           <span className="dshx:text-xs dshx:text-muted-foreground">
             {selectedRows.some(row => row.missing)
-              ? 'Missing checkouts are only forgotten; their paths are never removed. Unlanded work is always protected.'
+              ? 'Missing checkouts are only forgotten. Their paths are never removed. Unlanded work is always protected.'
               : 'Unlanded work is always protected'}
           </span>
           <DialogFooter className="dshx:gap-2">

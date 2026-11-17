@@ -185,8 +185,8 @@ const wrapToolCallTree = (input: ToolCallFrameParts & { readonly tree: Component
       return framed as RenderToolView
     }, [nativeRenderSlot, sessionId])
     useEffect(() => {
-      if (nativeRenderSlot === undefined) warnOnce('the tool-call renderer no longer receives renderSlot; tool timings are hidden')
-      else if (!dispatched.current) warnOnce('the tool-call renderer rendered without dispatching tool.call.toolview; tool timings are hidden')
+      if (nativeRenderSlot === undefined) warnOnce('the tool-call renderer no longer receives renderSlot. Tool timings are hidden')
+      else if (!dispatched.current) warnOnce('the tool-call renderer rendered without dispatching tool.call.toolview. Tool timings are hidden')
     }, [nativeRenderSlot])
     if (renderSlot === undefined) return createElement(Tree, props)
     return createElement(Tree, { ...props, renderSlot })
@@ -215,7 +215,7 @@ export const installToolCallTreeWrapper = (input: ToolCallFrameParts & { readonl
     const entry = toolCallEntryOf(input.slots)
     if (entry === undefined || wrappers.has(entry.component)) return
     if (entry.component === undefined || entry.component === null) {
-      warnOnce('the conversation.chat.node "tool-call" entry holds no component; tool timings are hidden')
+      warnOnce('the conversation.chat.node "tool-call" entry holds no component. Tool timings are hidden')
       return
     }
     originals.set(entry, entry.component)

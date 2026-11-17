@@ -179,7 +179,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
       setDraft(AgentEditor.draftOf(result.agent))
       setNotice({ tone: 'ok', text: 'Saved.' })
     },
-    onError: error => setNotice({ tone: 'error', text: `${sentence(errorMessage(error, 'The agent was not saved.'))} Your edits are still here; save again.` }),
+    onError: error => setNotice({ tone: 'error', text: `${sentence(errorMessage(error, 'The agent was not saved.'))} Your edits are still here. Save again.` }),
   })
   const saveDraft = (): void => {
     if (review.errors.length > 0) {

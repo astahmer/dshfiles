@@ -156,7 +156,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       {result.segments > 1 ? (
         <p className={HINT} role="status">
           {result.graphComplete === false
-            ? 'These revisions are not adjacent, so each one is shown as its own change. The history between them is too long to count here; select fewer or closer revisions to see the gaps.'
+            ? 'These revisions are not adjacent, so each one is shown as its own change. The history between them is too long to count here. Select fewer or closer revisions to see the gaps.'
             : 'These revisions are not adjacent, so each one is shown as its own change. Dashed lines mark revisions between them that are not in this review.'}
         </p>
       ) : null}
@@ -175,7 +175,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       ) : null}
       {marks.error === null || marks.error === undefined ? null : (
         <p className="dshx:text-xs dshx:text-destructive" role="alert">
-          {errorMessage(marks.error, 'Viewed marks could not be saved; try again.')}
+          {errorMessage(marks.error, 'Viewed marks could not be saved. Try again.')}
         </p>
       )}
       {revisions.length === 0 ? <EmptyState>None of the selected revisions could be read. Select them again in the graph.</EmptyState> : null}

@@ -142,7 +142,7 @@ export const ModeChip = (props: ModeChipProps & { readonly host: ModeChipHost; r
                   <ModeRow label="Standard" detail="Works on the task directly." />
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="plan" data-composer-mode-option="plan">
-                  <ModeRow label="Plan" detail="Writes a plan first; nothing changes until you approve it." />
+                  <ModeRow label="Plan" detail="Writes a plan first. Nothing changes until you approve it." />
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
               {current === undefined ? null : <DropdownMenuSeparator />}

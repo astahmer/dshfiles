@@ -49,7 +49,7 @@ export const en = {
   attachmentEnded: 'The terminal connection ended. Reconnect to continue.',
   invalidOutput: 'The terminal screen could not be received. Reconnect to recover it.',
   terminalLimit: 'The terminal limit has been reached. Close unused terminals and try again. Exited terminals also count toward the limit.',
-  'badge.agent': 'Agent', 'badge.agentHint': 'Opened by the agent. Typing here takes over; the agent can then only read it.',
+  'badge.agent': 'Agent', 'badge.agentHint': 'Opened by the agent. Typing here takes over. The agent can then only read it.',
   'badge.sandbox': 'Sandbox',
   'badge.readOnlyHint': "Commands run in the agent's read-only sandbox, including commands you type here.",
   'badge.workspaceWriteHint': "Commands run in the agent's workspace sandbox, including commands you type here.",

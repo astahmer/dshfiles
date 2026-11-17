@@ -328,7 +328,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
               hint={
                 props.catalogError === null
                   ? undefined
-                  : `The model list did not load (${props.catalogError}). Reopen the panel to retry; the saved route is kept.`
+                  : `The model list did not load (${props.catalogError}). Reopen the panel to retry. The saved route is kept.`
               }
             />
           </div>
@@ -504,7 +504,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
             field="routine"
             review={review}
             onFix={props.onFix}
-            hint="Optional. A thread started by this agent schedules it with its own reminder tools; there is no timer here."
+            hint="Optional. A thread started by this agent schedules it with its own reminder tools. There is no timer here."
           />
         </div>
       </Section>

@@ -318,7 +318,7 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
         ? linked.conflicts.slice(-3).map(conflict => (
             <p key={`${conflict.field}-${String(conflict.at)}`} className="dshx:text-muted-foreground">
               {conflict.field}:{' '}
-              {conflict.kept === 'none' ? 'both sides differ; make them agree' : `kept the ${conflict.kept === 'remote' ? source : 'backlog'} value`}.
+              {conflict.kept === 'none' ? 'both sides differ. Make them agree' : `kept the ${conflict.kept === 'remote' ? source : 'backlog'} value`}.
             </p>
           ))
         : null}

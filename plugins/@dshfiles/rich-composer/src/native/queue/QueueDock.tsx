@@ -390,7 +390,7 @@ export function QueueDock({ useSession, useProjection, updateQueue, notify, load
 }
 
 /** Shown when the dock's Session scope or its conversation provider is between hot replacements. */
-const QUEUE_RECONNECTING_MESSAGE = 'The queue is reconnecting; try again in a moment.'
+const QUEUE_RECONNECTING_MESSAGE = 'The queue is reconnecting. Try again in a moment.'
 
 /** Registers queue actions backed by the session-scoped conversation service. */
 export const queueDockEntry = {

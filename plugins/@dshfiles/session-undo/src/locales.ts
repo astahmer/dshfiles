@@ -16,7 +16,7 @@ const en = {
   untitledPrompt: '(no text)',
   confirmTitle: 'Rewind to before turn {turn}?',
   confirmLost: 'The thread continues in a fork cut before this turn. These {count} turns leave the thread:',
-  confirmFiles: 'Workspace files go back to how they were when turn {turn} started; edits made since are replaced.',
+  confirmFiles: 'Workspace files go back to how they were when turn {turn} started. Edits made since are replaced.',
   confirmNoFiles: 'Turn {turn} has no file snapshot: only the thread rewinds, files stay as they are.',
   checkpointFiles: 'files',
   confirmRedo: 'Redo brings the turns and their files back until the fork runs a new turn.',

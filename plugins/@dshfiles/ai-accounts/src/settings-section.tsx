@@ -328,7 +328,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
       <FailureRecoveryGroup readOnly={readOnly} write={write} />
       {!preferences.failureRecovery.exhausted.failover ? (
         <Group
-          description="For exhausted limits. Automatic resume queues one minute after a known provider reset, or backs off from 30 seconds up to every 10 minutes when the provider names none; an account failover still takes the request first."
+          description="For exhausted limits. Automatic resume queues one minute after a known provider reset, or backs off from 30 seconds up to every 10 minutes when the provider names none. An account failover still takes the request first."
           heading="Quota retry"
         >
           <Row hint="Pre-check the per-turn choice in every thread. The default is on." label="Automatically resume after reset by default">
@@ -360,7 +360,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             <Switch checked={preferences.footerButton} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('footerButton', value))} />
           )}
         </Row>
-        <Row hint="Controls the governing window and collapsed rail; all-window layouts show percentages." label="Meter shows">
+        <Row hint="Controls the governing window and collapsed rail. All-window layouts show percentages." label="Meter shows">
           {id => (
             <Select
               disabled={readOnly || !preferences.footerButton}
@@ -409,7 +409,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             </Select>
           )}
         </Row>
-        <Row hint="The tag beside each meter in the wide strip; set one per account below." label="Short names in the strip">
+        <Row hint="The tag beside each meter in the wide strip. Set one per account below." label="Short names in the strip">
           {id => (
             <Switch
               checked={preferences.usageShortNames}
@@ -676,7 +676,7 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
 
   return (
     <Group description="Estimated cost per thread beside the composer stats, priced from models.dev. An estimate, never an invoice." heading="Cost estimates">
-      <Row hint="Shows ≈$ beside the token stats; hover it for the breakdown." label="Show thread cost">
+      <Row hint="Shows ≈$ beside the token stats. Hover it for the breakdown." label="Show thread cost">
         {id => (
           <Switch
             checked={preferences.costEstimates}
@@ -1019,7 +1019,7 @@ const FailureRecoveryGroup = (props: { readonly readOnly: boolean; readonly writ
                 </Row>
               ) : null}
               {shows('failover') ? (
-                <Row hint="The failed account cools down; the thread returns to it once it recovers." label="Fail over to the next account">
+                <Row hint="The failed account cools down. The thread returns to it once it recovers." label="Fail over to the next account">
                   {id => <Switch checked={current.failover} disabled={props.readOnly} id={id} onCheckedChange={value => update(kind, 'failover', value)} />}
                 </Row>
               ) : null}

@@ -128,7 +128,7 @@ export function ResourcesPanel(props: { api: ResourcePacksClient; openConversati
           {list.data !== undefined && (
             <>
               <p className="dshx:text-xs dshx:text-muted-foreground">
-                Showing {list.data.resources.length} of {list.data.total} resources{list.data.total > 200 ? ' (first 200; refine your search)' : ''}.
+                Showing {list.data.resources.length} of {list.data.total} resources{list.data.total > 200 ? ' (first 200. Refine your search)' : ''}.
               </p>
               <ResourceTable
                 resources={list.data.resources}

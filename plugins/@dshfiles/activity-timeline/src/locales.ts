@@ -47,7 +47,7 @@ const en = {
   emptyDetail: 'Select an event to inspect its metadata and correlated activity.',
   openSession: 'Open thread',
   sessionUnavailable: 'This thread is archived or unavailable. Restore it from the thread list to open it.',
-  sessionNavigationFailed: 'Could not open this thread; nothing was changed. Open it from the thread list.',
+  sessionNavigationFailed: 'Could not open this thread. Nothing was changed. Open it from the thread list.',
 } as const
 
 const zh = {

@@ -39,7 +39,7 @@ const en = {
   sourceMcp: 'MCP',
   sourceMemory: 'memory',
   readOnly: 'read-only',
-  readOnlyHint: 'Declares itself safe beside sibling calls, DSH’s read-only marker; it may still refuse some arguments.',
+  readOnlyHint: 'Declares itself safe beside sibling calls, DSH’s read-only marker. It may still refuse some arguments.',
   writes: 'may write',
   restricted: 'restricted',
   restrictedHint: 'This thread’s agent preset hides this tool.',

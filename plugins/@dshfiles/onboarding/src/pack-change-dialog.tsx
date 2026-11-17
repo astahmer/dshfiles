@@ -52,7 +52,7 @@ const SUMMARY_VARIANT = {
 const SUMMARY_TITLE = {
   'up-to-date': 'Up to date',
   applied: 'Done',
-  'restart-required': 'Saved; waits for a restart',
+  'restart-required': 'Saved. Waits for a restart',
   partial: 'Partly done',
   manual: 'Install by hand',
   cancelled: 'Stopped',

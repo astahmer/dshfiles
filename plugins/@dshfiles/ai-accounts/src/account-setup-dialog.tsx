@@ -29,7 +29,7 @@ import { CodexSignIn } from './codex-sign-in.js'
 const CONNECTION_NOTES = new Map<AccountProfile['kind'], string>([
   [
     'claude',
-    'Claude Code checks local sign-in configuration using the selected directory and DSH’s environment, including CLAUDE_CODE_OAUTH_TOKEN. This is not remote token validation; quota may be unavailable. API keys have separate billing; setup-token verification requires access to the free token-count endpoint.',
+    'Claude Code checks local sign-in configuration using the selected directory and DSH’s environment, including CLAUDE_CODE_OAUTH_TOKEN. This is not remote token validation. Quota may be unavailable. API keys have separate billing. Setup-token verification requires access to the free token-count endpoint.',
   ],
   [
     'codex',
@@ -311,7 +311,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
           <div className="dshx:flex dshx:flex-col dshx:gap-3">
             <p role="alert" className="dshx:text-sm dshx:text-destructive">
               {resultUnknown
-                ? 'The connection result could not be read. Sign-in may already be saved; close setup and check your accounts.'
+                ? 'The connection result could not be read. Sign-in may already be saved. Close setup and check your accounts.'
                 : snapshot.matches('failed')
                   ? 'This connection attempt ended after verification failed. Start a new attempt to sign in again.'
                   : 'This connection is no longer active. Start a new attempt.'}

@@ -33,7 +33,7 @@ const en = {
   'ago.months': '{n}mo ago',
   'ago.years': '{n}y ago',
   cancel: 'Cancel',
-  actionFailed: 'Change not saved. Retry the action; refresh if another tab changed this history.',
+  actionFailed: 'Change not saved. Retry the action. Refresh if another tab changed this history.',
   'approval-needed': 'Approval requested',
   'input-needed': 'Input requested',
   'agent-message': 'Agent message',

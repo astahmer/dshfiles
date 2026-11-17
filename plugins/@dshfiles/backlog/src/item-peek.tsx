@@ -336,7 +336,7 @@ const BodyField = (props: {
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
       <BacklogTextBox
         ariaLabel="Body"
-        placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads, projects and agents; paste or drop an image."
+        placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads, projects and agents. Paste or drop an image."
         value={autosave.draft}
         onChange={value => autosave.send({ type: 'edit', value })}
         threads={props.threads}
@@ -544,7 +544,7 @@ const ReplyComposer = (props: {
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
       <BacklogTextBox
         ariaLabel="Edit reply"
-        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads, projects and agents; paste or drop an image"
+        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads, projects and agents. Paste or drop an image"
         value={text}
         onChange={setText}
         threads={props.threads}
@@ -939,7 +939,7 @@ const CommentBox = (props: {
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
       <BacklogTextBox
         ariaLabel="Comment"
-        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads, projects and agents; paste or drop an image"
+        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads, projects and agents. Paste or drop an image"
         value={text}
         onChange={setText}
         threads={props.threads}

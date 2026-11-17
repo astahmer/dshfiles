@@ -38,7 +38,7 @@ const en = {
   metricNoPoints: 'No chartable points in this window.',
   metricMoreSeries: 'more series not shown',
   serviceMap: 'Service map',
-  noServiceCalls: 'No span in this window has a parent in another service yet; services show without edges.',
+  noServiceCalls: 'No span in this window has a parent in another service yet. Services show without edges.',
   searchLogs: 'Search logs',
   searchLogsPlaceholder: 'Body, attribute, event name…',
   logService: 'Log service',

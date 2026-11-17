@@ -91,12 +91,12 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
             const busy = busyId === item.continuationId
             const targetTime = Math.max(item.resetAt ?? item.retryAt ?? 0, item.snoozedUntil ?? 0) + (item.resetAt === null ? 0 : 60_000)
             const resetStatus =
-              item.resetAt === null ? `Reset time unknown; retries back off up to every 10 minutes.` : `Known reset ${formatTime(item.resetAt)}.`
+              item.resetAt === null ? `Reset time unknown. Retries back off up to every 10 minutes.` : `Known reset ${formatTime(item.resetAt)}.`
             const scheduleStatus = item.scheduled
               ? `Automatic resume expected ${formatTime(targetTime)}.`
               : scheduleAvailable
-                ? 'No automatic timer is set; resume manually.'
-                : 'Schedule service is not loaded; resume manually.'
+                ? 'No automatic timer is set. Resume manually.'
+                : 'Schedule service is not loaded. Resume manually.'
             const snoozes = [
               { duration: 'one-hour', label: 'Snooze 1h' },
               { duration: 'four-hours', label: 'Snooze 4h' },
@@ -115,7 +115,7 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
                       {item.state === 'queued'
                         ? 'Recovery prompt queued.'
                         : item.ready
-                          ? 'Recovery time passed; ready for manual recovery.'
+                          ? 'Recovery time passed. Ready for manual recovery.'
                           : 'Quota-blocked turn.'}
                     </Badge>
                     <span>{resetStatus}</span>

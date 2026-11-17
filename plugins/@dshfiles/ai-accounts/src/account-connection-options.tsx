@@ -120,7 +120,7 @@ const ConnectionHomes = (props: ConnectionOptionsProps): JSX.Element => {
                 monospace
                 description={
                   codex
-                    ? 'Shared state; custom homes need a separate auth overlay.'
+                    ? 'Shared state. Custom homes need a separate auth overlay.'
                     : props.account.kind === 'antigravity'
                       ? 'Home whose .gemini folder holds this Google login. Empty uses your own; give each extra Google account its own folder.'
                       : 'Directory containing your Claude Code login.'

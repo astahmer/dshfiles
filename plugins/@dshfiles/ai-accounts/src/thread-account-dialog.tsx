@@ -84,7 +84,7 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
             </dl>
             <p className="dshx:text-sm dshx:text-muted-foreground">
               {plan.strategy === 'same-model'
-                ? 'Same model retained. Compatible reasoning effort is kept; otherwise this account’s reasoning default applies.'
+                ? 'Same model retained. Compatible reasoning effort is kept. Otherwise this account’s reasoning default applies.'
                 : plan.strategy === 'default-model'
                   ? 'Your current model is unavailable here. This account supports your deployment’s default model, shown above.'
                   : 'Your current and deployment-default models are unavailable here. The first model in this account’s preferred order is shown above.'}

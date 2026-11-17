@@ -35,7 +35,7 @@ interface ConversationService {
 }
 
 /** Shown when the dock's conversation provider is between hot replacements. */
-export const QUEUE_RECONNECTING_MESSAGE = 'The queue is reconnecting; try again in a moment.'
+export const QUEUE_RECONNECTING_MESSAGE = 'The queue is reconnecting. Try again in a moment.'
 
 const QueueDockSlot = (props: DockProps): JSX.Element => (
   <PluginQueryProvider>

@@ -543,7 +543,7 @@ const peekRetain =
   (sessions: ISessions): RetainThread =>
   (sessionId, signal) => {
     const listed = sessions.list.getSnapshot().ids.find(candidate => candidate === sessionId)
-    if (listed === undefined) throw new Error('This thread is not listed; open it from the thread list.')
+    if (listed === undefined) throw new Error('This thread is not listed. Open it from the thread list.')
     const reference = sessions.retain(listed, { source: 'inboxPeek', signal })
     return { ready: reference.ready.then(binding => ({ eventSource: binding.eventSource })), release: () => reference.release() }
   }
