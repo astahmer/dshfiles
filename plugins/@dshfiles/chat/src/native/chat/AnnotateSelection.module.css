@@ -18,6 +18,9 @@
   font: inherit;
   font-size: 13px;
   white-space: nowrap;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   cursor: pointer;
   transform: translate(-50%, calc(-100% - 8px));
   animation: pop-in var(--dshx-duration-menu, 160ms) var(--dshx-motion-ease-enter, cubic-bezier(0.2, 0, 0, 1));
@@ -40,6 +43,23 @@
   font-size: 15px;
   transform: translateX(-50%);
   animation-name: pop-in-below;
+}
+
+/* On touch, in the chat's selection action row after Quote text: the row places it. */
+.annotate[data-side='row'] {
+  order: 1;
+  position: static;
+  height: 44px;
+  padding: 0 16px 0 14px;
+  font-size: 15px;
+  transform: none;
+  animation-name: fade-in;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 @keyframes pop-in-below {

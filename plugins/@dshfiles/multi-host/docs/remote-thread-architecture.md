@@ -33,7 +33,7 @@ the shell. Its inputs come from the Session scope and from ten other client plug
 | Model + reasoning effort                      | `model-effort-picker` on `conversation.input.model`       | local model catalog and settings         |
 | `@` file/session references                   | `mentions` + `command-palette`                            | local workspace files and session search |
 | Prompt snippets                               | `prompt-stash`                                            | browser storage                          |
-| Image/file attachments                        | `attachment-gallery` + `send-after-upload`                | local file upload receipts               |
+| Image/file attachments                        | `attachment-gallery` + `rich-composer` held send          | local file upload receipts               |
 | Queue dock, todo, plan, permission            | `queue-reorder`, `jujutsu`, `home`, `btw`, plan/perm rows | session projections of this runtime      |
 | jj / project chips under the composer         | `jujutsu`, `jj-integration`                               | local filesystem and `jj`                |
 

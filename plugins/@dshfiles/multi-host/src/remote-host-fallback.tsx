@@ -1,12 +1,13 @@
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useState } from 'react'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { joinPageRead, useApi } from '@dshfiles/dshx/client'
+import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ExternalLinkIcon, EyeOffIcon, TriangleAlertIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { multiHostApi } from './api.js'
 import { openRemoteView } from './open-remote-view.js'
+import { readSessionRuntime } from './session-runtime-read.js'
 import { ConnectionDiagnostics } from './destination/connection-diagnostics.js'
 import { multiHostKeys, multiHostQueries } from './destination/queries.js'
 
@@ -15,12 +16,8 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
   const [popupBlocked, setPopupBlocked] = useState(false)
   const owner = useQuery({
     queryKey: ['multi-host', 'session-runtime', props.sessionId],
-    queryFn: async () => {
-      // The model picker reads the same owner when the Session opens; one request answers both.
-      const result = await joinPageRead({
-        key: `multi-host:sessionRuntime:${props.sessionId}`,
-        read: () => api.sessionRuntime({ sessionId: props.sessionId }),
-      })
+    queryFn: async ({ signal }) => {
+      const result = await readSessionRuntime({ client: api, sessionId: props.sessionId, signal })
       if (!result.ok) throw new Error(result.message)
       return result.runtimeId
     },

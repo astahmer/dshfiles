@@ -14,7 +14,7 @@ import { createEmptyHistoryState, registerHistory } from '@lexical/history'
 import { mergeRegister } from '@lexical/utils'
 import type { DraftQuote, DraftReference, ReferenceInsert } from '../../contract/draft-editor.ts'
 import type { CommandClaim } from '../../contract/input.ts'
-import { QuoteNode, $createQuoteNode, $isQuoteNode, REMOVE_QUOTE_COMMAND } from './QuoteNode.tsx'
+import { QuoteNode, $createQuoteNode, $isQuoteNode, COMMENT_QUOTE_COMMAND, REMOVE_QUOTE_COMMAND } from './QuoteNode.tsx'
 import type { QuoteNodeLabels } from './QuoteNode.tsx'
 import { registerReferenceActivation } from './reference-activation.ts'
 import { ReferenceChipNode, $createReferenceChipNode } from './chip-node.tsx'
@@ -32,6 +32,8 @@ type Lexicon = ReadonlyMap<'/' | '@' | '#', readonly string[]>
 interface DraftEditorRuntimeDeps {
   readonly onUpdate: () => void
   readonly quoteLabels: () => QuoteNodeLabels
+  /** Takes a quote the user commented out of the draft; absent, quotes offer no comment. */
+  readonly commentQuote?: (input: { readonly text: string; readonly comment: string }) => void
   readonly openReference: (source: string | undefined, reference: Pick<ReferenceInsert, 'ref' | 'appearance'>) => boolean
   readonly lexicon: () => Lexicon
   readonly resolveLexicon: () => ObservableSnapshot<Lexicon> | undefined
@@ -114,6 +116,7 @@ export class DraftEditorRuntime {
       registerPlainText(this.editor),
       this.editor.registerNodeTransform(QuoteNode, (node) => { node.setLabels(this.deps.quoteLabels()) }),
       this.editor.registerCommand(REMOVE_QUOTE_COMMAND, key => this.removeQuote(key), COMMAND_PRIORITY_CRITICAL),
+      this.editor.registerCommand(COMMENT_QUOTE_COMMAND, input => this.commentQuote(input), COMMAND_PRIORITY_CRITICAL),
       this.editor.registerCommand(KEY_BACKSPACE_COMMAND, event => this.deleteAdjacentQuote(event, true), COMMAND_PRIORITY_BEFORE_CRITICAL),
       this.editor.registerCommand(KEY_DELETE_COMMAND, event => this.deleteAdjacentQuote(event, false), COMMAND_PRIORITY_BEFORE_CRITICAL),
       this.editor.registerCommand(BLUR_COMMAND, () => {
@@ -381,6 +384,17 @@ export class DraftEditorRuntime {
       applied = $replaceDetectSpanWithNodes({ start: at, end: at }, [$createQuoteNode(text, labels, summary), $createTextNode(' ')])
     }, PASTE_TAG)
     return applied
+  }
+
+  /** Hand a commented quote to the annotation owner and take its chip out of the draft. */
+  private commentQuote(input: { readonly key: NodeKey; readonly comment: string }): boolean {
+    const node = $getNodeByKey(input.key)
+    const commentQuote = this.deps.commentQuote
+    if (!$isQuoteNode(node) || commentQuote === undefined || input.comment.trim() === '') return false
+    const text = node.getQuoteText()
+    this.removeQuote(input.key)
+    commentQuote({ text, comment: input.comment })
+    return true
   }
 
   /** Remove one quote node and leave the editor caret at its former position. */

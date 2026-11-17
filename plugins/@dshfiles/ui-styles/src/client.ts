@@ -1,4 +1,5 @@
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { installSheetDrag } from '@dshfiles/plugin-ui/hooks/sheet-drag'
 import { AppearanceModel, type AppearanceSettings } from '@dshfiles/plugin-ui/theme/appearance'
 import type { Rgb } from '@dshfiles/plugin-ui/theme/readability'
 import { SceneCatalog } from '@dshfiles/plugin-ui/theme/scenes'
@@ -122,5 +123,7 @@ export default defineClient({
         document.getElementById(RUNTIME_STYLE_ID)?.remove()
       }
     }, 'dshfiles-ui-styles: apply the Appearance theme')
+    // The phone sheet geometry lives in this bundle's sheet, so its drag gesture does too: one listener for every sheet.
+    ctx.effect(() => installSheetDrag(document), 'dshfiles-ui-styles: drag phone bottom sheets')
   },
 })

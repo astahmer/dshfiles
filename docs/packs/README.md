@@ -4,7 +4,7 @@
 
 A pack is a named set of owned plugins adopted together; a plugin may sit in several. Getting started (**Knowledge › Getting started**) shows the same packs with each plugin's live state, `onboarding_pack_apply` enables or disables one, and `dshx init` composes a new profile from them. Core is always on.
 
-1. [Core](core.md) (`core`, 25 plugins) — The thread list, tabs, chat, composer, session control, Settings, AI accounts and Getting started every other pack builds on.
+1. [Core](core.md) (`core`, 24 plugins) — The thread list, tabs, chat, composer, session control, Settings, AI accounts and Getting started every other pack builds on.
 2. [Composer & transcript](transcript.md) (`transcript`, 11 plugins) — Richer prompts and replies: @ references, model and effort, plan cards, diagrams, HTML and test cards, tool timing, turn summaries and a side chat.
 3. [Versioning workflow](versioning.md) (`versioning`, 5 plugins) — A workspace per thread, landing finished work, the revision graph, changed-file review, project checks and undo per turn. Works with jj and git.
 4. [GitHub & review](github.md) (`github`, 3 plugins) — Open and watch pull requests, review a workspace before landing, and run project automations from GitHub events.

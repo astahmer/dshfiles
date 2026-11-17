@@ -119,9 +119,79 @@ list still re-renders on every pick (`display: none` also makes the virtual rows
 puts the cost in layout forced by the virtual rows' `measureElement` and the Workbench's `_scrollTabIntoView`, paid by
 any frame that lays the page out.
 
-Found, not fixed: each list mount (load and every Back) asks the Host to auto-archive two settled threads that no
-longer exist; the Host answers `session/not-found` inside HTTP 200 and the auto-archive retries on the next mount
-(`thread-sidebar` `dueArchiveSessionIds` keeps them due while their rows stay listed).
+### Duplicate reads per switch and the auto-archive retry (2026-11-16)
+
+`METHODS=1` on the phone probe expands every batched dshx call by API method. Live, read-only (main build, emulated
+phone, four taps; the probe's taps record navigation, nothing else): each Back sent `workspace/archiveSession` 4.8 times
+and each open 0.3 times, for settled threads the Host no longer has (`session/not-found` inside HTTP 200, retried on
+every list mount and again after each settled scan); each open read `multi-host/sessionRuntime` twice for one thread.
+
+The four-fold `scheduled-sends/list`, `annotations/list` and `session-undo/history` reads of the stored phone trace did
+not reproduce: in scratch (40 threads, Workbench keeping three released thread views mounted, switches through
+`dshfiles:open-thread` 9 to 12 s apart so kept data went stale) and live, every switch read them once, for the shown
+thread only. A kept view is not remounted on a switch, so it does not refetch. Not measured: a Host event fanning out
+to every mounted body (`scheduled-sends` `changed` carries no Session, so each kept dock re-reads its own list).
+
+Owners of the second `sessionRuntime` read: the thread header's remote-host link and the model picker shared only reads
+still in flight (`joinPageRead`), and the JJ thread control (`useSessionThreadApi`, behind `threadAt`) read once per
+mount. All three now read through `@dshfiles/multi-host/session-runtime-read`, one page-wide resource-store entry per
+thread (30 s stale time). Auto-archive reports a `session/not-found` refusal as `missing`, and the sidebar drops those
+ids from its settled status, so they are never sent again.
+
+| Scratch, 40 threads, RTT 100 ms, 4× CPU   | Before (load 4.5) | After (load 10–18, two runs) |
+| ----------------------------------------- | ----------------- | ---------------------------- |
+| `multi-host/sessionRuntime` per open      | 2.2               | 1.2 / 1.2                    |
+| same, desktop main-tabs switch (6 × 9 s)  | 2.2               | 1.2                          |
+| dshx calls per desktop switch             | 19.0              | 17.8                         |
+| dshx calls per open, p50                  | 14                | 13 / 13                      |
+| tap → title p50 (ms)                      | 427               | 531 / 444                    |
+| tap → first message p50 (ms)              | 848               | 1189 / 1015                  |
+| Back → list p50 (ms)                      | 749               | 999 / 853                    |
+
+The timings moved with the machine's load (other agents' builds; 10 cores), not with the change: fewer calls cannot
+slow a tap. The auto-archive retry has no scratch reproduction (a listed thread the Host's workspace does not know), so
+its proof is the regression test and the live count above.
+
+Regression checks: multi-host `session-runtime-read.test.ts` ("answers a second bundle that asks after the first read
+settled without another request"), thread-sidebar `auto-archive-machine.test.ts` ("reports a Session the Host no
+longer has as missing, not as a failure to retry") and `organization.test.ts` ("an archive refused for a Session the Host
+does not have reads as missing").
+
+### Settings writes behind every open and Back (2026-11-16)
+
+Live, per tap: `settings/mutate` twice on every open and Back, `session/modelCatalog` 4.8 per open and 3.3 per Back,
+`settings/describe` 3.0 per open. Initiator stacks (CDP async stacks on the unbatched native calls) and the write bodies
+name one chain:
+
+1. Thread Sidebar's auto-archive drains a backlog of settled threads while the list is mounted (about four per Back on
+   the phone). Each archive changed the archived set, and the "archiving outranks settled" effect then rewrote the
+   whole settled status, every id and instant (52 KB live), to drop that one id: one `settings/mutate` per archive.
+2. Every write announces `settings/document-updated`, for any namespace. The page re-reads `settings/describe`, and
+   the model selector and the Subagent settings card each re-read `session/modelCatalog`. The card did so whether or
+   not it was on screen.
+
+Fixes: the sidebar holds that cleanup while an auto-archive scan runs, so a scan clears all its archived ids in one
+write (`SettledThreadsModel.archivedStillSettled`); the Subagent card (`@dshfiles/settings-subagent` fork) reads the
+catalog only while a renderer watches it, and catches up when it is shown.
+
+Scratch, phone list mounted for 25 s after settling seven listed threads with the archive delay `immediately`
+(`dshx config set thread-sidebar …`); a load with nothing to archive sends 2 `settings/describe` and 2
+`session/modelCatalog` in both builds:
+
+| Requests in 25 s           | Before (7 archived) | After (6 archived) |
+| -------------------------- | ------------------- | ------------------ |
+| `workspace/archiveSession` | 7                   | 6                  |
+| `settings/mutate`          | 5                   | 1                  |
+| `settings/describe`        | 10                  | 4                  |
+| `session/modelCatalog`     | 7                   | 3                  |
+
+Regression checks: thread-sidebar `settled-threads.test.ts` ("waits for a running auto-archive scan, so its archives
+clear the settled status in one write") and settings-subagent `catalog-read.test.ts` ("reads nothing on a settings
+write while no renderer shows the card").
+
+Still open: `settings/describe` and the model selector's catalog still follow every settings write, any namespace
+(native config-forms describe store; the selector cannot tell which namespaces feed provider routes). With the write
+per archive gone, they follow one write per scan.
 
 ## Idle polls replaced by Host change events (2026-11-12, issue #142)
 

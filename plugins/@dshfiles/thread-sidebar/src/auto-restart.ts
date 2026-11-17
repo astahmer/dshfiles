@@ -99,7 +99,9 @@ export class AutoRestart extends Context.Service<
           const jobs = yield* host.runningJobCount
           if (turns > 0 || jobs > 0) return { turns, jobs, questions: 0 }
           const sessions = yield* host.sessions.pipe(Effect.orElseSucceed(() => []))
-          return { turns, jobs, questions: sessions.filter(session => session.pendingQuestions > 0).length }
+          // A stopped Session's question persists in its projection forever and nobody can answer it on this Host: counting
+          // it kept the restart waiting with nothing running (7 such forms on the owner's Host, 2026-11-16).
+          return { turns, jobs, questions: sessions.filter(session => session.live && session.pendingQuestions > 0).length }
         })
 
         const evaluate = Effect.gen(function* () {

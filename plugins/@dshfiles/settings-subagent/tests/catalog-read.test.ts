@@ -20,10 +20,13 @@ const fixture = () => {
   return { ctx, modelCatalog }
 }
 
+const show = (controller: SubagentModelSelectionCardController): (() => void) => controller.inject().hooks.subagentModelSelectionCard.subscribe(() => {})
+
 describe('the Subagent page model catalog', () => {
-  it('reads once at boot: the read waits for the first connected generation, which needs no reread', async () => {
+  it('reads once when shown: the read waits for the first connected generation, which needs no reread', async () => {
     const { ctx, modelCatalog } = fixture()
     const controller = new SubagentModelSelectionCardController(enabledScope, ctx, false)
+    show(controller)
     await settle()
     expect(modelCatalog).not.toHaveBeenCalled()
 
@@ -48,10 +51,34 @@ describe('the Subagent page model catalog', () => {
     )
     const first = new SubagentModelSelectionCardController(enabledScope, ctx)
     const second = new SubagentModelSelectionCardController(enabledScope, ctx)
+    show(first)
+    show(second)
     await settle()
     expect(modelCatalog).toHaveBeenCalledTimes(1)
     answer?.()
     first.dispose()
     second.dispose()
+  })
+
+  it('reads nothing on a settings write while no renderer shows the card, and catches up when it is shown', async () => {
+    const { ctx, modelCatalog } = fixture()
+    const controller = new SubagentModelSelectionCardController(enabledScope, ctx)
+    await settle()
+    for (let write = 0; write < 3; write += 1) controller.refreshCatalog()
+    await settle()
+    expect(modelCatalog).not.toHaveBeenCalled()
+
+    const hide = show(controller)
+    await settle()
+    expect(modelCatalog).toHaveBeenCalledTimes(1)
+    controller.refreshCatalog()
+    await settle()
+    expect(modelCatalog).toHaveBeenCalledTimes(2)
+
+    hide()
+    controller.refreshCatalog()
+    await settle()
+    expect(modelCatalog).toHaveBeenCalledTimes(2)
+    controller.dispose()
   })
 })

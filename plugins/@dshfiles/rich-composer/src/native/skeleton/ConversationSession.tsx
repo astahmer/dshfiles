@@ -448,7 +448,8 @@ export function ConversationSessionHeader({
           aria-label={t('session.closeMenu')}
           onClick={() => { setMenuOpen(false) }}
         />
-        <div className={css.phoneSheet} role="dialog" aria-label={t('session.menu')} data-conversation-phone-sheet="" ref={phoneMenuRef} tabIndex={-1}>
+        {/* dshfiles: data-dshx-sheet hands the sheet to the shared drag gesture (@dshfiles/plugin-ui hooks/sheet-drag). */}
+        <div className={css.phoneSheet} role="dialog" aria-label={t('session.menu')} data-conversation-phone-sheet="" data-dshx-sheet="" ref={phoneMenuRef} tabIndex={-1}>
           <span className={css.phoneGrabber} aria-hidden />
           {views}
           <div className={css.phoneSheetActions}>

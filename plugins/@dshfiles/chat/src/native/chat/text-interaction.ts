@@ -185,15 +185,18 @@ export function useTextInteraction(
       frame = view.requestAnimationFrame(() => { frame = undefined; place() })
     }
     const dispatch = (trigger: TextInteractionTrigger, next: Target, event: Event): void => {
-      if (!available(root, next)) return
+      if (!available(root, next)) { dismiss(); return }
       const id = dispatchInteraction({
         trigger, hasSelection: next.selection !== null,
         readText: () => next.text,
         preventDefault: () => { event.preventDefault() },
       })
-      if (id === null) return
+      if (id === null) { dismiss(); return }
       target.current = next
-      setActive({ id, trigger })
+      // dshfiles: a handle drag re-dispatches on every selectionchange; the same owner keeps its mounted action
+      // and moves it now instead of hiding it until React re-renders, so the action never blinks or empties.
+      setActive(current => (current?.id === id && current.trigger === trigger ? current : { id, trigger }))
+      place()
     }
     const updateSelection = (event: Event): void => {
       if (pressingSurface) return
@@ -205,10 +208,8 @@ export function useTextInteraction(
       if (!selectionChangedDuringGesture && sameRange(previousRange, range)) return
       selectionChangedDuringGesture = false
       previousRange = range?.cloneRange() ?? null
-      dismiss()
-      if (selection === null) return
-      const text = selectedText(selection)
-      if (text === null) return
+      const text = selection === null ? null : selectedText(selection)
+      if (selection === null || text === null) { dismiss(); return }
       dispatch('selection', { source: selection.source, selection: { ...selection, range: selection.range.cloneRange() }, text, point: null }, event)
     }
     const insideSurface = (event: Event): boolean => event.composedPath().includes(surface)

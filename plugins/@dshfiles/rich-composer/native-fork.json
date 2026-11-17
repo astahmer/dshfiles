@@ -33,6 +33,7 @@
     "src/native/input/editor/ComposerContentEditable.tsx",
     "src/native/input/editor/view-binding.ts",
     "src/native/input/editor/runtime.ts",
+    "src/native/input/editor/QuoteNode.tsx",
     "src/native/input/editor/reference-activation.ts",
     "src/native/input/editor/projection.ts",
     "src/native/user-text/session-reference-rule.ts",
@@ -82,6 +83,7 @@
     "src/native/input/machine.test.ts",
     "src/native/input/retained-send.test.ts",
     "src/native/input/retained-send.ts",
-    "src/native/skeleton/AnnotationsPill.tsx"
+    "src/native/skeleton/AnnotationsPill.tsx",
+    "src/native/skeleton/annotations-pill-done.test.tsx"
   ]
 }

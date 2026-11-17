@@ -69,6 +69,24 @@ export const writeClipboard = async (text: string): Promise<boolean> => {
 /** Same user-agent rule as the Host's primitive, uncached so a test can change the user agent. */
 export const isMobileDevice = (): boolean => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
+/** Same Markdown blockquote as the Host's primitive. */
+export const formatQuoteText = (text: string): string =>
+  text
+    .replace(/\r\n?/gu, '\n')
+    .split('\n')
+    .map(line => `> ${line}`)
+    .join('\n')
+
+export const QuotePreview = (props: {
+  readonly text: string
+  readonly removal?: { readonly label: string; readonly onRemove: () => void } | undefined
+}): JSX.Element => (
+  <span data-quote-preview="">
+    {props.text}
+    {props.removal === undefined ? null : <button type="button" aria-label={props.removal.label} onClick={props.removal.onRemove} />}
+  </span>
+)
+
 export const StateDot = (props: { state: string }): JSX.Element => <span aria-hidden data-state={props.state} />
 
 export const Tooltip = (props: { content?: ReactNode; label?: ReactNode; children?: ReactNode }): JSX.Element => <>{props.children}</>

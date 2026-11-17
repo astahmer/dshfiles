@@ -42,7 +42,14 @@ interface ToolMessageData {
   readonly toolCallId?: unknown
 }
 
-const readEventData = (event: SessionEventLike): EventData => {
+/** The fields this plugin reads off any Session event; `SessionEventLike` and a recorded log line both fit. */
+interface RecordedEvent {
+  readonly type: string
+  readonly time?: number
+  readonly data?: unknown
+}
+
+const readEventData = (event: RecordedEvent): EventData => {
   const data: unknown = event.data
   return Wire.isObject(data) ? data : {}
 }
@@ -93,12 +100,10 @@ const planView: ConversationViewDefinition<ConversationViewNode, readonly PlanWr
   },
 }
 
-const activityEventOf = (event: SessionEventLike): ActivityEvent | undefined => {
+const activityEventOf = (event: RecordedEvent): ActivityEvent | undefined => {
   const data = readEventData(event)
-  const time = 'time' in event ? event.time : Date.now()
-  // `job/*` events are declared by @deepseek-ai/dsh-jobs, which this client does not import; read the type as text.
-  const type: string = event.type
-  switch (type) {
+  const time = event.time ?? Date.now()
+  switch (event.type) {
     case 'turn/start':
       return { type: 'turn-start', turn: Number(data.turn) }
     case 'turn/end':
@@ -131,12 +136,14 @@ const activityEventOf = (event: SessionEventLike): ActivityEvent | undefined => 
       const jobId = Wire.readString(data.jobId)
       return jobId === undefined ? undefined : { type: 'job-settled', jobId }
     }
+    case 'session/end-seed':
+      return { type: 'session-reopened' }
     default:
       return undefined
   }
 }
 
-const ACTIVITY_EVENTS = ['turn/start', 'turn/end', 'tool/call', 'tool/result', 'job/registered', 'job/settled'] as const
+const ACTIVITY_EVENTS = ['turn/start', 'turn/end', 'tool/call', 'tool/result', 'job/registered', 'job/settled', 'session/end-seed'] as const
 const activityMatch = (event: SessionEventLike) => (activityEventOf(event) === undefined ? null : { id: 'session', role: 'start' as const })
 
 /** One Session-wide Context that folds tool calls, results and job records into what runs now. */
@@ -177,4 +184,4 @@ const activityView: ConversationViewDefinition<ConversationViewNode, LiveActivit
 }
 
 /** What @dshfiles/agent-plan registers on `ctx.uiConversation`: two event Definitions and their view targets. */
-export const ConversationTargets = { planWriteDefinition, planView, activityDefinition, activityView }
+export const ConversationTargets = { planWriteDefinition, planView, activityEventOf, activityDefinition, activityView }

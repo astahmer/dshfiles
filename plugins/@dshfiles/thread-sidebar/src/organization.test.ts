@@ -589,6 +589,13 @@ test('archive still refuses when anything other than a quota recovery is running
   assert.deepEqual(requests, [{ stopActivity: false }])
 })
 
+test('an archive refused for a Session the Host does not have reads as missing; other refusals do not', () => {
+  const refusal = (code: string) => Object.assign(new Error('workspace session archive failed'), { rpcError: { code, message: code } })
+  assert.equal(SidebarOrganization.isMissingSessionRefusal(refusal('session/not-found')), true)
+  assert.equal(SidebarOrganization.isMissingSessionRefusal(activeRefusal(['turn'])), false)
+  assert.equal(SidebarOrganization.isMissingSessionRefusal(new Error('Host unavailable')), false)
+})
+
 test('footer and icon-row overflow keep whole items and reserve the More control only when something overflows', () => {
   assert.deepEqual(SidebarOrganization.fitItems({ widths: [80, 120], available: 208, gap: 8, reserve: 36 }), [true, true])
   assert.deepEqual(SidebarOrganization.fitItems({ widths: [80, 120], available: 200, gap: 8, reserve: 36 }), [true, false])

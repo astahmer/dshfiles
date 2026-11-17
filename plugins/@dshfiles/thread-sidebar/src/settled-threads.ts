@@ -101,7 +101,19 @@ const unpinSettledThreads = async (input: {
   await Promise.all(input.sessionIds.filter(sessionId => input.pinnedSessionIds.has(sessionId)).map(input.unpin))
 }
 
+/**
+ * Settled ids that are archived now, so their settled status can go. While an auto-archive scan runs, each thread it
+ * archives would otherwise rewrite the whole settled status (every id and instant) once; waiting for the scan to end
+ * clears them all in one write.
+ */
+const archivedStillSettled = (input: {
+  readonly settledSessionIds: readonly string[]
+  readonly archivedSessionIds: ReadonlySet<string>
+  readonly autoArchiveRunning: boolean
+}): readonly string[] => (input.autoArchiveRunning ? [] : input.settledSessionIds.filter(sessionId => input.archivedSessionIds.has(sessionId)))
+
 export class SettledThreadsModel {
+  static readonly archivedStillSettled = archivedStillSettled
   static readonly settle = settle
   static readonly unpinSettledThreads = unpinSettledThreads
   static readonly settleAndUnpark = settleAndUnpark

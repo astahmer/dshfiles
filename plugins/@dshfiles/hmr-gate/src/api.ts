@@ -28,10 +28,14 @@ const hostReloadStatusSchema = Schema.Struct({
   ).check(Schema.isMaxLength(16)),
 })
 
+/** When the browser applies a plugin code update: see the README's "When updates apply". */
+export const applyUpdatesSchema = Schema.Literals(['auto', 'immediately', 'when-hidden-or-idle'])
+
 const hmrGateStatusSchema = Schema.Struct({
   deferred: Schema.Array(deferredPackageSchema).check(Schema.isMaxLength(64)),
   watched: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(4096)),
   hostReload: Schema.optional(hostReloadStatusSchema),
+  applyUpdates: Schema.optional(applyUpdatesSchema),
 })
 
 export type DeferredPackage = typeof deferredPackageSchema.Type

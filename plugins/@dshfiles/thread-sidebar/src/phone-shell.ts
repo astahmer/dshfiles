@@ -48,6 +48,9 @@ export const PendingPick = {
 /** A visual viewport this much shorter than the layout viewport means the software keyboard is open. */
 const KEYBOARD_THRESHOLD = 120
 
+/** A visual viewport move under one CSS pixel is the browser snapping to a device pixel, not a pan or a keyboard. */
+const VIEWPORT_JITTER = 1
+
 /** `@dshfiles/settings-shell`'s one Settings page (destination-shell opens it the same way). */
 export const SETTINGS_PANEL_ID = 'dshfiles-settings'
 
@@ -119,6 +122,9 @@ const editable = (element: Element | null): boolean =>
  * and a `dvh` frame stay full height behind it. While an editable element has focus and the visual viewport is
  * clearly shorter, publish `data-phone-keyboard` and `--dsh-keyboard-inset` on the document (the frame shrinks to sit
  * on the keyboard, the tab bar hides) and `--dsh-visual-offset-top` (the top bar follows a scrolled layout viewport).
+ * Sub-pixel moves are ignored: Android pans to a fractional offset, and republishing its rounding moves the fixed bars,
+ * the browser snaps the viewport back a fraction, and every `scroll` event restyled the whole page and resized the
+ * transcript mid-drag.
  */
 export const useSoftwareKeyboard = (): void => {
   useEffect(() => {
@@ -126,10 +132,20 @@ export const useSoftwareKeyboard = (): void => {
     if (viewport === null || viewport === undefined) return
     const root = document.documentElement
     let frame: number | null = null
+    let published: { readonly height: number; readonly offsetTop: number; readonly focused: boolean } | null = null
     const apply = (): void => {
       frame = null
+      const focused = editable(document.activeElement)
+      if (
+        published !== null &&
+        published.focused === focused &&
+        Math.abs(published.height - viewport.height) < VIEWPORT_JITTER &&
+        Math.abs(published.offsetTop - viewport.offsetTop) < VIEWPORT_JITTER
+      )
+        return
+      published = { height: viewport.height, offsetTop: viewport.offsetTop, focused }
       const inset = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop))
-      const open = inset > KEYBOARD_THRESHOLD && editable(document.activeElement)
+      const open = inset > KEYBOARD_THRESHOLD && focused
       root.toggleAttribute('data-phone-keyboard', open)
       if (open) root.style.setProperty('--dsh-keyboard-inset', `${inset}px`)
       else root.style.removeProperty('--dsh-keyboard-inset')

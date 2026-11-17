@@ -18,12 +18,12 @@ export class DraftAnnotations {
 
   snapshot = (): readonly DraftAnnotation[] => this.state.getSnapshot()
 
-  add = (input: { readonly text: string; readonly source: string }): void => {
+  add = (input: { readonly text: string; readonly source: string; readonly comment?: string }): void => {
     const text = input.text.trim()
     if (text === '') return
     const id = this.nextId
     this.nextId += 1
-    this.state.set([...this.state.getSnapshot(), { id, text, comment: '', source: input.source }])
+    this.state.set([...this.state.getSnapshot(), { id, text, comment: input.comment?.trim() ?? '', source: input.source }])
   }
 
   setComment = (input: { readonly id: number; readonly comment: string }): void => {

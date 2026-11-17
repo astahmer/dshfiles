@@ -19,6 +19,7 @@ import {
   ListTodoIcon,
   MessagesSquareIcon,
   PanelBottomOpenIcon,
+  PanelLeftIcon,
   PlusIcon,
   SettingsIcon,
   SearchIcon,
@@ -47,6 +48,7 @@ import { useEdgeSwipe } from './edge-swipe.js'
 import { runStackMotion } from './stack-motion.js'
 import { clearThreadUrl, pageLoadThreadRoute } from './thread-url.js'
 import { PhoneRailActions, RailActionGroup, type RailAction } from './rail-actions.js'
+import { PhoneDrawer } from './phone-drawer.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
 const ICONS = {
@@ -178,6 +180,8 @@ export interface DestinationShellProps {
   readonly togglePanels?: (() => void) | null
   /** A swipe in from the right edge, inside a thread, opens the thread panel (Settings › phoneEdgeSwipePanels). */
   readonly edgeSwipePanels?: boolean
+  /** Phone model (Settings › phoneNavigation): the tab-bar stack, or the thread list as a drawer over the thread. */
+  readonly phoneNavigation?: 'stack' | 'drawer'
   readonly toggleSidebar: () => void
   readonly record: (record: NavigationRecord) => void
   /** Sidebar folders (b:952m): the rail's folders and their verbs; absent, the rail lists the eight destinations. */
@@ -855,8 +859,18 @@ const PhoneNavigation = (
     readonly openEntryIn: (owner: RailFolder) => (entry: ResolvedEntry) => void
   },
 ): JSX.Element => {
-  const { toggleSidebar } = props
-  const listOpen = !props.collapsed
+  // Drawer mode: the list is a drawer over the stage, so "list open" means the drawer is open. That is this component's
+  // own state, not the frame's left column: flipping the column re-renders the frame and the whole sidebar (a 100-180ms
+  // task at 4x CPU throttle), which would stall the slide. The column stays collapsed; a frame reveal opens the drawer.
+  const drawer = props.phoneNavigation === 'drawer'
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const listOpen = drawer ? drawerOpen : !props.collapsed
+  const toggleDrawer = useRef((): void => setDrawerOpen(open => !open)).current
+  const toggleSidebar = drawer ? toggleDrawer : props.toggleSidebar
+  const drawerId = useId()
+  const sidebarButton = useRef<HTMLButtonElement>(null)
+  // The drawer's list mounts once (an edge touch, the button, a thread link, or idle time) and then stays, hidden.
+  const [drawerMounted, setDrawerMounted] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   // More's tree (b:952m): the folders whose rows are shown inline, by id.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
@@ -866,6 +880,15 @@ const PhoneNavigation = (
   listOpenRef.current = listOpen
   const stackMotionPending = useRef(false)
   const moveStack = (motion: 'push' | 'pop', open: boolean, before?: () => void): void => {
+    // The drawer slides itself; no View Transition of the whole page.
+    if (drawer) {
+      before?.()
+      if (listOpenRef.current !== open) {
+        listOpenRef.current = open
+        toggleSidebar()
+      }
+      return
+    }
     if (stackMotionPending.current) {
       before?.()
       return
@@ -906,12 +929,35 @@ const PhoneNavigation = (
   // resolving the link selects the thread, which pushes the stage like a tap.
   useLayoutEffect(() => {
     const linked = pageLoadThreadRoute.pending(window.location.href)
+    // The drawer's home is the stage: a page load starts with it closed, its list mounted hidden for a thread link.
+    if (drawer) {
+      if (!props.collapsed) props.toggleSidebar()
+      if (linked === null || linked === props.selectedThreadId) return
+      props.setDestination('threads')
+      setDrawerMounted(true)
+      return
+    }
     if (linked === null || linked === props.selectedThreadId) return
     if (props.destination.id !== 'threads') props.setDestination('threads')
     if (listOpenRef.current) return
     listOpenRef.current = true
     toggleSidebar()
   }, [])
+  // A frame reveal (Reset layout, a palette "Go to…", recovery) expands the column: in drawer mode that opens the drawer
+  // on the list it chose, and the column folds back. The page-load fold above is not a reveal.
+  const revealSeen = useRef(false)
+  const { collapsed, toggleSidebar: toggleColumn } = props
+  useEffect(() => {
+    if (!revealSeen.current) {
+      revealSeen.current = true
+      return
+    }
+    if (!drawer || collapsed) return
+    setDrawerMounted(true)
+    listOpenRef.current = true
+    setDrawerOpen(true)
+    toggleColumn()
+  }, [drawer, collapsed, toggleColumn])
   useSoftwareKeyboard()
   useStandaloneStatusBar()
   // Opening a thread or a page from the list pushes the stage: close the list.
@@ -953,7 +999,7 @@ const PhoneNavigation = (
     const alreadyShown = props.activePanelId === SETTINGS_PANEL_ID
     if (next === 'settings' && openSettingsPage()) {
       props.record({ destination: next, surface: 'tab-bar' })
-      if (alreadyShown && listOpen) props.toggleSidebar()
+      if (alreadyShown && listOpen) toggleSidebar()
       return
     }
     if (sole !== undefined) {
@@ -963,7 +1009,7 @@ const PhoneNavigation = (
       return
     }
     props.record({ destination: next, surface: 'tab-bar' })
-    if (!listOpen) props.toggleSidebar()
+    if (!listOpen) toggleSidebar()
   }
   const stageOwner = Destinations.owning(props.destinations, props.activePanelId)?.id
   /** The highlighted tab: with the list closed, an Inbox or Land page in the stage; with it open, the shown destination. */
@@ -981,16 +1027,16 @@ const PhoneNavigation = (
     if (tab === 'more') {
       if (current === 'more' && moreOpen) {
         setMoreOpen(false)
-        props.toggleSidebar()
+        toggleSidebar()
         return
       }
       setMoreOpen(true)
-      if (!listOpen) props.toggleSidebar()
+      if (!listOpen) toggleSidebar()
       return
     }
     // A second tap on the open tab goes back to the stage.
     if (current === tab) {
-      props.toggleSidebar()
+      toggleSidebar()
       return
     }
     open(tab)
@@ -1032,6 +1078,48 @@ const PhoneNavigation = (
     origin,
   }
   const bar = PhoneTopBarModel.resolve(stack)
+  // The drawer never covers the stage, so its top bar always names what the stage shows.
+  const stageBar = drawer ? PhoneTopBarModel.resolve({ ...stack, listOpen: false, moreOpen: false }) : bar
+  // Drawer mode keeps one Back: a thread opened from a page on the stage (an Inbox item's Open) returns to that page.
+  const pageBack = drawer && stageBar.back?.to === 'page' ? stageBar.back : null
+  const backToPage = (): void => {
+    if (pageBack === null) return
+    setOrigin(undefined)
+    props.selectPanel(pageBack.panelId)
+  }
+  const openDrawer = (): void => {
+    setDrawerMounted(true)
+    props.setDestination('threads')
+    setMoreOpen(false)
+    if (listOpenRef.current) return
+    listOpenRef.current = true
+    toggleSidebar()
+  }
+  const closeDrawer = (): void => {
+    if (!listOpenRef.current) return
+    listOpenRef.current = false
+    toggleSidebar()
+  }
+  // Inside the drawer, More and the lists opened from it go back towards Threads; Threads itself closes.
+  const drawerView: 'threads' | 'more' | 'list' = moreOpen ? 'more' : props.destination.id === 'threads' ? 'threads' : 'list'
+  const drawerBackTo = drawerView === 'list' && !TABBED_DESTINATIONS.includes(props.destination.id) ? 'more' : 'threads'
+  const drawerBack = (): void => {
+    if (drawerView === 'threads') {
+      closeDrawer()
+      return
+    }
+    props.setDestination('threads')
+    setMoreOpen(drawerBackTo === 'more' && drawerView === 'list')
+  }
+  useEffect(() => {
+    if (!drawer || drawerMounted) return
+    const idle = window.requestIdleCallback?.(() => setDrawerMounted(true), { timeout: 2000 })
+    const timer = idle === undefined ? window.setTimeout(() => setDrawerMounted(true), 1000) : undefined
+    return () => {
+      if (idle !== undefined) window.cancelIdleCallback(idle)
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [drawer, drawerMounted])
   // Back pops one level of the stack: the stage returns to the list it came from, a destination list to More.
   const back = (): void => {
     const target = bar.back
@@ -1055,18 +1143,24 @@ const PhoneNavigation = (
     })
   }
   // The iOS back swipe (T5.3): a left-edge swipe is Back wherever the bar offers one.
-  useEdgeSwipe({ side: 'left', enabled: bar.back !== null, onSwipe: back })
+  useEdgeSwipe({ side: 'left', enabled: !drawer && bar.back !== null, onSwipe: back })
   // Android's back gesture (and a browser Back) pops the same stack: each level is one history entry. A push drops the
   // thread from the entry it leaves below, so going back never switches to another thread through the URL route.
-  usePhoneHistoryLayer({ key: 'dshfilesPhoneStack', depth: PhoneTopBarModel.depth(stack), enabled: true, pop: back, baseUrl: clearThreadUrl })
+  // In drawer mode the open drawer is one level (two inside More or a list opened there): system Back closes it first.
+  const drawerDepth = (pageBack === null ? 0 : 1) + (listOpen ? (drawerView === 'threads' ? 1 : 2) : 0)
+  const depth = drawer ? drawerDepth : PhoneTopBarModel.depth(stack)
+  const drawerPop = (): void => (listOpen ? drawerBack() : backToPage())
+  usePhoneHistoryLayer({ key: 'dshfilesPhoneStack', depth, enabled: true, pop: drawer ? drawerPop : back, baseUrl: clearThreadUrl })
   // Inside a thread the stage owns the bottom edge (plan phone rules): no tab bar, Back returns to the list.
-  const inThread = !listOpen && bar.thread
+  const inThread = !listOpen && stageBar.thread
+  // The drawer holds every destination, so drawer mode has no tab bar at all.
+  const tabBar = !drawer && !inThread
   useLayoutEffect(() => {
     const root = document.documentElement
     root.toggleAttribute('data-phone-in-thread', inThread)
-    root.style.setProperty('--dsh-phone-nav-height', inThread ? PHONE_NAV_HIDDEN_HEIGHT : PHONE_NAV_HEIGHT)
+    root.style.setProperty('--dsh-phone-nav-height', tabBar ? PHONE_NAV_HEIGHT : PHONE_NAV_HIDDEN_HEIGHT)
     return () => root.removeAttribute('data-phone-in-thread')
-  }, [inThread])
+  }, [inThread, tabBar])
   const togglePanels = props.togglePanels ?? null
   // The thread panel from the right edge (opt-in); an open sheet is modal, so the swipe never closes it again.
   useEdgeSwipe({ side: 'right', enabled: inThread && props.edgeSwipePanels === true && togglePanels !== null, onSwipe: () => togglePanels?.() })
@@ -1078,21 +1172,199 @@ const PhoneNavigation = (
       if (listOpenRef.current) pushStage()
     })
   }
+  const listContent = moreOpen ? (
+    <nav aria-label="More destinations" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-y-auto dshx:px-2 dshx:pb-2">
+      <EntityList aria-label="More destinations">
+        {others.map(candidate => {
+          const shown = expanded.has(candidate.id)
+          const rowsId = `more-${candidate.id}`
+          const toggle = (): void =>
+            setExpanded(current => {
+              const next = new Set(current)
+              if (next.has(candidate.id)) next.delete(candidate.id)
+              else next.add(candidate.id)
+              return next
+            })
+          return (
+            <div key={candidate.id} role="listitem">
+              <div className="dshx:flex dshx:items-center">
+                <div className="dshx:min-w-0 dshx:flex-1">
+                  <EntityRow
+                    data-destination={candidate.id}
+                    leading={
+                      <span className="dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center dshx:text-muted-foreground">
+                        {folderIcon(props, candidate, false)}
+                      </span>
+                    }
+                    heading={candidate.label}
+                    description={candidate.description}
+                    trailing={candidate.builtIn ? <ChevronRightIcon className="dshx:size-4 dshx:text-muted-foreground" aria-hidden="true" /> : null}
+                    onSelect={() => (candidate.builtIn && isDestinationId(candidate.id) ? open(candidate.id) : toggle())}
+                  />
+                </div>
+                {candidate.entries.length === 0 ? null : (
+                  <button
+                    type="button"
+                    aria-label={`${shown ? 'Hide' : 'Show'} ${candidate.label} pages`}
+                    aria-expanded={shown}
+                    aria-controls={rowsId}
+                    data-more-expand={candidate.id}
+                    onClick={toggle}
+                    className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+                  >
+                    <ChevronDownIcon className={cn('dshx:size-4 dshx:transition-transform', shown && 'dshx:rotate-180')} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+              {shown ? (
+                <nav
+                  id={rowsId}
+                  aria-label={`${candidate.label} pages`}
+                  data-more-folder={candidate.id}
+                  className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:pb-1 dshx:pl-6"
+                >
+                  <EntryRows
+                    folder={candidate}
+                    entries={candidate.entries}
+                    activePanelId={props.activePanelId}
+                    openEntry={entry => {
+                      if (entry.kind !== 'page') {
+                        // A thread facet opens in the thread panel's sheet; the list closes over the stage.
+                        props.openEntryIn(candidate)(entry)
+                        setMoreOpen(false)
+                        pushStage()
+                        return
+                      }
+                      props.openEntryIn(candidate)(entry)
+                    }}
+                    renderPanelIcon={props.renderPanelIcon}
+                    folderUi={undefined}
+                    descriptions={false}
+                  />
+                </nav>
+              ) : null}
+            </div>
+          )
+        })}
+      </EntityList>
+      <PhoneRailActions actions={props.railActions ?? NO_RAIL_ACTIONS} />
+    </nav>
+  ) : (
+    <ListPane
+      {...props}
+      phone
+      folder={phoneFolder}
+      openEntry={entry => (entry.kind === 'page' ? props.openSection(entry.viewId, 'index') : props.openEntryIn(phoneFolder)(entry))}
+    />
+  )
+  // The drawer's own header: close (or back inside More), the view's name and New thread; Threads lists the other
+  // destinations above the threads, since drawer mode has no tab bar.
+  const drawerLinks = (['inbox', 'land'] as const).flatMap(id => {
+    const target = props.destinations.find(candidate => candidate.id === id)
+    return target === undefined ? [] : [target]
+  })
+  const drawerButtonClass =
+    'dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent'
+  const drawerRowClass =
+    'dshx:flex dshx:h-11 dshx:w-full dshx:items-center dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:text-left dshx:text-sm dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent'
+  const drawerElement = (
+    <PhoneDrawer
+      id={drawerId}
+      label={drawerView === 'more' ? 'More' : props.destination.label}
+      open={listOpen}
+      onOpenChange={next => (next ? openDrawer() : closeDrawer())}
+      swipeToOpen={!listOpen}
+      onPrepare={() => setDrawerMounted(true)}
+      restoreFocus={() => sidebarButton.current?.focus({ preventScroll: true })}
+    >
+      <header data-phone-drawer-header="" className="dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:px-1">
+        {drawerView === 'threads' ? (
+          <button type="button" data-phone-drawer-close="" aria-label="Hide threads" onClick={closeDrawer} className={drawerButtonClass}>
+            <PanelLeftIcon className="dshx:size-5" aria-hidden="true" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            data-phone-drawer-back=""
+            aria-label={`Back to ${drawerBackTo === 'more' ? 'More' : 'Threads'}`}
+            onClick={drawerBack}
+            className={drawerButtonClass}
+          >
+            <ChevronLeftIcon className="dshx:size-5" aria-hidden="true" />
+          </button>
+        )}
+        <h2 className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:leading-tight dshx:font-semibold">
+          {drawerView === 'more' ? 'More' : props.destination.label}
+        </h2>
+        {drawerView === 'threads' ? (
+          <button type="button" data-phone-new="" aria-label="New thread" onClick={startThread} className={cn(drawerButtonClass, 'dshx:text-foreground')}>
+            <PlusIcon className="dshx:size-5" strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        ) : null}
+      </header>
+      {drawerView === 'threads' ? (
+        <nav aria-label="Destinations" data-phone-drawer-destinations="" className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:px-2 dshx:pb-2">
+          {drawerLinks.map(target => (
+            <button key={target.id} type="button" data-phone-drawer-destination={target.id} onClick={() => open(target.id)} className={drawerRowClass}>
+              <span className="dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
+                {destinationIcon(props, target, false, 20)}
+              </span>
+              {target.label}
+            </button>
+          ))}
+          <button type="button" data-phone-drawer-destination="more" onClick={() => setMoreOpen(true)} className={drawerRowClass}>
+            <span className="dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
+              <EllipsisIcon className="dshx:size-5" strokeWidth={1.5} />
+            </span>
+            More
+          </button>
+        </nav>
+      ) : null}
+      <div data-phone-list="" onClick={closeAfterPick} className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
+        {drawerMounted || listOpen ? listContent : null}
+      </div>
+    </PhoneDrawer>
+  )
   return createPortal(
     <div className="dshx-root">
       <header
         data-phone-top-bar=""
-        data-phone-stage={listOpen ? undefined : bar.thread ? 'thread' : (props.activePanelId ?? 'none')}
+        data-phone-stage={listOpen && !drawer ? undefined : stageBar.thread ? 'thread' : (props.activePanelId ?? 'none')}
         className={cn(
           'dshx:fixed dshx:inset-x-0 dshx:top-0 dshx:z-[41] dshx:flex dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-end dshx:border-b dshx:border-border dshx:bg-background dshx:pt-[env(safe-area-inset-top,0px)] dshx:pl-[max(4px,env(safe-area-inset-left,0px))] dshx:text-foreground',
           // A thread on the stage puts its Changes pill and one `⋯` menu (rich-composer, T1.4/T3.2) in the trailing
           // corner, publishing that bar's width; the status strip is a pill above the tab bar (frame-layout, T1.6).
-          bar.thread && !listOpen ? 'dshx:pr-[calc(var(--dsh-phone-bar-width,44px)+4px)]' : 'dshx:pr-1',
+          stageBar.thread && (drawer || !listOpen) ? 'dshx:pr-[calc(var(--dsh-phone-bar-width,44px)+4px)]' : 'dshx:pr-1',
         )}
         style={{ height: PHONE_TOP_HEIGHT }}
       >
         <div className="dshx:flex dshx:h-11 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-0.5">
-          {bar.back === null ? null : (
+          {pageBack === null ? null : (
+            <button
+              type="button"
+              data-phone-back=""
+              aria-label={`Back to ${pageBack.label}`}
+              onClick={backToPage}
+              className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+            >
+              <ChevronLeftIcon className="dshx:size-5" aria-hidden="true" />
+            </button>
+          )}
+          {drawer ? (
+            <button
+              ref={sidebarButton}
+              type="button"
+              data-phone-sidebar=""
+              aria-label="Show threads"
+              aria-haspopup="dialog"
+              aria-expanded={listOpen}
+              aria-controls={drawerId}
+              onClick={openDrawer}
+              className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+            >
+              <PanelLeftIcon className="dshx:size-5" aria-hidden="true" />
+            </button>
+          ) : bar.back === null ? null : (
             <button
               type="button"
               data-phone-back=""
@@ -1107,11 +1379,14 @@ const PhoneNavigation = (
           )}
           <h1
             data-phone-title=""
-            className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:leading-tight dshx:font-semibold', bar.back === null && 'dshx:pl-2.5')}
+            className={cn(
+              'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:leading-tight dshx:font-semibold',
+              !drawer && bar.back === null && 'dshx:pl-2.5',
+            )}
           >
-            {bar.title}
+            {stageBar.title}
           </h1>
-          {showNew ? (
+          {showNew && !drawer ? (
             <button
               type="button"
               data-phone-new=""
@@ -1122,7 +1397,7 @@ const PhoneNavigation = (
               <PlusIcon className="dshx:size-5" strokeWidth={1.75} aria-hidden="true" />
             </button>
           ) : null}
-          {bar.thread && togglePanels !== null ? (
+          {stageBar.thread && togglePanels !== null ? (
             <button
               type="button"
               data-phone-panels=""
@@ -1135,101 +1410,17 @@ const PhoneNavigation = (
           ) : null}
         </div>
       </header>
-      {listOpen ? (
+      {listOpen && !drawer ? (
         <div
           data-phone-list=""
           onClick={closeAfterPick}
           className="dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-2 dshx:text-foreground"
           style={{ top: PHONE_TOP_HEIGHT, bottom: PHONE_NAV_HEIGHT }}
         >
-          {moreOpen ? (
-            <nav aria-label="More destinations" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-y-auto dshx:px-2 dshx:pb-2">
-              <EntityList aria-label="More destinations">
-                {others.map(candidate => {
-                  const shown = expanded.has(candidate.id)
-                  const rowsId = `more-${candidate.id}`
-                  const toggle = (): void =>
-                    setExpanded(current => {
-                      const next = new Set(current)
-                      if (next.has(candidate.id)) next.delete(candidate.id)
-                      else next.add(candidate.id)
-                      return next
-                    })
-                  return (
-                    <div key={candidate.id} role="listitem">
-                      <div className="dshx:flex dshx:items-center">
-                        <div className="dshx:min-w-0 dshx:flex-1">
-                          <EntityRow
-                            data-destination={candidate.id}
-                            leading={
-                              <span className="dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center dshx:text-muted-foreground">
-                                {folderIcon(props, candidate, false)}
-                              </span>
-                            }
-                            heading={candidate.label}
-                            description={candidate.description}
-                            trailing={candidate.builtIn ? <ChevronRightIcon className="dshx:size-4 dshx:text-muted-foreground" aria-hidden="true" /> : null}
-                            onSelect={() => (candidate.builtIn && isDestinationId(candidate.id) ? open(candidate.id) : toggle())}
-                          />
-                        </div>
-                        {candidate.entries.length === 0 ? null : (
-                          <button
-                            type="button"
-                            aria-label={`${shown ? 'Hide' : 'Show'} ${candidate.label} pages`}
-                            aria-expanded={shown}
-                            aria-controls={rowsId}
-                            data-more-expand={candidate.id}
-                            onClick={toggle}
-                            className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
-                          >
-                            <ChevronDownIcon className={cn('dshx:size-4 dshx:transition-transform', shown && 'dshx:rotate-180')} aria-hidden="true" />
-                          </button>
-                        )}
-                      </div>
-                      {shown ? (
-                        <nav
-                          id={rowsId}
-                          aria-label={`${candidate.label} pages`}
-                          data-more-folder={candidate.id}
-                          className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:pb-1 dshx:pl-6"
-                        >
-                          <EntryRows
-                            folder={candidate}
-                            entries={candidate.entries}
-                            activePanelId={props.activePanelId}
-                            openEntry={entry => {
-                              if (entry.kind !== 'page') {
-                                // A thread facet opens in the thread panel's sheet; the list closes over the stage.
-                                props.openEntryIn(candidate)(entry)
-                                setMoreOpen(false)
-                                pushStage()
-                                return
-                              }
-                              props.openEntryIn(candidate)(entry)
-                            }}
-                            renderPanelIcon={props.renderPanelIcon}
-                            folderUi={undefined}
-                            descriptions={false}
-                          />
-                        </nav>
-                      ) : null}
-                    </div>
-                  )
-                })}
-              </EntityList>
-              <PhoneRailActions actions={props.railActions ?? NO_RAIL_ACTIONS} />
-            </nav>
-          ) : (
-            <ListPane
-              {...props}
-              phone
-              folder={phoneFolder}
-              openEntry={entry => (entry.kind === 'page' ? props.openSection(entry.viewId, 'index') : props.openEntryIn(phoneFolder)(entry))}
-            />
-          )}
+          {listContent}
         </div>
       ) : null}
-      {inThread ? null : (
+      {tabBar ? (
         <nav
           aria-label="Destinations"
           data-phone-tab-bar=""
@@ -1255,7 +1446,8 @@ const PhoneNavigation = (
             </button>
           ))}
         </nav>
-      )}
+      ) : null}
+      {drawer ? drawerElement : null}
     </div>,
     document.body,
   )

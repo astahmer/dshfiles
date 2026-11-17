@@ -38,6 +38,7 @@ describe('auto-archive machine', () => {
       archiveSession: async sessionId => {
         started.push(sessionId)
         if (sessionId === 'fails') throw new Error('Host unavailable')
+        return 'archived'
       },
     }
     const { actor, settled } = startFlow(client)
@@ -46,7 +47,21 @@ describe('auto-archive machine', () => {
     await vi.waitFor(() => expect(settled).toHaveLength(1))
 
     expect(started).toEqual(['first', 'fails', 'last'])
-    expect(settled).toEqual([{ type: 'settled', operationId: 1, failedSessionIds: ['fails'] }])
+    expect(settled).toEqual([{ type: 'settled', operationId: 1, failedSessionIds: ['fails'], missingSessionIds: [] }])
+    actor.stop()
+  })
+
+  it('reports a Session the Host no longer has as missing, not as a failure to retry', async () => {
+    const client: AutoArchiveClient = {
+      getCandidateSessionIds: () => sessionIds('kept', 'gone'),
+      archiveSession: async sessionId => (sessionId === 'gone' ? 'missing' : 'archived'),
+    }
+    const { actor, settled } = startFlow(client)
+    actor.send({ type: 'scan', source: 'all' })
+
+    await vi.waitFor(() => expect(settled).toHaveLength(1))
+
+    expect(settled).toEqual([{ type: 'settled', operationId: 1, failedSessionIds: [], missingSessionIds: ['gone'] }])
     actor.stop()
   })
 
@@ -64,6 +79,7 @@ describe('auto-archive machine', () => {
         maximumActiveCalls = Math.max(maximumActiveCalls, activeCalls)
         try {
           if (sessionId === 'first') await firstArchive.promise
+          return 'archived'
         } finally {
           activeCalls -= 1
         }
@@ -83,7 +99,7 @@ describe('auto-archive machine', () => {
     await vi.waitFor(() => expect(settled).toHaveLength(1))
 
     expect(maximumActiveCalls).toBe(1)
-    expect(settled).toEqual([{ type: 'settled', operationId: 2, failedSessionIds: [] }])
+    expect(settled).toEqual([{ type: 'settled', operationId: 2, failedSessionIds: [], missingSessionIds: [] }])
     actor.stop()
   })
 
@@ -104,6 +120,7 @@ describe('auto-archive machine', () => {
           await firstArchive.promise
           throw new Error('Host unavailable')
         }
+        return 'archived'
       },
     }
     const { actor, settled } = startFlow(client)
@@ -116,8 +133,8 @@ describe('auto-archive machine', () => {
     await vi.waitFor(() => expect(settled).toHaveLength(2))
 
     expect(settled).toEqual([
-      { type: 'settled', operationId: 1, failedSessionIds: ['regular-first'] },
-      { type: 'settled', operationId: 2, failedSessionIds: [] },
+      { type: 'settled', operationId: 1, failedSessionIds: ['regular-first'], missingSessionIds: [] },
+      { type: 'settled', operationId: 2, failedSessionIds: [], missingSessionIds: [] },
     ])
     actor.stop()
   })
@@ -130,6 +147,7 @@ describe('auto-archive machine', () => {
       archiveSession: async sessionId => {
         started.push(sessionId)
         if (sessionId === 'first') await firstArchive.promise
+        return 'archived'
       },
     }
     const { actor, settled } = startFlow(client)
@@ -153,6 +171,7 @@ describe('auto-archive machine', () => {
       archiveSession: async sessionId => {
         started.push(sessionId)
         if (sessionId === 'first') await firstArchive.promise
+        return 'archived'
       },
     }
     const { actor, settled } = startFlow(client)
@@ -174,6 +193,7 @@ describe('auto-archive machine', () => {
       archiveSession: async sessionId => {
         started.push(sessionId)
         if (started.length === 1) throw new Error('Host unavailable')
+        return 'archived'
       },
     }
     const { actor, settled } = startFlow(client, 250)

@@ -20,6 +20,12 @@ Feature: Chat browser journeys
     When a real thread with one hundred eighty transcript turns is opened
     Then each upward wheel step moves the rows under the reader by the wheel distance
 
+  @scenario:chat.windowed-transcript-touch
+  Scenario: On a phone, dragging a long transcript down pages its older rows
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted
+    When a real thread with one hundred eighty transcript turns is opened on a phone
+    Then dragging the transcript down with a finger reaches its first turn
+
   @scenario:chat.find-in-thread
   Scenario: Find in thread reaches a turn the window never mounted and steps through every match
     Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller, @dshfiles/session-search, @dshfiles/shortcuts" is booted with a one hundred eighty turn transcript

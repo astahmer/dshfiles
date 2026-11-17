@@ -72,7 +72,12 @@ export function TodoPanel({ todos, t }: TodoPanelProps) {
       <ComposerRow
         icon={<IconChecklistOutlineRegular />}
         label={t('todo.title')}
-        meta={progressLabel(todos, t)}
+        meta={
+          <>
+            <span className={css.metaFull}>{progressLabel(todos, t)}</span>
+            <span className={css.metaShort}>{`${todos.filter(item => item.status === 'completed').length}/${todos.length}`}</span>
+          </>
+        }
         actions={
           <span className={css.chevron} aria-hidden>
             {collapsed ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}

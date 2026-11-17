@@ -38,6 +38,7 @@ import { resolveSubmitMode } from '../input/submission-policy.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { parsePastedComposerText } from '../../paste-references.ts'
 import { LargePasteModel } from '../../large-paste.ts'
+import { SendWhenUploaded, settleHeldSend, uploadGate, type HeldDraft, type HeldSend, type UploadGate } from '../../held-send.ts'
 import { isImageMediaType, withCanonicalImageType } from '../canonical-image-type.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { AnnotationsPill } from './AnnotationsPill.tsx'
@@ -62,6 +63,22 @@ const FRESH_DRAFT_WAIT_MS = 15_000
 const MOD = typeof navigator !== 'undefined' && /mac|iphone|ipad/iu.test(navigator.userAgent) ? '⌘' : 'Ctrl+'
 
 const COMPOSER_ALERT_MS = 5000
+
+const heldProgressText = (gate: UploadGate): string => {
+  if (gate.kind !== 'uploading') return ''
+  return gate.fraction === undefined ? `${gate.ready}/${gate.total}` : `${Math.round(gate.fraction * 100)}%`
+}
+
+/** The held send's glyph: a ring that fills as the uploads progress. */
+const HeldGlyph = ({ fraction }: { readonly fraction: number | undefined }) => (
+  <svg className={fraction === undefined ? css.sendingSpinner : undefined} viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+    <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
+    {fraction === undefined
+      ? <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      : <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" pathLength={100} strokeDasharray={`${Math.max(4, fraction * 100)} 100`} transform="rotate(-90 8 8)" />}
+    <rect x="6" y="6" width="4" height="4" rx="1" fill="currentColor" />
+  </svg>
+)
 
 /** A composer warning in the line above the card; it leaves after a few seconds or on a tap. */
 const ComposerAlert = ({ text, onDone }: { readonly text: string; readonly onDone: () => void }) => {
@@ -170,18 +187,16 @@ export const InputBar = memo(function InputBar({
     () => input === undefined || resolveDraftAttachments === undefined ? [] : resolveDraftAttachments(input.attachmentIds),
     [resolveDraftAttachments, input?.attachmentIds],
   )
-  const annotationCount = useSyncExternalStore(
+  const annotations = useSyncExternalStore(
     keyboard?.annotations.subscribe ?? noSubscription,
-    () => keyboard?.annotations.snapshot().length ?? 0,
+    () => keyboard?.annotations.snapshot(),
   )
+  const annotationCount = annotations?.length ?? 0
   const empty = draft.trim() === '' && attachments.length === 0 && annotationCount === 0
+  const annotationsKey = useMemo(() => JSON.stringify(annotations ?? []), [annotations])
   const uploads = useFileUploads(snapshot => snapshot)
-  // Send waits for every picked file and every uploading image: uploading and
-  // failed drafts both hold the gate (a failed upload is retried or removed,
-  // never silently dropped). An image draft without an upload sends inline.
-  const uploadsPending = attachments.some(attachment => attachment.kind === 'file'
-    ? uploads[attachment.id]?.status !== 'ready'
-    : uploads[attachment.id] !== undefined && uploads[attachment.id]?.status !== 'ready')
+  const gateState = useMemo(() => uploadGate({ attachments, uploads }), [attachments, uploads])
+  const uploadsPending = gateState.kind !== 'clear'
   // Transient error banner (machine notices, image-intake rejections, and
   // prompt failures): the seq keys the Toast so an identical repeated message
   // restarts the hold-then-fade cycle instead of reusing the faded one.
@@ -451,15 +466,52 @@ export const InputBar = memo(function InputBar({
   }, [draft, machineBusy])
   const draftPage = variant === 'hero'
 
+  // Send pressed while uploads run waits for them and then goes out by itself, in the mode it was pressed for; an edit
+  // to what it would send, a failed upload or a press on the waiting Send drops it.
+  const sendWhenUploaded = useSyncExternalStore(SendWhenUploaded.subscribe, SendWhenUploaded.get)
+  const [heldSend, setHeldSend] = useState<HeldSend | null>(null)
+  useEffect(() => { setHeldSend(null) }, [sessionId])
+  const currentDraft = useMemo<HeldDraft>(() => ({
+    draft,
+    attachmentIds: input?.attachmentIds ?? [],
+    annotations: annotationsKey,
+    mode: planActive === true ? 'plan' : 'act',
+  }), [draft, input?.attachmentIds, annotationsKey, planActive])
+  const holdSend = useCallback((request: Omit<HeldSend, 'held'>): void => {
+    if (!sendWhenUploaded || gateState.kind === 'failed') {
+      showToast(uploadsHeldText)
+      return
+    }
+    setHeldSend({ held: currentDraft, ...request })
+  }, [sendWhenUploaded, gateState.kind, showToast, uploadsHeldText, currentDraft])
+  const cancelHeldSend = useCallback((): void => { setHeldSend(null) }, [])
+  useEffect(() => {
+    if (heldSend === null) return
+    const outcome = settleHeldSend({
+      pending: heldSend,
+      current: currentDraft,
+      gate: gateState,
+      canSubmit: keyboard !== undefined && !disabled && !machineBusy,
+    })
+    if (outcome.kind === 'wait') return
+    setHeldSend(null)
+    if (outcome.kind === 'cancel') {
+      if (outcome.reason === 'failed') showToast(uploadsHeldText)
+      return
+    }
+    keyboard?.submit(outcome.mode, outcome.source)
+    if (outcome.freshDraft) requestFreshDraft()
+  }, [heldSend, currentDraft, gateState, keyboard, disabled, machineBusy, showToast, uploadsHeldText, requestFreshDraft])
+
   // The keymap handlers read live bar state through this ref so the editor
   // registration survives re-renders without re-arming per keystroke.
   const gate = useRef({
     locked, machineBusy, canSteerQueue, running, steeringAvailable, busyEnter,
-    intakeFiles, pasteText, uploadsPending, uploadsHeldText, showToast, canAcceptDrop, promptHistory, replaceDraft, draftPage, requestFreshDraft,
+    intakeFiles, pasteText, uploadsPending, holdSend, canAcceptDrop, promptHistory, replaceDraft, draftPage, requestFreshDraft,
   })
   gate.current = {
     locked, machineBusy, canSteerQueue, running, steeringAvailable, busyEnter,
-    intakeFiles, pasteText, uploadsPending, uploadsHeldText, showToast, canAcceptDrop, promptHistory, replaceDraft, draftPage, requestFreshDraft,
+    intakeFiles, pasteText, uploadsPending, holdSend, canAcceptDrop, promptHistory, replaceDraft, draftPage, requestFreshDraft,
   }
 
   useEffect(() => {
@@ -557,11 +609,13 @@ export const InputBar = memo(function InputBar({
   const plainMessageDraft = !empty && input?.phase === 'plain' && !draft.trimStart().startsWith('/')
   // Visual refresh T3.3: one round button whose glyph says what a click does now — send, queue behind the running
   // turn, steer into it, or stop; upstream adds the Host-acceptance wait and continuing a retryable failure.
-  const sendMode: 'stop' | 'sending' | 'continue' | 'steer' | 'queue' | 'send' = primaryStops
+  const sendMode: 'stop' | 'sending' | 'held' | 'continue' | 'steer' | 'queue' | 'send' = primaryStops
     ? 'stop'
     : sending
       ? 'sending'
-      : primaryRetries
+      : heldSend !== null
+        ? 'held'
+        : primaryRetries
         ? 'continue'
         : running && steeringAvailable && !disabled && !uploadsPending && plainMessageDraft
           ? primarySubmitMode === 'steer' ? 'steer' : 'queue'
@@ -569,6 +623,7 @@ export const InputBar = memo(function InputBar({
   const primaryLabel = {
     stop: t('input.stop'),
     sending: t('input.sending'),
+    held: t('input.send.heldAria'),
     continue: t('input.continue'),
     steer: t('input.send.steer'),
     queue: t('input.send.queue'),
@@ -581,7 +636,7 @@ export const InputBar = memo(function InputBar({
     : running && steeringAvailable
       ? primarySubmitMode === 'steer' ? t('input.send.queue') : t('input.send.steer')
       : t('input.send.whileRunning')
-  const sendTooltip = sendMode === 'stop' || sendMode === 'sending' || sendMode === 'continue'
+  const sendTooltip = sendMode === 'stop' || sendMode === 'sending' || sendMode === 'held' || sendMode === 'continue'
     ? primaryLabel
     : `${primaryLabel} ↵ · ${acceleratedLabel} ${MOD}↵ · ${t('input.send.newThread')} ${MOD}⌥↵`
   const onPrimary = (): void => {
@@ -593,10 +648,13 @@ export const InputBar = memo(function InputBar({
       retry(retryableFailure)
       return
     }
+    if (heldSend !== null) {
+      cancelHeldSend()
+      return
+    }
     if (keyboard === undefined) return // absent machine: the button is disabled
-    // A held send says why instead of sitting disabled: a tap on a phone has no tooltip to read.
     if (uploadsPending) {
-      showToast(uploadsHeldText)
+      holdSend({ mode: primarySubmitMode, source: 'click', freshDraft: false })
       return
     }
     /* v8 ignore next -- defensive: the primary button is disabled for empty and disabled states. */
@@ -664,6 +722,14 @@ export const InputBar = memo(function InputBar({
           anchor={cardRef.current}
           onDone={dismissToast}
         />
+      )}
+      {heldSend !== null && (
+        <div className={clsx(css.notice, css.largePaste, css.heldSend)} role="status" data-held-send="">
+          <span>{t('input.send.held', { progress: heldProgressText(gateState) })}</span>
+          <button type="button" className={css.largePasteAction} onMouseDown={keepFocus} onClick={cancelHeldSend}>
+            {t('input.send.heldCancel')}
+          </button>
+        </div>
       )}
       {notice?.level === 'info' && (
         <div className={css.notice} role="status">
@@ -829,6 +895,8 @@ export const InputBar = memo(function InputBar({
                       <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
                       <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
+                  ) : sendMode === 'held' ? (
+                    <HeldGlyph fraction={gateState.kind === 'uploading' ? gateState.fraction : undefined} />
                   ) : sendMode === 'continue' ? (
                     <IconTriangleRightFillRegular size={16} className={css.continueIcon} />
                   ) : <SendGlyph key={sendMode} mode={sendMode} />}

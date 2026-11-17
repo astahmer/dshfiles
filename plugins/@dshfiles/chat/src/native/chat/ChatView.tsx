@@ -37,6 +37,7 @@ import { SinceYouLeftRecapModel } from './since-you-left.ts'
 import { SinceYouLeftCard, SinceYouLeftContext, type SinceYouLeftPlacement } from './SinceYouLeftCard.tsx'
 import { useTextInteraction } from './text-interaction.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
+import { OlderRowsSentinel } from './older-rows-sentinel.tsx'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
 import { ImagePreviewRequestModel, type ImagePreview } from '../../image-preview-request.ts'
 import { FileOpenRequestModel, type FileOpenRequest } from '../../file-open-request.ts'
@@ -377,6 +378,9 @@ export function ChatView({
   const interactionSurfaceRef = useRef<HTMLDivElement>(null)
   const interactionIds = useInteractionIds(ids => ids)
   const textInteraction = useTextInteraction(scroll.columnRef, interactionSurfaceRef, dispatchInteraction, interactionIds)
+  // dshfiles: on touch Annotate joins the shown selection action (Quote text) in its row instead of floating apart.
+  const [interactionSurface, setInteractionSurface] = useState<HTMLDivElement | null>(null)
+  useLayoutEffect(() => { setInteractionSurface(interactionSurfaceRef.current) }, [])
   const flowContext = useMemo<ChatFlowHookContext>(() => ({ motion: scroll.motion }), [scroll.motion])
 
   // dshfiles (productivity pass Q4): long-thread tools — find, the typed turn map, the Turns sheet, Since you left.
@@ -557,7 +561,8 @@ export function ChatView({
 
   return (
     <div ref={frameRef} className={css.frame}>
-      <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t} />
+      <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t}
+        actionRow={textInteraction.active?.trigger === 'selection' ? interactionSurface : null} />
       {scroll.initialized && (
         <TurnNavigator
           items={shownRailItems}
@@ -608,7 +613,7 @@ export function ChatView({
               </div>
             )}
             {transcript.hasMore && scroll.initialized && !loadingOlder && (
-              <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} onVisible={scroll.loadEarlier} fillSteps={fillSteps} />
+              <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} firstSeq={firstSeq} onVisible={scroll.loadEarlier} fillSteps={fillSteps} />
             )}
             {transcript.hasMore && loadingOlder && <div className={css.older}>{t('loading')}</div>}
             <MarkdownDelegateProvider
@@ -670,76 +675,6 @@ export function ChatView({
       )}
     </div>
   )
-}
-
-/**
- * Mounts the next older rows, or asks the Host for the next older page, once the reader nears the top. It unmounts
- * while a page loads, so a page that still leaves it in view observes it again and takes the next one.
- */
-function OlderRowsSentinel({ listRef, hidden, onVisible, fillSteps }: {
-  listRef: { readonly current: HTMLDivElement | null }
-  hidden: number
-  onVisible: () => void
-  /** Steps left that may widen a view the rows do not fill yet, without the reader scrolling. */
-  fillSteps: { current: number }
-}) {
-  const ref = useRef<HTMLDivElement>(null)
-  // Observed again after every step: a step that still leaves the sentinel in view must take the next one.
-  useEffect(() => {
-    const target = ref.current
-    const list = listRef.current
-    if (target === null || list === null || typeof IntersectionObserver !== 'function') return
-    let near = false
-    let fired = false
-    let upward = false
-    // First read in an observer callback, where layout is current; reading at mount would force the new rows' layout.
-    let lastTop: number | null = null
-    // A thread opens at its newest row, and collapsed Turns are a few pixels tall, so the top is often within reach
-    // there; widening only once the reader leaves the tail, or a few steps while the rows do not fill the view, keeps
-    // an open from paging in the whole history.
-    const take = (): void => {
-      if (fired || !near) return
-      const fillsView = list.scrollHeight > list.clientHeight + 1
-      const atTail = list.scrollHeight - list.scrollTop - list.clientHeight < 48
-      if (atTail && !upward && (fillsView || fillSteps.current <= 0)) return
-      if (atTail && !upward) fillSteps.current -= 1
-      fired = true
-      onVisible()
-    }
-    const observer = new IntersectionObserver((records) => {
-      near = records.some(record => record.isIntersecting)
-      lastTop ??= list.scrollTop
-      take()
-    }, { root: list, rootMargin: '1200px 0px 0px 0px' })
-    // Reading upward also counts when the rows cannot scroll yet: a wheel or key toward older rows.
-    const onScroll = (): void => {
-      const top = list.scrollTop
-      if (lastTop !== null && top < lastTop) upward = true
-      lastTop = top
-      take()
-    }
-    const onWheel = (event: WheelEvent): void => {
-      if (event.deltaY >= 0) return
-      upward = true
-      take()
-    }
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'PageUp' && event.key !== 'ArrowUp' && event.key !== 'Home') return
-      upward = true
-      take()
-    }
-    observer.observe(target)
-    list.addEventListener('scroll', onScroll, { passive: true })
-    list.addEventListener('wheel', onWheel, { passive: true })
-    list.addEventListener('keydown', onKey)
-    return () => {
-      observer.disconnect()
-      list.removeEventListener('scroll', onScroll)
-      list.removeEventListener('wheel', onWheel)
-      list.removeEventListener('keydown', onKey)
-    }
-  }, [listRef, hidden, onVisible])
-  return <div ref={ref} aria-hidden="true" data-chat-older-rows="" />
 }
 
 /** In-page Host open-path refusal: the wire reason plus a retry of the same path. */

@@ -992,6 +992,52 @@ button.crumbEditable {
   }
 }
 
+/* Phone: the dock entries above the composer (To-dos, working subagents, running jobs, ...) share one wrapping row
+   instead of a stack of full-width cards. A closed disclosure shrinks to a chip; an open one, or an entry without a
+   disclosure (a list such as the queue), takes the whole width. Each owner keeps its own row and toggle; desktop keeps
+   the stack. */
+@media (max-width: 639.98px) {
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) {
+    /* The slot outlet carries an inline display: contents. */
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--dsh-composer-stack-gap);
+    /* Flush with the composer card, so two chips fit on one line. */
+    padding-inline: var(--dsh-composer-side-clearance, 0px);
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']:empty) {
+    display: none !important;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > * {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    margin-inline: 0;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :is(:global(:has([aria-expanded='true'])), :global(:not(:has([aria-expanded])))) {
+    flex-basis: 100%;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) :global([data-slot='composer-row'][data-variant='card']) {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: 0;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) :global(:not([data-expanded]) > div > button > [data-slot='composer-row-meta']) {
+    white-space: nowrap;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) :global([data-slot='composer-row-label']) {
+    max-width: none;
+  }
+}
+
 /* Phone pickers as bottom sheets (visual refresh T3.5). The composer's pickers belong to their owners (kit Dialog,
    Radix popovers, the native menu); while one of them is open from the composer card on the phone shell, its layer
    presents as a 16px-radius sheet on the bottom edge with a grabber, the only shadowed layer besides the composer.

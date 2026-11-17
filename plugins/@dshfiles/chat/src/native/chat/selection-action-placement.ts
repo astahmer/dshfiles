@@ -59,12 +59,10 @@ export interface AnnotatePlacement {
   readonly side: 'above' | 'below'
 }
 
-const overlaps = (a: Box, b: Box): boolean => a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom
-
 /**
- * Where the Annotate button floats: centred above the selection on desktop, under its end on touch, where it steps
- * past the Quote action (`avoid`) that touch also puts there: below it, or above it when the viewport has no room.
- * @param input - the selection's bounds, the bounds of its last line, the window width, the visual viewport, the input kind, the button's width and the touch Quote action's bounds.
+ * Where the Annotate button floats when it is the only selection action: centred above the selection on desktop,
+ * under its end on touch. Beside a shown Quote action on touch it sits in that action's row instead.
+ * @param input - the selection's bounds, the bounds of its last line, the window width, the visual viewport, the input kind and the button's width.
  * @returns the button's anchor point and which side of the selection it takes.
  */
 export const annotatePlacement = (input: {
@@ -74,7 +72,6 @@ export const annotatePlacement = (input: {
   readonly viewport: Viewport
   readonly touch: boolean
   readonly buttonWidth: number
-  readonly avoid?: Box | undefined
 }): AnnotatePlacement => {
   if (!input.touch) {
     const centre = (input.selection.left + input.selection.right) / 2
@@ -83,11 +80,5 @@ export const annotatePlacement = (input: {
   const viewport = input.viewport
   const bounds = { left: viewport.offsetLeft, top: viewport.offsetTop, right: viewport.offsetLeft + viewport.width, bottom: viewport.offsetTop + viewport.height }
   const placed = touchActionPlacement({ end: input.end, width: input.buttonWidth, height: TOUCH_TARGET_PX, bounds })
-  const left = placed.left + input.buttonWidth / 2
-  const avoid = input.avoid
-  const box = (top: number): Box => ({ left: placed.left, top, right: placed.left + input.buttonWidth, bottom: top + TOUCH_TARGET_PX })
-  if (avoid === undefined || !overlaps(box(placed.top), avoid)) return { left, top: placed.top, side: 'below' }
-  const under = avoid.bottom + TOUCH_MARGIN_PX
-  const top = under + TOUCH_TARGET_PX <= bounds.bottom - TOUCH_MARGIN_PX ? under : avoid.top - TOUCH_MARGIN_PX - TOUCH_TARGET_PX
-  return { left, top, side: 'below' }
+  return { left: placed.left + input.buttonWidth / 2, top: placed.top, side: 'below' }
 }

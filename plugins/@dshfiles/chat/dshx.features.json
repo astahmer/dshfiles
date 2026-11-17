@@ -84,7 +84,8 @@
       "states": ["thread-opened", "latest-rows-visible", "older-rows-mounted"],
       "failureModes": [
         "A navigation or find target outside the mounted rows widens the window before it scrolls.",
-        "Rows the reader scrolls past must not snap back when older rows mount: a paging anchor armed mid-gesture yields to the reader's scroll."
+        "Rows the reader scrolls past must not snap back when older rows mount: a paging anchor armed mid-gesture yields to the reader's scroll.",
+        "Inside a shared conversation scrollport the older-rows trigger measures and listens to that scrollport, not the list it holds; otherwise a phone open spends its fill steps on a full view and a finger at the top never pages older rows."
       ],
       "externalDependencies": [],
       "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or threads\""],
@@ -103,6 +104,11 @@
         {
           "kind": "gherkin",
           "id": "chat.windowed-transcript-steady-scroll",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.windowed-transcript-touch",
           "featureFile": "tooling/dshx/e2e/features/chat.feature"
         }
       ],
