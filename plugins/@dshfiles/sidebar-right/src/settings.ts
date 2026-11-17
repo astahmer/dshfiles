@@ -12,5 +12,10 @@ export const sidebarRightSettings = defineSettings({
       .description(
         'Threads besides the one on screen whose side-panel tabs stay loaded: kept-mounted bodies (editor, Workbench), resource pins and their live Session. Older threads reload them when shown again. 0 keeps every visited thread loaded.',
       ),
+    restoreSidebarState: Schema.boolean()
+      .default(true)
+      .description(
+        'Restore the sidebar panel state (open/closed) when switching threads. Each thread remembers whether its sidebar was expanded.',
+      ),
   }),
 })

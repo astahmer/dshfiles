@@ -138,6 +138,8 @@ it('preserves genuine resource occurrences, pins and native floating layout whil
 it('reveals explicit resource open/reopen/focus and terminal intents, but not passive restored stores', () => {
   const dock = dockPane()
   const owner = sidebar({ workbench: () => true, dock: () => dock })
+  // Disable restore to test explicit-only reveals
+  owner.setRestoreSidebarState(false)
   // SAFETY: stable fixture identity is the persistence scope of both genuine store instances.
   const sessionId = 'restored-resource-session' as SessionId
   const handle = createSidebarRightStore(() => ({ kind: 'guide', title: 'Start' }))
@@ -182,6 +184,8 @@ it('reveals explicit resource open/reopen/focus and terminal intents, but not pa
 it('admits exact independent terminal records before publication without revealing the right pane', () => {
   const dock = dockPane()
   const owner = sidebar({ workbench: () => true, dock: () => dock })
+  // Disable restore to test publication-only reveals
+  owner.setRestoreSidebarState(false)
   // SAFETY: stable identities name the real adopted Session stores below.
   const sessionId = 'workbench-terminal-session' as SessionId
   const otherSession = 'other-terminal-session' as SessionId
@@ -293,6 +297,66 @@ it('routes the actual registered keyboard command globally and resolves replacem
   workbench = false
   expect(() => resolved.run()).not.toThrow()
   expect(command.resolve(keyContext).status).toBe('blocked')
+})
+
+it('restores sidebar expanded state from session layout when switching threads', () => {
+  const dock = dockPane()
+  const owner = sidebar({ workbench: () => true, dock: () => dock })
+  const handle = createSidebarRightStore(() => ({ kind: 'guide', title: 'Start' }))
+  // SAFETY: stable fixture identities name the real stores adopted below.
+  const expandedSession = 'expanded-session' as SessionId
+  const collapsedSession = 'collapsed-session' as SessionId
+  // Create and adopt stores for two sessions
+  const expandedStore = handle.create(expandedSession)
+  const collapsedStore = handle.create(collapsedSession)
+  releases.push(owner.adopt(expandedSession, expandedStore))
+  releases.push(owner.adopt(collapsedSession, collapsedStore))
+  // Expand the first session's sidebar
+  owner.show(expandedSession)
+  expandedStore.actions.setExpanded(expandedSession, true)
+  expect(expandedStore.getSnapshot().bySession[expandedSession]?.layout.expanded).toBe(true)
+  // Collapse the second session's sidebar
+  owner.show(collapsedSession)
+  collapsedStore.actions.setExpanded(collapsedSession, false)
+  expect(collapsedStore.getSnapshot().bySession[collapsedSession]?.layout.expanded).toBe(false)
+  // Set dock to closed initially
+  dock.close()
+  expect(dock.isOpen()).toBe(false)
+  // Switch to expanded session - dock should open
+  owner.show(expandedSession)
+  expect(dock.isOpen()).toBe(true)
+  // Switch to collapsed session - dock should close
+  owner.show(collapsedSession)
+  expect(dock.isOpen()).toBe(false)
+  // Switch back to expanded session - dock should open again
+  owner.show(expandedSession)
+  expect(dock.isOpen()).toBe(true)
+})
+
+it('respects restoreSidebarState setting when switching threads', () => {
+  const dock = dockPane()
+  const owner = sidebar({ workbench: () => true, dock: () => dock })
+  const handle = createSidebarRightStore(() => ({ kind: 'guide', title: 'Start' }))
+  // SAFETY: stable fixture identity names the real store adopted below.
+  const sessionId = 'restore-setting-session' as SessionId
+  const store = handle.create(sessionId)
+  releases.push(owner.adopt(sessionId, store))
+  // Expand the session's sidebar
+  owner.show(sessionId)
+  store.actions.setExpanded(sessionId, true)
+  expect(store.getSnapshot().bySession[sessionId]?.layout.expanded).toBe(true)
+  // Switch away and back
+  owner.show(undefined)
+  dock.close()
+  // Disable restoreSidebarState and switch back - dock should remain closed
+  owner.setRestoreSidebarState(false)
+  owner.show(sessionId)
+  expect(dock.isOpen()).toBe(false)
+  // Switch away, enable restoreSidebarState, and switch back - dock should open
+  owner.show(undefined)
+  owner.setRestoreSidebarState(true)
+  owner.show(sessionId)
+  expect(dock.isOpen()).toBe(true)
 })
 
 it('retains the original native service and keyboard behavior when no Workbench contract is installed', () => {

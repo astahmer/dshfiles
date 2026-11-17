@@ -24,6 +24,12 @@
           "defaultValue": "4",
           "constraints": "Integer 0 to 50; how many threads besides the one on screen keep their side-panel tabs loaded. 0 keeps every visited thread loaded. Applies live.",
           "coveredBy": ["sidebar-right.resident-window-default", "sidebar-right.resident-window-views"]
+        },
+        {
+          "key": "restoreSidebarState",
+          "defaultValue": "true",
+          "constraints": "Boolean; whether to restore the sidebar panel state (open/closed) when switching threads. Applies live.",
+          "coveredBy": ["sidebar-right.restore-state-on-switch", "sidebar-right.restore-state-setting"]
         }
       ],
       "states": [
@@ -112,6 +118,18 @@
           "id": "sidebar-right.resident-window-views",
           "file": "plugins/@dshfiles/sidebar-right/src/resident-window.test.ts",
           "testName": "keeps kept-mounted views only for the resident window, and every one at 0"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.restore-state-on-switch",
+          "file": "plugins/@dshfiles/sidebar-right/src/workbench-dock.test.ts",
+          "testName": "restores sidebar expanded state from session layout when switching threads"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.restore-state-setting",
+          "file": "plugins/@dshfiles/sidebar-right/src/workbench-dock.test.ts",
+          "testName": "respects restoreSidebarState setting when switching threads"
         }
       ],
       "telemetry": [

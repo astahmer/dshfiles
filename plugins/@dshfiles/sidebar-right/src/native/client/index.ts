@@ -115,7 +115,7 @@ export function apply(ctx: ClientContext): void {
   // hands them its width as owner props, and every seat reports the same rule.
   let autoFullscreen = false
   let mintStore: ((sessionId: SessionId) => void) | undefined
-  const { controller, adopt, forget, show, resident, setResidentThreads, measure } = createSidebarRightController(
+  const { controller, adopt, forget, show, resident, setResidentThreads, setRestoreSidebarState, measure } = createSidebarRightController(
     tabs,
     (address, signal) => {
       ctx.resources.pin(address, signal)
@@ -160,7 +160,9 @@ export function apply(ctx: ClientContext): void {
     residentViews()
     const settings = observeSettings(ctx, sidebarRightSettings)
     const applySettings = (): void => {
-      setResidentThreads(settings.getSnapshot()?.residentThreads ?? DEFAULT_RESIDENT_THREADS)
+      const snapshot = settings.getSnapshot()
+      setResidentThreads(snapshot?.residentThreads ?? DEFAULT_RESIDENT_THREADS)
+      setRestoreSidebarState(snapshot?.restoreSidebarState ?? true)
     }
     const unsubscribeSettings = settings.subscribe(applySettings)
     applySettings()
