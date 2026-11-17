@@ -5,7 +5,8 @@
     {
       "id": "component-gallery-page",
       "title": "Browse every shared component on one page",
-      "summary": "A main panel that renders every @dshfiles/plugin-ui component live, animated ones included, in one tab per category, with a filter over titles and import paths, a per-card and page-wide Replay, and a reduced-motion indicator.",
+      "summary": "Browse every shared UI component live on one page, filtered by name.",
+      "details": "A main panel that renders every @dshfiles/plugin-ui component live, animated ones included, in one tab per category, with a filter over titles and import paths, a per-card and page-wide Replay, and a reduced-motion indicator.",
       "reach": ["click tab \"Settings\"", "click button \"Component gallery\"", "expect heading \"Components\""],
       "surfaces": ["client"],
       "surface": "destinationSection",

@@ -5,7 +5,8 @@
     {
       "id": "bounded-compaction",
       "title": "Bounded compaction summaries",
-      "summary": "Summarizes oversized conversation history in bounded, tool-balanced requests before the native durable compaction transaction commits. A request the provider still rejects as too large is retried with older tool outputs and exchanges shortened (the newest exchange intact) before it is split.",
+      "summary": "Long histories are summarized in pieces small enough for the model to accept.",
+      "details": "Summarizes oversized conversation history in bounded, tool-balanced requests before the native durable compaction transaction commits. A request the provider still rejects as too large is retried with older tool outputs and exchanges shortened (the newest exchange intact) before it is split.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -60,7 +61,8 @@
     {
       "id": "background-summary",
       "title": "Background compaction summaries",
-      "summary": "Opt-in: once a thread nears its compaction threshold, the engine summarizes the span the next compaction would replace beside the running turn, then commits it instantly at the threshold if that span is unchanged. Off by default: a summary the conversation moves past is a billed request thrown away.",
+      "summary": "Off by default: a thread near its limit prepares its summary in the background so compaction is instant.",
+      "details": "Opt-in: once a thread nears its compaction threshold, the engine summarizes the span the next compaction would replace beside the running turn, then commits it instantly at the threshold if that span is unchanged. Off by default: a summary the conversation moves past is a billed request thrown away.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -122,7 +124,8 @@
     {
       "id": "loaded-skills",
       "title": "Loaded skills kept in compaction checkpoints",
-      "summary": "Opt-in: each checkpoint lists the skills the span it replaces loaded (and, in bodies mode, keeps their instructions), so a long thread does not reload a skill only because a compaction dropped it. Off by default: the kept block adds tokens to every later request.",
+      "summary": "Off by default: compaction keeps the skills a thread loaded, so it does not load them again.",
+      "details": "Opt-in: each checkpoint lists the skills the span it replaces loaded (and, in bodies mode, keeps their instructions), so a long thread does not reload a skill only because a compaction dropped it. Off by default: the kept block adds tokens to every later request.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -165,7 +168,8 @@
     {
       "id": "overflow-recognition",
       "title": "Provider context-overflow recognition",
-      "summary": "Recognizes context-overflow failures the core does not code as CONTEXT_WINDOW_EXCEEDED (Anthropic, Gemini, Bedrock, llama.cpp, xAI, Moonshot, Copilot, GLM, Cohere wording, along the cause chain) and gives them the stock recovery: one overflow compaction, then a retry. Also ignores a compaction headroom buffer that would leave the model no pressure budget.",
+      "summary": "A context overflow from any provider triggers one compaction and a retry.",
+      "details": "Recognizes context-overflow failures the core does not code as CONTEXT_WINDOW_EXCEEDED (Anthropic, Gemini, Bedrock, llama.cpp, xAI, Moonshot, Copilot, GLM, Cohere wording, along the cause chain) and gives them the stock recovery: one overflow compaction, then a retry. Also ignores a compaction headroom buffer that would leave the model no pressure budget.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -212,7 +216,8 @@
     {
       "id": "idle-compaction",
       "title": "Idle compaction before cache expiry",
-      "summary": "An opt-in Host timer compacts a large thread that has sat idle for most of its prompt-cache lifetime, so the next message does not re-send the whole prompt uncached. It only trusts activity this Host observed itself, attempts once per idle stretch and never after expiry. Off by default: each compaction is one billed request.",
+      "summary": "Off by default: a large idle thread compacts before its prompt cache expires.",
+      "details": "An opt-in Host timer compacts a large thread that has sat idle for most of its prompt-cache lifetime, so the next message does not re-send the whole prompt uncached. It only trusts activity this Host observed itself, attempts once per idle stretch and never after expiry. Off by default: each compaction is one billed request.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -314,7 +319,8 @@
     {
       "id": "compaction-threshold",
       "title": "Next automatic compaction for a thread",
-      "summary": "The threshold API (agent tool compaction_threshold) returns the token count at which automatic compaction next runs for one live thread: the running engine's policy, the thread's routed model and context window, its output reservation, and the engine's own pressure reading. A headroom buffer that leaves no pressure budget is ignored, as the engine ignores it. agent-plan shows it beside the composer's context meter.",
+      "summary": "The agent can ask how many tokens remain before a thread compacts.",
+      "details": "The threshold API (agent tool compaction_threshold) returns the token count at which automatic compaction next runs for one live thread: the running engine's policy, the thread's routed model and context window, its output reservation, and the engine's own pressure reading. A headroom buffer that leaves no pressure budget is ignored, as the engine ignores it. agent-plan shows it beside the composer's context meter.",
       "surfaces": ["host", "api", "tool"],
       "surface": "infrastructure",
       "destination": "none",
