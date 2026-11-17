@@ -110,3 +110,11 @@ test('solid-status-fill: a solid info, success or warning fill outside the kit',
   assert.deepEqual(ruleHits('solid-status-fill', line), ['dshx:bg-success', 'dshx:hover:bg-warning'])
   assert.deepEqual(ruleHits('solid-status-fill', line, 'plugins/@dshfiles/plugin-ui/src/components/ui/badge.tsx'), [])
 })
+
+test('palette-colour: numbered Tailwind palette classes, not semantic colours or kit hues', () => {
+  assert.deepEqual(ruleHits('palette-colour', "cn('dshx:bg-emerald-500 dshx:dark:text-red-400/80 dshx:border-l-amber-300 dshx:bg-teal dshx:text-violet dshx:bg-muted dshx:text-info')"), [
+    'dshx:bg-emerald-500',
+    'dshx:dark:text-red-400/80',
+    'dshx:border-l-amber-300',
+  ])
+})
