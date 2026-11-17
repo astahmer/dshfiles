@@ -90,8 +90,8 @@ From the onboarding feature catalog: 61 features, the 54 curated ones first.
 2. **Backlog work in the Activity timeline** (`backlog`) — Backlog changes show up in the activity feed alongside thread events.
 3. **File a thread capture under its project** (`backlog`) — An item captured from a thread's workspace is filed under that workspace's project.
 4. **Agents confirm bulk and destructive backlog writes** (`backlog`) — Agents must confirm before they revert, delete or change many items at once.
-5. **Sync backlog items with a Jira Cloud project** (`backlog-jira`) — Serves the backlog's backlog-provider Host API as the jira kind: a connection (site base URL, account email, API token reference) names the Atlassian account and discovers the projects it can browse; a binding to a project pulls issues changed since an updated checkpoint through…
-6. **Sync backlog items with a Notion data source** (`backlog-notion`) — Serves the backlog's backlog-provider Host API as the notion kind: a connection names the integration's bot and discovers the data sources it can see; a binding to a data source (or a database with one data source) pulls pages changed since a last_edited_time checkpoint in pages…
+5. **Sync backlog items with a Jira Cloud project** (`backlog-jira`) — Sync backlog items with a Jira Cloud project, both ways, through a remote sync connection.
+6. **Sync backlog items with a Notion data source** (`backlog-notion`) — Sync backlog items with a Notion database, both ways, through a remote sync connection.
 7. **Accept admitted continued-form answers as direct goal authority** (`goal-tool`) — The native goal-tool fork recognizes only an answered root-turn reply whose call id the user-question projection settled with a valid answer batch.
 
 ## Enable it

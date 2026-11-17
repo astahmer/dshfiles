@@ -174,7 +174,7 @@ rail destination (default); 35 features.
 | thread-transfer/thread-export: Export a thread to a portable .dshthread bundle | rowAction | thread row menu: Export… (also command palette: Export this thread…) |
 | multi-host/logical-project-grouping: Group remote threads under matching local projects | rowDecorator | thread-list: remote threads under their local project |
 | thread-sidebar/thread-subscriptions: Opt-in completion notices between threads | rowDecorator | threads: row context menu → Notify when finished |
-| cordis-cards/inventory-read-once: Cordis panel and cards read the inventory once per connection | statusItem | sidebar: Cordis panel in the row under the list (Sidebar settings › Show the row under the list), and Cordis tool cards in the transcript |
+| cordis-cards/inventory-read-once: Plugin panel loads its list once | statusItem | sidebar: Cordis panel in the row under the list (Sidebar settings › Show the row under the list), and Cordis tool cards in the transcript |
 
 ### Inbox
 
@@ -430,7 +430,7 @@ facets of the active thread; 32 features.
 | agent-toolkit/thread-context-facet: See what a thread loads into its context | threadFacet | thread panel: Context tab |
 | annotations/preview-file: Annotate an HTML preview | threadFacet | dialog: annotate an HTML preview |
 | background-jobs/thread-jobs-facet: Jobs tab in the thread panel | threadFacet | workbench: Choose a view › Thread panels › Jobs |
-| btw/btw-side-chat: /btw side chat | threadFacet | right-pane: btw tab |
+| btw/btw-side-chat: Side chat with /btw | threadFacet | right-pane: btw tab |
 | diff-viewed/review-file-markers: Mark review files as viewed | threadFacet | right-pane: native review tab › Viewed |
 | diffs-review/ai-scope-summaries: Summarize review scopes with the thread's own model | threadFacet | left-nav: Review › Summarize |
 | diffs-review/batch-reviewed-marks: Mark a selection of changed files reviewed | threadFacet | left-nav: Review › reviewed marks |
@@ -476,7 +476,7 @@ run row, chips, `/` and `@` sources; 70 features.
 | annotations/chrome-picker: Pick on any page in a DSH-owned Chrome | composerContribution | composer: ⋯ › Point at UI… › DSH-owned Chrome |
 | annotations/pick-element: Pick an element and add it to the draft | composerContribution | composer: ⋯ › Point at UI… (/annotate); a count chip while annotations are open |
 | backlog/backlog-mentions: Mention backlog items with @ | composerContribution | composer: @b: mentions |
-| btw/btw-command-chip: Persisted /btw command chip | composerContribution | composer: /btw chip |
+| btw/btw-command-chip: Keep a /btw draft after a reload | composerContribution | composer: /btw chip |
 | input-trigger/codex-at-tokens: Codex-style @ token targeting | composerContribution | composer: @ menu |
 | input-trigger/command-chip-restore: Restore a persisted command chip | composerContribution | composer: command chips |
 | input-trigger/command-slash-entries: Slash entries for dshx commands | composerContribution | composer: / menu |
@@ -555,7 +555,7 @@ cards inline in the active thread; 42 features.
 | chat/find-in-thread: Find text anywhere in a long thread | transcriptCard | transcript: find bar over the thread |
 | chat/folded-work: A finished turn folds its work under one Worked for row | transcriptCard | transcript: turn process row |
 | chat/image-links: Open image links in the gallery | transcriptCard | transcript: image links |
-| chat/resume-interrupted: Resume the latest stopped task | transcriptCard | transcript: Resume beside a stopped task |
+| chat/resume-interrupted: Resume the latest stopped turn | transcriptCard | transcript: Resume beside a stopped task |
 | chat/retry-failed-turn: Retry a turn that failed before any reply | transcriptCard | transcript: Retry beside a failed turn |
 | chat/route-change-markers: Mark where the model or effort changed | transcriptCard | transcript: route-change row |
 | chat/run-folds: Runs of background jobs and subagents fold into one summary row | transcriptCard | transcript: summary row in place of the first row of the run |
@@ -623,7 +623,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | btw/btw-side-question-entry-points: Open a side question from the palette, a shortcut or the composer | command | palette: Ask a side question (btw) |
 | command-palette/ask-dsh: Ask DSH from an empty palette | command | palette: Ask DSH |
 | command-palette/command-effective-keys: Commands show the keys they answer to | command | palette: Commands › keys |
-| command-palette/contributed-commands: List commands other plugins contribute through dshx | command | palette: Commands |
+| command-palette/contributed-commands: List commands from every plugin | command | palette: Commands |
 | command-palette/palette-prefix-routing: Route prefixed searches to the right content | command | palette: prefixes |
 | command-palette/palette-search: Search threads and workspace files | command | palette: Threads / Files search |
 | frame-layout/zen-mode: Zen mode: only the thread and its composer | command | palette: Zen mode |
@@ -668,11 +668,11 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | context-compaction/idle-compaction: Idle compaction before cache expiry | infrastructure | host: timer, no UI |
 | context-compaction/loaded-skills: Loaded skills kept in compaction checkpoints | infrastructure | host: appended to the checkpoint summary, no UI |
 | context-compaction/overflow-recognition: Provider context-overflow recognition | infrastructure | host: agent request-error listener, no UI |
-| cordis-client-runner/inspect-manifest-once: Publish the Client inspect manifest once per connection | infrastructure | client: dynamic Cordis package runner (no UI) |
-| credential-port/secret-credential-port: One Host service port for credentials kept in a secrets catalog | infrastructure | host: library |
-| dialogs/app-dialogs: App dialogs for every plugin | infrastructure | dialog: app confirm, alert and toast primitives |
-| dialogs/app-toasts: App toasts for every plugin | infrastructure | toast: app toast stack |
-| diff-viewed/host-owned-view-state: Retain viewed marks on the Host | infrastructure | host: diff_viewed storage |
+| cordis-client-runner/inspect-manifest-once: Publish the page's plugin list once | infrastructure | client: dynamic Cordis package runner (no UI) |
+| credential-port/secret-credential-port: One way to read credentials from a secrets catalog | infrastructure | host: library |
+| dialogs/app-dialogs: Dialogs for every plugin | infrastructure | dialog: app confirm, alert and toast primitives |
+| dialogs/app-toasts: Toasts for every plugin | infrastructure | toast: app toast stack |
+| diff-viewed/host-owned-view-state: Keep viewed marks across browsers | infrastructure | host: diff_viewed storage |
 | diff-viewed/revision-range-marks: One viewed-marks store for turns and revision ranges | infrastructure | host: diff_viewed storage |
 | diffs-review/review-marks-migration: Move the Review page's marks into the one viewed-marks store | infrastructure | host: diffs-review reviewed record |
 | editor/session-screen-contract: Session screen and workspace files for other plugins | infrastructure | client: SessionScreen contract |

@@ -1,6 +1,6 @@
 # @dshfiles/dialogs
 
-![App dialogs for every plugin](docs/screenshots/app-dialogs.png)
+![Dialogs for every plugin](docs/screenshots/app-dialogs.png)
 
 The app's own confirm, alert, prompt and select dialogs, and its toasts, for every plugin. It provides the dshx
 `Dialogs` and `Toasts` contracts from `@dshfiles/dshx/client`, so any plugin's `api.dialogs.confirm(...)` or
