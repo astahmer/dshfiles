@@ -11,7 +11,7 @@ export const backlogSettings = defineSettings({
     jevEnabled: Schema.boolean()
       .default(false)
       .description(
-        "Ask TypeSafe's Jev whether an item is work to do and whether it repeats an open item. Needs the Jev key in Settings › Tools & MCP › Jev, or TYPESAFE_API_KEY in the Host environment.",
+        "Ask TypeSafe's Jev whether an item is work to do and whether it repeats an open item. Needs the Jev key in Settings › Tools & MCP › Jev, or TYPESAFE_API_KEY in DSH’s environment.",
       ),
     // Moved to the one shared key in Settings › Tools & MCP › Jev (settings-shell). Kept, hidden, as the fallback while
     // the shared key is empty, so moving it loses nothing and clearing the shared key restores this value.
@@ -138,17 +138,17 @@ export const backlogSettings = defineSettings({
     )
       .default([])
       .hidden()
-      .description('Multi-host runtimes whose backlog this Host pulls. Turn them on in Backlog settings › Hosts.'),
+      .description('Other hosts whose backlog this host pulls. Turn them on in Backlog settings › Hosts.'),
     peerPullSeconds: Schema.natural()
       .min(10)
       .max(3_600)
       .default(60)
-      .description('How often each enabled peer Host is asked for backlog changes. Hosts that are offline are skipped and caught up later.'),
+      .description('How often each enabled host is asked for backlog changes. Offline hosts catch up later.'),
     automationHost: Schema.string()
       .default('')
       .hidden()
       .description(
-        'The backlog Host that runs gate checks and main polling when Hosts share the backlog. Empty: this Host. Pick it in Backlog settings › Hosts.',
+        'The host that runs checks when hosts share the backlog. Empty: this host. Pick it in Backlog settings › Hosts.',
       ),
     publishActivity: Schema.boolean()
       .default(true)
@@ -163,7 +163,7 @@ export const backlogSettings = defineSettings({
           .role('secret-ref')
           .default('')
           .description(
-            'Secret Catalog reference to a Linear personal API key or a GitHub token, as secret:ALIAS. Empty uses LINEAR_API_KEY or GITHUB_TOKEN from the Host environment.',
+            'Secret Catalog reference to a Linear personal API key or a GitHub token, as secret:ALIAS. Empty uses LINEAR_API_KEY or GITHUB_TOKEN from DSH’s environment.',
           ),
         autoSyncMinutes: Schema.natural()
           .max(1_440)

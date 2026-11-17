@@ -64,7 +64,7 @@ import { BacklogQueries } from './use-backlog-actions.js'
 
 const SYNC_STATUS_KEY = [BacklogQueries.key, 'sync-status'] as const
 const ALL_PROJECTS = 'all-projects'
-const HOST_RESTART = 'This DSH Host predates connections and bindings. Restart the DSH Host process to load them.'
+const HOST_RESTART = 'Restart DSH to load connections and bindings.'
 
 const stateLabels = { synced: 'Synced', pending: 'Changes to sync', conflict: 'Conflict', error: 'Sync error' } as const satisfies Record<SyncState, string>
 const stateTones = {
@@ -75,8 +75,8 @@ const stateTones = {
 } as const satisfies Record<SyncState, string>
 const credentialLabels = {
   reference: 'vault key',
-  environment: 'Host environment',
-  fallback: 'Host environment or CLI login',
+  environment: 'DSH environment',
+  fallback: 'DSH environment or CLI sign-in',
   none: 'no key needed',
   missing: 'no key',
   cli: 'CLI login',
@@ -350,8 +350,8 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
 
 /** What signing a provider in looks like on the Host, shown next to a create that could not reach its tracker. */
 const signInHintOf = (providerKind: string): { readonly text: string; readonly command?: string } | undefined => {
-  if (providerKind === 'github') return { text: 'Sign the gh CLI in on the Host, or set GITHUB_TOKEN for the Host.', command: 'gh auth login' }
-  if (providerKind === 'linear') return { text: 'Set LINEAR_API_KEY for the Host, or save a secret:ALIAS reference in Remote sync.' }
+  if (providerKind === 'github') return { text: 'Sign in with the gh CLI on this host, or set GITHUB_TOKEN for DSH.', command: 'gh auth login' }
+  if (providerKind === 'linear') return { text: 'Set LINEAR_API_KEY for DSH, or save a secret:ALIAS reference in Remote sync.' }
   return undefined
 }
 
@@ -744,7 +744,7 @@ const ConnectionForm = (props: {
       </div>
       {isReferenceOrEmpty(credential) ? null : (
         <p role="alert" className="dshx:text-xs dshx:text-destructive">
-          Keys are stored as vault references. Pick one with the key button in the field, or clear it to use the Host environment.
+          Keys are stored as vault references. Pick one with the key button in the field, or clear it to use DSH’s environment.
         </p>
       )}
       {testedDraft ? <TestReport report={test.data} error={test.error} /> : null}
@@ -1035,7 +1035,7 @@ const BindingRow = (props: {
       <span className="dshx:text-muted-foreground">{directionLabels[binding.direction]}</span>
       <span className="dshx:text-muted-foreground">{pollLabel(binding.pollEverySec)}</span>
       <span className="dshx:text-muted-foreground">{String(props.view.linked)} linked</span>
-      {props.view.owned ? null : <span className="dshx:text-warning">Runs on another Host</span>}
+      {props.view.owned ? null : <span className="dshx:text-warning">Runs on another host</span>}
       <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
         <Button
           type="button"

@@ -120,7 +120,7 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
         )}
         {preview.isError || switching.isError ? (
           <p role="alert" className="dshx:text-sm dshx:text-destructive">
-            {errorMessage(switching.error ?? preview.error, 'Account switching is unavailable. The Host may need updating; no new request was started.')}
+            {errorMessage(switching.error ?? preview.error, 'Account not switched and no request was sent. Update DSH and restart it, then retry.')}
           </p>
         ) : null}
         <DialogFooter>

@@ -159,8 +159,7 @@ const BacklogSettingsPanel = (): JSX.Element => {
         <div className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm">
           <span className="dshx:font-medium">TypeSafe API key</span>
           <span className="dshx:text-xs dshx:text-muted-foreground">
-            One key serves Backlog triage and Memory. Set it in Settings › Tools & MCP › Jev; without it, TYPESAFE_API_KEY from the DSH Host environment is
-            used.
+            One key serves Backlog triage and Memory. Set it in Settings › Tools & MCP › Jev. Without it, DSH uses TYPESAFE_API_KEY from its environment.
           </span>
           <Button type="button" variant="outline" size="sm" className="dshx:self-start" onClick={openJevKeySettings}>
             <KeyRoundIcon aria-hidden /> Open Jev settings
@@ -211,7 +210,7 @@ export const BacklogPanel = (props: {
   const backfillError =
     backfillStartError ??
     (backfill.error === null ? null : errorMessage(backfill.error, 'Could not read backfill progress.')) ??
-    (backfillJobId !== null && backfill.isSuccess && backfill.data === null ? 'This backfill is no longer available in this Host process.' : null)
+    (backfillJobId !== null && backfill.isSuccess && backfill.data === null ? 'This backfill ended when DSH restarted. Start it again.' : null)
   const scopeKey = useWorkbenchScopeKey()
   const preferences = useMemo(() => panelPreferences(props.panelId, scopeKey), [props.panelId, scopeKey])
   const stored = preferences.useValue()
