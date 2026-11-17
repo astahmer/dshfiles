@@ -19,12 +19,12 @@ test('plugin-name prefixes in template literals count by a title-form head, not 
   const strings = extractStrings('const a = `MCP Servers: ${translate(key)}`\nconst b = `mcp-servers: ${count} reloaded`')
   assert.deepEqual(
     strings.map(entry => entry.raw ?? entry.text),
-    ['MCP Servers: ${}', 'mcp-servers: ${} reloaded'],
+    ['MCP Servers: ${translate(key)}', 'mcp-servers: ${count} reloaded'],
   )
   const findings = findingsInStrings({ file: 'plugins/@dshfiles/mcp-servers/src/client.tsx', prefix, strings })
   assert.deepEqual(
     findings.map(finding => `${finding.term}:${finding.text}`),
-    ['plugin-prefix:MCP Servers: ${}'],
+    ['plugin-prefix:MCP Servers: ${translate(key)}'],
   )
 })
 
@@ -221,5 +221,23 @@ test('package-name: a package name in a sentence, not an import specifier or a c
       'Open Backlog to add a task',
     ]),
     ['@dshfiles/backlog is not installed. Enable it in Plugins.', 'Install @deepseek-ai/dsh 0.2.2 or later'],
+  )
+})
+
+test('raw-error-echo: a message that ends by echoing an error, not a labelled value', () => {
+  const source = [
+    'const a = `Could not save: ${error instanceof Error ? error.message : String(error)}`',
+    'const b = `Failed: ${err}.`',
+    "const c = 'Could not load the backlog: {message}'",
+    'const d = `Thread: ${title}`',
+    'const e = `Could not save: ${error.message}. Retry, or check the disk.`',
+    'const f = `${label}: ${message}`',
+    'const g = `failed:${snapshot.error}`',
+    "const h = 'Next: {message}'",
+  ].join('\n')
+  const findings = findingsInStrings({ file: 'plugins/@dshfiles/demo/src/a.tsx', prefix, strings: extractStrings(source) })
+  assert.deepEqual(
+    findings.filter(finding => finding.term === 'raw-error-echo').map(finding => finding.line),
+    [1, 2, 3],
   )
 })
