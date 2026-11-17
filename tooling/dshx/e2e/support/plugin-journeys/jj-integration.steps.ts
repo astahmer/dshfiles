@@ -746,7 +746,7 @@ When('a message is sent in the thread workspace', async ({ page }: { page: Page 
     await expect(composer).toContainText('jj integration rebase e2e thread', { timeout: 1_000 })
   }).toPass({ timeout: 20_000 })
   await composer.press('Enter')
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
+  await expect(page.getByRole('navigation', { name: 'Thread hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
 })
 
 Then('the current thread header identifies its jj workspace', async ({ page }: { page: Page }) => {
@@ -795,7 +795,7 @@ When('a message is sent in the shared checkout', async ({ page }: { page: Page }
   const composer = newThreadComposer(page)
   await composer.fill('jj integration shared checkout rebase e2e')
   await composer.press('Enter')
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration shared checkout rebase')
+  await expect(page.getByRole('navigation', { name: 'Thread hierarchy', exact: true })).toContainText('jj integration shared checkout rebase')
 })
 
 When('{string} is typed in the New thread composer', async ({ page }: { page: Page }, text: string) => {
@@ -809,7 +809,7 @@ Then('the New thread composer contains {string}', async ({ page }: { page: Page 
 
 When('the carried draft is sent', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('Draft handoff regression')
+  await expect(page.getByRole('navigation', { name: 'Thread hierarchy', exact: true })).toContainText('Draft handoff regression')
 })
 
 Then('the New thread composer is empty and no consumed draft remains stored', async ({ page }: { page: Page }) => {
@@ -1621,7 +1621,7 @@ When('the conversation is opened from its workspace row', async ({ page }: { pag
     .getByRole('button', { name: /^Open thread:/ })
     .first()
     .click()
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
+  await expect(page.getByRole('navigation', { name: 'Thread hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
 })
 
 When('the Thread workspaces side panel is opened', async ({ page }: { page: Page }) => {
@@ -1699,7 +1699,7 @@ Then('the thread workspace is gone from jj and from the panel', async ({ page }:
     await expect.poll(() => workspaceNames(repository)).toEqual(['default'])
     await expect(threadRow(page)).toHaveCount(0)
     await expect(page.getByText(repository.repositoryPath, { exact: true })).toHaveCount(0)
-    await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
+    await expect(page.getByRole('navigation', { name: 'Thread hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
   })
   await finishJourneyAssertions(page)
 })

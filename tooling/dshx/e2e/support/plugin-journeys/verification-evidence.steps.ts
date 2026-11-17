@@ -158,7 +158,7 @@ Then('the receipt is backfilled once after restarting the scratch Host', async (
     await page.getByRole('menuitem', { name: 'Archived only', exact: true }).click()
     await expect(owningSession).toBeVisible({ timeout: 10_000 })
     await owningSession.hover()
-    await expect(owningSession.getByRole('button', { name: 'Unarchive session', exact: true })).toBeVisible()
+    await expect(owningSession.getByRole('button', { name: 'Unarchive thread', exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'View options', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Hide archived', exact: true }).click()

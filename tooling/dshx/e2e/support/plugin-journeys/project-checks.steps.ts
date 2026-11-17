@@ -254,7 +254,7 @@ Then('the receipt is available without Activity Timeline', async ({ page }: { pa
 
 Then('the sibling folder offers no trusted action', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'project-checks-sibling-outside-the-root-is-refused', async () => {
-    await expect(checksPanel(page).getByText('No trusted actions are configured for this session directory.', { exact: true })).toBeVisible()
+    await expect(checksPanel(page).getByText('No trusted actions are set up for this thread’s folder.', { exact: true })).toBeVisible()
     await expect(checksPanel(page).getByRole('button', { name: 'Run', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)

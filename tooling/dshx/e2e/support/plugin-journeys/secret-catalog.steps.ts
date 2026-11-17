@@ -470,8 +470,8 @@ When('the inline row is renamed {string}, set to Generate, and left by clicking 
   const row = draftRow(page).last()
   await row.getByRole('textbox', { name: 'New secret name', exact: true }).fill(name)
   await row.getByRole('button', { name: `Actions for ${name}`, exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Generate on this Host', exact: true }).click()
-  await expect(row.getByText('Generated on this Host when saved', { exact: true })).toBeVisible()
+  await page.getByRole('menuitem', { name: 'Generate on this host', exact: true }).click()
+  await expect(row.getByText('Generated on this host when saved', { exact: true })).toBeVisible()
   await catalog(page).getByRole('heading', { name: 'Secrets', exact: true, level: 1 }).click()
 })
 
@@ -490,7 +490,7 @@ When('{string} is added to the global scope with a generated value', async ({ pa
   await dialog.getByRole('textbox', { name: 'Alias', exact: true }).fill(alias)
   await dialog.getByRole('combobox', { name: 'Save to', exact: true }).click()
   await page.getByRole('option', { name: 'Global (every project)', exact: true }).click()
-  await expect(dialog.getByRole('radio', { name: /^Generate on this Host/ })).toBeChecked()
+  await expect(dialog.getByRole('radio', { name: /^Generate on this host/ })).toBeChecked()
   await dialog.getByRole('button', { name: 'Add secret', exact: true }).click()
   await expect(dialog).toBeHidden()
 })
@@ -589,14 +589,14 @@ When('the vault item behind {string} in {string} is deleted', async ({ page }: {
     .click()
   const dialog = page.getByRole('alertdialog', { name: `Remove ${alias}`, exact: true })
   await dialog.getByRole('button', { name: 'Delete the Bitwarden item…', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Confirm delete item', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Delete item', exact: true }).click()
   await expect(dialog).toBeHidden()
 })
 
 When('a thread in the seeded project asks the fake model to {string}', async ({ page }: { page: Page }, directive: string) => {
   const project = fixtureFor(page).project
   if ((await page.getByRole('treeitem', { name: 'secret-project', exact: true }).count()) === 0) await registerWorkspaceFolder(page, project)
-  if ((await page.getByRole('navigation', { name: 'Session hierarchy', exact: true }).count()) === 0) {
+  if ((await page.getByRole('navigation', { name: 'Thread hierarchy', exact: true }).count()) === 0) {
     await startThreadWithModel(page, { project: 'secret-project', model: 'commandcode_work/gpt-6-luna' })
   }
   await sendMessage(page, directive)
@@ -830,7 +830,7 @@ const allModelText = (page: Page): string => JSON.stringify(fakeCommandCodeFor(p
 When('a thread in the seeded project asks the agent to request the secret {string}', async ({ page }: { page: Page }, alias: string) => {
   const project = fixtureFor(page).project
   if ((await page.getByRole('treeitem', { name: 'secret-project', exact: true }).count()) === 0) await registerWorkspaceFolder(page, project)
-  if ((await page.getByRole('navigation', { name: 'Session hierarchy', exact: true }).count()) === 0) {
+  if ((await page.getByRole('navigation', { name: 'Thread hierarchy', exact: true }).count()) === 0) {
     await startThreadWithModel(page, { project: 'secret-project', model: 'commandcode_work/gpt-6-luna' })
   }
   // The tool call waits for the user, so the turn stays open: send without waiting for it to settle.
