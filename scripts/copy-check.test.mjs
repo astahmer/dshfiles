@@ -187,3 +187,24 @@ test('attributes a file to its plugin directory', () => {
   assert.equal(pluginOf('plugins/@dshfiles/thread-sidebar/src/locales.ts'), 'thread-sidebar')
   assert.equal(pluginOf('plugins/@dshfiles/chat/dshx.features.json'), 'chat')
 })
+
+const ruleHits = (rule, texts) =>
+  findingsInStrings({ file: 'plugins/@dshfiles/demo/src/a.tsx', prefix, strings: texts.map((text, line) => ({ text, line })) })
+    .filter(finding => finding.term === rule)
+    .map(finding => finding.text)
+
+test('host-process: a capital Host inside a sentence is the server process; a lower-case host is a machine', () => {
+  assert.deepEqual(
+    ruleHits('host-process', [
+      'Restart the Host to apply this change',
+      'Host plugin missing, update DSH',
+      'Runs on this host',
+      'Hosts & network',
+      'Host key fingerprint for the remote',
+      'Add a remote host first',
+      'Open Observe › Hosts, or check the Hosts page',
+      'Scratch DSH Hosts are using memory',
+    ]),
+    ['Restart the Host to apply this change', 'Host plugin missing, update DSH', 'Scratch DSH Hosts are using memory'],
+  )
+})
