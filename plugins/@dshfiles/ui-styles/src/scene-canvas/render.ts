@@ -14,7 +14,9 @@ function sample(track: Track, time: number, out: Float64Array, at = 0): void {
   if (!track.loop && phase >= period) phase = period - 1e-6
   const position = (phase / period) * count
   const index = Math.min(count - 1, Math.floor(position))
-  const next = track.loop ? (index + 1) % count : Math.min(count - 1, index + 1)
+  // Sample `count` is the value as the period ends: the last step blends into it, and the next period starts over from
+  // sample 0 without sliding back.
+  const next = index + 1
   const blend = track.hold ? 0 : position - index
   for (let component = 0; component < stride; component += 1) {
     const from = values[index * stride + component] ?? 0

@@ -15,7 +15,9 @@ export type Rect = readonly [number, number, number, number]
 
 /**
  * One animated value over one period of its animation, sampled at even steps: `values[i * stride + c]` is component `c`
- * of sample `i`. Between samples the renderer interpolates, or holds the previous sample when the animation steps.
+ * of sample `i`, taken at `i * period / count`. There are `count + 1` samples: the last is the value just before the
+ * period ends, so a loop restarts from sample 0 at once instead of sliding back to it. Between samples the renderer
+ * interpolates, or holds the previous sample when the animation steps.
  */
 export interface Track {
   /** Milliseconds after which the values repeat (an alternate animation's period is two iterations). */
