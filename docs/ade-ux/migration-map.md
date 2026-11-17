@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-568 features from 122 plugins.
+568 features from 121 plugins.
 
 ## Counts
 
@@ -512,13 +512,13 @@ run row, chips, `/` and `@` sources; 70 features.
 | queue-reorder/send-later: Send a message later | composerContribution | composer ⋯: Send later…; dock: Scheduled messages |
 | rich-composer/composer-run-row: Run row, send states and meter line | composerContribution | composer: pickers in the card’s bottom bar of a new thread; summary chip on the meter line |
 | rich-composer/draft-reference-restore: Restore draft reference chips from plain text | composerContribution | composer: restored draft references |
+| rich-composer/held-send: Send once the attachments finish uploading | composerContribution | composer: held Send and its status line |
 | rich-composer/image-attachment-reference: Add inline references for image attachments | composerContribution | composer: image references |
 | rich-composer/image-reference-mentions: Reuse image references and open the selected image | composerContribution | composer: image reference chips |
 | rich-composer/large-paste-file: Attach a large paste as a text file | composerContribution | composer: large paste as file |
 | rich-composer/paste-session-mentions: Paste thread mentions as chips | composerContribution | composer: pasted thread mentions |
 | rich-composer/phone-thread-menu: Thread menu on a phone | composerContribution | phone top bar: Thread menu |
 | rich-composer/prompt-recall: Recall earlier prompts with ArrowUp | composerContribution | composer: ArrowUp recall |
-| send-after-upload/send-after-upload: Send when the attachment upload finishes | composerContribution | composer: Sending when upload finishes pill |
 | session-controller/turn-admission: Limit how many threads run at once | composerContribution | composer dock: Waiting for a free slot; Settings › General: Running threads limit |
 | session-undo/turn-rewind: Rewind to before any recorded turn, files included | composerContribution | composer: Rewind to an earlier turn |
 | session-undo/turn-undo-redo: Undo and redo a turn: conversation and files together | composerContribution | composer: Undo last turn |

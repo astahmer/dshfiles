@@ -26,13 +26,12 @@ Pack id `core`, always on: every other pack builds on it. Back to [all packs](RE
 16. [`@dshfiles/model-selection`](../../plugins/@dshfiles/model-selection/README.md) — Owned native model directory, composer seat and /model popup with local draft selection.
 17. [`@dshfiles/agent-preset`](../../plugins/@dshfiles/agent-preset/README.md) — Owned native preset surfaces with client-local Session draft selection.
 18. [`@dshfiles/input-trigger`](../../plugins/@dshfiles/input-trigger/README.md) — Owned MIT fork of DSH's shared / and @ autocomplete engine with Codex-style @ token targeting.
-19. [`@dshfiles/send-after-upload`](../../plugins/@dshfiles/send-after-upload/README.md) — Queue the send when Enter or Send is pressed while an attachment is still uploading.
-20. [`@dshfiles/user-questions`](../../plugins/@dshfiles/user-questions/README.md) — Owned fork of DSH's native question form: markdown questions with sandboxed HTML previews, and an answered question stays closed while its reply waits for admission.
-21. [`@dshfiles/deliverables`](../../plugins/@dshfiles/deliverables/README.md) — Owned native changed-files card, review tab and delivery cards that preview changed images instead of the binary placeholder.
-22. [`@dshfiles/cordis-cards`](../../plugins/@dshfiles/cordis-cards/README.md) — Owned native Cordis cards and panel whose inventory read waits for the connection instead of rereading on its first reset.
-23. [`@dshfiles/settings-models`](../../plugins/@dshfiles/settings-models/README.md) — Owned native Models settings page and onboarding dialogs that refresh once per burst and only while shown.
-24. [`@dshfiles/settings-subagent`](../../plugins/@dshfiles/settings-subagent/README.md) — Owned native Subagent settings page whose model catalog read waits for the connection and is shared page-wide.
-25. [`@dshfiles/settings-web-search`](../../plugins/@dshfiles/settings-web-search/README.md) — Owned native Web search settings page that reads its credential only while shown, once per burst.
+19. [`@dshfiles/user-questions`](../../plugins/@dshfiles/user-questions/README.md) — Owned fork of DSH's native question form: markdown questions with sandboxed HTML previews, and an answered question stays closed while its reply waits for admission.
+20. [`@dshfiles/deliverables`](../../plugins/@dshfiles/deliverables/README.md) — Owned native changed-files card, review tab and delivery cards that preview changed images instead of the binary placeholder.
+21. [`@dshfiles/cordis-cards`](../../plugins/@dshfiles/cordis-cards/README.md) — Owned native Cordis cards and panel whose inventory read waits for the connection instead of rereading on its first reset.
+22. [`@dshfiles/settings-models`](../../plugins/@dshfiles/settings-models/README.md) — Owned native Models settings page and onboarding dialogs that refresh once per burst and only while shown.
+23. [`@dshfiles/settings-subagent`](../../plugins/@dshfiles/settings-subagent/README.md) — Owned native Subagent settings page whose model catalog read waits for the connection and is shared page-wide.
+24. [`@dshfiles/settings-web-search`](../../plugins/@dshfiles/settings-web-search/README.md) — Owned native Web search settings page that reads its credential only while shown, once per burst.
 
 ## Prerequisites
 
@@ -45,7 +44,7 @@ Pack id `core`, always on: every other pack builds on it. Back to [all packs](RE
 
 ## Features
 
-From the onboarding feature catalog: 206 features, the 98 curated ones first.
+From the onboarding feature catalog: 206 features, the 99 curated ones first.
 
 ### Curated
 
@@ -96,57 +95,58 @@ From the onboarding feature catalog: 206 features, the 98 curated ones first.
 45. **Rename a thread from its header title** (`rich-composer`, threads) — Click the thread title in the header to rename it.
 46. **Recall earlier prompts with ArrowUp** (`rich-composer`, composer) — Press the Up arrow in an empty composer to bring back this thread's earlier prompts.
 47. **Attach a large paste as a text file** (`rich-composer`, composer) — Pasting a lot of text attaches it as a file, with an option to paste it as text instead.
-48. **Run row, send states and meter line** (`rich-composer`, composer) — A new thread's project, host, workspace, agent and model sit as quiet pickers in the composer.
-49. **Restore draft reference chips from plain text** (`rich-composer`, composer) — A queued message brought back into the composer gets its reference chips back.
-50. **Settings shell** (`settings-shell`, settings) — The Settings button, its sections, the General page and the Cmd+, shortcut.
-51. **Dock Settings as one panel** (`settings-shell`, settings) — Open all of Settings as one dockable panel with its sections, search and forms.
-52. **DSH release notice and summary** (`settings-shell`, settings) — Settings marks a new DSH release and sums up what changed since your version.
-53. **One Settings page in the stage** (`settings-shell`, settings) — Settings opens as one page in the main view, from the rail, the gear, the palette or Cmd+,.
-54. **Settings grouped by task, with deep links** (`settings-shell`, settings) — Settings are grouped by task, such as Models and accounts or Projects and workspaces, with direct links.
-55. **Search Settings inline** (`settings-shell`, settings) — Search all settings from one field and change matches in place.
-56. **Search section controls and open them at the control** (`settings-shell`, settings) — Search finds controls inside Settings sections and opens the section at that control.
-57. **Plugin settings with real controls** (`settings-shell`, settings) — Each plugin's settings show real controls such as switches, menus and number fields.
-58. **Modified settings and reset to default** (`settings-shell`, settings) — Settings you changed are marked, and Reset to default puts them back.
-59. **Edit plugin settings as JSON** (`settings-shell`, settings) — Edit a plugin's settings as JSON with completion and checks before you save.
-60. **List and switch plugin entries, from Settings or an Agent** (`settings-shell`, settings) — Turn a plugin on or off from its settings page, and the agent can do the same when you ask.
-61. **Open the configuration file elsewhere** (`settings-shell`, settings) — Open a configuration file in your default app or the editor, or copy or reveal its path.
-62. **Set the Jev key once** (`settings-shell`, settings) — Set one Jev key in Settings for Backlog and Memory to share.
-63. **See what this setup can do and what it still needs on one page** (`onboarding`, knowledge) — A setup checklist shows what this setup can do and what it still needs, with a fix for each missing step.
-64. **Enable or disable a plugin pack after an exact preview** (`onboarding`, knowledge) — Turn a plugin pack on or off after a preview of exactly what changes.
-65. **Get set up in three steps: account, project, first task** (`onboarding`, threads) — Three steps get you set up: add an account, add a project, start a first task.
-66. **First tasks for your project on the new-thread screen** (`onboarding`, composer) — A new project offers three first tasks that put a prompt in the composer without sending it.
-67. **Show me where a feature lives, one step at a time** (`onboarding`, knowledge) — Show me where highlights each control on the way to a feature, one step at a time.
-68. **See what changed in your plugins since your last visit** (`onboarding`, knowledge) — What's new lists the latest changes to your plugins, newest first.
-69. **Get features suggested from what you already do** (`onboarding`, knowledge) — Off by default: suggests features you have not tried, based on what you did in the last 30 days.
-70. **Try a feature with the agent in a new thread** (`onboarding`, knowledge) — Off by default: Try it starts a new thread where the agent demonstrates a feature, using tokens.
-71. **Use another account for this thread** (`ai-accounts`, composer) — Right-click an account in the sidebar to use it for this thread only, keeping the model when it can.
-72. **Connect an account without leaving the chat** (`ai-accounts`, settings) — Sign in to a provider from a short dialog without leaving the thread.
-73. **Edit and remove accounts** (`ai-accounts`, settings) — Edit an account's settings or remove it, and a new account is saved only once it signs in.
-74. **Manage account Models, Settings and Usage** (`ai-accounts`, settings) — Each account has Models, Settings and Usage tabs, with rename and sign-out.
-75. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers and how requests spread across accounts with the same model.
-76. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
-77. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.
-78. **Review usage history and cost forecasts** (`ai-accounts`, observe) — Chart past usage and cost, set your own prices, and see what a draft or a turn costs.
-79. **Forecast when each account runs out** (`ai-accounts`, observe) — See when each account will run out at the current pace and which account to use next.
-80. **Route exhausted Luna accounts through Reserve** (`ai-accounts`, settings) — Once the weekly Luna limit is spent, requests move to the separate Reserve model and its own limit.
-81. **Recover failed account requests per failure kind** (`ai-accounts`, settings) — Choose what happens when a request fails: retry, switch account, wait, or stop.
-82. **Retry exhausted quota when its reset arrives** (`ai-accounts`, inbox) — A thread stopped by a usage limit resumes on its own when the limit resets, or now on another account.
-83. **Open credential setup from failed turns** (`ai-accounts`, transcript) — A turn that failed on missing or rejected credentials links straight to AI Accounts.
-84. **Explain turns stopped by a stalled model stream** (`ai-accounts`, transcript) — A turn whose model went silent says for how long and offers Resume or another model.
-85. **Turn on the fallback chain for stalled streams** (`ai-accounts`, settings) — Let a stalled model fall back to the thread's next model.
-86. **Quota-blocked threads in the Inbox, resumable in place** (`ai-accounts`, inbox) — A thread stopped by a usage limit shows in the Inbox with when it resets and a Resume button.
-87. **Warn before re-sending an idle thread past its prompt-cache lifetime** (`ai-accounts`, composer) — After a long pause, a chip warns that the next message costs more because the prompt cache expired.
-88. **Add projects from the folder browser** (`workspace-folder-picker`, composer) — Add a project by browsing folders, or open your system's folder dialog.
-89. **Add a project by cloning a repository** (`workspace-folder-picker`, composer) — Add a project by cloning a repository, with progress and Cancel.
-90. **Remove a project** (`workspace-folder-picker`, composer) — Remove a project from the picker without deleting its folder or files.
-91. **Create a new project** (`workspace-folder-picker`, composer) — Create a new project folder with a Jujutsu repository and a first commit.
-92. **Search projects and browse folder paths** (`workspace-folder-picker`, composer) — Search your projects and browse folder paths, including ones under your home folder.
-93. **Select project folders with keyboard navigation** (`workspace-folder-picker`, composer) — Move through folders with the arrow keys.
-94. **Offer recent folders not yet registered as projects** (`workspace-folder-picker`, composer) — Recent folders that are not projects yet are offered first.
-95. **Start in the folder browser** (`workspace-folder-picker`, composer) — Some pickers open straight on the folder browser, without your projects.
-96. **Inspect a folder before adding it** (`workspace-folder-picker`, composer) — Choosing a folder first says what it is, such as a git or Jujutsu repository, before you add it.
-97. **Read a project's declared settings** (`workspace-folder-picker`, settings) — Settings › Projects lists your projects and the settings other features add for each one.
-98. **Choose an agent preset before typing** (`agent-preset`, composer) — Pick a preset for a new thread before you type its first message.
+48. **Send once the attachments finish uploading** (`rich-composer`, composer) — Press Send while a file still uploads and the message goes out by itself once every upload is ready.
+49. **Run row, send states and meter line** (`rich-composer`, composer) — A new thread's project, host, workspace, agent and model sit as quiet pickers in the composer.
+50. **Restore draft reference chips from plain text** (`rich-composer`, composer) — A queued message brought back into the composer gets its reference chips back.
+51. **Settings shell** (`settings-shell`, settings) — The Settings button, its sections, the General page and the Cmd+, shortcut.
+52. **Dock Settings as one panel** (`settings-shell`, settings) — Open all of Settings as one dockable panel with its sections, search and forms.
+53. **DSH release notice and summary** (`settings-shell`, settings) — Settings marks a new DSH release and sums up what changed since your version.
+54. **One Settings page in the stage** (`settings-shell`, settings) — Settings opens as one page in the main view, from the rail, the gear, the palette or Cmd+,.
+55. **Settings grouped by task, with deep links** (`settings-shell`, settings) — Settings are grouped by task, such as Models and accounts or Projects and workspaces, with direct links.
+56. **Search Settings inline** (`settings-shell`, settings) — Search all settings from one field and change matches in place.
+57. **Search section controls and open them at the control** (`settings-shell`, settings) — Search finds controls inside Settings sections and opens the section at that control.
+58. **Plugin settings with real controls** (`settings-shell`, settings) — Each plugin's settings show real controls such as switches, menus and number fields.
+59. **Modified settings and reset to default** (`settings-shell`, settings) — Settings you changed are marked, and Reset to default puts them back.
+60. **Edit plugin settings as JSON** (`settings-shell`, settings) — Edit a plugin's settings as JSON with completion and checks before you save.
+61. **List and switch plugin entries, from Settings or an Agent** (`settings-shell`, settings) — Turn a plugin on or off from its settings page, and the agent can do the same when you ask.
+62. **Open the configuration file elsewhere** (`settings-shell`, settings) — Open a configuration file in your default app or the editor, or copy or reveal its path.
+63. **Set the Jev key once** (`settings-shell`, settings) — Set one Jev key in Settings for Backlog and Memory to share.
+64. **See what this setup can do and what it still needs on one page** (`onboarding`, knowledge) — A setup checklist shows what this setup can do and what it still needs, with a fix for each missing step.
+65. **Enable or disable a plugin pack after an exact preview** (`onboarding`, knowledge) — Turn a plugin pack on or off after a preview of exactly what changes.
+66. **Get set up in three steps: account, project, first task** (`onboarding`, threads) — Three steps get you set up: add an account, add a project, start a first task.
+67. **First tasks for your project on the new-thread screen** (`onboarding`, composer) — A new project offers three first tasks that put a prompt in the composer without sending it.
+68. **Show me where a feature lives, one step at a time** (`onboarding`, knowledge) — Show me where highlights each control on the way to a feature, one step at a time.
+69. **See what changed in your plugins since your last visit** (`onboarding`, knowledge) — What's new lists the latest changes to your plugins, newest first.
+70. **Get features suggested from what you already do** (`onboarding`, knowledge) — Off by default: suggests features you have not tried, based on what you did in the last 30 days.
+71. **Try a feature with the agent in a new thread** (`onboarding`, knowledge) — Off by default: Try it starts a new thread where the agent demonstrates a feature, using tokens.
+72. **Use another account for this thread** (`ai-accounts`, composer) — Right-click an account in the sidebar to use it for this thread only, keeping the model when it can.
+73. **Connect an account without leaving the chat** (`ai-accounts`, settings) — Sign in to a provider from a short dialog without leaving the thread.
+74. **Edit and remove accounts** (`ai-accounts`, settings) — Edit an account's settings or remove it, and a new account is saved only once it signs in.
+75. **Manage account Models, Settings and Usage** (`ai-accounts`, settings) — Each account has Models, Settings and Usage tabs, with rename and sign-out.
+76. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers and how requests spread across accounts with the same model.
+77. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
+78. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.
+79. **Review usage history and cost forecasts** (`ai-accounts`, observe) — Chart past usage and cost, set your own prices, and see what a draft or a turn costs.
+80. **Forecast when each account runs out** (`ai-accounts`, observe) — See when each account will run out at the current pace and which account to use next.
+81. **Route exhausted Luna accounts through Reserve** (`ai-accounts`, settings) — Once the weekly Luna limit is spent, requests move to the separate Reserve model and its own limit.
+82. **Recover failed account requests per failure kind** (`ai-accounts`, settings) — Choose what happens when a request fails: retry, switch account, wait, or stop.
+83. **Retry exhausted quota when its reset arrives** (`ai-accounts`, inbox) — A thread stopped by a usage limit resumes on its own when the limit resets, or now on another account.
+84. **Open credential setup from failed turns** (`ai-accounts`, transcript) — A turn that failed on missing or rejected credentials links straight to AI Accounts.
+85. **Explain turns stopped by a stalled model stream** (`ai-accounts`, transcript) — A turn whose model went silent says for how long and offers Resume or another model.
+86. **Turn on the fallback chain for stalled streams** (`ai-accounts`, settings) — Let a stalled model fall back to the thread's next model.
+87. **Quota-blocked threads in the Inbox, resumable in place** (`ai-accounts`, inbox) — A thread stopped by a usage limit shows in the Inbox with when it resets and a Resume button.
+88. **Warn before re-sending an idle thread past its prompt-cache lifetime** (`ai-accounts`, composer) — After a long pause, a chip warns that the next message costs more because the prompt cache expired.
+89. **Add projects from the folder browser** (`workspace-folder-picker`, composer) — Add a project by browsing folders, or open your system's folder dialog.
+90. **Add a project by cloning a repository** (`workspace-folder-picker`, composer) — Add a project by cloning a repository, with progress and Cancel.
+91. **Remove a project** (`workspace-folder-picker`, composer) — Remove a project from the picker without deleting its folder or files.
+92. **Create a new project** (`workspace-folder-picker`, composer) — Create a new project folder with a Jujutsu repository and a first commit.
+93. **Search projects and browse folder paths** (`workspace-folder-picker`, composer) — Search your projects and browse folder paths, including ones under your home folder.
+94. **Select project folders with keyboard navigation** (`workspace-folder-picker`, composer) — Move through folders with the arrow keys.
+95. **Offer recent folders not yet registered as projects** (`workspace-folder-picker`, composer) — Recent folders that are not projects yet are offered first.
+96. **Start in the folder browser** (`workspace-folder-picker`, composer) — Some pickers open straight on the folder browser, without your projects.
+97. **Inspect a folder before adding it** (`workspace-folder-picker`, composer) — Choosing a folder first says what it is, such as a git or Jujutsu repository, before you add it.
+98. **Read a project's declared settings** (`workspace-folder-picker`, settings) — Settings › Projects lists your projects and the settings other features add for each one.
+99. **Choose an agent preset before typing** (`agent-preset`, composer) — Pick a preset for a new thread before you type its first message.
 
 ### More
 
@@ -249,15 +249,14 @@ From the onboarding feature catalog: 206 features, the 98 curated ones first.
 97. **Restore a persisted command chip** (`input-trigger`, composer) — A draft that starts with a command keeps its command chip after a reload.
 98. **Slash entries for commands** (`input-trigger`, composer) — Commands with a slash name appear in the composer's / menu and run when picked.
 99. **One mention and reference-preview registry** (`input-trigger`) — Files, threads, skills, backlog items, agents and more share one @ menu and one preview card.
-100. **Send when the attachment upload finishes** (`send-after-upload`, composer) — Press Enter while a file uploads, and the message sends once the upload finishes.
-101. **An answered question form stays closed while its reply waits for admission** (`user-questions`, transcript) — A question you answered stays closed while your reply waits to reach the agent.
-102. **Markdown questions with sandboxed HTML previews** (`user-questions`, transcript) — Questions show Markdown, and their HTML previews run safely sandboxed.
-103. **Changed-files card and review tab** (`deliverables`, transcript) — Each turn lists the files it changed, with a comparison on hover and a review tab.
-104. **Changed images preview instead of the binary placeholder** (`deliverables`, transcript) — A changed image shows as the image itself instead of a binary file note.
-105. **Plugin panel loads its list once** (`cordis-cards`, threads) — The dynamic plugin panel and its tool cards load the plugin list once per connection.
-106. **Models settings and provider onboarding** (`settings-models`, settings) — The Models settings page and the DeepSeek sign-in step, refreshed only while you look at them.
-107. **Subagent settings** (`settings-subagent`, settings) — Set how deep subagents can nest, how many run at once and which model they use.
-108. **Web search settings** (`settings-web-search`, settings) — Choose the web search provider, its limits and its key.
+100. **An answered question form stays closed while its reply waits for admission** (`user-questions`, transcript) — A question you answered stays closed while your reply waits to reach the agent.
+101. **Markdown questions with sandboxed HTML previews** (`user-questions`, transcript) — Questions show Markdown, and their HTML previews run safely sandboxed.
+102. **Changed-files card and review tab** (`deliverables`, transcript) — Each turn lists the files it changed, with a comparison on hover and a review tab.
+103. **Changed images preview instead of the binary placeholder** (`deliverables`, transcript) — A changed image shows as the image itself instead of a binary file note.
+104. **Plugin panel loads its list once** (`cordis-cards`, threads) — The dynamic plugin panel and its tool cards load the plugin list once per connection.
+105. **Models settings and provider onboarding** (`settings-models`, settings) — The Models settings page and the DeepSeek sign-in step, refreshed only while you look at them.
+106. **Subagent settings** (`settings-subagent`, settings) — Set how deep subagents can nest, how many run at once and which model they use.
+107. **Web search settings** (`settings-web-search`, settings) — Choose the web search provider, its limits and its key.
 
 ## Enable it
 
