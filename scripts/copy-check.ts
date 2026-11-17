@@ -52,12 +52,32 @@ export interface CopyString {
   readonly line: number
   /** The text with each template hole kept as `${}`; absent when it equals `text`. */
   readonly raw?: string
+  /** The property key (`label`) or method call (`description()`) the literal is the value or first argument of. */
+  readonly key?: string
 }
 
-const lineAt = (source: string, index: number): number => {
-  let line = 1
-  for (let position = 0; position < index; position += 1) if (source.charCodeAt(position) === 10) line += 1
-  return line
+/** What a literal belongs to, read from the code before it: `label: '…'` → `label`, `.description('…')` → `description()`. */
+const keyBefore = (code: string): string | undefined => {
+  const tail = code.slice(-160)
+  const call = /\.(\w+)\(\s*$/.exec(tail)
+  if (call !== null) return `${call[1] ?? ''}()`
+  return /(?:^|[{,\n])\s*(\w+)\??\s*:\s*$/.exec(tail)?.[1]
+}
+
+/** Line numbers by offset, from the line starts indexed once per file (a linear count per string is quadratic). */
+const lineIndex = (source: string): ((index: number) => number) => {
+  const starts = [0]
+  for (let position = 0; position < source.length; position += 1) if (source.charCodeAt(position) === 10) starts.push(position + 1)
+  return index => {
+    let low = 0
+    let high = starts.length - 1
+    while (low < high) {
+      const middle = (low + high + 1) >> 1
+      if ((starts[middle] ?? 0) <= index) low = middle
+      else high = middle - 1
+    }
+    return low + 1
+  }
 }
 
 /** Locale codes other than English, as a table name (`const fr = {`, `zhCN`) or key (`'pt-BR': {`). */
@@ -97,6 +117,7 @@ const nonEnglishRanges = (source: string): readonly (readonly [number, number])[
  */
 const extractStrings = (source: string): readonly CopyString[] => {
   const strings: CopyString[] = []
+  const lineAt = lineIndex(source)
   const foreign = nonEnglishRanges(source)
   let code = ''
   let index = 0
@@ -104,7 +125,8 @@ const extractStrings = (source: string): readonly CopyString[] => {
     // Developer diagnostics, not copy.
     if (/console\.\w+\([^;\n)]*$/.test(code.slice(-400))) return
     if (foreign.some(([from, to]) => start >= from && start < to)) return
-    strings.push(raw === text ? { text, line: lineAt(source, start) } : { text, line: lineAt(source, start), raw })
+    const key = keyBefore(code)
+    strings.push({ text, line: lineAt(start), ...(raw === text ? {} : { raw }), ...(key === undefined ? {} : { key }) })
   }
   while (index < source.length) {
     const char = source[index]
@@ -185,7 +207,7 @@ const extractStrings = (source: string): readonly CopyString[] => {
     if (/\b[a-z]\w*\??:\s*(?:boolean|string|number|unknown|void|null|undefined|[A-Z]\w*(?:<|\[|\s*$))/.test(text)) continue
     // Offsets in `code` drift from `source` where literals were collapsed, so find the text in the source.
     const at = source.indexOf(text.trim())
-    strings.push({ text: text.trim(), line: at === -1 ? 0 : lineAt(source, at) })
+    strings.push({ text: text.trim(), line: at === -1 ? 0 : lineAt(at) })
   }
   return strings
 }
@@ -229,6 +251,15 @@ const findingsInStrings = (input: { readonly file: string; readonly strings: rea
 
 const isLocaleFile = (path: string): boolean => /(?:^|\/)(?:locales?|i18n)(?:\/[^/]+)?\.ts$|-locales?\.ts$/.test(path)
 
+/**
+ * The copy in a plain `.ts` file (not a component, not a locale table): the `.description(…)` text of a settings
+ * schema, which Settings shows under each field.
+ */
+const holdsPlainTsCopy = (source: string): boolean => source.includes('defineSettings')
+
+const copyInPlainTs = (source: string, strings: readonly CopyString[]): readonly CopyString[] =>
+  holdsPlainTsCopy(source) ? strings.filter(string => string.key === 'description()') : []
+
 const walk = (directory: string, files: string[]): void => {
   for (const entry of readdirSync(directory)) {
     // Vendored native forks (`src/native/`) are read too: their labels reach the same screens as owned copy.
@@ -259,9 +290,14 @@ const scanRepository = (root: string): readonly CopyFinding[] => {
     }
     for (const file of files) {
       const rel = relative(root, file)
-      if (/\.(?:test|spec|characterization\.test)\.tsx?$/.test(rel)) continue
-      if (!rel.endsWith('.tsx') && !isLocaleFile(rel)) continue
-      findings.push(...findingsInStrings({ file: rel, strings: extractStrings(readFileSync(file, 'utf8')), prefix }))
+      if (/\.(?:test|spec|characterization\.test)\.tsx?$/.test(rel) || !/\.tsx?$/.test(rel) || rel.endsWith('.d.ts')) continue
+      const source = readFileSync(file, 'utf8')
+      const whole = rel.endsWith('.tsx') || isLocaleFile(rel)
+      // Lexing every Host file costs seconds; a plain .ts file is read only when it can hold copy.
+      if (!whole && !holdsPlainTsCopy(source)) continue
+      const strings = extractStrings(source)
+      const copy = whole ? strings : copyInPlainTs(source, strings)
+      findings.push(...findingsInStrings({ file: rel, strings: copy, prefix }))
     }
     const catalog = join(pluginsRoot, plugin, 'dshx.features.json')
     let text: string
@@ -320,6 +356,7 @@ export class CopyCheck {
   static readonly pluginPrefixPattern = pluginPrefixPattern
   static readonly extractStrings = extractStrings
   static readonly isProse = isProse
+  static readonly copyInPlainTs = copyInPlainTs
   static readonly findingsInStrings = findingsInStrings
   static readonly scanRepository = scanRepository
   static readonly pluginOf = pluginOf
