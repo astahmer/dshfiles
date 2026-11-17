@@ -136,7 +136,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
       keywords: [option.provider, option.model, option.providerName],
       group: option.providerName,
     })),
-    ...(draft.route !== null && routeOption === undefined ? [{ value: routeKey, label: draft.route.model, description: 'not offered by this Host' }] : []),
+    ...(draft.route !== null && routeOption === undefined ? [{ value: routeKey, label: draft.route.model, description: 'not offered by this DSH' }] : []),
   ]
   const effortOptions: readonly ComboboxOption[] = [
     { value: '', label: routeOption?.defaultEffort === undefined ? 'Model default' : `Model default (${routeOption.defaultEffort})` },

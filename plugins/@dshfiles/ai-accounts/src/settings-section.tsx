@@ -219,7 +219,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
 
       {settings.error?.kind === 'namespace-unregistered' || settings.error?.kind === 'provider-unavailable' ? (
         <Alert variant="warning">
-          <AlertDescription>Restart DSH to load these preferences; the running Host predates them. Defaults apply until then.</AlertDescription>
+          <AlertDescription>Restart DSH to load these settings. Defaults apply until then.</AlertDescription>
         </Alert>
       ) : readOnly && settings.status === 'ready' ? (
         <Alert variant="warning">
@@ -455,7 +455,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             />
           )}
         </Row>
-        <Row hint="How often open surfaces ask for fresh quota. Surfaces share one Host reading." label="Refresh usage every">
+        <Row hint="How often open surfaces ask for fresh quota. All surfaces share one reading." label="Refresh usage every">
           {id => (
             <NumberSelect
               disabled={readOnly}
@@ -474,7 +474,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
 
       <WorkHoursGroup readOnly={readOnly} write={write} />
 
-      <Group description="The Host records one quota snapshot per enabled account on this schedule." heading="Usage history">
+      <Group description="DSH records one quota snapshot per enabled account on this schedule." heading="Usage history">
         <Row label="Record every">
           {id => (
             <NumberSelect

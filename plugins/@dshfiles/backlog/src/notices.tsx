@@ -52,8 +52,8 @@ const showFailure = (fallback: string) => (error: unknown) =>
   showNotice({
     text:
       isApiError(error) && error.kind === 'contract'
-        ? 'The running DSH Host predates this backlog action. Restart the DSH Host process to load it.'
-        : errorMessage(error, `${fallback} Try again; if it keeps failing, check the Host log.`),
+        ? 'This DSH is older than this backlog action. Restart DSH to load it.'
+        : errorMessage(error, `${fallback} Retry. If it keeps failing, check the DSH log.`),
     kind: 'failure',
     sessionId: null,
   })

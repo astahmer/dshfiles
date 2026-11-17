@@ -355,7 +355,7 @@ export const Composer = (props: {
     if (voice.phase === 'idle') {
       const status = speech.data
       if (status === undefined || !status.available) {
-        setFailed(status?.reason ?? 'The voice-input bundle is not loaded.')
+        setFailed(status?.reason ?? 'Voice input is not installed. Add it from Plugins, then restart DSH.')
         return
       }
       if (!status.ready) {
@@ -412,7 +412,7 @@ export const Composer = (props: {
 
   const preview = useMemo(() => (text.trim() === '' ? null : BacklogItems.triage(serializeProjectReferenceDraft(text, props.projects))), [text, props.projects])
   const chat = props.variant === 'chat'
-  const speechReason = speech.data?.reason ?? 'The voice-input bundle is not loaded.'
+  const speechReason = speech.data?.reason ?? 'Voice input is not installed. Add it from Plugins, then restart DSH.'
   const voiceAvailable = speech.data?.available === true
   const inputClass = cn(
     'dshx:w-full dshx:overflow-y-auto dshx:whitespace-pre-wrap dshx:break-words dshx:rounded-md dshx:bg-transparent dshx:leading-relaxed dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',

@@ -164,7 +164,7 @@ describe('real account sign-out confirmation component with fake Host', () => {
     const view = await mount()
     expect(button(view.container, 'Sign out').disabled).toBe(true)
     expect(view.container.textContent).toBe('Sign out')
-    expect(view.container.querySelector('[aria-label]')?.getAttribute('aria-label')).toContain('updated Host')
+    expect(view.container.querySelector('[aria-label]')?.getAttribute('aria-label')).toContain('updated DSH')
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000)
     })

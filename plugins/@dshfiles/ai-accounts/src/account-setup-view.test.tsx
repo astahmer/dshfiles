@@ -634,7 +634,7 @@ describe('actual account setup view with operation-owned QueryClient data', () =
     await click('Use default Claude Code login')
     expect(field('CLAUDE_CONFIG_DIR').value).toBe('~/.claude')
     await click('API key')
-    expect(document.body.textContent).toContain('Credential management is unavailable')
+    expect(document.body.textContent).toContain('This DSH cannot store credentials')
     expect(button('Claude account').disabled).toBe(false)
     await click('Claude account')
     expect(document.querySelector('#ai-account-api-key-value')).toBeNull()
@@ -647,7 +647,7 @@ describe('actual account setup view with operation-owned QueryClient data', () =
   it('keeps CLI and reference choices available from keyed setup without a credential writer', async () => {
     const view = await mount({}, savedFile, { credentialSetup: undefined })
     await click('Command Code account')
-    expect(document.body.textContent).toContain('Credential management is unavailable')
+    expect(document.body.textContent).toContain('This DSH cannot store credentials')
     await click('CLI login')
     expect(document.querySelector('pre code')?.textContent).toBe('cmd login')
     await expand('More options')

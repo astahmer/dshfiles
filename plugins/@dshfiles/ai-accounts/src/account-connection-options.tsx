@@ -172,7 +172,7 @@ export const ExistingConnectionReference = (props: ConnectionOptionsProps): JSX.
               label="Existing credential reference"
               monospace
               placeholder={example}
-              description="An existing DSH credential or Host environment variable."
+              description="An existing DSH credential or an environment variable DSH was started with."
             />
           )}
         </form.AppField>

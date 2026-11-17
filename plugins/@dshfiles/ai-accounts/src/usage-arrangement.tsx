@@ -31,14 +31,14 @@ export const useUsageLayout = () => {
   const preference = useMutation({
     mutationFn: async (input: { readonly hidden: string[] } | { readonly shortNames: boolean }) => {
       const saved = 'hidden' in input ? await settings.set('hiddenUsageAccounts', input.hidden) : await settings.set('usageShortNames', input.shortNames)
-      if (!saved) throw new Error('The Host refused to save this display preference.')
+      if (!saved) throw new Error('DSH did not save this display setting. Retry.')
     },
   })
   const saveHidden = (ids: string[]): void => preference.mutate({ hidden: ids })
   const arrangementError = (): string | null => {
-    if (reorder.isError) return `Could not change account priority: ${errorMessage(reorder.error, 'The Host may need updating. Retry after it is updated.')}`
+    if (reorder.isError) return `Could not change account priority: ${errorMessage(reorder.error, 'Update DSH and restart it, then retry.')}`
     if (preference.isError) return errorMessage(preference.error, 'Could not save display preference.')
-    if (fileQuery.isError) return 'Account priority is unavailable. Retry when the account Host is available.'
+    if (fileQuery.isError) return 'Account priority did not load. Retry once DSH is reachable.'
     return null
   }
   return {

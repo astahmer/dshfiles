@@ -19,7 +19,7 @@ export const agentPlanSettings = defineSettings({
       .description('Add "Ask to fix" beside Retry on a failed turn. It writes a request in the composer for you to review and send.'),
     compactionMeter: Schema.boolean()
       .default(true)
-      .description('Show how many tokens are left before automatic compaction in the context meter panel. Needs @dshfiles/context-compaction.'),
+      .description('Show how many tokens are left before automatic compaction in the context meter panel. Needs the context compaction plugin.'),
   }),
   applies: 'live',
 })

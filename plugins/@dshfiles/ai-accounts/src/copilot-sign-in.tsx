@@ -138,7 +138,7 @@ export const CopilotSignIn = (props: {
       )}
       {statusQuery.isError ? (
         <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
-          Sign-in status will refresh when the Host is available.
+          Sign-in status refreshes once DSH is reachable.
         </p>
       ) : null}
     </div>
