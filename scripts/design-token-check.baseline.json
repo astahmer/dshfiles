@@ -5,7 +5,8 @@
     "raw-colour": 91,
     "native-icons": 70,
     "default-shadow": 92,
-    "numeric-duration": 47
+    "numeric-duration": 47,
+    "viewport-variant": 46
   },
   "counts": {
     "arbitrary-radius/attachment-gallery": 1,
@@ -71,6 +72,16 @@
     "raw-colour/thread-sidebar": 1,
     "raw-colour/user-questions": 4,
     "raw-colour/whiteboard": 2,
-    "raw-colour/workspace-nav": 4
+    "raw-colour/workspace-nav": 4,
+    "viewport-variant/ai-accounts": 3,
+    "viewport-variant/jujutsu": 11,
+    "viewport-variant/mcp-servers": 2,
+    "viewport-variant/plugin-ui": 16,
+    "viewport-variant/project-automations": 1,
+    "viewport-variant/secret-catalog": 3,
+    "viewport-variant/settings-shell": 2,
+    "viewport-variant/sidebar-right": 1,
+    "viewport-variant/thread-sidebar": 3,
+    "viewport-variant/workbench": 4
   }
 }

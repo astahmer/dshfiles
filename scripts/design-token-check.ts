@@ -107,6 +107,14 @@ export const designTokenRules: readonly DesignTokenRule[] = [
     use: 'a duration token (dshx:duration-(--dshx-duration-fade|menu|panel|sheet)), or the kit component that already animates',
     matches: (line, file) => classes(line, file, token => /^duration-(?:\d+|\[[^\]]+\])$/.test(token.utility)),
   },
+  {
+    // A plugin renders in a pane, not the window: a split pane at 480 px on a wide screen still gets `md:`. A
+    // dialog's `sm:max-w-*` width is the one defensible use (the dialog portals to the window).
+    id: 'viewport-variant',
+    use: 'a container query (dshx:@container with dshx:@md:…), or the kit component that adapts',
+    matches: (line, file) =>
+      classes(line, file, token => token.variants.some(variant => /^(?:max-)?(?:sm|md|lg|xl|2xl)$/.test(variant)) && !/^max-w-/.test(token.utility)),
+  },
 ]
 
 /** Files that define the tokens: colour literals there are the palette itself. */

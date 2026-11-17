@@ -96,3 +96,11 @@ test('numeric-duration: a number or an arbitrary time, not a motion token', () =
     'dshx:hover:duration-[350ms]',
   ])
 })
+
+test('viewport-variant: window breakpoints, not container queries or dialog widths', () => {
+  assert.deepEqual(ruleHits('viewport-variant', "cn('dshx:md:text-sm dshx:max-sm:hidden dshx:hover:lg:flex dshx:@md:flex dshx:sm:max-w-lg dshx:smooth')"), [
+    'dshx:md:text-sm',
+    'dshx:max-sm:hidden',
+    'dshx:hover:lg:flex',
+  ])
+})
