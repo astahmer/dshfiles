@@ -214,7 +214,7 @@ When('the server is signed in through the provider page', async ({ page }: { pag
 Then("the server loads with the provider's tool and reads {string}", async ({ page }: { page: Page }, status: string) => {
   await recordAssertion(page, 'mcp-servers-oauth-sign-in-loads-the-server', async () => {
     await expect(oauthRow(page)).toContainText(status, { timeout: 30_000 })
-    await expect(oauthRow(page)).toContainText('1 Host tools registered', { timeout: 30_000 })
+    await expect(oauthRow(page)).toContainText('1 DSH tools registered', { timeout: 30_000 })
     expect(fakeOAuthMcpFor(page).acceptedTokens.size).toBe(1)
     expect(fakeOAuthMcpFor(page).registeredClientNames).toEqual(['DSH MCP servers'])
   })
@@ -227,7 +227,7 @@ When('the server is signed out', async ({ page }: { page: Page }) => {
 Then('the server asks for sign-in again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'mcp-servers-oauth-sign-out-drops-the-grant', async () => {
     await expect(oauthRow(page)).toContainText('Sign-in required', { timeout: 30_000 })
-    await expect(oauthRow(page)).not.toContainText('1 Host tools registered')
+    await expect(oauthRow(page)).not.toContainText('1 DSH tools registered')
   })
   await finishJourneyAssertions(page)
 })

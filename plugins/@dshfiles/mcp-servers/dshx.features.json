@@ -238,7 +238,7 @@
         "fill textbox \"Display name\" \"Echo server\"",
         "fill textbox \"Command and arguments\" \"node tooling/dshx/e2e/support/fake-mcp-server.mjs\"",
         "click button \"Add server\"",
-        "expect text \"Native client loaded · 1 Host tools registered\"",
+        "expect text \"Native client loaded · 1 DSH tools registered\"",
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"MCP autocomplete tool context\"",
         "click button \"Send message\"",
