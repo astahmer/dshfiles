@@ -5,7 +5,7 @@ export { HostsPage } from './hosts-page.js'
 export { InventoryPoll } from './inventory-poll.js'
 export { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 export { RemoteSessionBootstrap } from './remote-session-bootstrap.js'
-export { shouldBootstrapRemoteSession } from './remote-session-bootstrap-policy.js'
+export { shouldBootstrapRemoteSession, type ShownSession } from './remote-session-bootstrap-policy.js'
 export { remoteDirectoryPicker } from './remote-folders.js'
 export {
   HOSTS_PANEL_ID,
