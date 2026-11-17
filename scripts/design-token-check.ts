@@ -101,6 +101,12 @@ export const designTokenRules: readonly DesignTokenRule[] = [
     use: 'an elevation step (dshx:shadow-s1/s2/s3, var(--dshx-elevation-*)), or a border instead of depth',
     matches: (line, file) => classes(line, file, token => /^shadow-(?:2xs|xs|sm|md|lg|xl|2xl)(?:\/[\w.[\]-]+)?$/.test(token.utility)),
   },
+  {
+    // A number cannot follow the scale when it moves; the duration tokens name the job (hover, fade, menu, panel, sheet).
+    id: 'numeric-duration',
+    use: 'a duration token (dshx:duration-(--dshx-duration-fade|menu|panel|sheet)), or the kit component that already animates',
+    matches: (line, file) => classes(line, file, token => /^duration-(?:\d+|\[[^\]]+\])$/.test(token.utility)),
+  },
 ]
 
 /** Files that define the tokens: colour literals there are the palette itself. */
