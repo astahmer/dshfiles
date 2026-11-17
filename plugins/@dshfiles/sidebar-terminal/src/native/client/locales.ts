@@ -9,10 +9,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** Simplified Chinese terminal copy. */
 export const zh = {
-  'shortcut.noSession': '请先选择会话',
+  'shortcut.noSession': '请先选择对话',
   recoveryFailed: '恢复终端失败：{message}', retryRecovery: '重试恢复终端',
-  shell: '选择 Shell', shellLoading: '正在读取 Shell…', shellEmpty: '没有可用的 Shell', description: '在会话工作区运行命令',
-  addExcerpt: '添加选中内容到对话', excerptFailed: '无法添加到对话，请打开此会话并重试。',
+  shell: '选择 Shell', shellLoading: '正在读取 Shell…', shellEmpty: '没有可用的 Shell', description: '在对话工作区运行命令',
+  addExcerpt: '添加选中内容到对话', excerptFailed: '无法添加到对话，请打开此对话并重试。',
   excerptNoSelection: '请先选中终端内容。',
   title: '终端', new: '新建终端', loading: '正在读取终端环境…', creating: '正在启动…',
   connecting: '正在连接…', disconnected: '连接已断开。', reconnect: '重新连接',
@@ -33,10 +33,10 @@ export const zh = {
 
 /** English terminal copy. */
 export const en = {
-  'shortcut.noSession': 'Select a session first',
+  'shortcut.noSession': 'Select a thread first',
   recoveryFailed: 'Terminal recovery failed: {message}', retryRecovery: 'Retry terminal recovery',
-  shell: 'Choose shell', shellLoading: 'Loading shells…', shellEmpty: 'No shells available', description: 'Run commands in the Session workspace',
-  addExcerpt: 'Add selection to chat', excerptFailed: 'Could not add to chat. Open this session and try again.',
+  shell: 'Choose shell', shellLoading: 'Loading shells…', shellEmpty: 'No shells available', description: 'Run commands in the thread’s workspace',
+  addExcerpt: 'Add selection to the thread', excerptFailed: 'Could not add to the thread. Open it, then retry.',
   excerptNoSelection: 'Select terminal output first.',
   title: 'Terminal', new: 'New terminal', loading: 'Reading terminal environment…', creating: 'Starting…',
   connecting: 'Connecting…', disconnected: 'Disconnected.', reconnect: 'Reconnect',
@@ -57,13 +57,13 @@ export const en = {
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
-  'shortcut.noSession': '先にセッションを選択してください',
+  'shortcut.noSession': '先にスレッドを選択してください',
   'recoveryFailed': 'ターミナルの復元に失敗しました: {message}',
   'retryRecovery': 'ターミナルの復元を再試行',
   'shell': 'シェルを選択',
   'shellLoading': 'シェルを読み込み中…',
   'shellEmpty': '利用可能なシェルがありません',
-  'description': 'セッションのワークスペースでコマンドを実行',
+  'description': 'スレッドのワークスペースでコマンドを実行',
   'title': 'ターミナル',
   'new': '新しいターミナル',
   'loading': 'ターミナル環境を読み込み中…',
@@ -90,15 +90,15 @@ export const ja = {
   'badge.sandbox': 'サンドボックス',
   'badge.readOnlyHint': 'コマンドはエージェントの読み取り専用サンドボックスで実行されます（ここで入力したコマンドも含みます）。',
   'badge.workspaceWriteHint': 'コマンドはエージェントのワークスペースサンドボックスで実行されます（ここで入力したコマンドも含みます）。',
-  addExcerpt: '選択範囲をチャットに追加', excerptFailed: 'チャットに追加できませんでした。このセッションを開いて再試行してください。',
+  addExcerpt: '選択範囲をチャットに追加', excerptFailed: 'チャットに追加できませんでした。このスレッドを開いて再試行してください。',
   excerptNoSelection: '先にターミナル出力を選択してください。',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
-  'shortcut.noSession': 'Seleccione una sesión primero',
+  'shortcut.noSession': 'Seleccione una conversación primero',
   recoveryFailed: 'Falló la recuperación del terminal: {message}', retryRecovery: 'Reintentar la recuperación del terminal',
-  shell: 'Elige concha', shellLoading: 'Cargando proyectiles…', shellEmpty: 'No hay conchas disponibles', description: 'Ejecutar comandos en el espacio de trabajo de sesión',
+  shell: 'Elige concha', shellLoading: 'Cargando proyectiles…', shellEmpty: 'No hay conchas disponibles', description: 'Ejecutar comandos en el espacio de trabajo de conversación',
   title: 'terminales', new: 'Nueva terminal', loading: 'Entorno de terminal de lectura...', creating: 'Empezando…',
   connecting: 'Conectando…', disconnected: 'Desconectado.', reconnect: 'Reconectar',
   readonly: 'Esta vista es de sólo lectura.', control: 'toma el control',
@@ -114,15 +114,15 @@ export const es = {
   'badge.sandbox': 'Sandbox',
   'badge.readOnlyHint': 'Los comandos se ejecutan en el sandbox de solo lectura del agente, incluidos los que escriba aquí.',
   'badge.workspaceWriteHint': 'Los comandos se ejecutan en el sandbox del espacio de trabajo del agente, incluidos los que escriba aquí.',
-  addExcerpt: 'Añadir selección al chat', excerptFailed: 'No se pudo añadir al chat. Abra esta sesión e inténtelo de nuevo.',
+  addExcerpt: 'Añadir selección al chat', excerptFailed: 'No se pudo añadir al chat. Abra esta conversación e inténtelo de nuevo.',
   excerptNoSelection: 'Seleccione primero la salida del terminal.',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
-  'shortcut.noSession': "Sélectionnez d'abord une session",
+  'shortcut.noSession': 'Sélectionnez d\'abord une conversation',
   recoveryFailed: 'Échec de la récupération du terminal : {message}', retryRecovery: 'Réessayez la récupération du terminal',
-  shell: 'Choisissez la coque', shellLoading: 'Chargement des obus…', shellEmpty: 'Aucune coquille disponible', description: 'Exécuter des commandes dans l’espace de travail de la session',
+  shell: 'Choisissez la coque', shellLoading: 'Chargement des obus…', shellEmpty: 'Aucune coquille disponible', description: 'Exécuter des commandes dans l’espace de travail de la conversation',
   title: 'Borne', new: 'Nouvelle borne', loading: 'Environnement du terminal de lecture…', creating: 'Commencer…',
   connecting: 'Connexion…', disconnected: 'Déconnecté.', reconnect: 'Reconnecter',
   readonly: 'Cette vue est en lecture seule.', control: 'Prenez le contrôle',
@@ -138,15 +138,15 @@ export const fr = {
   'badge.sandbox': 'Sandbox',
   'badge.readOnlyHint': 'Les commandes s’exécutent dans le sandbox en lecture seule de l’agent, y compris celles que vous saisissez ici.',
   'badge.workspaceWriteHint': 'Les commandes s’exécutent dans le sandbox de l’espace de travail de l’agent, y compris celles que vous saisissez ici.',
-  addExcerpt: 'Ajouter la sélection au chat', excerptFailed: "Impossible d'ajouter au chat. Ouvrez cette session et réessayez.",
+  addExcerpt: 'Ajouter la sélection au chat', excerptFailed: 'Impossible d\'ajouter au chat. Ouvrez cette conversation et réessayez.',
   excerptNoSelection: "Sélectionnez d'abord la sortie du terminal.",
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
 export const de = {
-  'shortcut.noSession': 'Wählen Sie zunächst eine Sitzung aus',
+  'shortcut.noSession': 'Wählen Sie zunächst eine Unterhaltung aus',
   recoveryFailed: 'Terminalwiederherstellung fehlgeschlagen: {message}', retryRecovery: 'Versuchen Sie die Terminalwiederherstellung erneut',
-  shell: 'Wählen Sie Shell', shellLoading: 'Granaten werden geladen…', shellEmpty: 'Keine Muscheln verfügbar', description: 'Führen Sie Befehle im Sitzungsarbeitsbereich aus',
+  shell: 'Wählen Sie Shell', shellLoading: 'Granaten werden geladen…', shellEmpty: 'Keine Muscheln verfügbar', description: 'Führen Sie Befehle im Unterhaltungsarbeitsbereich aus',
   title: 'Terminal', new: 'Neues Terminal', loading: 'Terminalumgebung lesen…', creating: 'Beginnend mit …',
   connecting: 'Verbinden…', disconnected: 'Nicht verbunden.', reconnect: 'Wieder verbinden',
   readonly: 'Diese Ansicht ist schreibgeschützt.', control: 'Übernehmen Sie die Kontrolle',
@@ -162,15 +162,15 @@ export const de = {
   'badge.sandbox': 'Sandbox',
   'badge.readOnlyHint': 'Befehle laufen in der schreibgeschützten Sandbox des Agenten, auch Befehle, die Sie hier eingeben.',
   'badge.workspaceWriteHint': 'Befehle laufen in der Arbeitsbereich-Sandbox des Agenten, auch Befehle, die Sie hier eingeben.',
-  addExcerpt: 'Auswahl zum Chat hinzufügen', excerptFailed: 'Konnte nicht zum Chat hinzugefügt werden. Öffnen Sie diese Sitzung und versuchen Sie es erneut.',
+  addExcerpt: 'Auswahl zum Chat hinzufügen', excerptFailed: 'Konnte nicht zum Chat hinzugefügt werden. Öffnen Sie diese Unterhaltung und versuchen Sie es erneut.',
   excerptNoSelection: 'Wählen Sie zuerst eine Terminalausgabe aus.',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
-  'shortcut.noSession': 'Сначала выберите сеанс',
+  'shortcut.noSession': 'Сначала выберите тред',
   recoveryFailed: 'Восстановление терминала не удалось: {message}', retryRecovery: 'Повторить попытку восстановления терминала',
-  shell: 'Выбрать оболочку', shellLoading: 'Загрузка снарядов…', shellEmpty: 'Нет доступных ракушек', description: 'Запуск команд в рабочей области сеанса',
+  shell: 'Выбрать оболочку', shellLoading: 'Загрузка снарядов…', shellEmpty: 'Нет доступных ракушек', description: 'Запуск команд в рабочей области треда',
   title: 'Терминал', new: 'Новый терминал', loading: 'Чтение среды терминала…', creating: 'Начало…',
   connecting: 'Подключение…', disconnected: 'Отключено.', reconnect: 'Восстановить соединение',
   readonly: 'Это представление доступно только для чтения.', control: 'Возьмите под свой контроль',
@@ -186,15 +186,15 @@ export const ru = {
   'badge.sandbox': 'Песочница',
   'badge.readOnlyHint': 'Команды выполняются в песочнице агента только для чтения, включая команды, которые вы вводите здесь.',
   'badge.workspaceWriteHint': 'Команды выполняются в песочнице рабочей области агента, включая команды, которые вы вводите здесь.',
-  addExcerpt: 'Добавить выделенное в чат', excerptFailed: 'Не удалось добавить в чат. Откройте этот сеанс и повторите попытку.',
+  addExcerpt: 'Добавить выделенное в чат', excerptFailed: 'Не удалось добавить в чат. Откройте этот тред и повторите попытку.',
   excerptNoSelection: 'Сначала выделите вывод терминала.',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
-  'shortcut.noSession': 'Selecione uma sessão primeiro',
+  'shortcut.noSession': 'Selecione uma conversa primeiro',
   recoveryFailed: 'Falha na recuperação do terminal: {message}', retryRecovery: 'Tentar novamente a recuperação do terminal',
-  shell: 'Escolha a concha', shellLoading: 'Carregando conchas…', shellEmpty: 'Não há conchas disponíveis', description: 'Execute comandos no espaço de trabalho Sessão',
+  shell: 'Escolha a concha', shellLoading: 'Carregando conchas…', shellEmpty: 'Não há conchas disponíveis', description: 'Execute comandos no espaço de trabalho Conversa',
   title: 'Terminais', new: 'Novo terminal', loading: 'Lendo o ambiente do terminal…', creating: 'Começando…',
   connecting: 'Conectando…', disconnected: 'Desconectado.', reconnect: 'Reconectar',
   readonly: 'Esta visualização é somente leitura.', control: 'Assuma o controle',
@@ -210,6 +210,6 @@ export const pt = {
   'badge.sandbox': 'Sandbox',
   'badge.readOnlyHint': 'Os comandos são executados no sandbox somente leitura do agente, incluindo os que você digitar aqui.',
   'badge.workspaceWriteHint': 'Os comandos são executados no sandbox do espaço de trabalho do agente, incluindo os que você digitar aqui.',
-  addExcerpt: 'Adicionar seleção ao chat', excerptFailed: 'Não foi possível adicionar ao chat. Abra esta sessão e tente novamente.',
+  addExcerpt: 'Adicionar seleção ao chat', excerptFailed: 'Não foi possível adicionar ao chat. Abra esta conversa e tente novamente.',
   excerptNoSelection: 'Selecione primeiro a saída do terminal.',
 } satisfies Record<keyof typeof en, string>

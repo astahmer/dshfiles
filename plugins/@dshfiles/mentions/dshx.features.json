@@ -107,7 +107,7 @@
         "expect text \"Threads \u00b7 @f: files\"",
         "press Enter",
         "press Enter",
-        "expect link \"Referenced session*\""
+        "expect link \"Referenced thread*\""
       ],
       "surfaces": ["client"],
       "surface": "entityProvider",

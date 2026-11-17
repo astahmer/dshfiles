@@ -218,7 +218,7 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
   const hooks = hooksQuery.data ?? []
   const busyAction = runMutation.isPending ? (runMutation.variables?.id ?? null) : null
   const notice = runMutation.isError
-    ? 'The action did not start. Confirm the session directory and trusted project root.'
+    ? 'The action did not start. Check the thread’s folder and the trusted project root, then run it again.'
     : actionsQuery.isError || receiptsQuery.isError || hooksQuery.isError
       ? 'Project checks could not load this thread. Refresh and try again.'
       : ''
@@ -239,7 +239,7 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
         <CardTitle className="dshx:text-sm">
           <h2>Project checks</h2>
         </CardTitle>
-        <CardDescription className="dshx:text-xs">Profile-trusted commands run with argv in this session’s project directory.</CardDescription>
+        <CardDescription className="dshx:text-xs">Trusted commands run in this thread’s project folder.</CardDescription>
         <CardAction className="dshx:flex dshx:items-center dshx:gap-1">
           <Button
             type="button"
@@ -272,7 +272,7 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
           Actions
         </h3>
         {actions.length === 0 ? (
-          <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No trusted actions are configured for this session directory.</p>
+          <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No trusted actions are set up for this thread’s folder.</p>
         ) : null}
         <ItemGroup className="dshx:gap-1">
           {actions.map(action => (

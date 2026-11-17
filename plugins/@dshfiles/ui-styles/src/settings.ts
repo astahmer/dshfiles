@@ -46,14 +46,14 @@ export const appearanceSettings = defineSettings({
       .max(24)
       .default(0)
       .description(
-        'Blur under the conversation column while a backdrop scene shows, in px (0–24). The blur is a still of the scene, computed once, so it costs nothing per frame; the scene keeps moving on the sides.',
+        'Blur under the thread column while a backdrop scene shows, in px (0–24).',
       ),
     readingTint: Schema.natural()
       .min(0)
       .max(100)
       .default(0)
       .description(
-        'Extra tint of the theme background under the conversation column while a backdrop shows, in percent (0–100). Each theme already lays the least tint its text needs to stay readable over its scene.',
+        'Extra tint of the theme background under the thread column while a backdrop shows, in percent (0–100).',
       ),
     sceneFrameRate: Schema.natural()
       .min(SCENE_FRAME_RATE.min)
