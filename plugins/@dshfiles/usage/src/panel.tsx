@@ -186,8 +186,8 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
       : status.indexing
         ? 'Indexing thread logs…'
         : `${indexedLogsLabel(status.indexedFiles)}${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, now, relativeTime)}`}`
-  const indexError = status?.lastError == null ? null : `Indexing failed: ${status.lastError}`
-  const refreshError = refresh.isError ? errorMessage(refresh.error, 'Re-indexing failed.') : null
+  const indexError = status?.lastError == null ? null : `Indexing failed. Re-index to retry. ${status.lastError}`
+  const refreshError = refresh.isError ? errorMessage(refresh.error, 'Re-indexing failed. Retry.') : null
 
   return (
     <Page

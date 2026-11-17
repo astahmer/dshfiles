@@ -1881,7 +1881,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             ) : null}
             {fanOutCatalog.error === null ? null : (
               <p role="alert" className="dshx:text-sm dshx:text-destructive">
-                {errorMessage(fanOutCatalog.error, 'Could not load model catalog.')}
+                {errorMessage(fanOutCatalog.error, 'Could not load models. Reopen this dialog to retry.')}
               </p>
             )}
           </div>

@@ -44,7 +44,7 @@ export const ProjectFolderSetup = (props: {
   const publish = useMutation({
     mutationFn: (visibility: 'private' | 'public') => props.api.publishProject({ path: props.path, visibility }),
     onSuccess: project => setPublished(project.repository),
-    onError: cause => setError(errorMessage(cause, 'Could not publish this repository.')),
+    onError: cause => setError(errorMessage(cause, 'Could not publish this repository. Retry.')),
   })
   const [enabling, setEnabling] = useState(false)
   const [published, setPublished] = useState<string | null>(null)
@@ -130,7 +130,7 @@ export const ProjectFolderSetup = (props: {
           )}
           {inspection.isError && (
             <Alert variant="destructive">
-              <AlertDescription>{errorMessage(inspection.error, 'Could not read this folder.')}</AlertDescription>
+              <AlertDescription>{errorMessage(inspection.error, 'Could not read this folder. Check that it exists, then pick it again.')}</AlertDescription>
             </Alert>
           )}
           <ProjectTonePicker choice={color} name={name} onChange={setColor} />

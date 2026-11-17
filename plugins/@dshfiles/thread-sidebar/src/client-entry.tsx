@@ -369,7 +369,7 @@ export default defineClient({
       list: async (sessionId, signal) => {
         const result = await ctx.remote.skills.list({ sessionId }, signal)
         signal.throwIfAborted()
-        if (!result.ok) throw new Error('Skill catalog is unavailable.')
+        if (!result.ok) throw new Error('Skills did not load. Retry.')
         return result.value.skills
       },
       section: translate('threadSidebarSkillSource'),
