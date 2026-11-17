@@ -287,6 +287,13 @@ export const copyRules: readonly CopyRule[] = [
   { id: 'package-name', use: 'the plugin or feature name users see', scope: 'any', test: packageNameInCopy },
   // `any`: `Failed: ${error}` is one word before the hole, so it is neither prose nor always a label.
   { id: 'raw-error-echo', use: 'a sentence that says what failed and what to do next; the cause under Details', scope: 'any', test: rawErrorEcho },
+  // A whole label only: "Running tests" or "3 completed" is detail text, which plugins may add.
+  {
+    id: 'status-word',
+    use: 'one of the six states (Working, Needs you, Failed, Ready, Idle, Done) from WorkStatus',
+    scope: 'label',
+    test: text => /^(?:Running|Completed|In progress|Finished|Succeeded|Inactive|Input needed|Needs attention)$/i.test(text.trim()) && /^[A-Z]/.test(text.trim()),
+  },
 ]
 
 export interface CopyComparison {
