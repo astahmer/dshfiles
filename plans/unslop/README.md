@@ -5,8 +5,8 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1 to 10 are done. Steps 12 and 13 were dispatched on 2026-11-16; steps 11 (copy) and 14
-(guardrails) wait for them, because they touch every plugin and re-baseline the ratchets. See [Work list](#work-list).
+**Resume here:** steps 1 to 10 and 13 are done. Step 12 (Backlog and Traces) is running; steps 11 (copy) and 14
+(guardrails) wait for it, because they touch every plugin and re-baseline the ratchets. See [Work list](#work-list).
 
 ## Method and limits
 
@@ -200,7 +200,7 @@ before and passes after; see each revision's description for the reason.
 | 10 ✅ | Developer pages in a "Developer" group at the end of Settings (setting to hide it, shown by default); Capabilities hub quiet and no longer first; Plugin Market says what to do. See [Destinations lane](#destinations-lane). | N9 | small |
 | 11   | Copy: catalog summary cap, error strings with a next step, `compactJson` renders, six status words, glossary in native forks.                          | C1–C8             | large  |
 | 12   | Backlog, History, Source control and Traces onto `Page`.                                                                                               | P5, P7, P8, P12   | large  |
-| 13   | Phone: type scale, landscape shell, thread panel sheet, palette as full-screen search, hide keyboard hints on touch.                                   | U7, U8, N12       | large  |
+| 13 ✅ | Phone: kit text follows the density tokens (15/13 px), a sideways phone keeps the phone shell, full-screen palette, no keyboard hints on touch, page titles printed once. See [Phone lane](#phone-lane). | U7, U8, N12 | large |
 | 14   | Guardrails: both ratchets into `check:green` after re-baselining, widen `copy-check`, add rules for shadows, durations, viewport variants and solid status fills, repair the catalog walks. | G1–G7 | medium |
 
 ## Transcript lane
@@ -358,6 +358,37 @@ Unverified:
   checked.
 
 jj-integration's Host half changed (`/rebase` wording), so a running instance needs a restart.
+
+## Phone lane
+
+16 revisions (`kywtrloqyoup` … `oqqzukqypllq`) in plugin-ui, input-trigger, deliverables, frame-layout,
+command-palette, and the phone parts of thread-sidebar and rich-composer. All client code.
+
+- Text: `.dshx-root` and `--text-xs|sm|base` were fixed rem values and nothing read the density tokens. They now
+  read `--dshx-density-text-*` with the old values as fallback, so a coarse-pointer phone gets 15/13 px. Desktop
+  text sizes were compared node by node on two pages before and after: unchanged.
+- One phone-shell rule in the kit (`plugin-ui/lib/phone-shell`: under 640 px wide, or a coarse pointer under 500 px
+  tall). A sideways phone now keeps the phone shell, top bar and status pill instead of the desktop rail.
+- The palette is a full-screen search on a phone, with no key legend; results end at the keyboard.
+- Keyboard hints in kit menus are hidden on a touch screen. A page title is printed once under the phone top bar
+  (the `h1` stays for screen readers).
+- The `+`/`@`/`/` lists have 44 px rows, 13 px labels and a 16 px radius, and stay above the composer so typing still
+  filters. Edited-file counts read 12 px. The mode chip keeps "Can edit" and the model name truncates first.
+- Land is a tab root on a phone (no "‹ More"); empty rows are dropped from the phone status list.
+
+Did not reproduce: the status pill covering page content; a menu-sheet handle that does not drag.
+
+Not done: "Land" as a header button on a phone (the workspace control's slot only renders inside the `⋯` sheet
+there; jj-integration could fill the slot the phone bar already shows). Proposed, not built: tabs Threads · Inbox ·
+New · More with Land under More.
+
+For other plugins: workbench, rich-composer (four components) and onboarding still key phone layout on width alone and
+should use the kit rule; the model picker's bordered card and the thread panel's white sheet are two more sheet looks;
+11 px text remains in Usage chart axes, the question card header and the failure card's code.
+
+Unverified: measured in Playwright WebKit 26.0 with an iPhone 14 descriptor, not on the device. Journeys:
+frame-layout 2/2, command-palette 17/18, input-trigger 2/3, thread-sidebar's phone scenario; each failure fails at
+the base at the same step. The deliverables card was checked by CSS test only.
 
 ## Destinations lane
 
