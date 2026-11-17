@@ -23,6 +23,8 @@ export interface CodeEditorHandle {
   markSaved(documentId: string, version: number): void
   setDark(dark: boolean): void
   focus(): void
+  /** Trigger the in-editor find widget (Ctrl+F / Cmd+F). */
+  triggerFind(): void
   dispose(): void
 }
 

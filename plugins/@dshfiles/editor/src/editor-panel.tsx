@@ -265,9 +265,25 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
     <div
       className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground"
       onKeyDownCapture={event => {
-        if (event.key !== 's' || !(event.metaKey || event.ctrlKey)) return
-        event.preventDefault()
-        requestSaveRef.current()
+        const isMod = event.metaKey || event.ctrlKey
+        if (event.key === 's' && isMod) {
+          event.preventDefault()
+          requestSaveRef.current()
+          return
+        }
+        // Ctrl+F / Cmd+F: trigger Monaco's find widget
+        if (event.key === 'f' && isMod && !event.shiftKey && editable) {
+          event.preventDefault()
+          handleRef.current?.triggerFind()
+          return
+        }
+        // Ctrl+Shift+F / Cmd+Shift+F: open global file search (dispatch Ctrl+P to trigger the sidebar's file search)
+        if (event.key === 'f' && isMod && event.shiftKey) {
+          event.preventDefault()
+          // Dispatch the standard file search shortcut (Ctrl+P / Cmd+P) which the sidebar handles
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP', ctrlKey: !event.metaKey, metaKey: event.metaKey, bubbles: true }))
+          return
+        }
       }}
     >
       <div className="dshx:flex dshx:h-8 dshx:flex-none dshx:items-center dshx:gap-1 dshx:border-b dshx:px-1">
@@ -326,22 +342,6 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           <SaveIcon />
         </Button>
       </div>
-      {showTree && (
-        <div className="dshx:max-h-[40%] dshx:min-h-24 dshx:flex-none dshx:overflow-auto dshx:border-b">
-          <div className="dshx:flex dshx:items-center dshx:justify-between dshx:px-2 dshx:pt-1 dshx:text-2xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">
-            Files
-            <Button
-              aria-label="Refresh files"
-              onClick={() => void queryClient.invalidateQueries({ queryKey: ['dshfiles-editor', 'list', sessionId] })}
-              size="icon-xs"
-              variant="ghost"
-            >
-              <RefreshCwIcon />
-            </Button>
-          </div>
-          <FileTree activePath={active?.path ?? null} onOpen={path => props.store.open(sessionId, { path })} remote={props.remote} sessionId={sessionId} />
-        </div>
-      )}
       {active?.diskChanged === true && (
         <div className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-b dshx:bg-warning/10 dshx:px-2 dshx:py-1 dshx:text-xs" role="status">
           <span className="dshx:min-w-0 dshx:flex-1">Changed on disk while you were editing.</span>
@@ -353,18 +353,36 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           </Button>
         </div>
       )}
-      <div className="dshx:relative dshx:min-h-0 dshx:flex-1">
-        <div className={cn('dshx:absolute dshx:inset-0', !editable && 'dshx:invisible')} data-editor-surface="" ref={containerRef} />
-        {active?.status === 'ready' && <FilePreview document={active} remote={props.remote} />}
-        {viewing && (
-          <div className="dshx:absolute dshx:inset-0 dshx:overflow-auto dshx:bg-background dshx:p-4" data-file-viewer={viewer.id}>
-            <viewer.component sessionId={sessionId} path={active.path} text={handleRef.current?.snapshot(active.id)?.text ?? active.text} />
+      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-row">
+        {showTree && (
+          <div className="dshx:flex dshx:w-60 dshx:flex-none dshx:flex-col dshx:overflow-auto dshx:border-r">
+            <div className="dshx:flex dshx:items-center dshx:justify-between dshx:px-2 dshx:pt-1 dshx:text-2xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">
+              Files
+              <Button
+                aria-label="Refresh files"
+                onClick={() => void queryClient.invalidateQueries({ queryKey: ['dshfiles-editor', 'list', sessionId] })}
+                size="icon-xs"
+                variant="ghost"
+              >
+                <RefreshCwIcon />
+              </Button>
+            </div>
+            <FileTree activePath={active?.path ?? null} onOpen={path => props.store.open(sessionId, { path })} remote={props.remote} sessionId={sessionId} />
           </div>
         )}
-        {active === undefined && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Pick a file in the tree, or open one from another panel.</p>}
-        {active?.status === 'loading' && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Loading {active.name}…</p>}
-        {active?.status === 'error' && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">{active.error}</p>}
-        {engineError && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">The editor could not start.</p>}
+        <div className="dshx:relative dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
+          <div className={cn('dshx:absolute dshx:inset-0', !editable && 'dshx:invisible')} data-editor-surface="" ref={containerRef} />
+          {active?.status === 'ready' && <FilePreview document={active} remote={props.remote} />}
+          {viewing && (
+            <div className="dshx:absolute dshx:inset-0 dshx:overflow-auto dshx:bg-background dshx:p-4" data-file-viewer={viewer.id}>
+              <viewer.component sessionId={sessionId} path={active.path} text={handleRef.current?.snapshot(active.id)?.text ?? active.text} />
+            </div>
+          )}
+          {active === undefined && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Pick a file in the tree, or open one from another panel.</p>}
+          {active?.status === 'loading' && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Loading {active.name}…</p>}
+          {active?.status === 'error' && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">{active.error}</p>}
+          {engineError && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">The editor could not start.</p>}
+        </div>
       </div>
       <div className="dshx:flex dshx:h-6 dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-t dshx:px-2 dshx:text-2xs dshx:text-muted-foreground">
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate" title={active?.path}>

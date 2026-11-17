@@ -140,6 +140,10 @@ export const monacoEngine: CodeEditorEngine = {
       },
       setDark: dark => monaco.editor.setTheme(dark ? DARK_THEME : LIGHT_THEME),
       focus: () => editor.focus(),
+      triggerFind: () => {
+        editor.focus()
+        editor.trigger('keyboard', 'actions.find', null)
+      },
       dispose: () => {
         editor.dispose()
         for (const model of models.values()) releaseModel(model)
