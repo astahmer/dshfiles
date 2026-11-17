@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "markdown-question-guidance",
-      "title": "ask_user_question tells the model that questions are markdown",
-      "summary": "The forked ask_user_question tool keeps the upstream schema and answer encoding and only rewrites its description text: question text and option descriptions are Markdown, the first paragraph is the heading, and a ```html preview fence becomes a sandboxed HTML view with no network and no same-origin access.",
+      "title": "The agent knows questions can use Markdown",
+      "summary": "The agent is told that its questions can use Markdown and HTML previews.",
+      "details": "The forked ask_user_question tool keeps the upstream schema and answer encoding and only rewrites its description text: question text and option descriptions are Markdown, the first paragraph is the heading, and a ```html preview fence becomes a sandboxed HTML view with no network and no same-origin access.",
       "surfaces": ["host"],
       "configuration": [],
       "states": ["legacy", "timed"],

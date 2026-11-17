@@ -75,7 +75,7 @@ From the onboarding feature catalog: 45 features, the 32 curated ones first.
 10. **Provider context-overflow recognition** (`context-compaction`) — A context overflow from any provider triggers one compaction and a retry.
 11. **Idle compaction before cache expiry** (`context-compaction`) — Off by default: a large idle thread compacts before its prompt cache expires.
 12. **Next automatic compaction for a thread** (`context-compaction`) — The agent can ask how many tokens remain before a thread compacts.
-13. **Search and disclose tools per agent** (`tool-search`) — Keep a bounded global tool surface per agent and progressively reveal ranked global tools through Native Tool Mode search.
+13. **Search and disclose tools per agent** (`tool-search`) — The agent starts with a small set of tools and finds others by searching for them.
 
 ## Enable it
 

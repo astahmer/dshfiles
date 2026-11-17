@@ -5,7 +5,8 @@
     {
       "id": "public-post-context",
       "title": "Fetch public X post, photos, video samples, and thread posts",
-      "summary": "Fetch a public post, quote, multiple photos, same-author thread follow-ups, and content-aware video samples with bounded frame and media budgets.",
+      "summary": "The agent can read a public X post with its photos, video frames and thread replies.",
+      "details": "Fetch a public post, quote, multiple photos, same-author thread follow-ups, and content-aware video samples with bounded frame and media budgets.",
       "surfaces": ["host", "integration"],
       "surface": "agentToolOnly",
       "destination": "none",

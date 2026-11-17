@@ -1,6 +1,6 @@
 # @dshfiles/thread-transfer
 
-![Export a thread to a portable .dshthread bundle](docs/screenshots/thread-export.png)
+![Export a thread to a file](docs/screenshots/thread-export.png)
 
 Hand a thread to someone on another machine. **Export…** saves the whole
 conversation — every message, tool call and result, attachment, the title and
@@ -17,7 +17,7 @@ source machine is needed to read or continue the thread.
 | Command palette                   | **Export this thread…** does the same for the open thread.                                                                                                                |
 | Command palette                   | **Import thread…** picks a `.dshthread` file, previews its title, counts and model, and imports it into a registered project, the home folder or another folder you type. |
 
-![Import a .dshthread bundle as a new thread](docs/screenshots/thread-import.png)
+![Import a thread from a file](docs/screenshots/thread-import.png)
 
 The imported thread gets a fresh id and opens right away. It is an ordinary
 thread: continue it, rename it, or archive it to undo the import. The source

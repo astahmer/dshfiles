@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "live-model-selection-policy",
-      "title": "Subagent model routes follow the saved setting in running threads",
-      "summary": "The forked subagent and subagent_fork tools keep upstream's schema and delegation behaviour, but the allowed child model routes are re-read from the Subagents model-selection setting at each delegation or list_subagent_models call. A changed list appends a replacement subagent/model-selection-policy event, and the policy projection keeps the latest one, so a route added after a thread started is accepted without a new thread.",
+      "title": "Subagent models follow your setting",
+      "summary": "Running threads use the subagent models you allowed in Settings without a restart.",
+      "details": "The forked subagent and subagent_fork tools keep upstream's schema and delegation behaviour, but the allowed child model routes are re-read from the Subagents model-selection setting at each delegation or list_subagent_models call. A changed list appends a replacement subagent/model-selection-policy event, and the policy projection keeps the latest one, so a route added after a thread started is accepted without a new thread.",
       "surfaces": ["host"],
       "configuration": [],
       "states": ["enabled", "disabled-mid-session"],
