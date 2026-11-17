@@ -194,7 +194,7 @@ When('a thread is started and the New Session screen opens again', async ({ page
   await createWorkbenchWorkspace(page)
   await sendMessage(page, 'dock thread one')
   // Back to the screen with no thread on it: the dock must not depend on a session at all.
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await page.getByRole('button', { name: /^(?:New thread|New session)$/ }).first().click()
   await expect(page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
 })
 

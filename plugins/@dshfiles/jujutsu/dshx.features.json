@@ -634,7 +634,7 @@
         "click link \"Jujutsu bookmark: Sample project (main)\"",
         "expect button \"Jujutsu view settings\"",
         "click button \"Jujutsu view settings\"",
-        "expect text \"Open Jujutsu refs from chat\"",
+        "expect text \"Open Jujutsu refs from threads\"",
         "click menuitem \"Chat reference click (focus revision)\"",
         "expect text \"Focus revision\"",
         "expect text \"Compare with main/default and show history path\"",

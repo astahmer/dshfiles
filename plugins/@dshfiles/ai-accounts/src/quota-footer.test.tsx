@@ -585,7 +585,7 @@ describe('actual quota strip and usage popover unavailable-account regression', 
     const button = quotaButton('Codex Example')
     expect(button.getAttribute('data-active-account')).toBe(UNAVAILABLE_ACCOUNT_ID)
     expect(button.getAttribute('aria-current')).toBe('true')
-    expect(button.getAttribute('aria-label')).toBe(`${UNAVAILABLE_LABEL}. ${running ? 'In use by active chat' : 'Last used by active chat'}`)
+    expect(button.getAttribute('aria-label')).toBe(`${UNAVAILABLE_LABEL}. ${running ? 'In use by this thread' : 'Last used by this thread'}`)
     expect(strip().querySelectorAll(`[data-active-account="${UNAVAILABLE_ACCOUNT_ID}"]`)).toHaveLength(1)
     expectNoSyntheticQuota(button)
     expect(button.textContent).toContain('Sign in again')
@@ -636,7 +636,7 @@ describe('actual quota strip and usage popover unavailable-account regression', 
       activeAccountRunning: true,
     })
     const chip = strip().querySelector<HTMLButtonElement>(`button[data-active-account="${UNAVAILABLE_ACCOUNT_ID}"]`)
-    expect(chip?.getAttribute('aria-label')).toBe('Codex Example. In use by active chat. Quota unavailable or hidden.')
+    expect(chip?.getAttribute('aria-label')).toBe('Codex Example. In use by this thread. Quota unavailable or hidden.')
     expect(chip?.getAttribute('aria-current')).toBe('true')
     expect(accountButtons()).toHaveLength(2)
     expect(accountButtons().some(button => button.getAttribute('aria-label') === UNAVAILABLE_LABEL)).toBe(false)

@@ -27,7 +27,7 @@ Feature: Ranked @ mentions and thread links
     And threads named "Mention target" and "Second thread" are started
     And a new thread mentions "Mention target" and is sent
     Then the sent message links to "Mention target"
-    When the "Referenced session" link is clicked
+    When the "Referenced thread" link is clicked
     Then the thread "Mention target" is shown
     When the sending thread is shown again and its thread chip is Cmd-clicked
     Then the thread "Mention target" is shown in a tab of its own

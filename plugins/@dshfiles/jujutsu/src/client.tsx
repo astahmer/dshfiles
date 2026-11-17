@@ -2330,7 +2330,7 @@ const PreferencesMenu = (): JSX.Element => {
           className="dshx:text-xs"
           onCheckedChange={checked => setPreference('chatReferenceLinks', checked)}
         >
-          Open Jujutsu refs from chat
+          Open Jujutsu refs from threads
         </DropdownMenuCheckboxItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="dshx:text-xs">

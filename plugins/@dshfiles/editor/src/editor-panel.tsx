@@ -44,7 +44,7 @@ const isDarkTheme = (): boolean => document.body.hasAttribute('data-ds-dark-them
 const DIALOG_COPY = {
   approve: {
     title: 'Write this file to disk?',
-    description: 'The editor writes inside the session workspace only. Later saves of this tab will not ask again.',
+    description: 'The editor writes inside the thread’s workspace only. Later saves of this tab will not ask again.',
     action: 'Save',
   },
   conflict: {
@@ -228,7 +228,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   }, [state.documents, active, engine])
 
   if (props.sessionId === undefined) {
-    return <p className="dshx-root dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Open a session to browse and edit its files.</p>
+    return <p className="dshx-root dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Open a thread to browse and edit its files.</p>
   }
   const sessionId = props.sessionId
   const pendingSave = saveSnapshot.context.pending

@@ -46,7 +46,7 @@ Given('the isolated trace-link profile is booted with agent telemetry, Chat and 
 
 When('a new thread asks the fake model to run a bash command', async ({ page }: { page: Page }) => {
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await page.getByRole('button', { name: /^(?:New thread|New session)$/ }).first().click()
   await page.getByRole('button', { name: /^Select model/ }).click()
   await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
   const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })

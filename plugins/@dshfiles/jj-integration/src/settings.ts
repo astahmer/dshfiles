@@ -10,10 +10,10 @@ export const jjIntegrationSettings = defineSettings({
         'Start new threads in their own jj workspace by default. Automatic integration scope all forces this on; the composer toggle can override it per thread.',
       ),
     autoIntegrationScope: Schema.union([
-      Schema.const('none').description('Keep integration manual.'),
-      Schema.const('isolated').description('Automatically integrate verified, isolated thread workspaces; new-thread isolation stays opt-in.'),
+      Schema.const('none').description('Keep landing manual.'),
+      Schema.const('isolated').description('Land verified, isolated thread workspaces automatically (new threads are isolated only when asked).'),
       Schema.const('all').description(
-        'Automatically isolate each new thread and land only its verified, uniquely owned thread workspace; existing shared checkouts stay manual.',
+        'Isolate each new thread and land its verified workspace automatically (shared checkouts stay manual).',
       ),
     ])
       .default('none')
@@ -79,13 +79,13 @@ export const jjIntegrationSettings = defineSettings({
       ),
     stopProjectActionsOnSettle: Schema.boolean()
       .default(false)
-      .description('When a thread is settled, cancel its Project Checks actions that are still queued or running, such as a dev server it started.'),
+      .description('When a thread is marked done, stop its queued or running Project Checks actions, such as a dev server.'),
     autoCleanup: Schema.object({
       enabled: Schema.boolean().default(true).description('Run “Clean up thread workspaces” on its own, on the interval below.'),
       kinds: Schema.array(
         Schema.union([
           Schema.const('empty').description('Empty: workspaces that never landed anything.'),
-          Schema.const('integrated').description('Integrated: workspaces whose work all landed.'),
+          Schema.const('integrated').description('Landed: workspaces whose work all landed.'),
           Schema.const('untracked').description('Untracked: threads-directory folders and files no jj workspace owns.'),
         ]),
       )

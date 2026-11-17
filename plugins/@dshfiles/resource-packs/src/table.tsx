@@ -12,7 +12,7 @@ function ReferenceCell(props: { reference: ResourceRef; resources: readonly Reso
   const label = ResourceUiModel.referenceLabel(props.reference, props.resources)
   if (props.reference.provider === 'dsh' && props.reference.kind === 'conversation')
     return (
-      <Button type="button" variant="link" aria-label={`Open conversation ${label}`} onClick={() => props.onOpenReference(props.reference)}>
+      <Button type="button" variant="link" aria-label={`Open thread ${label}`} onClick={() => props.onOpenReference(props.reference)}>
         {label}
       </Button>
     )
