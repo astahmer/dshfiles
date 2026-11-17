@@ -208,3 +208,18 @@ test('host-process: a capital Host inside a sentence is the server process; a lo
     ['Restart the Host to apply this change', 'Host plugin missing, update DSH', 'Scratch DSH Hosts are using memory'],
   )
 })
+
+test('package-name: a package name in a sentence, not an import specifier or a command', () => {
+  assert.deepEqual(
+    ruleHits('package-name', [
+      '@dshfiles/backlog is not installed. Enable it in Plugins.',
+      'Install @deepseek-ai/dsh 0.2.2 or later',
+      '@dshfiles/plugin-ui/icons',
+      "import { Button } from '@dshfiles/plugin-ui'",
+      'pnpm --dir plugins/@dshfiles/backlog test',
+      '@dshfiles/chat code fences',
+      'Open Backlog to add a task',
+    ]),
+    ['@dshfiles/backlog is not installed. Enable it in Plugins.', 'Install @deepseek-ai/dsh 0.2.2 or later'],
+  )
+})

@@ -6,7 +6,8 @@
     "new-chat": 2,
     "integrate": 2,
     "settle": 3,
-    "host-process": 9
+    "host-process": 9,
+    "package-name": 2
   },
   "counts": {
     "conversation/agent-preset": 1,
@@ -29,6 +30,8 @@
     "host-process/worktree-memory": 5,
     "integrate/jj-integration": 2,
     "new-chat/command-palette": 2,
+    "package-name/component-gallery": 1,
+    "package-name/main-tabs": 1,
     "plugin-prefix/activity-timeline": 1,
     "plugin-prefix/agent-toolkit": 1,
     "plugin-prefix/ai-accounts": 3,
