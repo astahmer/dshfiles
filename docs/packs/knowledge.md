@@ -41,7 +41,7 @@ From the onboarding feature catalog: 21 features, the 6 curated ones first.
 
 ### More
 
-1. **Digest idle threads from DSH's own session logs** (`memory`) — An idle thread gets a short digest of its requests, decisions and answer, mostly without a model call.
+1. **Digest idle threads from their logs** (`memory`) — An idle thread gets a short digest of its requests, decisions and answer, mostly without a model call.
 2. **Start every thread with one frozen memory block** (`memory`) — Each thread starts with a short memory block of notes and past threads for its project.
 3. **Search, read and note memory from any agent** (`memory`) — Agents search memory, read a digest or note, and save new notes.
 4. **Search threads in the background** (`session-search`) — Thread search runs from a background index, so searching never slows DSH down.

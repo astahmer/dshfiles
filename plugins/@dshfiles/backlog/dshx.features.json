@@ -3617,7 +3617,7 @@
     },
     {
       "id": "agent-claims",
-      "title": "Agents claim items with a lease; you release them",
+      "title": "Agents claim items while they work on them",
       "summary": "An agent claims an item while it works on it, and the claim lapses when the agent goes idle.",
       "details": "backlog_claim hands an item to the calling agent thread in one write: it becomes the delegate (the owner stays whoever captured it), moves to In progress, links the thread and starts a lease. Another agent's claim is refused with the holder named. Every write by the holder renews the lease; it ends after the idle time in Backlog settings (30 minutes by default), when the holder's thread is archived, settled or gone, when the item is done or dropped, or with backlog_release; a lapsed or abandoned claim returns the item to Todo. The inspector shows Owner \u00b7 Delegate and the claim with a Release action; rows and cards show a lock chip. `is:claimed`, `is:delegated` and `delegate:agent` search them. Starting a thread from an item also makes that thread its delegate.",
       "reach": [

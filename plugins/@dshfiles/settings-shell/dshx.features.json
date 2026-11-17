@@ -104,7 +104,7 @@
     },
     {
       "id": "dsh-release-notice",
-      "title": "DSH release notice and TL;DR",
+      "title": "DSH release notice and summary",
       "summary": "Settings marks a new DSH release and sums up what changed since your version.",
       "details": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, links both versions to their GitHub releases with how long ago each shipped and how many releases behind the install is, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
       "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "expect button \"Check for DSH updates\""],

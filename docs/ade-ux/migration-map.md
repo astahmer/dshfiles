@@ -260,7 +260,7 @@ rail destination; 41 features.
 | backlog/short-item-references: Name new items with a short alias | destinationSection | left-nav: Backlog (every item label, reference card, mention chip and agent tool) |
 | project-automations/project-automations: Start threads in a project on a schedule | destinationSection | rail: Work › Automations (already on the rail) |
 | schedule/catalog-read-reuse: Tasks and reminders load once | destinationSection | sidebar: Tasks page, task tabs and the Session header's reminders |
-| backlog/agent-claims: Agents claim items with a lease; you release them | detail | left-nav: Backlog › item detail › Owner · Delegate › Release |
+| backlog/agent-claims: Agents claim items while they work on them | detail | left-nav: Backlog › item detail › Owner · Delegate › Release |
 | backlog/backlinks: See the backlog items that link to a thread or revision | detail | thread header ⋯ submenu (thread-sidebar ThreadMenuSections); jj panel revision details (jj-integration RevisionSections) |
 | backlog/board-links-and-history: Board, links, backlinks and history | detail | left-nav: Backlog › Board / item detail |
 | backlog/item-timeline-lanes: Conversation and work log in the item timeline | detail | left-nav: Backlog › item detail › Activity › Conversation / Work log |
@@ -389,7 +389,7 @@ rail destination (bottom); 67 features.
 | secret-catalog/reference-repair: Repair a secret reference that does not resolve | settingsSection | settings: secret-reference fields › repair |
 | secret-catalog/scoped-alias-catalog: Browse secrets by scope and environment | settingsSection | left-nav: Secrets |
 | settings-models/models-settings: Models settings and provider onboarding | settingsSection | settings: Models section |
-| settings-shell/dsh-release-notice: DSH release notice and TL;DR | settingsSection | sidebar: Settings trigger release mark › General |
+| settings-shell/dsh-release-notice: DSH release notice and summary | settingsSection | sidebar: Settings trigger release mark › General |
 | settings-shell/modified-settings: Modified settings and reset to default | settingsSection | settings: Reset to default |
 | settings-shell/open-config-menu: Open the configuration file elsewhere | settingsSection | settings: Open configuration file |
 | settings-shell/plugin-enablement-tools: List and switch plugin entries, from Settings or an Agent | settingsSection | settings: plugin page › entry card; agent tools: plugin_inventory, plugin_set_enabled |
@@ -703,7 +703,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | mcp-endpoint/mcp-endpoint: Drive DSH threads from an outside agent over MCP | infrastructure | host: /mcp endpoint |
 | mcp-endpoint/mcp-endpoint-plugin-tools: Expose plugin tools to MCP clients | infrastructure | host: /mcp endpoint |
 | memory/start-block: Start every thread with one frozen memory block | infrastructure | host: memory start block in the system prompt |
-| memory/thread-digests: Digest idle threads from DSH's own session logs | infrastructure | host: memory digests |
+| memory/thread-digests: Digest idle threads from their logs | infrastructure | host: memory digests |
 | multi-host/ssh-runtime-connection: Connect to a host over SSH | infrastructure | host: SSH runtime tunnels |
 | opencode-compat/plugin-tools: Run OpenCode plugin tools and tool hooks | infrastructure | agent tools contributed by configured plugins |
 | opencode-compat/skills-context-storage: OpenCode skills, context hooks and storage | infrastructure | settings: dshfiles-opencode-compat |
@@ -736,7 +736,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | session-search/prompt-history: Search the prompts sent across threads | infrastructure | host: session-search promptHistory API (read by @dshfiles/prompt-stash) |
 | session-search/worker-session-search: Search threads in the background | infrastructure | host: session search index |
 | session-source-port/session-source-registry: Threads that live on another host | infrastructure | host: library |
-| shared-runtime/shared-client-runtime: Share the client UI runtime | infrastructure | client: shared runtime |
+| shared-runtime/shared-client-runtime: Share one copy of the UI code | infrastructure | client: shared runtime |
 | shared-streams/shared-event-sources: One live connection per address across tabs | infrastructure | client: shared EventSource |
 | sidebar-right/addressable-resources: Dock files, diffs and terminals as panels | infrastructure | right-pane: native resources as workbench panels |
 | sidebar-terminal/terminal-excerpts: Add terminal selection to chat | infrastructure | terminal and composer |

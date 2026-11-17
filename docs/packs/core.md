@@ -100,7 +100,7 @@ From the onboarding feature catalog: 206 features, the 98 curated ones first.
 49. **Restore draft reference chips from plain text** (`rich-composer`, composer) — A queued message brought back into the composer gets its reference chips back.
 50. **Settings shell** (`settings-shell`, settings) — The Settings button, its sections, the General page and the Cmd+, shortcut.
 51. **Dock Settings as one panel** (`settings-shell`, settings) — Open all of Settings as one dockable panel with its sections, search and forms.
-52. **DSH release notice and TL;DR** (`settings-shell`, settings) — Settings marks a new DSH release and sums up what changed since your version.
+52. **DSH release notice and summary** (`settings-shell`, settings) — Settings marks a new DSH release and sums up what changed since your version.
 53. **One Settings page in the stage** (`settings-shell`, settings) — Settings opens as one page in the main view, from the rail, the gear, the palette or Cmd+,.
 54. **Settings grouped by task, with deep links** (`settings-shell`, settings) — Settings are grouped by task, such as Models and accounts or Projects and workspaces, with direct links.
 55. **Search Settings inline** (`settings-shell`, settings) — Search all settings from one field and change matches in place.
