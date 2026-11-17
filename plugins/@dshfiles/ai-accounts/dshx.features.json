@@ -3,8 +3,9 @@
   "features": [
     {
       "id": "disabled-account-preview",
-      "title": "Keep disabled accounts visible and toggle routing from the usage popover",
-      "summary": "Disabled saved accounts keep their measured quota percentage and reset time in muted grey, with a compact OFF label beneath the name, without increasing the preview row height. Clicking still opens the usage popover, where each account has an Enable account toggle using the same Switch component as Settings and sharing the existing saved-account operation. Explicit Hide is separate. Disabled accounts cannot be selected for thread routing or counted as the most critical enabled account. Missing measurements remain unavailable rather than invented; pending and failed saves stay visible without optimistic routing changes.",
+      "title": "Turn an account on or off from the usage popover",
+      "summary": "Turned-off accounts stay visible in the usage strip, and the usage popover turns each one back on.",
+      "details": "Disabled saved accounts keep their measured quota percentage and reset time in muted grey, with a compact OFF label beneath the name, without increasing the preview row height. Clicking still opens the usage popover, where each account has an Enable account toggle using the same Switch component as Settings and sharing the existing saved-account operation. Explicit Hide is separate. Disabled accounts cannot be selected for thread routing or counted as the most critical enabled account. Missing measurements remain unavailable rather than invented; pending and failed saves stay visible without optimistic routing changes.",
       "surfaces": ["client", "host", "storage"],
       "surface": "statusItem",
       "destination": "none",
@@ -68,8 +69,9 @@
     },
     {
       "id": "thread-account-switch",
-      "title": "Use a sidebar account for this thread without reselecting its model",
-      "summary": "Right-click a sidebar account to preview a thread-only selection. Keep the exact model when offered, otherwise use the deployment default if offered or the target's preferred available model, shown explicitly. Preserve compatible reasoning effort, the active request and the global default. A durable provider preference takes precedence over distribution without changing global order; normal failure recovery remains available. Suggest optional compaction only from a measured context estimate, with cost/detail-loss/cache caveats; never compact or send a message automatically.",
+      "title": "Use another account for this thread",
+      "summary": "Right-click an account in the sidebar to use it for this thread only, keeping the model when it can.",
+      "details": "Right-click a sidebar account to preview a thread-only selection. Keep the exact model when offered, otherwise use the deployment default if offered or the target's preferred available model, shown explicitly. Preserve compatible reasoning effort, the active request and the global default. A durable provider preference takes precedence over distribution without changing global order; normal failure recovery remains available. Suggest optional compaction only from a measured context estimate, with cost/detail-loss/cache caveats; never compact or send a message automatically.",
       "surfaces": ["client", "host", "storage"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -161,7 +163,8 @@
         }
       ],
       "title": "Connect an account without leaving the chat",
-      "summary": "Minimal provider dialogs show common sign-in choices, with named credentials and custom CLI homes under More options. A pencil edits the provisional new-account name without changing route identity or restarting authentication. New profiles remain outside saved accounts and model routes until verification. Claude subscriptions use official CLI configuration status, not remote token validation.",
+      "summary": "Sign in to a provider from a short dialog without leaving the thread.",
+      "details": "Minimal provider dialogs show common sign-in choices, with named credentials and custom CLI homes under More options. A pencil edits the provisional new-account name without changing route identity or restarting authentication. New profiles remain outside saved accounts and model routes until verification. Claude subscriptions use official CLI configuration status, not remote token validation.",
       "reach": ["click group \"AI accounts usage*\"", "click button \"Add AI account\"", "expect dialog \"Add account\""],
       "surfaces": ["client", "host", "storage"],
       "surface": "settingsSection",
@@ -231,8 +234,9 @@
           "source": "model-stream"
         }
       ],
-      "title": "See which account serves the active chat",
-      "summary": "Sidebar meters highlight actual wire-account metadata for the foreground chat, following distribution and failover. Idle chats show the last successful account; unknown sources are never inferred from model selection.",
+      "title": "See which account serves this thread",
+      "summary": "The usage strip highlights the account the open thread is using right now.",
+      "details": "Sidebar meters highlight actual wire-account metadata for the foreground chat, following distribution and failover. Idle chats show the last successful account; unknown sources are never inferred from model selection.",
       "reach": ["seed tool-call-thread", "expect group \"AI accounts usage*\""],
       "surfaces": ["client", "host", "storage"],
       "surface": "statusItem",
@@ -266,8 +270,9 @@
     },
     {
       "id": "account-lifecycle",
-      "title": "Manage provider account drafts",
-      "summary": "Edit and persist saved account settings; confirm removals, preserve an existing profile when removal is cancelled, and retry failed writes. New accounts use provisional setup and are saved only after connection succeeds.",
+      "title": "Edit and remove accounts",
+      "summary": "Edit an account's settings or remove it, and a new account is saved only once it signs in.",
+      "details": "Edit and persist saved account settings; confirm removals, preserve an existing profile when removal is cancelled, and retry failed writes. New accounts use provisional setup and are saved only after connection succeeds.",
       "reach": [
         "click tab \"Settings\"",
         "click button \"AI accounts\"",
@@ -350,7 +355,8 @@
         }
       ],
       "title": "Manage account Models, Settings and Usage",
-      "summary": "Reference-faithful account rail and tabbed detail with inline rename, observed connection state, model reasoning/visibility/inheritance, same-provider priority, confirmed scoped sign-out, and real exact-account request analytics. While @dshfiles/usage runs, the account Usage tab is an alias of Observe › Usage › Quota › Accounts for that account (selecting it opens Usage there); account management itself stays in Settings.",
+      "summary": "Each account has Models, Settings and Usage tabs, with rename and sign-out.",
+      "details": "Reference-faithful account rail and tabbed detail with inline rename, observed connection state, model reasoning/visibility/inheritance, same-provider priority, confirmed scoped sign-out, and real exact-account request analytics. While @dshfiles/usage runs, the account Usage tab is an alias of Observe › Usage › Quota › Accounts for that account (selecting it opens Usage there); account management itself stays in Settings.",
       "reach": ["seed tool-call-thread", "click tab \"Settings\"", "click button \"AI accounts\"", "expect tab \"Models\""],
       "surfaces": ["client", "host", "storage"],
       "surface": "settingsSection",
@@ -382,7 +388,8 @@
     {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
-      "summary": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
+      "summary": "Choose the models each provider offers and how requests spread across accounts with the same model.",
+      "details": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
       "reach": [
         "seed tool-call-thread",
         "click tab \"Settings\"",
@@ -564,7 +571,8 @@
     {
       "id": "quota-dashboard",
       "title": "Read provider quota and usage status",
-      "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. Refresh bypasses the Host's 30-second sweep cache. Every card says when its own content was read: a reading kept through a failed read keeps its original time and names why, with Retry, and a shared Claude reading says when the next one can reach the provider. A failed read of the whole sweep shows a retryable notice beside the last reading on every quota surface. Claude cards add an Extra usage meter (spent vs monthly cap, percent, currency, reset when reported, or Extra usage off), and an account whose quota reports extra usage carries a “Use extra usage” switch there and in its Settings tab, off by default; the guard behind it is a separate feature. The same `extraUsage` object also appears in the quota agent tool and recorded history. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
+      "summary": "See each account's quota, when it resets and when it was last read, with Refresh and Retry.",
+      "details": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. Refresh bypasses the Host's 30-second sweep cache. Every card says when its own content was read: a reading kept through a failed read keeps its original time and names why, with Retry, and a shared Claude reading says when the next one can reach the provider. A failed read of the whole sweep shows a retryable notice beside the last reading on every quota surface. Claude cards add an Extra usage meter (spent vs monthly cap, percent, currency, reset when reported, or Extra usage off), and an account whose quota reports extra usage carries a “Use extra usage” switch there and in its Settings tab, off by default; the guard behind it is a separate feature. The same `extraUsage` object also appears in the quota agent tool and recorded history. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
       "reach": ["expect group \"AI accounts usage\"", "click button \"AI accounts usage\"", "expect region \"AI account usage\""],
       "surfaces": ["client", "host", "settings"],
       "surface": "destinationSection",
@@ -750,7 +758,8 @@
     {
       "id": "strip-short-names",
       "title": "Short names in the sidebar usage strip",
-      "summary": "Show or hide the tag beside each meter in the wide usage strip (Settings switch or the strip's context menu), and set each account's strip short name in AI Accounts settings; an account without one uses its picker tag, then its initials.",
+      "summary": "Show or hide the short name beside each meter in the usage strip, and set each account's short name.",
+      "details": "Show or hide the tag beside each meter in the wide usage strip (Settings switch or the strip's context menu), and set each account's strip short name in AI Accounts settings; an account without one uses its picker tag, then its initials.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click text \"AI Accounts\"", "expect switch \"Short names in the strip\""],
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
@@ -803,7 +812,8 @@
     {
       "id": "usage-history-and-pricing",
       "title": "Review usage history and cost forecasts",
-      "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, apply explicit price overrides, and estimate composer and completed-turn costs without persisting provider response payloads. The history view is Observe › Usage › Quota › History while @dshfiles/usage runs (ai-accounts provides it through the `quota-views` contract, and saved tabs of the former Usage history page redirect there); without usage it stays the AI Accounts: Usage history page.",
+      "summary": "Chart past usage and cost, set your own prices, and see what a draft or a turn costs.",
+      "details": "Store bounded successful usage snapshots, chart historical and forecast usage, apply explicit price overrides, and estimate composer and completed-turn costs without persisting provider response payloads. The history view is Observe › Usage › Quota › History while @dshfiles/usage runs (ai-accounts provides it through the `quota-views` contract, and saved tabs of the former Usage history page redirect there); without usage it stays the AI Accounts: Usage history page.",
       "surfaces": ["client", "host", "storage", "settings"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -906,8 +916,9 @@
     },
     {
       "id": "quota-forecast",
-      "title": "Forecast when each account runs out, whether a kind kept an account free, and the order to use them in",
-      "summary": "Observe › Usage › Quota › Forecast (the former AI Accounts: Quota forecast page, still its own page when @dshfiles/usage is not loaded) projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry. Pace overlays every account's current window on one start-to-reset axis against even pace, with past windows for the selected account.",
+      "title": "Forecast when each account runs out",
+      "summary": "See when each account will run out at the current pace and which account to use next.",
+      "details": "Observe › Usage › Quota › Forecast (the former AI Accounts: Quota forecast page, still its own page when @dshfiles/usage is not loaded) projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry. Pace overlays every account's current window on one start-to-reset axis against even pace, with past windows for the selected account.",
       "reach": [
         "click tab \"Observe\"",
         "click button \"Usage\"",
@@ -1028,7 +1039,8 @@
     {
       "id": "extra-usage-guard",
       "title": "Stop at the plan limits instead of drawing paid extra usage",
-      "summary": "A provider that reports extra usage (Claude's pay-as-you-go spend past the plan) gets a per-account “Use extra usage” switch on its usage card and in AI Accounts settings, off by default. With it off, a reading that spends the session or weekly plan window blocks the account: request routing skips it and fails over to an enabled compatible account, and a turn that would still run on it stops with a message naming the spent window, the reset time, the setting to turn on and the alternative of switching the thread. The block lifts at the reported reset, or after a bounded hold when the provider names none. The guard decides from the last quota sweep, so a request can still start a few minutes into overage between readings.",
+      "summary": "Off by default: an account stops at its plan limit instead of paying for extra usage.",
+      "details": "A provider that reports extra usage (Claude's pay-as-you-go spend past the plan) gets a per-account “Use extra usage” switch on its usage card and in AI Accounts settings, off by default. With it off, a reading that spends the session or weekly plan window blocks the account: request routing skips it and fails over to an enabled compatible account, and a turn that would still run on it stops with a message naming the spent window, the reset time, the setting to turn on and the alternative of switching the thread. The block lifts at the reported reset, or after a bounded hold when the provider names none. The guard decides from the last quota sweep, so a request can still start a few minutes into overage between readings.",
       "surfaces": ["client", "host", "settings", "storage"],
       "surface": "statusItem",
       "destination": "none",
@@ -1089,7 +1101,8 @@
     {
       "id": "luna-reserve-routing",
       "title": "Route exhausted Luna accounts through Reserve",
-      "summary": "Use the separate Reserve quota window and route to the Reserve model only after the weekly Luna window is spent.",
+      "summary": "Once the weekly Luna limit is spent, requests move to the separate Reserve model and its own limit.",
+      "details": "Use the separate Reserve quota window and route to the Reserve model only after the weekly Luna window is spent.",
       "surfaces": ["client", "host", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -1154,7 +1167,8 @@
     {
       "id": "failure-recovery",
       "title": "Recover failed account requests per failure kind",
-      "summary": "Retry, Luna Reserve, fail over to a compatible account, wait, shrink re-sent images, then fail or hand to DSH, configured per failure kind.",
+      "summary": "Choose what happens when a request fails: retry, switch account, wait, or stop.",
+      "details": "Retry, Luna Reserve, fail over to a compatible account, wait, shrink re-sent images, then fail or hand to DSH, configured per failure kind.",
       "surfaces": ["client", "host", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -1232,7 +1246,8 @@
     {
       "id": "quota-auto-retry",
       "title": "Retry exhausted quota when its reset arrives",
-      "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and auto-resume one minute after a known reset — or on a 30 s to 10 min growing backoff when the provider names none — from a checkbox beside Resume, on by default and overridable per thread.",
+      "summary": "A thread stopped by a usage limit resumes on its own when the limit resets, or now on another account.",
+      "details": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and auto-resume one minute after a known reset — or on a 30 s to 10 min growing backoff when the provider names none — from a checkbox beside Resume, on by default and overridable per thread.",
       "surfaces": ["client", "host", "settings", "storage"],
       "surface": "attentionProvider",
       "destination": "inbox",
@@ -1341,7 +1356,8 @@
     {
       "id": "credential-recovery",
       "title": "Open credential setup from failed turns",
-      "summary": "Offer an inline route to AI Accounts when a failed turn reports missing or rejected provider credentials.",
+      "summary": "A turn that failed on missing or rejected credentials links straight to AI Accounts.",
+      "details": "Offer an inline route to AI Accounts when a failed turn reports missing or rejected provider credentials.",
       "reach": [
         "seed credential-recovery",
         "fill textbox \"commands, @ files or threads*\" \"Reproduce missing credential recovery.\"",
@@ -1386,7 +1402,8 @@
     {
       "id": "stalled-stream-recovery",
       "title": "Explain turns stopped by a stalled model stream",
-      "summary": "When a model sends no data until its idle timeout and the retries run out, the failed turn says how long it stayed silent and how to recover: Resume, another model, or the stalled-stream fallback.",
+      "summary": "A turn whose model went silent says for how long and offers Resume or another model.",
+      "details": "When a model sends no data until its idle timeout and the retries run out, the failed turn says how long it stayed silent and how to recover: Resume, another model, or the stalled-stream fallback.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or sessions*\" \"[[fail pi-ai stream idle timeout after 120000ms]]\"",
@@ -1427,7 +1444,8 @@
     {
       "id": "stalled-stream-fallback-setting",
       "title": "Turn on the fallback chain for stalled streams",
-      "summary": "A transport Failure recovery switch that lets a stalled stream walk the thread's model fallback chain under any distribution.",
+      "summary": "Let a stalled model fall back to the thread's next model.",
+      "details": "A transport Failure recovery switch that lets a stalled stream walk the thread's model fallback chain under any distribution.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: AI accounts\"",
@@ -1467,7 +1485,8 @@
     {
       "id": "quota-inbox-items",
       "title": "Quota-blocked threads in the Inbox, resumable in place",
-      "summary": "Every waiting quota continuation (a turn stopped by an exhausted account limit) is a blocking Inbox item about its thread, with when the quota resets and whether it resumes by itself. Resume runs the same stored continuation as the Usage page's Resume, only when the user chooses it; Open goes to the thread to switch account or model first. Done dismisses the stored continuation with the item, and a boot retires one an earlier build left waiting under a done item, so no thread keeps offering a Resume for a recovery the user set aside. The item resolves once the continuation is resumed, dismissed or superseded.",
+      "summary": "A thread stopped by a usage limit shows in the Inbox with when it resets and a Resume button.",
+      "details": "Every waiting quota continuation (a turn stopped by an exhausted account limit) is a blocking Inbox item about its thread, with when the quota resets and whether it resumes by itself. Resume runs the same stored continuation as the Usage page's Resume, only when the user chooses it; Open goes to the thread to switch account or model first. Done dismisses the stored continuation with the item, and a boot retires one an earlier build left waiting under a done item, so no thread keeps offering a Resume for a recovery the user set aside. The item resolves once the continuation is resumed, dismissed or superseded.",
       "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
       "reachNarrow": ["click button \"Inbox\"", "expect heading \"Inbox\""],
       "surfaces": ["host", "integration"],
@@ -1518,7 +1537,8 @@
     {
       "id": "idle-cache-warning",
       "title": "Warn before re-sending an idle thread past its prompt-cache lifetime",
-      "summary": "In the composer meter line, before the context ring, a chip appears once a long thread sat idle past its provider prompt-cache lifetime (Anthropic 5 min, OpenAI and Codex 10 min, or a per-route setting): \"cache expired · next send ≈$0.45\". Its popover gives the idle time, the prompt tokens the next request re-sends uncached and their models.dev price against the cached price, and offers Compact first (session-controller compact), New thread with a reference (a thread in the same folder whose first message names this one and carries the draft) or Send anyway. The prompt size is the native contextPressure projection; the route comes from context-compaction threshold API, else the route of the latest turn.",
+      "summary": "After a long pause, a chip warns that the next message costs more because the prompt cache expired.",
+      "details": "In the composer meter line, before the context ring, a chip appears once a long thread sat idle past its provider prompt-cache lifetime (Anthropic 5 min, OpenAI and Codex 10 min, or a per-route setting): \"cache expired · next send ≈$0.45\". Its popover gives the idle time, the prompt tokens the next request re-sends uncached and their models.dev price against the cached price, and offers Compact first (session-controller compact), New thread with a reference (a thread in the same folder whose first message names this one and carries the draft) or Send anyway. The prompt size is the native contextPressure projection; the route comes from context-compaction threshold API, else the route of the latest turn.",
       "reach": ["seed jev-setup-chat-thread", "click button \"cache expired*\"", "expect button \"Compact first\""],
       "surfaces": ["client", "settings"],
       "surface": "composerContribution",

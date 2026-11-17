@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "apply-patch-tool",
-      "title": "Edit a file the Agent inspected without the native read tool",
-      "summary": "The apply_patch agent tool reads the file itself, records that read on the Host's observation policy, applies literal replacements in order with a whitespace-tolerant fallback, and writes once; it never creates a file.",
+      "title": "Edit a file with literal replacements",
+      "summary": "The agent edits an existing file by replacing exact text, and never creates a new one.",
+      "details": "The apply_patch agent tool reads the file itself, records that read on the Host's observation policy, applies literal replacements in order with a whitespace-tolerant fallback, and writes once; it never creates a file.",
       "surfaces": ["host", "tool"],
       "surface": "agentToolOnly",
       "destination": "none",
