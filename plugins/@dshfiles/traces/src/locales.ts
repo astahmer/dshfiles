@@ -108,7 +108,7 @@ const en = {
   waterfallTokens: 'Tokens',
   waterfallSlowest: 'Slowest',
   sessionTimeline: 'Turn timeline',
-  timelineRunning: 'Running',
+  timelineRunning: 'Working',
   timelineDone: 'Done',
   timelineFailed: 'Failed',
   timelineTokens: 'tokens',

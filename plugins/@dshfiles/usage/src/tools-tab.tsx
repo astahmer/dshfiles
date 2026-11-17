@@ -360,7 +360,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
                     Calls
                   </th>
                   <th scope="col" className="dshx:py-2 dshx:pr-3">
-                    Succeeded
+                    Done
                   </th>
                   <th scope="col" className="dshx:py-2 dshx:pr-3">
                     Errors
