@@ -33,6 +33,43 @@ const isCss = (file: string): boolean => file.endsWith('.css')
 
 const all = (pattern: RegExp, line: string): readonly string[] => [...line.matchAll(pattern)].map(match => match[0])
 
+export interface ClassToken {
+  /** The whole class as written, `dshx:hover:md:shadow-sm`. */
+  readonly text: string
+  /** Its variants in order, `['hover', 'md']`. */
+  readonly variants: readonly string[]
+  /** The utility after the last variant, `shadow-sm`, with a leading or trailing `!` dropped. */
+  readonly utility: string
+}
+
+/** Split on the colons outside brackets and parentheses (`[&:hover]:`, `text-[length:calc(…)]` keep theirs). */
+const splitVariants = (body: string): readonly string[] => {
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+  for (const char of body) {
+    if (char === '[' || char === '(') depth += 1
+    else if (char === ']' || char === ')') depth -= 1
+    if (char === ':' && depth === 0) {
+      parts.push(current)
+      current = ''
+    } else current += char
+  }
+  parts.push(current)
+  return parts
+}
+
+/** The `dshx:`-prefixed Tailwind classes on one line, parsed into variants and utility. */
+const classTokens = (line: string): readonly ClassToken[] =>
+  [...line.matchAll(/(?<![\w:-])dshx:[^\s'"`]+/g)].map(match => {
+    const parts = splitVariants(match[0].slice('dshx:'.length))
+    return { text: match[0], variants: parts.slice(0, -1), utility: (parts.at(-1) ?? '').replace(/^!|!$/g, '') }
+  })
+
+/** Classes on the line whose parsed token passes `test`, as excerpts; CSS files hold no classes. */
+const classes = (line: string, file: string, test: (token: ClassToken) => boolean): readonly string[] =>
+  isCss(file) ? [] : classTokens(line).filter(test).map(token => token.text)
+
 export const designTokenRules: readonly DesignTokenRule[] = [
   {
     id: 'arbitrary-text',
@@ -57,6 +94,12 @@ export const designTokenRules: readonly DesignTokenRule[] = [
     id: 'native-icons',
     use: 'the lucide icon from @dshfiles/plugin-ui/icons',
     matches: (line, file) => (isCss(file) ? [] : all(/\bIcon[A-Z]\w*OutlineRegular\b/g, line)),
+  },
+  {
+    // The kit's @theme maps only shadow-s0..s3 onto the elevation tokens; xs..2xl draw Tailwind's default shadows.
+    id: 'default-shadow',
+    use: 'an elevation step (dshx:shadow-s1/s2/s3, var(--dshx-elevation-*)), or a border instead of depth',
+    matches: (line, file) => classes(line, file, token => /^shadow-(?:2xs|xs|sm|md|lg|xl|2xl)(?:\/[\w.[\]-]+)?$/.test(token.utility)),
   },
 ]
 
@@ -192,6 +235,7 @@ const baselineSchema = Schema.Struct({ totals: Schema.Record(Schema.String, Sche
 /** The design-token check's pure parts, exported for its tests. */
 export class DesignTokenCheck {
   static readonly rules = designTokenRules
+  static readonly classTokens = classTokens
   static readonly isTokenFile = isTokenFile
   static readonly isSource = isSource
   static readonly findingsInText = findingsInText

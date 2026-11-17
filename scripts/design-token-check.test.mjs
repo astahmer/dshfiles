@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { DesignTokenCheck } from './design-token-check.ts'
 
-const { compare, countByRuleAndPlugin, findingsInText, isSource, isTokenFile } = DesignTokenCheck
+const { classTokens, compare, countByRuleAndPlugin, findingsInText, isSource, isTokenFile } = DesignTokenCheck
 
 const rulesIn = (file, text) => findingsInText({ plugin: 'demo', file, text }).map(finding => `${finding.rule}:${finding.text}`)
 
@@ -63,4 +63,29 @@ test('ratchets per rule and plugin, so one plugin cannot hide another', () => {
   const result = compare({ baseline: { 'raw-colour/a': 1, 'raw-colour/b': 5 }, current })
   assert.deepEqual(result.increased, ['raw-colour/a: 2 > baseline 1'])
   assert.deepEqual(result.decreased, ['raw-colour/b: 0 < baseline 5'])
+})
+
+const ruleHits = (rule, text, file = 'plugins/@dshfiles/demo/src/a.tsx') =>
+  findingsInText({ plugin: 'demo', file, text })
+    .filter(finding => finding.rule === rule)
+    .map(finding => finding.text)
+
+test('parses dshx classes into variants and utility, keeping colons inside brackets', () => {
+  assert.deepEqual(
+    classTokens("cn('dshx:hover:md:shadow-sm dshx:[&:hover]:flex dshx:text-[length:calc(var(--x)-1px)] dshx:shadow-md!')").map(token => [token.variants, token.utility]),
+    [
+      [['hover', 'md'], 'shadow-sm'],
+      [['[&:hover]'], 'flex'],
+      [[], 'text-[length:calc(var(--x)-1px)]'],
+      [[], 'shadow-md'],
+    ],
+  )
+})
+
+test('default-shadow: Tailwind shadow steps, not the elevation steps', () => {
+  assert.deepEqual(ruleHits('default-shadow', "cn('dshx:shadow-sm dshx:hover:shadow-lg dshx:shadow-s2 dshx:shadow-none dshx:shadow-md/20 shadow-xl')"), [
+    'dshx:shadow-sm',
+    'dshx:hover:shadow-lg',
+    'dshx:shadow-md/20',
+  ])
 })
