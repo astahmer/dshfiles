@@ -8,7 +8,8 @@
     "settle": 3,
     "host-process": 9,
     "package-name": 2,
-    "raw-error-echo": 13
+    "raw-error-echo": 13,
+    "status-word": 21
   },
   "counts": {
     "conversation/agent-preset": 1,
@@ -73,6 +74,12 @@
     "session/workspace-nav": 2,
     "settle/conversation-cleanup": 1,
     "settle/test-runs": 1,
-    "settle/tool-meta": 1
+    "settle/tool-meta": 1,
+    "status-word/agents": 1,
+    "status-word/backlog": 1,
+    "status-word/cordis-cards": 1,
+    "status-word/mcp-servers": 1,
+    "status-word/plugin-ui": 16,
+    "status-word/resource-packs": 1
   }
 }

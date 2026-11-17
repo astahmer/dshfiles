@@ -241,3 +241,10 @@ test('raw-error-echo: a message that ends by echoing an error, not a labelled va
     [1, 2, 3],
   )
 })
+
+test('status-word: a non-canonical state word as a whole label, not inside a sentence or as an enum value', () => {
+  assert.deepEqual(
+    ruleHits('status-word', ['Running', 'In progress', 'Needs attention', 'Running tests', 'running', '3 completed', 'Working', 'Done']),
+    ['Running', 'In progress', 'Needs attention'],
+  )
+})
