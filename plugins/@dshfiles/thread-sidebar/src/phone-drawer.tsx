@@ -1,8 +1,9 @@
 /**
  * The phone thread drawer (Settings › phoneNavigation 'drawer'): the Threads list slides in from the left over a scrim
- * that dims the thread, as in stock DSH and the ChatGPT/Claude apps. A swipe in from the left edge drags it open with
- * the finger, a swipe left on the drawer or its scrim drags it closed, and a release snaps by distance and velocity
- * ({@link DrawerGestureModel}). The scrim, Escape and the parent's own controls close it too.
+ * that dims the thread, as in stock DSH and the ChatGPT/Claude apps. A rightward swipe on the stage, from the left edge
+ * or anywhere else, drags it open with the finger, a swipe left on the drawer or its scrim drags it closed, and a release
+ * snaps by distance and velocity ({@link DrawerGestureModel}). The scrim, Escape and the parent's own controls close it
+ * too. Away from the edge band the swipe leaves alone what owns sideways drags or text (see {@link ignoresStageSwipe}).
  *
  * The open state belongs to the parent (the frame's left column "expanded" state); a drag only writes the drawer's own
  * inline style until the release, so a gesture never re-renders the list per frame. Closed, the drawer stays laid out but
@@ -10,13 +11,24 @@
  */
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, type ReactNode } from 'react'
-import { DrawerGestureModel, type DrawerSample } from './drawer-gesture.js'
-import { EdgeSwipeModel, ignoresEdgeSwipe, insideHorizontalScroller, type EdgeSwipeIntent } from './edge-swipe.js'
+import { DrawerGestureModel, type DrawerOpeningOrigin, type DrawerSample } from './drawer-gesture.js'
+import { ignoresEdgeSwipe, insideHorizontalScroller, type EdgeSwipeIntent } from './edge-swipe.js'
 
 /** Inside the open drawer these keep their own drags: a thread row's Done/Pin swipe, menus and popovers. */
 const OWN_DRAG_SELECTOR = 'article[data-thread-id], [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]'
 /** A layer above the drawer that answers Escape itself. */
 const ESCAPE_OWNER_SELECTOR = '[role="menu"], [role="listbox"], [data-radix-popper-content-wrapper], [role="dialog"][data-slot="dialog-content"]'
+
+/**
+ * Away from the edge band these keep a rightward drag: fields and the composer (caret and selection drags), sliders,
+ * canvases and editors that pan themselves, and anything marked `data-drawer-swipe="off"`.
+ */
+const STAGE_OWN_DRAG_SELECTOR =
+  'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [data-composer-card], [role="slider"], canvas, .monaco-editor, .xterm, [data-drawer-swipe="off"]'
+
+/** A stage drag never opens the drawer over what the edge swipe ignores, the elements above, or a text selection. */
+export const ignoresStageSwipe = (target: Element | null): boolean =>
+  ignoresEdgeSwipe(target) || target === null || target.closest(STAGE_OWN_DRAG_SELECTOR) !== null || document.getSelection()?.isCollapsed === false
 
 const closedTransform = 'translateX(-100%)'
 const transformAt = (progress: number): string => `translateX(${((progress - 1) * 100).toFixed(2)}%)`
@@ -26,6 +38,9 @@ interface Drag {
   readonly x: number
   readonly y: number
   readonly startedOpen: boolean
+  /** Where an opening drag started; a stage drag checks its target once it locks to a swipe. */
+  readonly origin: DrawerOpeningOrigin | null
+  readonly target: Element | null
   readonly width: number
   intent: EdgeSwipeIntent
   progress: number
@@ -37,9 +52,9 @@ export const PhoneDrawer = (props: {
   readonly label: string
   readonly open: boolean
   readonly onOpenChange: (open: boolean) => void
-  /** A swipe in from the left edge may open it (off while another layer owns the screen). */
-  readonly edgeSwipe: boolean
-  /** The first sign the drawer is about to show (an edge touch): mount its content before it slides in. */
+  /** A rightward swipe on the stage may open it (off while another layer owns the screen). */
+  readonly swipeToOpen: boolean
+  /** The first sign the drawer is about to show (an edge touch, a stage swipe): mount its content before it slides in. */
   readonly onPrepare: () => void
   /** Called after it closed while focus was inside it: return focus to the control that opened it. */
   readonly restoreFocus: () => void
@@ -49,7 +64,7 @@ export const PhoneDrawer = (props: {
   const scrimRef = useRef<HTMLDivElement>(null)
   const latest = useRef(props)
   latest.current = props
-  const { open, edgeSwipe } = props
+  const { open, swipeToOpen } = props
 
   /** Follow the finger: the drawer and scrim leave their transitions and track `progress` directly. */
   const follow = (progress: number): void => {
@@ -93,24 +108,57 @@ export const PhoneDrawer = (props: {
       if (open) {
         const inside = target !== null && (panelRef.current?.contains(target) === true || scrimRef.current?.contains(target) === true)
         if (!inside || target.closest(OWN_DRAG_SELECTOR) !== null || insideHorizontalScroller(target)) return
-        drag = { id: touch.identifier, x: touch.clientX, y: touch.clientY, startedOpen: true, width, intent: 'undecided', progress: 1, samples: [] }
+        drag = {
+          id: touch.identifier,
+          x: touch.clientX,
+          y: touch.clientY,
+          startedOpen: true,
+          origin: null,
+          target,
+          width,
+          intent: 'undecided',
+          progress: 1,
+          samples: [],
+        }
         return
       }
-      if (!edgeSwipe || !EdgeSwipeModel.starts({ side: 'left', x: touch.clientX, width: window.innerWidth }) || ignoresEdgeSwipe(target)) return
-      drag = { id: touch.identifier, x: touch.clientX, y: touch.clientY, startedOpen: false, width, intent: 'undecided', progress: 0, samples: [] }
-      latest.current.onPrepare()
+      if (!swipeToOpen) return
+      const origin = DrawerGestureModel.openingOrigin({ x: touch.clientX, width: window.innerWidth })
+      if (origin === null || (origin === 'edge' && ignoresEdgeSwipe(target))) return
+      drag = {
+        id: touch.identifier,
+        x: touch.clientX,
+        y: touch.clientY,
+        startedOpen: false,
+        origin,
+        target,
+        width,
+        intent: 'undecided',
+        progress: 0,
+        samples: [],
+      }
+      // A stage touch is mostly a scroll or a tap: it reads the DOM only once it turns into a swipe.
+      if (origin === 'edge') latest.current.onPrepare()
     }
     const move = (event: TouchEvent): void => {
       if (drag === undefined) return
       const touch = find(event.changedTouches, drag.id)
       if (touch === undefined) return
       const dx = touch.clientX - drag.x
+      const before = drag.intent
       drag.intent = DrawerGestureModel.intent({ startedOpen: drag.startedOpen, current: drag.intent, dx, dy: touch.clientY - drag.y })
       if (drag.intent === 'other') {
         drag = undefined
         return
       }
       if (drag.intent !== 'swipe') return
+      if (before === 'undecided' && drag.origin === 'stage') {
+        if (ignoresStageSwipe(drag.target)) {
+          drag = undefined
+          return
+        }
+        latest.current.onPrepare()
+      }
       drag.samples.push({ x: touch.clientX, t: event.timeStamp })
       if (drag.samples.length > 8) drag.samples.shift()
       drag.progress = DrawerGestureModel.progress({ startedOpen: drag.startedOpen, dx, width: drag.width })
@@ -146,7 +194,7 @@ export const PhoneDrawer = (props: {
       document.removeEventListener('touchend', end)
       document.removeEventListener('touchcancel', cancel)
     }
-  }, [open, edgeSwipe])
+  }, [open, swipeToOpen])
 
   const wasOpen = useRef(open)
   useEffect(() => {

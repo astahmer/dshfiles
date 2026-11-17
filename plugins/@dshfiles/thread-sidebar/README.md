@@ -232,17 +232,20 @@ full-screen list covers the thread is not "watched": it stays in the Inbox until
 above) or `drawer`, the model of stock DSH and the ChatGPT and Claude apps. In drawer mode the thread stays on screen and
 there is no tab bar: the top bar's leading control is **Show threads** instead of Back (a thread opened from a page on
 the stage, such as an Inbox item's Open, puts a Back chevron to that page before it; Android's back gesture follows it
-too), and it, or a swipe in from the left
-edge (the edge swipe's 24px band, axis lock and ignores), opens the Threads list as a drawer, `min(85vw, 360px)` wide,
-over a scrim that dims the thread. The drawer follows the finger and snaps open or closed on release: past half way, or
+too), and it, or a rightward drag anywhere on the stage, opens the Threads list as a drawer, `min(85vw, 360px)` wide,
+over a scrim that dims the thread. The drag need not start at the edge, as in the ChatGPT and Claude Android apps:
+Android's gesture navigation and Chrome's back swipe take the screen's left edge first. It locks to an axis (mostly
+vertical travel scrolls) and leaves alone thread rows, dialogs, menus, horizontal scrollers, fields, the composer,
+sliders, canvases, editors, a text selection and anything marked `data-drawer-swipe="off"`. The drawer follows the finger and snaps open or closed on release: past half way, or
 any flick of 0.4px/ms or more in its direction. Its header holds Hide threads and New thread; Inbox, Land and More sit
 above the threads, and More (every other destination and your folders) and the lists opened from it show inside the
 drawer with Back, so every destination stays reachable. Picking a thread or a page switches the stage and closes the
 drawer; the scrim, a leftward swipe on the drawer, Escape and Android's back gesture close it too (it is one phone-history
-level, two inside More). A page load starts with it closed. The list mounts on the first edge touch, the button, a thread
-link or idle time, then stays laid out but hidden, so opening it is a transform, not a fresh layout. Reduced motion drops
+level, two inside More). A page load starts with it closed. The list mounts on the first edge touch or stage swipe, the
+button, a thread link or idle time, then stays laid out but hidden, so opening it is a transform, not a fresh layout. Reduced motion drops
 the slide. Agents switch the model with `settings_set` on the `thread-sidebar` namespace; the drawer's open state is
-presentation only. In a Safari tab iOS keeps the left edge for its own history swipe; the button always works.
+presentation only. In a Safari tab iOS keeps the left edge for its own history swipe; a drag from further in, and the
+button, still open it.
 
 **Navigation counter.** Each destination or section open (rail, tab bar, list, palette, moved-to) adds one to a private
 counter in this Host's runtime folder: ids and counts only, never a thread or its content. Agents read it with

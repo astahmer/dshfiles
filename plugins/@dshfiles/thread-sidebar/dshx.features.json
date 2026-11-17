@@ -3847,7 +3847,7 @@
     {
       "id": "phone-drawer-navigation",
       "title": "Open the thread list as a drawer on a phone",
-      "summary": "With phoneNavigation set to drawer, a phone (below 640px) keeps the thread on screen instead of pushing it over a full-screen list, as stock DSH and the ChatGPT and Claude apps do. The top bar's leading control is Show threads and there is no bottom tab bar; only a thread opened from a page on the stage (an Inbox item's Open) puts a Back chevron to that page before it, which Android's back gesture also follows. The button, or a swipe in from the left edge (the edge swipe's 24px band, axis lock and its ignores: thread rows, dialogs, menus, horizontal scrollers, an open modal), opens the Threads list as a drawer: min(85vw, 360px) from the left over a scrim that dims the thread. The drawer follows the finger and on release snaps open or closed by distance (half way) or velocity (a flick of 0.4px/ms or more); reduced motion drops the slide. Its header holds Hide threads and New thread; Inbox, Land and More sit above the threads, and More and the lists opened from it show inside the drawer with Back. Picking a thread or page switches the stage and closes the drawer; the scrim, a leftward swipe on the drawer, Escape and Android's back gesture (one phone-history level, two inside More) close it. The list mounts on the first edge touch, the button, a thread link or idle time, then stays laid out but hidden, so opening is a transform. Stack stays the default.",
+      "summary": "With phoneNavigation set to drawer, a phone (below 640px) keeps the thread on screen instead of pushing it over a full-screen list, as stock DSH and the ChatGPT and Claude apps do. The top bar's leading control is Show threads and there is no bottom tab bar; only a thread opened from a page on the stage (an Inbox item's Open) puts a Back chevron to that page before it, which Android's back gesture also follows. The button, or a rightward drag anywhere on the stage (not only the edge band, which Android gesture navigation and Chrome's back swipe take first; axis lock, and it ignores thread rows, dialogs, menus, horizontal scrollers, an open modal, fields, the composer, sliders, canvases, editors, a text selection and data-drawer-swipe=\"off\"), opens the Threads list as a drawer: min(85vw, 360px) from the left over a scrim that dims the thread. The drawer follows the finger and on release snaps open or closed by distance (half way) or velocity (a flick of 0.4px/ms or more); reduced motion drops the slide. Its header holds Hide threads and New thread; Inbox, Land and More sit above the threads, and More and the lists opened from it show inside the drawer with Back. Picking a thread or page switches the stage and closes the drawer; the scrim, a leftward swipe on the drawer, Escape and Android's back gesture (one phone-history level, two inside More) close it. The list mounts on the first edge touch or stage swipe, the button, a thread link or idle time, then stays laid out but hidden, so opening is a transform. Stack stays the default.",
       "surfaces": ["client", "settings"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3863,7 +3863,7 @@
       ],
       "states": ["closed", "dragging", "open", "more", "destination-list"],
       "failureModes": [
-        "In a browser tab iOS claims the left edge for its own history swipe (the page then sees touchcancel and the drawer snaps back); the Show threads button always opens it, and a home-screen app has no system swipe there.",
+        "Android gesture navigation, Chrome's back swipe and iOS Safari claim the screen's left edge for their own back gesture (the page sees no touch, or touchcancel and the drawer snaps back); a rightward drag from further in and the Show threads button still open it.",
         "An older Host without the phoneNavigation setting decodes the stored preference to stack, the earlier model."
       ],
       "externalDependencies": [],
@@ -3888,6 +3888,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "thread-sidebar.phone-drawer-stage-swipe",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "opens from a rightward drag mid-stage, where Android gesture navigation leaves the page its touches"
+        },
+        {
+          "kind": "unit-test",
           "id": "thread-sidebar.phone-drawer-back-to-page",
           "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
           "testName": "returns a thread opened from the Inbox page to the Inbox, keeping the sidebar button"
@@ -3901,7 +3907,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.phone-drawer-browser",
-          "reason": "The Gherkin harness runs Chromium at 1440x900 only; the drawer was driven at 390x844 with an Android touch context (edge drag, half drag, scrim, Inbox item Open then Back) for docs/screenshots/phone-drawer-navigation.png."
+          "reason": "The Gherkin harness runs Chromium at 1440x900 only; the drawer was driven at 390x844 with an Android touch context (edge drag, mid-stage drag from x=120, half drag, vertical scroll, scrim, Inbox item Open then Back) for docs/screenshots/phone-drawer-navigation.png."
         }
       ],
       "telemetry": [

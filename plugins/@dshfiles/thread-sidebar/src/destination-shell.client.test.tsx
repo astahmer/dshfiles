@@ -367,6 +367,53 @@ describe('phone navigation: drawer', () => {
     drag(screen.getByRole('dialog', { name: 'Threads' }), [300, 270, 200, 100])
     expect(drawerState()).toBe('closed')
   })
+
+  it('opens from a rightward drag mid-stage, where Android gesture navigation leaves the page its touches', () => {
+    setPhone(true)
+    render(shell({ ...threadProps(), phoneNavigation: 'drawer' }))
+    const stage = document.createElement('main')
+    stage.innerHTML =
+      '<p data-testid="text">Answer</p><pre data-testid="code" style="overflow-x:auto">wide</pre><textarea data-testid="field"></textarea><div data-composer-card=""><button data-testid="chip">Model</button></div>'
+    document.body.append(stage)
+    const at = (id: string): Element => stage.querySelector(`[data-testid="${id}"]`) ?? document.body
+    const code = at('code')
+    Object.defineProperty(code, 'scrollWidth', { value: 800 })
+    Object.defineProperty(code, 'clientWidth', { value: 390 })
+    // Mid-drag from x=120 the drawer (360px in jsdom's 1024px window) follows the finger, then opens past half way.
+    touch(at('text'), 'touchstart', 120)
+    touch(at('text'), 'touchmove', 150)
+    touch(at('text'), 'touchmove', 300)
+    const panel = document.querySelector<HTMLElement>('[data-phone-drawer]')
+    expect(panel?.hasAttribute('data-phone-drawer-dragging')).toBe(true)
+    expect(panel?.style.transform).toBe('translateX(-50.00%)')
+    touch(at('text'), 'touchmove', 400)
+    touch(at('text'), 'touchend', 400)
+    expect(drawerState()).toBe('open')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(drawerState()).toBe('closed')
+    // Mostly vertical travel scrolls the transcript.
+    touch(at('text'), 'touchstart', 120, 500)
+    touch(at('text'), 'touchmove', 140, 400)
+    touch(at('text'), 'touchmove', 330, 380)
+    touch(at('text'), 'touchend', 330, 380)
+    expect(drawerState()).toBe('closed')
+    // A horizontal scroller, a field and the composer keep their own sideways drags.
+    for (const id of ['code', 'field', 'chip']) {
+      drag(at(id), [120, 160, 300, 400])
+      expect(drawerState()).toBe('closed')
+    }
+    // So does a text selection.
+    const range = document.createRange()
+    range.selectNodeContents(at('text'))
+    document.getSelection()?.removeAllRanges()
+    document.getSelection()?.addRange(range)
+    drag(at('text'), [120, 160, 300, 400])
+    expect(drawerState()).toBe('closed')
+    document.getSelection()?.removeAllRanges()
+    drag(at('text'), [120, 160, 300, 400])
+    expect(drawerState()).toBe('open')
+    stage.remove()
+  })
 })
 
 describe('DSH actions on the rail (b:kgcc)', () => {

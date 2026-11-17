@@ -1,8 +1,12 @@
 /**
- * The phone thread drawer's gesture model (Settings › phoneNavigation 'drawer'): a swipe in from the left edge, or a
- * swipe left on the open drawer or its scrim, drags the drawer with the finger; on release it snaps open or closed by
- * the distance covered and the release velocity. Starting and axis locking reuse {@link EdgeSwipeModel}: opening is the
- * left edge's swipe, closing locks like a swipe in from the right (leftward and mostly sideways).
+ * The phone thread drawer's gesture model (Settings › phoneNavigation 'drawer'): a rightward swipe on the stage (from
+ * the left edge or anywhere else), or a swipe left on the open drawer or its scrim, drags the drawer with the finger; on
+ * release it snaps open or closed by the distance covered and the release velocity. Axis locking reuses
+ * {@link EdgeSwipeModel}: opening locks like the left edge's swipe, closing like a swipe in from the right (leftward and
+ * mostly sideways).
+ *
+ * Opening is not limited to the edge band, as in the ChatGPT and Claude Android apps: Android's gesture navigation and
+ * Chrome's back swipe own the screen's left edge, so a page never sees most edge touches there.
  */
 import { EdgeSwipeModel, type EdgeSwipeIntent } from './edge-swipe.js'
 
@@ -19,7 +23,15 @@ export interface DrawerSample {
   readonly t: number
 }
 
+/** Where an opening drag started: the edge band (the drawer mounts at once) or elsewhere on the stage. */
+export type DrawerOpeningOrigin = 'edge' | 'stage'
+
 export const DrawerGestureModel = {
+  /** A touch on the screen may open a closed drawer from anywhere; the edge band is told apart. */
+  openingOrigin: (input: { readonly x: number; readonly width: number }): DrawerOpeningOrigin | null => {
+    if (input.x < 0 || input.x > input.width) return null
+    return EdgeSwipeModel.starts({ side: 'left', x: input.x, width: input.width }) ? 'edge' : 'stage'
+  },
   width: (viewportWidth: number): number => Math.round(Math.min(viewportWidth * DRAWER_WIDTH_RATIO, DRAWER_MAX_WIDTH_PX)),
   /** How open the drawer is, 0 (closed) to 1 (open), for a finger `dx` from where it started. */
   progress: (input: { readonly startedOpen: boolean; readonly dx: number; readonly width: number }): number => {

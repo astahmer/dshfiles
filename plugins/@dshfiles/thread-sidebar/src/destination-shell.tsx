@@ -1273,7 +1273,7 @@ const PhoneNavigation = (
       label={drawerView === 'more' ? 'More' : props.destination.label}
       open={listOpen}
       onOpenChange={next => (next ? openDrawer() : closeDrawer())}
-      edgeSwipe={!listOpen}
+      swipeToOpen={!listOpen}
       onPrepare={() => setDrawerMounted(true)}
       restoreFocus={() => sidebarButton.current?.focus({ preventScroll: true })}
     >

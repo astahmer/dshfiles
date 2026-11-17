@@ -7,6 +7,13 @@ describe('DrawerGestureModel', () => {
     expect(DrawerGestureModel.width(1024)).toBe(DRAWER_MAX_WIDTH_PX)
   })
 
+  it('opens from anywhere on the stage, not only the edge band Android gesture navigation takes', () => {
+    expect(DrawerGestureModel.openingOrigin({ x: 10, width: 390 })).toBe('edge')
+    expect(DrawerGestureModel.openingOrigin({ x: 120, width: 390 })).toBe('stage')
+    expect(DrawerGestureModel.openingOrigin({ x: 380, width: 390 })).toBe('stage')
+    expect(DrawerGestureModel.openingOrigin({ x: -1, width: 390 })).toBeNull()
+  })
+
   it('follows the finger from closed and from open, clamped to the drawer', () => {
     expect(DrawerGestureModel.progress({ startedOpen: false, dx: 166, width: 332 })).toBe(0.5)
     expect(DrawerGestureModel.progress({ startedOpen: false, dx: -40, width: 332 })).toBe(0)
