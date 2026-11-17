@@ -27,7 +27,7 @@ export const readableFetchSettings = defineSettings({
     citations: Schema.boolean()
       .default(true)
       .description(
-        'Show a source chip under each web_search and web_fetch result in the transcript: host and title, opening the page in the browser pane or a new tab.',
+        'Show a source chip under each web_search and web_fetch result.',
       ),
   }),
 })

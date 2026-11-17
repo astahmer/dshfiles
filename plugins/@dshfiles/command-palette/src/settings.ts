@@ -7,7 +7,7 @@ export const paletteSettings = defineSettings({
     threadsScope: Schema.union([Schema.const('project').description('Current project'), Schema.const('all').description('All projects')])
       .default('project')
       .description(
-        'Threads the Threads tab lists: the current project’s (its thread workspaces included), or every project’s. Without a current project it lists them all.',
+        'Which threads the Threads tab lists: the current project’s, or every project’s.',
       ),
   }),
   applies: 'live',

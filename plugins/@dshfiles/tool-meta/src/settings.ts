@@ -19,7 +19,7 @@ export const toolMetaSettings = defineSettings({
     fileCards: Schema.boolean()
       .default(true)
       .description(
-        'Show `read` results as a syntax-highlighted code card, and `edit` / `write` / `apply_patch` as collapsible diffs. Off keeps the native rows; `apply_patch` has no native card and keeps its diff.',
+        'Show `read` results as code cards and `edit`, `write` and `apply_patch` as collapsible diffs.',
       ),
   }),
   applies: 'live',

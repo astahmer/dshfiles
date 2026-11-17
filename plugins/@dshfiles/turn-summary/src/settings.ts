@@ -11,14 +11,14 @@ export const turnSummarySettings = defineSettings({
     testResults: Schema.boolean()
       .default(true)
       .description(
-        'Show the test outcome ("2 of 42 tests failed", "40 tests passed") from the last test-runner summary a command printed (Vitest, Jest, pytest).',
+        'Show the test outcome from the last test-runner summary a command printed (Vitest, Jest, pytest).',
       ),
     duration: Schema.boolean().default(true).description('Show how long the turn took, from its start to its end.'),
     openLists: Schema.boolean().default(true).description('Let the edited-file and command counts open their lists; each file opens in the editor.'),
     walkthrough: Schema.boolean()
       .default(true)
       .description(
-        'Name the files a turn edited as chips. A turn that edited files in several folders, or more files than the chips show, also gets a walkthrough: the files by folder and a link to the Changes view.',
+        'Name the files a turn edited as chips, with a walkthrough when they span several folders.',
       ),
   }),
   applies: 'live',

@@ -54,7 +54,7 @@ export const memorySettings = defineSettings({
     jevEnabled: Schema.boolean()
       .default(false)
       .description(
-        "Ask TypeSafe's Jev which messages are worth remembering and whether saved notes are outdated. Needs the Jev key in Settings › Tools & MCP › Jev.",
+        'Ask TypeSafe\'s Jev which messages to remember and which notes are outdated (needs the Jev key).',
       ),
     // Moved to the one shared key in Settings › Tools & MCP › Jev (settings-shell). Kept, hidden, as the fallback while
     // the shared key is empty, so moving it loses nothing and clearing the shared key restores this value.
@@ -78,7 +78,7 @@ export const memorySettings = defineSettings({
     embeddingProvider: Schema.string()
       .default('')
       .description(
-        'ES module (absolute path or package name) whose default export createEmbedder() returns { model, embed(texts, kind) }. Memory ships no model; see the README.',
+        'ES module whose default export createEmbedder() embeds texts for search (see the README).',
       ),
     retentionDays: Schema.natural()
       .min(0)

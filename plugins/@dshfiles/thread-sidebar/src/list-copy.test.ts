@@ -76,5 +76,5 @@ test('a setting description is one or two sentences', () => {
   // The automatic-restart description ran to four sentences: trigger, off state, cost and dependency in one field.
   const sentences = (text: string): number => text.split(/[.!?](?:\s|$)/u).filter(part => part.trim() !== '').length
   expect(descriptions.filter(text => sentences(text) > 3)).toEqual([])
-  expect(descriptions.some(text => text.startsWith('Restart DSH by itself when idle to apply updates.'))).toBe(true)
+  expect(descriptions.some(text => text.startsWith('Restart DSH when idle to apply updates'))).toBe(true)
 })

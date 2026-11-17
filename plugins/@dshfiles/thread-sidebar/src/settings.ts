@@ -68,27 +68,27 @@ export const threadSidebarSettings = defineSettings({
     phoneEdgeSwipePanels: Schema.boolean()
       .default(DEFAULT_PREFERENCES.phoneEdgeSwipePanels)
       .description(
-        "On a phone, inside a thread, a swipe in from the right screen edge opens the thread panel. Off by default because Android's back gesture also uses that edge; the swipe starts slightly inside it.",
+        'On a phone, swipe in from the right edge to open the thread panel (off by default: Android’s back gesture uses it).',
       ),
     phoneNavigation: Schema.union(['stack', 'drawer'] as const)
       .default(DEFAULT_PREFERENCES.phoneNavigation)
       .description(
-        'On a phone: stack shows a bottom tab bar and the thread list full screen, with Back from a thread; drawer keeps the thread on screen and slides the thread list in from the left (sidebar button or a swipe from the left edge), with Inbox, Land and More at its top.',
+        'On a phone, stack shows the thread list full screen with a tab bar, and drawer slides it in over the thread.',
       ),
     showFooter: Schema.boolean()
       .default(DEFAULT_PREFERENCES.showFooter)
       .description(
-        'Show the row of controls under the thread list (Settings, More; Restart DSH, Copy URL and Pair a phone too while Show DSH actions on the rail is off). Off: those live in the rail and ⌘K.',
+        'Show the row of controls under the thread list (off: they live in the rail and ⌘K).',
       ),
     showRailActions: Schema.boolean()
       .default(DEFAULT_PREFERENCES.showRailActions)
       .description(
-        'Show DSH actions on the rail: Copy DSH URL for agents, Pair a phone and a pending page reload, directly above Settings (on a phone, under More › DSH). Off: they move to the row under the list, which a pending restart or page reload then shows; ⌘K keeps them either way.',
+        'Show Copy DSH URL, Pair a phone and a pending reload on the rail above Settings.',
       ),
     showRailRestart: Schema.boolean()
       .default(DEFAULT_PREFERENCES.showRailRestart)
       .description(
-        'Show Restart DSH among the DSH actions on the rail. Off (the default): the status strip shows the restart notice and its Restart buttons while updates wait, and ⌘K keeps Restart DSH.',
+        'Show Restart DSH on the rail (off: the status strip shows it while updates wait).',
       ),
     showDeveloperPages: Schema.boolean()
       .default(DEFAULT_PREFERENCES.showDeveloperPages)
@@ -156,7 +156,7 @@ export const threadSidebarSettings = defineSettings({
     resumeAfterRestart: Schema.boolean()
       .default(DEFAULT_PREFERENCES.resumeAfterRestart)
       .description(
-        'After a managed restart (Restart DSH, Restart when idle), continue each thread whose turn the restart cut off, once, with a note naming what was cut off. Off by default: each resume is one turn nobody asked for. Crashes and forced stops stay in Interrupted for a manual Resume.',
+        'After a managed restart, continue once each thread whose turn it cut off (off by default: it spends a turn).',
       ),
     resumeAfterRestartMaxThreads: Schema.natural()
       .min(1)
@@ -170,7 +170,7 @@ export const threadSidebarSettings = defineSettings({
     autoRestartWhenIdle: Schema.boolean()
       .default(false)
       .description(
-        'Restart DSH by itself when idle to apply updates. A 30 s notice with Postpone comes first; it needs DSH started through the supervised launcher.',
+        'Restart DSH when idle to apply updates, after a 30 s notice (needs the supervised launcher).',
       ),
     autoRestartQuietSeconds: Schema.natural()
       .min(30)
@@ -180,12 +180,12 @@ export const threadSidebarSettings = defineSettings({
     subscriptionNoticeLevel: Schema.union(SUBSCRIPTION_NOTICE_LEVELS)
       .default('all')
       .description(
-        'Which turn ends of a subscribed thread reach the thread watching it, unless that subscription sets its own level: all, outcomes (landed, failed, asks a question), stuck (failed, asks a question, blocked, truncated) or never.',
+        'Which turn ends of a subscribed thread notify the thread watching it: all, outcomes, stuck or never.',
       ),
     subscriptionDelivery: Schema.union(SUBSCRIPTION_DELIVERY_MODES)
       .default('steer')
       .description(
-        'How a notice reaches a watching thread that is running: steer it into the live turn at its next step, or queue it for after that turn. Notices that arrive together merge into one either way.',
+        'Steer a notice into a watching thread’s live turn, or queue it for after that turn.',
       ),
     applyActionsToChildThreads: Schema.boolean()
       .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
@@ -201,7 +201,7 @@ export const threadSidebarSettings = defineSettings({
     subagentRunCards: Schema.boolean()
       .default(DEFAULT_PREFERENCES.subagentRunCards)
       .description(
-        'Show each working subagent above the composer as a compact run card: its current tool, route, elapsed time, a Stop that interrupts the child and Open thread. Off keeps the one-line row with its expandable live progress. A child whose open turn, route or tool is not known yet keeps the row.',
+        'Show each working subagent above the composer as a run card with its tool, time and Stop.',
       ),
     archiveUndoEnabled: Schema.boolean()
       .default(DEFAULT_PREFERENCES.archiveUndoEnabled)
@@ -231,7 +231,7 @@ export const threadSidebarSettings = defineSettings({
       .max(720)
       .default(DEFAULT_PREFERENCES.subagentSettleHours)
       .description(
-        'Mark a subagent thread done after this many idle hours and stop the background jobs it left running. Pinned, opted-out, waiting or running threads stay. 0 turns it off.',
+        'Mark an idle subagent thread done after this many hours and stop its jobs (0 turns it off).',
       ),
     scanIntervalMinutes: Schema.natural()
       .min(1)
