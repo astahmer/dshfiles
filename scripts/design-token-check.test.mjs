@@ -156,3 +156,22 @@ test('unguarded-loop-animation: spin or pulse with no motion variant in the same
     ['1:dshx:animate-spin'],
   )
 })
+
+test('outline-without-focus: a control with outline-none and no focus-visible replacement in the same class list', () => {
+  const source = [
+    '<button type="button" className="dshx:outline-none dshx:rounded-md" onClick={() => go()}>Go</button>',
+    '<DropdownMenuTrigger className={cn(\'dshx:outline-none\',',
+    "  'dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring')} />",
+    '<div role="button" tabIndex={0} className="dshx:outline-none dshx:has-[:focus-visible]:outline-none" />',
+    '<a href="#x" className="dshx:outline-none dshx:group-focus-within:ring-1">x</a>',
+    '<div tabIndex={-1} className="dshx:outline-none">panel</div>',
+    '<input className="dshx:outline-none dshx:bg-transparent" />',
+    "const inputClass = cn('dshx:outline-none dshx:w-full')",
+  ].join('\n')
+  assert.deepEqual(
+    findingsInText({ plugin: 'demo', file: 'plugins/@dshfiles/demo/src/a.tsx', text: source })
+      .filter(finding => finding.rule === 'outline-without-focus')
+      .map(finding => `${finding.line}:${finding.text}`),
+    ['1:dshx:outline-none', '4:dshx:outline-none'],
+  )
+})
