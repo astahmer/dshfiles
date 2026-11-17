@@ -270,9 +270,28 @@ const walk = (directory: string, files: string[]): void => {
   }
 }
 
-const reachSchema = Schema.Struct({
-  features: Schema.optional(Schema.Array(Schema.Struct({ reach: Schema.optional(Schema.Array(Schema.String)) }))),
+const catalogSchema = Schema.Struct({
+  features: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        title: Schema.optional(Schema.String),
+        summary: Schema.optional(Schema.String),
+        reach: Schema.optional(Schema.Array(Schema.String)),
+        onboarding: Schema.optional(Schema.Struct({ firstAction: Schema.optional(Schema.String), doneWhen: Schema.optional(Schema.String) })),
+      }),
+    ),
+  ),
 })
+
+type Catalog = typeof catalogSchema.Type
+
+/** The catalog text users read: Getting started and the plugin guide show each feature's title and summary, and onboarding its first action and done-when sentence. */
+const catalogCopy = (catalog: Catalog): readonly CopyString[] =>
+  (catalog.features ?? []).flatMap(feature =>
+    [feature.title, feature.summary, feature.onboarding?.firstAction, feature.onboarding?.doneWhen]
+      .filter((text): text is string => text !== undefined)
+      .map(text => ({ text, line: 0 })),
+  )
 
 /** Every finding in the repository's owned plugins, sorted for stable output. */
 const scanRepository = (root: string): readonly CopyFinding[] => {
@@ -306,13 +325,14 @@ const scanRepository = (root: string): readonly CopyFinding[] => {
     } catch {
       continue
     }
-    const decoded = ScriptJson.decodeJsonSafe(reachSchema, text)
+    const decoded = ScriptJson.decodeJsonSafe(catalogSchema, text)
     if (!decoded.success) continue
+    const rel = relative(root, catalog)
+    findings.push(...findingsInStrings({ file: rel, strings: catalogCopy(decoded.data), prefix }))
     const labels = new Set<string>()
     for (const feature of decoded.data.features ?? [])
       for (const step of feature.reach ?? []) for (const quoted of step.matchAll(/"([^"]+)"/g)) labels.add(quoted[1] ?? '')
     // Reach labels are UI names even when they are one word, so only the prefix and glossary terms apply.
-    const rel = relative(root, catalog)
     for (const label of labels) {
       if (prefix.test(label)) findings.push({ term: 'plugin-prefix', plugin, file: rel, line: 0, text: label })
       for (const term of copyTerms) if (term.pattern.test(label)) findings.push({ term: term.id, plugin, file: rel, line: 0, text: label })
@@ -357,6 +377,7 @@ export class CopyCheck {
   static readonly extractStrings = extractStrings
   static readonly isProse = isProse
   static readonly copyInPlainTs = copyInPlainTs
+  static readonly catalogCopy = catalogCopy
   static readonly findingsInStrings = findingsInStrings
   static readonly scanRepository = scanRepository
   static readonly pluginOf = pluginOf

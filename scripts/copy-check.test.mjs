@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { CopyCheck } from './copy-check.ts'
 
-const { compare, copyInPlainTs, countByTermAndPlugin, extractStrings, findingsInStrings, isProse, pluginOf, pluginPrefixPattern, totalsByTerm } = CopyCheck
+const { catalogCopy, compare, copyInPlainTs, countByTermAndPlugin, extractStrings, findingsInStrings, isProse, pluginOf, pluginPrefixPattern, totalsByTerm } = CopyCheck
 
 const prefix = pluginPrefixPattern(['jj-integration', 'pulls-review', 'thread-sidebar', 'mcp-servers'])
 
@@ -99,6 +99,27 @@ test('reads settings-schema descriptions from plain .ts files that define settin
   // A tool parameter description outside a settings file is model-facing, not Settings copy.
   const tool = "const params = Schema.object({ id: Schema.string().description('The session id') })"
   assert.deepEqual(copyInPlainTs(tool, extractStrings(tool)), [])
+})
+
+test('reads the catalog text users read: title, summary, firstAction and doneWhen', () => {
+  const catalog = {
+    features: [
+      {
+        title: 'Resume a session',
+        summary: 'Pick up the thread where it stopped.',
+        details: 'Internal: reads the session store.',
+        onboarding: { firstAction: 'Open the conversation list.', doneWhen: 'The thread opens.' },
+      },
+      { title: 'Search' },
+    ],
+  }
+  const strings = catalogCopy(catalog)
+  assert.deepEqual(
+    strings.map(entry => entry.text),
+    ['Resume a session', 'Pick up the thread where it stopped.', 'Open the conversation list.', 'The thread opens.', 'Search'],
+  )
+  const terms = findingsInStrings({ file: 'plugins/@dshfiles/demo/dshx.features.json', prefix, strings }).map(finding => finding.term)
+  assert.deepEqual(terms, ['session', 'conversation'])
 })
 
 test('only prose counts; identifiers and class strings do not', () => {
