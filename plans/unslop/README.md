@@ -1,8 +1,9 @@
 # Unslop: UI/UX audit and work list
 
 Audit date: 2026-11-16, on the fork's `main` at `wqstyzvl`. This file is the audit and the work list that follows
-from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35a3` (local bookmark
-`unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
+from it. The fixes were built on upstream `astahmer/dshfiles` `main` at `b9ef35a3` and rebased on 2026-11-17 onto
+`ea6b8d88`, one revision per change, not on the fork's `main`, so they
+merge into upstream as a fast-forward. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
 **Resume here:** all 14 steps are done. What is left is under [Follow-ups](#follow-ups): items the lanes found
