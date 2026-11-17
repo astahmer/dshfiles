@@ -6,24 +6,24 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-552 features from 120 plugins.
+568 features from 122 plugins.
 
 ## Counts
 
 | Destination | agentToolOnly | attentionProvider | command | composerContribution | destinationSection | detail | entityProvider | infrastructure | rowAction | rowDecorator | settingsSection | statusItem | threadFacet | transcriptCard | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Threads |  |  |  |  | 12 | 1 | 1 |  | 17 | 2 |  | 1 |  |  | 34 |
+| Threads |  |  |  |  | 13 | 1 | 1 |  | 17 | 2 |  | 1 |  |  | 35 |
 | Inbox |  | 19 |  |  | 3 |  |  |  | 1 |  |  |  |  |  | 23 |
 | Land |  |  | 2 |  | 7 | 2 | 1 |  | 4 |  |  |  |  |  | 16 |
 | Work |  |  | 1 |  | 24 | 8 | 1 |  | 7 |  |  |  |  |  | 41 |
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
-| Observe |  |  |  |  | 23 | 1 |  |  | 3 |  |  | 1 |  |  | 28 |
-| Knowledge |  |  |  |  | 8 | 4 | 1 |  | 2 |  |  |  |  |  | 15 |
-| Settings |  |  |  |  | 2 |  |  |  | 1 |  | 60 |  |  |  | 63 |
+| Observe |  |  |  |  | 23 | 2 |  |  | 3 |  |  | 1 |  |  | 29 |
+| Knowledge |  |  |  |  | 7 | 4 | 1 |  | 2 |  |  |  |  |  | 14 |
+| Settings |  |  |  |  | 3 |  |  |  | 1 |  | 63 |  |  |  | 67 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 32 |  | 32 |
-| Composer |  |  |  | 69 |  |  |  |  |  |  |  |  |  |  | 69 |
-| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 40 | 40 |
-| No place of its own | 28 |  | 21 |  |  |  | 1 | 126 |  |  |  | 10 |  |  | 186 |
+| Composer |  |  |  | 70 |  |  |  |  |  |  |  |  |  |  | 70 |
+| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 42 | 42 |
+| No place of its own | 28 |  | 22 |  |  |  | 1 | 133 |  |  |  | 10 |  |  | 194 |
 
 ## By current left-nav entry
 
@@ -41,9 +41,8 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Background Jobs: Jobs | Observe | background-jobs/batch-stop-jobs → Observe (rowAction)<br>background-jobs/jobs-board → Observe (destinationSection)<br>background-jobs/outlived-jobs → Observe (rowAction) |
 | Backlog | Work, Inbox, Settings | backlog/acceptance-criteria → Work (destinationSection)<br>backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/agent-claims → Work (detail)<br>backlog/agent-run-state → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/capture-templates → Work (destinationSection)<br>backlog/due-dates → Work (destinationSection)<br>backlog/duplicate-merge → Work (destinationSection)<br>backlog/export-backlog → Settings (settingsSection)<br>backlog/gates-and-pull-requests → Work (destinationSection)<br>backlog/hide-agent-items → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/item-priority → Work (destinationSection)<br>backlog/item-timeline-lanes → Work (detail)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/peer-hosts → Settings (settingsSection)<br>backlog/project-agent-guidance → Work (destinationSection)<br>backlog/project-scope → Work (destinationSection)<br>backlog/ready-queue → Work (destinationSection)<br>backlog/recurring-items → Work (destinationSection)<br>backlog/revert-field-change → Work (detail)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/scheduled-rules → Work (destinationSection)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/secret-link-reveal → Work (detail)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/shipped-digest → Work (destinationSection)<br>backlog/shipped-summary → Work (destinationSection)<br>backlog/short-item-references → Work (destinationSection)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/sub-issues → Work (detail)<br>backlog/tweet-context-enrichment → Work (rowAction) |
 | Backlog: Items | Work, Settings | backlog/remote-sync → Work (rowAction)<br>backlog/remote-sync-settings → Settings (settingsSection) |
-| Component gallery | Knowledge | component-gallery/component-gallery-page → Knowledge (destinationSection) |
-| Hosts | Observe | multi-host/checkout-sync → Observe (destinationSection)<br>multi-host/fleet-update → Observe (destinationSection)<br>multi-host/host-management → Observe (destinationSection)<br>multi-host/host-settings → Observe (detail)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
-| Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>activity-timeline/inbox-push → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>thread-sidebar/waiting-threads-page → Inbox (destinationSection)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
+| Hosts | Observe | multi-host/checkout-sync → Observe (destinationSection)<br>multi-host/fleet-update → Observe (destinationSection)<br>multi-host/host-management → Observe (destinationSection)<br>multi-host/host-settings → Observe (detail)<br>multi-host/isolated-runtime-views → Observe (rowAction)<br>multi-host/linked-machines → Observe (detail) |
+| Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>activity-timeline/inbox-push → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
 | Land | Land | jj-integration/thread-integration-attention-view → Land (destinationSection)<br>jj-integration/thread-integration-empty → Land (destinationSection)<br>jj-integration/thread-integration-row-details → Land (detail)<br>jj-integration/thread-workspaces-panel → Land (destinationSection) |
 | MCP Servers: Servers | Settings | mcp-servers/batch-server-actions → Settings (rowAction)<br>mcp-servers/oauth-authorization → Settings (settingsSection)<br>mcp-servers/registry-catalog → Settings (settingsSection)<br>mcp-servers/secret-catalog-credential-bindings → Settings (settingsSection)<br>mcp-servers/server-configuration → Settings (settingsSection) |
 | Memory | Knowledge | memory/batch-forget-notes → Knowledge (rowAction)<br>memory/memory-panel → Knowledge (destinationSection)<br>memory/usage-telemetry → Knowledge (destinationSection) |
@@ -72,13 +71,16 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | agent tool | 27 | No place of its own 22, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
 | agent tool notify_user; in-app toast and system notification | 1 | No place of its own 1 |
 | agent tools | 5 | No place of its own 5 |
+| agent tools contributed by configured plugins | 1 | No place of its own 1 |
+| Agent tools theme_define / theme_set (customTheme) / theme_remove / theme_get; Settings › General › Appearance (Custom theme id, Dracula preset) | 1 | Settings 1 |
 | agent tools traces_store_space, traces_reclaim_space | 1 | No place of its own 1 |
 | Backlog composer | 1 | Composer 1 |
 | Backlog settings › Remote sync › Add Jira connection (rendered by @dshfiles/backlog) | 1 | No place of its own 1 |
 | Backlog settings › Remote sync › Add Notion connection (rendered by @dshfiles/backlog) | 1 | No place of its own 1 |
 | chat transcript | 2 | Transcript 2 |
-| client | 16 | No place of its own 16 |
+| client | 17 | No place of its own 17 |
 | command palette | 1 | No place of its own 1 |
+| command palette and New tab page | 1 | Inbox 1 |
 | composer | 62 | Composer 60, Settings 1, Thread panel 1 |
 | composer ⋯ | 1 | Composer 1 |
 | composer and transcript | 1 | Threads 1 |
@@ -88,35 +90,35 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | conversation.chat.assistant-actions | 1 | Work 1 |
 | dialog | 3 | No place of its own 1, Settings 1, Thread panel 1 |
 | empty thread view (first run); palette | 1 | Threads 1 |
-| host | 67 | No place of its own 67 |
+| host | 71 | No place of its own 71 |
 | host and client | 1 | No place of its own 1 |
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | Inbox | 1 | Inbox 1 |
 | keyboard | 5 | No place of its own 5 |
-| left-nav | 121 | Work 36, Observe 23, Settings 16, Land 15, Inbox 14, Knowledge 7, Agents 4, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 120 | Work 36, Observe 24, Settings 16, Land 15, Inbox 13, Knowledge 6, Agents 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 12 | No place of its own 7, Thread panel 4, Settings 1 |
 | module | 1 | No place of its own 1 |
-| new-thread screen | 1 | Composer 1 |
+| new-thread screen | 2 | Composer 2 |
 | observe | 2 | Observe 2 |
 | Observe › Notifications | 1 | Observe 1 |
 | overlay | 4 | Agents 1, Knowledge 1, No place of its own 1, Work 1 |
-| palette | 13 | No place of its own 13 |
+| palette | 14 | No place of its own 14 |
 | phone top bar | 1 | Composer 1 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
-| rail | 10 | Knowledge 6, Settings 2, No place of its own 1, Work 1 |
+| rail | 13 | Knowledge 6, Settings 4, No place of its own 1, Threads 1, Work 1 |
 | right sidebar | 1 | Threads 1 |
 | right-pane | 10 | Thread panel 8, No place of its own 2 |
-| settings | 34 | Settings 32, No place of its own 2 |
+| settings | 37 | Settings 34, No place of its own 3 |
 | Settings | 1 | Settings 1 |
 | Settings › General › Appearance; agent tools theme_get / theme_set | 1 | Settings 1 |
 | Settings › General › Status bar | 1 | Settings 1 |
 | shell | 9 | No place of its own 6, Threads 3 |
-| sidebar | 5 | Settings 3, No place of its own 1, Work 1 |
-| sidebar footer | 1 | Threads 1 |
-| sidebar-footer | 2 | No place of its own 2 |
+| sidebar | 6 | No place of its own 2, Settings 2, Threads 1, Work 1 |
+| sidebar-footer | 1 | No place of its own 1 |
 | status-strip | 11 | No place of its own 8, Observe 2, Composer 1 |
 | terminal and composer | 1 | No place of its own 1 |
+| thread | 1 | Transcript 1 |
 | thread header | 1 | Thread panel 1 |
 | thread header ⋯ submenu (thread-sidebar ThreadMenuSections); jj panel revision details (jj-integration RevisionSections) | 1 | Work 1 |
 | thread panel | 2 | Thread panel 2 |
@@ -126,7 +128,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | thread-panel | 1 | Thread panel 1 |
 | threads | 1 | Threads 1 |
 | toast | 1 | No place of its own 1 |
-| transcript | 41 | Transcript 38, Inbox 1, Land 1, Thread panel 1 |
+| transcript | 42 | Transcript 39, Inbox 1, Land 1, Thread panel 1 |
 | url | 1 | No place of its own 1 |
 | workbench | 17 | No place of its own 12, Thread panel 4, Settings 1 |
 
@@ -134,14 +136,15 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 
 ### Threads
 
-rail destination (default); 34 features.
+rail destination (default); 35 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | multi-host/remote-inventory: Every thread on every host | destinationSection | thread-list: All remote threads |
-| thread-sidebar/destination-rail: Switch destinations from the rail | destinationSection | shell: Navigation list (21 entries) and collapsed icon rail |
+| thread-sidebar/destination-rail: Switch destinations from the rail | destinationSection | rail: the Destinations tabs and the selected destination's list; collapsed, a folder's flyout |
 | thread-sidebar/filter-presets: Save and switch thread list filter presets | destinationSection | thread-list: Filter menu › Presets |
 | thread-sidebar/live-working-activity: See what a working thread is doing right now | destinationSection | thread-list: working row second line; session header utilities; document title |
+| thread-sidebar/phone-drawer-navigation: Open the thread list as a drawer on a phone | destinationSection | shell: phone stack only (tab bar, full-screen list, Back) |
 | thread-sidebar/phone-stack-navigation: Navigate the phone as a stack | destinationSection | shell: phone tab bar only; the stage kept the desktop tab strip and no Back |
 | thread-sidebar/phone-tab-bar: Navigate from a bottom tab bar on a phone | destinationSection | shell: collapsed icon rail at phone width |
 | thread-sidebar/section-order: Group remote threads with each view | destinationSection | thread-list: Thread list settings › Remote group |
@@ -162,7 +165,7 @@ rail destination (default); 34 features.
 | thread-sidebar/no-folder-promotion: Turn a No folder thread into a project | rowAction | thread-list: No folder row › Turn into project |
 | thread-sidebar/open-thread-in-side-panel: Open a thread in the right side panel | rowAction | thread-list: row menu › Open in side panel |
 | thread-sidebar/project-header-chat: Start a chat from a project group header | rowAction | thread-list: project header › New chat |
-| thread-sidebar/rename-thread-title: Edit a thread title from its row menu | rowAction | thread-list: row menu › Edit title |
+| thread-sidebar/rename-thread-title: Edit a thread title from its row menu | rowAction | thread-list: row menu › Rename |
 | thread-sidebar/session-header-actions: Manage threads from the session header | rowAction | thread-header: Pin / More menu |
 | thread-sidebar/thread-mute: Mute or snooze a thread | rowAction | thread-list: row menu › Mute |
 | thread-sidebar/thread-reference-mention: Mention another thread from its row, its tab, or a drag into the composer | rowAction | thread-list: row menu › Mention |
@@ -170,8 +173,8 @@ rail destination (default); 34 features.
 | thread-sidebar/touch-row-menu: Open a thread's actions by touch | rowAction | thread-list: hover action strip and right-click menu only |
 | thread-transfer/thread-export: Export a thread to a portable .dshthread bundle | rowAction | thread row menu: Export… (also command palette: Export this thread…) |
 | multi-host/logical-project-grouping: Group remote threads under matching local projects | rowDecorator | thread-list: remote threads under their local project |
-| thread-sidebar/thread-subscriptions: Opt-in completion notices between threads | rowDecorator | threads: row context menu → Notify… |
-| cordis-cards/inventory-read-once: Cordis panel and cards read the inventory once per connection | statusItem | sidebar footer: Cordis panel, and Cordis tool cards in the transcript |
+| thread-sidebar/thread-subscriptions: Opt-in completion notices between threads | rowDecorator | threads: row context menu → Notify when finished |
+| cordis-cards/inventory-read-once: Cordis panel and cards read the inventory once per connection | statusItem | sidebar: Cordis panel in the row under the list (Sidebar settings › Show the row under the list), and Cordis tool cards in the transcript |
 
 ### Inbox
 
@@ -199,8 +202,8 @@ rail destination; 23 features.
 | traces/alert-inbox-items: Firing alerts in the Inbox | attentionProvider | left-nav: Inbox › traces.alert-firing |
 | traces/alert-rules: Alert rules over stored telemetry | attentionProvider | left-nav: Traces: Explorer › Alerts |
 | activity-timeline/inbox-panel: Inbox page with one Needs you badge | destinationSection | left-nav: Inbox |
-| activity-timeline/inbox-push: Push blocking Inbox items to a device | destinationSection | left-nav: Inbox › Push blocking items to this device |
-| thread-sidebar/waiting-threads-page: See the threads waiting on you in one page | destinationSection | left-nav: Inbox › Waiting threads |
+| activity-timeline/inbox-push: Push blocking Inbox items to a device | destinationSection | left-nav: Inbox › More actions › Alerts on this device |
+| thread-sidebar/waiting-threads-page: See the threads waiting on you in one page | destinationSection | command palette and New tab page: Waiting threads (not a second row of the Inbox list) |
 | activity-timeline/inbox-opens-subject: Open an Inbox item's source in one click | rowAction | Inbox: Open on an item's subject |
 
 ### Land
@@ -288,7 +291,7 @@ rail destination; 5 features.
 
 ### Observe
 
-rail destination; 28 features.
+rail destination; 29 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -316,6 +319,7 @@ rail destination; 28 features.
 | usage/usage-request-log: Request log | destinationSection | left-nav: Usage › Requests |
 | worktree-memory/memory-board: Process memory and Node origins | destinationSection | left-nav: Worktree Memory: RAM |
 | multi-host/host-settings: Weight Auto placement and fetch before new threads | detail | left-nav: Hosts › Edit host |
+| multi-host/linked-machines: Link machines without SSH, both ways | detail | left-nav: Hosts › Link this machine, Pair a machine |
 | background-jobs/batch-stop-jobs: Stop a selection of running jobs | rowAction | left-nav: Background Jobs: Jobs › batch stop |
 | background-jobs/outlived-jobs: Jobs that outlived their turn | rowAction | left-nav: Background Jobs: Jobs › outlived its turn |
 | multi-host/isolated-runtime-views: Open the host's own DSH UI | rowAction | left-nav: Hosts › Open host UI |
@@ -323,12 +327,11 @@ rail destination; 28 features.
 
 ### Knowledge
 
-rail destination; 15 features.
+rail destination; 14 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | agentsview/agent-sessions-panel: Agent CLI sessions browser | destinationSection | left-nav: Agent CLI threads |
-| component-gallery/component-gallery-page: Browse every shared component on one page | destinationSection | left-nav: Component gallery |
 | memory/memory-panel: Browse and clean up memory in the Memory panel | destinationSection | left-nav: Memory |
 | memory/usage-telemetry: Show what memory costs and whether it holds up | destinationSection | left-nav: Memory › Analytics |
 | onboarding/getting-started: See what this setup can do and what it still needs on one page | destinationSection | rail: Knowledge › Getting started; palette: Getting started |
@@ -345,12 +348,13 @@ rail destination; 15 features.
 
 ### Settings
 
-rail destination (bottom); 63 features.
+rail destination (bottom); 67 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | capabilities-hub/capabilities-hub: Open the manager for skills, MCP servers or plugins from one page | destinationSection | rail: Settings › Capabilities hub (already on the rail) |
-| plugin-guide/plugin-guide: Browse where a plugin can extend DSH | destinationSection | rail: Settings › Plugin guide (already on the rail) |
+| component-gallery/component-gallery-page: Browse every shared component on one page | destinationSection | rail: Settings › Developer › Component gallery |
+| plugin-guide/plugin-guide: Browse where a plugin can extend DSH | destinationSection | rail: Settings › Developer › Plugin guide |
 | mcp-servers/batch-server-actions: Batch enable, disable and remove MCP servers | rowAction | left-nav: MCP Servers: Servers › batch actions |
 | ai-accounts/account-lifecycle: Manage provider account drafts | settingsSection | left-nav: AI Accounts: Accounts |
 | ai-accounts/failure-recovery: Recover failed account requests per failure kind | settingsSection | settings: AI Accounts › failure recovery |
@@ -358,6 +362,7 @@ rail destination (bottom); 63 features.
 | ai-accounts/model-routing: Curate models and choose account routes | settingsSection | left-nav: AI Accounts: Accounts › Models |
 | ai-accounts/quick-account-setup: Connect an account without leaving the chat | settingsSection | dialog: Add AI account |
 | ai-accounts/reference-dashboard: Manage account Models, Settings and Usage | settingsSection | left-nav: AI Accounts: Accounts › Models / Settings / Usage tabs |
+| ai-accounts/stalled-stream-fallback-setting: Turn on the fallback chain for stalled streams | settingsSection | settings: AI Accounts › Failure recovery › Fall back on stalled streams |
 | ai-accounts/strip-short-names: Short names in the sidebar usage strip | settingsSection | settings: AI Accounts › strip short names |
 | backlog/export-backlog: Export the backlog to JSONL or an SQLite copy | settingsSection | left-nav: Backlog › Backlog settings › Export |
 | backlog/jev-settings: Configure Jev from the Backlog panel | settingsSection | left-nav: Backlog › Backlog settings |
@@ -368,12 +373,13 @@ rail destination (bottom); 63 features.
 | frame-layout/status-bar-settings: Show, hide and reorder status bar items | settingsSection | Settings › General › Status bar |
 | jj-integration/project-main-branch: Choose a project's main branch | settingsSection | settings: Projects › Main branch |
 | loopback-access/network-access-settings: Choose how DSH is reachable | settingsSection | settings: Network access |
-| mcp-endpoint/mcp-endpoint-settings: Issue the MCP token and copy the Claude Code command | settingsSection | settings: MCP endpoint |
+| mcp-endpoint/mcp-endpoint-settings: Issue an MCP token and connect a client | settingsSection | settings: MCP endpoint |
 | mcp-servers/oauth-authorization: Authorize remote OAuth servers | settingsSection | left-nav: MCP Servers: Servers › OAuth |
 | mcp-servers/registry-catalog: Search curated providers and the MCP Registry | settingsSection | left-nav: MCP Servers: Servers › registry |
 | mcp-servers/secret-catalog-credential-bindings: Bind server headers and environment to Secret Catalog references | settingsSection | left-nav: MCP Servers: Servers › Add MCP server › Advanced: request headers |
 | mcp-servers/server-configuration: Manage local and remote MCP server definitions | settingsSection | left-nav: MCP Servers: Servers |
 | multi-host/runtime-directory: Register and identify local DSH runtimes | settingsSection | composer: Run on Local › Add host |
+| opencode-compat/plugin-loader: Load OpenCode server plugins | settingsSection | settings: dshfiles-opencode-compat |
 | policies/deny-policies: Deny tool calls outright, after permissions | settingsSection | agent tool: policies_list (no UI) |
 | secret-catalog/alias-mutations: Create, edit, rename, and remove aliases safely | settingsSection | left-nav: Secrets › Add with details |
 | secret-catalog/backlog-jev-setup: Add a Jev key from the Backlog setting | settingsSection | plugins-page: View @dshfiles/backlog › Jev secret |
@@ -391,7 +397,7 @@ rail destination (bottom); 63 features.
 | settings-shell/settings-json-editor: Edit plugin settings as JSON | settingsSection | settings: plugin page › JSON |
 | settings-shell/settings-search: Search Settings inline | settingsSection | settings: Search settings |
 | settings-shell/settings-search-entries: Search section controls and open them at the control | settingsSection | settings: Search settings › section controls |
-| settings-shell/settings-shell-port: Native Settings shell, ported | settingsSection | sidebar: Account menu › Settings |
+| settings-shell/settings-shell-port: Native Settings shell, ported | settingsSection | rail: Settings; palette: Settings: General |
 | settings-shell/settings-tab: One Settings page in the stage | settingsSection | settings: the Settings page in the stage |
 | settings-shell/settings-task-groups: Settings grouped by task, with deep links | settingsSection | settings: task groups in the Settings navigation |
 | settings-shell/settings-workbench-panels: One dockable Settings hub with real navigation and forms | settingsSection | main-tabs: New tab › Settings |
@@ -402,12 +408,13 @@ rail destination (bottom); 63 features.
 | thread-share/thread-share-link: Share a thread as a read-only link | settingsSection | settings: Thread sharing |
 | thread-share/thread-share-publish: Publish share pages through a time-bounded tunnel | settingsSection | settings: Thread sharing |
 | thread-share/thread-share-snapshot-export: Freeze a snapshot or download a self-contained HTML export | settingsSection | settings: Thread sharing |
-| thread-sidebar/idle-archive-policy: Automatically settle eligible idle threads | settingsSection | settings: Thread sidebar › idle policy |
+| thread-sidebar/idle-archive-policy: Mark idle threads done automatically | settingsSection | settings: Thread sidebar › idle policy |
 | thread-sidebar/layout-mode: One sidebar layout: the rail and list as a movable pane | settingsSection | sidebar: the rail and list (Workbench Sidebar pane) |
 | thread-sidebar/navigation-layout: Customize sidebar navigation and sections | settingsSection | thread-list: Sidebar settings › Customize sidebar |
 | thread-sidebar/notification-delivery: Configure per-category thread notifications | settingsSection | settings: Notifications › Thread notifications |
-| thread-sidebar/settled-auto-archive: Archive a settled thread once its delay passes | settingsSection | settings: Thread sidebar › settled archive delay |
+| thread-sidebar/settled-auto-archive: Archive a done thread once its delay passes | settingsSection | settings: Thread sidebar › settled archive delay |
 | ui-styles/appearance-theme: Appearance theme: presets, palette and fonts | settingsSection | Settings › General › Appearance; agent tools theme_get / theme_set |
+| ui-styles/saved-themes: Saved and gallery themes: any theme on request, Claude Code scenes, and Dracula | settingsSection | Agent tools theme_define / theme_set (customTheme) / theme_remove / theme_get; Settings › General › Appearance (Custom theme id, Dracula preset) |
 | web-fetch-readable/readable-web-fetch: Answer ctx.web fetches across redirects with the readable article | settingsSection | settings: dshfiles-web-fetch-readable |
 | web-search-brave/brave-web-search: Answer ctx.web searches with Brave Web Search | settingsSection | settings: Brave web search |
 | workbench/dockable-panel-layouts: Arrange plugin panels in independent layouts | settingsSection | workbench: Pane options › Layouts |
@@ -449,12 +456,12 @@ facets of the active thread; 32 features.
 | traces/thread-traces-tab: Per-thread Traces facet | threadFacet | thread-panel: Traces / Requests facets |
 | usage/thread-cost-facet: Thread panel Cost facet | threadFacet | workbench: Choose a view › Thread panels › Cost |
 | workbench/phone-thread-panel-sheet: Open the thread panel as a bottom sheet on a phone | threadFacet | workbench: right pane as a narrow column; phone reached facets only through the main pane's New tab |
-| workbench/terminal-pages: Open native terminals from any pane's view chooser | threadFacet | main-tabs: New tab › Terminal: Terminal |
+| workbench/terminal-pages: Open native terminals from any pane's view chooser | threadFacet | main-tabs: New tab › Terminal |
 | workbench/thread-facets: Open thread facets from any pane's view chooser | threadFacet | workbench: Choose a view › Thread panels |
 
 ### Composer
 
-run row, chips, `/` and `@` sources; 69 features.
+run row, chips, `/` and `@` sources; 70 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -490,6 +497,7 @@ run row, chips, `/` and `@` sources; 69 features.
 | multi-host/remote-interactions: Answer a remote agent's questions and approvals in this client | composerContribution | conversation composer seat of a mirrored thread |
 | multi-host/remote-thread-references: Mention remote threads safely | composerContribution | composer: @t: remote threads |
 | multi-host/session-routing: Use the native composer for remote threads | composerContribution | composer: Run on Local chip |
+| onboarding/starter-tasks: First tasks for your project on the new-thread screen | composerContribution | new-thread screen: suggestion cards |
 | project-checks/trusted-actions: Run trusted project checks | composerContribution | composer: Project checks |
 | prompt-stash/draft-attachment-retention: Keep draft attachments across thread navigation | composerContribution | composer: draft attachments |
 | prompt-stash/guarded-composer-insertion: Insert prompt text without submitting | composerContribution | composer: Prompts › insert |
@@ -530,15 +538,17 @@ run row, chips, `/` and `@` sources; 69 features.
 
 ### Transcript
 
-cards inline in the active thread; 40 features.
+cards inline in the active thread; 42 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| agent-plan/failure-card: Retry and Ask to fix under failed turns | transcriptCard | transcript: turn error row |
+| activity-timeline/thread-question-strip: Answer a subagent's question in its parent thread | transcriptCard | thread: above the composer while a subagent's question waits |
+| agent-plan/failure-card: Ask to fix on a failed turn | transcriptCard | transcript: failed turn action row |
 | agent-plan/plan-card: Plan card for todo_write | transcriptCard | transcript: todo_write tool card |
 | agent-questions/question-card-layout: Steady countdown and compact native question card | transcriptCard | transcript: native question card |
 | agent-questions/root-timed-questions: Root timed questions keep the Agent working | transcriptCard | transcript: native question card |
 | ai-accounts/credential-recovery: Open credential setup from failed turns | transcriptCard | transcript: failed turn › Open AI Accounts |
+| ai-accounts/stalled-stream-recovery: Explain turns stopped by a stalled model stream | transcriptCard | transcript: failed turn › stalled-stream advice |
 | attachment-gallery/image-gallery-navigation: Navigate image previews | transcriptCard | transcript: image previews (and composer attachments) |
 | background-jobs/transcript-job-preview: Live job preview in the transcript and above the composer | transcriptCard | transcript: under the tool card that started the job; composer dock while it runs |
 | backlog/jev-secret-setup: Set up a missing Jev key from chat | transcriptCard | transcript: turn tail › Set up missing secrets |
@@ -567,7 +577,7 @@ cards inline in the active thread; 40 features.
 | thread-sidebar/subagent-live-preview: Live subagent preview in the transcript and above the composer | transcriptCard | transcript: subagent tool row; composer dock while the child works |
 | tool-meta/file-diff-card: File edits as collapsible diffs | transcriptCard | transcript: file edit as a collapsible diff |
 | tool-meta/read-code-card: File reads as a syntax-highlighted code card | transcriptCard | transcript: file read as a code card |
-| tool-meta/tool-call-timing: Start time and duration on every tool call | transcriptCard | transcript: tool call timing |
+| tool-meta/tool-call-timing: How long each tool call took | transcriptCard | transcript: tool call timing |
 | traces/trace-transcript-links: Span ↔ transcript links | transcriptCard | transcript: Open the trace of turn |
 | turn-summary/turn-summary-line: A summary footer under each finished turn | transcriptCard | transcript: turn summary footer |
 | turn-summary/turn-walkthrough: A walkthrough under a turn that changed code | transcriptCard | transcript: turn walkthrough row |
@@ -577,7 +587,7 @@ cards inline in the active thread; 40 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 186 features.
+palette commands, status items, agent tools, infrastructure; 194 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -616,6 +626,7 @@ palette commands, status items, agent tools, infrastructure; 186 features.
 | command-palette/contributed-commands: List commands other plugins contribute through dshx | command | palette: Commands |
 | command-palette/palette-prefix-routing: Route prefixed searches to the right content | command | palette: prefixes |
 | command-palette/palette-search: Search threads and workspace files | command | palette: Threads / Files search |
+| frame-layout/zen-mode: Zen mode: only the thread and its composer | command | palette: Zen mode |
 | main-tabs/new-tab-page: Open a new tab with suggestions of what to show | command | main-tabs: New tab |
 | main-tabs/tab-keyboard: Jump between tabs from the keyboard | command | keyboard: tab jumps |
 | pull-requests/github-pull-request-create: Create a GitHub pull request from a thread | command | palette: Create pull request from this thread (dialog) |
@@ -623,12 +634,12 @@ palette commands, status items, agent tools, infrastructure; 186 features.
 | shortcuts/scoped-key-layers: Single keys, sequences and scoped keys | command | keyboard: J / K / E / ? / G then I |
 | shortcuts/shortcut-cheat-sheet: Keyboard shortcut sheet | command | keyboard: ? / Mod+/ |
 | shortcuts/sidebar-toggle-chord: Toggle the sidebar with the platform primary chord | command | keyboard: Mod+B |
-| thread-sidebar/footer-more-menu: Reach Settings, sidebar pages, and hidden footer actions from both More menus | command | sidebar-footer: More menu |
+| thread-sidebar/footer-more-menu: Reach Settings, sidebar pages, and hidden footer actions from both More menus | command | sidebar: More in the row under the list (Sidebar settings › Show the row under the list) and the Workbench Navigation view's More menu |
 | thread-sidebar/moved-to-map: Find where a former sidebar page went | command | palette: Where did a page go? |
 | thread-sidebar/multi-model-fan-out: Send one prompt to several models | command | palette: Send to several models… |
 | thread-sidebar/palette-search-history: Search threads, files, and recent navigation | command | thread-list: Search threads |
 | thread-sidebar/prompt-links: Open a prefilled new thread from a prompt link | command | url: ?prompt= link |
-| thread-sidebar/rail-actions: Restart DSH, Copy DSH URL and Pair a phone on the rail above Settings | command | rail: DSH actions above Settings; phone: More › DSH |
+| thread-sidebar/rail-actions: Copy DSH URL, Pair a phone and a pending page reload on the rail above Settings | command | rail: DSH actions above Settings; phone: More › DSH |
 | thread-transfer/thread-import: Import a .dshthread bundle as a new thread | command | command palette: Import thread… |
 | input-trigger/entity-registry: One mention and reference-preview registry | entityProvider | overlay: shared reference preview card; composer: @ menu groups |
 | agent-loop/output-limit-continuation: Continue a reply cut at the output-token limit | infrastructure | host: no UI |
@@ -655,6 +666,7 @@ palette commands, status items, agent tools, infrastructure; 186 features.
 | context-compaction/bounded-compaction: Bounded compaction summaries | infrastructure | host: no UI |
 | context-compaction/compaction-threshold: Next automatic compaction for a thread | infrastructure | host: threshold API and agent tool |
 | context-compaction/idle-compaction: Idle compaction before cache expiry | infrastructure | host: timer, no UI |
+| context-compaction/loaded-skills: Loaded skills kept in compaction checkpoints | infrastructure | host: appended to the checkpoint summary, no UI |
 | context-compaction/overflow-recognition: Provider context-overflow recognition | infrastructure | host: agent request-error listener, no UI |
 | cordis-client-runner/inspect-manifest-once: Publish the Client inspect manifest once per connection | infrastructure | client: dynamic Cordis package runner (no UI) |
 | credential-port/secret-credential-port: One Host service port for credentials kept in a secrets catalog | infrastructure | host: library |
@@ -677,6 +689,7 @@ palette commands, status items, agent tools, infrastructure; 186 features.
 | goal-stall-guard/pause-stalled-goals: Pause goals after consecutive empty rounds | infrastructure | host: goal rounds |
 | goal-tool/continued-form-goal-authority: Accept admitted continued-form answers as direct goal authority | infrastructure | host: goal tool fork |
 | hmr-gate/host-reload: Experimental in-process Host reload for opted-in plugins | infrastructure | host: hmr-gate deferral |
+| hmr-gate/update-timing: Plugin updates wait for a hidden or idle moment | infrastructure | client: hmr-gate frame handling |
 | image-preview/image-preview-response: One guarded way to serve and show a changed image | infrastructure | host and client: library |
 | jev/jev-ask: Ask Jev one Noul question and record its usage | infrastructure | host: library |
 | jj-cli/jj-cli-run: One Effect service that runs the Jujutsu CLI | infrastructure | host: library |
@@ -688,15 +701,19 @@ palette commands, status items, agent tools, infrastructure; 186 features.
 | main-tabs/tab-persistence: Keep tabs across reloads, per project or globally | infrastructure | main-tabs: tab persistence |
 | main-tabs/workbench-semantics-provider: One tab semantics provider for Workbench and standalone fallback | infrastructure | main-tabs: tab semantics |
 | mcp-endpoint/mcp-endpoint: Drive DSH threads from an outside agent over MCP | infrastructure | host: /mcp endpoint |
+| mcp-endpoint/mcp-endpoint-plugin-tools: Expose plugin tools to MCP clients | infrastructure | host: /mcp endpoint |
 | memory/start-block: Start every thread with one frozen memory block | infrastructure | host: memory start block in the system prompt |
 | memory/thread-digests: Digest idle threads from DSH's own session logs | infrastructure | host: memory digests |
 | multi-host/ssh-runtime-connection: Connect to an SSH-managed runtime | infrastructure | host: SSH runtime tunnels |
+| opencode-compat/plugin-tools: Run OpenCode plugin tools and tool hooks | infrastructure | agent tools contributed by configured plugins |
+| opencode-compat/skills-context-storage: OpenCode skills, context hooks and storage | infrastructure | settings: dshfiles-opencode-compat |
 | optmem-core/bounded-utf8-text: Count, clip, and paginate UTF-8 text by bytes | infrastructure | host: library |
 | optmem-core/credential-redaction: Redact credentials before data reaches persistence | infrastructure | host: library |
 | optmem-core/deterministic-view-and-summary: Build deterministic views | infrastructure | host: library |
 | optmem-core/memory-tree-addressing: Address complete nodes in a hierarchical memory tree | infrastructure | host: library |
+| phone-access/phone-edge-routes: Share the phone origin with other Host plugins | infrastructure | host: dshx API phone-access-edge (status, claimRoutes, releaseRoutes) |
 | phone-access/phone-sign-in-qr: Print a phone sign-in QR for a trusted HTTPS origin | infrastructure | host: startup terminal output |
-| phone-pairing/phone-pairing: Pair a phone over a self-provisioned HTTPS tunnel | infrastructure | host: loopback gateway, terminal QR and the sidebar footer's pairing popover |
+| phone-pairing/phone-pairing: Pair a phone over a self-provisioned HTTPS tunnel | infrastructure | host: loopback gateway, terminal QR and the rail's Pair a phone dialog |
 | plugin-ui/debounced-client-values: Debounce fast-changing client input | infrastructure | client: library |
 | plugin-ui/query-client-binding: Provide host-backed client queries | infrastructure | client: library |
 | plugin-ui/schema-validated-persistent-values: Persist schema-validated client values | infrastructure | client: library |
@@ -706,6 +723,7 @@ palette commands, status items, agent tools, infrastructure; 186 features.
 | preview/render-html: Offline HTML screenshots for other Host plugins | infrastructure | host: preview-render contract |
 | project-automations/project-automation-webhooks: Start threads from signed webhooks | infrastructure | host: /automations/webhook/<id> route |
 | project-checks/activity-projection: Project check receipts appear safely in the Activity Timeline | infrastructure | host: receipts into left-nav: Activity Timeline: Activity |
+| pwa/installable-app: Install the Web UI as an app on the phone | infrastructure | host: served manifest, icon routes and index head |
 | request-messages/dispatch-request-messages: Dispatch agent/request-messages on stock DSH | infrastructure | host: no UI |
 | rich-composer/composer-contract: Composer contract for other plugins | infrastructure | client: Composer contract |
 | rich-composer/workbench-conversation-views: Dock an independently bound Conversation view | infrastructure | workbench: docked Conversation views |

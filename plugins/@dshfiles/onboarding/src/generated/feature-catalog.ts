@@ -4422,6 +4422,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4433,6 +4440,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -4450,6 +4464,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4464,6 +4485,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4475,6 +4503,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -4529,6 +4564,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4536,13 +4578,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4550,13 +4606,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Board\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Board\"",
+          "action": "click",
+          "by": "option",
           "name": "Board",
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4564,13 +4634,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Projects\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Projects\"",
+          "action": "click",
+          "by": "option",
           "name": "Projects",
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4578,10 +4662,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Inbox\"",
+          "text": "click combobox \"Backlog view\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Inbox\"",
+          "action": "click",
+          "by": "option",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
           "action": "click",
           "by": "button",
-          "name": "Inbox",
+          "name": "New",
           "value": null
         },
         {
@@ -4645,10 +4743,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -4711,6 +4816,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -4863,6 +4975,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Feed item to close\"",
           "action": "fill",
           "by": "textbox",
@@ -4891,9 +5010,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Feed\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Feed\"",
+          "action": "click",
+          "by": "option",
           "name": "Feed",
           "value": null
         },
@@ -5024,6 +5150,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -5235,6 +5368,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"First selection item\"",
           "action": "fill",
           "by": "textbox",
@@ -5374,6 +5514,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"First menu selection item\"",
           "action": "fill",
           "by": "textbox",
@@ -5509,6 +5656,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -5617,6 +5771,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -5624,9 +5785,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backfill triage\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Backfill triage\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Backfill triage",
           "value": null
         },
@@ -5661,6 +5829,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -5668,9 +5843,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backfill triage\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Backfill triage\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Backfill triage",
           "value": null
         },
@@ -5778,6 +5960,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "by": null,
           "name": null,
           "value": "tooling/dshx/e2e/fixtures/attachments/blue.png"
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
         },
         {
           "text": "fill textbox \"Capture\" \"Ship the backlog reference preview\nRemember where the link goes.\"",
@@ -6024,9 +6213,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Inbox\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Inbox\"",
+          "action": "click",
+          "by": "option",
           "name": "Inbox",
           "value": null
         },
@@ -6073,6 +6269,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -6292,6 +6495,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Describe me with a screenshot\"",
           "action": "fill",
           "by": "textbox",
@@ -6487,17 +6697,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
           "name": "Capture",
-          "value": null
-        },
-        {
-          "text": "expect combobox \"Filter by project\"",
-          "action": "expect",
-          "by": "combobox",
-          "name": "Filter by project",
           "value": null
         },
         {
@@ -6527,6 +6737,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "by": null,
           "name": null,
           "value": "Escape"
+        },
+        {
+          "text": "click button \"Backlog view options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog view options",
+          "value": null
         },
         {
           "text": "click combobox \"Filter by project\"",
@@ -6601,17 +6818,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
           "name": "Capture",
-          "value": null
-        },
-        {
-          "text": "expect combobox \"Filter by project\"",
-          "action": "expect",
-          "by": "combobox",
-          "name": "Filter by project",
           "value": null
         },
         {
@@ -6641,6 +6858,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "by": null,
           "name": null,
           "value": "Escape"
+        },
+        {
+          "text": "click button \"Backlog view options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog view options",
+          "value": null
         },
         {
           "text": "click combobox \"Filter by project\"",
@@ -6718,6 +6942,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"Backlog view options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog view options",
+          "value": null
+        },
+        {
           "text": "click button \"Hide agent items\"",
           "action": "click",
           "by": "button",
@@ -6752,6 +6983,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog view options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog view options",
           "value": null
         },
         {
@@ -6804,6 +7042,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -7033,6 +7278,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -7040,9 +7292,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Feed\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Feed\"",
+          "action": "click",
+          "by": "option",
           "name": "Feed",
           "value": null
         },
@@ -7075,9 +7334,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Feed\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Feed\"",
+          "action": "click",
+          "by": "option",
           "name": "Feed",
           "value": null
         },
@@ -7138,9 +7404,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Board\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Board\"",
+          "action": "click",
+          "by": "option",
           "name": "Board",
           "value": null
         },
@@ -7326,6 +7599,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Tweet context in backlog https://x.com/someone/status/123\"",
           "action": "fill",
           "by": "textbox",
@@ -7378,6 +7658,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -7520,10 +7807,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -7566,6 +7860,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Close",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -7624,10 +7925,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -7738,10 +8046,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -7855,6 +8170,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Rotate secret:GITHUB_TOKEN\"",
           "action": "fill",
           "by": "textbox",
@@ -7917,6 +8239,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Short alias demo\"",
           "action": "fill",
           "by": "textbox",
@@ -7962,6 +8291,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -8017,6 +8353,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -8129,10 +8472,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -8173,10 +8523,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -8217,6 +8574,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -8355,6 +8719,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Ship the shipped digest\"",
           "action": "fill",
           "by": "textbox",
@@ -8383,9 +8754,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Feed\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Feed\"",
+          "action": "click",
+          "by": "option",
           "name": "Feed",
           "value": null
         },
@@ -8439,9 +8817,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Shipped\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Shipped\"",
+          "action": "click",
+          "by": "option",
           "name": "Shipped",
           "value": null
         },
@@ -8493,6 +8878,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Ship the shipped digest\"",
           "action": "fill",
           "by": "textbox",
@@ -8628,6 +9020,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Ship the shipped digest\"",
           "action": "fill",
           "by": "textbox",
@@ -8656,9 +9055,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Feed\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Feed\"",
+          "action": "click",
+          "by": "option",
           "name": "Feed",
           "value": null
         },
@@ -8712,9 +9118,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Shipped\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Shipped\"",
+          "action": "click",
+          "by": "option",
           "name": "Shipped",
           "value": null
         },
@@ -8766,6 +9179,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"!2 Priority demo\"",
           "action": "fill",
           "by": "textbox",
@@ -8817,6 +9237,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"!2 Priority demo\"",
           "action": "fill",
           "by": "textbox",
@@ -8831,9 +9258,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -8868,6 +9302,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -8933,6 +9374,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9004,6 +9452,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"!1 Fix the login outage\"",
           "action": "fill",
           "by": "textbox",
@@ -9111,6 +9566,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"!1 Fix the login outage\"",
           "action": "fill",
           "by": "textbox",
@@ -9181,9 +9643,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Ready\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Ready\"",
+          "action": "click",
+          "by": "option",
           "name": "Ready",
           "value": null
         },
@@ -9218,6 +9687,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9269,6 +9745,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9326,6 +9809,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Run state demo\"",
           "action": "fill",
           "by": "textbox",
@@ -9377,6 +9867,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Run state demo\"",
           "action": "fill",
           "by": "textbox",
@@ -9391,9 +9888,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -9428,6 +9932,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9552,6 +10063,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Ship structured sections #backlog !2\"",
           "action": "fill",
           "by": "textbox",
@@ -9566,9 +10084,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -9676,6 +10201,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Login fails on Safari /template Bug report\"",
           "action": "fill",
           "by": "textbox",
@@ -9734,6 +10266,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Login fails on Safari /template Bug report\"",
           "action": "fill",
           "by": "textbox",
@@ -9748,9 +10287,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -9792,6 +10338,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9864,6 +10417,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Water the plants\"",
           "action": "fill",
           "by": "textbox",
@@ -9929,6 +10489,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Water the plants\"",
           "action": "fill",
           "by": "textbox",
@@ -9943,9 +10510,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -9994,6 +10568,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -10080,6 +10661,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Ship after the PR\"",
           "action": "fill",
           "by": "textbox",
@@ -10138,6 +10726,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Ship after the PR\"",
           "action": "fill",
           "by": "textbox",
@@ -10152,9 +10747,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -10196,6 +10798,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -10257,6 +10866,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Triage the inbox nightly\"",
           "action": "fill",
           "by": "textbox",
@@ -10271,9 +10887,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -10355,9 +10978,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Projects\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Projects\"",
+          "action": "click",
+          "by": "option",
           "name": "Projects",
           "value": null
         },
@@ -10402,10 +11032,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -10443,10 +11080,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -10484,10 +11128,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -27136,7 +27787,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "trace-insights",
       "title": "Service and operation overview, error groups",
-      "summary": "A service strip and an Operations tab summarize span volume, error rate and p50/p95/p99 latency per service and operation over a chosen window; an Errors tab groups error spans by service, operation, error type and message shape with counts, first and last seen and a sample trac…",
+      "summary": "An Operations view (under More views) summarizes span volume, error rate and p50/p95/p99 latency per service and operation over a chosen window; an Errors tab groups error spans by service, operation, error type and message shape with counts, first and last seen and a sample tra…",
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Operations / Errors",
       "reach": [
@@ -27155,9 +27806,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Operations\"",
+          "text": "click button \"More views\"",
           "action": "click",
-          "by": "tab",
+          "by": "button",
+          "name": "More views",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Operations\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Operations",
           "value": null
         },
@@ -27192,9 +27850,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Operations\"",
+          "text": "click button \"More views\"",
           "action": "click",
-          "by": "tab",
+          "by": "button",
+          "name": "More views",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Operations\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Operations",
           "value": null
         },
@@ -27239,9 +27904,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Service map\"",
+          "text": "click button \"More views\"",
           "action": "click",
-          "by": "tab",
+          "by": "button",
+          "name": "More views",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Service map\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Service map",
           "value": null
         },
@@ -27287,9 +27959,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Metrics\"",
+          "text": "click button \"More views\"",
           "action": "click",
-          "by": "tab",
+          "by": "button",
+          "name": "More views",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Metrics\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Metrics",
           "value": null
         },
@@ -27425,9 +28104,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Boards\"",
+          "text": "click button \"More views\"",
           "action": "click",
-          "by": "tab",
+          "by": "button",
+          "name": "More views",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Boards\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Boards",
           "value": null
         },

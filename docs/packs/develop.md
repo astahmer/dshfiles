@@ -30,7 +30,7 @@ From the onboarding feature catalog: 7 features, the 1 curated ones first.
 
 ### More
 
-1. **Browse every shared component on one page** (`component-gallery`, knowledge) — A main panel that renders every @dshfiles/plugin-ui component live, animated ones included, in one tab per category, with a filter over titles and import paths, a per-card and page-wide Replay, and a reduced-motion indicator.
+1. **Browse every shared component on one page** (`component-gallery`, settings) — A main panel that renders every @dshfiles/plugin-ui component live, animated ones included, in one tab per category, with a filter over titles and import paths, a per-card and page-wide Replay, and a reduced-motion indicator.
 2. **Plugin updates waiting for a Host restart** (`hmr-gate`) — A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.
 3. **Plugin updates waiting for a restart in the Inbox** (`hmr-gate`, inbox) — While any rebuilt plugin is held back because its new Host code is not loaded, the Inbox shows one Ready item about this DSH naming the waiting packages and how to apply them (restart when no agent is working). It offers no restart verb: restarting stays the user's decision. A c…
 4. **Held-back bundles join the one restart notice** (`hmr-gate`) — While a rebuilt plugin waits for a Host restart, hmr-gate lists it in thread-sidebar's restart sources, so the status strip's one Restart pending item names it beside the Host files thread-sidebar watches. thread-sidebar owns that item and its Restart DSH / Restart when idle ver…
