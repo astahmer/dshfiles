@@ -37,14 +37,14 @@ From the onboarding feature catalog: 15 features, the 11 curated ones first.
 8. **A turn's Edited files card opens Changes on that turn** (`diffs-review`, thread-panel) — A turn's Edited files card opens the Changes tab on that turn.
 9. **Land a thread from the top of its Changes facet** (`diffs-review`, thread-panel) — The Land card shows what will land and what blocks it, then lands the thread after one confirm.
 10. **Comment on diff lines as chips in the next message** (`diffs-review`, thread-panel) — Select lines in a diff to add a comment to your next message.
-11. **Start threads in a project on a schedule** (`project-automations`, work) — Work › Automations lists per-project automations and creates, edits, pauses, resumes, runs now and deletes them. A schedule (cron, daily, weekly with an explicit IANA time zone, or every N minutes) starts a new thread in its project with its prompt, agent preset and model throug…
+11. **Start threads in a project on a schedule** (`project-automations`, work) — Start a thread in a project on a schedule, with its own prompt, agent and model.
 
 ### More
 
-1. **Link and watch GitHub pull requests from DSH threads** (`pull-requests`) — Durably links GitHub.com pull requests to threads, refreshes a thread's watched pull requests through gh when its push command returns, its turn ends or a link is added (3-second debounce), sweeps every watched one every ten minutes as a fallback, queues concise state transition…
-2. **Create a GitHub pull request from a thread** (`pull-requests`) — Previews the thread's jj workspace (repository, base, bookmark, commits above the base, an open pull request for the bookmark) with a title and body drafted from the thread by its model, then on explicit confirm sets the bookmark, pushes it with jj git push, runs gh pr create an…
+1. **Link and watch GitHub pull requests from DSH threads** (`pull-requests`) — Pull requests linked to a thread are watched, and their state changes are reported in the thread.
+2. **Create a GitHub pull request from a thread** (`pull-requests`) — Create a GitHub pull request from a thread after a preview with a drafted title and body.
 3. **Move the Review page's marks into the one viewed-marks store** (`diffs-review`) — Reviewed marks from the old Review page move into the shared viewed marks.
-4. **Start threads from signed webhooks** (`project-automations`) — A webhook automation answers POST /automations/webhook/<id> on the DSH web server. The request carries either x-dsh-timestamp (Unix seconds) and x-dsh-signature: sha256=HMAC-SHA256(secret, "<timestamp>.<raw body>"), or GitHub's x-hub-signature-256 over the raw body with x-github…
+4. **Start threads from signed webhooks** (`project-automations`) — Start a thread in a project when a signed webhook, such as one from GitHub, arrives.
 
 ## Enable it
 

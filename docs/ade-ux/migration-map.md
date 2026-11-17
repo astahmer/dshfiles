@@ -451,7 +451,7 @@ facets of the active thread; 32 features.
 | preview/agent-browser: Agent browser | threadFacet | thread panel: Agent browser |
 | preview/preview-browser: Agent preview browser | threadFacet | agent tool: preview_open / preview_screenshot |
 | preview/thread-dev-servers: Thread dev servers | threadFacet | thread-header: Dev servers and previews |
-| project-checks/native-hook-receipts: Show native hook invocation records | threadFacet | composer: Project checks › hook events |
+| project-checks/native-hook-receipts: Show hook runs | threadFacet | composer: Project checks › hook events |
 | traces/span-cost: List-price cost on traces | threadFacet | conversation-view: Traces tab › cost |
 | traces/thread-traces-tab: Per-thread Traces facet | threadFacet | thread-panel: Traces / Requests facets |
 | usage/thread-cost-facet: Thread panel Cost facet | threadFacet | workbench: Choose a view › Thread panels › Cost |
@@ -711,16 +711,16 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | optmem-core/credential-redaction: Redact credentials before data reaches persistence | infrastructure | host: library |
 | optmem-core/deterministic-view-and-summary: Build deterministic views | infrastructure | host: library |
 | optmem-core/memory-tree-addressing: Address complete nodes in a hierarchical memory tree | infrastructure | host: library |
-| phone-access/phone-edge-routes: Share the phone origin with other Host plugins | infrastructure | host: dshx API phone-access-edge (status, claimRoutes, releaseRoutes) |
+| phone-access/phone-edge-routes: Share the phone address with other plugins | infrastructure | host: dshx API phone-access-edge (status, claimRoutes, releaseRoutes) |
 | phone-access/phone-sign-in-qr: Print a phone sign-in QR for a trusted HTTPS origin | infrastructure | host: startup terminal output |
 | phone-pairing/phone-pairing: Pair a phone over a self-provisioned HTTPS tunnel | infrastructure | host: loopback gateway, terminal QR and the rail's Pair a phone dialog |
 | plugin-ui/debounced-client-values: Debounce fast-changing client input | infrastructure | client: library |
-| plugin-ui/query-client-binding: Provide host-backed client queries | infrastructure | client: library |
-| plugin-ui/schema-validated-persistent-values: Persist schema-validated client values | infrastructure | client: library |
+| plugin-ui/query-client-binding: Load data from DSH in plugin views | infrastructure | client: library |
+| plugin-ui/schema-validated-persistent-values: Remember checked values in the browser | infrastructure | client: library |
 | plugin-ui/shared-motion: Animate components with one shared motion layer | infrastructure | client: library |
-| plugin-ui/touch-targets: Give kit controls a 44px touch target | infrastructure | client: library |
+| plugin-ui/touch-targets: Touch-sized controls | infrastructure | client: library |
 | plugin-ui/typed-forms-and-accessible-tables: Compose validated forms and accessible data tables | infrastructure | client: library |
-| preview/render-html: Offline HTML screenshots for other Host plugins | infrastructure | host: preview-render contract |
+| preview/render-html: Offline HTML screenshots for other plugins | infrastructure | host: preview-render contract |
 | project-automations/project-automation-webhooks: Start threads from signed webhooks | infrastructure | host: /automations/webhook/<id> route |
 | project-checks/activity-projection: Project check receipts appear safely in the Activity Timeline | infrastructure | host: receipts into left-nav: Activity Timeline: Activity |
 | pwa/installable-app: Install the Web UI as an app on the phone | infrastructure | host: served manifest, icon routes and index head |

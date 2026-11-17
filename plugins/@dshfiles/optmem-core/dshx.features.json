@@ -5,7 +5,8 @@
     {
       "id": "credential-redaction",
       "title": "Redact credentials before data reaches persistence",
-      "summary": "Remove common credential shapes and caller-supplied secret literals while leaving ordinary code intact.",
+      "summary": "Credentials are removed from text before it is stored, and ordinary code stays intact.",
+      "details": "Remove common credential shapes and caller-supplied secret literals while leaving ordinary code intact.",
       "surfaces": ["host", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -38,7 +39,8 @@
     {
       "id": "bounded-utf8-text",
       "title": "Count, clip, and paginate UTF-8 text by bytes",
-      "summary": "Measure and bound UTF-8 payloads without splitting a code point and with an explicit truncation marker.",
+      "summary": "Long text is cut to a byte limit with a clear marker, never in the middle of a character.",
+      "details": "Measure and bound UTF-8 payloads without splitting a code point and with an explicit truncation marker.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -77,7 +79,8 @@
     {
       "id": "memory-tree-addressing",
       "title": "Address complete nodes in a hierarchical memory tree",
-      "summary": "Map level/index addresses to ranges, navigate relatives, identify complete nodes, and find the covering view node deterministically.",
+      "summary": "Memory finds any part of a long history by its place in a tree of summaries.",
+      "details": "Map level/index addresses to ranges, navigate relatives, identify complete nodes, and find the covering view node deterministically.",
       "surfaces": ["host", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -116,7 +119,8 @@
     {
       "id": "deterministic-view-and-summary",
       "title": "Build deterministic views",
-      "summary": "Merge the most due node pairs first, preserve recent detail, and report compatibility capabilities accurately.",
+      "summary": "Memory builds the same summary view from the same history, keeping recent detail.",
+      "details": "Merge the most due node pairs first, preserve recent detail, and report compatibility capabilities accurately.",
       "surfaces": ["host", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
