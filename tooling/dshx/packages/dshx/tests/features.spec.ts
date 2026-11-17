@@ -51,6 +51,12 @@ describe('plugin feature metadata', () => {
     ).toEqual(expect.arrayContaining([expect.stringContaining('coveredBy'), expect.stringContaining('choices must include defaultValue')]))
   })
 
+  it('keeps engineering notes in an optional details field', () => {
+    const withText = (patch: Record<string, unknown>) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, ...patch }] })
+    expect(withText({ details: 'The move keeps the message id; a second edit while saving waits for the first.' })).toEqual([])
+    expect(withText({ details: '' })).toEqual([expect.stringContaining('details')])
+  })
+
   it('requires telemetry on every feature and agent-tool on tool surfaces', () => {
     const withTelemetry = (patch: Record<string, unknown>) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, ...patch }] })
     expect(withTelemetry({ telemetry: [] })).toEqual(expect.arrayContaining([expect.stringContaining('telemetry')]))

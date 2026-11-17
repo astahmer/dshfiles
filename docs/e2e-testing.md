@@ -106,7 +106,9 @@ cell and a native entry was still registered behind it.
 ## Feature catalogs
 
 Each package declares its user-visible features in `dshx.features.json`
-(schema in `tooling/dshx/packages/dshx/src/project/features.ts`): id, summary,
+(schema in `tooling/dshx/packages/dshx/src/project/features.ts`): id, title,
+summary (one plain sentence for the person using the feature, shown in Getting
+started), optional details (engineering notes for developers, never rendered),
 surfaces, configuration keys, states, failure modes, external dependencies, and
 `verification` entries of kind `gherkin`, `unit-test`, `host-test` or
 `not-applicable`. A scenario links back with `@scenario:<id>` on the Scenario
