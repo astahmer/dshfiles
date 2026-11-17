@@ -440,27 +440,6 @@ export default defineClient({
           }),
         'command-palette: shortcut',
       )
-    const fileSearchShortcutId = 'commandPalette.openFiles'
-    if (isShortcutCommandId(fileSearchShortcutId))
-      ctx.effect(
-        () =>
-          ctx.shortcuts.register({
-            id: fileSearchShortcutId,
-            label: () => translate('commandPaletteFiles'),
-            aliases: ['search files', 'find file', 'go to file'],
-            defaults: {
-              'desktop:macos': { code: 'KeyF', modifiers: ['primary', 'shift'] },
-              'desktop:windows': { code: 'KeyF', modifiers: ['primary', 'shift'] },
-              'desktop:linux': { code: 'KeyF', modifiers: ['primary', 'shift'] },
-              'web:macos': { code: 'KeyF', modifiers: ['primary', 'shift'] },
-              'web:windows': { code: 'KeyF', modifiers: ['primary', 'shift'] },
-            },
-            regions: ['page', 'editable'],
-            modals: [],
-            resolve: () => ({ status: 'handled', run: () => PaletteApi.open('files') }),
-          }),
-        'command-palette: file search shortcut',
-      )
     const startNewThread = (): void => ctx.uiWorkspace.startSession()
     const newThreadShortcutId = 'commandPalette.newThread'
     const newThreadAction: PaletteAction = {

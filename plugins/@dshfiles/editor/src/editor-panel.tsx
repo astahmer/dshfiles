@@ -171,10 +171,10 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   const editable = active?.status === 'ready' && active.content.kind === 'text'
   const viewers = useRegistry(FileViewer)
   const viewer = editable ? viewers.find(candidate => candidate.matches(active.path)) : undefined
-  /** Trigger global file search by simulating the Mod+Shift+F shortcut */
+  /** Trigger command palette in files mode by simulating Mod+Shift+P */
   const openGlobalSearch = useCallback(() => {
     const isMac = navigator.platform.toLowerCase().includes('mac')
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', code: 'KeyF', shiftKey: true, metaKey: isMac, ctrlKey: !isMac, bubbles: true }))
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP', shiftKey: true, metaKey: isMac, ctrlKey: !isMac, bubbles: true }))
   }, [])
   const [viewedDocuments, setViewedDocuments] = useState<ReadonlySet<string>>(new Set())
   const viewing = viewer !== undefined && active !== undefined && viewedDocuments.has(active.id)
@@ -283,7 +283,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           handleRef.current?.triggerFind()
           return
         }
-        // Note: Ctrl+Shift+F / Cmd+Shift+F is handled by the global shortcut system (commandPalette.openFiles)
+        // Note: Search is available via the command palette (Mod+Shift+P) or the search button/input
       }}
     >
       <div className="dshx:flex dshx:h-8 dshx:flex-none dshx:items-center dshx:gap-1 dshx:border-b dshx:px-1">
@@ -335,7 +335,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           aria-label="Search files"
           onClick={openGlobalSearch}
           size="icon-xs"
-          title="Search files (⌘⇧F)"
+          title="Search files (⌘⇧P)"
           variant="ghost"
         >
           <SearchIcon />
