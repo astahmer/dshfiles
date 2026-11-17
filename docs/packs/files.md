@@ -39,8 +39,8 @@ From the onboarding feature catalog: 14 features, the 0 curated ones first.
 9. **Share a thread as a read-only link** (`thread-share`, settings) — Share a thread as a read-only link, live or frozen, with an optional passphrase and expiry.
 10. **Freeze a snapshot or download a self-contained HTML export** (`thread-share`, settings) — Freeze a shared thread as a snapshot, or download it as one HTML file.
 11. **Publish share pages through a time-bounded tunnel** (`thread-share`, settings) — Publish share pages outside your network through a tunnel that closes after a set time.
-12. **Export a thread to a portable .dshthread bundle** (`thread-transfer`, threads) — A thread's row menu (Export…) and the command palette (Export this thread…) build one gzip file holding the thread's whole Session log — messages, tool calls and results, title, model — and every attachment it cites, stored once by sha256. The browser downloads it in chunks; the…
-13. **Import a .dshthread bundle as a new thread** (`thread-transfer`) — Import thread… in the command palette uploads a bundle, previews its title, message, event and attachment counts and model, and refuses one this DSH cannot replay (another bundle version or Session log format, a damaged log, an attachment failing its checksum). On import the att…
+12. **Export a thread to a file** (`thread-transfer`, threads) — Export a thread with its messages, tool calls and attachments to one file you can import elsewhere.
+13. **Import a thread from a file** (`thread-transfer`) — Import an exported thread file as a new thread after a preview of what it holds.
 14. **Permanently clean up done or archived threads** (`conversation-cleanup`, settings) — Preview done or archived threads and permanently delete their logs after you confirm.
 
 ## Enable it

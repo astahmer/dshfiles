@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "thread-export",
-      "title": "Export a thread to a portable .dshthread bundle",
-      "summary": "A thread's row menu (Export…) and the command palette (Export this thread…) build one gzip file holding the thread's whole Session log — messages, tool calls and results, title, model — and every attachment it cites, stored once by sha256. The browser downloads it in chunks; the agent tool writes it to an absolute Host path. No Session id, working directory or credential is needed to replay it.",
+      "title": "Export a thread to a file",
+      "summary": "Export a thread with its messages, tool calls and attachments to one file you can import elsewhere.",
+      "details": "A thread's row menu (Export…) and the command palette (Export this thread…) build one gzip file holding the thread's whole Session log — messages, tool calls and results, title, model — and every attachment it cites, stored once by sha256. The browser downloads it in chunks; the agent tool writes it to an absolute Host path. No Session id, working directory or credential is needed to replay it.",
       "surfaces": ["client", "host", "tool"],
       "surface": "rowAction",
       "destination": "threads",
@@ -68,8 +69,9 @@
     },
     {
       "id": "thread-import",
-      "title": "Import a .dshthread bundle as a new thread",
-      "summary": "Import thread… in the command palette uploads a bundle, previews its title, message, event and attachment counts and model, and refuses one this DSH cannot replay (another bundle version or Session log format, a damaged log, an attachment failing its checksum). On import the attachments are saved into this machine's store, their references rewritten, and the log stored as a new thread with a fresh id in the chosen project, an existing folder or the home folder; the thread opens. The agent tools inspect and import a bundle file on the Host.",
+      "title": "Import a thread from a file",
+      "summary": "Import an exported thread file as a new thread after a preview of what it holds.",
+      "details": "Import thread… in the command palette uploads a bundle, previews its title, message, event and attachment counts and model, and refuses one this DSH cannot replay (another bundle version or Session log format, a damaged log, an attachment failing its checksum). On import the attachments are saved into this machine's store, their references rewritten, and the log stored as a new thread with a fresh id in the chosen project, an existing folder or the home folder; the thread opens. The agent tools inspect and import a bundle file on the Host.",
       "surfaces": ["client", "host", "tool"],
       "surface": "command",
       "destination": "none",

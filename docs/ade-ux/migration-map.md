@@ -171,7 +171,7 @@ rail destination (default); 35 features.
 | thread-sidebar/thread-reference-mention: Mention another thread from its row, its tab, or a drag into the composer | rowAction | thread-list: row menu › Mention |
 | thread-sidebar/thread-referenced-by: See which threads reference one thread | rowAction | thread-list: row menu › Referenced by |
 | thread-sidebar/touch-row-menu: Open a thread's actions by touch | rowAction | thread-list: hover action strip and right-click menu only |
-| thread-transfer/thread-export: Export a thread to a portable .dshthread bundle | rowAction | thread row menu: Export… (also command palette: Export this thread…) |
+| thread-transfer/thread-export: Export a thread to a file | rowAction | thread row menu: Export… (also command palette: Export this thread…) |
 | multi-host/logical-project-grouping: Group remote threads under matching local projects | rowDecorator | thread-list: remote threads under their local project |
 | thread-sidebar/thread-subscriptions: Opt-in completion notices between threads | rowDecorator | threads: row context menu → Notify when finished |
 | cordis-cards/inventory-read-once: Plugin panel loads its list once | statusItem | sidebar: Cordis panel in the row under the list (Sidebar settings › Show the row under the list), and Cordis tool cards in the transcript |
@@ -414,7 +414,7 @@ rail destination (bottom); 67 features.
 | thread-sidebar/notification-delivery: Configure per-category thread notifications | settingsSection | settings: Notifications › Thread notifications |
 | thread-sidebar/settled-auto-archive: Archive a done thread once its delay passes | settingsSection | settings: Thread sidebar › settled archive delay |
 | ui-styles/appearance-theme: Appearance theme: presets, palette and fonts | settingsSection | Settings › General › Appearance; agent tools theme_get / theme_set |
-| ui-styles/saved-themes: Saved and gallery themes: any theme on request, Claude Code scenes, and Dracula | settingsSection | Agent tools theme_define / theme_set (customTheme) / theme_remove / theme_get; Settings › General › Appearance (Custom theme id, Dracula preset) |
+| ui-styles/saved-themes: Saved and gallery themes | settingsSection | Agent tools theme_define / theme_set (customTheme) / theme_remove / theme_get; Settings › General › Appearance (Custom theme id, Dracula preset) |
 | web-fetch-readable/readable-web-fetch: Answer ctx.web fetches across redirects with the readable article | settingsSection | settings: dshfiles-web-fetch-readable |
 | web-search-brave/brave-web-search: Answer ctx.web searches with Brave Web Search | settingsSection | settings: Brave web search |
 | workbench/dockable-panel-layouts: Arrange plugin panels in independent layouts | settingsSection | workbench: Pane options › Layouts |
@@ -453,7 +453,7 @@ facets of the active thread; 32 features.
 | preview/thread-dev-servers: Thread dev servers | threadFacet | thread-header: Dev servers and previews |
 | project-checks/native-hook-receipts: Show hook runs | threadFacet | composer: Project checks › hook events |
 | traces/span-cost: List-price cost on traces | threadFacet | conversation-view: Traces tab › cost |
-| traces/thread-traces-tab: Per-thread Traces facet | threadFacet | thread-panel: Traces / Requests facets |
+| traces/thread-traces-tab: Traces tab in the thread panel | threadFacet | thread-panel: Traces / Requests facets |
 | usage/thread-cost-facet: Thread panel Cost facet | threadFacet | workbench: Choose a view › Thread panels › Cost |
 | workbench/phone-thread-panel-sheet: Open the thread panel as a bottom sheet on a phone | threadFacet | workbench: right pane as a narrow column; phone reached facets only through the main pane's New tab |
 | workbench/terminal-pages: Open native terminals from any pane's view chooser | threadFacet | main-tabs: New tab › Terminal |
@@ -524,7 +524,7 @@ run row, chips, `/` and `@` sources; 70 features.
 | session-undo/turn-undo-redo: Undo and redo a turn: conversation and files together | composerContribution | composer: Undo last turn |
 | thread-sidebar/hero-suggestions: Resume, Review and Inbox cards on the new-thread screen | composerContribution | new-thread screen: suggestion cards |
 | thread-sidebar/skill-mentions: Find human-invocable skills from @ autocomplete | composerContribution | composer: @ skills |
-| tool-meta/approval-card: The native approval request as a risk card | composerContribution | composer: pending approval request |
+| tool-meta/approval-card: Approval requests as a risk card | composerContribution | composer: pending approval request |
 | workspace-folder-picker/directory-only-mode: Start directly in the Host folder browser | composerContribution | Hosts › Add folder (directory-only picker) |
 | workspace-folder-picker/keyboard-folder-selection: Select project folders with keyboard navigation | composerContribution | composer: Choose project › keyboard rows |
 | workspace-folder-picker/project-clone: Add a project by cloning a repository | composerContribution | composer: Choose project › Add folder › Clone repository |
@@ -612,10 +612,10 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | thread-sidebar/agent-user-notification: Agent sends the user a notification | agentToolOnly | agent tool notify_user; in-app toast and system notification |
 | thread-sidebar/navigation-counter: Count destination and section opens | agentToolOnly | agent tool: shell_navigation_counts / shell_navigation_reset |
 | thread-sidebar/queued-message-tools: Remove, steer or edit a queued message as an agent | agentToolOnly | agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit |
-| tool-ask-user/markdown-question-guidance: ask_user_question tells the model that questions are markdown | agentToolOnly | agent tool: ask_user_question |
-| tool-bash/bash-tool: bash tool | agentToolOnly | agent tool: bash |
-| tool-fs/file-tools: read, write, edit and read_image tools | agentToolOnly | agent tools: read, write, edit, read_image |
-| tool-subagent/live-model-selection-policy: Subagent model routes follow the saved setting in running threads | agentToolOnly | agent tools: subagent, subagent_fork, list_subagent_models |
+| tool-ask-user/markdown-question-guidance: The agent knows questions can use Markdown | agentToolOnly | agent tool: ask_user_question |
+| tool-bash/bash-tool: Shell commands for the agent | agentToolOnly | agent tool: bash |
+| tool-fs/file-tools: Read, write and edit files | agentToolOnly | agent tools: read, write, edit, read_image |
+| tool-subagent/live-model-selection-policy: Subagent models follow your setting | agentToolOnly | agent tools: subagent, subagent_fork, list_subagent_models |
 | tweet-context/public-post-context: Fetch public X post, photos, video samples, and thread posts | agentToolOnly | agent tool: tweet_context |
 | usage/usage-otel-export: OTLP metrics export | agentToolOnly | agent tool: usage_otel_metrics |
 | whiteboard/agent-diagrams: Agent-drawn diagrams | agentToolOnly | agent tools: whiteboard_list, whiteboard_read, whiteboard_write, whiteboard_rename, whiteboard_delete, whiteboard_restore |
@@ -640,7 +640,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | thread-sidebar/palette-search-history: Search threads, files, and recent navigation | command | thread-list: Search threads |
 | thread-sidebar/prompt-links: Open a prefilled new thread from a prompt link | command | url: ?prompt= link |
 | thread-sidebar/rail-actions: Copy the DSH address and pair a phone from the rail | command | rail: DSH actions above Settings; phone: More › DSH |
-| thread-transfer/thread-import: Import a .dshthread bundle as a new thread | command | command palette: Import thread… |
+| thread-transfer/thread-import: Import a thread from a file | command | command palette: Import thread… |
 | input-trigger/entity-registry: One mention and reference-preview registry | entityProvider | overlay: shared reference preview card; composer: @ menu groups |
 | agent-loop/output-limit-continuation: Continue a reply cut at the output-token limit | infrastructure | host: no UI |
 | agent-loop/settled-stream-size: Store reply metadata once | infrastructure | host: no UI |
@@ -751,10 +751,10 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | thread-sidebar/workbench-sidebar-assemblies: Dock sidebar views as tabs | infrastructure | main-tabs: New tab › Thread Sidebar views |
 | tool-search/progressive-tool-disclosure: Search and disclose tools per agent | infrastructure | host: tool search (not mounted) |
 | traces/browser-interaction-traces: Browser interaction traces | infrastructure | host: browser interaction spans |
-| traces/event-loop-stalls: Host event-loop stalls | infrastructure | host: probe; agent tool traces_stalls |
-| traces/otlp-receiver: Local OTLP/HTTP receiver | infrastructure | host: OTLP receiver (read in left-nav: Traces: Explorer) |
+| traces/event-loop-stalls: DSH stalls | infrastructure | host: probe; agent tool traces_stalls |
+| traces/otlp-receiver: Built-in trace receiver | infrastructure | host: OTLP receiver (read in left-nav: Traces: Explorer) |
 | traces/store-space: Span store space and Reclaim | infrastructure | agent tools traces_store_space, traces_reclaim_space |
-| turn-summary/turn-marks-projection: Per-Turn facts for the turn map and Since you left | infrastructure | host: session projection |
+| turn-summary/turn-marks-projection: Turn facts for the turn map and Since you left | infrastructure | host: session projection |
 | ui-styles/one-shared-stylesheet: One shared plugin stylesheet | infrastructure | client: shared stylesheet |
 | ui-styles/touch-platform-baseline: Touch platform baseline | infrastructure | client: shared stylesheet |
 | usage/usage-index: Incremental request and tool index from session logs | infrastructure | host: usage ledger |

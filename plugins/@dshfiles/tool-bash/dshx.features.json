@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "bash-tool",
-      "title": "bash tool",
-      "summary": "The forked bash tool keeps upstream execution, sandboxing, approvals and background-job hand-off, and renders a result the model can act on: an exit code on every completed run, a timeout that names its wait and suggests a larger timeoutMs, and a truncated tail that counts whole lines.",
+      "title": "Shell commands for the agent",
+      "summary": "The agent's shell tool always reports the exit code and says how to retry a command that timed out.",
+      "details": "The forked bash tool keeps upstream execution, sandboxing, approvals and background-job hand-off, and renders a result the model can act on: an exit code on every completed run, a timeout that names its wait and suggests a larger timeoutMs, and a truncated tail that counts whole lines.",
       "surfaces": ["host"],
       "configuration": [],
       "states": ["completed", "timed-out", "backgrounded"],
