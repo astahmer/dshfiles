@@ -149,7 +149,7 @@ rail destination (default); 35 features.
 | thread-sidebar/phone-tab-bar: Navigate from a bottom tab bar on a phone | destinationSection | shell: collapsed icon rail at phone width |
 | thread-sidebar/section-order: Group remote threads with each view | destinationSection | thread-list: Thread list settings › Remote group |
 | thread-sidebar/status-grouped-thread-list: See every thread grouped by what it needs from you | destinationSection | thread-list: All threads › Group: Status |
-| thread-sidebar/thread-children-and-links: Browse child sessions and share thread URLs | destinationSection | thread-list: child threads |
+| thread-sidebar/thread-children-and-links: Browse subagent threads and share thread links | destinationSection | thread-list: child threads |
 | thread-sidebar/thread-classification: Organize threads by workspace and status | destinationSection | left-nav: Thread Sidebar: Board |
 | thread-sidebar/thread-keyboard-navigation: Navigate and multi-select threads from the keyboard | destinationSection | thread-list: keyboard navigation |
 | thread-sidebar/thread-list-views: Configure saved thread views | destinationSection | thread-list: Thread list settings › Manage views |
@@ -164,9 +164,9 @@ rail destination (default); 35 features.
 | thread-sidebar/manual-unread: Keep selected threads manually unread | rowAction | thread-list: row menu › Mark unread |
 | thread-sidebar/no-folder-promotion: Turn a No folder thread into a project | rowAction | thread-list: No folder row › Turn into project |
 | thread-sidebar/open-thread-in-side-panel: Open a thread in the right side panel | rowAction | thread-list: row menu › Open in side panel |
-| thread-sidebar/project-header-chat: Start a chat from a project group header | rowAction | thread-list: project header › New chat |
+| thread-sidebar/project-header-chat: Start a thread from a project header | rowAction | thread-list: project header › New chat |
 | thread-sidebar/rename-thread-title: Edit a thread title from its row menu | rowAction | thread-list: row menu › Rename |
-| thread-sidebar/session-header-actions: Manage threads from the session header | rowAction | thread-header: Pin / More menu |
+| thread-sidebar/session-header-actions: Manage a thread from its header | rowAction | thread-header: Pin / More menu |
 | thread-sidebar/thread-mute: Mute or snooze a thread | rowAction | thread-list: row menu › Mute |
 | thread-sidebar/thread-reference-mention: Mention another thread from its row, its tab, or a drag into the composer | rowAction | thread-list: row menu › Mention |
 | thread-sidebar/thread-referenced-by: See which threads reference one thread | rowAction | thread-list: row menu › Referenced by |
@@ -195,7 +195,7 @@ rail destination; 23 features.
 | hmr-gate/deferred-update-inbox-item: Plugin updates waiting for a restart in the Inbox | attentionProvider | left-nav: Inbox › hmr-gate.deferred-update |
 | jj-integration/land-inbox-items: Blocked and ready-to-land workspaces in the Inbox | attentionProvider | left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land |
 | thread-sidebar/auto-resume-after-restart: Resume threads a managed restart cut off | attentionProvider | activity: Resumed automatically after the restart |
-| thread-sidebar/finished-turn-attention: See finished turns on the Host until they are acknowledged | attentionProvider | thread-list: finished-turn unread marks |
+| thread-sidebar/finished-turn-attention: See finished turns until you open them | attentionProvider | thread-list: finished-turn unread marks |
 | thread-sidebar/finished-turn-inbox: Finished turns in the Inbox | attentionProvider | left-nav: Inbox › Turn finished |
 | thread-sidebar/interrupted-turn-threads: See threads a crash interrupted | attentionProvider | thread-list: interrupted threads |
 | thread-sidebar/usage-limit-group: Group provider-blocked threads under Usage limit | attentionProvider | thread-list: Usage limit group |
@@ -408,7 +408,7 @@ rail destination (bottom); 67 features.
 | thread-share/thread-share-link: Share a thread as a read-only link | settingsSection | settings: Thread sharing |
 | thread-share/thread-share-publish: Publish share pages through a time-bounded tunnel | settingsSection | settings: Thread sharing |
 | thread-share/thread-share-snapshot-export: Freeze a snapshot or download a self-contained HTML export | settingsSection | settings: Thread sharing |
-| thread-sidebar/idle-archive-policy: Mark idle threads done automatically | settingsSection | settings: Thread sidebar › idle policy |
+| thread-sidebar/idle-archive-policy: Mark idle threads done | settingsSection | settings: Thread sidebar › idle policy |
 | thread-sidebar/layout-mode: One sidebar layout: the rail and list as a movable pane | settingsSection | sidebar: the rail and list (Workbench Sidebar pane) |
 | thread-sidebar/navigation-layout: Customize sidebar navigation and sections | settingsSection | thread-list: Sidebar settings › Customize sidebar |
 | thread-sidebar/notification-delivery: Configure per-category thread notifications | settingsSection | settings: Notifications › Thread notifications |
@@ -611,7 +611,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | settings-shell/settings-inspect-tool: Inspect a setting's default, override and source | agentToolOnly | agent tool: settings_inspect |
 | thread-sidebar/agent-user-notification: Agent sends the user a notification | agentToolOnly | agent tool notify_user; in-app toast and system notification |
 | thread-sidebar/navigation-counter: Count destination and section opens | agentToolOnly | agent tool: shell_navigation_counts / shell_navigation_reset |
-| thread-sidebar/queued-message-tools: Remove, steer or edit a queued message as an Agent | agentToolOnly | agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit |
+| thread-sidebar/queued-message-tools: Remove, steer or edit a queued message as an agent | agentToolOnly | agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit |
 | tool-ask-user/markdown-question-guidance: ask_user_question tells the model that questions are markdown | agentToolOnly | agent tool: ask_user_question |
 | tool-bash/bash-tool: bash tool | agentToolOnly | agent tool: bash |
 | tool-fs/file-tools: read, write, edit and read_image tools | agentToolOnly | agent tools: read, write, edit, read_image |
@@ -639,7 +639,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | thread-sidebar/multi-model-fan-out: Send one prompt to several models | command | palette: Send to several models… |
 | thread-sidebar/palette-search-history: Search threads, files, and recent navigation | command | thread-list: Search threads |
 | thread-sidebar/prompt-links: Open a prefilled new thread from a prompt link | command | url: ?prompt= link |
-| thread-sidebar/rail-actions: Copy DSH URL, Pair a phone and a pending page reload on the rail above Settings | command | rail: DSH actions above Settings; phone: More › DSH |
+| thread-sidebar/rail-actions: Copy the DSH address and pair a phone from the rail | command | rail: DSH actions above Settings; phone: More › DSH |
 | thread-transfer/thread-import: Import a .dshthread bundle as a new thread | command | command palette: Import thread… |
 | input-trigger/entity-registry: One mention and reference-preview registry | entityProvider | overlay: shared reference preview card; composer: @ menu groups |
 | agent-loop/output-limit-continuation: Continue a reply cut at the output-token limit | infrastructure | host: no UI |
@@ -747,8 +747,8 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | storage-json/lazy-per-record-reads: Read one stored JSON record without loading the whole unit | infrastructure | host: no UI |
 | subprocess-local/group-exit-backoff: Wait for background processes cheaply | infrastructure | host: no UI |
 | thread-sidebar/sidebar-folders: Folders of plugin panels on the rail | infrastructure | sidebar: the rail's folders (agent tools sidebar_*) |
-| thread-sidebar/thread-inventory-reads: Read the thread inventory only while it is on screen | infrastructure | thread-list: inventory reads |
-| thread-sidebar/workbench-sidebar-assemblies: Dock the actual sidebar content assemblies | infrastructure | main-tabs: New tab › Thread Sidebar views |
+| thread-sidebar/thread-inventory-reads: Read workspaces only while the list is visible | infrastructure | thread-list: inventory reads |
+| thread-sidebar/workbench-sidebar-assemblies: Dock sidebar views as tabs | infrastructure | main-tabs: New tab › Thread Sidebar views |
 | tool-search/progressive-tool-disclosure: Search and disclose tools per agent | infrastructure | host: tool search (not mounted) |
 | traces/browser-interaction-traces: Browser interaction traces | infrastructure | host: browser interaction spans |
 | traces/event-loop-stalls: Host event-loop stalls | infrastructure | host: probe; agent tool traces_stalls |
@@ -783,7 +783,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | hmr-gate/restart-status-item: Waiting updates join the restart notice | statusItem | status-strip: Restart pending |
 | thread-sidebar/auto-restart-when-idle: Restart by itself to apply updates when idle | statusItem | status-strip: Restarting to apply updates |
 | thread-sidebar/client-reload-banner: Offer a page reload when the running client bundles are behind | statusItem | sidebar-footer: client reload banner |
-| thread-sidebar/pending-host-restart: Warn when a host restart is required | statusItem | status-strip: Restart pending |
+| thread-sidebar/pending-host-restart: Warn when DSH needs a restart | statusItem | status-strip: Restart pending |
 | thread-sidebar/working-status-item: See how many threads are working in the status strip | statusItem | status-strip: N working |
 
 ## Ambiguous choices
