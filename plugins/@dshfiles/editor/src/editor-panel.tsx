@@ -13,7 +13,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { FileViewer, useRegistry } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { EyeIcon, ExternalLinkIcon, FileQuestionIcon, FolderOpenIcon, FolderTreeIcon, RefreshCwIcon, SaveIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { EyeIcon, ExternalLinkIcon, FileQuestionIcon, FolderOpenIcon, FolderTreeIcon, RefreshCwIcon, SaveIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -24,6 +24,7 @@ import { editorEngineLoaderMachine } from './editor-engine-machine.js'
 import { FileTree } from './file-tree.js'
 import { useEditorSaveMachine } from './use-editor-save-machine.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 
 export interface EditorPanelProps {
   readonly store: EditorStore
@@ -170,6 +171,11 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   const editable = active?.status === 'ready' && active.content.kind === 'text'
   const viewers = useRegistry(FileViewer)
   const viewer = editable ? viewers.find(candidate => candidate.matches(active.path)) : undefined
+  /** Trigger global file search by simulating the Mod+Shift+F shortcut */
+  const openGlobalSearch = useCallback(() => {
+    const isMac = navigator.platform.toLowerCase().includes('mac')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', code: 'KeyF', shiftKey: true, metaKey: isMac, ctrlKey: !isMac, bubbles: true }))
+  }, [])
   const [viewedDocuments, setViewedDocuments] = useState<ReadonlySet<string>>(new Set())
   const viewing = viewer !== undefined && active !== undefined && viewedDocuments.has(active.id)
   const toggleViewer = (documentId: string): void =>
@@ -277,13 +283,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           handleRef.current?.triggerFind()
           return
         }
-        // Ctrl+Shift+F / Cmd+Shift+F: open global file search (dispatch Ctrl+P to trigger the sidebar's file search)
-        if (event.key === 'f' && isMod && event.shiftKey) {
-          event.preventDefault()
-          // Dispatch the standard file search shortcut (Ctrl+P / Cmd+P) which the sidebar handles
-          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP', ctrlKey: !event.metaKey, metaKey: event.metaKey, bubbles: true }))
-          return
-        }
+        // Note: Ctrl+Shift+F / Cmd+Shift+F is handled by the global shortcut system (commandPalette.openFiles)
       }}
     >
       <div className="dshx:flex dshx:h-8 dshx:flex-none dshx:items-center dshx:gap-1 dshx:border-b dshx:px-1">
@@ -332,6 +332,15 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           </Button>
         )}
         <Button
+          aria-label="Search files"
+          onClick={openGlobalSearch}
+          size="icon-xs"
+          title="Search files (⌘⇧F)"
+          variant="ghost"
+        >
+          <SearchIcon />
+        </Button>
+        <Button
           aria-label="Save"
           disabled={!editable || savePending || saveSnapshot.matches('approval') || saveSnapshot.matches('conflict')}
           onClick={() => requestSaveRef.current()}
@@ -366,6 +375,14 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
               >
                 <RefreshCwIcon />
               </Button>
+            </div>
+            <div className="dshx:px-2 dshx:py-1">
+              <SearchInput
+                className="dshx:h-7"
+                placeholder="Search files…"
+                onFocus={openGlobalSearch}
+                readOnly
+              />
             </div>
             <FileTree activePath={active?.path ?? null} onOpen={path => props.store.open(sessionId, { path })} remote={props.remote} sessionId={sessionId} />
           </div>
