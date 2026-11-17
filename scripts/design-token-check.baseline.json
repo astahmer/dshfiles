@@ -10,7 +10,8 @@
     "solid-status-fill": 32,
     "palette-colour": 2,
     "uppercase": 18,
-    "unguarded-loop-animation": 10
+    "unguarded-loop-animation": 10,
+    "outline-without-focus": 4
   },
   "counts": {
     "arbitrary-radius/attachment-gallery": 1,
@@ -58,6 +59,10 @@
     "numeric-duration/backlog": 7,
     "numeric-duration/plugin-ui": 36,
     "numeric-duration/thread-sidebar": 3,
+    "outline-without-focus/backlog": 1,
+    "outline-without-focus/editor": 1,
+    "outline-without-focus/jujutsu": 1,
+    "outline-without-focus/plugin-ui": 1,
     "palette-colour/jj-integration": 1,
     "palette-colour/thread-sidebar": 1,
     "raw-colour/ai-accounts": 7,

@@ -146,6 +146,23 @@ export interface ClassGroup {
   readonly index: number
   /** The literals' bodies joined by a space. */
   readonly text: string
+  /** The JSX element whose attribute holds the list (`button`, `DropdownMenuTrigger`), when the list is inline. */
+  readonly element?: string
+  /** Whether that element's open tag says `role="button"` (or another widget role) before the list. */
+  readonly widgetRole?: boolean
+}
+
+/**
+ * The JSX element a class list at `index` sits in: the nearest `<Tag` before it whose open tag has not closed. An
+ * arrow (`=>`) is not a closing `>`. A list held in a variable (`const inputClass = cn(…)`) has none.
+ */
+const elementAt = (text: string, index: number): { readonly element?: string; readonly widgetRole?: boolean } => {
+  const before = text.slice(Math.max(0, index - 800), index)
+  const open = [...before.matchAll(/<([A-Za-z][\w.]*)\b/g)].at(-1)
+  if (open === undefined) return {}
+  const attributes = before.slice(open.index + open[0].length)
+  if (/(?<!=)>|\/>|<\//.test(attributes.replace(/=>/g, ''))) return {}
+  return { element: open[1] ?? '', widgetRole: /\brole=["'{]*(?:button|link|tab|menuitem|option|switch|checkbox)\b/.test(attributes) }
 }
 
 /**
@@ -193,7 +210,7 @@ const classGroups = (text: string): readonly ClassGroup[] => {
       last.end = literal.end
     } else groups.push({ index: literal.start, text: literal.body, end: literal.end })
   }
-  return groups.map(group => ({ index: group.index, text: group.text }))
+  return groups.map(group => ({ index: group.index, text: group.text, ...elementAt(text, group.index) }))
 }
 
 export interface DesignTokenGroupRule {
@@ -214,6 +231,23 @@ export const designTokenGroupRules: readonly DesignTokenGroupRule[] = [
       const tokens = classTokens(group.text)
       if (tokens.some(token => token.variants.some(variant => variant === 'motion-reduce' || variant === 'motion-safe'))) return []
       return tokens.filter(token => /^animate-(?:spin|pulse)$/.test(token.utility)).map(token => token.text)
+    },
+  },
+  {
+    // A hand-built trigger that removes the browser outline must draw a focus ring of its own. Only a control counts
+    // (button, link, summary, a *Trigger, or a widget role): a dialog, tab panel or drawer takes programmatic focus with
+    // no ring by design, and an input usually sits in a wrapper that draws a focus-within ring.
+    id: 'outline-without-focus',
+    use: 'the kit Button (asChild for a trigger), or a dshx:focus-visible:ring-* / focus-visible:outline-* in the same list',
+    matches: (group, file) => {
+      if (isCss(file) || !group.text.includes('outline-none')) return []
+      const element = group.element ?? ''
+      if (!(/^(?:button|a|summary)$/.test(element) || /Trigger$/.test(element) || group.widgetRole === true)) return []
+      const tokens = classTokens(group.text)
+      const replaced = tokens.some(
+        token => token.variants.some(variant => /focus-(?:visible|within)/.test(variant)) && !/^outline-(?:none|hidden)$/.test(token.utility),
+      )
+      return replaced ? [] : tokens.filter(token => token.utility === 'outline-none' && token.variants.length === 0).map(token => token.text)
     },
   },
 ]
