@@ -291,7 +291,13 @@ const reachSchema = Schema.Array(Schema.String.check(Schema.makeFilter(step => p
 export const DshxFeatureSchema = strictStruct({
   id: Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/)),
   title: Schema.String.check(Schema.isMinLength(1)),
+  /** One plain sentence for the person using the feature; Getting started, packs and the onboarding agent tools show it. */
   summary: Schema.String.check(Schema.isMinLength(1)),
+  /**
+   * Engineering notes for developers and reviewers: how the feature works, its limits and edge cases. No UI renders it;
+   * keep anything a user needs in `summary`.
+   */
+  details: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   surfaces: Schema.Array(DshxFeatureSurfaceSchema).check(Schema.isMinLength(1)),
   configuration: Schema.Array(configurationOptionSchema),
   states: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1)),
