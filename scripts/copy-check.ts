@@ -212,13 +212,50 @@ const extractStrings = (source: string): readonly CopyString[] => {
   return strings
 }
 
+/** Tailwind classes, paths, selectors, URLs, dotted or dashed identifiers and code. */
+const isCodeShaped = (trimmed: string): boolean => /dshx:|^[@./#]|^https?:|^[a-z]+(?:[.-][a-z0-9]+)+$|=>|\bimport\b/.test(trimmed)
+
 /** Copy, not code: has a space between words and no Tailwind, path, selector or identifier shape. */
 const isProse = (text: string): boolean => {
   const trimmed = text.trim()
-  if (!/[A-Za-z]{2,}\s+[A-Za-z]/.test(trimmed)) return false
-  if (/dshx:|^[@./#]|^https?:|^[a-z]+(?:[.-][a-z0-9]+)+$|=>|\bimport\b/.test(trimmed)) return false
-  return true
+  return /[A-Za-z]{2,}\s+[A-Za-z]/.test(trimmed) && !isCodeShaped(trimmed)
 }
+
+/** A possible label, one word included (`Running`, `Loading...`): has letters and no code shape. */
+const isLabel = (text: string): boolean => {
+  const trimmed = text.trim()
+  return /[A-Za-z]{2}/.test(trimmed) && !isCodeShaped(trimmed)
+}
+
+export interface CopyRule {
+  readonly id: string
+  readonly use: string
+  /** `prose` rules read strings of two or more words; `label` rules read one-word labels too. */
+  readonly scope: 'prose' | 'label'
+  /** Whether one string breaks the rule; `raw` keeps each template hole as `${…}`. */
+  readonly test: (text: string, raw: string) => boolean
+}
+
+/**
+ * "Host" with a capital, inside a sentence, is the DSH server process ("restart the Host", "the Host plugin"); users
+ * see a machine, which is a lower-case "host". At the start of a label or after `›` it is a name ("Hosts & network",
+ * "Observe › Hosts", "the Hosts page"), so it counts there only before an architecture word.
+ */
+const hostAsProcess = (text: string): boolean => {
+  for (const match of text.matchAll(/\bHosts?\b/g)) {
+    const before = text.slice(0, match.index).trimEnd()
+    const after = text.slice(match.index + match[0].length)
+    const startsSentence = before === '' || /[.!?:;•·(—–›-]$/.test(before)
+    if (/^\s+page\b/.test(after)) continue
+    if (!startsSentence || /^\s+(?:plugin|half|process|environment|restart|bundle|side|API)\b/.test(after)) return true
+  }
+  return false
+}
+
+/** Copy rules beyond the glossary, from the copy audit's systemic patterns; each is counted and ratcheted like a term. */
+export const copyRules: readonly CopyRule[] = [
+  { id: 'host-process', use: 'what the user sees (DSH, the app, a restart) or a lower-case host for a machine', scope: 'prose', test: hostAsProcess },
+]
 
 export interface CopyComparison {
   readonly increased: readonly string[]
@@ -240,11 +277,14 @@ const findingsInStrings = (input: { readonly file: string; readonly strings: rea
   const findings: CopyFinding[] = []
   const plugin = pluginOf(input.file)
   for (const string of input.strings) {
-    const prefixed = input.prefix.test(string.raw ?? string.text)
-    if (!isProse(string.text) && !prefixed) continue
-    const at = { plugin, file: input.file, line: string.line, text: (string.raw ?? string.text).trim().slice(0, 120) }
+    const raw = string.raw ?? string.text
+    const prefixed = input.prefix.test(raw)
+    const prose = isProse(string.text)
+    if (!prose && !prefixed && !isLabel(string.text)) continue
+    const at = { plugin, file: input.file, line: string.line, text: raw.trim().slice(0, 120) }
     if (prefixed) findings.push({ term: 'plugin-prefix', ...at })
-    for (const term of copyTerms) if (term.pattern.test(string.text)) findings.push({ term: term.id, ...at })
+    if (prose) for (const term of copyTerms) if (term.pattern.test(string.text)) findings.push({ term: term.id, ...at })
+    for (const rule of copyRules) if ((rule.scope === 'label' || prose) && rule.test(string.text, raw)) findings.push({ term: rule.id, ...at })
   }
   return findings
 }
@@ -376,7 +416,7 @@ const scanRepository = (root: string): readonly CopyFinding[] => {
   return findings.toSorted((left, right) => left.term.localeCompare(right.term) || left.file.localeCompare(right.file) || left.line - right.line)
 }
 
-const termIds = (): readonly string[] => ['plugin-prefix', ...copyTerms.map(entry => entry.id)]
+const termIds = (): readonly string[] => ['plugin-prefix', ...copyTerms.map(entry => entry.id), ...copyRules.map(rule => rule.id)]
 
 /** Counts keyed `term/plugin`, so a fix in one plugin cannot hide a regression in another. */
 const countByTermAndPlugin = (findings: readonly CopyFinding[]): Readonly<Record<string, number>> => {
@@ -408,6 +448,8 @@ const compare = (input: { readonly baseline: Readonly<Record<string, number>>; r
 /** The copy check's pure parts, exported for its tests. */
 export class CopyCheck {
   static readonly terms = copyTerms
+  static readonly rules = copyRules
+  static readonly isLabel = isLabel
   static readonly pluginPrefixPattern = pluginPrefixPattern
   static readonly extractStrings = extractStrings
   static readonly isProse = isProse
@@ -436,10 +478,10 @@ const main = (): void => {
   }
   const baseline = ScriptJson.decodeJson(baselineSchema, readFileSync(baselineUrl, 'utf8')).counts
   const { increased, decreased } = compare({ baseline, current })
-  const use = new Map(copyTerms.map(term => [term.id, term.use]))
+  const use = new Map([...copyTerms.map(term => [term.id, term.use] as const), ...copyRules.map(rule => [rule.id, rule.use] as const)])
   use.set('plugin-prefix', 'the view name alone')
   if (increased.length > 0) {
-    console.error('copy-check: banned glossary terms increased in UI copy (docs/ade-ux/README.md §3 Glossary):')
+    console.error('copy-check: banned terms or copy patterns increased in UI copy (docs/ade-ux/README.md §3 Glossary, DESIGN.md Copy):')
     for (const line of increased) console.error(`  ${line} — use "${use.get(line.split('/')[0] ?? '') ?? ''}"`)
     console.error('Run `node --run check:copy -- --report` to list findings and fix the new copy.')
     process.exitCode = 1

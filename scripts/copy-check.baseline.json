@@ -5,7 +5,8 @@
     "conversation": 22,
     "new-chat": 2,
     "integrate": 2,
-    "settle": 3
+    "settle": 3,
+    "host-process": 9
   },
   "counts": {
     "conversation/agent-preset": 1,
@@ -21,6 +22,11 @@
     "conversation/thread-sidebar": 1,
     "conversation/tool-meta": 2,
     "conversation/ui-styles": 1,
+    "host-process/component-gallery": 1,
+    "host-process/cordis-cards": 1,
+    "host-process/hmr-gate": 1,
+    "host-process/workbench": 1,
+    "host-process/worktree-memory": 5,
     "integrate/jj-integration": 2,
     "new-chat/command-palette": 2,
     "plugin-prefix/activity-timeline": 1,
