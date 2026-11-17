@@ -7,7 +7,8 @@
     "default-shadow": 92,
     "numeric-duration": 47,
     "viewport-variant": 46,
-    "solid-status-fill": 32
+    "solid-status-fill": 32,
+    "palette-colour": 2
   },
   "counts": {
     "arbitrary-radius/attachment-gallery": 1,
@@ -55,6 +56,8 @@
     "numeric-duration/backlog": 7,
     "numeric-duration/plugin-ui": 36,
     "numeric-duration/thread-sidebar": 3,
+    "palette-colour/jj-integration": 1,
+    "palette-colour/thread-sidebar": 1,
     "raw-colour/ai-accounts": 7,
     "raw-colour/annotations": 8,
     "raw-colour/backlog": 2,

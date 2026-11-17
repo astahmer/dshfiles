@@ -122,6 +122,17 @@ export const designTokenRules: readonly DesignTokenRule[] = [
     matches: (line, file) =>
       file.startsWith('plugins/@dshfiles/plugin-ui/') ? [] : classes(line, file, token => /^bg-(?:info|success|warning)$/.test(token.utility)),
   },
+  {
+    // Tailwind's numbered palette (emerald-500) ignores the theme; the kit's own hues (teal, violet) carry no step.
+    id: 'palette-colour',
+    use: 'a semantic colour (bg-muted, text-info, var(--dshx-tone-*)) or a kit hue (teal, violet, graph-1..6)',
+    matches: (line, file) =>
+      classes(line, file, token =>
+        /^(?:bg|text|border(?:-[trblxyse])?|ring|ring-offset|outline|divide|fill|stroke|from|via|to|shadow|accent|caret|decoration|placeholder)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}(?:\/[\w.[\]-]+)?$/.test(
+          token.utility,
+        ),
+      ),
+  },
 ]
 
 /** Files that define the tokens: colour literals there are the palette itself. */
