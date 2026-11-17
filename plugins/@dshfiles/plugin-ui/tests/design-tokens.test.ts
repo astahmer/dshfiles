@@ -41,6 +41,14 @@ describe('kit design tokens (visual refresh T0.5)', () => {
     }
   })
 
+  it("draws Tailwind's default shadow steps from the elevation levels, not its grey defaults", () => {
+    expect(theme).toContain('--shadow-2xs: none;')
+    expect(theme).toContain('--shadow-xs: none;')
+    for (const [step, level] of Object.entries({ sm: 1, md: 2, lg: 2, xl: 3, '2xl': 3 })) {
+      expect(theme).toContain(`--shadow-${step}: var(--dshx-elevation-${level});`)
+    }
+  })
+
   it('gives dark elevation an inner top highlight', () => {
     const dark = styles.slice(styles.indexOf('Elevation, dark'))
     for (const level of [1, 2, 3]) expect(dark).toMatch(new RegExp(`--dshx-elevation-${level}:[^;]*inset 0 1px 0`, 'u'))
