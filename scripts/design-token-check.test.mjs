@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { DesignTokenCheck } from './design-token-check.ts'
 
-const { classGroups, classTokens, compare, countByRuleAndPlugin, findingsInText, isSource, isTokenFile } = DesignTokenCheck
+const { classGroups, classTokens, compare, countByRuleAndPlugin, findingsInText, isSource, isTokenFile, scanRepository } = DesignTokenCheck
 
 const rulesIn = (file, text) => findingsInText({ plugin: 'demo', file, text }).map(finding => `${finding.rule}:${finding.text}`)
 
@@ -174,4 +177,17 @@ test('outline-without-focus: a control with outline-none and no focus-visible re
       .map(finding => `${finding.line}:${finding.text}`),
     ['1:dshx:outline-none', '4:dshx:outline-none'],
   )
+})
+
+test('counts vendored forks with the owned plugins instead of skipping them', () => {
+  const root = mkdtempSync(join(tmpdir(), 'design-token-check-'))
+  try {
+    for (const plugin of ['schedule', 'backlog']) {
+      mkdirSync(join(root, 'plugins/@dshfiles', plugin, 'src'), { recursive: true })
+      writeFileSync(join(root, 'plugins/@dshfiles', plugin, 'src/a.module.css'), '.a { border-radius: 6px; }\n')
+    }
+    assert.deepEqual(countByRuleAndPlugin(scanRepository(root)), { 'arbitrary-radius/backlog': 1, 'arbitrary-radius/schedule': 1 })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })

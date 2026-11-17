@@ -333,20 +333,12 @@ const walk = (directory: string, files: string[]): void => {
   }
 }
 
-/**
- * Whole native Loader rows vendored from upstream as forks that carry no styling delta of ours yet, so their native
- * styling is upstream's and is not counted. They arrived with the 2026-11-11 upstream merge
- * (the 2026-11-11 upstream merge); move one out of this set when its first styling delta lands, and tokenise it then.
- * `sidebar-terminal` left the set with its restyle (upstream UI fit). `deliverables` (the native changed-files
- * card, forked upstream for image previews) arrived with the 2026-11-12 merge (the 2026-11-12 upstream merge) and waits
- * for the same UI-fit step.
- */
-export const VENDORED_UNSTYLED_FORKS: ReadonlySet<string> = new Set(['cordis-cards', 'deliverables', 'schedule', 'settings-subagent'])
-
 /** Every finding in the repository's plugins (owned and forked), sorted for stable output. */
 const scanRepository = (root: string): readonly DesignTokenFinding[] => {
   const pluginsRoot = join(root, 'plugins/@dshfiles')
-  const plugins = readdirSync(pluginsRoot).filter(name => statSync(join(pluginsRoot, name)).isDirectory() && !VENDORED_UNSTYLED_FORKS.has(name))
+  // Vendored forks with no styling delta of ours yet (cordis-cards, deliverables, schedule, settings-subagent) count
+  // too: their upstream styling is still debt on our screens, and the baseline keeps it from growing.
+  const plugins = readdirSync(pluginsRoot).filter(name => statSync(join(pluginsRoot, name)).isDirectory())
   const findings: DesignTokenFinding[] = []
   for (const plugin of plugins) {
     const files: string[] = []
