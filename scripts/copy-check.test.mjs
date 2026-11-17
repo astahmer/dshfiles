@@ -122,6 +122,27 @@ test('reads the catalog text users read: title, summary, firstAction and doneWhe
   assert.deepEqual(terms, ['session', 'conversation'])
 })
 
+test('reads label-keyed values of plain .ts label tables, not tool or API descriptions', () => {
+  const table = [
+    'export const groups = [',
+    "  { id: 'general', label: 'General session', description: 'Each conversation and its tabs.' },",
+    "  { id: 'empty', emptyTitle: 'No sessions yet', name: 'internal session' },",
+    ']',
+  ].join('\n')
+  assert.deepEqual(
+    copyInPlainTs(table, extractStrings(table), 'plugins/@dshfiles/demo/src/groups.ts').map(entry => entry.text),
+    ['General session', 'Each conversation and its tabs.', 'No sessions yet'],
+  )
+  const tools = [
+    "const tool = defineTool({ name: 'list_sessions', description: 'List every live session.' })",
+    "const row = { label: 'Open session' }",
+  ].join('\n')
+  assert.deepEqual(
+    copyInPlainTs(tools, extractStrings(tools), 'plugins/@dshfiles/demo/src/tools.ts').map(entry => entry.text),
+    ['Open session'],
+  )
+})
+
 test('reads every string of a locale/en.json table', () => {
   const table = { meta: { title: 'Conversation cleanup', description: 'Delete cold sessions.' }, labels: ['One', { two: 'Two' }], count: 3 }
   assert.deepEqual(

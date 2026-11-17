@@ -251,14 +251,31 @@ const findingsInStrings = (input: { readonly file: string; readonly strings: rea
 
 const isLocaleFile = (path: string): boolean => /(?:^|\/)(?:locales?|i18n)(?:\/[^/]+)?\.ts$|-locales?\.ts$/.test(path)
 
+/** Keys whose string value a screen prints: `label: '…'`, `emptyTitle: '…'`, `searchPlaceholder: '…'`. */
+const LABEL_KEY = /^(?:label|title|placeholder|hint|heading|tooltip|[a-z]\w*(?:Label|Title|Placeholder|Hint|Heading))$/
+
+/** `description` and `summary` are UI text in a label table, but model-facing in a tool, API or schema definition. */
+const PROSE_KEY = /^(?:description|summary)$/
+const definesToolsOrApis = (source: string, path: string): boolean =>
+  /\bdefineTool\b|\bdefineApi\b|\btool\s*:|\binputSchema\b|\bSchema\./.test(source) ||
+  // The runner's slot and API catalogs are developer reference.
+  /\/cordis-client-runner\/|(?:api|slot)-catalog\.ts$/.test(path)
+
 /**
  * The copy in a plain `.ts` file (not a component, not a locale table): the `.description(…)` text of a settings
- * schema, which Settings shows under each field.
+ * schema, which Settings shows under each field, and label-keyed values of a label table (`settings-groups.ts`,
+ * `packs.ts`).
  */
-const holdsPlainTsCopy = (source: string): boolean => source.includes('defineSettings')
+const holdsPlainTsCopy = (source: string): boolean =>
+  source.includes('defineSettings') || /\b(?:label|title|placeholder|hint|heading|tooltip|description|summary|\w+(?:Label|Title|Placeholder|Hint|Heading))\s*:\s*['"`]/.test(source)
 
-const copyInPlainTs = (source: string, strings: readonly CopyString[]): readonly CopyString[] =>
-  holdsPlainTsCopy(source) ? strings.filter(string => string.key === 'description()') : []
+const copyInPlainTs = (source: string, strings: readonly CopyString[], path = ''): readonly CopyString[] => {
+  const settings = source.includes('defineSettings')
+  const prose = !settings && !definesToolsOrApis(source, path)
+  return strings.filter(
+    ({ key }) => key !== undefined && ((settings && key === 'description()') || LABEL_KEY.test(key) || (prose && PROSE_KEY.test(key))),
+  )
+}
 
 const walk = (directory: string, files: string[]): void => {
   for (const entry of readdirSync(directory)) {
@@ -325,7 +342,7 @@ const scanRepository = (root: string): readonly CopyFinding[] => {
       // Lexing every Host file costs seconds; a plain .ts file is read only when it can hold copy.
       if (!whole && !holdsPlainTsCopy(source)) continue
       const strings = extractStrings(source)
-      const copy = whole ? strings : copyInPlainTs(source, strings)
+      const copy = whole ? strings : copyInPlainTs(source, strings, rel)
       findings.push(...findingsInStrings({ file: rel, strings: copy, prefix }))
     }
     // The English Loader-row table: DSH shows its meta.title and meta.description in the plugin list and Settings.
