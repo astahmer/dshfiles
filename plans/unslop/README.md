@@ -5,8 +5,8 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1 to 10 and 13 are done. Step 12 (Backlog and Traces) is running; steps 11 (copy) and 14
-(guardrails) wait for it, because they touch every plugin and re-baseline the ratchets. See [Work list](#work-list).
+**Resume here:** steps 1 to 10, 12 and 13 are done. Steps 11 (copy) and 14 (guardrails) are open; they touch every
+plugin and re-baseline the ratchets, so they run last. See [Work list](#work-list).
 
 ## Method and limits
 
@@ -199,7 +199,7 @@ before and passes after; see each revision's description for the reason.
 | 9 ✅ | AI accounts on the kit switch and the colour rule, one header row, no nested cards. See [Pages lane](#pages-lane). | P4 | small |
 | 10 ✅ | Developer pages in a "Developer" group at the end of Settings (setting to hide it, shown by default); Capabilities hub quiet and no longer first; Plugin Market says what to do. See [Destinations lane](#destinations-lane). | N9 | small |
 | 11   | Copy: catalog summary cap, error strings with a next step, `compactJson` renders, six status words, glossary in native forks.                          | C1–C8             | large  |
-| 12   | Backlog, History, Source control and Traces onto `Page`.                                                                                               | P5, P7, P8, P12   | large  |
+| 12 ✅ | Backlog and Traces on the kit `Page` (History and Source control were done in the Land lane). See [Backlog lane](#backlog-lane). | P5, P7, P8, P12 | large |
 | 13 ✅ | Phone: kit text follows the density tokens (15/13 px), a sideways phone keeps the phone shell, full-screen palette, no keyboard hints on touch, page titles printed once. See [Phone lane](#phone-lane). | U7, U8, N12 | large |
 | 14   | Guardrails: both ratchets into `check:green` after re-baselining, widen `copy-check`, add rules for shadows, durations, viewport variants and solid status fills, repair the catalog walks. | G1–G7 | medium |
 
@@ -358,6 +358,34 @@ Unverified:
   checked.
 
 jj-integration's Host half changed (`/rebase` wording), so a running instance needs a restart.
+
+## Backlog lane
+
+13 revisions (`wtzswwqo` … `srttppkw`) in backlog and traces, plus `ttnsyuvs`, which fixes the dshx spec for the traces seed
+(the lane changed `scratch/seed.ts` to follow the removed receiver chip but not its dshx spec).
+
+- Backlog is on the kit `Page`: `h1` with a count, one-line description, primary New, seven labelled views (one select
+  below `@max-pane-narrow`), one "View" popover for scope, sort, hide-agent and saved views, Settings and backfill in
+  the page `⋯`. The capture box shows on Feed only (New opens it elsewhere) and keeps one hint. The detail is titled
+  by the item's name with its id as trailing meta. Status filters are a kit toggle group without zero counts. Reply
+  deletion uses the kit dialog; looping spinners stop under reduced motion; focus rings are back on hand-built
+  triggers.
+- Traces: no green receiver chip or service tiles; Traces · Logs · Alerts tabs with the other five under "More";
+  alert states as glyphs; no firing toast while Alerts is on screen; resolved alerts silent by default (new
+  `announceResolved` setting); receiver, retention and stall settings fold under Advanced; plain copy in the
+  empty state and confirmations.
+
+Kept or deviated: the seven Backlog views stay views (Inbox, Ready and Shipped have their own layouts and stored
+`view` values), drawn as a navigation row in the kit segmented style rather than `Page` tabs, because `Page` tabs
+cannot act as links with a current-view marker.
+
+Not done: the trace stat strip's ALL-CAPS truncated labels come from the kit's `motion/cost-waterfall.tsx`; Backlog's
+group headers still colour Done green and In progress amber; the Alerts intro still says "on the Host"; the item
+detail clips its pickers row at 390 px; durations still read "120ms" where journeys expect "120 ms".
+
+Unverified: journeys backlog 62 / 20 and traces 6 / 5 on the first forced pass; every remaining failure fails at the
+base at the same step (mostly the harness's "Add a project" dialog). No full suite after the last fixes; phone views
+checked in Chromium at 390 px, not WebKit. traces needs a Host restart (settings schema and client inject list).
 
 ## Phone lane
 
