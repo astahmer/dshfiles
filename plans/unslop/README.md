@@ -5,8 +5,8 @@ from it. The fixes are stacked on upstream `astahmer/dshfiles` `main` at `b9ef35
 `unslop-upstream-base`), one revision per change, not on the fork's `main`. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** steps 1 to 10, 12 and 13 are done. Steps 11 (copy) and 14 (guardrails) are open; they touch every
-plugin and re-baseline the ratchets, so they run last. See [Work list](#work-list).
+**Resume here:** steps 1 to 10, 12 and 13 are done. Step 11 is half done (catalog summaries); its UI-string half
+is running. Step 14 (guardrails) waits for it. See [Work list](#work-list).
 
 ## Method and limits
 
@@ -198,7 +198,7 @@ before and passes after; see each revision's description for the reason.
 | 8 ✅ | No zero-count chips, tiles and stat blocks on Usage, Memory and Processes. See [Pages lane](#pages-lane). | P6 | small |
 | 9 ✅ | AI accounts on the kit switch and the colour rule, one header row, no nested cards. See [Pages lane](#pages-lane). | P4 | small |
 | 10 ✅ | Developer pages in a "Developer" group at the end of Settings (setting to hide it, shown by default); Capabilities hub quiet and no longer first; Plugin Market says what to do. See [Destinations lane](#destinations-lane). | N9 | small |
-| 11   | Copy: catalog summary cap, error strings with a next step, `compactJson` renders, six status words, glossary in native forks.                          | C1–C8             | large  |
+| 11 ◐ | Copy: catalog summary cap, error strings with a next step, `compactJson` renders, six status words, glossary in native forks. Done: C1 (see [Catalog copy lane](#catalog-copy-lane)). C3 dropped: see there. Open: C2, C4–C8. | C1–C8 | large |
 | 12 ✅ | Backlog and Traces on the kit `Page` (History and Source control were done in the Land lane). See [Backlog lane](#backlog-lane). | P5, P7, P8, P12 | large |
 | 13 ✅ | Phone: kit text follows the density tokens (15/13 px), a sideways phone keeps the phone shell, full-screen palette, no keyboard hints on touch, page titles printed once. See [Phone lane](#phone-lane). | U7, U8, N12 | large |
 | 14   | Guardrails: both ratchets into `check:green` after re-baselining, widen `copy-check`, add rules for shadows, durations, viewport variants and solid status fills, repair the catalog walks. | G1–G7 | medium |
@@ -358,6 +358,28 @@ Unverified:
   checked.
 
 jj-integration's Host half changed (`/rebase` wording), so a running instance needs a restart.
+
+## Catalog copy lane
+
+17 revisions (`ytpxqtpxyyrw` … `polqynupuomt`) across every `dshx.features.json` and tooling/dshx.
+
+- All 568 feature summaries are one plain sentence: over 160 characters 496 → 0, with a semicolon 317 → 0, with a
+  backtick 49 → 0, saying "Host" 128 → 0, "Session" 44 → 0. About 90 titles lost plugin names and old glossary words.
+- Each old summary is kept verbatim in a new optional `details` field that nothing renders.
+- `features:check` fails a summary over 160 characters, with a semicolon or with a backtick, and points to `details`.
+- The derived catalogs, pack docs and migration map are regenerated (they were already stale on the base).
+
+Users see `summary` in Getting started, its search, the Try it prompt and the onboarding agent tools. What's new does
+not read the catalog; it comes from the jj history.
+
+C3 dropped: a dshx tool's `render` is the tool result the model receives (`tooling/dshx/packages/dshx/src/api/host-
+runtime.ts:252`, `dsh-tools` `pipeline.js:202`), so a sentence render would hide the data from the agent. The
+transcript's collapsed row is `toolName · <first string argument>`, never the render; a call with no string argument
+shows its raw argument JSON (`traces_reclaim_space · {"confirm":true}`). Follow-up: a dshx `tool.label(output)` kept
+in `presentationMeta`, which the model never sees, shown by chat's tool row.
+
+Not done: package descriptions that Getting started also shows still read as engineering notes (input-trigger's
+"Codex-style @ token targeting"). Getting started was not looked at in a scratch DSH.
 
 ## Backlog lane
 
