@@ -2,7 +2,7 @@
 
 ![Preview an agent from its mention](docs/screenshots/agent-mention-preview.png)
 
-![Manage persistent agents](docs/screenshots/agent-registry.png)
+![Manage agents](docs/screenshots/agent-registry.png)
 
 Persistent, mentionable agents. An agent is saved configuration — identity, instructions, model
 route and Agent preset — that dispatches an **ordinary DSH thread** when you mention its handle

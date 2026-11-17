@@ -1,6 +1,6 @@
 # @dshfiles/agent-plan
 
-![Plan card for todo_write](docs/screenshots/plan-card.png)
+![Plan card for the agent's to-do list](docs/screenshots/plan-card.png)
 
 Agent work you can read at a glance, in the transcript and beside the composer:
 

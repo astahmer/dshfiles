@@ -37,7 +37,7 @@ From the onboarding feature catalog: 21 features, the 6 curated ones first.
 3. **Show what memory costs and whether it holds up** (`memory`, knowledge) — Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the use…
 4. **Forget a selection of notes** (`memory`, knowledge) — Valid notes carry a checkbox; Shift/Cmd select ranges and toggles, select-all covers the visible valid notes, and one confirmed action forgets the selection with a shared reason. Superseded and forgotten notes never get a checkbox.
 5. **Attach named outside directories and git repositories to a thread** (`references`, knowledge) — Save a reference (a directory read in place, or a git URL shallow-cloned under $DSH_HOME/references), attach it to a Session with /reference or the reference_* tools, and name every attached reference with its absolute path in that Session's runtime context.
-6. **Agent CLI sessions browser** (`agentsview`, knowledge) — One page lists the sessions other agent CLIs recorded on this machine (Claude Code under ~/.claude/projects, Codex under ~/.codex/sessions), newest first, with title, working directory, branch, prompts, tool calls and token totals; filters them by agent and text, searches their…
+6. **Claude Code and Codex history** (`agentsview`, knowledge) — Browse what Claude Code and Codex recorded on this machine and read any run as a transcript.
 
 ### More
 

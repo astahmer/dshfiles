@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "agent-registry",
-      "title": "Manage persistent agents",
-      "summary": "Create, edit, enable, duplicate and remove agents \u2014 handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort \u2014 from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted. Thread rows in the thread sidebar show the @handle of the agent that started the thread (agents.threadHandles), falling back to the preset chip.",
+      "title": "Manage agents",
+      "summary": "Create, edit and remove agents with their own instructions, model and tools, shared by every browser.",
+      "details": "Create, edit, enable, duplicate and remove agents \u2014 handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort \u2014 from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted. Thread rows in the thread sidebar show the @handle of the agent that started the thread (agents.threadHandles), falling back to the preset chip.",
       "reach": [
         "click button \"Agents\"",
         "expect text \"Start from a template\"",
@@ -154,7 +155,8 @@
     {
       "id": "agent-mentions",
       "title": "Mention an agent where a thread starts",
-      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was \u2014 the backlog reports the new thread in a toast whose Open action shows it \u2014 the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
+      "summary": "Start a thread on an agent by typing its @handle at the start of your message.",
+      "details": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was \u2014 the backlog reports the new thread in a toast whose Open action shows it \u2014 the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -223,7 +225,8 @@
     {
       "id": "agent-mention-preview",
       "title": "Preview an agent from its mention",
-      "summary": "Every rendered @{handle} reference (and legacy @handle mention) that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the reference with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instructions and its recent threads, and an Open in Agents action selects it in the panel. The card follows the reference while the conversation scrolls; an unknown, removed or misspelled handle stays plain text, so an email address or a menu scope never becomes a link.",
+      "summary": "Click an agent's @handle anywhere to see its card with its model, tools, instructions and recent threads.",
+      "details": "Every rendered @{handle} reference (and legacy @handle mention) that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the reference with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instructions and its recent threads, and an Open in Agents action selects it in the panel. The card follows the reference while the conversation scrolls; an unknown, removed or misspelled handle stays plain text, so an email address or a menu scope never becomes a link.",
       "surfaces": ["client"],
       "surface": "entityProvider",
       "destination": "agents",

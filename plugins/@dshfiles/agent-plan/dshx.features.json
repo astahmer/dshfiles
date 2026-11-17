@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "plan-card",
-      "title": "Plan card for todo_write",
-      "summary": "Each todo_write call is drawn as a plan card: \"Step 2 of 3 · Fix the rounding bug\", expanding to every step with a done, active or pending glyph and how long it took. Timing comes from the times of successive todo_write calls, followed back across turns while the plan keeps a step. A call the card cannot read, or that failed, shows the native todo row.",
+      "title": "Plan card for the agent's to-do list",
+      "summary": "The agent's plan shows as a card with each step, its state and how long it took.",
+      "details": "Each todo_write call is drawn as a plan card: \"Step 2 of 3 · Fix the rounding bug\", expanding to every step with a done, active or pending glyph and how long it took. Timing comes from the times of successive todo_write calls, followed back across turns while the plan keeps a step. A call the card cannot read, or that failed, shows the native todo row.",
       "reach": [
         "seed jev-setup-chat-thread",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"pending\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
@@ -84,7 +85,8 @@
     {
       "id": "pinned-step",
       "title": "Current plan step pinned beside the composer",
-      "summary": "While the latest turn's plan has steps left, a chip beside the native plan-mode control says \"Step 2 of 3 · Fix the rounding bug · 12s\" and opens the whole plan. It sits beside the native control rather than replacing it. While the chip is on, the To-dos strip above the composer gives way to it, so the plan is not shown twice.",
+      "summary": "The current plan step sits beside the composer and opens the whole plan.",
+      "details": "While the latest turn's plan has steps left, a chip beside the native plan-mode control says \"Step 2 of 3 · Fix the rounding bug · 12s\" and opens the whole plan. It sits beside the native control rather than replacing it. While the chip is on, the To-dos strip above the composer gives way to it, so the plan is not shown twice.",
       "reach": [
         "seed jev-setup-chat-thread",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
@@ -137,7 +139,8 @@
     {
       "id": "live-activity-strip",
       "title": "Live activity strip beside the composer controls",
-      "summary": "While anything runs, a strip beside the native composer activity says what: the running tool call, background jobs and subagents, with a live timer; it opens the full list with a timer per row. It reads Session events only (tool/call, tool/result, job/registered, job/settled) and renders nothing while idle.",
+      "summary": "While the agent works, a strip beside the composer shows the running tool, jobs and subagents with timers.",
+      "details": "While anything runs, a strip beside the native composer activity says what: the running tool call, background jobs and subagents, with a live timer; it opens the full list with a timer per row. It reads Session events only (tool/call, tool/result, job/registered, job/settled) and renders nothing while idle.",
       "reach": [
         "seed jev-setup-chat-thread",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call bash {\\\"command\\\":\\\"sleep 20\\\",\\\"description\\\":\\\"Wait twenty seconds\\\"}]]\"",
@@ -186,7 +189,8 @@
     {
       "id": "failure-card",
       "title": "Ask to fix on a failed turn",
-      "summary": "Adds Ask to fix beside Retry in the failed turn's one row of actions. It writes the failure and a request to fix it into the composer; the user reviews and sends. Stopped turns get no action.",
+      "summary": "A failed turn offers Ask to fix, which drafts a fix request in the composer for you to review and send.",
+      "details": "Adds Ask to fix beside Retry in the failed turn's one row of actions. It writes the failure and a request to fix it into the composer; the user reviews and sends. Stopped turns get no action.",
       "reach": [
         "seed jev-setup-chat-thread",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[fail The fake provider rejected this request]]\"",
@@ -235,7 +239,8 @@
     {
       "id": "compaction-meter",
       "title": "Tokens left before automatic compaction",
-      "summary": "In the composer's context meter panel, under the occupancy breakdown, a row says how many tokens remain before automatic compaction (\"Compacts in ~40K\", then \"Compacts next step\") and gives the trigger and window, so the meter line carries one context item. The trigger comes from the running context-compaction engine through its threshold API; the live prompt size is the native contextPressure projection the ring reads.",
+      "summary": "The context meter shows how many tokens are left before the thread compacts.",
+      "details": "In the composer's context meter panel, under the occupancy breakdown, a row says how many tokens remain before automatic compaction (\"Compacts in ~40K\", then \"Compacts next step\") and gives the trigger and window, so the meter line carries one context item. The trigger comes from the running context-compaction engine through its threshold API; the live prompt size is the native contextPressure projection the ring reads.",
       "reach": [
         "seed jev-setup-chat-thread",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Summarize the pricing module [[usage 40000]] [[answer The pricing module rounds each line item.]]\"",

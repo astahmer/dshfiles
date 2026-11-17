@@ -1,6 +1,6 @@
 # @dshfiles/agentsview
 
-![Agent CLI sessions browser](docs/screenshots/agent-sessions-panel.png)
+![Claude Code and Codex history](docs/screenshots/agent-sessions-panel.png)
 
 Browse, search and read the sessions other agent CLIs recorded on this machine — Claude Code and Codex — inside DSH,
 read-only. One **Agent CLI threads** page (sidebar) lists them newest first with title, working directory, branch,

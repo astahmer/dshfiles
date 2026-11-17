@@ -3,8 +3,9 @@
   "features": [
     {
       "id": "parent-child-question",
-      "title": "Ask and answer a child-agent question",
-      "summary": "A child asks its direct parent with bounded context and a recommendation policy; only the parent can deliver the answer.",
+      "title": "Ask and answer a subagent's question",
+      "summary": "A subagent can ask its parent thread a question, and only the parent can answer it.",
+      "details": "A child asks its direct parent with bounded context and a recommendation policy; only the parent can deliver the answer.",
       "reach": [
         "click tab \"Agents\"",
         "click button \"Capabilities\"",
@@ -73,8 +74,9 @@
     },
     {
       "id": "question-expiry",
-      "title": "Resolve question expiry safely",
-      "summary": "Expiry either returns the recommended choice or writes a private deferred Markdown record without treating it as an answer.",
+      "title": "Handle an expired question",
+      "summary": "An expired question returns its recommended choice or is saved for later, never taken as an answer.",
+      "details": "Expiry either returns the recommended choice or writes a private deferred Markdown record without treating it as an answer.",
       "reach": [
         "click tab \"Agents\"",
         "click button \"Capabilities\"",
@@ -130,8 +132,9 @@
     },
     {
       "id": "revision-pinned-feedback",
-      "title": "Submit and resolve anchored Markdown feedback",
-      "summary": "Submit line-anchored feedback against the current document revision and deliver accepted, rejected, or deferred resolution receipts to the child.",
+      "title": "Give anchored feedback on a document",
+      "summary": "Leave line-anchored feedback on a subagent's document and send back what was accepted or rejected.",
+      "details": "Submit line-anchored feedback against the current document revision and deliver accepted, rejected, or deferred resolution receipts to the child.",
       "reach": [
         "click tab \"Agents\"",
         "click button \"Capabilities\"",
@@ -202,7 +205,8 @@
     {
       "id": "bounded-batch-resolution",
       "title": "Resolve feedback in bounded batches",
-      "summary": "Accept at most twenty feedback resolutions atomically and reject oversized batches before writing any receipt.",
+      "summary": "Resolve up to twenty feedback items at once, all or nothing.",
+      "details": "Accept at most twenty feedback resolutions atomically and reject oversized batches before writing any receipt.",
       "reach": [
         "click tab \"Agents\"",
         "click button \"Capabilities\"",
@@ -240,8 +244,9 @@
     },
     {
       "id": "root-timed-questions",
-      "title": "Root timed questions keep the Agent working",
-      "summary": "With the web seed's tool-ask-user row in mode: timed, a root Agent's ask_user_question shows a counting-down card; when the foreground wait ends the Agent gets a pending result and keeps working, a later answer arrives as a user message tagged answer_to_pending_question, and stopping the turn withdraws the form.",
+      "title": "Timed questions keep the agent working",
+      "summary": "A timed question counts down while the agent keeps working, and a later answer still reaches it.",
+      "details": "With the web seed's tool-ask-user row in mode: timed, a root Agent's ask_user_question shows a counting-down card; when the foreground wait ends the Agent gets a pending result and keeps working, a later answer arrives as a user message tagged answer_to_pending_question, and stopping the turn withdraws the form.",
       "surfaces": ["client", "integration"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -291,8 +296,9 @@
     },
     {
       "id": "question-card-layout",
-      "title": "Steady countdown and compact native question card",
-      "summary": "Restyles the native async question card: a tabular, fixed-width countdown, a header that stacks under 480px, and a question clamped to three lines that expands on hover or focus.",
+      "title": "Steady countdown on question cards",
+      "summary": "The question card keeps a steady countdown and folds long questions to three lines.",
+      "details": "Restyles the native async question card: a tabular, fixed-width countdown, a header that stacks under 480px, and a question clamped to three lines that expands on hover or focus.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -321,7 +327,8 @@
     {
       "id": "cross-thread-question-inbox",
       "title": "List and answer thread questions",
-      "summary": "Root Agents can list timed native questions across Sessions or by id, plus direct-child durable questions, with recommendation, timeout, and answerability metadata. Native forms that report canAnswer (continued, or still open and held on this Host) and parent-scoped child questions use their authorized answer tools.",
+      "summary": "Agents can list open questions across threads and answer the ones they are allowed to.",
+      "details": "Root Agents can list timed native questions across Sessions or by id, plus direct-child durable questions, with recommendation, timeout, and answerability metadata. Native forms that report canAnswer (continued, or still open and held on this Host) and parent-scoped child questions use their authorized answer tools.",
       "reach": [
         "click tab \"Agents\"",
         "click button \"Capabilities\"",
@@ -384,7 +391,8 @@
     {
       "id": "child-questions-inbox",
       "title": "Subagent questions in the Inbox, answerable in place",
-      "summary": "Every pending, unexpired child-to-parent question is a blocking Inbox item about the parent thread, with the question options as answer choices. Choosing one answers as the parent thread (which must be running), wakes the waiting subagent, and resolves the item; a question answered, expired or cancelled elsewhere resolves by itself.",
+      "summary": "A subagent's question appears in the Inbox, and choosing an option answers it and wakes the subagent.",
+      "details": "Every pending, unexpired child-to-parent question is a blocking Inbox item about the parent thread, with the question options as answer choices. Choosing one answers as the parent thread (which must be running), wakes the waiting subagent, and resolves the item; a question answered, expired or cancelled elsewhere resolves by itself.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
@@ -449,7 +457,8 @@
     {
       "id": "native-questions-inbox",
       "title": "Thread questions in the Inbox",
-      "summary": "Every native ask_user_question form waiting in a live root thread is a blocking Inbox item about that thread. A form with one single-select question is answerable in place with its options: a continued form through the native answer API, a form still open through the question waterfall request this Host holds for it. Both are the paths answer_thread_question takes. Any other form says to answer it in the thread. The item resolves when the form settles or its thread stops.",
+      "summary": "Questions waiting in a thread appear in the Inbox, and simple ones can be answered there.",
+      "details": "Every native ask_user_question form waiting in a live root thread is a blocking Inbox item about that thread. A form with one single-select question is answerable in place with its options: a continued form through the native answer API, a form still open through the question waterfall request this Host holds for it. Both are the paths answer_thread_question takes. Any other form says to answer it in the thread. The item resolves when the form settles or its thread stops.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or threads*\" \"[[once call ask_user_question {\\\"questions\\\": [{\\\"id\\\": \\\"layout\\\", \\\"question\\\": \\\"Which layout should the release notes use?\\\", \\\"options\\\": [{\\\"label\\\": \\\"Grouped by plugin (Recommended)\\\"}, {\\\"label\\\": \\\"One flat list\\\"}]}], \\\"timeout\\\": -1}]]\"",
