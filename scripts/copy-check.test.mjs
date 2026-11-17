@@ -51,6 +51,33 @@ test('extracts literals and JSX text but skips comments, console output and type
   )
 })
 
+test('skips non-English locale tables, declared or keyed', () => {
+  const source = [
+    'export const en = {',
+    "  title: 'Open the thread',",
+    '}',
+    'export const fr = {',
+    "  title: 'Ouvrir la conversation',",
+    '  nested: {',
+    "    more: 'Une conversation',",
+    '  },',
+    '}',
+    'const tables = {',
+    "  en: { a: 'English' },",
+    "  'zh-CN': {",
+    "    a: '会话',",
+    '  },',
+    '  de: {',
+    "    a: 'Konversation',",
+    '  },',
+    "  es: { b: 'inline' },",
+    '}',
+    "const after = 'After the tables'",
+  ].join('\n')
+  const texts = extractStrings(source).map(entry => entry.text)
+  assert.deepEqual(texts, ['Open the thread', 'English', 'After the tables'])
+})
+
 test('only prose counts; identifiers and class strings do not', () => {
   assert.ok(isProse('Open session'))
   assert.equal(isProse('session'), false)

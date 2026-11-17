@@ -60,17 +60,50 @@ const lineAt = (source: string, index: number): number => {
   return line
 }
 
+/** Locale codes other than English, as a table name (`const fr = {`, `zhCN`) or key (`'pt-BR': {`). */
+const NON_ENGLISH_LOCALE = String.raw`(?:zh|ja|es|fr|de|ru|pt|ko|it|nl|pl|tr|uk|ar|hi|vi|th|sv|cs)(?:[-_]?[A-Z][A-Za-z]*)?`
+
+/**
+ * Source ranges holding a non-English locale table: a `const fr = {` declaration or an `fr: {` / `'zh-CN': {` key,
+ * up to the closing brace at the same indentation. The glossary is English; `conversation` is also French.
+ */
+const nonEnglishRanges = (source: string): readonly (readonly [number, number])[] => {
+  const ranges: (readonly [number, number])[] = []
+  const opener = new RegExp(
+    String.raw`^([ \t]*)(?:(?:export\s+)?(?:const|let)\s+${NON_ENGLISH_LOCALE}\b[^=\n]*=|['"]?${NON_ENGLISH_LOCALE}['"]?\s*:)\s*\{`,
+    'gm',
+  )
+  for (const match of source.matchAll(opener)) {
+    const indent = match[1] ?? ''
+    const opened = match.index + match[0].length
+    const newline = source.indexOf('\n', opened)
+    const lineEnd = newline === -1 ? source.length : newline
+    // `es: { a: '…' },` on one line ends with its line.
+    if (source.slice(opened, lineEnd).trim().length > 0) {
+      ranges.push([match.index, lineEnd])
+      continue
+    }
+    const closer = new RegExp(String.raw`^${indent}\}`, 'gm')
+    closer.lastIndex = opened
+    const end = closer.exec(source)
+    ranges.push([match.index, end === null ? source.length : end.index])
+  }
+  return ranges
+}
+
 /**
  * String literals, template literals (without their `${…}` holes) and JSX text of one source file. A small lexer
  * rather than a parser: it skips comments, regex-free code and nested template holes well enough for a ratchet.
  */
 const extractStrings = (source: string): readonly CopyString[] => {
   const strings: CopyString[] = []
+  const foreign = nonEnglishRanges(source)
   let code = ''
   let index = 0
   const push = (text: string, start: number, raw: string = text): void => {
     // Developer diagnostics, not copy.
     if (/console\.\w+\([^;\n)]*$/.test(code.slice(-400))) return
+    if (foreign.some(([from, to]) => start >= from && start < to)) return
     strings.push(raw === text ? { text, line: lineAt(source, start) } : { text, line: lineAt(source, start), raw })
   }
   while (index < source.length) {
@@ -142,7 +175,8 @@ const extractStrings = (source: string): readonly CopyString[] => {
     code += char
     index += 1
   }
-  // JSX text: prose between a closing `>` and the next `<` of the comment- and string-free code.
+  // JSX text: prose between a closing `>` and the next `<` of the comment- and string-free code. Locale tables hold no
+  // JSX, so the foreign ranges do not apply here.
   for (const match of code.matchAll(/>([^<>{}]*)</g)) {
     const text = match[1] ?? ''
     if (!/[A-Za-z]{2}/.test(text) || /&&|\|\||=|;|\(|\)/.test(text)) continue
@@ -197,7 +231,8 @@ const isLocaleFile = (path: string): boolean => /(?:^|\/)(?:locales?|i18n)(?:\/[
 
 const walk = (directory: string, files: string[]): void => {
   for (const entry of readdirSync(directory)) {
-    if (entry === 'node_modules' || entry === 'dist' || entry === 'native' || entry === '__snapshots__') continue
+    // Vendored native forks (`src/native/`) are read too: their labels reach the same screens as owned copy.
+    if (entry === 'node_modules' || entry === 'dist' || entry === '__snapshots__') continue
     const path = join(directory, entry)
     if (statSync(path).isDirectory()) walk(path, files)
     else files.push(path)
