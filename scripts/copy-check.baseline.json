@@ -1,6 +1,6 @@
 {
   "totals": {
-    "plugin-prefix": 0,
+    "plugin-prefix": 11,
     "session": 21,
     "conversation": 6,
     "new-chat": 2,
@@ -13,6 +13,14 @@
     "conversation/thread-sidebar": 1,
     "conversation/tool-meta": 2,
     "new-chat/command-palette": 2,
+    "plugin-prefix/activity-timeline": 1,
+    "plugin-prefix/agent-toolkit": 1,
+    "plugin-prefix/ai-accounts": 3,
+    "plugin-prefix/background-jobs": 1,
+    "plugin-prefix/mcp-servers": 1,
+    "plugin-prefix/traces": 1,
+    "plugin-prefix/workbench": 2,
+    "plugin-prefix/worktree-memory": 1,
     "session/ai-accounts": 1,
     "session/attachment-gallery": 1,
     "session/chat": 1,

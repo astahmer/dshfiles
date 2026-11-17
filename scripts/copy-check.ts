@@ -40,13 +40,18 @@ const pluginPrefixPattern = (pluginNames: readonly string[]): RegExp => {
         .map(part => part.replace(/[a-z]/gi, letter => `[${letter.toLowerCase()}${letter.toUpperCase()}]`).replace(/[.*+?^${}()|\\]/g, '\\$&'))
         .join('[ .-]'),
     )
-  // A capital after the colon: `pulls.review: Reviews` is a label, `pulls.review: marks stay unsaved` a log line.
-  return new RegExp(`^\\s*(?:${alternatives.join('|')})\\s*:\\s+[A-Z\\u3000-\\u9fff]`)
+  const names = `(?:${alternatives.join('|')})`
+  // A capital after the colon: `pulls.review: Reviews` is a label, `pulls.review: marks stay unsaved` a log line. A
+  // template hole (`${}` in a string's raw form) after a title-form name counts too: `AI Accounts: ${translate(…)}`
+  // is a label, `main-tabs: ${commandId} shortcut` a registration's debug name.
+  return new RegExp(`^\\s*(?:${names}\\s*:\\s+[A-Z\\u3000-\\u9fff]|(?=[^:]*[A-Z])${names}\\s*:\\s+\\$\\{)`)
 }
 
 export interface CopyString {
   readonly text: string
   readonly line: number
+  /** The text with each template hole kept as `${}`; absent when it equals `text`. */
+  readonly raw?: string
 }
 
 const lineAt = (source: string, index: number): number => {
@@ -63,10 +68,10 @@ const extractStrings = (source: string): readonly CopyString[] => {
   const strings: CopyString[] = []
   let code = ''
   let index = 0
-  const push = (text: string, start: number): void => {
+  const push = (text: string, start: number, raw: string = text): void => {
     // Developer diagnostics, not copy.
     if (/console\.\w+\([^;\n)]*$/.test(code.slice(-400))) return
-    strings.push({ text, line: lineAt(source, start) })
+    strings.push(raw === text ? { text, line: lineAt(source, start) } : { text, line: lineAt(source, start), raw })
   }
   while (index < source.length) {
     const char = source[index]
@@ -104,10 +109,12 @@ const extractStrings = (source: string): readonly CopyString[] => {
       // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: `index` advances past the literal.
       const start = index
       let text = ''
+      let raw = ''
       index += 1
       while (index < source.length && source[index] !== '`') {
         if (source[index] === '\\') {
           text += source[index + 1] ?? ''
+          raw += source[index + 1] ?? ''
           index += 2
           continue
         }
@@ -120,13 +127,15 @@ const extractStrings = (source: string): readonly CopyString[] => {
             index += 1
           }
           text += ' '
+          raw += '${}'
           continue
         }
         text += source[index]
+        raw += source[index]
         index += 1
       }
       index += 1
-      push(text, start)
+      push(text, start, raw)
       code += '""'
       continue
     }
@@ -175,9 +184,10 @@ const findingsInStrings = (input: { readonly file: string; readonly strings: rea
   const findings: CopyFinding[] = []
   const plugin = pluginOf(input.file)
   for (const string of input.strings) {
-    if (!isProse(string.text) && !input.prefix.test(string.text)) continue
-    const at = { plugin, file: input.file, line: string.line, text: string.text.trim().slice(0, 120) }
-    if (input.prefix.test(string.text)) findings.push({ term: 'plugin-prefix', ...at })
+    const prefixed = input.prefix.test(string.raw ?? string.text)
+    if (!isProse(string.text) && !prefixed) continue
+    const at = { plugin, file: input.file, line: string.line, text: (string.raw ?? string.text).trim().slice(0, 120) }
+    if (prefixed) findings.push({ term: 'plugin-prefix', ...at })
     for (const term of copyTerms) if (term.pattern.test(string.text)) findings.push({ term: term.id, ...at })
   }
   return findings

@@ -15,6 +15,19 @@ test('plugin-name prefixes match labels, not log lines', () => {
   assert.equal(prefix.test('Reviews'), false)
 })
 
+test('plugin-name prefixes in template literals count by a title-form head, not a debug slug', () => {
+  const strings = extractStrings('const a = `MCP Servers: ${translate(key)}`\nconst b = `mcp-servers: ${count} reloaded`')
+  assert.deepEqual(
+    strings.map(entry => entry.raw ?? entry.text),
+    ['MCP Servers: ${}', 'mcp-servers: ${} reloaded'],
+  )
+  const findings = findingsInStrings({ file: 'plugins/@dshfiles/mcp-servers/src/client.tsx', prefix, strings })
+  assert.deepEqual(
+    findings.map(finding => `${finding.term}:${finding.text}`),
+    ['plugin-prefix:MCP Servers: ${}'],
+  )
+})
+
 test('extracts literals and JSX text but skips comments, console output and type arguments', () => {
   const source = [
     '// New chat in a comment',
