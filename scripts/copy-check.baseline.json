@@ -1,7 +1,7 @@
 {
   "totals": {
     "plugin-prefix": 11,
-    "session": 49,
+    "session": 50,
     "conversation": 20,
     "new-chat": 2,
     "integrate": 2,
@@ -44,7 +44,7 @@
     "session/multi-host": 1,
     "session/project-checks": 1,
     "session/rich-composer": 1,
-    "session/schedule": 17,
+    "session/schedule": 18,
     "session/secret-catalog": 1,
     "session/session-controller": 1,
     "session/settings-subagent": 1,

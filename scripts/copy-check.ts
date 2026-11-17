@@ -285,6 +285,16 @@ const catalogSchema = Schema.Struct({
 
 type Catalog = typeof catalogSchema.Type
 
+/** Every string value of a JSON document, depth first (a `locale/en.json` table: plugin title, description, labels). */
+const jsonStrings = (value: unknown): readonly CopyString[] => {
+  if (typeof value === 'string') return [{ text: value, line: 0 }]
+  if (Array.isArray(value)) return value.flatMap(jsonStrings)
+  if (typeof value === 'object' && value !== null) return Object.values(value).flatMap(jsonStrings)
+  return []
+}
+
+const localeTableSchema = Schema.Record(Schema.String, Schema.Unknown)
+
 /** The catalog text users read: Getting started and the plugin guide show each feature's title and summary, and onboarding its first action and done-when sentence. */
 const catalogCopy = (catalog: Catalog): readonly CopyString[] =>
   (catalog.features ?? []).flatMap(feature =>
@@ -317,6 +327,14 @@ const scanRepository = (root: string): readonly CopyFinding[] => {
       const strings = extractStrings(source)
       const copy = whole ? strings : copyInPlainTs(source, strings)
       findings.push(...findingsInStrings({ file: rel, strings: copy, prefix }))
+    }
+    // The English Loader-row table: DSH shows its meta.title and meta.description in the plugin list and Settings.
+    const englishTable = join(pluginsRoot, plugin, 'locale/en.json')
+    try {
+      const table = ScriptJson.decodeJsonSafe(localeTableSchema, readFileSync(englishTable, 'utf8'))
+      if (table.success) findings.push(...findingsInStrings({ file: relative(root, englishTable), strings: jsonStrings(table.data), prefix }))
+    } catch {
+      // Most owned plugins have no locale directory.
     }
     const catalog = join(pluginsRoot, plugin, 'dshx.features.json')
     let text: string
@@ -378,6 +396,7 @@ export class CopyCheck {
   static readonly isProse = isProse
   static readonly copyInPlainTs = copyInPlainTs
   static readonly catalogCopy = catalogCopy
+  static readonly jsonStrings = jsonStrings
   static readonly findingsInStrings = findingsInStrings
   static readonly scanRepository = scanRepository
   static readonly pluginOf = pluginOf

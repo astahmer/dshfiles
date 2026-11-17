@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { CopyCheck } from './copy-check.ts'
 
-const { catalogCopy, compare, copyInPlainTs, countByTermAndPlugin, extractStrings, findingsInStrings, isProse, pluginOf, pluginPrefixPattern, totalsByTerm } = CopyCheck
+const { catalogCopy, compare, copyInPlainTs, countByTermAndPlugin, extractStrings, findingsInStrings, isProse, jsonStrings, pluginOf, pluginPrefixPattern, totalsByTerm } = CopyCheck
 
 const prefix = pluginPrefixPattern(['jj-integration', 'pulls-review', 'thread-sidebar', 'mcp-servers'])
 
@@ -120,6 +120,14 @@ test('reads the catalog text users read: title, summary, firstAction and doneWhe
   )
   const terms = findingsInStrings({ file: 'plugins/@dshfiles/demo/dshx.features.json', prefix, strings }).map(finding => finding.term)
   assert.deepEqual(terms, ['session', 'conversation'])
+})
+
+test('reads every string of a locale/en.json table', () => {
+  const table = { meta: { title: 'Conversation cleanup', description: 'Delete cold sessions.' }, labels: ['One', { two: 'Two' }], count: 3 }
+  assert.deepEqual(
+    jsonStrings(table).map(entry => entry.text),
+    ['Conversation cleanup', 'Delete cold sessions.', 'One', 'Two'],
+  )
 })
 
 test('only prose counts; identifiers and class strings do not', () => {
