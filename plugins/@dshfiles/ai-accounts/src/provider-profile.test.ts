@@ -130,6 +130,31 @@ describe('account provider profiles', () => {
     expect(codex.streamIdleTimeoutMs).toBe(300_000)
   })
 
+  it('keeps a Mistral request under the image ceiling that rejects the 21st image', () => {
+    const mistral = ProviderProfileModel.buildProfile({
+      upstream: createMistralProvider(),
+      provider: 'mistral-work',
+      displayName: 'Mistral 1',
+      additionalModelIds: [],
+    })
+    const codex = ProviderProfileModel.buildProfile({
+      upstream: openaiCodexProvider(),
+      provider: 'codex-alex2',
+      displayName: 'Codex Alex2',
+      additionalModelIds: [],
+    })
+
+    // Mistral answers INVALID_REQUEST (code 3051) above 20 images, so the budget has to
+    // stay at the ceiling: a larger one never fires and the provider fails the turn
+    // instead of letting the image-offload executor drop the oldest screenshots.
+    expect(mistral.maxRequestImages).toBe(20)
+    expect(mistral.imageOffloadCountQuantum).toBeGreaterThan(0)
+    expect(mistral.imageOffloadCountQuantum).toBeLessThanOrEqual(mistral.maxRequestImages)
+    // Routes without a lower published ceiling keep the shared budget.
+    expect(codex.maxRequestImages).toBe(50)
+    expect(codex.imageOffloadCountQuantum).toBe(10)
+  })
+
   it('publishes each Codex account model pin as that route model default', async () => {
     const modelId = 'gpt-6-luna'
     const profiles = new Map([
