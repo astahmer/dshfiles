@@ -496,7 +496,8 @@
     {
       "id": "held-send",
       "title": "Send once the attachments finish uploading",
-      "summary": "Send or Enter while a file or image still uploads holds the message instead of refusing it: Send shows a filling ring, a status line above the composer reads 'Sending when uploads finish (40%)' with Cancel, and the message goes out by itself, in the queue or steer mode it was pressed for, once every upload is ready. Editing the text, attachments, quotes or plan mode, pressing the waiting Send again, or Cancel drops it.",
+      "summary": "Press Send while a file still uploads and the message goes out by itself once every upload is ready.",
+      "details": "Send or Enter while a file or image still uploads holds the message instead of refusing it: Send shows a filling ring, a status line above the composer reads 'Sending when uploads finish (40%)' with Cancel, and the message goes out by itself, in the queue or steer mode it was pressed for, once every upload is ready. Editing the text, attachments, quotes or plan mode, pressing the waiting Send again, or Cancel drops it.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
