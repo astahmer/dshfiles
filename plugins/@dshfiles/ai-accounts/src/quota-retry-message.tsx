@@ -100,7 +100,7 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
     : "Your current account's usage limit is exhausted. Reset time is unknown, so retries back off from 30 seconds up to every 10 minutes."
   const pendingStatus = continuationsQuery.isFetching
     ? 'Quota exhausted. Recovery details are loading.'
-    : 'Quota exhausted. Reset details are unavailable; retry manually.'
+    : 'Quota exhausted. Reset details are unavailable. Retry manually.'
   const recoveryStatus = continuation === undefined ? pendingStatus : exhaustedStatus
   const status = continuationsQuery.isError ? 'Quota exhausted. Retry when your provider limit resets.' : recoveryStatus
   const busy = resume.isPending || dismiss.isPending

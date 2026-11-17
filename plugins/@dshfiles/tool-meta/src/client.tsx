@@ -80,7 +80,7 @@ export default defineClient({
     )
     ctx.effect(() => {
       const timer = setTimeout(() => {
-        if (!isToolCallTreeWrapped(ctx.slots)) warnOnce('no conversation.chat.node "tool-call" renderer to wrap; tool timings are hidden')
+        if (!isToolCallTreeWrapped(ctx.slots)) warnOnce('no conversation.chat.node "tool-call" renderer to wrap. Tool timings are hidden')
       }, WRAP_DEADLINE_MS)
       return () => clearTimeout(timer)
     }, 'tool-meta: report a missing tool-call renderer')

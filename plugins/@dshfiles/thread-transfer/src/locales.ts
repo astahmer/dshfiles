@@ -8,7 +8,7 @@ const en = {
   importPalette: 'Import thread…',
   exportTitle: 'Export thread',
   exportDescription:
-    'Saves every message, tool call and result, attachment, the title and the model in one .dshthread file. Another DSH imports it as a new thread; it needs none of this machine’s folders or credentials.',
+    'Saves every message, tool call and result, attachment, the title and the model in one .dshthread file. Another DSH imports it as a new thread. It needs none of this machine’s folders or credentials.',
   exportPreparing: 'Preparing the file…',
   exportReady: 'Saved {file}',
   exportStats: '{messages} messages · {events} events · {attachments}',
@@ -17,7 +17,7 @@ const en = {
   exportMissing: '{count} attachments could not be read on this machine and were left out.',
   exportAgain: 'Export again',
   importTitle: 'Import thread',
-  importDescription: 'Pick a .dshthread file exported from DSH. It becomes a new thread here; the original stays untouched.',
+  importDescription: 'Pick a .dshthread file exported from DSH. It becomes a new thread here. The original stays untouched.',
   importPick: 'Choose a .dshthread file',
   importUploading: 'Reading the file…',
   importModel: 'Model {model}',

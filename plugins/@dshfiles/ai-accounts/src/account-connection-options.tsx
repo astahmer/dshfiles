@@ -111,7 +111,7 @@ const ConnectionHomes = (props: ConnectionOptionsProps): JSX.Element => {
               <field.TextField
                 label={codex ? 'Shared Codex home' : 'CLAUDE_CONFIG_DIR'}
                 monospace
-                description={codex ? 'Shared state; custom homes need a separate auth overlay.' : 'Directory containing your Claude Code login.'}
+                description={codex ? 'Shared state. Custom homes need a separate auth overlay.' : 'Directory containing your Claude Code login.'}
               />
             )}
           </form.AppField>

@@ -343,7 +343,7 @@ const ShareList = (): JSX.Element => {
                       trigger="Revoke"
                       triggerLabel={`Revoke share of ${row.title}`}
                       heading="Revoke this share?"
-                      description="The link stops working at once and a snapshot is deleted. This cannot be undone; create a new share to share again."
+                      description="The link stops working at once and a snapshot is deleted. This cannot be undone. Create a new share to share again."
                       action="Revoke share"
                       disabled={revoke.isPending}
                       onConfirm={() => revoke.mutate(row.id)}

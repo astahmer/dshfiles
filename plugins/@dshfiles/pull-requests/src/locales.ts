@@ -16,7 +16,7 @@ const en = {
   linkExisting: 'Push and link existing pull request',
   creating: 'Pushing and creating…',
   commits: '{count} commit(s) to push',
-  existing: 'An open pull request already uses this bookmark; confirming links it instead of opening another.',
+  existing: 'An open pull request already uses this bookmark. Confirming links it instead of opening another.',
   blocked: 'Fix these before creating the pull request:',
   draftNote: 'Drafted from the commit messages: {note}',
   generated: 'Drafted by {route} from this thread.',

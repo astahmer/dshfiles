@@ -89,7 +89,7 @@ const en = {
   doneCount: 'Marked {count} item(s) done. Press Z to undo.',
   snoozedCount: 'Snoozed {count} item(s) for an hour. Press Z to undo.',
   mutedSource: 'Muted this source. Press Z to undo.',
-  answeredNoUndo: 'Answered. An answer cannot be undone; reply in the thread to change it.',
+  answeredNoUndo: 'Answered. An answer cannot be undone. Reply in the thread to change it.',
   updates: '{count} update(s)',
   updatesHint: 'The list holds its order while you work in it. Show the new order.',
   peekLastReply: 'Last reply',
@@ -103,7 +103,7 @@ const en = {
   pushTestSent: 'Test sent to {count} device(s).',
   pushDenied: 'Notifications are blocked for DSH in this browser. Allow them in its site settings, then turn push on again.',
   pushNoKeys: 'This browser made a push subscription without its keys. Turn push off and on again.',
-  pushFailed: 'Push could not be turned on. Retry; the in-tab alerts above still work.',
+  pushFailed: 'Push could not be turned on. Retry. The in-tab alerts above still work.',
   pushHomeScreen:
     'Push on an iPhone needs DSH on the Home Screen: Share › Add to Home Screen (iOS 16.4 or later), open DSH from there, then turn push on here.',
   triageProgress: '{index} of {total}',

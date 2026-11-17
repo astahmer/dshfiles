@@ -412,7 +412,7 @@ export const en = {
   'chat.turnMap.kind.failed': 'Failed',
   'chat.turnMap.kind.edited': 'Edited files',
   'chat.turns.title': 'Turns',
-  'chat.turns.description': 'Every turn of this thread; tap one to jump to it.',
+  'chat.turns.description': 'Every turn of this thread. Tap one to jump to it.',
   'chat.turns.empty': 'No turns match this filter.',
   'chat.since.divider': 'Since you left',
   'chat.since.turnsOne': '1 turn',

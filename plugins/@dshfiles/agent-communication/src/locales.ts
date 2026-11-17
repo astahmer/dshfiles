@@ -91,7 +91,7 @@ const en = {
   outcome: 'Outcome',
   success: 'Success',
   failure: 'Failure',
-  historyNote: 'Activity history begins when tracking is enabled; earlier use cannot be inferred.',
+  historyNote: 'Activity history begins when tracking is enabled. Earlier use cannot be inferred.',
   cancel: 'Cancel',
   confirm: 'Confirm',
 } as const

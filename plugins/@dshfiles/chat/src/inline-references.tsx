@@ -146,7 +146,7 @@ const segment = (text: string, items: readonly InlineReference[], context: Inlin
     try {
       spans = item.find(text, context)
     } catch (error) {
-      reportOnce(`${item.id}:match`, `matcher ${item.id} failed; its references render as plain text.`, error)
+      reportOnce(`${item.id}:match`, `matcher ${item.id} failed. Its references render as plain text.`, error)
       return
     }
     for (const span of spans) {
@@ -190,7 +190,7 @@ class ReferenceBoundary extends Component<{ readonly id: string; readonly text: 
     return { failed: true }
   }
   override componentDidCatch(error: unknown, _info: ErrorInfo): void {
-    reportOnce(`${this.props.id}:render`, `renderer ${this.props.id} failed; the reference renders as plain text.`, error)
+    reportOnce(`${this.props.id}:render`, `renderer ${this.props.id} failed. The reference renders as plain text.`, error)
   }
   override render(): ReactNode {
     return this.state.failed ? this.props.text : this.props.children
@@ -204,7 +204,7 @@ const renderPieces = (pieces: readonly InlineReferencePiece[]): ReactNode[] =>
     try {
       rendered = piece.render()
     } catch (error) {
-      reportOnce(`${piece.id}:render`, `renderer ${piece.id} failed; the reference renders as plain text.`, error)
+      reportOnce(`${piece.id}:render`, `renderer ${piece.id} failed. The reference renders as plain text.`, error)
       rendered = piece.text
     }
     return (

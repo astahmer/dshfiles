@@ -43,9 +43,9 @@ export type QuestionKey = keyof typeof zh
 export const en = {
   'error.incomplete': 'Please complete this question first.',
   'error.unanswered': 'Please select an option or enter a custom answer.',
-  'error.unavailable': 'Cannot submit right now; try again in a moment.',
-  'error.resubmit': 'The answer did not arrive before work continued; submit it again.',
-  'status.sent': 'Reply sent; the panel could not close.',
+  'error.unavailable': 'Cannot submit right now. Try again in a moment.',
+  'error.resubmit': 'The answer did not arrive before work continued. Submit it again.',
+  'status.sent': 'Reply sent. The panel could not close.',
   'wait.takeTime': 'Take time',
   'wait.countdown': 'Continuing in {seconds}s',
   'wait.paused': 'Paused · {seconds}s remaining',

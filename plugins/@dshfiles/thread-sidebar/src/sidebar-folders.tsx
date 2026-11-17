@@ -226,7 +226,7 @@ export const useSidebarFolders = (input: {
       deleteFolder: id =>
         run(
           () => api.folderDelete({ id, confirm: true }),
-          undoable(`Folder “${folderTitle(id)}” deleted; its panels moved to Settings › Other pages.`, () => run(() => api.folderRestore({ id }))),
+          undoable(`Folder “${folderTitle(id)}” deleted. Its panels moved to Settings › Other pages.`, () => run(() => api.folderRestore({ id }))),
         ),
       addPanel: (viewId, folderId) =>
         run(

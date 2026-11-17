@@ -248,7 +248,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
             />
           )}
         </Panel>
-        <Panel title="Most-used tools" description="Top 10 by the selected metric; returned tokens are text characters / 4.">
+        <Panel title="Most-used tools" description="Top 10 by the selected metric. Returned tokens are text characters / 4.">
           <ToggleGroup
             type="single"
             variant="outline"
@@ -320,7 +320,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
             </ol>
           )}
         </Panel>
-        <Panel title="Time by test runner" description="Recognized runners; outcomes are shell-call status, not parsed test output.">
+        <Panel title="Time by test runner" description="Recognized runners. Outcomes are shell-call status, not parsed test output.">
           {testRunDistribution.length === 0 ? (
             <EmptyState>No recognized test-run timings in this range.</EmptyState>
           ) : (

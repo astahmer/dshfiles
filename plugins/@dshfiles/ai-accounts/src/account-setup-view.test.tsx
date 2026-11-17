@@ -885,7 +885,7 @@ describe('actual account setup view with operation-owned QueryClient data', () =
       const request = view.controller.getSnapshot()
       if (request === null) throw new Error('Missing synthetic reconnect request')
       await click('Verify subscription and reconnect')
-      expect(document.body.textContent).toContain('The connection result could not be read. Sign-in may already be saved; close setup and check your accounts.')
+      expect(document.body.textContent).toContain('The connection result could not be read. Sign-in may already be saved. Close setup and check your accounts.')
       expect(document.body.textContent).not.toContain('could not be verified')
       expect([...document.querySelectorAll('button')].some(item => item.textContent === 'Verify subscription and reconnect')).toBe(false)
       expect(document.querySelector('[aria-label="Sign-in method"]')).toBeNull()

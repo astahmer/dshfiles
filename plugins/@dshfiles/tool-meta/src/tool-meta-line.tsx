@@ -81,7 +81,7 @@ export const ToolMetaLine = ({ owner, t }: ToolMetaLineProps): ReactElement | nu
   }
   const view = useSyncExternalStore(live ? clock.subscribe : subscribeNever, read)
   if (timing === undefined) {
-    warnOnce('the tool.call.toolview owner no longer carries phase/block.time; tool timings are hidden')
+    warnOnce('the tool.call.toolview owner no longer carries phase/block.time. Tool timings are hidden')
     return null
   }
   if (timing === null || !enabled || view === undefined) return null

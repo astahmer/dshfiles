@@ -6,7 +6,7 @@ export const NETWORK_LOCALE_NAMESPACE = 'dshfiles.loopback-access'
 export const networkEnglish = {
   networkAccess: 'Network access',
   description:
-    'Choose how this DSH is reachable. Localhost access stays enabled. Saving stages preferences; it does not restart DSH or change the current connection.',
+    'Choose how this DSH is reachable. Localhost access stays enabled. Saving stages preferences. It does not restart DSH or change the current connection.',
   lanEnabled: 'LAN access',
   lanHint: 'Allow other devices to connect through one specific local address.',
   bindAddress: 'LAN address',

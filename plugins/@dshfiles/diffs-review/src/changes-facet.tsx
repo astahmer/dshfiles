@@ -559,7 +559,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
           ) : null}
           {marks.error === null || marks.error === undefined ? null : (
             <p className="dshx:text-xs dshx:text-destructive" role="alert">
-              {errorMessage(marks.error, 'Viewed marks could not be saved; try again.')}
+              {errorMessage(marks.error, 'Viewed marks could not be saved. Try again.')}
             </p>
           )}
           <ul aria-label="Changed files" className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-md dshx:border dshx:border-border">

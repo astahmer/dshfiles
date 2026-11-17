@@ -54,7 +54,7 @@ const pickFailureMessage = ({
   readonly noPage: string
 }): string | null => {
   if (reason === 'no-page') return noPage
-  if (reason === 'timeout') return 'The pick timed out; click Pick again.'
+  if (reason === 'timeout') return 'The pick timed out. Click Pick again.'
   if (reason === 'cancelled') return null
   return 'Could not reach that tab. Pick again.'
 }
@@ -154,11 +154,11 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
     annotationsUi.pickedFrom({ scope, owner, picked: { target: picked.target, point: picked.point, mode: 'element' } })
   }
   const pickActiveTab = useMutation({
-    mutationFn: () => pickInChrome({ noPage: 'No annotatable tab yet; open a page in that window.' }),
+    mutationFn: () => pickInChrome({ noPage: 'No annotatable tab yet. Open a page in that window.' }),
     onSuccess: acceptPick,
   })
   const pickOnChrome = useMutation({
-    mutationFn: (pageId: string) => pickInChrome({ pageId, noPage: 'That tab is gone; refresh the list.' }),
+    mutationFn: (pageId: string) => pickInChrome({ pageId, noPage: 'That tab is gone. Refresh the list.' }),
     onSuccess: acceptPick,
   })
   const tokenQuery = useQuery({

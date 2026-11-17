@@ -61,7 +61,7 @@ const en = {
   stopConfirmCount: 'Confirm stop ({count})',
   stopDetached: 'Stop detached',
   stopFailed: 'The process could not be stopped.',
-  stopFailedRecovery: 'Refresh the list, then stop it again; it may already have exited.',
+  stopFailedRecovery: 'Refresh the list, then stop it again. It may already have exited.',
   detachedTotal: 'detached',
   stopSummary: 'Stopped',
   leftRunning: '{count} running, left alone',

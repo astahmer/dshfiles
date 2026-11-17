@@ -340,7 +340,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
           <DialogDescription className="dshx:sr-only">
             {props.mode === 'directories'
               ? 'Browse folders, or type a path to open a unique folder match automatically.'
-              : 'Search registered projects, or type an absolute or ~/ path to browse folders; a unique match opens automatically.'}
+              : 'Search registered projects, or type an absolute or ~/ path to browse folders. A unique match opens automatically.'}
           </DialogDescription>
           <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:p-2">
             <div className="dshx:relative dshx:flex-1">

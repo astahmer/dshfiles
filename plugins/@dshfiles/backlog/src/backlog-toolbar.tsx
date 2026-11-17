@@ -303,8 +303,8 @@ export const ViewMenu = (props: {
           </TooltipTrigger>
           <TooltipContent>
             {props.agentItems.hidden
-              ? `${String(props.agentItems.hiddenCount)} agent ${props.agentItems.hiddenCount === 1 ? 'item' : 'items'} hidden until you touch them; click to show`
-              : 'Showing agent items; click to hide the ones you have not touched'}
+              ? `${String(props.agentItems.hiddenCount)} agent ${props.agentItems.hiddenCount === 1 ? 'item' : 'items'} hidden until you touch them. Click to show`
+              : 'Showing agent items. Click to hide the ones you have not touched'}
           </TooltipContent>
         </Tooltip>
       )}

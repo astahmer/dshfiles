@@ -4,7 +4,7 @@ export const BTW_LOCALE_NAMESPACE = 'dshfiles.btw'
 
 const en = {
   description: 'Ask a side question about this thread without touching it',
-  hint: 'Ask about this thread; the answer opens in a side panel',
+  hint: 'Ask about this thread. The answer opens in a side panel',
   empty: 'Type a question after /btw.',
   thinking: 'Asking…',
   cache: '{share}% of the first request read from the prefix cache',
@@ -13,7 +13,7 @@ const en = {
   dismiss: 'Dismiss',
   paletteAsk: 'Ask a side question (btw)',
   askTitle: 'Ask a side question',
-  askDescription: 'About “{thread}”. The answer opens in a side panel; the thread stays untouched.',
+  askDescription: 'About “{thread}”. The answer opens in a side panel. The thread stays untouched.',
   askLabel: 'Side question',
   askPlaceholder: 'What do you want to know about this thread?',
   askSubmit: 'Ask',

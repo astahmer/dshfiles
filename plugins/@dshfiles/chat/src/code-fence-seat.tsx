@@ -46,7 +46,7 @@ class FenceBoundary extends Component<FenceBoundaryProps, FenceBoundaryState> {
     return props.code === state.code ? null : { failed: false, code: props.code }
   }
   override componentDidCatch(error: unknown, _info: ErrorInfo): void {
-    this.props.report(`${this.props.id}:render`, `renderer ${this.props.id} failed; the fence renders as code.`, error)
+    this.props.report(`${this.props.id}:render`, `renderer ${this.props.id} failed. The fence renders as code.`, error)
   }
   override render(): ReactNode {
     return this.state.failed ? this.props.fallback : this.props.children

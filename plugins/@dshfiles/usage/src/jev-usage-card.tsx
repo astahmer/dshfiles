@@ -76,7 +76,7 @@ export const JevUsageCard = (props: { readonly usage: JevUsageView | undefined; 
                   aria-label={`${row.credential} share of input tokens this month`}
                   className="dshx:h-1.5 dshx:bg-muted"
                   value={maximumInputTokens === 0 ? 0 : (row.inputTokens / maximumInputTokens) * 100}
-                  aria-valuetext={`${UsageFormattingModel.formatCount(row.inputTokens)} input tokens; ${row.calls.toLocaleString()} requests; ${UsageFormattingModel.formatCost(row.estimatedCostUsd)} estimated cost this month; bars are relative to the most-used credential`}
+                  aria-valuetext={`${UsageFormattingModel.formatCount(row.inputTokens)} input tokens; ${row.calls.toLocaleString()} requests; ${UsageFormattingModel.formatCost(row.estimatedCostUsd)} estimated cost this month. Bars are relative to the most-used credential`}
                 />
                 <p className="dshx:text-2xs dshx:text-muted-foreground">
                   {UsageFormattingModel.formatCount(row.inputTokens)} input tokens · {UsageFormattingModel.formatCount(row.outputTokens)} output · Backlog{' '}

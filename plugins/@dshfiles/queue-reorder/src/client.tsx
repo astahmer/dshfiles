@@ -146,7 +146,7 @@ const transferOutcomeText = (outcome: TransferOutcome): string => {
   if (outcome.kind !== 'moved') return outcome.message
   return outcome.destination === 'queue'
     ? `Moved to the queue of ${outcome.target.title}.`
-    : `Moved into the composer of ${outcome.target.title}, which was idle; it is open now.`
+    : `Moved into the composer of ${outcome.target.title}, which was idle. It is open now.`
 }
 
 /**
