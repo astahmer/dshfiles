@@ -7,7 +7,8 @@
     "integrate": 2,
     "settle": 3,
     "host-process": 9,
-    "package-name": 2
+    "package-name": 2,
+    "raw-error-echo": 13
   },
   "counts": {
     "conversation/agent-preset": 1,
@@ -40,6 +41,12 @@
     "plugin-prefix/traces": 1,
     "plugin-prefix/workbench": 2,
     "plugin-prefix/worktree-memory": 1,
+    "raw-error-echo/ai-accounts": 5,
+    "raw-error-echo/cordis-cards": 1,
+    "raw-error-echo/jj-integration": 1,
+    "raw-error-echo/model-selection": 3,
+    "raw-error-echo/rich-composer": 1,
+    "raw-error-echo/sidebar-terminal": 2,
     "session/activity-timeline": 1,
     "session/agentsview": 2,
     "session/ai-accounts": 1,

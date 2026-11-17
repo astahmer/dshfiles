@@ -42,7 +42,7 @@ const pluginPrefixPattern = (pluginNames: readonly string[]): RegExp => {
     )
   const names = `(?:${alternatives.join('|')})`
   // A capital after the colon: `pulls.review: Reviews` is a label, `pulls.review: marks stay unsaved` a log line. A
-  // template hole (`${}` in a string's raw form) after a title-form name counts too: `AI Accounts: ${translate(…)}`
+  // template hole (`${…}` in a string's raw form) after a title-form name counts too: `AI Accounts: ${translate(…)}`
   // is a label, `main-tabs: ${commandId} shortcut` a registration's debug name.
   return new RegExp(`^\\s*(?:${names}\\s*:\\s+[A-Z\\u3000-\\u9fff]|(?=[^:]*[A-Z])${names}\\s*:\\s+\\$\\{)`)
 }
@@ -50,7 +50,7 @@ const pluginPrefixPattern = (pluginNames: readonly string[]): RegExp => {
 export interface CopyString {
   readonly text: string
   readonly line: number
-  /** The text with each template hole kept as `${}`; absent when it equals `text`. */
+  /** The text with each template hole kept as written (`${error.message}`); absent when it equals `text`. */
   readonly raw?: string
   /** The property key (`label`) or method call (`description()`) the literal is the value or first argument of. */
   readonly key?: string
@@ -174,6 +174,7 @@ const extractStrings = (source: string): readonly CopyString[] => {
           continue
         }
         if (source[index] === '$' && source[index + 1] === '{') {
+          const hole = index
           let depth = 1
           index += 2
           while (index < source.length && depth > 0) {
@@ -182,7 +183,7 @@ const extractStrings = (source: string): readonly CopyString[] => {
             index += 1
           }
           text += ' '
-          raw += '${}'
+          raw += source.slice(hole, index)
           continue
         }
         text += source[index]
@@ -232,7 +233,7 @@ export interface CopyRule {
   readonly use: string
   /** `prose` rules read strings of two or more words, `label` rules one-word labels too, `any` every string (the rule gates itself). */
   readonly scope: 'prose' | 'label' | 'any'
-  /** Whether one string breaks the rule; `raw` keeps each template hole as `${…}`. */
+  /** Whether one string breaks the rule; `raw` keeps each template hole as written. */
   readonly test: (text: string, raw: string) => boolean
 }
 
@@ -264,11 +265,28 @@ const packageNameInCopy = (text: string): boolean => {
   return !trimmed.startsWith('@') || /[.!?]/.test(trimmed)
 }
 
+/**
+ * A message that ends by echoing an error: `Could not save: {message}`, `Failed: ${error.message}`. The user gets the
+ * raw cause and no next step. Only a trailing placeholder or hole that holds an error, message, reason or cause counts,
+ * so a labelled value (`Thread: ${title}`) does not; nor does a key without a space (`failed:${error}`) or a next step
+ * (`Next: {message}`).
+ */
+const rawErrorEcho = (_text: string, raw: string): boolean => {
+  const trimmed = raw.trim()
+  const placeholder = /:\s+\{(?:message|reason|error|detail|details|cause)\}\.?$/i.test(trimmed)
+  const hole = /:\s+(\$\{(?:(?!\$\{).)*\})\.?$/s.exec(trimmed)?.[1]
+  const echoesError = hole !== undefined && /\b(?:message|reason|error|err|cause|details?)\b/i.test(hole)
+  const head = trimmed.slice(0, trimmed.lastIndexOf(':')).replace(/\$\{[^}]*\}/g, '').trim()
+  return (placeholder || echoesError) && /[A-Za-z]{2}/.test(head) && !/^(?:Next|Hint|Tip|Note)$/i.test(head)
+}
+
 /** Copy rules beyond the glossary, from the copy audit's systemic patterns; each is counted and ratcheted like a term. */
 export const copyRules: readonly CopyRule[] = [
   { id: 'host-process', use: 'what the user sees (DSH, the app, a restart) or a lower-case host for a machine', scope: 'prose', test: hostAsProcess },
   // `any`: a sentence that starts with `@dshfiles/…` is neither prose nor a label to the code-shape filter.
   { id: 'package-name', use: 'the plugin or feature name users see', scope: 'any', test: packageNameInCopy },
+  // `any`: `Failed: ${error}` is one word before the hole, so it is neither prose nor always a label.
+  { id: 'raw-error-echo', use: 'a sentence that says what failed and what to do next; the cause under Details', scope: 'any', test: rawErrorEcho },
 ]
 
 export interface CopyComparison {
