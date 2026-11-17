@@ -452,6 +452,19 @@ describe('checkout rebuild selection', () => {
     ])
   })
 
+  it('rebuilds the shared stylesheet owner when a client plugin changes, since its sheet scans every plugin', () => {
+    plugin('ui-styles', { '@dshfiles/plugin-ui': 'workspace:*' }, { client: ['../src/client.ts'] })
+    const names = (changedFiles: readonly string[]): readonly string[] => CheckoutRebuild.plan({ root, changedFiles }).plugins.map(entry => entry.name)
+    expect(names(['plugins/@dshfiles/sidebar/src/client.tsx'])).toEqual(['@dshfiles/sidebar', '@dshfiles/ui-styles'])
+    expect(CheckoutRebuild.plan({ root, changedFiles: ['plugins/@dshfiles/sidebar/src/client.tsx'] }).plugins).toContainEqual({
+      name: '@dshfiles/ui-styles',
+      host: false,
+      client: true,
+    })
+    // A Host-only plugin renders no classes.
+    expect(names(['plugins/@dshfiles/quiet/src/host.ts'])).toEqual(['@dshfiles/quiet'])
+  })
+
   it('never opens a bundle source map when nothing changed', () => {
     // An unparseable map only proves the point if the planner would have read it.
     writeFile(join(root, 'plugins/@dshfiles/panel/dist/client.js.map'), 'not json')

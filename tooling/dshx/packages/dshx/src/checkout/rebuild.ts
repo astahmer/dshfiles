@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { decodeJson, jsonValueSchema } from '../json.js'
+import { SHARED_STYLES_BUNDLE_ID } from '../project/local-bundles.js'
 import { DependencyManifests } from '../repository/bundle-freshness.js'
 
 export class CheckoutSyncError extends Error {
@@ -59,6 +60,7 @@ interface PluginPackage {
   /** Read on demand: an unchanged checkout never needs to know which files a bundle inlined. */
   readonly hostSources: () => ReadonlySet<string>
   readonly clientSources: () => ReadonlySet<string>
+  readonly hasClientBundle: boolean
   readonly missingHostBundle: boolean
   readonly missingClientBundle: boolean
   readonly missingLibraryOutput: boolean
@@ -123,6 +125,7 @@ const readPluginPackages = (root: string): readonly PluginPackage[] => {
           .map(([name]) => name),
         hostSources: memoizedSources(() => bundledSources(root, directory, 'index')),
         clientSources: memoizedSources(() => bundledSources(root, directory, 'client')),
+        hasClientBundle,
         missingHostBundle: !library && !existsSync(join(distDirectory, 'index.js')),
         missingClientBundle: hasClientBundle && !existsSync(join(distDirectory, 'client.js')),
         missingLibraryOutput: library && libraryOutputs.some(path => !existsSync(join(root, directory, path))),
@@ -169,6 +172,11 @@ const planRebuild = (input: { readonly root: string; readonly changedFiles: read
       grew = true
     }
   }
+  // The shared sheet's Tailwind source scans every plugin but depends on none: a class only a changed client plugin
+  // renders reaches the page once that sheet is rebuilt too.
+  const sheetOwner = packages.find(pluginPackage => pluginPackage.name === SHARED_STYLES_BUNDLE_ID)
+  if (sheetOwner !== undefined && packages.some(pluginPackage => pluginPackage.hasClientBundle && changedPackages.has(pluginPackage.name)))
+    dependencyAffected.add(sheetOwner.name)
   const selected = new Set([
     ...dependencyAffected,
     ...packages
