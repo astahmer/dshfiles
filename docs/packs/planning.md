@@ -76,13 +76,13 @@ From the onboarding feature catalog: 61 features, the 54 curated ones first.
 45. **Schedule backlog rules as project automations** (`backlog`, work) — Schedule nightly triage or other backlog rules as project automations.
 46. **Give agents per-project guidance** (`backlog`, work) — Write guidance for agents per project, and threads started from its items begin with it.
 47. **Share one backlog across hosts** (`backlog`, settings) — Turn on other hosts in Backlog settings to share and merge one backlog across them.
-48. **Tasks and reminder catalogs keep their read until a schedule change** (`schedule`, work) — The native Tasks page, task tabs and the Session header's reminders from one owned fork of the stock row. Behaviour is the native one; a reminder catalog subscribed again keeps its last read while no schedule/changed event or connection reset happened since, so reopening a threa…
-49. **Reorder pending messages** (`queue-reorder`, composer) — Move a queued item up, down, or by drag while preserving its durable identity and respecting next-turn and next-step boundaries.
-50. **Edit queued messages in the composer** (`queue-reorder`, composer) — Move a queued message's text and attachments into the main composer, show an editing placeholder in its place, and put the edited (Submit) or original (Cancel/Escape) message back at the same position.
-51. **Preview queued message text** (`queue-reorder`, composer) — Show a normalized one-line text preview, hide attachment payloads, and honor the configured character limit without splitting Unicode code points.
-52. **Move a queued message to another thread** (`queue-reorder`, composer) — Move to thread… opens a thread picker; the queued message, with its images and files, leaves this queue and lands in the chosen thread's queue when that thread is busy, or in its composer (and the thread opens) when it is idle.
-53. **Preview queued attachments** (`queue-reorder`, composer) — Each queued message shows a small thumbnail for every image and a chip with the name for every other file, read from the session that holds them; a setting turns the previews off.
-54. **Send a message later** (`queue-reorder`, composer) — Schedule the composer's message from Send later (presets or a picked time); it waits above the composer with its time and optional model and effort, can be edited, sent now or cancelled back into the composer, survives a Host restart in plugin storage, and is sent once through t…
+48. **Tasks and reminders load once** (`schedule`, work) — The Tasks page and thread reminders reload only when a schedule changes.
+49. **Reorder pending messages** (`queue-reorder`, composer) — Move queued messages up, down or by drag.
+50. **Edit queued messages in the composer** (`queue-reorder`, composer) — Edit a queued message in the composer, and it goes back to the same place in the queue.
+51. **Preview queued message text** (`queue-reorder`, composer) — Each queued message shows a one-line preview of its text.
+52. **Move a queued message to another thread** (`queue-reorder`, composer) — Move a queued message, with its files, to another thread.
+53. **Preview queued attachments** (`queue-reorder`, composer) — Queued messages show a thumbnail for each image and a name for each file.
+54. **Send a message later** (`queue-reorder`, composer) — Schedule a message to send later, and edit, send now or cancel it until then.
 
 ### More
 

@@ -9,7 +9,8 @@
         { "kind": "automatic", "source": "agent-tool" }
       ],
       "title": "Typed packs on referenced resources",
-      "summary": "Register resources and attach reusable typed property packs, without modifying native content or running agents.",
+      "summary": "Attach reusable sets of typed properties to resources without changing them.",
+      "details": "Register resources and attach reusable typed property packs, without modifying native content or running agents.",
       "reach": ["click tab \"Knowledge\"", "click button \"Resources\"", "expect heading \"Resources\""],
       "surfaces": ["client", "host", "tool"],
       "surface": "destinationSection",

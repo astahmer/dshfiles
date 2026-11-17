@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "phone-thread-menu",
-      "title": "Open a scoped phone thread menu",
-      "summary": "The phone top bar offers a menu only for its mounted Conversation reader. The typed PhoneThreadMenu dshx contract lists this occurrence's views, header controls and composer tools by stable id. Blank selected threads keep Composer tools; missing launchers never hide mounted controls; selected blank threads keep menu access. Escape and scrim dismiss with focus return; tool picks hand focus to the tool and its popover returns focus to the visible menu opener when closed.",
+      "title": "Thread menu on a phone",
+      "summary": "On a phone, the top bar's menu holds this thread's views, header controls and composer tools.",
+      "details": "The phone top bar offers a menu only for its mounted Conversation reader. The typed PhoneThreadMenu dshx contract lists this occurrence's views, header controls and composer tools by stable id. Blank selected threads keep Composer tools; missing launchers never hide mounted controls; selected blank threads keep menu access. Escape and scrim dismiss with focus return; tool picks hand focus to the tool and its popover returns focus to the visible menu opener when closed.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -45,8 +46,9 @@
     },
     {
       "id": "workbench-conversation-views",
-      "title": "Dock an independently bound Conversation view",
-      "summary": "Restore existing independently bound Conversation views without an extra composer. Per-thread occurrences remain addressable for saved layouts but are excluded from reusable view pickers. Fixed conversations also render the original authorized header through the owned public Factory: a single native header declaration, original session-targeted controls and native per-session child-view selection over the same resident editor. Native main mode shares the renderer; the Workbench-only host-corner clearance prevents row recovery from covering the original toolbar. In the phone shell the main occurrence's typed PhoneThreadMenu contract opens only its own header and tools by stable id and real open callbacks; blank selected threads retain Composer tools, missing launchers never hide mounted controls, and view-only headers cannot borrow another composer. Escape and scrim close with focus return; a selected secondary view keeps its tab strip.",
+      "title": "Dock a thread view",
+      "summary": "Saved layouts restore their docked thread views without an extra composer.",
+      "details": "Restore existing independently bound Conversation views without an extra composer. Per-thread occurrences remain addressable for saved layouts but are excluded from reusable view pickers. Fixed conversations also render the original authorized header through the owned public Factory: a single native header declaration, original session-targeted controls and native per-session child-view selection over the same resident editor. Native main mode shares the renderer; the Workbench-only host-corner clearance prevents row recovery from covering the original toolbar. In the phone shell the main occurrence's typed PhoneThreadMenu contract opens only its own header and tools by stable id and real open callbacks; blank selected threads retain Composer tools, missing launchers never hide mounted controls, and view-only headers cannot borrow another composer. Escape and scrim close with focus return; a selected secondary view keeps its tab strip.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -133,8 +135,9 @@
     },
     {
       "id": "paste-session-mentions",
-      "title": "Paste session mentions as reference chips",
-      "summary": "Pasted canonical thread mentions keep their structured label and reference behavior in the composer.",
+      "title": "Paste thread mentions as chips",
+      "summary": "A thread mention you paste into the composer becomes a reference chip.",
+      "details": "Pasted canonical thread mentions keep their structured label and reference behavior in the composer.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -175,7 +178,8 @@
     {
       "id": "image-attachment-reference",
       "title": "Add inline references for image attachments",
-      "summary": "When an image enters the composer, it gets an ordered inline reference in the draft so users can point to specific screenshots in their message.",
+      "summary": "Each image you attach gets a numbered reference in the draft, so you can point to it.",
+      "details": "When an image enters the composer, it gets an ordered inline reference in the draft so users can point to specific screenshots in their message.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -235,7 +239,8 @@
     {
       "id": "image-reference-mentions",
       "title": "Reuse image references and open the selected image",
-      "summary": "Attached images remain reusable @ candidates; repeated picks create distinct chips, and activating a chip opens that exact image in the attachment gallery.",
+      "summary": "Mention an attached image again with @, and click its chip to open that image.",
+      "details": "Attached images remain reusable @ candidates; repeated picks create distinct chips, and activating a chip opens that exact image in the attachment gallery.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -294,7 +299,8 @@
     {
       "id": "rename-thread-title",
       "title": "Rename a thread from its header title",
-      "summary": "Clicking the current Session title in the main view header opens an in-place editor focused on the whole title. Enter or leaving the field commits the trimmed title through the Session rename API, Escape cancels, and a blank or unchanged draft closes without a Host call. The header keeps the breadcrumb shape, so ancestor crumbs still navigate and a subagent's lineage switcher is unchanged.",
+      "summary": "Click the thread title in the header to rename it.",
+      "details": "Clicking the current Session title in the main view header opens an in-place editor focused on the whole title. Enter or leaving the field commits the trimmed title through the Session rename API, Escape cancels, and a blank or unchanged draft closes without a Host call. The header keeps the breadcrumb shape, so ancestor crumbs still navigate and a subagent's lineage switcher is unchanged.",
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "threads",
@@ -330,7 +336,8 @@
     {
       "id": "composer-contract",
       "title": "Composer contract for other plugins",
-      "summary": "Provides dshx's Composer contract: the composer on screen and whether it holds focus, the draft text to read, replace or insert at the caret, file, quote, note and line-comment chips, the next message's model and variant, and focus. Those chips keep their content in the chip, so a restored draft still sends them.",
+      "summary": "Other features can read and change the draft, add chips and pick the next message's model.",
+      "details": "Provides dshx's Composer contract: the composer on screen and whether it holds focus, the draft text to read, replace or insert at the caret, file, quote, note and line-comment chips, the next message's model and variant, and focus. Those chips keep their content in the chip, so a restored draft still sends them.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -365,7 +372,8 @@
     {
       "id": "prompt-recall",
       "title": "Recall earlier prompts with ArrowUp",
-      "summary": "ArrowUp in an empty composer shows this thread's previous prompts from its loaded history, newest first; repeated ArrowUp goes older, ArrowDown goes newer and back to the empty draft, Escape restores the draft, and editing the recalled text ends recall.",
+      "summary": "Press the Up arrow in an empty composer to bring back this thread's earlier prompts.",
+      "details": "ArrowUp in an empty composer shows this thread's previous prompts from its loaded history, newest first; repeated ArrowUp goes older, ArrowDown goes newer and back to the empty draft, Escape restores the draft, and editing the recalled text ends recall.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -440,7 +448,8 @@
     {
       "id": "large-paste-file",
       "title": "Attach a large paste as a text file",
-      "summary": "A text paste of 32 KiB or more becomes a pasted-<date>-<time>.txt file attachment through the composer's existing upload path, and a notice offers Paste as text to remove the file and insert the text instead.",
+      "summary": "Pasting a lot of text attaches it as a file, with an option to paste it as text instead.",
+      "details": "A text paste of 32 KiB or more becomes a pasted-<date>-<time>.txt file attachment through the composer's existing upload path, and a notice offers Paste as text to remove the file and insert the text instead.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -559,7 +568,8 @@
     {
       "id": "composer-run-row",
       "title": "Run row, send states and meter line",
-      "summary": "A new thread carries its pre-send choices inside the composer card as quiet ghost pickers in the bottom bar: project · host · workspace · agent mode · file access after the + control, model and account beside Send. Each segment is the owner plugin’s own control placed through the composer’s slots, with its jargon explained in a tooltip; defaults come from each owner: host, agent mode and model from their last choice, the workspace from the project’s isolate-by-default setting, so a new thread with defaults needs no chip change. Send is one round button whose glyph says what a click does now (send, queue behind the running turn, steer into it, stop), with the context meter beside it. Once the thread has started the pickers collapse to one summary chip that leads the quiet meter line under the input (cost and activity readings · N queued); model and file access stay changeable in the toolbar. Below 560px the bar is one sideways-scrolling line with Send pinned, and the meter line scrolls instead of truncating.",
+      "summary": "A new thread's project, host, workspace, agent and model sit as quiet pickers in the composer.",
+      "details": "A new thread carries its pre-send choices inside the composer card as quiet ghost pickers in the bottom bar: project · host · workspace · agent mode · file access after the + control, model and account beside Send. Each segment is the owner plugin’s own control placed through the composer’s slots, with its jargon explained in a tooltip; defaults come from each owner: host, agent mode and model from their last choice, the workspace from the project’s isolate-by-default setting, so a new thread with defaults needs no chip change. Send is one round button whose glyph says what a click does now (send, queue behind the running turn, steer into it, stop), with the context meter beside it. Once the thread has started the pickers collapse to one summary chip that leads the quiet meter line under the input (cost and activity readings · N queued); model and file access stay changeable in the toolbar. Below 560px the bar is one sideways-scrolling line with Send pinned, and the meter line scrolls instead of truncating.",
       "reach": [
         "click button \"New thread\"",
         "expect group \"Run settings\"",
@@ -614,7 +624,8 @@
     {
       "id": "draft-reference-restore",
       "title": "Restore draft reference chips from plain text",
-      "summary": "A queued message comes back into the composer as plain text; every trigger source's own restore grammar turns the serialized references it still names back into the chips the composer sent, without changing the draft text.",
+      "summary": "A queued message brought back into the composer gets its reference chips back.",
+      "details": "A queued message comes back into the composer as plain text; every trigger source's own restore grammar turns the serialized references it still names back into the chips the composer sent, without changing the draft text.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",

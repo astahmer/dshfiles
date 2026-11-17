@@ -5,7 +5,8 @@
     {
       "id": "live-model-catalog",
       "title": "The model picker follows connected account changes",
-      "summary": "Session model catalogs share a bounded Host cache, invalidated immediately by adapter, settings and credential changes instead of retaining a pre-account snapshot.",
+      "summary": "The model picker updates as soon as you connect or change an account.",
+      "details": "Session model catalogs share a bounded Host cache, invalidated immediately by adapter, settings and credential changes instead of retaining a pre-account snapshot.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",
@@ -37,7 +38,8 @@
     {
       "id": "thread-local-model",
       "title": "Guarded thread-local model selection",
-      "summary": "Expose one supported Host/client/Agent contract for reading and changing local model intent without saving global defaults or enqueuing input. Validate the target, recheck the native selection revision and queued work at commit, and synchronously persist selection plus provider-preference annotation. Capture request intent at the native assembly boundary so stale automatic recovery cannot overwrite a newer choice. Ordinary model-picker behavior remains unchanged.",
+      "summary": "Change the model for this thread only, without changing your defaults.",
+      "details": "Expose one supported Host/client/Agent contract for reading and changing local model intent without saving global defaults or enqueuing input. Validate the target, recheck the native selection revision and queued work at commit, and synchronously persist selection plus provider-preference annotation. Capture request intent at the native assembly boundary so stale automatic recovery cannot overwrite a newer choice. Ordinary model-picker behavior remains unchanged.",
       "surfaces": ["host", "storage"],
       "surface": "agentToolOnly",
       "destination": "none",
@@ -107,7 +109,8 @@
     {
       "id": "lean-session-follow",
       "title": "Send the browser only what a thread renders",
-      "summary": "Opening and following a thread sends its events without provider replay state, which only the Host needs to continue a conversation.",
+      "summary": "Opening a thread sends the browser only what it shows, so threads open faster.",
+      "details": "Opening and following a thread sends its events without provider replay state, which only the Host needs to continue a conversation.",
       "surfaces": ["host", "client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -146,7 +149,8 @@
     {
       "id": "drive-threads",
       "title": "Drive threads from another plugin",
-      "summary": "The sessions API lets a plugin or a browser list threads, read a thread's recent messages, create a thread, prompt it, run its commands, add a message on its behalf, compact, interrupt, wait for it, switch its model or agent preset, keep keyed instructions in its system prompt, and make one-off model calls.",
+      "summary": "Other features can list, start, prompt, stop and wait for threads.",
+      "details": "The sessions API lets a plugin or a browser list threads, read a thread's recent messages, create a thread, prompt it, run its commands, add a message on its behalf, compact, interrupt, wait for it, switch its model or agent preset, keep keyed instructions in its system prompt, and make one-off model calls.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",
@@ -224,7 +228,8 @@
     {
       "id": "turn-admission",
       "title": "Limit how many threads run at once",
-      "summary": "Settings › General › Running threads limit caps how many threads run a turn at once (0, the default, is no limit; Subagents take a slot decides whether running subagents count). Once the cap is reached, a new turn for an idle thread waits in its inbox and its composer shows Waiting for a free slot · N ahead with Start now; waiting turns start first in, first out when a running turn ends. thread_admission_status reads the limit and queue, thread_admission_configure sets it and thread_admission_force_start starts one thread past it.",
+      "summary": "Limit how many threads run at once in Settings, and the rest wait for a free slot.",
+      "details": "Settings › General › Running threads limit caps how many threads run a turn at once (0, the default, is no limit; Subagents take a slot decides whether running subagents count). Once the cap is reached, a new turn for an idle thread waits in its inbox and its composer shows Waiting for a free slot · N ahead with Start now; waiting turns start first in, first out when a running turn ends. thread_admission_status reads the limit and queue, thread_admission_configure sets it and thread_admission_force_start starts one thread past it.",
       "surfaces": ["client", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
