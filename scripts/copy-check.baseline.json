@@ -9,7 +9,8 @@
     "host-process": 9,
     "package-name": 2,
     "raw-error-echo": 13,
-    "status-word": 21
+    "status-word": 21,
+    "try-again": 0
   },
   "counts": {
     "conversation/agent-preset": 1,

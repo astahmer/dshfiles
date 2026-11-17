@@ -294,6 +294,8 @@ export const copyRules: readonly CopyRule[] = [
     scope: 'label',
     test: text => /^(?:Running|Completed|In progress|Finished|Succeeded|Inactive|Input needed|Needs attention)$/i.test(text.trim()) && /^[A-Z]/.test(text.trim()),
   },
+  // The retry verb is Retry; "try again" inside a sentence ("Check the path, then try again.") is fine.
+  { id: 'try-again', use: 'Retry', scope: 'label', test: text => /^Try again[.!]?$/i.test(text.trim()) },
 ]
 
 export interface CopyComparison {
