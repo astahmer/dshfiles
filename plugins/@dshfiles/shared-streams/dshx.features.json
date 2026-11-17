@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "shared-event-sources",
-      "title": "One EventSource per URL across tabs",
-      "summary": "A shim injected before the app entry routes every tab's EventSource through one SharedWorker per URL, so the browser's six-socket-per-origin limit cannot starve new tabs.",
+      "title": "One live connection per address across tabs",
+      "summary": "All tabs share one live connection per address, so opening many tabs never stalls new ones.",
+      "details": "A shim injected before the app entry routes every tab's EventSource through one SharedWorker per URL, so the browser's six-socket-per-origin limit cannot starve new tabs.",
       "surfaces": ["host", "client"],
       "surface": "infrastructure",
       "destination": "none",

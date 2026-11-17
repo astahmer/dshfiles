@@ -397,10 +397,10 @@ rail destination (bottom); 67 features.
 | settings-shell/settings-json-editor: Edit plugin settings as JSON | settingsSection | settings: plugin page › JSON |
 | settings-shell/settings-search: Search Settings inline | settingsSection | settings: Search settings |
 | settings-shell/settings-search-entries: Search section controls and open them at the control | settingsSection | settings: Search settings › section controls |
-| settings-shell/settings-shell-port: Native Settings shell, ported | settingsSection | rail: Settings; palette: Settings: General |
+| settings-shell/settings-shell-port: Settings shell | settingsSection | rail: Settings; palette: Settings: General |
 | settings-shell/settings-tab: One Settings page in the stage | settingsSection | settings: the Settings page in the stage |
 | settings-shell/settings-task-groups: Settings grouped by task, with deep links | settingsSection | settings: task groups in the Settings navigation |
-| settings-shell/settings-workbench-panels: One dockable Settings hub with real navigation and forms | settingsSection | main-tabs: New tab › Settings |
+| settings-shell/settings-workbench-panels: Dock Settings as one panel | settingsSection | main-tabs: New tab › Settings |
 | settings-shell/shared-jev-key: Set the Jev key once | settingsSection | settings: Tools & MCP › Jev › Key |
 | settings-subagent/subagent-settings: Subagent settings | settingsSection | settings: Plugins › Subagent |
 | settings-web-search/web-search-settings: Web search settings | settingsSection | settings: Plugins › Web search |
@@ -730,14 +730,14 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | session-controller/drive-threads: Drive threads from another plugin | infrastructure | host: sessions API |
 | session-controller/lean-session-follow: Send the browser only what a thread renders | infrastructure | host: session event stream |
 | session-controller/live-model-catalog: The model picker follows connected account changes | infrastructure | host: model catalog cache |
-| session-log-window/bounded-session-log-window: Read a stored Session log by its window, not its whole event list | infrastructure | host: library |
-| session-persistence-jsonl/tool-catalog-dedupe: Store a Session's request-header tool catalog once | infrastructure | host: no UI |
+| session-log-window/bounded-session-log-window: Read part of a thread log without loading all of it | infrastructure | host: library |
+| session-persistence-jsonl/tool-catalog-dedupe: Store a thread's tool list once | infrastructure | host: no UI |
 | session-search/find-in-thread: Find every match in one thread | infrastructure | host: session-search findInThread API and session_find_in_thread tool |
 | session-search/prompt-history: Search the prompts sent across threads | infrastructure | host: session-search promptHistory API (read by @dshfiles/prompt-stash) |
-| session-search/worker-session-search: Serve session search from a worker-owned index | infrastructure | host: session search index |
-| session-source-port/session-source-registry: One Host port for Sessions that live on another runtime | infrastructure | host: library |
+| session-search/worker-session-search: Search threads in the background | infrastructure | host: session search index |
+| session-source-port/session-source-registry: Threads that live on another host | infrastructure | host: library |
 | shared-runtime/shared-client-runtime: Share the client UI runtime | infrastructure | client: shared runtime |
-| shared-streams/shared-event-sources: One EventSource per URL across tabs | infrastructure | client: shared EventSource |
+| shared-streams/shared-event-sources: One live connection per address across tabs | infrastructure | client: shared EventSource |
 | sidebar-right/addressable-resources: Dock genuine session resources as workbench panels | infrastructure | right-pane: native resources as workbench panels |
 | sidebar-terminal/terminal-excerpts: Add terminal selection to chat | infrastructure | terminal and composer |
 | sqlite-store/sqlite-store-lock-wait: Lock-wait spans | infrastructure | host: library |
