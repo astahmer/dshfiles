@@ -1,16 +1,24 @@
-// Design-token check: off-scale styling in plugin sources, as a ratchet (visual refresh T4.1).
+// Design-token check: off-scale styling in plugin sources, as a ratchet (visual refresh T4.1, unslop guardrails).
 //
-// DESIGN.md names one scale for type, radius and colour, generated in `plugin-ui` and `ui-styles`. This script counts
-// what bypasses it, per rule and per plugin, in every owned and forked plugin's `src` (tests, generated files and the
-// token files themselves excluded):
+// DESIGN.md names one scale for type, radius, colour, elevation and motion, generated in `plugin-ui` and `ui-styles`.
+// This script counts what bypasses it, per rule and per plugin, in every owned and forked plugin's `src` (tests,
+// generated files and the token files themselves excluded):
 //
-//   arbitrary-text    `text-[…]` utilities (a size or colour off the type scale)
-//   arbitrary-radius  `rounded-[…]` utilities and literal `border-radius: <n>px` in CSS
-//   raw-colour        hex, rgb()/rgba(), hsl()/hsla() and oklch() literals outside the token files
-//   native-icons      `Icon…OutlineRegular` imports (the native icon family; lucide is the one family)
+//   arbitrary-text            `text-[…]` utilities (a size or colour off the type scale)
+//   arbitrary-radius          `rounded-[…]` utilities and literal `border-radius: <n>px` in CSS
+//   raw-colour                hex, rgb()/rgba(), hsl()/hsla() and oklch() literals outside the token files
+//   native-icons              `Icon…OutlineRegular` imports (the native icon family; lucide is the one family)
+//   default-shadow            Tailwind's shadow steps (`shadow-xs..2xl`) instead of the elevation steps `shadow-s0..s3`
+//   numeric-duration          `duration-<n>` instead of a `--dshx-duration-*` token
+//   viewport-variant          window breakpoints (`sm:`…`2xl:`, `max-*`) in a pane; a dialog's `max-w-*` is allowed
+//   solid-status-fill         solid `bg-info|success|warning` outside the kit
+//   palette-colour            numbered Tailwind palette classes (`bg-emerald-500`)
+//   uppercase                 `uppercase` and `text-transform: uppercase`
+//   unguarded-loop-animation  spin or pulse with no `motion-reduce:`/`motion-safe:` class in the same list
+//   outline-without-focus     a control's `outline-none` with no `focus-visible:` replacement in the same list
 //
 // It fails only when a rule's count for one plugin rises above `scripts/design-token-check.baseline.json`, so the
-// burn-down (T4.2–T4.3) can land plugin by plugin while new code stays on the tokens.
+// burn-down can land plugin by plugin while new code stays on the tokens.
 //
 //   node --run check:design-tokens             # compare with the baseline; fail on an increase
 //   node --run check:design-tokens -- --report # list every finding
@@ -68,7 +76,11 @@ const classTokens = (line: string): readonly ClassToken[] =>
 
 /** Classes on the line whose parsed token passes `test`, as excerpts; CSS files hold no classes. */
 const classes = (line: string, file: string, test: (token: ClassToken) => boolean): readonly string[] =>
-  isCss(file) ? [] : classTokens(line).filter(test).map(token => token.text)
+  isCss(file)
+    ? []
+    : classTokens(line)
+        .filter(test)
+        .map(token => token.text)
 
 export const designTokenRules: readonly DesignTokenRule[] = [
   {
@@ -152,11 +164,14 @@ export interface ClassGroup {
   readonly widgetRole?: boolean
 }
 
+/** Where a class list sits: the JSX element and whether its open tag gives it a widget role. */
+type ElementContext = Pick<ClassGroup, 'element' | 'widgetRole'>
+
 /**
  * The JSX element a class list at `index` sits in: the nearest `<Tag` before it whose open tag has not closed. An
  * arrow (`=>`) is not a closing `>`. A list held in a variable (`const inputClass = cn(…)`) has none.
  */
-const elementAt = (text: string, index: number): { readonly element?: string; readonly widgetRole?: boolean } => {
+const elementAt = (text: string, index: number): ElementContext => {
   const before = text.slice(Math.max(0, index - 800), index)
   const open = [...before.matchAll(/<([A-Za-z][\w.]*)\b/g)].at(-1)
   if (open === undefined) return {}
@@ -179,6 +194,7 @@ const classGroups = (text: string): readonly ClassGroup[] => {
       index += 1
       continue
     }
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: `index` advances past the literal.
     const start = index
     let depth = 0
     index += 1
@@ -318,7 +334,8 @@ const findingsInText = (input: { readonly plugin: string; readonly file: string;
     for (const group of classGroups(text)) {
       for (; counted < group.index; counted += 1) if (text.charCodeAt(counted) === 10) line += 1
       for (const rule of designTokenGroupRules)
-        for (const match of rule.matches(group, input.file)) findings.push({ rule: rule.id, plugin: input.plugin, file: input.file, line, text: match.slice(0, 80) })
+        for (const match of rule.matches(group, input.file))
+          findings.push({ rule: rule.id, plugin: input.plugin, file: input.file, line, text: match.slice(0, 80) })
     }
   }
   return findings

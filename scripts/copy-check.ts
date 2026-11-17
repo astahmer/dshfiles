@@ -1,10 +1,13 @@
-// Copy check: banned glossary terms in user-facing plugin labels, as a ratchet.
+// Copy check: banned glossary terms and copy patterns in user-facing plugin text, as a ratchet.
 //
 // The ADE plan glossary (docs/ade-ux/README.md §3) names one word per concept: thread (not session, chat or
-// conversation), land (not integrate), done (not settle), and labels never carry a plugin name. This script scans
-// client copy — string literals and JSX text in plugin `.tsx` files, locale tables, and the UI labels quoted in
-// `dshx.features.json` `reach` steps — and counts findings per term and plugin. It fails only when one `term/plugin`
-// count rises above `scripts/copy-check.baseline.json`, so a fix in one plugin cannot hide a regression in another.
+// conversation), land (not integrate), done (not settle), and labels never carry a plugin name. The copy audit added
+// mechanical rules (copyRules): "Host" as the server process, package names, raw error echoes, non-canonical status
+// words, "Try again" and three-dot ellipses. This script reads client copy — string literals and JSX text in `.tsx`
+// files (vendored `native/` forks included), English locale tables, settings-schema descriptions, label tables in
+// plain `.ts`, `locale/en.json`, and the catalog text users read in `dshx.features.json` — and counts findings per
+// term and plugin. It fails only when one `term/plugin` count rises above `scripts/copy-check.baseline.json`, so a fix
+// in one plugin cannot hide a regression in another. Rules: docs/repository-checks.md#design-and-copy-ratchets.
 //
 //   node --run check:copy             # compare with the baseline; fail on an increase
 //   node --run check:copy -- --report # list every finding
@@ -55,6 +58,9 @@ export interface CopyString {
   /** The property key (`label`) or method call (`description()`) the literal is the value or first argument of. */
   readonly key?: string
 }
+
+/** A CopyString while its optional parts are added. */
+type DraftCopyString = { -readonly [Key in keyof CopyString]: CopyString[Key] }
 
 /** What a literal belongs to, read from the code before it: `label: '…'` → `label`, `.description('…')` → `description()`. */
 const keyBefore = (code: string): string | undefined => {
@@ -125,8 +131,11 @@ const extractStrings = (source: string): readonly CopyString[] => {
     // Developer diagnostics, not copy.
     if (/console\.\w+\([^;\n)]*$/.test(code.slice(-400))) return
     if (foreign.some(([from, to]) => start >= from && start < to)) return
+    const entry: DraftCopyString = { text, line: lineAt(start) }
+    if (raw !== text) entry.raw = raw
     const key = keyBefore(code)
-    strings.push({ text, line: lineAt(start), ...(raw === text ? {} : { raw }), ...(key === undefined ? {} : { key }) })
+    if (key !== undefined) entry.key = key
+    strings.push(entry)
   }
   while (index < source.length) {
     const char = source[index]
@@ -174,6 +183,7 @@ const extractStrings = (source: string): readonly CopyString[] => {
           continue
         }
         if (source[index] === '$' && source[index + 1] === '{') {
+          // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: `index` advances past the hole.
           const hole = index
           let depth = 1
           index += 2
@@ -276,7 +286,10 @@ const rawErrorEcho = (_text: string, raw: string): boolean => {
   const placeholder = /:\s+\{(?:message|reason|error|detail|details|cause)\}\.?$/i.test(trimmed)
   const hole = /:\s+(\$\{(?:(?!\$\{).)*\})\.?$/s.exec(trimmed)?.[1]
   const echoesError = hole !== undefined && /\b(?:message|reason|error|err|cause|details?)\b/i.test(hole)
-  const head = trimmed.slice(0, trimmed.lastIndexOf(':')).replace(/\$\{[^}]*\}/g, '').trim()
+  const head = trimmed
+    .slice(0, trimmed.lastIndexOf(':'))
+    .replace(/\$\{[^}]*\}/g, '')
+    .trim()
   return (placeholder || echoesError) && /[A-Za-z]{2}/.test(head) && !/^(?:Next|Hint|Tip|Note)$/i.test(head)
 }
 
@@ -292,7 +305,8 @@ export const copyRules: readonly CopyRule[] = [
     id: 'status-word',
     use: 'one of the six states (Working, Needs you, Failed, Ready, Idle, Done) from WorkStatus',
     scope: 'label',
-    test: text => /^(?:Running|Completed|In progress|Finished|Succeeded|Inactive|Input needed|Needs attention)$/i.test(text.trim()) && /^[A-Z]/.test(text.trim()),
+    test: text =>
+      /^(?:Running|Completed|In progress|Finished|Succeeded|Inactive|Input needed|Needs attention)$/i.test(text.trim()) && /^[A-Z]/.test(text.trim()),
   },
   // The retry verb is Retry; "try again" inside a sentence ("Check the path, then try again.") is fine.
   { id: 'try-again', use: 'Retry', scope: 'label', test: text => /^Try again[.!]?$/i.test(text.trim()) },
@@ -353,14 +367,13 @@ const definesToolsOrApis = (source: string, path: string): boolean =>
  * `packs.ts`).
  */
 const holdsPlainTsCopy = (source: string): boolean =>
-  source.includes('defineSettings') || /\b(?:label|title|placeholder|hint|heading|tooltip|description|summary|\w+(?:Label|Title|Placeholder|Hint|Heading))\s*:\s*['"`]/.test(source)
+  source.includes('defineSettings') ||
+  /\b(?:label|title|placeholder|hint|heading|tooltip|description|summary|\w+(?:Label|Title|Placeholder|Hint|Heading))\s*:\s*['"`]/.test(source)
 
 const copyInPlainTs = (source: string, strings: readonly CopyString[], path = ''): readonly CopyString[] => {
   const settings = source.includes('defineSettings')
   const prose = !settings && !definesToolsOrApis(source, path)
-  return strings.filter(
-    ({ key }) => key !== undefined && ((settings && key === 'description()') || LABEL_KEY.test(key) || (prose && PROSE_KEY.test(key))),
-  )
+  return strings.filter(({ key }) => key !== undefined && ((settings && key === 'description()') || LABEL_KEY.test(key) || (prose && PROSE_KEY.test(key))))
 }
 
 const walk = (directory: string, files: string[]): void => {
@@ -388,15 +401,17 @@ const catalogSchema = Schema.Struct({
 
 type Catalog = typeof catalogSchema.Type
 
-/** Every string value of a JSON document, depth first (a `locale/en.json` table: plugin title, description, labels). */
-const jsonStrings = (value: unknown): readonly CopyString[] => {
-  if (typeof value === 'string') return [{ text: value, line: 0 }]
-  if (Array.isArray(value)) return value.flatMap(jsonStrings)
-  if (typeof value === 'object' && value !== null) return Object.values(value).flatMap(jsonStrings)
-  return []
+/**
+ * Every string value of a JSON document (a `locale/en.json` table: plugin title, description, labels), with its line.
+ * A key is followed by `:`, a value by `,`, `}` or `]`.
+ */
+const jsonStrings = (source: string): readonly CopyString[] => {
+  const lineAt = lineIndex(source)
+  return [...source.matchAll(/"(?:\\.|[^"\\])*"(?=\s*[,}\]])/g)].map(match => ({
+    text: ScriptJson.decodeJson(Schema.String, match[0]),
+    line: lineAt(match.index),
+  }))
 }
-
-const localeTableSchema = Schema.Record(Schema.String, Schema.Unknown)
 
 /** The catalog text users read: Getting started and the plugin guide show each feature's title and summary, and onboarding its first action and done-when sentence. */
 const catalogCopy = (catalog: Catalog): readonly CopyString[] =>
@@ -434,8 +449,7 @@ const scanRepository = (root: string): readonly CopyFinding[] => {
     // The English Loader-row table: DSH shows its meta.title and meta.description in the plugin list and Settings.
     const englishTable = join(pluginsRoot, plugin, 'locale/en.json')
     try {
-      const table = ScriptJson.decodeJsonSafe(localeTableSchema, readFileSync(englishTable, 'utf8'))
-      if (table.success) findings.push(...findingsInStrings({ file: relative(root, englishTable), strings: jsonStrings(table.data), prefix }))
+      findings.push(...findingsInStrings({ file: relative(root, englishTable), strings: jsonStrings(readFileSync(englishTable, 'utf8')), prefix }))
     } catch {
       // Most owned plugins have no locale directory.
     }

@@ -75,7 +75,10 @@ const ruleHits = (rule, text, file = 'plugins/@dshfiles/demo/src/a.tsx') =>
 
 test('parses dshx classes into variants and utility, keeping colons inside brackets', () => {
   assert.deepEqual(
-    classTokens("cn('dshx:hover:md:shadow-sm dshx:[&:hover]:flex dshx:text-[length:calc(var(--x)-1px)] dshx:shadow-md!')").map(token => [token.variants, token.utility]),
+    classTokens("cn('dshx:hover:md:shadow-sm dshx:[&:hover]:flex dshx:text-[length:calc(var(--x)-1px)] dshx:shadow-md!')").map(token => [
+      token.variants,
+      token.utility,
+    ]),
     [
       [['hover', 'md'], 'shadow-sm'],
       [['[&:hover]'], 'flex'],
@@ -94,10 +97,10 @@ test('default-shadow: Tailwind shadow steps, not the elevation steps', () => {
 })
 
 test('numeric-duration: a number or an arbitrary time, not a motion token', () => {
-  assert.deepEqual(ruleHits('numeric-duration', "cn('dshx:duration-200 dshx:hover:duration-[350ms] dshx:duration-(--dshx-duration-fade) dshx:transition-opacity')"), [
-    'dshx:duration-200',
-    'dshx:hover:duration-[350ms]',
-  ])
+  assert.deepEqual(
+    ruleHits('numeric-duration', "cn('dshx:duration-200 dshx:hover:duration-[350ms] dshx:duration-(--dshx-duration-fade) dshx:transition-opacity')"),
+    ['dshx:duration-200', 'dshx:hover:duration-[350ms]'],
+  )
 })
 
 test('viewport-variant: window breakpoints, not container queries or dialog widths', () => {
@@ -115,11 +118,13 @@ test('solid-status-fill: a solid info, success or warning fill outside the kit',
 })
 
 test('palette-colour: numbered Tailwind palette classes, not semantic colours or kit hues', () => {
-  assert.deepEqual(ruleHits('palette-colour', "cn('dshx:bg-emerald-500 dshx:dark:text-red-400/80 dshx:border-l-amber-300 dshx:bg-teal dshx:text-violet dshx:bg-muted dshx:text-info')"), [
-    'dshx:bg-emerald-500',
-    'dshx:dark:text-red-400/80',
-    'dshx:border-l-amber-300',
-  ])
+  assert.deepEqual(
+    ruleHits(
+      'palette-colour',
+      "cn('dshx:bg-emerald-500 dshx:dark:text-red-400/80 dshx:border-l-amber-300 dshx:bg-teal dshx:text-violet dshx:bg-muted dshx:text-info')",
+    ),
+    ['dshx:bg-emerald-500', 'dshx:dark:text-red-400/80', 'dshx:border-l-amber-300'],
+  )
 })
 
 test('uppercase: the class and the CSS declaration, not other text transforms', () => {
@@ -163,7 +168,7 @@ test('unguarded-loop-animation: spin or pulse with no motion variant in the same
 test('outline-without-focus: a control with outline-none and no focus-visible replacement in the same class list', () => {
   const source = [
     '<button type="button" className="dshx:outline-none dshx:rounded-md" onClick={() => go()}>Go</button>',
-    '<DropdownMenuTrigger className={cn(\'dshx:outline-none\',',
+    "<DropdownMenuTrigger className={cn('dshx:outline-none',",
     "  'dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring')} />",
     '<div role="button" tabIndex={0} className="dshx:outline-none dshx:has-[:focus-visible]:outline-none" />',
     '<a href="#x" className="dshx:outline-none dshx:group-focus-within:ring-1">x</a>',
