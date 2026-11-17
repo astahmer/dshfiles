@@ -1,6 +1,6 @@
 # @dshfiles/test-runs
 
-![Vitest runs as a test-results card](docs/screenshots/test-run-card.png)
+![Vitest runs as a test results card](docs/screenshots/test-run-card.png)
 
 A `bash` call that runs Vitest renders as a test-results card in the chat transcript instead of a terminal block:
 

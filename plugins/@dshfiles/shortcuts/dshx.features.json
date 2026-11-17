@@ -4,7 +4,8 @@
     {
       "id": "sidebar-toggle-chord",
       "title": "Toggle the sidebar with the platform primary chord",
-      "summary": "Capture primary+B in the browser capture phase, prevent competing shell handling, and choose Meta on Mac or Control elsewhere.",
+      "summary": "Press Cmd+B on a Mac, or Ctrl+B elsewhere, to show or hide the sidebar.",
+      "details": "Capture primary+B in the browser capture phase, prevent competing shell handling, and choose Meta on Mac or Control elsewhere.",
       "surfaces": ["client", "integration"],
       "surface": "command",
       "destination": "none",
@@ -71,7 +72,8 @@
     {
       "id": "panel-selection-chords",
       "title": "Select native panels with keyboard shortcuts",
-      "summary": "Use primary+N and primary+comma to select the declared panel target while respecting editable fields, IME composition, repeat, terminal ownership, and prior event claims. A chord the shell reads inside xterm opts out of the terminal.",
+      "summary": "Press Cmd+N or Cmd+, to open their panels, without taking keys from text fields or the terminal.",
+      "details": "Use primary+N and primary+comma to select the declared panel target while respecting editable fields, IME composition, repeat, terminal ownership, and prior event claims. A chord the shell reads inside xterm opts out of the terminal.",
       "surfaces": ["client", "integration"],
       "surface": "command",
       "destination": "none",
@@ -127,7 +129,8 @@
     {
       "id": "editable-command-keys",
       "title": "Rebindable command keys",
-      "summary": "Binds every dshx Command on the keys it answers to now: its default keys, or the binding the user chose in the Host's Keyboard shortcuts dialog for an editable command. Editable commands are listed there without a default binding, and page-scoped commands keep their keys off inside text fields.",
+      "summary": "Change the keys of any command in Keyboard shortcuts, and the new keys work at once.",
+      "details": "Binds every dshx Command on the keys it answers to now: its default keys, or the binding the user chose in the Host's Keyboard shortcuts dialog for an editable command. Editable commands are listed there without a default binding, and page-scoped commands keep their keys off inside text fields.",
       "surfaces": ["client"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -162,7 +165,8 @@
     {
       "id": "scoped-key-layers",
       "title": "Single keys, sequences and scoped keys",
-      "summary": "Binds every dshx Command key by scope (global, not-typing, list, triage, changes, composer): chords, single keys (J, Shift+J, ?), ⌥ letters and two-step sequences (G then I within 1.2 s), matched by physical key. A list, triage or changes key fires only inside its region (or the region last used when nothing has focus); single keys and ⌥ letters never fire in a text field, an IME composition or an open menu, and one setting turns character keys off.",
+      "summary": "Single keys and two-key sequences such as G then I work where they apply, never while you type.",
+      "details": "Binds every dshx Command key by scope (global, not-typing, list, triage, changes, composer): chords, single keys (J, Shift+J, ?), ⌥ letters and two-step sequences (G then I within 1.2 s), matched by physical key. A list, triage or changes key fires only inside its region (or the region last used when nothing has focus); single keys and ⌥ letters never fire in a text field, an IME composition or an open menu, and one setting turns character keys off.",
       "surfaces": ["client", "integration"],
       "surface": "command",
       "destination": "none",
@@ -241,7 +245,8 @@
     {
       "id": "shortcut-cheat-sheet",
       "title": "Keyboard shortcut sheet",
-      "summary": "? or ⌘/ opens a sheet of every bound key grouped by where it works (Global, Go to, Lists, Triage, Changes, Composer, App), generated from the dshx Command registry and the Host shortcut catalog, with the Single-key shortcuts switch beside the keys it turns off.",
+      "summary": "Press ? or Cmd+/ to see every shortcut, grouped by where it works.",
+      "details": "? or ⌘/ opens a sheet of every bound key grouped by where it works (Global, Go to, Lists, Triage, Changes, Composer, App), generated from the dshx Command registry and the Host shortcut catalog, with the Single-key shortcuts switch beside the keys it turns off.",
       "surfaces": ["client"],
       "surface": "command",
       "destination": "none",

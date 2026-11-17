@@ -573,7 +573,7 @@ cards inline in the active thread; 42 features.
 | secret-catalog/backlog-jev-chat-setup: Set up a Jev key from chat | transcriptCard | transcript: turn tail › Set up missing secrets |
 | session-undo/turn-checkpoint: Each turn names the jj revision its edits left, with Restore to here | transcriptCard | transcript: reply More actions menu |
 | test-runs/bash-stack-trace: Stack traces under failed commands | transcriptCard | transcript: Stack trace card under a bash call |
-| test-runs/test-run-card: Vitest runs as a test-results card | transcriptCard | transcript: Vitest results card |
+| test-runs/test-run-card: Vitest runs as a test results card | transcriptCard | transcript: Vitest results card |
 | thread-sidebar/subagent-live-preview: Live subagent preview in the transcript and above the composer | transcriptCard | transcript: subagent tool row; composer dock while the child works |
 | tool-meta/file-diff-card: File edits as collapsible diffs | transcriptCard | transcript: file edit as a collapsible diff |
 | tool-meta/read-code-card: File reads as a syntax-highlighted code card | transcriptCard | transcript: file read as a code card |
@@ -738,14 +738,14 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | session-source-port/session-source-registry: Threads that live on another host | infrastructure | host: library |
 | shared-runtime/shared-client-runtime: Share the client UI runtime | infrastructure | client: shared runtime |
 | shared-streams/shared-event-sources: One live connection per address across tabs | infrastructure | client: shared EventSource |
-| sidebar-right/addressable-resources: Dock genuine session resources as workbench panels | infrastructure | right-pane: native resources as workbench panels |
+| sidebar-right/addressable-resources: Dock files, diffs and terminals as panels | infrastructure | right-pane: native resources as workbench panels |
 | sidebar-terminal/terminal-excerpts: Add terminal selection to chat | infrastructure | terminal and composer |
 | sqlite-store/sqlite-store-lock-wait: Lock-wait spans | infrastructure | host: library |
-| sqlite-store/sqlite-store-open: One SqlClient layer for a plugin-owned SQLite file | infrastructure | host: library |
+| sqlite-store/sqlite-store-open: Open a plugin's own database safely | infrastructure | host: library |
 | sqlite-store/sqlite-store-space: Free pages go back to the disk | infrastructure | host: library |
-| storage-domain/lazy-domain-hydration: Hydrate a per-record domain one record at a time | infrastructure | host: no UI |
+| storage-domain/lazy-domain-hydration: Load stored records one at a time | infrastructure | host: no UI |
 | storage-json/lazy-per-record-reads: Read one stored JSON record without loading the whole unit | infrastructure | host: no UI |
-| subprocess-local/group-exit-backoff: Wait for detached process groups without probing every 15 ms | infrastructure | host: no UI |
+| subprocess-local/group-exit-backoff: Wait for background processes cheaply | infrastructure | host: no UI |
 | thread-sidebar/sidebar-folders: Folders of plugin panels on the rail | infrastructure | sidebar: the rail's folders (agent tools sidebar_*) |
 | thread-sidebar/thread-inventory-reads: Read the thread inventory only while it is on screen | infrastructure | thread-list: inventory reads |
 | thread-sidebar/workbench-sidebar-assemblies: Dock the actual sidebar content assemblies | infrastructure | main-tabs: New tab › Thread Sidebar views |
