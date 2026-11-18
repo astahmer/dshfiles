@@ -13,6 +13,8 @@ export const BridgeLimits = {
   defaultTimeoutMs: 10_000,
   minTimeoutMs: 1_000,
   maxTimeoutMs: 60_000,
+  /** Steps one `client_tool_call` may chain. */
+  maxSteps: 20,
   /** A window that has not announced itself for this long is gone (a closed tab never says goodbye reliably). */
   windowTtlMs: 90_000,
   /** How often a page re-announces itself while nothing changes. */
@@ -59,11 +61,23 @@ export const completionSchema = Schema.Struct({
   requestId: id(64),
   clientId: id(64),
   outcome: Schema.Literals(['ok', 'error']),
-  /** The tool's JSON result when `ok`. */
-  result: Schema.optionalKey(Schema.Json),
+  /** Each step's JSON result, in order: all of them when `ok`, the ones that ran before the failure when `error`. */
+  results: Schema.Array(Schema.Json).check(Schema.isMaxLength(BridgeLimits.maxSteps)),
+  /** The index of the step that failed when `error`. */
+  failedStep: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
   /** What went wrong when `error`; shown to the Agent. */
   error: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(2_000))),
 })
+
+const toolName = id(64).annotate({ description: 'Client tool name from client_tools_list, e.g. "settings_open".' })
+const toolInput = Schema.optionalKey(jsonObject).annotate({ description: 'The tool’s input, matching its inputSchema. Omit for none.' })
+
+export const stepSchema = Schema.Struct({ tool: toolName, input: toolInput })
+export type ClientToolStep = typeof stepSchema.Type
+
+const onlyOneForm = Schema.makeFilter<{ readonly tool?: string | undefined; readonly steps?: readonly unknown[] | undefined }>(input =>
+  (input.tool === undefined) !== (input.steps === undefined) ? true : 'Pass exactly one of tool (one call) or steps (a chain).',
+)
 
 export const clientBridgeApi = defineApi({
   id: 'client-bridge',
@@ -94,18 +108,29 @@ export const clientBridgeApi = defineApi({
     }),
     call: method({
       input: Schema.Struct({
-        tool: id(64).annotate({ description: 'Client tool name from client_tools_list, e.g. "settings_open".' }),
-        input: Schema.optionalKey(jsonObject).annotate({ description: 'The tool’s input, matching its inputSchema. Omit for none.' }),
+        tool: Schema.optionalKey(toolName),
+        input: toolInput,
+        steps: Schema.optionalKey(Schema.Array(stepSchema).check(Schema.isMinLength(1), Schema.isMaxLength(BridgeLimits.maxSteps))).annotate({
+          description:
+            'Instead of tool and input: up to 20 client tool calls run in order in one window, in one round trip, stopping at the first failure. Use it to chain page actions, e.g. open a tab, then open Settings at a section.',
+        }),
         clientId: Schema.optionalKey(id(64)).annotate({
           description: 'Window to act in, from client_tools_list. Omit to use the focused window showing your thread, else the window used most recently.',
         }),
         timeoutMs: Schema.optionalKey(
           Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(BridgeLimits.minTimeoutMs), Schema.isLessThanOrEqualTo(BridgeLimits.maxTimeoutMs)),
-        ).annotate({ description: 'How long to wait for the window, 1000 to 60000 ms; defaults to 10000.' }),
+        ).annotate({ description: 'How long to wait for the window (the whole chain), 1000 to 60000 ms; defaults to 10000.' }),
+      }).check(onlyOneForm),
+      output: Schema.Struct({
+        clientId: Schema.String,
+        /** One call: its tool and result. */
+        tool: Schema.optionalKey(Schema.String),
+        result: Schema.optionalKey(Schema.Json),
+        /** A chain: each step's tool and result, in order. */
+        steps: Schema.optionalKey(Schema.Array(Schema.Struct({ tool: Schema.String, result: Schema.Json }))),
       }),
-      output: Schema.Struct({ clientId: Schema.String, tool: Schema.String, result: Schema.Json }),
       description:
-        'Run one client tool in a DSH browser window and return its result: the action happens in the user’s page (Settings opens, a tab opens). Run a tool that changes the page only when the user asked for that action; read-only tools may be called freely. The window shows the user a notice naming the action.',
+        'Run one client tool, or a chain of them with steps, in a DSH browser window and return the results: the action happens in the user’s page (Settings opens, a tab opens). A chain runs in order in one round trip and stops at the first failure, naming the failed step and what ran before it. Run a tool that changes the page only when the user asked for that action; read-only tools may be called freely. The window shows the user one notice naming the actions.',
       tool: { name: 'client_tool_call', readOnly: false, render: compactJson },
     }),
   },
@@ -114,15 +139,14 @@ export const clientBridgeApi = defineApi({
       schema: Schema.Struct({
         requestId: Schema.String,
         clientId: Schema.String,
-        tool: Schema.String,
-        input: jsonObject,
+        steps: Schema.Array(Schema.Struct({ tool: Schema.String, input: jsonObject })),
         timeoutMs: Schema.Number,
         /** Show the user a notice naming the action (the `notify` setting); read-only tools never do. */
         notify: Schema.Boolean,
         /** The Host span the call runs under, so the page's span joins the same trace. */
         traceparent: Schema.NullOr(Schema.String),
       }),
-      description: 'Run one client tool in the window named by clientId; every other window ignores it.',
+      description: 'Run client tools in order in the window named by clientId; every other window ignores it.',
     }),
   },
 })

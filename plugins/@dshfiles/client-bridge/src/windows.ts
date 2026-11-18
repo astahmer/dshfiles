@@ -11,7 +11,7 @@ export type PickResult =
   | { readonly kind: 'picked'; readonly window: KnownWindow }
   | { readonly kind: 'no-window' }
   | { readonly kind: 'unknown-window'; readonly clientId: string }
-  | { readonly kind: 'unknown-tool'; readonly window: KnownWindow }
+  | { readonly kind: 'unknown-tool'; readonly window: KnownWindow; readonly missing: readonly string[] }
 
 /**
  * Record a window's announcement.
@@ -39,27 +39,32 @@ const ranked = (windows: readonly KnownWindow[], sessionId: string | undefined):
   return [...windows].sort((left, right) => score(right) - score(left) || right.lastActiveAt - left.lastActiveAt)
 }
 
+/** The tools of `wanted` a window does not offer. */
+const missingFrom = (window: KnownWindow, wanted: readonly string[]): readonly string[] =>
+  [...new Set(wanted)].filter(name => !window.tools.some(tool => tool.name === name))
+
 /**
- * The window a call runs in: the one named, else the best-ranked window offering the tool.
- * @param input - the live windows, the caller's thread, the tool and an optional window id.
+ * The window a call runs in: the one named, else the best-ranked window offering every tool of the call.
+ * @param input - the live windows, the caller's thread, the tools a call (or chain) needs and an optional window id.
  * @returns the window, or why none fits.
  */
 const pick = (input: {
   readonly windows: readonly KnownWindow[]
   readonly sessionId: string | undefined
-  readonly tool: string
+  readonly tools: readonly string[]
   readonly clientId: string | undefined
 }): PickResult => {
   if (input.clientId !== undefined) {
     const named = input.windows.find(window => window.clientId === input.clientId)
     if (named === undefined) return { kind: 'unknown-window', clientId: input.clientId }
-    return named.tools.some(tool => tool.name === input.tool) ? { kind: 'picked', window: named } : { kind: 'unknown-tool', window: named }
+    const missing = missingFrom(named, input.tools)
+    return missing.length === 0 ? { kind: 'picked', window: named } : { kind: 'unknown-tool', window: named, missing }
   }
   const order = ranked(input.windows, input.sessionId)
   const first = order[0]
   if (first === undefined) return { kind: 'no-window' }
-  const offering = order.find(window => window.tools.some(tool => tool.name === input.tool))
-  return offering === undefined ? { kind: 'unknown-tool', window: first } : { kind: 'picked', window: offering }
+  const offering = order.find(window => missingFrom(window, input.tools).length === 0)
+  return offering === undefined ? { kind: 'unknown-tool', window: first, missing: missingFrom(first, input.tools) } : { kind: 'picked', window: offering }
 }
 
 /** What an Agent reads of each window, best first. */

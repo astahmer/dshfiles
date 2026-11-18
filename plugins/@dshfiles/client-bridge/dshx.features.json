@@ -5,7 +5,7 @@
     {
       "id": "agent-client-tools",
       "title": "Agents act in your DSH window",
-      "summary": "client_tools_list shows the open DSH browser windows and the client tools other plugins declare in them; client_tool_call runs one (open Settings at a section, open a tab) in the window showing the Agent's thread, or the one it names, and returns the result. The window shows a notice for every change.",
+      "summary": "client_tools_list shows the open DSH browser windows and the client tools other plugins declare in them; client_tool_call runs one (open Settings at a section, open a tab), or a chain of up to 20 with steps in one round trip stopping at the first failure, in the window showing the Agent's thread or the one it names, and returns the results. A PTC-mode (Code Mode) agent calls both from a run_code program. The window shows one notice per call for the changes it made.",
       "reach": [
         "seed jev-setup-chat-thread",
         "fill textbox \"Message or run a task*\" \"[[call client_tool_call {\\\"tool\\\":\\\"settings_open\\\",\\\"input\\\":{\\\"section\\\":\\\"General\\\"}}]]\"",
@@ -38,7 +38,8 @@
         "The named window closed or never answers: window-closed at once on leave, timeout after timeoutMs otherwise.",
         "No window offers the tool: the refusal lists the tools the window does offer.",
         "Invalid input: the window replies with the schema validation error and runs nothing.",
-        "Switched off in Settings: every call is refused with the setting to turn on."
+        "Switched off in Settings: every call is refused with the setting to turn on.",
+        "A chain stops at the first failing step: the Agent is told which step failed, why, and what already ran in the window; the later steps do not run."
       ],
       "externalDependencies": [],
       "onboarding": {
@@ -60,6 +61,11 @@
         {
           "kind": "gherkin",
           "id": "client-bridge.refuses-unknown-tool",
+          "featureFile": "tooling/dshx/e2e/features/client-bridge.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "client-bridge.code-mode-chain",
           "featureFile": "tooling/dshx/e2e/features/client-bridge.feature"
         },
         {
@@ -109,6 +115,24 @@
           "id": "client-bridge.runner-read-no-notice",
           "file": "plugins/@dshfiles/client-bridge/src/invoke-runner.test.ts",
           "testName": "says when the tool is gone and never notifies for a read"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.call-chain",
+          "file": "plugins/@dshfiles/client-bridge/src/client-tool-call.test.ts",
+          "testName": "runs a chain in one window in one round trip and returns each step’s result"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.call-chain-failure",
+          "file": "plugins/@dshfiles/client-bridge/src/client-tool-call.test.ts",
+          "testName": "names the failed step of a chain and what already ran before it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.runner-chain",
+          "file": "plugins/@dshfiles/client-bridge/src/invoke-runner.test.ts",
+          "testName": "runs a chain in order, one span per step, and stops at the first failure with one notice for what ran"
         }
       ],
       "telemetry": [
@@ -131,7 +155,7 @@
     {
       "id": "window-presence",
       "title": "Window presence",
-      "summary": "Each DSH browser window announces its focus, the thread it shows and its client tools, re-announces after a Host restart and every 30 s, and leaves when the page closes; the Host forgets a silent window after 90 s.",
+      "summary": "Each DSH browser window (one id per tab, kept across a reload) announces its focus, the thread it shows and its client tools, re-announces after a Host restart and every 30 s, and leaves when the page closes; the Host forgets a silent window after 90 s.",
       "surfaces": ["client", "host", "api"],
       "surface": "infrastructure",
       "destination": "none",
@@ -152,6 +176,12 @@
           "id": "client-bridge.windows-focus-time",
           "file": "plugins/@dshfiles/client-bridge/src/windows.test.ts",
           "testName": "keeps the last focus time while a window stays in the background"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.window-id-reload",
+          "file": "plugins/@dshfiles/client-bridge/src/window-state.test.ts",
+          "testName": "keeps the id across a reload and gets a new one for any other navigation, a duplicated tab included"
         },
         {
           "kind": "not-applicable",

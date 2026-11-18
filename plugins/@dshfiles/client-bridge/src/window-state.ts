@@ -7,6 +7,32 @@ import { BridgeLimits, type ClientToolDescriptorView, type WindowState } from '.
  */
 const newClientId = (): string => `w-${Array.from(crypto.getRandomValues(new Uint8Array(12)), byte => byte.toString(16).padStart(2, '0')).join('')}`
 
+const CLIENT_ID_KEY = 'dshfiles-client-bridge.client-id'
+const CLIENT_ID = /^w-[0-9a-f]{24}$/u
+
+/**
+ * This window's id: kept across a reload, so the Host replaces the window instead of listing it twice until the old
+ * entry expires (the `leave` a closing page sends may not arrive), and an Agent's `clientId` still names it. Any other
+ * navigation, a duplicated tab included (it copies sessionStorage), gets a new one.
+ * @param input - the tab's sessionStorage (absent when the browser refuses it) and how this page was reached.
+ * @returns the id to announce.
+ */
+const clientIdFor = (input: { readonly storage: Pick<Storage, 'getItem' | 'setItem'> | undefined; readonly navigation: string | undefined }): string => {
+  let kept: string | null = null
+  try {
+    kept = input.navigation === 'reload' ? (input.storage?.getItem(CLIENT_ID_KEY) ?? null) : null
+  } catch {
+    kept = null
+  }
+  const id = kept !== null && CLIENT_ID.test(kept) ? kept : newClientId()
+  try {
+    input.storage?.setItem(CLIENT_ID_KEY, id)
+  } catch {
+    // A storage-less page still works; it only gets a new id on reload.
+  }
+  return id
+}
+
 /**
  * A short, non-identifying name for this browser so an Agent can tell two windows apart ("Chrome on macOS").
  * @param userAgent - `navigator.userAgent`.
@@ -80,6 +106,7 @@ const build = (input: {
 
 export class WindowStateModel {
   static readonly newClientId = newClientId
+  static readonly clientIdFor = clientIdFor
   static readonly label = label
   static readonly descriptors = descriptors
   static readonly build = build

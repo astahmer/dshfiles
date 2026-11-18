@@ -22,3 +22,13 @@ Feature: Agents act in the DSH window
     When a Command Code account backed by a local fake provider is added
     And a new thread on the fake model calls the client tool "nope_open"
     Then the agent is told no window offers "nope_open" and that it offers "settings_open"
+
+  @scenario:client-bridge.code-mode-chain
+  Scenario: A PTC-mode agent chains client tools from one run_code program
+    Given the isolated plugin composition of "@dshfiles/client-bridge,@dshfiles/ai-accounts,@dshfiles/settings-shell,@dshfiles/dialogs,@dshfiles/agent-preset,@dshfiles/tool-search" is booted
+    When a Command Code account backed by a local fake provider is added
+    And PTC mode is the new task default
+    And a new thread on the fake model runs a program that lists the client tools and chains "settings_sections" then "settings_open" for "General"
+    Then the program returned both step results from one window
+    And Settings is open in the window with a notice naming "Open Settings"
+    And the client bridge journey is recorded

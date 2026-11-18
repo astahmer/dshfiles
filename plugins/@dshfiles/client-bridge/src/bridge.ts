@@ -1,23 +1,21 @@
 import { Clock, Context, Deferred, Effect, Layer, Ref } from 'effect'
-import type * as Schema from 'effect/Schema'
 import type { WindowState, completionSchema } from './api.js'
 import { BridgeLimits } from './api.js'
 import { ClientToolRefused } from './errors.js'
 import { BridgeWindows, type KnownWindow } from './windows.js'
 
-type Completion = typeof completionSchema.Type
-type Json = Schema.Json
+export type Completion = typeof completionSchema.Type
 
 interface PendingCall {
   readonly clientId: string
-  readonly settle: Deferred.Deferred<Json, ClientToolRefused>
+  readonly settle: Deferred.Deferred<Completion, ClientToolRefused>
 }
 
 /** A call the Host sent to a window and now waits on. */
 export interface StartedCall {
   readonly requestId: string
-  /** Succeeds with the tool's result, fails with the window's error, or with `timeout` after `timeoutMs`. */
-  readonly result: Effect.Effect<Json, ClientToolRefused>
+  /** Succeeds with the window's reply (`ok` or `error`), or fails with `timeout` / `window-closed`. */
+  readonly result: Effect.Effect<Completion, ClientToolRefused>
   /** Forget the call without waiting, when the request never reached a window. */
   readonly cancel: Effect.Effect<void>
 }
@@ -83,7 +81,7 @@ export class ClientBridge extends Context.Service<
         start: input =>
           Effect.gen(function* () {
             const requestId = crypto.randomUUID()
-            const settle = yield* Deferred.make<Json, ClientToolRefused>()
+            const settle = yield* Deferred.make<Completion, ClientToolRefused>()
             pending.set(requestId, { clientId: input.clientId, settle })
             const result = Deferred.await(settle).pipe(
               Effect.timeoutOrElse({
@@ -105,11 +103,7 @@ export class ClientBridge extends Context.Service<
             const call = pending.get(completion.requestId)
             if (call === undefined || call.clientId !== completion.clientId) return false
             pending.delete(completion.requestId)
-            if (completion.outcome === 'ok') return yield* Deferred.succeed(call.settle, completion.result ?? null)
-            return yield* Deferred.fail(
-              call.settle,
-              new ClientToolRefused({ reason: 'failed', recovery: completion.error ?? 'The client tool failed without saying why.' }),
-            )
+            return yield* Deferred.succeed(call.settle, completion)
           }),
       })
     }),

@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
-import { finishJourneyAssertions, recordAssertion, settingsPage } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, reloadPastProviderSetup, settingsNavEntry, settingsPage } from '../steps.js'
 import { selectModelForNewThread, sendMessage } from '../threads.js'
 
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
@@ -11,6 +11,8 @@ const toolResults = (page: Page): string[] =>
 
 /** A tool's JSON input as the fake provider's `[[call …]]` directive carries it. */
 type DirectiveInput = Readonly<Record<string, string | Readonly<Record<string, string>>>>
+
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
 
 const directive = (tool: string, input: DirectiveInput): string => `[[call ${tool} ${JSON.stringify(input)}]]`
 
@@ -32,7 +34,7 @@ Then('the agent sees this window offer the client tool {string}', async ({ page 
 
 When('the thread calls the client tool {string} for the Settings section {string}', async ({ page }: { page: Page }, tool: string, section: string) => {
   // Not sendMessage: Settings takes the main view, so the turn's settled status leaves the screen by design.
-  const composer = page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
   await composer.fill(directive('client_tool_call', { tool, input: { section } }))
   await composer.press('Enter')
 })
@@ -63,5 +65,71 @@ Then('the agent is told no window offers {string} and that it offers {string}', 
   await recordAssertion(page, 'client-bridge-unknown-tool-refused', () =>
     expect.poll(() => toolResults(page).some(text => text.includes(`No open window offers ${missing}`) && text.includes(offered))).toBe(true),
   )
+  await finishJourneyAssertions(page)
+})
+
+When('PTC mode is the new task default', async ({ page }: { page: Page }) => {
+  await openSettingsDialog(page)
+  // PTC is a coding preset: with the coding view off, a PTC default falls back to Standard.
+  await settingsNavEntry(page, 'General').click()
+  const codingView = settingsPage(page).getByRole('switch', { name: 'Show coding view' })
+  if ((await codingView.getAttribute('aria-checked')) !== 'true') await codingView.click()
+  await expect(codingView).toHaveAttribute('aria-checked', 'true')
+  // The registry's selectedDefault is the preset new threads start with; the Agent presets cards write the same field.
+  await settingsNavEntry(page, 'Preset registry').click()
+  const field = settingsPage(page)
+    .getByRole('textbox', { name: /selected ?default/iu })
+    .first()
+  await field.fill('ptc')
+  await field.blur()
+  await expect(field).toHaveValue('ptc')
+  await page.keyboard.press('Escape')
+  // The new-thread composer reads the roster once; a reload makes it start from the new default.
+  await reloadPastProviderSetup(page)
+})
+
+/** A run_code program: list the windows, then one client_tool_call chain; it returns what the agent needs. */
+const chainProgram = (first: string, second: string, section: string): string =>
+  [
+    'const listed = await tools.client_tools_list({})',
+    `const chain = await tools.client_tool_call({ steps: [{ tool: ${JSON.stringify(first)}, input: {} }, { tool: ${JSON.stringify(second)}, input: { section: ${JSON.stringify(section)} } }] })`,
+    'return { windows: listed.windows.length, chained: chain.steps.map(step => step.tool), opened: chain.steps[1].result }',
+  ].join('\n')
+
+When(
+  'a new thread on the fake model runs a program that lists the client tools and chains {string} then {string} for {string}',
+  async ({ page }: { page: Page }, first: string, second: string, section: string) => {
+    await newFakeThread(page)
+    const composer = page.getByRole('textbox', {
+      name: /^(?:Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/u,
+    })
+    await composer.fill(directive('run_code', { code: chainProgram(first, second, section), description: 'Open Settings through the client bridge' }))
+    await composer.press('Enter')
+  },
+)
+
+Then('the program returned both step results from one window', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'client-bridge-code-mode-chain', () =>
+    // The last tool result is the run_code output: its JSON, or the raw text when it is not JSON, so a mismatch shows it.
+    expect
+      .poll(
+        () => {
+          const text = toolResults(page).at(-1) ?? ''
+          try {
+            const parsed: { readonly windows?: number; readonly chained?: readonly string[] } = JSON.parse(text)
+            return { windows: parsed.windows, chained: parsed.chained }
+          } catch {
+            return text
+          }
+        },
+        { timeout: 20_000 },
+      )
+      .toEqual({ windows: 1, chained: ['settings_sections', 'settings_open'] }),
+  )
+  // Code Mode kept the preset's executor: no tool_search proxy ran.
+  expect(fakeCommandCodeFor(page).requests.some(request => request.messages.some(message => message.text.includes('tool_search')))).toBe(false)
+})
+
+Then('the client bridge journey is recorded', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })

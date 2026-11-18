@@ -11,13 +11,47 @@ user's window and the result back.
 
 ## Agent tools
 
-| Tool                | What it does                                                                                                                                                                                                                                                                                 |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `client_tools_list` | Read-only. The open DSH windows, best first: `clientId`, label (`Chrome on macOS`), focus, the thread it shows (`showsYourThread`), and the client tools it offers with their input JSON Schema.                                                                                             |
-| `client_tool_call`  | Runs one client tool. `tool`, `input`, optional `clientId` (else: the focused window showing the Agent's thread, then any focused window, then the most recent) and `timeoutMs` (1–60 s, default 10 s). Returns the window, the tool and its JSON result, or a refusal that says what to do. |
+| Tool                | What it does                                                                                                                                                                                                                                                                                                                      |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client_tools_list` | Read-only. The open DSH windows, best first: `clientId`, label (`Chrome on macOS`), focus, the thread it shows (`showsYourThread`), and the client tools it offers with their input JSON Schema.                                                                                                                                  |
+| `client_tool_call`  | Runs one client tool, or a chain with `steps` (see below). `tool`, `input`, optional `clientId` (else: the focused window showing the Agent's thread, then any focused window, then the most recent) and `timeoutMs` (1–60 s, default 10 s). Returns the window, the tool and its JSON result, or a refusal that says what to do. |
 
 The Agent decides which window when several are open: `client_tools_list` gives it what it needs, and `clientId`
 targets one.
+
+## Chaining actions
+
+Two ways, depending on what the chain needs.
+
+**`steps`: a fixed sequence, no code.** Pass `steps` instead of `tool`/`input`: up to 20 calls run in order in one
+window, in one round trip, under the same timeout. The window stops at the first failure and the Agent is told which
+step failed, why, and what already ran (the earlier steps' effects stay); the result lists each step's tool and result.
+One notice names every page-changing step that ran.
+
+```json
+{
+  "steps": [
+    { "tool": "tabs_open", "input": { "target": { "kind": "panel", "panelId": "dshfiles-settings" } } },
+    { "tool": "settings_open", "input": { "section": "Plugin Market" } }
+  ]
+}
+```
+
+**Code Mode: loops and conditions.** A thread on DSH's **PTC mode** preset (Settings › General › Show coding view,
+then Agent presets, or the agent-mode chip of a new thread) calls tools from one `run_code` TypeScript program. Both
+bridge tools are in its SDK, so a program can read the windows, branch on what they show and chain calls:
+
+```ts
+const { windows } = await tools.client_tools_list({})
+const mine = windows.find(window => window.showsYourThread) ?? windows[0]
+const done = await tools.client_tool_call({ clientId: mine.clientId, steps: [/* … */] })
+return done.steps.map(step => step.tool)
+```
+
+With `@dshfiles/tool-search` in cache-safe mode, this needs its `codeModePresets` (default `[ptc]`) so the preset keeps
+its PTC executor, and the two bridge tools in `alwaysVisible` (the default); see the
+[tool-search README](../tool-search/README.md#code-mode-presets). Every nested call keeps its own `execute_tool` span
+under `execute_tool run_code`.
 
 ## Client tools today
 
@@ -55,7 +89,7 @@ say what to change. Writes say "Call only when the user asked"; destructive verb
 
 ## Settings
 
-Settings › Client Bridge (`dshfiles-client-bridge`), applied live:
+Settings › Client bridge (`dshfiles-client-bridge`), applied live:
 
 | Key       | Default | Effect                                                                                   |
 | --------- | ------- | ---------------------------------------------------------------------------------------- |
@@ -82,8 +116,8 @@ Each call is one trace:
 - `execute_tool client_tool_call` (automatic, agent-telemetry), with the Agent's input and result in the transcript;
 - `client-tool invoke` (Host, this plugin): tool name, caller kind, window focus, whether it showed the Agent's thread,
   outcome;
-- `client-tool execute` (browser, `dshfiles-web`), continuing that span from the `traceparent` in the event, and its
-  `client-tool reply` child, whose `client-bridge/complete` call carries the trace back to the Host's dispatch span.
+- `client-tool execute` (browser, `dshfiles-web`), continuing that span from the `traceparent` in the event, with one
+  `client-tool step` child per step and the `client-tool reply` child, whose `client-bridge/complete` call carries the trace back to the Host's dispatch span.
 
 Spans carry identities and outcomes only, never the tool's input or result.
 

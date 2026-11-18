@@ -23,11 +23,11 @@ const known = (clientId: string, lastActiveAt: number, overrides: Partial<Window
 describe('client-bridge windows', () => {
   it('prefers the window showing the caller’s thread, then focus, then recency', () => {
     const windows = [known('old', 1), known('focused', 2, { focused: true }), known('mine', 0, { sessionId: 's1' })]
-    expect(BridgeWindows.pick({ windows, sessionId: 's1', tool: 'settings_open', clientId: undefined })).toMatchObject({
+    expect(BridgeWindows.pick({ windows, sessionId: 's1', tools: ['settings_open'], clientId: undefined })).toMatchObject({
       kind: 'picked',
       window: { clientId: 'mine' },
     })
-    expect(BridgeWindows.pick({ windows, sessionId: 'other', tool: 'settings_open', clientId: undefined })).toMatchObject({
+    expect(BridgeWindows.pick({ windows, sessionId: 'other', tools: ['settings_open'], clientId: undefined })).toMatchObject({
       kind: 'picked',
       window: { clientId: 'focused' },
     })
@@ -35,21 +35,24 @@ describe('client-bridge windows', () => {
 
   it('lets the Agent name the window', () => {
     const windows = [known('a', 1, { focused: true }), known('b', 0)]
-    expect(BridgeWindows.pick({ windows, sessionId: undefined, tool: 'settings_open', clientId: 'b' })).toMatchObject({
+    expect(BridgeWindows.pick({ windows, sessionId: undefined, tools: ['settings_open'], clientId: 'b' })).toMatchObject({
       kind: 'picked',
       window: { clientId: 'b' },
     })
-    expect(BridgeWindows.pick({ windows, sessionId: undefined, tool: 'settings_open', clientId: 'gone' })).toEqual({ kind: 'unknown-window', clientId: 'gone' })
+    expect(BridgeWindows.pick({ windows, sessionId: undefined, tools: ['settings_open'], clientId: 'gone' })).toEqual({
+      kind: 'unknown-window',
+      clientId: 'gone',
+    })
   })
 
   it('skips to a window that offers the tool, and says when none does', () => {
     const windows = [known('bare', 5, { focused: true, tools: [] }), known('tabs', 1, { tools: [tool('tabs_open')] })]
-    expect(BridgeWindows.pick({ windows, sessionId: undefined, tool: 'tabs_open', clientId: undefined })).toMatchObject({
+    expect(BridgeWindows.pick({ windows, sessionId: undefined, tools: ['tabs_open'], clientId: undefined })).toMatchObject({
       kind: 'picked',
       window: { clientId: 'tabs' },
     })
-    expect(BridgeWindows.pick({ windows, sessionId: undefined, tool: 'nope', clientId: undefined })).toMatchObject({ kind: 'unknown-tool' })
-    expect(BridgeWindows.pick({ windows: [], sessionId: undefined, tool: 'tabs_open', clientId: undefined })).toEqual({ kind: 'no-window' })
+    expect(BridgeWindows.pick({ windows, sessionId: undefined, tools: ['nope'], clientId: undefined })).toMatchObject({ kind: 'unknown-tool' })
+    expect(BridgeWindows.pick({ windows: [], sessionId: undefined, tools: ['tabs_open'], clientId: undefined })).toEqual({ kind: 'no-window' })
   })
 
   it('forgets a window it has not heard from within the TTL', () => {

@@ -16,7 +16,17 @@ export default defineClientPlugin({
   uses: ['rpc'],
   setup(api) {
     const rpc = api.rpc.use(clientBridgeApi)
-    const clientId = WindowStateModel.newClientId()
+    const navigation = performance.getEntriesByType('navigation')[0]
+    const clientId = WindowStateModel.clientIdFor({
+      storage: (() => {
+        try {
+          return window.sessionStorage
+        } catch {
+          return undefined
+        }
+      })(),
+      navigation: navigation instanceof PerformanceNavigationTiming ? navigation.type : undefined,
+    })
     const tools = api.list(ClientTools)
     const screen = api.use(SessionScreen)
     const label = WindowStateModel.label(navigator.userAgent, window.matchMedia(NARROW).matches)
@@ -83,10 +93,10 @@ export default defineClientPlugin({
           request,
           clientId,
           tools: tools.get(),
-          notice: tool => {
+          notice: ran => {
             api.toast.show({
-              title: `Agent: ${tool.title}`,
-              description: 'An agent did this in your window. Settings › Client Bridge turns agent control or these notices off.',
+              title: `Agent: ${ran.map(tool => tool.title).join(' → ')}`,
+              description: 'An agent did this in your window. Settings › Client bridge turns agent control or these notices off.',
               duration: 5_000,
             })
           },
