@@ -55,10 +55,11 @@ under `execute_tool run_code`.
 
 ## Client tools today
 
-| Owner                                | Tools                                                                                                                             |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| [settings-shell](../settings-shell/) | `settings_sections` (read-only: every Settings entry id and label), `settings_open` (`section` by id or label, `target`, `query`) |
-| [main-tabs](../main-tabs/)           | `tabs_list` (read-only), `tabs_open` (a thread or main panel, new tab by default), `tabs_focus`                                   |
+| Owner                                  | Tools                                                                                                                             |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| [settings-shell](../settings-shell/)   | `settings_sections` (read-only: every Settings entry id and label), `settings_open` (`section` by id or label, `target`, `query`) |
+| [main-tabs](../main-tabs/)             | `tabs_list` (read-only), `tabs_open` (a thread or main panel, new tab by default), `tabs_focus`                                   |
+| [command-palette](../command-palette/) | `palette_commands` (read-only: the commands available where the user is), `palette_run` (`id`, `confirm: true`)                   |
 
 ## Declaring a client tool in another plugin
 

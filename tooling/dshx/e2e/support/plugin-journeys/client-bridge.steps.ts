@@ -133,3 +133,20 @@ Then('the program returned both step results from one window', async ({ page }: 
 Then('the client bridge journey is recorded', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })
+
+When('a new thread on the fake model finds the palette command {string} and runs it', async ({ page }: { page: Page }, label: string) => {
+  await newFakeThread(page)
+  await sendMessage(page, directive('client_tool_call', { tool: 'palette_commands', input: { query: label } }))
+  // The settings-shell row's id, as palette_commands listed it.
+  await expect.poll(() => toolResults(page).some(text => text.includes('"id":"@dshfiles/settings-shell/open"'))).toBe(true)
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+  await composer.fill(`[[call client_tool_call ${JSON.stringify({ tool: 'palette_run', input: { id: '@dshfiles/settings-shell/open', confirm: true } })}]]`)
+  await composer.press('Enter')
+})
+
+Then('the agent received the palette command it ran', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'command-palette-agent-ran-command', () =>
+    expect.poll(() => toolResults(page).some(text => text.includes('"ran":"@dshfiles/settings-shell/open"'))).toBe(true),
+  )
+  await finishJourneyAssertions(page)
+})

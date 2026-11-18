@@ -32,3 +32,11 @@ Feature: Agents act in the DSH window
     Then the program returned both step results from one window
     And Settings is open in the window with a notice naming "Open Settings"
     And the client bridge journey is recorded
+
+  @scenario:command-palette.agent-runs-palette-command
+  Scenario: An agent runs a command palette command in the user's window
+    Given the isolated plugin composition of "@dshfiles/client-bridge,@dshfiles/ai-accounts,@dshfiles/settings-shell,@dshfiles/dialogs,@dshfiles/command-palette" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a new thread on the fake model finds the palette command "Open Settings" and runs it
+    Then Settings is open in the window with a notice naming "Run a palette command"
+    And the agent received the palette command it ran

@@ -57,10 +57,11 @@ native `ui-theme` setting (`settings_set`). The historical survey counts below a
 
 Host tools cannot reach browser-only actions, so the owning plugin declares them as client tools: `defineClientTool` (dshx, WebMCP shape: name, title, description, input schema, `readOnly`, `execute`) added to the page-wide `ClientTools` registry. `@dshfiles/client-bridge` carries Agent calls: `client_tools_list` (read-only) lists the open windows (focus, thread on screen, tools with their input schema) and `client_tool_call` runs one tool in the window showing the Agent's thread, or the `clientId` it names, and returns the result. The bridge declares no action itself.
 
-| Owner          | Client tools                                       |
-| -------------- | -------------------------------------------------- |
-| settings-shell | `settings_sections` (read-only), `settings_open`   |
-| main-tabs      | `tabs_list` (read-only), `tabs_open`, `tabs_focus` |
+| Owner           | Client tools                                                    |
+| --------------- | --------------------------------------------------------------- |
+| settings-shell  | `settings_sections` (read-only), `settings_open`                |
+| main-tabs       | `tabs_list` (read-only), `tabs_open`, `tabs_focus`              |
+| command-palette | `palette_commands` (read-only), `palette_run` (`confirm: true`) |
 
 The same rules as Host tools apply: writes say they run only when the user asked; the window shows a notice for each write (`notify` setting); every call is one `client-tool invoke` Host span continued by the page's `client-tool execute` span, under the automatic `execute_tool client_tool_call` span, and the transcript keeps its input and result. `enabled` (default on) in Settings › Client bridge refuses every call. To chain page actions, `client_tool_call` takes `steps` (up to 20 calls in order in one round trip, stopping at the first failure); for loops and conditions, a thread on the **PTC mode** preset calls both bridge tools from one `run_code` program, which `@dshfiles/tool-search` allows through `codeModePresets` with the bridge tools in its default `alwaysVisible`. See the [plugin README](../plugins/@dshfiles/client-bridge/README.md#chaining-actions).
 
