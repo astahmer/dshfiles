@@ -81,6 +81,8 @@ const syncStateSchema = Schema.Struct({
   dependencies: Schema.Record(Schema.String, Schema.String),
   bundles: Schema.Array(Schema.String),
   installedManifestHash: Schema.optionalKey(Schema.String),
+  /** Top-level row ids the seed's managed region declared at the last sync: a row with one of them is the seed's. */
+  regionRowIds: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 type SyncState = Schema.Schema.Type<typeof syncStateSchema>
 type ProfileManifest = Schema.Schema.Type<typeof profileManifestSchema>
@@ -267,24 +269,109 @@ const countOccurrences = (text: string, needle: string): number => text.split(ne
  */
 const withoutEmptyRoot = (text: string): string => (/^- /m.test(text) && /^\[\][ \t]*$/m.test(text) ? text.replace(/^\[\][ \t]*\n?/gm, '') : text)
 
-/** The Cordis region between the markers is the seed's; everything around it stays local. */
-const reconciledPatch = (target: string, source: string): string => withoutEmptyRoot(reconciledRegion(target, source))
+type PatchRow = { readonly text: string; readonly id: string | undefined }
 
-const reconciledRegion = (target: string, source: string): string => {
-  if (countOccurrences(source, patchStart) !== 1 || countOccurrences(source, patchEnd) !== 1) return target
-  const sourceStart = source.indexOf(patchStart)
-  const region = source.slice(sourceStart, source.indexOf(patchEnd, sourceStart) + patchEnd.length)
+const unquoted = (value: string): string => (/^(['"]).*\1$/.test(value) ? value.slice(1, -1) : value)
+const rowIdPattern = /^(?:- |  )id:[ \t]*('[^']*'|"[^"]*"|[^\s#]+)/
+
+/**
+ * The top-level rows of a block-sequence patch, as written. A row runs from its `- ` line through the indented and
+ * blank lines after it, and ends at the next line in column 0 (a row or a comment), so nested lists and block scalars
+ * stay whole. Its id is `id:` on the dash line or a key indented two spaces; nested `- id:` children are not rows.
+ */
+const patchRows = (text: string): readonly PatchRow[] => {
+  const rows: string[][] = []
+  let current: string[] | undefined
+  for (const line of text.split('\n')) {
+    if (line === '-' || line.startsWith('- ')) rows.push((current = [line]))
+    else if (current !== undefined && (line.trim() === '' || /^[ \t]/.test(line))) current.push(line)
+    else current = undefined
+  }
+  return rows.map(lines => {
+    while (lines.at(-1)?.trim() === '') lines.pop()
+    const idLine = lines.find((line, index) => (index === 0 ? line.startsWith('- id:') : line.startsWith('  id:')))
+    const id = idLine === undefined ? undefined : rowIdPattern.exec(idLine)?.[1]
+    return { text: `${lines.join('\n')}\n`, id: id === undefined ? undefined : unquoted(id) }
+  })
+}
+
+const regionOf = (text: string): string | undefined => {
+  if (countOccurrences(text, patchStart) !== 1 || countOccurrences(text, patchEnd) !== 1) return undefined
+  const start = text.indexOf(patchStart)
+  const end = text.indexOf(patchEnd, start)
+  return end < 0 ? undefined : text.slice(start, end + patchEnd.length)
+}
+
+/** The ids of the rows a seed's managed region declares, recorded so a later sync knows which rows were the seed's. */
+const seedRegionRowIds = (source: string): readonly string[] =>
+  [...new Set(patchRows(regionOf(source) ?? '').flatMap(row => (row.id === undefined ? [] : [row.id])))].sort()
+
+const keptHeader = '# Rows saved inside the managed region, moved here by profile-sync: it rewrites only that region.'
+const duplicateHeader = (id: string): string =>
+  `# profile-sync: this copy of ${id} was saved inside the managed region, but the profile declares ${id} outside it too:`
+
+type ReconciledPatch = {
+  readonly patch: string
+  /** Ids (or first lines) of rows found inside the region, which the seed does not own, moved below the region. */
+  readonly kept: readonly string[]
+  /** Ids of such rows the profile already declares outside the region, kept only as a comment. */
+  readonly duplicates: readonly string[]
+}
+
+/**
+ * The Cordis region between the markers is the seed's; everything around it stays local. DSH's Settings append a row
+ * at the end of the patch, which is inside the region when the region ends the file, so replacing the region wholesale
+ * dropped those rows (2026-11-18: every MCP server and the UI preferences of a profile). A region row the seed owns —
+ * its id is in this seed's region or the previous one's — is replaced; any other row is moved below the region.
+ */
+const reconciledPatch = (target: string, source: string, previousRegionRowIds: readonly string[]): ReconciledPatch => {
+  const reconciled = reconciledRegion(target, source, previousRegionRowIds)
+  return { ...reconciled, patch: withoutEmptyRoot(reconciled.patch) }
+}
+
+const reconciledRegion = (target: string, source: string, previousRegionRowIds: readonly string[]): ReconciledPatch => {
+  const region = regionOf(source)
+  if (region === undefined) return { patch: target, kept: [], duplicates: [] }
   const starts = countOccurrences(target, patchStart)
   const ends = countOccurrences(target, patchEnd)
   if (starts === 1 && ends === 1) {
     const start = target.indexOf(patchStart)
-    return `${target.slice(0, start)}${region}${target.slice(target.indexOf(patchEnd, start) + patchEnd.length)}`
+    const end = target.indexOf(patchEnd, start) + patchEnd.length
+    const before = target.slice(0, start)
+    const after = target.slice(end)
+    const seedRows = patchRows(region)
+    const seedIds = new Set([...previousRegionRowIds, ...seedRows.flatMap(row => (row.id === undefined ? [] : [row.id]))])
+    const seedTexts = new Set(seedRows.map(row => row.text))
+    const outsideRows = patchRows(`${before}\n${after}`)
+    const outsideIds = new Set(outsideRows.flatMap(row => (row.id === undefined ? [] : [row.id])))
+    const outsideTexts = new Set(outsideRows.map(row => row.text))
+    const kept: PatchRow[] = []
+    const duplicates: { readonly id: string; readonly text: string }[] = []
+    for (const row of patchRows(target.slice(start, end))) {
+      if (row.id === undefined ? seedTexts.has(row.text) : seedIds.has(row.id)) continue
+      if (outsideTexts.has(row.text)) continue
+      if (row.id !== undefined && outsideIds.has(row.id)) duplicates.push({ id: row.id, text: row.text })
+      else kept.push(row)
+    }
+    const keptBlock =
+      kept.length === 0
+        ? ''
+        : `\n\n${keptHeader}\n${kept
+            .map(row => row.text)
+            .join('')
+            .trimEnd()}`
+    const duplicateBlock = duplicates.map(row => `\n\n${duplicateHeader(row.id)}\n${row.text.trimEnd().replace(/^/gm, '# ').replace(/^# $/gm, '#')}`).join('')
+    return {
+      patch: `${before}${region}${keptBlock}${duplicateBlock}${after}`,
+      kept: kept.map(row => row.id ?? row.text.split('\n', 1)[0] ?? row.text),
+      duplicates: duplicates.map(row => row.id),
+    }
   }
   if (starts > 0 || ends > 0) throw new Error(`${join(profileDirectory, 'cordis.patch.yml')} has an incomplete managed Cordis region`)
   const legacyRegion = region.replace(`${patchStart}\n`, '').replace(`\n${patchEnd}`, '')
-  if (target.includes(legacyRegion)) return target.replace(legacyRegion, () => region)
-  if (target.includes('id: dshfiles-multi-host')) return target
-  return `${target.trimEnd()}\n\n${region}\n`
+  if (target.includes(legacyRegion)) return { patch: target.replace(legacyRegion, () => region), kept: [], duplicates: [] }
+  if (target.includes('id: dshfiles-multi-host')) return { patch: target, kept: [], duplicates: [] }
+  return { patch: `${target.trimEnd()}\n\n${region}\n`, kept: [], duplicates: [] }
 }
 
 const resolveLocalSpec = (spec: string): string => {
@@ -355,8 +442,12 @@ const syncSeededProfile = async (): Promise<void> => {
     const patchPath = join(profileDirectory, 'cordis.patch.yml')
     const seedPatchPath = join(seedDirectory, 'cordis.patch.yml')
     const currentPatch = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : undefined
-    const nextPatch =
-      currentPatch !== undefined && existsSync(seedPatchPath) ? reconciledPatch(currentPatch, readFileSync(seedPatchPath, 'utf8')) : currentPatch
+    const seedPatch = existsSync(seedPatchPath) ? readFileSync(seedPatchPath, 'utf8') : undefined
+    const regionRowIds = seedPatch === undefined ? (previous?.regionRowIds ?? []) : seedRegionRowIds(seedPatch)
+    const reconciled =
+      currentPatch !== undefined && seedPatch !== undefined ? reconciledPatch(currentPatch, seedPatch, previous?.regionRowIds ?? []) : undefined
+    const nextPatch = reconciled?.patch ?? currentPatch
+    const regionRowIdsCurrent = JSON.stringify(previous?.regionRowIds ?? null) === JSON.stringify(regionRowIds)
 
     const added = bundles.filter(name => !manifest.dsh.profile.bundles.includes(name))
     const removed = manifest.dsh.profile.bundles.filter(name => !bundles.includes(name))
@@ -365,11 +456,16 @@ const syncSeededProfile = async (): Promise<void> => {
     // node_modules/.modules.yaml for a profile of links alone, so that file cannot stand for an install.
     const installPresent = Object.keys(dependencies).every(name => existsSync(join(profileDirectory, 'node_modules', name)))
     const installNeeded = manifestChanged || previous?.installedManifestHash !== nextHash || !installPresent
-    const state: SyncState = { dependencies: desiredDependencies, bundles: desiredBundles, installedManifestHash: previous?.installedManifestHash }
+    const state: SyncState = {
+      dependencies: desiredDependencies,
+      bundles: desiredBundles,
+      installedManifestHash: previous?.installedManifestHash,
+      regionRowIds,
+    }
     const stateText = (value: SyncState): string => `${JSON.stringify(value, null, 2)}\n`
     const statePath = join(profileDirectory, stateFilename)
 
-    if (!manifestChanged && !installNeeded && nextPatch === currentPatch && existsSync(statePath)) {
+    if (!manifestChanged && !installNeeded && nextPatch === currentPatch && regionRowIdsCurrent && existsSync(statePath)) {
       log(`profile ${values.profile} is up to date with ${seedDirectory}`)
       return
     }
@@ -377,6 +473,14 @@ const syncSeededProfile = async (): Promise<void> => {
     for (const name of added) console.log(`  + ${name}`)
     for (const name of removed) console.log(`  - ${name}`)
     if (nextPatch !== currentPatch) console.log('  ~ cordis.patch.yml managed region')
+    const kept = reconciled?.kept ?? []
+    if (kept.length > 0) {
+      const rows = `${kept.length} row${kept.length === 1 ? '' : 's'}`
+      log(`${dryRun ? 'would keep' : 'kept'} ${rows} saved inside the managed region below it: ${kept.join(', ')}`)
+    }
+    for (const id of reconciled?.duplicates ?? []) {
+      log(`warning: ${id} is declared both inside and outside the managed region; the copy inside is kept below it as a comment`)
+    }
     if (dryRun) {
       if (installNeeded) console.log('  would run pnpm install')
       return
