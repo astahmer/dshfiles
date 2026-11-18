@@ -6,7 +6,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { createApiClient, defineClient, observeStandaloneDisplay, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { ClientTools, createApiClient, defineClient, observeStandaloneDisplay, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { MainTabsClientTools } from './main-tabs-client-tools.js'
 import { modalSelector } from '@deepseek-ai/dsh-client-ui-primitives'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { handlePwaTabShortcut } from './pwa-tab-shortcuts.js'
@@ -333,17 +334,20 @@ export default defineClient({
       () => ctx.uiSession.adapter.current.getSnapshot().key,
     )
     ctx.effect(() => connectWorkbenchTabs(publication.provider), 'main-tabs: workbench semantics provider')
-    metadata?.plugin?.provide(
-      MainTabs,
-      createMainTabsService({
-        provider: publication.provider,
-        enabled: tabsEnabled,
-        currentSet,
-        isListedThread: sessionId => ctx.sessions.list.getSnapshot().ids.some(id => id === sessionId),
-        canReopen: () => actor.getSnapshot().can({ type: 'tab.reopenClosed' }),
-        send: event => actor.send(event),
-      }),
-    )
+    const mainTabsService = createMainTabsService({
+      provider: publication.provider,
+      enabled: tabsEnabled,
+      currentSet,
+      isListedThread: sessionId => ctx.sessions.list.getSnapshot().ids.some(id => id === sessionId),
+      canReopen: () => actor.getSnapshot().can({ type: 'tab.reopenClosed' }),
+      send: event => actor.send(event),
+    })
+    metadata?.plugin?.provide(MainTabs, mainTabsService)
+    // The same service, offered to Agents as client tools; a bridge plugin carries the calls.
+    ctx.effect(() => {
+      const releases = MainTabsClientTools.create(mainTabsService).map(tool => metadata?.plugin?.add(ClientTools, tool) ?? (() => {}))
+      return () => releases.forEach(release => release())
+    }, 'main-tabs: client tools for Agents')
 
     // Free-docking tabs (the workbench) get the same page names as the strip: the destination section labels.
     ctx.effect(() => {
