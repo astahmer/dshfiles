@@ -15,6 +15,7 @@ interface ToolSearchResult {
 interface ToolSearchConfig {
   readonly mode?: 'cache-safe' | 'progressive'
   readonly alwaysVisible?: readonly string[]
+  readonly codeModePresets?: readonly string[]
   readonly maxResults?: number
   readonly maxQueryChars?: number
   readonly reportSchemaMetrics?: boolean
@@ -49,7 +50,11 @@ interface AgentContext {
 
 interface TestAgent {
   readonly id: string
-  readonly session: { readonly requestHeader: () => { readonly tools?: ToolSchema[] } | undefined }
+  readonly session: {
+    readonly id: string
+    readonly requestHeader: () => { readonly tools?: ToolSchema[] } | undefined
+    readonly header?: { readonly agentPreset?: string } | undefined
+  }
   readonly ctx: AgentContext
 }
 
@@ -59,7 +64,7 @@ interface TestHostContext {
     readonly get: (name: string, scope?: TestAgent) => RegisteredTool | undefined
   }
   readonly agents: { readonly list: () => TestAgent[] }
-  readonly on: (name: string, listener: (payload?: AgentEvent) => void) => () => void
+  readonly on: (name: string, listener: (payload?: AgentEvent | string) => void) => () => void
 }
 
 interface BuiltPlugin {
@@ -75,7 +80,10 @@ const schema = (name: string, description: string): ToolSchema => ({
   parameters: { type: 'object', properties: {} },
 })
 
-const harness = async (plugin: BuiltPlugin, options: { readonly restored?: readonly string[]; readonly config?: ToolSearchConfig } = {}) => {
+const harness = async (
+  plugin: BuiltPlugin,
+  options: { readonly restored?: readonly string[]; readonly config?: ToolSearchConfig; readonly preset?: string } = {},
+) => {
   const schemas = new Map<string, ToolSchema>([
     ['read_file', schema('read_file', 'Read a workspace file')],
     ['write_file', schema('write_file', 'Write a workspace file')],
@@ -84,7 +92,8 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
   const globalTools = new Map<string, RegisteredTool>([...schemas.values()].map(tool => [tool.name, { ...tool }]))
   const scopedTools = new Map<TestAgent, Map<string, RegisteredTool>>()
   const restrictions = new Map<TestAgent, Filter[]>()
-  const listeners = new Map<string, Set<(payload?: AgentEvent) => void>>()
+  const listeners = new Map<string, Set<(payload?: AgentEvent | string) => void>>()
+  const presets = new Map<string, string>()
   const admits = (agent: TestAgent, name: string) =>
     (restrictions.get(agent) ?? []).every(filter => (filter.allow?.has(name) ?? true) && !(filter.deny?.has(name) ?? false))
   const visibleGlobals = (agent: TestAgent): ToolSchema[] => [...schemas.values()].filter(tool => admits(agent, tool.name))
@@ -131,6 +140,11 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
     agent = {
       id,
       session: {
+        id: `session-${id}`,
+        get header() {
+          const preset = presets.get(`session-${id}`) ?? options.preset
+          return preset === undefined ? undefined : { agentPreset: preset }
+        },
         requestHeader: () => ({
           tools: [
             ...restored.map(name => schemas.get(name)).filter((tool): tool is ToolSchema => tool !== undefined),
@@ -142,7 +156,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
     }
     return agent
   }
-  const emit = (name: string, payload?: AgentEvent) => {
+  const emit = (name: string, payload?: AgentEvent | string) => {
     for (const listener of listeners.get(name) ?? []) listener(payload)
   }
   const agents = [makeAgent('one', options.restored), makeAgent('two')]
@@ -163,7 +177,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
     serial: () => undefined,
     bail: () => undefined,
     waterfall: () => undefined,
-    on: (name: string, listener: (payload?: AgentEvent) => void) => {
+    on: (name: string, listener: (payload?: AgentEvent | string) => void) => {
       const registered = listeners.get(name) ?? new Set()
       registered.add(listener)
       listeners.set(name, registered)
@@ -185,6 +199,11 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
       return agent
     },
     disposeAgent: (agent: TestAgent) => emit('agent/disposed', { agent }),
+    /** A blank session switching preset, as the registry commits it. */
+    selectPreset: (agent: TestAgent, preset: string) => {
+      presets.set(agent.session.id, preset)
+      emit('agent-preset/selected', agent.session.id)
+    },
     schemas,
     visibleSchemas: (agent: TestAgent) => [
       ...visibleGlobals(agent),
@@ -363,5 +382,29 @@ describe('tool-search host integration', () => {
         .map(tool => tool.name)
         .sort(),
     ).toEqual(['read_file', 'search_threads', 'write_file'])
+  })
+
+  it('leaves a Code Mode preset agent its own executor and keeps deferred globals out of its program SDK', async () => {
+    // The harness has no setExecutor: a cache-safe attachment would throw, so passing proves the executor was left alone.
+    const runtime = await harness(await loadPlugin(), {
+      preset: 'ptc',
+      config: { mode: 'cache-safe', alwaysVisible: ['read_file', 'client_tool*'], codeModePresets: ['ptc'] },
+    })
+    const first = runtime.agents[0]!
+    expect(runtime.visibleSchemas(first).map(tool => tool.name)).toEqual(['read_file'])
+    runtime.registerGlobal('client_tool_call', 'Run client tools in the user window')
+    runtime.registerGlobal('mcp__docs__lookup', 'Look up a document in MCP')
+    expect(runtime.visibleSchemas(first).map(tool => tool.name)).toEqual(['read_file', 'client_tool_call'])
+    await runtime.dispose()
+    expect(runtime.visibleSchemas(first).map(tool => tool.name)).toContain('mcp__docs__lookup')
+  })
+
+  it('attaches again when a blank session switches to a Code Mode preset', async () => {
+    const runtime = await harness(await loadPlugin(), { config: { alwaysVisible: ['read_file'], codeModePresets: ['ptc'] } })
+    const first = runtime.agents[0]!
+    expect(runtime.visibleSchemas(first).map(tool => tool.name)).toEqual(['read_file', 'tool_search'])
+    runtime.selectPreset(first, 'ptc')
+    await expect.poll(() => runtime.visibleSchemas(first).map(tool => tool.name)).toEqual(['read_file'])
+    await runtime.dispose()
   })
 })
