@@ -95,6 +95,14 @@ export type {
   PanelIconProps,
 } from '../sdk/client.js'
 
+import { ClientToolsModel } from './client-tools.js'
+/** Actions a page offers Agents (WebMCP shape); the owning plugin adds them, a bridge carries the calls. */
+export { ClientTools } from './client-tools.js'
+export const defineClientTool = ClientToolsModel.define
+export const describeClientTool = ClientToolsModel.describe
+export const runClientTool = ClientToolsModel.run
+export type { ClientToolContext, ClientToolDescriptor, ClientToolItem, ClientToolResult } from './client-tools.js'
+
 export const defineContract = BrowserBroker.defineContract
 export const defineRegistry = BrowserBroker.defineRegistry
 /** Contributions that threw, for a diagnostics view; `useContributionFailures` reads it in React. */

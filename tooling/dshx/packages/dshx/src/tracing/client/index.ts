@@ -9,7 +9,7 @@ import {
 } from '../browser.js'
 import type { BrowserSpanRecord } from '../browser-protocol.js'
 import { redactIdentifier } from '../identifier.js'
-import type { SpanContext } from '../traceparent.js'
+import { TraceparentModel, type SpanContext } from '../traceparent.js'
 
 export type {
   BrowserSpan,
@@ -82,6 +82,12 @@ export const activeSpanContext = (): SpanContext | undefined => BrowserTracerMod
 
 /** The W3C `traceparent` for the active span or open interaction. dshx API calls already carry it. */
 export const traceparent = (): string | undefined => BrowserTracerModel.page().traceparent()
+
+/**
+ * The span context a W3C `traceparent` names, to continue a trace another process started (pass it as `parent`); undefined
+ * when the header is absent or malformed.
+ */
+export const parseTraceparent = (header: string | null | undefined): SpanContext | undefined => TraceparentModel.parse(header)
 
 /** Send every queued browser span to the Host now; resolves (never rejects) once each batch was tried. */
 export const flushBrowserTracing = (): Promise<void> => BrowserTracerModel.page().flush()
