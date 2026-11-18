@@ -51,6 +51,7 @@ const API_HOST_EVENTS_PATH = fileURLToPath(new URL('../../api/host-events.js', i
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const HOST_PLUGIN_STORAGE_PATH = fileURLToPath(new URL('../../host/plugin-storage.js', import.meta.url))
 const HOST_GENERATE_PATH = fileURLToPath(new URL('../../host/generate.js', import.meta.url))
+const HOST_TOOL_EDITS_PATH = fileURLToPath(new URL('../../host/tool-edits.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_SECTION_ENTRIES_SCHEMA_PATH = fileURLToPath(new URL('../../settings/section-entries-schema.js', import.meta.url))
 const COMMUNICATION_RUNTIME_PATH = fileURLToPath(new URL('../../communication/index.js', import.meta.url))
@@ -101,6 +102,7 @@ const RUNTIME_ENTRIES: readonly string[] = [
   API_COMMON_PATH,
   HOST_PLUGIN_STORAGE_PATH,
   HOST_GENERATE_PATH,
+  HOST_TOOL_EDITS_PATH,
   SETTINGS_DEFINE_PATH,
   SETTINGS_SECTION_ENTRIES_SCHEMA_PATH,
   COMMUNICATION_RUNTIME_PATH,
@@ -212,6 +214,8 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const toStorageSchema = PluginStorageModel.toStorageSchema',
           // A named function export, not a static class member, so a Host that never calls it drops its dsh-llm import.
           `export { generate } from ${JSON.stringify(HOST_GENERATE_PATH)}`,
+          `import { ToolEditsModel } from ${JSON.stringify(HOST_TOOL_EDITS_PATH)}`,
+          'export const mountCodeMode = ToolEditsModel.mountCodeMode',
           '',
         ].join('\n')
       }
