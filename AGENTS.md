@@ -358,7 +358,11 @@ dshx inspect slots --root sidebar     # read the live composition instead of gue
    4. Each new user-visible state transition gets a way to see the result and,
       where meaningful, to reverse or reopen it. Test both paths, or state why it
       is intentionally irreversible.
-   5. Presentation-only state (tab layout, lightbox, draft) is not a tool.
+   5. Presentation-only state (tab layout, lightbox, draft) is not a Host tool.
+      A browser action the user may ask an Agent for (open Settings at a
+      section, open a tab) is a client tool: the owning plugin adds it to dshx
+      `ClientTools` with `defineClientTool`, and `@dshfiles/client-bridge`
+      carries `client_tool_call` to the window. Never a bridge-side copy.
    6. No native Host verb? Apply [The core boundary](#the-core-boundary).
    7. Audit and backlog: [`docs/agent-tool-parity.md`](docs/agent-tool-parity.md).
 6. Host work leaves a span, and the catalog says which. Each feature in
