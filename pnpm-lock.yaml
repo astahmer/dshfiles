@@ -2596,6 +2596,49 @@ importers:
         specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@22.19.20)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2)
 
+  plugins/@dshfiles/client-bridge:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: 'catalog:'
+        version: 3.19.0
+      '@dshfiles/dshx':
+        specifier: workspace:*
+        version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/shared-runtime':
+        specifier: workspace:*
+        version: link:../shared-runtime
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.2
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.1.0
+        version: 4.1.0(@deepseek-ai/cordis-plugin-include@1.1.0)(@deepseek-ai/cordis-plugin-loader@1.1.0)
+      '@deepseek-ai/dsh':
+        specifier: 0.2.2-rc.2
+        version: 0.2.2-rc.2(34f92283d9066be3c40d7129a4797a0c)
+      '@deepseek-ai/dsh-client-connection':
+        specifier: 'catalog:'
+        version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-scope@0.2.2-rc.2)
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.1.2(effect@4.1.2)(vitest@4.1.12)
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
+      '@types/react':
+        specifier: 'catalog:'
+        version: 18.3.31
+      react:
+        specifier: 'catalog:'
+        version: 18.3.1
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2)
+
   plugins/@dshfiles/command-palette:
     dependencies:
       '@dshfiles/editor':
@@ -32065,7 +32108,7 @@ snapshots:
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@22.19.20)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
 
   '@vitest/pretty-format@4.1.12':
     dependencies:
