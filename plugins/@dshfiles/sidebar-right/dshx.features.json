@@ -51,8 +51,16 @@
         }
       ],
       "verification": [
-        { "kind": "gherkin", "id": "sidebar-right.workbench-header-opener", "featureFile": "tooling/dshx/e2e/features/workbench-chat-header.feature" },
-        { "kind": "gherkin", "id": "sidebar-right.workbench-resources", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "gherkin",
+          "id": "sidebar-right.workbench-header-opener",
+          "featureFile": "tooling/dshx/e2e/features/workbench-chat-header.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "sidebar-right.workbench-resources",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
         {
           "kind": "unit-test",
           "id": "sidebar-right.header-dock-opener",
@@ -118,6 +126,48 @@
         {
           "kind": "not-applicable",
           "reason": "Client-only presentation of existing resource services; no new Host I/O, model calls or execution. Providers retain their original spans."
+        }
+      ]
+    },
+    {
+      "id": "sidepanel-client-tools",
+      "title": "Side panel pages as client tools",
+      "summary": "Through the client bridge, sidepanel_tabs lists the pages the side panel guide offers (changes, thread views, workspaces, terminals) and sidepanel_open opens one by kind beside the thread on screen, revealing it when already open. Only guide pages are offered, since those open without parameters.",
+      "surfaces": ["client"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "client tools: sidepanel_tabs, sidepanel_open (through client_tool_call)",
+      "configuration": [],
+      "states": ["listed", "opened", "unknown-kind", "no-thread-on-screen"],
+      "failureModes": ["A kind the guide does not offer, or no thread on screen, is refused with what to do instead."],
+      "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Ask an agent to open the changes page in the side panel beside your thread.",
+        "doneWhen": "The side panel shows that page and a notice names the agent action."
+      },
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "sidebar-right.agent-lists-sidepanel-pages",
+          "featureFile": "tooling/dshx/e2e/features/client-bridge.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.sidepanel-tools-list",
+          "file": "plugins/@dshfiles/sidebar-right/src/sidepanel-client-tools.test.ts",
+          "testName": "lists each guide page once, the first registration of a kind, with the thread on screen"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.sidepanel-tools-open",
+          "file": "plugins/@dshfiles/sidebar-right/src/sidepanel-client-tools.test.ts",
+          "testName": "opens a guide page beside the thread, and refuses an unknown kind or no thread on screen"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-side tool: the client bridge records each call (execute_tool, client-tool invoke, client-tool execute and step spans)."
         }
       ]
     }

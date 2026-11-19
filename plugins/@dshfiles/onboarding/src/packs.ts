@@ -196,4 +196,8 @@ export const PACK_EXEMPTIONS: readonly PackExemption[] = [
     plugin: 'loopback-access',
     reason: 'Network plumbing: its one setting only matters once the Web server binds a LAN address, which no pack does.',
   },
+  {
+    plugin: 'sidebar-right',
+    reason: 'The native side panel every composition loads in place of the stock one; users never choose it, only the pages other plugins add to it.',
+  },
 ]
