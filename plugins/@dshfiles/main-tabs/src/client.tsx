@@ -6,8 +6,18 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { ClientTools, createApiClient, defineClient, observeStandaloneDisplay, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import {
+  ClientTools,
+  createApiClient,
+  defineClient,
+  LinkHandler,
+  observeStandaloneDisplay,
+  runHostCommand,
+  useRegistry,
+  useSettings,
+} from '@dshfiles/dshx/client'
 import { MainTabsClientTools } from './main-tabs-client-tools.js'
+import { THREAD_LINK_SCHEME, ThreadReference } from './thread-reference.js'
 import { modalSelector } from '@deepseek-ai/dsh-client-ui-primitives'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { handlePwaTabShortcut } from './pwa-tab-shortcuts.js'
@@ -151,6 +161,22 @@ export default defineClient({
       () => installThreadLinkClicks({ document, origin: window.location.origin, openThread: sessionId => requestThreadTab(sessionId, true) }),
       'main-tabs: open a clicked thread link in a tab',
     )
+
+    // `[Fix auth](thread:session-…)` in a reply: a click opens the thread in a tab, or shows it when tabs are off.
+    metadata?.plugin?.add(LinkHandler, {
+      id: 'dshfiles-main-tabs.thread',
+      scheme: THREAD_LINK_SCHEME,
+      open: link => {
+        const resolution = ThreadReference.resolve({ reference: link.target, listed: ctx.sessions.list.getSnapshot().ids })
+        if (resolution.kind !== 'found') {
+          console.warn(`main-tabs: ${ThreadReference.explain(resolution)}`)
+          return
+        }
+        if (requestThreadTab(resolution.sessionId, true)) return
+        const listed = ctx.sessions.list.getSnapshot().ids.find(id => id === resolution.sessionId)
+        if (listed !== undefined) ctx.uiWorkspace.openSession(listed)
+      },
+    })
 
     ctx.effect(() => {
       const onOpenThread = (event: Event): void => {
@@ -345,7 +371,14 @@ export default defineClient({
     metadata?.plugin?.provide(MainTabs, mainTabsService)
     // The same service, offered to Agents as client tools; a bridge plugin carries the calls.
     ctx.effect(() => {
-      const releases = MainTabsClientTools.create(mainTabsService).map(tool => metadata?.plugin?.add(ClientTools, tool) ?? (() => {}))
+      const releases = MainTabsClientTools.create(mainTabsService, {
+        listed: () => ctx.sessions.list.getSnapshot().ids,
+        title: sessionId => {
+          const list = ctx.sessions.list.getSnapshot()
+          const listed = list.ids.find(id => id === sessionId)
+          return listed === undefined ? undefined : list.byId[listed]?.displayTitle
+        },
+      }).map(tool => metadata?.plugin?.add(ClientTools, tool) ?? (() => {}))
       return () => releases.forEach(release => release())
     }, 'main-tabs: client tools for Agents')
 

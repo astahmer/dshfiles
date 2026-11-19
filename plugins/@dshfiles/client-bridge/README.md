@@ -64,6 +64,13 @@ under `execute_tool run_code`.
 | [workbench](../workbench/)             | `workbench_panels` (read-only), `workbench_open_panel` (`panelId`, `region`)                                                      |
 | [chat](../chat/)                       | `browser_open` (`url`, in the browser pane beside the thread)                                                                     |
 
+## Links to other threads
+
+`tabs_open` accepts a thread as `session-<uuid>` or the short `t:<id>` memory prints (6+ characters, one match), and
+returns `link`, a Markdown link `[title](thread:session-…)` the Agent puts in its reply. main-tabs claims the `thread:`
+scheme, so a click opens that thread in a tab later without asking the Agent again; a system-prompt section from
+main-tabs teaches the form. memory digests carry the full Session id and the same link.
+
 ## Declaring a client tool in another plugin
 
 The bridge declares no action of its own: the plugin that owns the behavior adds it, next to the code that already does

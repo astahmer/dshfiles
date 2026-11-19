@@ -181,3 +181,38 @@ Then('the chain listed the {string} panel and reports {string} as the active fil
   await expect(page.getByText('Agent: Open a file in the editor').first()).toBeVisible()
   await finishJourneyAssertions(page)
 })
+
+let linkedSessionId = ''
+
+/** The thread the selected main tab shows, from its actor tab id `thread:session-…`. */
+const activeThreadId = async (page: Page): Promise<string> => {
+  const selected = page.getByRole('tablist', { name: 'Open views', exact: true }).locator('[role="tab"][aria-selected="true"]').first()
+  const tabId = (await selected.getAttribute('data-tab-id').catch(() => null)) ?? ''
+  return tabId.startsWith('thread:') ? tabId.slice('thread:'.length) : ''
+}
+
+When('a new thread on the fake model is named {string}', async ({ page }: { page: Page }, title: string) => {
+  await newFakeThread(page)
+  await sendMessage(page, `[[title ${title}]]`)
+  await expect.poll(() => activeThreadId(page)).toMatch(/^session-/u)
+  linkedSessionId = await activeThreadId(page)
+})
+
+When('another new thread on the fake model answers with a thread link to it', async ({ page }: { page: Page }) => {
+  await newFakeThread(page)
+  // The short form memory prints: the link resolves it to the one listed thread it names.
+  await sendMessage(page, `[[answer See [the linked thread](thread:${linkedSessionId.replace(/^session-/u, '').slice(0, 8)}).]]`)
+  await expect.poll(() => activeThreadId(page)).not.toBe(linkedSessionId)
+})
+
+When('the thread link in that answer is clicked', async ({ page }: { page: Page }) => {
+  await page.getByRole('link', { name: 'the linked thread', exact: true }).last().click()
+})
+
+Then('the {string} thread is open in a tab', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'main-tabs-thread-link-opened', async () => {
+    await expect.poll(() => activeThreadId(page)).toBe(linkedSessionId)
+    await expect(page.getByRole('tablist', { name: 'Open views', exact: true }).getByRole('tab', { name: new RegExp(title, 'u') }).first()).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

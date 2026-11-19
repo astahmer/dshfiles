@@ -48,3 +48,12 @@ Feature: Agents act in the DSH window
     When a Command Code account backed by a local fake provider is added
     And a new thread on the fake model chains "workbench_panels", "editor_open_file" for "README.md" and "editor_files"
     Then the chain listed the "Files" panel and reports "README.md" as the active file
+
+  @scenario:main-tabs.agent-thread-link
+  Scenario: A thread link in an agent's reply opens that thread in a tab
+    Given the isolated plugin composition of "@dshfiles/frame-layout,@dshfiles/main-tabs,@dshfiles/ai-accounts,@dshfiles/settings-shell,@dshfiles/chat" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a new thread on the fake model is named "Linked target"
+    And another new thread on the fake model answers with a thread link to it
+    And the thread link in that answer is clicked
+    Then the "Linked target" thread is open in a tab

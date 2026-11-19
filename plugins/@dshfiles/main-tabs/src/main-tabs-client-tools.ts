@@ -1,11 +1,15 @@
 import { defineClientTool, type ClientToolItem } from '@dshfiles/dshx/client'
 import * as Schema from 'effect/Schema'
 import type { MainTabsService } from './tabs-contract.js'
+import { ThreadReference } from './thread-reference.js'
 
 const id = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))
 
 const targetSchema = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('thread'), sessionId: id.annotate({ description: 'Thread id.' }) }),
+  Schema.Struct({
+    kind: Schema.Literal('thread'),
+    sessionId: id.annotate({ description: 'Thread id: session-<uuid>, or the t:<id> memory prints (at least 6 characters).' }),
+  }),
   Schema.Struct({
     kind: Schema.Literal('panel'),
     panelId: id.annotate({ description: 'Main panel id from tabs_list, e.g. "dshfiles-settings" for Settings.' }),
@@ -36,7 +40,10 @@ const viewOf = (tab: Tab) => ({
  * @param tabs - the strip's service.
  * @returns the tools to add to `ClientTools`.
  */
-const create = (tabs: MainTabsService): readonly ClientToolItem[] => [
+const create = (
+  tabs: MainTabsService,
+  threads: { readonly listed: () => readonly string[]; readonly title: (sessionId: string) => string | undefined },
+): readonly ClientToolItem[] => [
   defineClientTool({
     name: 'tabs_list',
     title: 'List tabs',
@@ -50,7 +57,7 @@ const create = (tabs: MainTabsService): readonly ClientToolItem[] => [
     name: 'tabs_open',
     title: 'Open a tab',
     description:
-      'Open a thread or a main panel in the user’s tab strip, or select the tab that already shows it. newTab (default true) opens beside the current tab instead of replacing the preview tab. Call only when the user asked to open it.',
+      'Open a thread or a main panel in the user’s tab strip, or select the tab that already shows it. newTab (default true) opens beside the current tab instead of replacing the preview tab. For a thread the result carries link, a Markdown link to put in your reply so the user can open it again. Call only when the user asked to open it.',
     readOnly: false,
     input: Schema.Struct({
       target: targetSchema,
@@ -58,14 +65,20 @@ const create = (tabs: MainTabsService): readonly ClientToolItem[] => [
       title: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(200))).annotate({ description: 'Tab title until the panel names itself.' }),
     }),
     execute: input => {
-      const tabId = tabs.open(input.target, { newTab: input.newTab ?? true, ...(input.title !== undefined && { title: input.title }) })
+      const options = { newTab: input.newTab ?? true, ...(input.title !== undefined && { title: input.title }) }
+      if (input.target.kind === 'panel') {
+        const tabId = tabs.open(input.target, options)
+        if (tabId === undefined) throw new Error('Tabs are off in this window (Settings › Main tabs); open the panel another way.')
+        return { tabId }
+      }
+      const resolution = ThreadReference.resolve({ reference: input.target.sessionId, listed: threads.listed() })
+      if (resolution.kind !== 'found') throw new Error(ThreadReference.explain(resolution))
+      const sessionId = resolution.sessionId
+      const link = ThreadReference.link({ sessionId, title: threads.title(sessionId) ?? input.title ?? sessionId })
+      const tabId = tabs.open({ kind: 'thread', sessionId }, options)
       if (tabId === undefined)
-        throw new Error(
-          input.target.kind === 'thread'
-            ? `Thread ${input.target.sessionId} is not listed in this window, or tabs are off (Settings › Main tabs).`
-            : 'Tabs are off in this window (Settings › Main tabs); open the panel another way.',
-        )
-      return { tabId }
+        throw new Error(`Tabs are off in this window (Settings › Main tabs). Give the user ${link} instead; clicking it opens the thread.`)
+      return { tabId, sessionId, link }
     },
   }),
   defineClientTool({
