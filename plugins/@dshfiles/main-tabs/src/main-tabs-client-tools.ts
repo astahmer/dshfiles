@@ -1,7 +1,7 @@
 import { defineClientTool, type ClientToolItem } from '@dshfiles/dshx/client'
 import * as Schema from 'effect/Schema'
 import type { MainTabsService } from './tabs-contract.js'
-import { ThreadReference } from './thread-reference.js'
+import { ThreadReference } from '@dshfiles/thread-sidebar/thread-reference'
 
 const id = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))
 

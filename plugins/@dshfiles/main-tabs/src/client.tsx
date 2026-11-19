@@ -17,7 +17,7 @@ import {
   useSettings,
 } from '@dshfiles/dshx/client'
 import { MainTabsClientTools } from './main-tabs-client-tools.js'
-import { THREAD_LINK_SCHEME, ThreadReference } from './thread-reference.js'
+import { THREAD_LINK_SCHEME, ThreadReference } from '@dshfiles/thread-sidebar/thread-reference'
 import { modalSelector } from '@deepseek-ai/dsh-client-ui-primitives'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { handlePwaTabShortcut } from './pwa-tab-shortcuts.js'

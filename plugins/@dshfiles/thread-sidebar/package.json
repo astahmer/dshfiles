@@ -41,6 +41,10 @@
       "types": "./src/snapshots.ts",
       "default": "./dist/snapshots.js"
     },
+    "./thread-reference": {
+      "types": "./src/thread-reference.ts",
+      "default": "./dist/thread-reference.js"
+    },
     "./thread-mention": {
       "types": "./src/thread-mention.ts",
       "default": "./dist/thread-mention.js"
