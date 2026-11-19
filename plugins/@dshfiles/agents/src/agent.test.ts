@@ -34,6 +34,8 @@ test('handles are mentionable slugs', () => {
 test('parses only a leading mention', () => {
   assert.deepEqual(Agents.parseMention('@reviewer look at b:12'), { handle: 'reviewer', text: 'look at b:12' })
   assert.deepEqual(Agents.parseMention('  @dsh'), { handle: 'dsh', text: '' })
+  assert.deepEqual(Agents.parseMention('@{dood-rapide} donne moi les chemins'), { handle: 'dood-rapide', text: 'donne moi les chemins' })
+  assert.equal(Agents.parseMention('@{bad handle} x'), null)
   assert.equal(Agents.parseMention('pony @reviewer look'), null)
   assert.equal(Agents.parseMention('email me at foo@reviewer'), null)
   assert.equal(Agents.parseMention('@Reviewer upper'), null)

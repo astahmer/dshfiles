@@ -3,7 +3,7 @@ import type { DraftInitializationResult } from './native/contract/input.ts'
 import type { DraftInput } from './native/contract/draft-editor.ts'
 import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
 
-export type { DraftInitializationOptions, DraftInitializationResult } from './native/contract/input.ts'
+export type { BeforeSendContext, DraftInitializationOptions, DraftInitializationResult } from './native/contract/input.ts'
 export type { DraftInput, DraftReference, DraftSnapshot } from './native/contract/draft-editor.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -42,6 +42,8 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
       binding: SessionBinding,
       options: { readonly prompt?: DraftInput; readonly clearPreviousDraft?: boolean },
     ): DraftInitializationResult
+    /** Register a callback to run before sending a message (e.g., agent model selection). */
+    registerBeforeSend?(hook: (ctx: { readonly sessionId: string; readonly isNewSession: boolean; readonly text: string }) => Promise<void>): () => void
   }
 }
 

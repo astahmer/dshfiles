@@ -114,8 +114,8 @@ export interface AgentMention {
   readonly text: string
 }
 
-/** A leading `@handle`, so only an addressed message dispatches; a mention mid-sentence stays a mention. */
-const LEADING_MENTION = /^\s*@([a-z][a-z0-9-]{0,31})(?=\s|$)/u
+/** A leading `@{handle}` (the sent spelling) or `@handle`, so only an addressed message dispatches; a mention mid-sentence stays a mention. */
+const LEADING_MENTION = /^\s*@(?:\{([a-z][a-z0-9-]{0,31})\}|([a-z][a-z0-9-]{0,31}))(?=\s|$)/u
 
 const clip = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`)
 
@@ -139,7 +139,7 @@ export class Agents {
   static parseMention(text: string): AgentMention | null {
     const match = LEADING_MENTION.exec(text)
     if (match === null) return null
-    const handle = match[1]
+    const handle = match[1] ?? match[2]
     if (handle === undefined) return null
     return { handle, text: text.slice(match[0].length).trim() }
   }

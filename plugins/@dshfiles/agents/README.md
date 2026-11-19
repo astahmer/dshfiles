@@ -24,8 +24,13 @@ where a thread starts.
   affect only new threads. Attachments stay on the backlog item rather than being copied into the queued message. The
   backlog reports the result in a toast whose **Open** action shows the thread. The backlog's
   Start thread dialog also picks an agent, which replaces its account/model fields with the agent's
-  preset, route and instructions. Inside a running thread the same text is a mention the Agent
-  reads, because a preset and system prompt are fixed when the thread is created.
+  preset, route and instructions. In the composer, a message that opens a new thread with a leading
+  `@{handle}` (or `@handle`) of an enabled agent that pins a route selects that provider, model and reasoning effort
+  for the thread before the first message is sent; the Rich composer's `registerBeforeSend` hook runs it. Only
+  the model follows: the Agent preset and instructions are fixed when the thread is created and are not applied, and the
+  mention stays plain text the Agent reads. Later messages, an unknown or disabled handle, an agent without a route and a
+  mention that is not at the start never change the model; a failed selection keeps the Host default and only logs a
+  warning.
 - **The `@` menu.** `@agent:` (or `@a:`) lists agents right away; a partial handle such as `@rev`
   lists matching agents beside files and threads. A plain `@` stays with files and threads.
 - **One chip, one card.** Picking an agent in the `@` menu inserts the agent chip; a sent `@{handle}` and a

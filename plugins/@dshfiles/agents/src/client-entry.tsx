@@ -13,6 +13,7 @@ import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
+import { Agents } from './agent.js'
 import { AgentFocusModel } from './agent-focus.js'
 import { AgentInlineReference } from './agent-inline-reference.js'
 import { AgentMentionChip } from './agent-mention-chip.js'
@@ -48,6 +49,33 @@ export default defineClient({
       ctx.slots.register({ name: 'conversation.user.text.node', key: 'agent', priority: 100 }, AgentMentionChip),
     )
     const api = createApiClient(ctx, agentsApi)
+
+    // Register before-send hook to update model when mentioning an agent in the first message
+    type ConversationFace = { readonly input?: { registerBeforeSend?: (hook: (ctx: { readonly sessionId: string; readonly isNewSession: boolean; readonly text: string }) => Promise<void>) => () => void } }
+    const conversation = ctx.get('conversation') as ConversationFace | undefined
+    const beforeSend = conversation?.input?.registerBeforeSend
+    if (beforeSend !== undefined) {
+      ctx.effect(() => beforeSend(async (sendCtx) => {
+        // Only process first message of a new thread
+        if (!sendCtx.isNewSession) return
+        // Parse agent mention from message start
+        const mention = Agents.parseMention(sendCtx.text)
+        if (mention === null) return
+        // Look up the agent
+        const { agents } = await api.list()
+        const agent = agents.find(a => a.handle === mention.handle && a.enabled)
+        if (agent === undefined || agent.route === null) return
+        // Update the model to match the agent's configuration
+        const route = agent.route
+        const selection: AgentModelSelection =
+          route.reasoningEffort === undefined
+            ? { sessionId: sendCtx.sessionId as SessionId, provider: route.provider, model: route.model }
+            : { sessionId: sendCtx.sessionId as SessionId, provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort }
+        const selected = await ctx.remote.session.selectModel(selection)
+        if (!selected.ok) console.warn(`agents: first message @${mention.handle} kept the Host default model: ${selected.error.message}`)
+        else console.info(`agents: first message @${mention.handle} set model to ${route.provider}/${route.model}`)
+      }), 'agents: first message agent mention model selection')
+    }
 
     const startThread = async (request: AgentDispatchRequest): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> => {
       const target = AgentDispatch.creationArgs(request.target, ctx.workspaces.list.getSnapshot().items[0]?.workspaceId)

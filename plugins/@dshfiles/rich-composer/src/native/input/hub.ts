@@ -17,7 +17,7 @@ import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { ModelSelectionProjection } from '@deepseek-ai/dsh-agent/types'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type {
-  DraftAttachmentId, DraftAttachmentSerializationResult, DraftInitializationOptions, DraftInitializationResult, InputTriggerController,
+  BeforeSendContext, DraftAttachmentId, DraftAttachmentSerializationResult, DraftInitializationOptions, DraftInitializationResult, InputTriggerController,
   SessionInputResolver, SessionInput, SubmitOutcome,
 } from '../contract/input.ts'
 import type { ComposerKeyboard } from '../contract/draft-editor.ts'
@@ -63,6 +63,7 @@ interface ConversationAttachmentFace {
 /** Session-addressed input facade registry (SessionInputResolver face + composer-layer extras). */
 export class InputHub implements SessionInputResolver {
   private readonly shells = new WeakMap<SessionBinding, SessionInputShell>()
+  private readonly beforeSendHooks = new Set<(ctx: BeforeSendContext) => Promise<void>>()
 
   /**
    * @param ctx - client root context (services resolved lazily per call — boot order stays free).
@@ -72,6 +73,16 @@ export class InputHub implements SessionInputResolver {
     private readonly rootCtx: Context,
     private readonly t: TranslateNS<'conversation'>,
   ) {}
+
+  /**
+   * Register a callback to run before sending a message.
+   * @param hook - async callback that receives send context.
+   * @returns dispose function to unregister the hook.
+   */
+  registerBeforeSend = (hook: (ctx: BeforeSendContext) => Promise<void>): () => void => {
+    this.beforeSendHooks.add(hook)
+    return () => { this.beforeSendHooks.delete(hook) }
+  }
 
   /**
    * Resolve the facade for one session-scope ctx (SessionInputResolver face).
@@ -292,6 +303,18 @@ export class InputHub implements SessionInputResolver {
   ): Promise<SubmitOutcome> {
     if (text === '' && attachmentIds.length === 0) {
       return session.prompt([], mode, signal).then(result => result.ok ? { kind: 'success' } : { kind: 'error' })
+    }
+    // Run before-send hooks (e.g., agent mention detection for model selection)
+    if (this.beforeSendHooks.size > 0 && typeof session.getSnapshot === 'function') {
+      const isNewSession = session.getSnapshot().blank
+      const hookContext: BeforeSendContext = { sessionId: session.sessionId, isNewSession, text }
+      for (const hook of this.beforeSendHooks) {
+        try {
+          await hook(hookContext)
+        } catch (error) {
+          console.warn('conversation.input: before-send hook failed', error)
+        }
+      }
     }
     return whileSessionRetained({
       sessions: this.sessions(),
