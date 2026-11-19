@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { Schema } from 'effect'
 import { jjIntegrationApi, threadWorkspaceNameEffect, type DestinationView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { mainViewSessionId, mainViewSessionVisitId } from './main-view-session.js'
 import { resolveNewThreadWorkspaceId } from './new-thread-workspace.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
@@ -42,7 +43,10 @@ export interface DestinationBarServices {
   readonly openWorkspace: (workspaceId: string, signal: AbortSignal) => Promise<void>
   readonly pickWorkspace: (workspaceId: string) => boolean
   readonly bindWorkspacePicker: (pick: (workspaceId: string) => void) => () => void
-  readonly openSession: (sessionId: string) => void | Promise<void>
+  /** The Session the main view shows, from the native selection; the Session list only counts retains. */
+  readonly shownSessionId: { readonly getSnapshot: () => SessionId | undefined; readonly subscribe: (listener: () => void) => () => void }
+  /** Open a Session; `replacing` names the New thread whose tab it takes over, so that tab does not stay behind. */
+  readonly openSession: (input: { readonly sessionId: string; readonly replacing: string | undefined }) => void | Promise<void>
 }
 
 /** The host chip leads the native row; `display: contents` lets each chip of the bar be an item of that row. */

@@ -13,10 +13,16 @@ import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderSetup } from '@dshfiles/workspace-folder-picker/project-folder-setup'
 import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
-import { hostDestination, multiHostApi, multiHostQueries, RemoteSessionBootstrap, shouldBootstrapRemoteSession } from '@dshfiles/multi-host/destination'
+import {
+  hostDestination,
+  multiHostApi,
+  multiHostQueries,
+  RemoteSessionBootstrap,
+  shouldBootstrapRemoteSession,
+  type ShownSession,
+} from '@dshfiles/multi-host/destination'
 import { useCallback, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi } from './api.js'
-import { mainViewSessionId } from './main-view-session.js'
 import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { NoFolderWorkspace } from './no-folder.js'
@@ -63,7 +69,21 @@ export const HeroWorkspacePicker = (
   const [remotePickerOpen, setRemotePickerOpen] = useState(false)
   const [inspecting, setInspecting] = useState<string | null>(null)
   const directory = useQuery({ ...multiHostQueries.directory(multiHost), enabled: destination.kind === 'runtime' })
-  const currentSessionId = mainViewSessionId(services.sessions.list.getSnapshot())
+  const shownSessionId = useSyncExternalStore(
+    useCallback((listener: () => void) => services.shownSessionId.subscribe(listener), [services]),
+    () => services.shownSessionId.getSnapshot(),
+  )
+  const shownBlank = useSyncExternalStore(
+    useCallback((listener: () => void) => services.sessions.list.subscribe(listener), [services]),
+    () => (shownSessionId === undefined ? undefined : services.sessions.list.getSnapshot().byId[shownSessionId]?.blank),
+  )
+  const shown: ShownSession =
+    shownSessionId === undefined
+      ? { kind: 'none' }
+      : shownBlank === undefined
+        ? { kind: 'unlisted' }
+        : { kind: 'session', sessionId: shownSessionId, blank: shownBlank }
+  const currentSessionId = shown.kind === 'session' && shown.blank ? shownSessionId : undefined
   const currentSessionOwner = useQuery({
     queryKey: ['multi-host', 'session-runtime', currentSessionId],
     enabled: destination.kind === 'runtime' && currentSessionId !== undefined,
@@ -80,8 +100,8 @@ export const HeroWorkspacePicker = (
   const bootstrapRemoteSession =
     destination.kind === 'runtime' &&
     shouldBootstrapRemoteSession({
-      currentSessionId,
-      ownerKnown: currentSessionId === undefined || currentSessionOwner.isSuccess,
+      shown,
+      ownerKnown: currentSessionOwner.isSuccess,
       ownerRuntimeId: currentSessionOwner.data,
       destinationRuntimeId: destination.runtimeId,
     })
@@ -119,7 +139,7 @@ export const HeroWorkspacePicker = (
             hostName={hostName}
             cwd={destination.folder}
             prepareCwd={() => prepareRemoteFolder(multiHost, destination)}
-            onStarted={props.services.openSession}
+            onStarted={sessionId => props.services.openSession({ sessionId, replacing: currentSessionId })}
           />
         )
       }
