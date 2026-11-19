@@ -62,6 +62,9 @@ Host tools cannot reach browser-only actions, so the owning plugin declares them
 | settings-shell  | `settings_sections` (read-only), `settings_open`                |
 | main-tabs       | `tabs_list` (read-only), `tabs_open`, `tabs_focus`              |
 | command-palette | `palette_commands` (read-only), `palette_run` (`confirm: true`) |
+| editor          | `editor_files` (read-only), `editor_open_file`                  |
+| workbench       | `workbench_panels` (read-only), `workbench_open_panel`          |
+| chat            | `browser_open`                                                  |
 
 The same rules as Host tools apply: writes say they run only when the user asked; the window shows a notice for each write (`notify` setting); every call is one `client-tool invoke` Host span continued by the page's `client-tool execute` span, under the automatic `execute_tool client_tool_call` span, and the transcript keeps its input and result. `enabled` (default on) in Settings › Client bridge refuses every call. To chain page actions, `client_tool_call` takes `steps` (up to 20 calls in order in one round trip, stopping at the first failure); for loops and conditions, a thread on the **PTC mode** preset calls both bridge tools from one `run_code` program, which `@dshfiles/tool-search` allows through `codeModePresets` with the bridge tools in its default `alwaysVisible`. See the [plugin README](../plugins/@dshfiles/client-bridge/README.md#chaining-actions).
 

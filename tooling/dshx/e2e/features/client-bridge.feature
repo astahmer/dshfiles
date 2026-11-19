@@ -40,3 +40,11 @@ Feature: Agents act in the DSH window
     And a new thread on the fake model finds the palette command "Open Settings" and runs it
     Then Settings is open in the window with a notice naming "Run a palette command"
     And the agent received the palette command it ran
+
+  @scenario:editor.agent-opens-file
+  @scenario:workbench.agent-lists-panels
+  Scenario: An agent finds the Files panel and opens a file in the user's editor in one chain
+    Given the isolated plugin composition of "@dshfiles/client-bridge,@dshfiles/ai-accounts,@dshfiles/settings-shell,@dshfiles/dialogs,@dshfiles/editor,@dshfiles/workbench,@dshfiles/frame-layout" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a new thread on the fake model chains "workbench_panels", "editor_open_file" for "README.md" and "editor_files"
+    Then the chain listed the "Files" panel and reports "README.md" as the active file

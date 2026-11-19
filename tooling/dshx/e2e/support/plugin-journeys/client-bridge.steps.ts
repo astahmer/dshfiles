@@ -150,3 +150,34 @@ Then('the agent received the palette command it ran', async ({ page }: { page: P
   )
   await finishJourneyAssertions(page)
 })
+
+When(
+  'a new thread on the fake model chains {string}, {string} for {string} and {string}',
+  async ({ page }: { page: Page }, panels: string, open: string, path: string, files: string) => {
+    await newFakeThread(page)
+    const steps = [{ tool: panels }, { tool: open, input: { path } }, { tool: files }]
+    // Not sendMessage: the editor may take the main view, so the turn's settled status leaves the screen by design.
+    const composer = page.getByRole('textbox', { name: /^(?:Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)$/u })
+    await composer.fill(`[[call client_tool_call ${JSON.stringify({ steps })}]]`)
+    await composer.press('Enter')
+  },
+)
+
+Then('the chain listed the {string} panel and reports {string} as the active file', async ({ page }: { page: Page }, panel: string, path: string) => {
+  await recordAssertion(page, 'client-bridge-file-and-panel-chain', () =>
+    expect
+      .poll(() => {
+        const text = toolResults(page).at(-1) ?? ''
+        try {
+          const parsed: { readonly steps?: readonly { readonly tool: string; readonly result: { readonly panels?: readonly { readonly title: string }[]; readonly active?: string } }[] } =
+            JSON.parse(text)
+          return { panel: parsed.steps?.[0]?.result.panels?.some(entry => entry.title === panel), active: parsed.steps?.[2]?.result.active }
+        } catch {
+          return text
+        }
+      })
+      .toEqual({ panel: true, active: path }),
+  )
+  await expect(page.getByText('Agent: Open a file in the editor').first()).toBeVisible()
+  await finishJourneyAssertions(page)
+})

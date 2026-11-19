@@ -60,6 +60,9 @@ under `execute_tool run_code`.
 | [settings-shell](../settings-shell/)   | `settings_sections` (read-only: every Settings entry id and label), `settings_open` (`section` by id or label, `target`, `query`) |
 | [main-tabs](../main-tabs/)             | `tabs_list` (read-only), `tabs_open` (a thread or main panel, new tab by default), `tabs_focus`                                   |
 | [command-palette](../command-palette/) | `palette_commands` (read-only: the commands available where the user is), `palette_run` (`id`, `confirm: true`)                   |
+| [editor](../editor/)                   | `editor_files` (read-only: open files, active first), `editor_open_file` (`path`, `line`)                                         |
+| [workbench](../workbench/)             | `workbench_panels` (read-only), `workbench_open_panel` (`panelId`, `region`)                                                      |
+| [chat](../chat/)                       | `browser_open` (`url`, in the browser pane beside the thread)                                                                     |
 
 ## Declaring a client tool in another plugin
 
