@@ -162,7 +162,19 @@ export default defineClient({
       'main-tabs: open a clicked thread link in a tab',
     )
 
-    // `[Fix auth](thread:session-…)` in a reply: a click opens the thread in a tab, or shows it when tabs are off.
+    // A Markdown link hands its opener no event, so a Shift-click is read from the pointer that just went down.
+    let shiftPointerAt = Number.NEGATIVE_INFINITY
+    ctx.effect(() => {
+      const onPointerDown = (event: PointerEvent): void => {
+        if (event.shiftKey) shiftPointerAt = performance.now()
+      }
+      document.addEventListener('pointerdown', onPointerDown, true)
+      return () => document.removeEventListener('pointerdown', onPointerDown, true)
+    }, 'main-tabs: Shift-click on thread links')
+    const SHIFT_WINDOW_MS = 1000
+
+    // `[Fix auth](thread:session-…)` in a reply: a click opens the thread in a tab (or shows it when tabs are off);
+    // Shift-click shows it in the side panel beside the thread on screen.
     metadata?.plugin?.add(LinkHandler, {
       id: 'dshfiles-main-tabs.thread',
       scheme: THREAD_LINK_SCHEME,
@@ -172,6 +184,7 @@ export default defineClient({
           console.warn(`main-tabs: ${ThreadReference.explain(resolution)}`)
           return
         }
+        if (performance.now() - shiftPointerAt < SHIFT_WINDOW_MS && requestThreadAside(resolution.sessionId)) return
         if (requestThreadTab(resolution.sessionId, true)) return
         const listed = ctx.sessions.list.getSnapshot().ids.find(id => id === resolution.sessionId)
         if (listed !== undefined) ctx.uiWorkspace.openSession(listed)

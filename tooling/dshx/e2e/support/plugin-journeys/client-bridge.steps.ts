@@ -17,7 +17,8 @@ const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:thre
 const directive = (tool: string, input: DirectiveInput): string => `[[call ${tool} ${JSON.stringify(input)}]]`
 
 const newFakeThread = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  // The stock sidebar names it New session; thread-sidebar names it New thread.
+  await page.getByRole('button', { name: /^New (?:session|thread)$/u }).first().click()
   await selectModelForNewThread(page, FAKE_MODEL)
 }
 
@@ -214,5 +215,39 @@ Then('the {string} thread is open in a tab', async ({ page }: { page: Page }, ti
     await expect.poll(() => activeThreadId(page)).toBe(linkedSessionId)
     await expect(page.getByRole('tablist', { name: 'Open views', exact: true }).getByRole('tab', { name: new RegExp(title, 'u') }).first()).toBeVisible()
   })
+  await finishJourneyAssertions(page)
+})
+
+When(
+  'another new thread on the fake model chains {string} then {string} for that thread',
+  async ({ page }: { page: Page }, list: string, open: string) => {
+    await newFakeThread(page)
+    // Settle this thread first, so the side panel has a thread on screen to open beside.
+    await sendMessage(page, '[[answer Ready.]]')
+    const steps = [{ tool: list }, { tool: open, input: { sessionId: `t:${linkedSessionId.replace(/^session-/u, '').slice(0, 8)}` } }]
+    await sendMessage(page, `[[call client_tool_call ${JSON.stringify({ steps })}]]`)
+  },
+)
+
+Then('the chain listed side panel pages and opened {string} beside the thread', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'thread-aside-opened-by-agent', () =>
+    expect
+      .poll(() => {
+        const text = toolResults(page).at(-1) ?? ''
+        try {
+          const parsed: { readonly steps?: readonly { readonly result: { readonly pages?: readonly unknown[]; readonly opened?: string; readonly link?: string } }[] } =
+            JSON.parse(text)
+          return {
+            pages: (parsed.steps?.[0]?.result.pages?.length ?? 0) > 0,
+            opened: parsed.steps?.[1]?.result.opened,
+            link: parsed.steps?.[1]?.result.link?.startsWith(`[${title}`),
+          }
+        } catch {
+          return text
+        }
+      })
+      .toEqual({ pages: true, opened: linkedSessionId, link: true }),
+  )
+  await expect(page.getByText('Agent: Open a thread in the side panel').first()).toBeVisible()
   await finishJourneyAssertions(page)
 })

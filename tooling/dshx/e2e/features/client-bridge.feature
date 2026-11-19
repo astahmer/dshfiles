@@ -57,3 +57,12 @@ Feature: Agents act in the DSH window
     And another new thread on the fake model answers with a thread link to it
     And the thread link in that answer is clicked
     Then the "Linked target" thread is open in a tab
+
+  @scenario:thread-sidebar.agent-opens-thread-aside
+  @scenario:sidebar-right.agent-lists-sidepanel-pages
+  Scenario: An agent lists the side panel pages and shows another thread in the side panel
+    Given the isolated plugin composition of "@dshfiles/frame-layout,@dshfiles/main-tabs,@dshfiles/client-bridge,@dshfiles/ai-accounts,@dshfiles/settings-shell,@dshfiles/dialogs,@dshfiles/sidebar-right,@dshfiles/thread-sidebar,@dshfiles/session-controller,@dshfiles/rich-composer,@dshfiles/chat,@dshfiles/multi-host,@dshfiles/jj-integration" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a new thread on the fake model is named "Aside target"
+    And another new thread on the fake model chains "sidepanel_tabs" then "thread_open_aside" for that thread
+    Then the chain listed side panel pages and opened "Aside target" beside the thread

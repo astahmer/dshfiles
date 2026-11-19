@@ -11,7 +11,7 @@ const threadLinkSection = definePromptSection({
   text: [
     'To point the user at another DSH conversation, write a Markdown link `[title](thread:session-<uuid>)`; clicking it',
     'opens that thread in a tab. A short id such as `thread:122d56e6` (6+ characters, as memory prints `t:122d56e6`) also',
-    'works when it names one thread. tabs_open returns such a link for the thread it opened.',
+    'works when it names one thread; Shift-click opens it in the side panel. tabs_open and thread_open_aside return such a link.',
   ].join(' '),
 })
 

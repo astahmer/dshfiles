@@ -132,13 +132,19 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "chat",
       "description": "Owned fork of DSH's native Chat plugin that mounts only the transcript rows near the viewport.",
       "ui": true,
-      "features": 15
+      "features": 16
+    },
+    {
+      "name": "client-bridge",
+      "description": "Lets Host-side Agents run the client tools other plugins declare (open a file in the editor, a panel, Settings, a tab, a palette command) in the user's DSH browser window.",
+      "ui": true,
+      "features": 2
     },
     {
       "name": "command-palette",
       "description": "The app-wide searchable command palette and plugin action registry.",
       "ui": true,
-      "features": 8
+      "features": 9
     },
     {
       "name": "component-gallery",
@@ -204,7 +210,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "editor",
       "description": "Monaco file editor for DSH: workspace file tree, tabs, open-from-anywhere and confined saving.",
       "ui": true,
-      "features": 5
+      "features": 6
     },
     {
       "name": "fff-search",
@@ -246,7 +252,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "hmr-gate",
       "description": "Web client HMR transport that only announces a rebuilt plugin while its Host half is the code the running Host loaded.",
       "ui": true,
-      "features": 4
+      "features": 5
     },
     {
       "name": "html-render",
@@ -300,7 +306,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "main-tabs",
       "description": "Browser-like tabs above the main view for threads and global panels: pin, reorder, preview, shortcuts, per-project persistence.",
       "ui": true,
-      "features": 6
+      "features": 7
     },
     {
       "name": "mcp-endpoint",
@@ -564,7 +570,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "sidebar-right",
       "description": "Owned native sidebar-right fork: session-scoped resource bodies in workbench panels with unchanged contribution slots.",
       "ui": true,
-      "features": 1
+      "features": 2
     },
     {
       "name": "sidebar-terminal",
@@ -612,7 +618,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "thread-sidebar",
       "description": "Replace the DSH sidebar with project-scoped thread groups and customizable navigation.",
       "ui": true,
-      "features": 55
+      "features": 56
     },
     {
       "name": "thread-transfer",
@@ -720,7 +726,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "workbench",
       "description": "Docking workbench in the main slot: registered panels move, split, tab and float without remounting; the layout persists.",
       "ui": true,
-      "features": 18
+      "features": 19
     },
     {
       "name": "workspace-folder-picker",
@@ -11018,6 +11024,82 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "chat#browser-pane-client-tool",
+      "plugin": "chat",
+      "id": "browser-pane-client-tool",
+      "title": "Browser pane as a client tool",
+      "summary": "Through the client bridge, browser_open opens an http(s) URL in the browser pane beside the thread on screen, in the user own browser, through the Browser service the Preview and Open buttons use.",
+      "destination": "none",
+      "currentSurface": "client tool: browser_open (through client_tool_call)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "client-bridge#agent-client-tools",
+      "plugin": "client-bridge",
+      "id": "agent-client-tools",
+      "title": "Agents act in your DSH window",
+      "summary": "client_tools_list shows the open DSH browser windows and the client tools other plugins declare in them; client_tool_call runs one (open a file at a line in the editor, a panel, Settings, a tab, a palette command), or a chain of up to 20 with steps in one round trip stopping at…",
+      "destination": "none",
+      "currentSurface": "agent tools: client_tools_list, client_tool_call",
+      "reach": [
+        {
+          "text": "seed jev-setup-chat-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "jev-setup-chat-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task*\" \"[[call client_tool_call {\\\"tool\\\":\\\"settings_open\\\",\\\"input\\\":{\\\"section\\\":\\\"General\\\"}}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task*",
+          "value": "[[call client_tool_call {\"tool\":\"settings_open\",\"input\":{\"section\":\"General\"}}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Agent: Open Settings\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Agent: Open Settings",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": {
+        "firstAction": "Ask an agent to open Settings at the Plugin Market for you.",
+        "doneWhen": "Settings opens at Plugin Market in your window and a notice names the agent's action.",
+        "open": {
+          "settings": {
+            "entryId": "dshfiles-client-bridge",
+            "fieldPath": [
+              "enabled"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "key": "client-bridge#window-presence",
+      "plugin": "client-bridge",
+      "id": "window-presence",
+      "title": "Window presence",
+      "summary": "Each DSH browser window (one id per tab, kept across a reload) announces its focus, the thread it shows and its client tools, re-announces after a Host restart and every 30 s, and leaves when the page closes; the Host forgets a silent window after 90 s.",
+      "destination": "none",
+      "currentSurface": "none (feeds client_tools_list)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "command-palette#palette-search",
       "plugin": "command-palette",
       "id": "palette-search",
@@ -11264,6 +11346,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "Command rows show each command's effective keys from api.commands.keys, so a binding the user changed shows at once, and commands marked suggested appear before anything is typed.",
       "destination": "none",
       "currentSurface": "palette: Commands › keys",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "command-palette#palette-client-tools",
+      "plugin": "command-palette",
+      "id": "palette-client-tools",
+      "title": "Palette commands as client tools",
+      "summary": "Every command palette row is offered to Agents through the client bridge: palette_commands lists the commands available where the user is (the same context the palette computes: thread on screen, project, theme), and palette_run runs one by id, with confirm: true, exactly as pic…",
+      "destination": "none",
+      "currentSurface": "client tools: palette_commands, palette_run (through client_tool_call)",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -12487,6 +12581,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "editor#editor-client-tools",
+      "plugin": "editor",
+      "id": "editor-client-tools",
+      "title": "Editor as client tools",
+      "summary": "Through the client bridge, editor_files lists the files open in the editor for the thread on screen (active first, unsaved and changed-on-disk flags) so an Agent knows what \"this file\" means, and editor_open_file opens a workspace file at a line through the editor open path.",
+      "destination": "none",
+      "currentSurface": "client tools: editor_files, editor_open_file (through client_tool_call)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "fff-search#resident-grep-glob",
       "plugin": "fff-search",
       "id": "resident-grep-glob",
@@ -13018,6 +13124,26 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "With the hmr-gate row's hostReload config on, a rebuilt Host half of a plugin whose package.json declares dshx.hostReload \"safe\" is replaced inside the running DSH: its own modules are evicted from the ESM cache and imported again, the Loader contract (name, inject, Config) is c…",
       "destination": "none",
       "currentSurface": "host: hmr-gate deferral",
+      "reach": [
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "hmr-gate#update-timing",
+      "plugin": "hmr-gate",
+      "id": "update-timing",
+      "title": "Plugin updates wait for a hidden or idle moment",
+      "summary": "The browser half holds graph and rebuilt frames until the Host connection is live again and the page is hidden, or the reader has been idle for 30 s with no focused field; nothing applies in the 10 s after the page comes back. Updates of the thread-drawing packages (chat, workbe…",
+      "destination": "none",
+      "currentSurface": "client: hmr-gate frame handling",
       "reach": [
         {
           "text": "expect region \"Threads\"",
@@ -14708,10 +14834,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "expect button \"Locate a landmark\"",
+          "text": "expect button \"Locate Current\"",
           "action": "expect",
           "by": "button",
-          "name": "Locate a landmark",
+          "name": "Locate Current",
           "value": null
         },
         {
@@ -16687,6 +16813,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "main-tabs#thread-links",
+      "plugin": "main-tabs",
+      "id": "thread-links",
+      "title": "Thread links in replies",
+      "summary": "An agent cites another conversation as [title](thread:<id>); a click opens it in a tab (or shows it when tabs are off). The id may be the full session-<uuid> or a 6+ character prefix such as the t:<id> memory prints. A system-prompt section teaches the form, tabs_open accepts th…",
+      "destination": "transcript",
+      "currentSurface": "transcript: thread: links in assistant replies",
+      "reach": [],
       "reachNarrow": null,
       "onboarding": null
     },
@@ -22948,6 +23086,21 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "sidebar-right#sidepanel-client-tools",
+      "plugin": "sidebar-right",
+      "id": "sidepanel-client-tools",
+      "title": "Side panel pages as client tools",
+      "summary": "Through the client bridge, sidepanel_tabs lists the pages the side panel guide offers (changes, thread views, workspaces, terminals) and sidepanel_open opens one by kind beside the thread on screen, revealing it when already open. Only guide pages are offered, since those open w…",
+      "destination": "none",
+      "currentSurface": "client tools: sidepanel_tabs, sidepanel_open (through client_tool_call)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": {
+        "firstAction": "Ask an agent to open the changes page in the side panel beside your thread.",
+        "doneWhen": "The side panel shows that page and a notice names the agent action."
+      }
+    },
+    {
       "key": "sidebar-terminal#terminal-excerpts",
       "plugin": "sidebar-terminal",
       "id": "terminal-excerpts",
@@ -26334,6 +26487,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "thread-sidebar#thread-aside-client-tool",
+      "plugin": "thread-sidebar",
+      "id": "thread-aside-client-tool",
+      "title": "Thread aside as a client tool",
+      "summary": "Through the client bridge, thread_open_aside shows another thread in the side panel beside the thread on screen, through the same opener as the row action Open in side panel. It accepts session-<uuid> or the short t:<id> memory prints and returns a thread: link.",
+      "destination": "none",
+      "currentSurface": "client tool: thread_open_aside (through client_tool_call)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "thread-transfer#thread-export",
       "plugin": "thread-transfer",
       "id": "thread-export",
@@ -29134,6 +29299,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "Retain stable panel registrations and early open requests until the matching dock view mounts.",
       "destination": "none",
       "currentSurface": "workbench: panel registration",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "workbench#workbench-client-tools",
+      "plugin": "workbench",
+      "id": "workbench-client-tools",
+      "title": "Workbench panels as client tools",
+      "summary": "Through the client bridge, workbench_panels lists the panels a user can add (never runtime thread occurrences) and workbench_open_panel opens one in its usual place or a named region (main, right, bottom, left), through the same registry and placement the Add panel menu uses.",
+      "destination": "none",
+      "currentSurface": "client tools: workbench_panels, workbench_open_panel (through client_tool_call)",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

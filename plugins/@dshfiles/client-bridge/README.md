@@ -63,12 +63,14 @@ under `execute_tool run_code`.
 | [editor](../editor/)                   | `editor_files` (read-only: open files, active first), `editor_open_file` (`path`, `line`)                                         |
 | [workbench](../workbench/)             | `workbench_panels` (read-only), `workbench_open_panel` (`panelId`, `region`)                                                      |
 | [chat](../chat/)                       | `browser_open` (`url`, in the browser pane beside the thread)                                                                     |
+| [thread-sidebar](../thread-sidebar/)   | `thread_open_aside` (another thread in the side panel, short ids accepted, returns a `thread:` link)                              |
+| [sidebar-right](../sidebar-right/)     | `sidepanel_tabs` (read-only: the side panel guide's pages), `sidepanel_open` (`kind`)                                             |
 
 ## Links to other threads
 
 `tabs_open` accepts a thread as `session-<uuid>` or the short `t:<id>` memory prints (6+ characters, one match), and
 returns `link`, a Markdown link `[title](thread:session-…)` the Agent puts in its reply. main-tabs claims the `thread:`
-scheme, so a click opens that thread in a tab later without asking the Agent again; a system-prompt section from
+scheme, so a click opens that thread in a tab later without asking the Agent again (Shift-click: in the side panel); a system-prompt section from
 main-tabs teaches the form. memory digests carry the full Session id and the same link.
 
 ## Declaring a client tool in another plugin

@@ -31,6 +31,8 @@ export const WINDOW_ACTION_EXAMPLES = [
   { tool: 'editor_files', does: 'read which file they have open (what “this file” means)' },
   { tool: 'workbench_open_panel', does: 'open a panel (Files, Traces…)' },
   { tool: 'browser_open', does: 'open a page beside the thread' },
+  { tool: 'thread_open_aside', does: 'show another thread in the side panel' },
+  { tool: 'sidepanel_open', does: 'open a side panel page (changes, terminal…)' },
   { tool: 'settings_open', does: 'open Settings at a section' },
   { tool: 'tabs_open', does: 'open a thread or panel in a tab' },
   { tool: 'palette_run', does: 'run any command palette command' },
