@@ -62,7 +62,8 @@ export const aiAccountsLoginApi = defineApi({
     status: method({
       input: accountInput,
       output: accountLoginStateSchema,
-      description: 'Read managed account sign-in status. Metadata only for agent callers; the authenticated Web GUI shows the device instructions. Read-only.',
+      description:
+        'Read the status of a device sign-in started by ai_accounts_begin_login or the Web GUI. Metadata only for agent callers; the authenticated Web GUI shows the device instructions. It does not track a provisional connection the user signed in to from a terminal (it stays idle): finish that one with ai_accounts_complete_connection. Read-only.',
       tool: { name: 'ai_accounts_login_status', readOnly: true, render: renderMetadata },
     }),
     cancel: method({
