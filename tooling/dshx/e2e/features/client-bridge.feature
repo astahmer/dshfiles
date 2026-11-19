@@ -66,3 +66,11 @@ Feature: Agents act in the DSH window
     And a new thread on the fake model is named "Aside target"
     And another new thread on the fake model chains "sidepanel_tabs" then "thread_open_aside" for that thread
     Then the chain listed side panel pages and opened "Aside target" beside the thread
+
+  @scenario:chat.agent-file-reference-link
+  Scenario: A file reference in an agent's reply opens the file at that line
+    Given the isolated plugin composition of "@dshfiles/frame-layout,@dshfiles/ai-accounts,@dshfiles/settings-shell,@dshfiles/dialogs,@dshfiles/chat,@dshfiles/editor,@dshfiles/workbench" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a new thread on the fake model writes "notes/plan.md" with "Ship the file links", then names it in a later answer as "plan.md:1"
+    And the file reference "plan.md:1" in that answer is clicked
+    Then the editor shows the file with "Ship the file links"

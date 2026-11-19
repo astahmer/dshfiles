@@ -745,6 +745,50 @@
           "testName": "refuses another scheme, a window without a pane, or no thread on screen, each with what to do"
         }
       ]
+    },
+    {
+      "id": "file-reference-links",
+      "title": "File references open at their line",
+      "summary": "An inline-code file reference in any assistant reply (name.ts:318, dir/name.ts#L40, a path with a directory) becomes a link that opens the file at that line in the side panel or editor, even for a file the turn only read. A click finds the file among the paths the thread tool calls named, then through the Host file search; a system-prompt section asks the agent to write workspace-relative path:line.",
+      "surfaces": ["client", "host"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: inline-code file references in assistant replies",
+      "configuration": [],
+      "states": ["linked", "opened", "not-found"],
+      "failureModes": ["A name no tool call or search finds opens the written path, and the editor says the file does not exist there."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "chat.agent-file-reference-link",
+          "featureFile": "tooling/dshx/e2e/features/client-bridge.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.file-reference-shape",
+          "file": "plugins/@dshfiles/chat/src/file-reference-links.test.ts",
+          "testName": "links file names with a line and paths with a directory, never code identifiers or hosts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.file-reference-read-path",
+          "file": "plugins/@dshfiles/chat/src/file-reference-links.test.ts",
+          "testName": "opens the file the thread read at the written line, without searching"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.file-reference-search",
+          "file": "plugins/@dshfiles/chat/src/file-reference-links.test.ts",
+          "testName": "falls back to the Host file search for a file the thread never named, and to the written path when nothing matches"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "A prompt section and a client link: the click runs the Host file search only when the thread named no matching path, through the native fileReferences API."
+        }
+      ]
     }
   ]
 }

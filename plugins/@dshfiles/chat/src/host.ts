@@ -4,7 +4,7 @@ import type {} from '@deepseek-ai/dsh-settings'
 import type { Volatile, Context } from '@deepseek-ai/cordis'
 import type { ChatSettings, CollapseTiming, FoldedReplies, ImageGalleryScope, LinkOpening, PerformanceUsageMode, UnreadLanding } from './chat-settings.ts'
 import z from '@deepseek-ai/schemastery'
-import { defineHost } from '@dshfiles/dshx/host'
+import { defineHost, definePromptSection } from '@dshfiles/dshx/host'
 import { Option } from 'effect'
 import * as Schema from 'effect/Schema'
 import { CHAT_SETTINGS_NAMESPACE, IMAGE_GALLERY_SCOPE_FIELD, TRANSCRIPT_VIEW_FIELD, UNREAD_LANDING_FIELD } from './chat-settings.ts'
@@ -90,8 +90,22 @@ const transcriptViewHost = transcriptViewApi.host({
  * schemastery object (it implements Standard Schema), so the `dshfiles-chat` namespace and its live projection to the
  * browser are unchanged; setup is the native `apply`.
  */
+/**
+ * dshfiles: how an Agent points at code so the user can open it. The client links an inline-code `path:line` to the
+ * file at that line in the side panel; a bare name works, a workspace-relative path is never ambiguous.
+ */
+const fileReferenceSection = definePromptSection({
+  name: 'dshfiles-chat:file-references',
+  order: 906,
+  text: [
+    'When you point the user at code, write the location as inline code `path/to/file.ts:42`: the workspace-relative',
+    'path, then a colon and the line. DSH turns it into a link that opens the file at that line in the side panel.',
+  ].join(' '),
+})
+
 export default defineHost({
   Config,
   apis: [transcriptViewHost],
+  prompts: [fileReferenceSection],
   setup: (ctx: Context) => { apply(ctx) },
 })

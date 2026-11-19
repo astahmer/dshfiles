@@ -251,3 +251,26 @@ Then('the chain listed side panel pages and opened {string} beside the thread', 
   await expect(page.getByText('Agent: Open a thread in the side panel').first()).toBeVisible()
   await finishJourneyAssertions(page)
 })
+
+When(
+  'a new thread on the fake model writes {string} with {string}, then names it in a later answer as {string}',
+  async ({ page }: { page: Page }, path: string, content: string, reference: string) => {
+    await newFakeThread(page)
+    await sendMessage(page, `[[call write ${JSON.stringify({ file_path: path, content: `${content}\n` })}]]`)
+    // A later turn that never touched the file: only the reply names it, by its bare name, as an Agent pointing at code does.
+    await sendMessage(page, `[[answer The plan is at \`${reference}\`.]]`)
+  },
+)
+
+When('the file reference {string} in that answer is clicked', async ({ page }: { page: Page }, reference: string) => {
+  const chip = page.locator('code[data-file-chip] button').filter({ hasText: reference }).last()
+  await recordAssertion(page, 'chat-file-reference-is-a-link', () => expect(chip).toBeVisible())
+  await chip.click()
+})
+
+Then('the editor shows the file with {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'chat-file-reference-opened-in-editor', () =>
+    expect(page.locator('[data-editor-surface] .view-lines').filter({ hasText: text }).first()).toBeVisible(),
+  )
+  await finishJourneyAssertions(page)
+})
