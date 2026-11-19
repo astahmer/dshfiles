@@ -59,6 +59,35 @@ export const OVERRIDES = [
   },
 ]
 
+/**
+ * Children the stock preset does not have, each inserted after a stock top-level child. An anchor the stock preset no
+ * longer has fails generation, as for an override.
+ */
+export const ADDITIONS = [
+  {
+    id: 'user-terminals',
+    after: 'compaction',
+    reason:
+      'persistent terminals in the side panel: terminal_open/send/read let the agent run a command the user watches (the panel guidance already names them), and user_terminal_list/read read terminals the user opened (issue #270)',
+    yaml: `- id: user-terminals
+  name: cordis:group
+  group: true
+  isolate:
+    terminals: true
+  config:
+    - id: terminal-registry
+      name: '@deepseek-ai/dsh-terminal'
+    - id: terminal-panel
+      name: '@deepseek-ai/dsh-terminal-panel'
+      config:
+        readUserTerminals: true
+        preferredShells: !!js "process.platform === 'win32' ? ['pwsh', 'powershell'] : []"
+    - id: tool-terminal
+      name: '@deepseek-ai/dsh-tool-terminal'
+`,
+  },
+]
+
 const webAppDirectory = (root = ROOT) => {
   const core = realpathSync(join(root, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'))
   return dirname(createRequire(core).resolve('@deepseek-ai/dsh-web-app/package.json'))
@@ -93,10 +122,21 @@ export const derive = ({ root = ROOT } = {}) => {
     if (override.config === null) child.delete('config')
     else if (override.config !== undefined) child.set('config', doc.createNode(override.config))
   }
+  const plugins = stock.getIn(['config', 'plugins'], true)
+  for (const addition of ADDITIONS) {
+    const index = plugins.items.findIndex(child => YAML.isMap(child) && child.get('id') === addition.after)
+    if (index === -1)
+      throw new Error(
+        `stock preset-standard (dsh-web-app ${version}) has no child "${addition.after}" to insert "${addition.id}" after; review ${fileURLToPath(import.meta.url)}`,
+      )
+    if (byId.has(addition.id)) throw new Error(`stock preset-standard (dsh-web-app ${version}) now has "${addition.id}"; drop or turn it into an override`)
+    const inserted = YAML.parseDocument(addition.yaml, { customTags: [JS_TAG] }).contents.items[0]
+    plugins.items.splice(index + 1, 0, inserted)
+  }
   const row = new YAML.Document(null, { customTags: [JS_TAG] })
   row.contents = row.createNode([])
   row.contents.items.push(stock)
-  const reasons = OVERRIDES.map(override => `#   ${override.id}: ${override.reason}`)
+  const reasons = [...OVERRIDES, ...ADDITIONS].map(change => `#   ${change.id}: ${change.reason}`)
   const body = row.toString({ lineWidth: 0 }).trimEnd()
   return [
     BEGIN,
