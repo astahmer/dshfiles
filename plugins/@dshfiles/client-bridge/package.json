@@ -2,7 +2,7 @@
   "name": "@dshfiles/client-bridge",
   "version": "0.1.0",
   "private": true,
-  "description": "Lets Host-side Agents run the client tools other plugins declare (open Settings at a section, open a tab) in the user's DSH browser window.",
+  "description": "Lets Host-side Agents run the client tools other plugins declare (open a file in the editor, a panel, Settings, a tab, a palette command) in the user's DSH browser window.",
   "license": "MIT",
   "files": [
     "dist",

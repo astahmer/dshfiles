@@ -5,7 +5,7 @@
     {
       "id": "agent-client-tools",
       "title": "Agents act in your DSH window",
-      "summary": "client_tools_list shows the open DSH browser windows and the client tools other plugins declare in them; client_tool_call runs one (open Settings at a section, open a tab), or a chain of up to 20 with steps in one round trip stopping at the first failure, in the window showing the Agent's thread or the one it names, and returns the results. A PTC-mode (Code Mode) agent calls both from a run_code program. The window shows one notice per call for the changes it made.",
+      "summary": "client_tools_list shows the open DSH browser windows and the client tools other plugins declare in them; client_tool_call runs one (open a file at a line in the editor, a panel, Settings, a tab, a palette command), or a chain of up to 20 with steps in one round trip stopping at the first failure, in the window showing the Agent's thread or the one it names, and returns the results. A PTC-mode (Code Mode) agent calls both from a run_code program. The window shows one notice per call for the changes it made.",
       "reach": [
         "seed jev-setup-chat-thread",
         "fill textbox \"Message or run a task*\" \"[[call client_tool_call {\\\"tool\\\":\\\"settings_open\\\",\\\"input\\\":{\\\"section\\\":\\\"General\\\"}}]]\"",
@@ -39,7 +39,8 @@
         "No window offers the tool: the refusal lists the tools the window does offer.",
         "Invalid input: the window replies with the schema validation error and runs nothing.",
         "Switched off in Settings: every call is refused with the setting to turn on.",
-        "A chain stops at the first failing step: the Agent is told which step failed, why, and what already ran in the window; the later steps do not run."
+        "A chain stops at the first failing step: the Agent is told which step failed, why, and what already ran in the window; the later steps do not run.",
+        "A model reads \"open X\" as \"read X\": the two Host tools name what the window can do and when to act there instead of reading."
       ],
       "externalDependencies": [],
       "onboarding": {
@@ -133,6 +134,18 @@
           "id": "client-bridge.runner-chain",
           "file": "plugins/@dshfiles/client-bridge/src/invoke-runner.test.ts",
           "testName": "runs a chain in order, one span per step, and stops at the first failure with one notice for what ran"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.descriptions-name-declared-tools",
+          "file": "plugins/@dshfiles/client-bridge/src/api.test.ts",
+          "testName": "name only client tools an owned plugin still declares"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.descriptions-open-in-window",
+          "file": "plugins/@dshfiles/client-bridge/src/api.test.ts",
+          "testName": "tell the model to act in the window when asked to open something, in both Host tools"
         }
       ],
       "telemetry": [

@@ -6,7 +6,9 @@ export const clientBridgeSettings = defineSettings({
   schema: Schema.object({
     enabled: Schema.boolean()
       .default(true)
-      .description('Let Agents run client tools in your DSH browser windows (open Settings at a section, open a tab). Off refuses every call.'),
+      .description(
+        'Let Agents act in your DSH browser windows (open a file in the editor, a panel, Settings, a tab, a palette command). Off refuses every call.',
+      ),
     notify: Schema.boolean().default(true).description('Show a notice in the window each time an Agent runs a tool that changes the page.'),
   }),
   applies: 'live',
