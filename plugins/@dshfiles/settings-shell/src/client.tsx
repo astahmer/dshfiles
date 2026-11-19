@@ -26,6 +26,7 @@ import {
 } from '@dshfiles/dshx/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { PaletteActions, type PaletteAction } from '@dshfiles/command-palette/palette-contract'
+import { workbenchTabs } from '@dshfiles/workbench/tabs'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -738,6 +739,13 @@ export default defineClient({
         destinations: () =>
           groups.getSnapshot().flatMap(({ group, entries }) => entries.map(entry => ({ id: entry.id, label: entry.label, group: group.label }))),
         open: openRequest,
+        // The tab strip main-tabs publishes through the workbench channel (no dependency on main-tabs itself).
+        openInNewTab: () => {
+          const tabs = workbenchTabs()
+          if (!tabs.getSnapshot().enabled) return false
+          tabs.actions.open({ kind: 'panel', panelId: SETTINGS_PANEL_ID }, true, 'Settings')
+          return true
+        },
       }).map(tool => plugin.add(ClientTools, tool))
       // Plugin pages come from the settings mirror, which otherwise loads on the first Settings open.
       void describe.ensure()

@@ -8,9 +8,16 @@ const destinations = [
   { id: 'market', label: 'Plugin Market', group: 'Plugins' },
 ]
 
-const tools = () => {
-  const opened: OpenSettingsRequest[] = []
-  const created = SettingsClientTools.create({ destinations: () => destinations, open: request => opened.push(request) })
+const tools = (tabsOn = true) => {
+  const opened: Array<OpenSettingsRequest | 'new-tab'> = []
+  const created = SettingsClientTools.create({
+    destinations: () => destinations,
+    open: request => void opened.push(request),
+    openInNewTab: () => {
+      if (tabsOn) opened.push('new-tab')
+      return tabsOn
+    },
+  })
   const byName = (name: string) => {
     const tool = created.find(candidate => candidate.name === name)
     if (tool === undefined) throw new Error(`missing ${name}`)
@@ -24,7 +31,7 @@ const signal = new AbortController().signal
 describe('settings client tools', () => {
   it('opens Settings at the Plugin Market by id or by label, through the open-settings path', async () => {
     const { opened, byName } = tools()
-    await expect(runClientTool(byName('settings_open'), { section: 'market' }, { signal })).resolves.toEqual({ opened: destinations[1] })
+    await expect(runClientTool(byName('settings_open'), { section: 'market' }, { signal })).resolves.toEqual({ opened: destinations[1], newTab: false })
     await runClientTool(byName('settings_open'), { section: 'plugin market', query: 'jira' }, { signal })
     expect(opened).toEqual([{ section: 'market' }, { section: 'market', query: 'jira' }])
   })
@@ -41,5 +48,20 @@ describe('settings client tools', () => {
     expect(byName('settings_sections').readOnly).toBe(true)
     expect(byName('settings_open').readOnly).toBe(false)
     expect(byName('settings_open').description).toMatch(/only when the user asked/u)
+  })
+
+  it('opens Settings in its own tab first when asked, and says when tabs are off', async () => {
+    const on = tools()
+    await expect(runClientTool(on.byName('settings_open'), { section: 'market', newTab: true }, { signal })).resolves.toEqual({
+      opened: destinations[1],
+      newTab: true,
+    })
+    expect(on.opened).toEqual(['new-tab', { section: 'market' }])
+    const off = tools(false)
+    await expect(runClientTool(off.byName('settings_open'), { section: 'market', newTab: true }, { signal })).resolves.toMatchObject({
+      newTab: false,
+      note: expect.stringMatching(/Tabs are off/u),
+    })
+    expect(off.opened).toEqual([{ section: 'market' }])
   })
 })

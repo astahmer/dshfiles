@@ -18,6 +18,9 @@ const openInput = Schema.Struct({
   }),
   target: Schema.optionalKey(text(200)).annotate({ description: 'A search entry id inside that section to scroll to.' }),
   query: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(200))).annotate({ description: 'Search Settings for this text.' }),
+  newTab: Schema.optionalKey(Schema.Boolean).annotate({
+    description: 'Open Settings in its own main tab beside the current one (when the user says “in a new tab”); otherwise the user’s usual place.',
+  }),
 })
 
 /**
@@ -41,6 +44,8 @@ const resolve = (destinations: readonly SettingsDestination[], section: string):
 const create = (ports: {
   readonly destinations: () => readonly SettingsDestination[]
   readonly open: (request: OpenSettingsRequest) => void
+  /** Give Settings its own main tab beside the current one; false while tabs are off or not loaded. */
+  readonly openInNewTab: () => boolean
 }): readonly ClientToolItem[] => [
   defineClientTool({
     name: 'settings_sections',
@@ -54,7 +59,7 @@ const create = (ports: {
     name: 'settings_open',
     title: 'Open Settings',
     description:
-      'Open Settings in the user’s window (as a main tab when tabs are on) at one entry, optionally scrolled to a control or searching. Call only when the user asked to see Settings.',
+      'Open Settings in the user’s window at one entry, optionally scrolled to a control or searching; newTab: true gives it its own tab beside the current one. Call only when the user asked to see Settings.',
     readOnly: false,
     input: openInput,
     execute: input => {
@@ -71,8 +76,14 @@ const create = (ports: {
       }
       if (input.target !== undefined) request.target = input.target
       if (input.query !== undefined) request.query = input.query
+      // The tab first, so the section opens in it rather than in the tab it replaces.
+      const newTab = input.newTab === true ? ports.openInNewTab() : false
       ports.open(request)
-      return { opened: opened ?? { id: 'home', label: 'Settings', group: '' } }
+      return {
+        opened: opened ?? { id: 'home', label: 'Settings', group: '' },
+        newTab,
+        ...(input.newTab === true && !newTab && { note: 'Tabs are off in this window (Settings › Main tabs), so Settings opened in its usual place.' }),
+      }
     },
   }),
 ]
