@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-browser/client'
-import { Browser, Command, createRegisteredApiClient, defineClient, type BrowserService } from '@dshfiles/dshx/client'
+import { Browser, ClientTools, Command, createRegisteredApiClient, defineClient, type BrowserService } from '@dshfiles/dshx/client'
+import { BrowserClientTools } from './browser-client-tools.js'
 import { ChatViewRegistry } from './native/chat/chat-view-registry.ts'
 import { registerWebPageLauncher } from './web-page-launcher.ts'
 import { apply, inject } from './native/index.ts'
@@ -63,6 +64,8 @@ export default defineClient({
       },
     }
     plugin.provide(Browser, browser)
+    // The same pane, offered to Agents as a client tool; a bridge plugin carries the calls.
+    for (const tool of BrowserClientTools.create(browser)) plugin.add(ClientTools, tool)
     // dshfiles (productivity pass Q4): find in thread asks session-search by registered identity (see thread-find-port).
     const finder = createRegisteredApiClient(ctx, SESSION_SEARCH_FIND_API)
     ThreadFindPort.set((input, signal) => {
