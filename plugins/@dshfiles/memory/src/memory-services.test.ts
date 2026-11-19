@@ -496,6 +496,22 @@ describe('memory services', () => {
     }).pipe(Effect.scoped),
   )
 
+  it.effect('gives a digest its full Session id and a thread: link, and resolves t:<id> for the thread detail', () =>
+    Effect.gen(function* () {
+      const memory = yield* harness({})
+      const id = 'session-11111111-0000-4000-8000-000000000000'
+      const thread = halyardThread(id, memory.root)
+      memory.fakes.logs.set(thread.header.id, thread.log())
+      yield* memory.digester.digest(thread.header.id)
+      const digest = yield* memory.recall.read({ id: 't:11111111' })
+      expect(digest).toContain(`Session ${id}; cite it in chat as [`)
+      expect(digest).toContain(`](thread:${id}).`)
+      const short = yield* memory.recall.threadDetail('t:11111111')
+      expect(short.messages).toBeGreaterThan(0)
+      expect(yield* memory.recall.threadDetail(id)).toEqual(short)
+    }).pipe(Effect.scoped),
+  )
+
   it.effect('answers a later thread through search, read and an excerpt, and counts the citation', () =>
     Effect.gen(function* () {
       const memory = yield* harness({})
