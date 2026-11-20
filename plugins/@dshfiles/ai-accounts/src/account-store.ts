@@ -12,6 +12,7 @@ import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
 import { MISTRAL_LOGIN_HINT, MistralAccountModel } from './mistral-account.js'
+import { AntigravityAccountModel } from './antigravity-account.js'
 import { AccountOrderModel } from './account-order-model.js'
 import { type AccountReorder, type CreateSetupAccountInput } from './api.js'
 import { AccountConflict, AccountOrderRejected, AccountStoreFileUnreadable, AccountStoreWriteFailed } from './errors.js'
@@ -128,6 +129,18 @@ const observe = async (
       detail: null,
     })
   }
+  if (draft.kind === 'antigravity') {
+    const home = AntigravityAccountModel.resolveHome(draft.homePath)
+    const description = await AntigravityAccountModel.describe({ home })
+    return observed(draft, {
+      pool,
+      signedIn: description.signedIn,
+      identity: null,
+      plan: description.signedIn ? (description.plan ?? null) : null,
+      loginHint: AntigravityAccountModel.loginHint(home),
+      detail: description.signedIn ? null : description.detail,
+    })
+  }
   if (draft.kind === 'claude') {
     const configDir = ClaudeAccountModel.resolveClaudeConfigDir(draft.homePath)
     const auth = await claudeAccountService.describeAuth({ configDir, keyEnv: draft.apiKeyEnv, now: Date.now(), resolveCredential })
@@ -236,6 +249,7 @@ const connectionMetadata = (draft: AccountDraft, shadowRoot: string): Pick<Accou
   }
   if (draft.kind === 'claude')
     return { mode: 'direct', loginHint: ClaudeAccountModel.claudeLoginHint(ClaudeAccountModel.resolveClaudeConfigDir(draft.homePath)) }
+  if (draft.kind === 'antigravity') return { mode: 'direct', loginHint: AntigravityAccountModel.loginHint(AntigravityAccountModel.resolveHome(draft.homePath)) }
   return {
     mode: 'direct',
     loginHint: directLoginHint(draft.kind),

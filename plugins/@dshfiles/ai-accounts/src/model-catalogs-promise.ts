@@ -1,7 +1,7 @@
 import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
 import { Effect, Exit, Fiber, Option, Schema, type Context } from 'effect'
 import type { ModelCatalogs } from './model-catalogs.js'
-import type { KeyedRoute } from './provider-routes.js'
+import type { DiscoveringRoute } from './provider-routes.js'
 
 /** One account's model discovery failed; the catalog keeps its previous models. */
 export class ModelCatalogRefreshFailed extends Schema.TaggedError<ModelCatalogRefreshFailed>()('ModelCatalogRefreshFailed', {
@@ -21,9 +21,9 @@ export interface ModelCatalogsPromise {
     instanceId: string,
     task: (signal: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>,
   ) => Promise<readonly LlmDiscoveredModel[] | undefined>
-  readonly record: (input: { readonly instanceId: string; readonly route: KeyedRoute; readonly models: readonly LlmDiscoveredModel[] }) => void
+  readonly record: (input: { readonly instanceId: string; readonly route: DiscoveringRoute; readonly models: readonly LlmDiscoveredModel[] }) => void
   readonly forget: (instanceId: string) => void
-  readonly retain: (matches: (input: { readonly instanceId: string; readonly route: KeyedRoute }) => boolean) => void
+  readonly retain: (matches: (input: { readonly instanceId: string; readonly route: DiscoveringRoute }) => boolean) => void
 }
 
 export class ModelCatalogsPromiseModel {

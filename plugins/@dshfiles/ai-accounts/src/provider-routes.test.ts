@@ -125,6 +125,7 @@ describe('provider ids another plugin serves', () => {
     ],
     claudeAccounts: [],
     githubCopilotAccounts: [{ instanceId: 'copilot-work', displayName: 'Copilot Work', enabled }],
+    antigravityAccounts: [],
     opencodeApiKey: '',
     distribution: 'sticky',
     cooldownMs: 0,

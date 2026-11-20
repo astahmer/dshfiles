@@ -41,11 +41,20 @@ export interface ClaudeAccountConfig {
   readonly enabled: boolean
 }
 
+export interface AntigravityAccountConfig {
+  readonly instanceId: string
+  readonly displayName: string
+  /** HOME the Antigravity CLI runs with, whose `.gemini` holds the login; empty means the Host user's home. */
+  readonly home: string
+  readonly enabled: boolean
+}
+
 export interface AiAccountsConfig {
   readonly codexAccounts: readonly CodexAccountConfig[]
   readonly opencodeAccounts: readonly OpenCodeAccountConfig[]
   readonly claudeAccounts: readonly ClaudeAccountConfig[]
   readonly githubCopilotAccounts: readonly GitHubCopilotAccountConfig[]
+  readonly antigravityAccounts: readonly AntigravityAccountConfig[]
   readonly opencodeApiKey: string
   readonly distribution: Distribution
   readonly cooldownMs: number
@@ -66,10 +75,15 @@ export const configFromAccountsFile = (file: AccountStoreFile): AiAccountsConfig
   const opencodeAccounts: KeyedAccountConfig[] = []
   const claudeAccounts: ClaudeAccountConfig[] = []
   const githubCopilotAccounts: GitHubCopilotAccountConfig[] = []
+  const antigravityAccounts: AntigravityAccountConfig[] = []
   for (const account of file.accounts) {
     if (account.kind === 'codex' || account.kind === 'cursor') continue
     if (account.kind === 'github-copilot') {
       githubCopilotAccounts.push({ instanceId: account.instanceId, displayName: account.displayName, enabled: account.enabled })
+      continue
+    }
+    if (account.kind === 'antigravity') {
+      antigravityAccounts.push({ instanceId: account.instanceId, displayName: account.displayName, home: account.homePath, enabled: account.enabled })
       continue
     }
     if (account.kind === 'claude') {
@@ -99,6 +113,7 @@ export const configFromAccountsFile = (file: AccountStoreFile): AiAccountsConfig
     opencodeAccounts,
     claudeAccounts,
     githubCopilotAccounts,
+    antigravityAccounts,
     opencodeApiKey: CredentialModel.readKeyFromEnv('OPENCODE_API_KEY') ?? '',
     distribution: file.distribution,
     cooldownMs: file.cooldownMs,

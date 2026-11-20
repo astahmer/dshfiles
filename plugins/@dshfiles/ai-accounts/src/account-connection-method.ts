@@ -8,6 +8,7 @@ const methods = {
   commandcode: ['key', 'cli', 'reference'],
   cursor: ['key', 'cli', 'reference'],
   mistral: ['cli', 'key', 'reference'],
+  antigravity: ['cli'],
 } as const satisfies Record<AccountKind, readonly AccountConnectionMethod[]>
 const labels = {
   device: 'Sign in in the browser',
@@ -26,6 +27,8 @@ export class AccountConnectionMethodModel {
   }
   static defaultMethod = (kind: AccountKind, existing?: Pick<AccountDraft, 'apiKeyEnv'>): AccountConnectionMethod => {
     if (kind === 'codex' || kind === 'github-copilot') return 'device'
+    // Google serves its plans only to its own Antigravity CLI, so its login is the only connection.
+    if (kind === 'antigravity') return 'cli'
     if (existing !== undefined && existing.apiKeyEnv.trim() !== '') return 'reference'
     if (kind === 'claude') return 'subscription'
     if (existing !== undefined && (kind === 'commandcode' || kind === 'cursor')) return 'cli'

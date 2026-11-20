@@ -6,6 +6,7 @@ import type { OAuthCredential } from '@earendil-works/pi-ai'
 import { readCopilotUsage } from './copilot-quota.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { readCursorUsage } from './cursor-account.js'
+import { AntigravityAccountModel } from './antigravity-account.js'
 import { MistralAccountModel } from './mistral-account.js'
 import { ProviderUsageModel, readCodexUsage, readOpenCodeUsage } from './usage.js'
 
@@ -90,6 +91,8 @@ export const readAccountUsage = async (input: {
         onAuthenticated: input.onAuthenticated,
         signal,
       })
+    case 'antigravity':
+      return AntigravityAccountModel.readUsage({ home: AntigravityAccountModel.resolveHome(account.homePath), onAuthenticated: input.onAuthenticated })
     case 'opencode-go': {
       const key = input.resolveCredential === undefined ? CredentialModel.readKeyFromEnv(account.apiKeyEnv) : await input.resolveCredential(account.apiKeyEnv)
       return readOpenCodeUsage(key, signal, input.onAuthenticated)

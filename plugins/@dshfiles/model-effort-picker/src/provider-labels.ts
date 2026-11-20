@@ -9,4 +9,5 @@ export const PROVIDER_LABEL = {
   'github-copilot': 'GitHub Copilot',
   cursor: 'Cursor',
   mistral: 'Mistral',
+  antigravity: 'Antigravity',
 } satisfies Record<AccountKind, string>

@@ -23,7 +23,7 @@ makes the strip a filter (`usageStripPinned`): only pinned accounts are segments
 ("CC1 10% · CC2 12% · CC3 limit 2h 40m +3"; a reset only at the limit); its sheet lists every account with its reset.
 
 AI Accounts runs several subscription accounts side by side. Codex, Claude,
-Mistral, OpenCode Go and Command Code accounts each become their own route in the
+Antigravity (Google AI plans), Mistral, OpenCode Go and Command Code accounts each become their own route in the
 model picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
 accounts only track identity and quota: DSH has no Cursor agent runtime, so
 Cursor sessions run outside DSH.
@@ -259,6 +259,37 @@ with `toolUse`, and DSH's tool result releases it, so the same process continues
 A new user turn goes to the same process; a process whose transcript diverged (an edit, a compaction, a Host restart)
 is replaced by one that receives the transcript so far as text. Idle processes stop after 30 minutes, and at most six
 run at once. `src/claude-cli.ts` holds the transport; a setup-token or API key keeps the Messages API.
+
+## Google AI plans through the Antigravity CLI
+
+![Connect an Antigravity account with the official agy sign-in](docs/screenshots/antigravity-accounts.png)
+
+Google serves its individual plans (free, Google AI Pro, Google AI Ultra) to coding agents only through its own
+[Antigravity CLI](https://antigravity.google/docs/cli/acp/), `agy`: Gemini CLI
+[stopped serving them](https://github.com/google-gemini/gemini-cli/discussions/28017) on 2026-06-18, and reusing a
+Google login outside Google's own client gets accounts suspended. An **Antigravity** account therefore never reads,
+copies or replays the Google login. It runs `agy acp`, the Agent Client Protocol server Google documents for editors,
+and lets that process talk to Google, the same way Claude accounts run the `claude` CLI.
+
+- **Install and sign in.** Install the CLI on the Host (`curl -fsSL https://antigravity.google/cli/install.sh | bash`),
+  then run `agy acp --login`: it prints a Google link, and the page it lands on shows a code to paste back. The login
+  lives under `$HOME/.gemini`. A second Google account gets its own folder in **HOME for agy**, signed in with
+  `HOME=<folder> agy acp --login`.
+- **Models.** Whatever the account's plan offers, read from `agy` itself when the account is read: one ACP session is
+  opened in a scratch folder, nothing is prompted, and each model's thought levels are read by selecting it (Gemini 4
+  Argon stops at High, for example). The plan name (`Google AI Pro`, `Antigravity Starter Quota`…) shows on the account.
+  Gemini 4 needs Google AI Pro or Ultra; the free tier offers Gemini 3.8 Flash and the third-party models Google adds to
+  it.
+- **Requests.** Each DSH conversation drives one `agy acp` process with its own private `--gemini-dir`, so the
+  conversation's files, settings and history stay out of the user's own `agy`, and are removed with the process. A
+  custom agent in that folder carries DSH's system prompt and turns off Antigravity's built-in tools (`tools: []`); DSH's
+  tools reach the model over the same MCP bridge Claude uses (`src/cli-bridge.ts`), and a held call ends the DSH step
+  with `toolUse` until DSH's result releases it, inside the same ACP prompt. The model and thought level are set with
+  `session/set_config_option`; a level the model does not offer falls back to the closest lower one. Thought summaries
+  stream as thinking, and the turn's tokens and cache reads come from the prompt result. `src/antigravity-acp.ts` holds
+  the transport.
+- **Quota.** ACP exposes no quota, so the card names the plan and points to `agy` → `/usage` instead of guessing.
+- **Sign out.** Not offered: run `agy` and type `/logout`.
 
 ## API keys
 

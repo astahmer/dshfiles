@@ -22,7 +22,7 @@ import { ShellCommand } from './shell-command.js'
  * whether it holds a login, the identity it presents, and the command that creates one.
  */
 
-export const accountKindSchema = Schema.Literals(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor', 'mistral'])
+export const accountKindSchema = Schema.Literals(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor', 'mistral', 'antigravity'])
 
 export const createSetupAccountInputSchema = Schema.Struct({ kind: accountKindSchema, requestId: Schema.String.check(Schema.isUUID()) })
 export type CreateSetupAccountInput = typeof createSetupAccountInputSchema.Type

@@ -569,6 +569,30 @@ Then('account setup closes without navigating away or losing the composer draft'
   await finishJourneyAssertions(page)
 })
 
+When('an Antigravity account is chosen from the sidebar add-account shortcut', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Add AI account', exact: true }).click()
+  const chooser = page.getByRole('dialog', { name: 'Add account', exact: true })
+  await chooser.getByRole('button', { name: 'Antigravity account', exact: true }).click()
+})
+
+Then('the Antigravity CLI sign-in command is offered without a key field, and cancelling adds no account', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-antigravity-setup', async () => {
+    const dialog = page.getByRole('dialog').last()
+    await expect(dialog).toContainText('official Antigravity CLI (agy)')
+    await expandSetupDetails(page, 'Sign-in command')
+    await expect(dialog.locator('pre code')).toContainText('agy acp --login')
+    await expect(dialog.getByRole('button', { name: 'Copy Antigravity sign-in command', exact: true })).toBeVisible()
+    await expect(dialog.getByRole('textbox', { name: 'API key value', exact: true })).toHaveCount(0)
+    await page.screenshot({ path: test.info().outputPath('provisional-antigravity.png') })
+    await emptyAccountStore(page)
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(dialog).toBeHidden()
+    await emptyAccountStore(page)
+    await expect(providerAccounts(page)).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('restored sign-in methods are configured provisionally without using real credentials', async ({ page }: { page: Page }) => {
   await startFakeCommandCode(page)
   for (const name of ['Claude', 'Codex', 'Command Code', 'Cursor', 'OpenCode Go']) {

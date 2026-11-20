@@ -12,6 +12,7 @@ import type { AccountStoreFile } from './account-store.js'
 import type { AccountSessionCapability } from './account-session-api.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
+import { AntigravityAccountModel } from './antigravity-account.js'
 import { CodexHomeModel, type CodexHomeLayout } from './codex-home.js'
 import { createCodexLoginFiles } from './codex-login-files.js'
 import { CODEX_LOGIN_EXECUTABLE } from './codex-login-process.js'
@@ -294,6 +295,12 @@ export const createAccountSessionService = (input: {
       return {
         reason: `${account.kind === 'cursor' ? 'Cursor Agent' : 'Command Code'} currently uses a shared global CLI login. Run ${account.kind === 'cursor' ? 'cursor-agent logout' : 'cmd logout'} manually; DSH cannot safely scope that command to this profile.`,
       }
+    if (account.kind === 'antigravity') {
+      const home = AntigravityAccountModel.resolveHome(account.homePath)
+      return {
+        reason: `The Antigravity CLI owns this Google login in ${home}/.gemini. Run ${AntigravityAccountModel.command(home)} and type /logout; DSH never reads or removes that login itself.`,
+      }
+    }
     if (account.kind === 'mistral')
       return {
         reason:
