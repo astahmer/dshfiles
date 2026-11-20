@@ -1244,6 +1244,9 @@ importers:
       '@dshfiles/input-trigger':
         specifier: workspace:*
         version: link:../input-trigger
+      '@dshfiles/model-effort-picker':
+        specifier: workspace:*
+        version: link:../model-effort-picker
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
