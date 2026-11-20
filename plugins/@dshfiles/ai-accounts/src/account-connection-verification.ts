@@ -120,6 +120,7 @@ export const verifyAccountConnection = async (
       shadowRoot: input.shadowRoot,
       resolveCredential,
       readCopilotCredential: input.readCopilotCredential,
+      describeAntigravity: input.describeAntigravity,
       signal: controller.signal,
       onAuthenticated: () => {
         if (!controller.signal.aborted) authenticated = true

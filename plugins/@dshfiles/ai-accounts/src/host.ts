@@ -100,6 +100,7 @@ import {
 import { AntigravityAcpSessions } from './antigravity-acp.js'
 import { ANTIGRAVITY_CLI_TOKEN, AntigravityAccountModel } from './antigravity-account.js'
 import { createAntigravityProvider } from './antigravity-provider.js'
+import { AntigravityProcesses, AntigravityProcessesPromiseModel, type AntigravityProcessesPromise } from './antigravity-processes.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -139,6 +140,7 @@ const startAccountsHost = (input: {
   readonly usageHistory: { readonly collectNow: () => Promise<number> }
   readonly pricing: PricingCatalogPromise
   readonly modelCatalogs: ModelCatalogsPromise
+  readonly antigravity: AntigravityProcessesPromise
   readonly onRelease: (release: () => void) => void
 }): AccountsHostActivation => {
   const { ctx, readSettings, store, onRelease } = input
@@ -168,6 +170,7 @@ const startAccountsHost = (input: {
           [],
           resolveCredential,
           async id => (await copilotCredentialReader(id)) !== undefined,
+          runtime.antigravity?.describe,
         )
       ).accounts[0]
     },
@@ -176,6 +179,7 @@ const startAccountsHost = (input: {
       return verifyAccountConnection({
         ...request,
         readCopilotCredential: async id => runtime.copilotLogin?.readPending(id) ?? copilotCredentialReader(id),
+        describeAntigravity: runtime.antigravity?.describe,
         ...(pendingHome !== undefined && {
           readAccountUsage: async (probe: Parameters<typeof readAccountUsage>[0]) =>
             probe.account.kind === 'codex' ? readCodexUsage(pendingHome, probe.signal, probe.onAuthenticated) : readAccountUsage(probe),
@@ -335,13 +339,19 @@ const startAccountsHost = (input: {
     },
   })
   // Google AI plans serve only Google's own Antigravity CLI; requests run through one `agy acp` per conversation.
+  const describeAntigravity = (home: string) => AntigravityAccountModel.describe({ home, processes: input.antigravity })
+  runtime.antigravity = { describe: describeAntigravity }
+  onRelease(() => {
+    if (runtime.antigravity?.describe === describeAntigravity) delete runtime.antigravity
+  })
   const antigravityCli = new AntigravityAcpSessions({
+    processes: input.antigravity,
     home: provider => {
       const route = routes.get(provider)
       return route?.kind === ANTIGRAVITY_KIND ? route.home : AntigravityAccountModel.resolveHome('')
     },
   })
-  onRelease(() => antigravityCli.dispose())
+  onRelease(() => void antigravityCli.dispose())
   const antigravityUpstream = createAntigravityProvider(antigravityCli)
   const githubCopilotUpstream = githubCopilotProvider()
   const declaredRetryAfter = new DeclaredRetryAfter()
@@ -690,7 +700,7 @@ const startAccountsHost = (input: {
   const registerKeyedDiscovery = (id: string, route: DiscoveringRoute): void => {
     const dispose = llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async (request, signal) => {
       if (route.kind === ANTIGRAVITY_KIND) {
-        const description = await AntigravityAccountModel.describe({ home: route.home })
+        const description = await describeAntigravity(route.home)
         if (!description.signedIn) throw new LlmError(description.detail, 'MISSING_CREDENTIAL')
         antigravityUpstream.remember(description.models)
         return description.models.map(entry => ({ id: entry.id, name: entry.name }))
@@ -873,6 +883,7 @@ const AccountsHostLive = Layer.effectDiscard(
     const usage = UsageSnapshotPromiseModel.facade(yield* UsageSnapshot, services)
     const usageHistory = UsageHistoryPromiseModel.facade(yield* UsageHistorySchedule, services)
     const modelCatalogs = ModelCatalogsPromiseModel.facade(yield* ModelCatalogs, services)
+    const antigravity = AntigravityProcessesPromiseModel.facade(yield* AntigravityProcesses, services)
     const pricingService = yield* PricingCatalog
     const pricing = PricingCatalogPromiseModel.facade(pricingService, services)
     // The imperative Host reads preferences synchronously; this mirror follows every committed change.
@@ -898,6 +909,7 @@ const AccountsHostLive = Layer.effectDiscard(
             usageHistory,
             pricing,
             modelCatalogs,
+            antigravity,
             onRelease: release => releases.push(release),
           }),
           releases,
@@ -939,6 +951,7 @@ export default DshxPlugin.make({
         UsageHistoryPromiseModel.layer,
         PricingCatalog.scheduled().pipe(Layer.provideMerge(PricingCatalog.layer({ path: DEFAULT_PRICING_PATH }))),
         ModelCatalogs.layer,
+        AntigravityProcesses.hostLayer,
       ).pipe(
         Layer.provideMerge(AccountPoolLive),
         Layer.provideMerge(

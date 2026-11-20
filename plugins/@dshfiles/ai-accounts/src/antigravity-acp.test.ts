@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { normalizeContext, type AssistantMessage, type AssistantMessageEventStream, type Message, type Model } from '@earendil-works/pi-ai'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { layer as nodeChildProcessSpawnerLayer } from '@effect/platform-node/NodeChildProcessSpawner'
+import { Context, Effect, Layer, Scope } from 'effect'
 import { afterEach, expect, it, vi } from 'vitest'
+import { AntigravityProcesses, AntigravityProcessesPromiseModel } from './antigravity-processes.js'
+import { AccountsPlatformLive } from './platform-layer.js'
 import { AntigravityAcpSessions } from './antigravity-acp.js'
 import { AntigravityAccountModel } from './antigravity-account.js'
 import { createAntigravityProvider } from './antigravity-provider.js'
@@ -87,10 +91,17 @@ createInterface({ input: process.stdin }).on('line', async line => {
 })
 `
 
+/** The production service on Effect's Node spawner, as the transport drives it through its Promise facade. */
+const processesScope = Scope.makeUnsafe()
+const processesContext = Effect.runSync(
+  Layer.buildWithScope(AntigravityProcesses.layer.pipe(Layer.provide(nodeChildProcessSpawnerLayer), Layer.provide(AccountsPlatformLive)), processesScope),
+)
+const processes = AntigravityProcessesPromiseModel.facade(Context.get(processesContext, AntigravityProcesses), processesContext)
+
 const directories: string[] = []
 const sessions: AntigravityAcpSessions[] = []
-afterEach(() => {
-  for (const session of sessions.splice(0)) session.dispose()
+afterEach(async () => {
+  await Promise.all(sessions.splice(0).map(session => session.dispose()))
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
@@ -104,7 +115,7 @@ const fakeAgy = (source = FAKE_AGY): string => {
 }
 
 const setup = (home = '/synthetic/agy-home') => {
-  const cli = new AntigravityAcpSessions({ home: () => home, executable: fakeAgy() })
+  const cli = new AntigravityAcpSessions({ processes, home: () => home, executable: fakeAgy() })
   sessions.push(cli)
   const provider = createAntigravityProvider(cli)
   const model = (id: string): Model<string> => provider.describeModel(id)
@@ -230,8 +241,8 @@ it("runs agy with DSH's agent in a private Gemini folder, the account HOME and n
     expect(readFileSync(join(geminiDir, 'config', 'agents', 'dsh.md'), 'utf8')).toBe(
       '---\nname: dsh\ndescription: DeepSeek Harness conversation agent.\ntools: []\nmainAgent: true\nsubagent: false\n---\nYou are DSH.\n',
     )
-    cli.dispose()
-    await vi.waitFor(() => expect(existsSync(geminiDir)).toBe(false))
+    await cli.dispose()
+    expect(existsSync(geminiDir)).toBe(false)
   } finally {
     vi.unstubAllEnvs()
   }
@@ -266,7 +277,7 @@ it('keeps a process that is awaiting a tool call past the idle timeout, then sto
 })
 
 it('describes a signed-in account: plan, models and the thought levels each one accepts', async () => {
-  const description = await AntigravityAccountModel.probe({ home: '/synthetic/probe-home', executable: fakeAgy() })
+  const description = await AntigravityAccountModel.probe({ home: '/synthetic/probe-home', processes, executable: fakeAgy() })
   expect(description).toEqual({
     signedIn: true,
     plan: 'Google AI Pro',
@@ -278,11 +289,11 @@ it('describes a signed-in account: plan, models and the thought levels each one 
 })
 
 it('describes a signed-out account with its sign-in command, and a missing CLI with its install command', async () => {
-  expect(await AntigravityAccountModel.probe({ home: '/synthetic/signed-out-probe', executable: fakeAgy() })).toEqual({
+  expect(await AntigravityAccountModel.probe({ home: '/synthetic/signed-out-probe', processes, executable: fakeAgy() })).toEqual({
     signedIn: false,
     detail: "Antigravity CLI is not signed in for this account. Run: HOME='/synthetic/signed-out-probe' agy acp --login",
   })
-  expect(await AntigravityAccountModel.probe({ home: '/synthetic/probe-home', executable: '/synthetic/missing/agy' })).toEqual({
+  expect(await AntigravityAccountModel.probe({ home: '/synthetic/probe-home', processes, executable: '/synthetic/missing/agy' })).toEqual({
     signedIn: false,
     detail: 'Antigravity CLI (agy) is not installed on the Host. Install it with: curl -fsSL https://antigravity.google/cli/install.sh | bash',
   })
@@ -290,7 +301,7 @@ it('describes a signed-out account with its sign-in command, and a missing CLI w
 
 it('records an antigravity describe span with the model count, never the home, plan or model names', async () => {
   using recorder = recordSpans()
-  await AntigravityAccountModel.probe({ home: '/synthetic/private-home', executable: fakeAgy() })
+  await AntigravityAccountModel.probe({ home: '/synthetic/private-home', processes, executable: fakeAgy() })
   const span = recorder.span('antigravity describe')
   expect(span.kind).toBe('client')
   expect(span.attributes).toEqual({ 'process.executable.name': 'agy', 'antigravity.models': 2 })

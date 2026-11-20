@@ -1,10 +1,8 @@
-import type { Readable, Writable } from 'node:stream'
-import { createInterface } from 'node:readline'
 import * as Schema from 'effect/Schema'
 import { CliBridge } from './cli-bridge.js'
 
 /**
- * JSON-RPC 2.0 over a child's stdio, one message per line: the transport of the Agent Client Protocol (ACP) that
+ * JSON-RPC 2.0, one message per line: the transport of the Agent Client Protocol (ACP) that
  * `agy acp` serves. Responses settle the matching request; requests and notifications from the agent go to the owner.
  */
 
@@ -43,20 +41,14 @@ export class AcpRpc {
 
   constructor(
     private readonly input: {
-      /** The agent's stdout, one JSON-RPC message per line. */
-      readonly from: Readable
-      /** The agent's stdin. */
-      readonly to: Writable
+      /** Write one line to the agent's stdin. */
+      readonly send: (line: string) => void
       /** A notification from the agent, such as `session/update`. */
       readonly onNotification: (method: string, params: AcpJson) => void
       /** A request from the agent, such as `session/request_permission`: the result sent back, or none for an unsupported method. */
       readonly onRequest: (method: string, params: AcpJson) => { readonly result: AcpJson } | undefined
     },
-  ) {
-    createInterface({ input: input.from }).on('line', line => this.receive(line))
-    // A write after the process exited fails with EPIPE; the exit handler already reports the failure.
-    input.to.on('error', () => undefined)
-  }
+  ) {}
 
   request(method: string, params: AcpJson): Promise<AcpJson> {
     if (this.closedWith !== undefined) return Promise.reject(this.closedWith)
@@ -81,10 +73,11 @@ export class AcpRpc {
   }
 
   private write(message: AcpJson): void {
-    this.input.to.write(`${JSON.stringify(message)}\n`)
+    this.input.send(JSON.stringify(message))
   }
 
-  private receive(line: string): void {
+  /** One line the agent wrote to its stdout. */
+  accept(line: string): void {
     if (line.trim() === '') return
     const decoded = CliBridge.decodeJsonLine(rpcLineSchema, line)
     if (decoded._tag !== 'Success') return

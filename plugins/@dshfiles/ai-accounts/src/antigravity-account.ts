@@ -1,10 +1,10 @@
-import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdirSync, mkdtempSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import * as Schema from 'effect/Schema'
 import { AcpRequestFailed, AcpRpc } from './acp-rpc.js'
+import type { AgyLaunch, AntigravityProcessesPromise } from './antigravity-processes.js'
 import type { UsageCard } from './api.js'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { AiAccountsSchema } from './effect-schema.js'
@@ -94,25 +94,6 @@ export class AntigravityAccountModel {
   static levelsOf = (options: AcpConfigOptions | undefined): readonly AntigravityLevel[] =>
     AntigravityAccountModel.optionValues(options, 'thought_level').filter(isLevel)
 
-  /** Stop `child` and resolve once it has exited, or after a grace period if it ignores the signal. */
-  static stopChild = (child: ChildProcess): Promise<void> =>
-    new Promise(resolve => {
-      if (child.exitCode !== null || child.signalCode !== null) {
-        resolve()
-        return
-      }
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL')
-        resolve()
-      }, 5_000)
-      timer.unref()
-      child.once('exit', () => {
-        clearTimeout(timer)
-        resolve()
-      })
-      child.kill()
-    })
-
   /** The HOME `agy` runs with for this account; empty means the Host user's own home and its `~/.gemini` login. */
   static resolveHome = (homePath: string): string => {
     const trimmed = homePath.trim()
@@ -128,11 +109,12 @@ export class AntigravityAccountModel {
   static loginHint = (home: string): string => AntigravityAccountModel.command(home, 'acp --login')
 
   /** `agy` finds its login under `$HOME/.gemini`, so a separate account is a separate HOME. */
-  static cliEnvironment = (input: { readonly environment: NodeJS.ProcessEnv; readonly home: string }): NodeJS.ProcessEnv => {
-    const environment = { ...input.environment }
-    // An API key in the environment would make `agy` bill the Gemini API instead of the plan the login carries.
-    delete environment['GEMINI_API_KEY']
-    delete environment['GOOGLE_API_KEY']
+  static cliEnvironment = (input: { readonly environment: NodeJS.ProcessEnv; readonly home: string }): AgyLaunch['env'] => {
+    const environment: Record<string, string> = {}
+    for (const [name, value] of Object.entries(input.environment)) {
+      // An API key in the environment would make `agy` bill the Gemini API instead of the plan the login carries.
+      if (value !== undefined && name !== 'GEMINI_API_KEY' && name !== 'GOOGLE_API_KEY') environment[name] = value
+    }
     if (input.home !== homedir()) environment['HOME'] = input.home
     return environment
   }
@@ -145,7 +127,12 @@ export class AntigravityAccountModel {
   }
 
   /** Sign-in state, plan and models of the login under `home`, cached for a while per home. */
-  static describe = (input: { readonly home: string; readonly executable?: string; readonly now?: number }): Promise<AntigravityAccountDescription> => {
+  static describe = (input: {
+    readonly home: string
+    readonly processes: AntigravityProcessesPromise
+    readonly executable?: string
+    readonly now?: number
+  }): Promise<AntigravityAccountDescription> => {
     const now = input.now ?? Date.now()
     const cached = describeCache.get(input.home)
     if (cached !== undefined && cached.expiresAt > now) return cached.description
@@ -160,11 +147,10 @@ export class AntigravityAccountModel {
    * ACP does not expose them, so the card names the plan and says where to look rather than inventing a percentage.
    */
   static readUsage = async (input: {
-    readonly home: string
-    readonly executable?: string
+    readonly describe: () => Promise<AntigravityAccountDescription>
     readonly onAuthenticated?: (() => void) | undefined
   }): Promise<UsageCard> => {
-    const description = await AntigravityAccountModel.describe(input)
+    const description = await input.describe()
     if (!description.signedIn) return ProviderUsageModel.emptyUsage('unauthenticated', description.detail)
     input.onAuthenticated?.()
     return {
@@ -193,21 +179,27 @@ export class AntigravityAccountModel {
    * Open one ACP session in a scratch folder and read what `agy` offers: the plan, every model, and each model's thought
    * levels (they change with the selected model). Nothing is prompted, so no quota is spent.
    */
-  static probe = (input: { readonly home: string; readonly executable?: string }): Promise<AntigravityAccountDescription> =>
+  static probe = (input: {
+    readonly home: string
+    readonly processes: AntigravityProcessesPromise
+    readonly executable?: string
+  }): Promise<AntigravityAccountDescription> =>
     withSpan('antigravity describe', { kind: 'client', attributes: { 'process.executable.name': ANTIGRAVITY_EXECUTABLE } }, async span => {
       const directory = mkdtempSync(join(tmpdir(), 'dsh-agy-probe-'))
       const geminiDir = join(directory, 'gemini')
       mkdirSync(geminiDir, { recursive: true })
-      const child = spawn(input.executable ?? ANTIGRAVITY_EXECUTABLE, ['acp', '--gemini-dir', geminiDir, '--disable-telemetry'], {
+      // The handlers run only once agy writes, after `rpc` below exists.
+      const running = input.processes.launch({
+        executable: input.executable ?? ANTIGRAVITY_EXECUTABLE,
+        args: ['acp', '--gemini-dir', geminiDir, '--disable-telemetry'],
         cwd: directory,
         env: AntigravityAccountModel.cliEnvironment({ environment: process.env, home: input.home }),
-        stdio: ['pipe', 'pipe', 'pipe'],
+        onLine: line => rpc.accept(line),
+        onStderr: () => undefined,
+        onEnd: outcome => rpc.close(new Error(outcome.kind === 'failed' && outcome.missing ? 'ENOENT: agy is not installed' : 'agy exited before it answered')),
       })
-      const rpc = new AcpRpc({ from: child.stdout, to: child.stdin, onNotification: () => undefined, onRequest: () => undefined })
-      const timer = setTimeout(() => rpc.close(new Error(`no answer within ${String(PROBE_TIMEOUT_MS / 1000)} s`)), PROBE_TIMEOUT_MS)
-      timer.unref()
-      child.on('error', error => rpc.close(error))
-      child.on('exit', code => rpc.close(new Error(`agy exited with ${String(code)}`)))
+      const rpc = new AcpRpc({ send: line => running.send(line), onNotification: () => undefined, onRequest: () => undefined })
+      const cancelTimeout = input.processes.after(PROBE_TIMEOUT_MS, () => rpc.close(new Error(`no answer within ${String(PROBE_TIMEOUT_MS / 1000)} s`)))
       try {
         await rpc.request('initialize', {
           protocolVersion: 1,
@@ -236,10 +228,9 @@ export class AntigravityAccountModel {
         span.setAttribute('antigravity.signed_in', false)
         return { signedIn: false, detail: probeFailure(error, input.home) }
       } finally {
-        clearTimeout(timer)
+        cancelTimeout()
         rpc.close(new Error('probe finished'))
-        await AntigravityAccountModel.stopChild(child)
-        // `agy` and its worker may still be flushing into the folder as they exit.
+        await running.stop()
         await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(() => undefined)
       }
     })

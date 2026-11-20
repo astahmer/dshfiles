@@ -287,7 +287,8 @@ and lets that process talk to Google, the same way Claude accounts run the `clau
   with `toolUse` until DSH's result releases it, inside the same ACP prompt. The model and thought level are set with
   `session/set_config_option`; a level the model does not offer falls back to the closest lower one. Thought summaries
   stream as thinking, and the turn's tokens and cache reads come from the prompt result. `src/antigravity-acp.ts` holds
-  the transport.
+  the transport; `src/antigravity-processes.ts` runs `agy` on the Host's DSH subprocess spawner, which stops the ACP
+  front and its session worker together.
 - **Quota.** ACP exposes no quota, so the card names the plan and points to `agy` → `/usage` instead of guessing.
 - **Sign out.** Not offered: run `agy` and type `/logout`.
 

@@ -1,4 +1,3 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { closeSync, mkdirSync, mkdtempSync, openSync, promises as fsPromises, readSync, unwatchFile, watch, watchFile, writeFileSync } from 'node:fs'
 import { createServer, type Server, type Socket } from 'node:net'
@@ -27,6 +26,7 @@ import {
   type AcpConfigOptions,
   type AntigravityLevel,
 } from './antigravity-account.js'
+import type { AgyRunning, AntigravityProcessesPromise } from './antigravity-processes.js'
 import { MCP_BRIDGE_SOURCE, bridgeCallSchema, CliBridge } from './cli-bridge.js'
 import { AiAccountsSchema } from './effect-schema.js'
 
@@ -90,6 +90,11 @@ type PromptResult = typeof promptResultSchema.Type
 const newSessionSchema = Schema.Struct({ sessionId: Schema.String, configOptions: Schema.optional(configOptionsSchema) })
 const configUpdateSchema = Schema.Struct({ configOptions: configOptionsSchema })
 
+/** Follows one process's worker log until closed. */
+interface QuotaWatch {
+  readonly close: () => void
+}
+
 /** Where a held tool call stands: the model asked for it, DSH answered it, or both (then it is released). */
 interface HeldCall {
   bridgeId?: string | number
@@ -99,7 +104,7 @@ interface HeldCall {
 
 type SessionPhase =
   | { readonly kind: 'starting' }
-  | { readonly kind: 'idle'; readonly timer: NodeJS.Timeout }
+  | { readonly kind: 'idle'; readonly cancelReap: () => void }
   | { readonly kind: 'streaming'; readonly sink: (event: AcpEvent) => void }
   | { readonly kind: 'awaitingTools' }
   | { readonly kind: 'dead' }
@@ -117,7 +122,7 @@ type AcpEvent =
 interface Session {
   readonly key: string
   readonly signature: string
-  readonly child: ChildProcessWithoutNullStreams
+  readonly running: AgyRunning
   readonly rpc: AcpRpc
   readonly server: Server
   /** Bridge connections the server accepted; `server.close()` leaves these open, which keeps the bridge alive. */
@@ -144,7 +149,7 @@ interface Session {
   readonly emittedToolUses: { readonly id: string; readonly name: string; readonly argumentsJson: string }[]
   readonly seenToolCalls: Set<string>
   /** Follows the worker log for spent-quota retries; closed with the process. */
-  readonly quotaWatch: { readonly close: () => void }
+  readonly quotaWatch: QuotaWatch
 }
 
 /** `agy` names an unauthenticated session "Authentication required", which says nothing about how to sign in. */
@@ -177,8 +182,16 @@ const agentFile = (system: string): string =>
 
 export class AntigravityAcpSessions {
   private readonly sessions = new Map<string, Session>()
+  /** Folder removals still waiting for their process to exit. */
+  private readonly removals = new Set<Promise<void>>()
 
-  constructor(private readonly options: { readonly home: (provider: string) => string; readonly executable?: string }) {}
+  constructor(
+    private readonly options: {
+      readonly processes: AntigravityProcessesPromise
+      readonly home: (provider: string) => string
+      readonly executable?: string
+    },
+  ) {}
 
   /** Stream one DSH model step through the conversation's `agy acp` process. */
   stream(model: Model<string>, context: TranscriptContext, streamOptions: SimpleStreamOptions | undefined): AssistantMessageEventStream {
@@ -213,15 +226,17 @@ export class AntigravityAcpSessions {
     return this.sessions.size
   }
 
-  dispose(): void {
+  /** Stop every process; resolves once their process ranges and private folders are gone. */
+  dispose(): Promise<void> {
     for (const session of this.sessions.values()) this.stop(session)
     this.sessions.clear()
+    return Promise.all(this.removals).then(() => undefined)
   }
 
   private static pendingTools = (session: Session): boolean => session.held.size > 0 || session.unmatchedCalls.length > 0 || session.emittedToolUses.length > 0
 
   private static stopTimer(phase: SessionPhase): void {
-    if (phase.kind === 'idle') clearTimeout(phase.timer)
+    if (phase.kind === 'idle') phase.cancelReap()
   }
 
   private idleOrAwaiting(session: Session): void {
@@ -229,9 +244,7 @@ export class AntigravityAcpSessions {
       session.phase = { kind: 'awaitingTools' }
       return
     }
-    const timer = setTimeout(() => this.stopKey(session.key), IDLE_PROCESS_MS)
-    timer.unref()
-    session.phase = { kind: 'idle', timer }
+    session.phase = { kind: 'idle', cancelReap: this.options.processes.after(IDLE_PROCESS_MS, () => this.stopKey(session.key)) }
   }
 
   /** Tool bookkeeping changed outside a step; a running stream owns those transitions while it lasts. */
@@ -415,7 +428,7 @@ export class AntigravityAcpSessions {
    * Follow the worker log in the private Gemini folder for lines that report a spent quota. `fs.watch` finds the log when
    * the worker creates it, but on macOS it does not report the appends that follow, so the file is then polled by stat.
    */
-  private static watchQuota(input: { readonly geminiDir: string; readonly onSpent: () => void }): { readonly close: () => void } {
+  private static watchQuota(input: { readonly geminiDir: string; readonly onSpent: () => void }): QuotaWatch {
     const offsets = new Map<string, number>()
     const read = (path: string): void => {
       let descriptor: number
@@ -525,15 +538,35 @@ export class AntigravityAcpSessions {
       '--dangerously-skip-permissions',
       '--disable-telemetry',
     ]
-    const child = spawn(this.options.executable ?? ANTIGRAVITY_EXECUTABLE, args, {
+    let stderr = ''
+    // The handlers run only once agy writes or ends, after `rpc` and `session` below exist.
+    const running = this.options.processes.launch({
+      executable: this.options.executable ?? ANTIGRAVITY_EXECUTABLE,
+      args,
       cwd: directory,
       env: AntigravityAccountModel.cliEnvironment({ environment: process.env, home }),
-      stdio: ['pipe', 'pipe', 'pipe'],
+      onLine: line => rpc.accept(line),
+      onStderr: text => {
+        stderr = `${stderr}${text}`.slice(-2_000)
+      },
+      onEnd: outcome => {
+        this.die(session)
+        rpc.close(new Error('agy exited'))
+        if (outcome.kind === 'failed')
+          this.emit(session, {
+            kind: 'failed',
+            message: outcome.missing
+              ? `Antigravity CLI (agy) is not installed on the Host. Install it with: ${ANTIGRAVITY_INSTALL_HINT}. Then retry.`
+              : `agy failed: ${outcome.message}`,
+          })
+        else if (outcome.code !== 0)
+          this.emit(session, { kind: 'failed', message: `agy exited with ${String(outcome.code)}${stderr.trim() === '' ? '' : `: ${stderr.trim()}`}` })
+        this.emit(session, { kind: 'exited' })
+        this.cleanup(session)
+      },
     })
-    // The handlers run only once agy writes, after `session` below exists.
     const rpc = new AcpRpc({
-      from: child.stdout,
-      to: child.stdin,
+      send: line => running.send(line),
       onNotification: (method, params) => this.onNotification(session, method, params),
       onRequest: AntigravityAcpSessions.answerPermission,
     })
@@ -543,7 +576,7 @@ export class AntigravityAcpSessions {
     const session: Session = {
       key: input.key,
       signature: input.signature,
-      child,
+      running,
       rpc,
       server: createServer(),
       connections: new Set(),
@@ -583,30 +616,6 @@ export class AntigravityAcpSessions {
       })
     })
     session.server.listen(socketPath)
-    let stderr = ''
-    child.stderr.setEncoding('utf8')
-    child.stderr.on('data', (chunk: string) => {
-      stderr = `${stderr}${chunk}`.slice(-2_000)
-    })
-    child.on('exit', code => {
-      this.die(session)
-      rpc.close(new Error('agy exited'))
-      if (code !== 0 && code !== null)
-        this.emit(session, { kind: 'failed', message: `agy exited with ${String(code)}${stderr.trim() === '' ? '' : `: ${stderr.trim()}`}` })
-      this.emit(session, { kind: 'exited' })
-      this.cleanup(session)
-    })
-    child.on('error', error => {
-      this.die(session)
-      rpc.close(error)
-      this.emit(session, {
-        kind: 'failed',
-        message: /ENOENT/u.test(error.message)
-          ? `Antigravity CLI (agy) is not installed on the Host. Install it with: ${ANTIGRAVITY_INSTALL_HINT}. Then retry.`
-          : `could not start agy: ${error.message}`,
-      })
-      this.cleanup(session)
-    })
     session.server.on('error', error => {
       this.die(session)
       this.emit(session, { kind: 'failed', message: `could not open the Antigravity tool bridge: ${error.message}` })
@@ -818,7 +827,7 @@ export class AntigravityAcpSessions {
   }
 
   private static async removeAfterExit(session: Session): Promise<void> {
-    await AntigravityAccountModel.stopChild(session.child)
+    await session.running.stop()
     await fsPromises.rm(session.directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => undefined)
   }
 
@@ -829,8 +838,10 @@ export class AntigravityAcpSessions {
     for (const socket of session.connections) socket.destroy()
     session.connections.clear()
     if (this.sessions.get(session.key) === session) this.sessions.delete(session.key)
-    // `agy` and its session worker may still be flushing into the folder (and on Windows lock it) until they exit, so the
-    // removal waits for the process and retries in the background instead of blocking the Host.
-    void AntigravityAcpSessions.removeAfterExit(session)
+    // `agy` and its session worker may still be flushing into the folder (and on Windows lock it) until their process range
+    // is gone, so the removal waits for it in the background instead of blocking the Host.
+    const removal = AntigravityAcpSessions.removeAfterExit(session)
+    this.removals.add(removal)
+    void removal.finally(() => this.removals.delete(removal))
   }
 }

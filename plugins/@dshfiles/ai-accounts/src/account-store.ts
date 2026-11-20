@@ -12,7 +12,7 @@ import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
 import { MISTRAL_LOGIN_HINT, MistralAccountModel } from './mistral-account.js'
-import { AntigravityAccountModel } from './antigravity-account.js'
+import { AntigravityAccountModel, type AntigravityAccountDescription } from './antigravity-account.js'
 import { AccountOrderModel } from './account-order-model.js'
 import { type AccountReorder, type CreateSetupAccountInput } from './api.js'
 import { AccountConflict, AccountOrderRejected, AccountStoreFileUnreadable, AccountStoreWriteFailed } from './errors.js'
@@ -90,6 +90,7 @@ const observe = async (
   status: AccountStatus | undefined,
   resolveCredential?: CredentialValueResolver,
   isCopilotSignedIn?: (instanceId: string) => Promise<boolean>,
+  describeAntigravity?: (home: string) => Promise<AntigravityAccountDescription>,
 ): Promise<AccountProfile> => {
   const pool = status?.state
   const resolveKey = async (name: string): Promise<string> => (resolveCredential === undefined ? CredentialModel.readKeyFromEnv(name) : resolveCredential(name))
@@ -131,7 +132,10 @@ const observe = async (
   }
   if (draft.kind === 'antigravity') {
     const home = AntigravityAccountModel.resolveHome(draft.homePath)
-    const description = await AntigravityAccountModel.describe({ home })
+    const description: AntigravityAccountDescription =
+      describeAntigravity === undefined
+        ? { signedIn: false, detail: 'Antigravity accounts are read by the AI Accounts Host, which is not running.' }
+        : await describeAntigravity(home)
     return observed(draft, {
       pool,
       signedIn: description.signedIn,
@@ -218,12 +222,13 @@ const buildAccountsFile = async (
   statuses: readonly AccountStatus[],
   resolveCredential?: CredentialValueResolver,
   isCopilotSignedIn?: (instanceId: string) => Promise<boolean>,
+  describeAntigravity?: (home: string) => Promise<AntigravityAccountDescription>,
 ): Promise<AccountsFile> => ({
   ...file,
   accounts: await Promise.all(
     file.accounts.map(async draft => {
       const status = statuses.find(candidate => candidate.id === draft.instanceId)
-      return observe(draft, file, status, resolveCredential, isCopilotSignedIn)
+      return observe(draft, file, status, resolveCredential, isCopilotSignedIn, describeAntigravity)
     }),
   ),
 })
