@@ -40,7 +40,7 @@ export const LandPreview = (props: {
           onClick={() => setOpen(current => !current)}
           type="button"
         >
-          <span className="dshx:min-w-0">{props.t('inlineIntegrateHint', { count: props.revisions.length, bookmark: props.bookmark })}</span>
+          <span className="dshx:min-w-0">{props.t(props.revisions.length === 1 ? 'inlineIntegrateHintOne' : 'inlineIntegrateHintMany', { count: props.revisions.length, bookmark: props.bookmark })}</span>
           <span className="dshx:sr-only">{props.t(open ? 'inlineIntegrateHideDetails' : 'inlineIntegrateShowDetails')}</span>
           <ChevronDownIcon
             aria-hidden="true"
@@ -56,6 +56,8 @@ export const LandPreview = (props: {
               onClick={props.onLand}
               size="sm"
               type="button"
+              // The thread header holds the one primary Land; this is the same verb next to the answer.
+              variant="outline"
             >
               {props.pending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5" />}
               {props.pending ? props.t('rebasing') : props.t('rebaseOnto', { bookmark: props.bookmark })}

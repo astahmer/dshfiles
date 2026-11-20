@@ -3,8 +3,9 @@
   "features": [
     {
       "id": "agent-directory",
-      "title": "Discover Agents and workspace channels",
-      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first, and keep same-directory Agents on one hashed workspace topic.",
+      "title": "Find running agents",
+      "summary": "Agents can find the other running agents, with the ones in the same project listed first.",
+      "details": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first, and keep same-directory Agents on one hashed workspace topic.",
       "surfaces": ["tool", "host", "client"],
       "surface": "destinationSection",
       "destination": "agents",
@@ -58,8 +59,9 @@
     },
     {
       "id": "passive-messaging",
-      "title": "Store and browse passive messages",
-      "summary": "Topic and direct messages remain durable records; explicit Agent reads record read time without acknowledging or starting execution.",
+      "title": "Store and browse agent messages",
+      "summary": "Messages between agents are kept, and reading one never starts any work.",
+      "details": "Topic and direct messages remain durable records; explicit Agent reads record read time without acknowledging or starting execution.",
       "surfaces": ["tool", "host", "storage", "client"],
       "surface": "destinationSection",
       "destination": "agents",
@@ -180,7 +182,8 @@
     {
       "id": "human-browser",
       "title": "Post messages from the communication browser",
-      "summary": "A human can seed a topic or send a direct message; the UI receives a storage receipt and does not inject work into an Agent.",
+      "summary": "Post to a topic or message an agent directly without starting its work.",
+      "details": "A human can seed a topic or send a direct message; the UI receives a storage receipt and does not inject work into an Agent.",
       "reach": ["click tab \"Agents\"", "click button \"Messages\"", "expect combobox \"Message a thread…\""],
       "reachNarrow": [
         "click button \"More\"",
@@ -219,7 +222,8 @@
     {
       "id": "durable-inbox",
       "title": "Read and acknowledge direct messages",
-      "summary": "Messages survive service reopen, explicit inbox reads do not acknowledge, and only the recipient can acknowledge its record.",
+      "summary": "Agents read and acknowledge their own direct messages, which survive a restart.",
+      "details": "Messages survive service reopen, explicit inbox reads do not acknowledge, and only the recipient can acknowledge its record.",
       "surfaces": ["tool", "host", "storage"],
       "surface": "agentToolOnly",
       "destination": "none",

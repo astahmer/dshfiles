@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createPluginMarketPanel } from './plugin-market-page.js'
 import { OPEN_SETTINGS_EVENT } from '@dshfiles/settings-shell/open-settings'
 
@@ -41,16 +41,32 @@ describe('PluginMarketPanel', () => {
     expect(requests).toEqual([{ section: 'market' }])
   })
 
-  it('says how to install the market, then hands over once it registers', () => {
+  it('is one sentence and one action without the market, never a shell command, then hands over once it registers', () => {
     const requests = openRequests()
     const market = presence(false)
-    const PluginMarketPanel = createPluginMarketPanel(market)
+    const openPlugins = vi.fn()
+    const PluginMarketPanel = createPluginMarketPanel({ ...market, openPlugins })
     render(<PluginMarketPanel />)
-    expect(screen.getByText('dsh plugin --profile web add dshmarket')).toBeDefined()
+    const page = screen.getByRole('main', { name: 'Plugin market' })
+    // The page body was a bare install command; the next step is a control.
+    expect(page.querySelector('code')).toBeNull()
+    expect(page.textContent).not.toMatch(/dsh plugin|--profile/u)
+    expect(screen.getByText(/The community catalog is not installed in this profile\./u)).toBeTruthy()
+    const actions = within(page).getAllByRole('button')
+    expect(actions.map(button => button.textContent)).toEqual(['Open Plugins'])
+    fireEvent.click(actions[0] as HTMLElement)
+    expect(openPlugins).toHaveBeenCalledOnce()
     expect(requests).toEqual([])
 
     act(() => market.register())
-    expect(screen.queryByText('dsh plugin --profile web add dshmarket')).toBeNull()
+    expect(screen.queryByRole('main', { name: 'Plugin market' })).toBeNull()
     expect(requests).toEqual([{ section: 'market' }])
+  })
+
+  it('offers no action when this composition has no Plugins page', () => {
+    const PluginMarketPanel = createPluginMarketPanel(presence(false))
+    render(<PluginMarketPanel />)
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.getByText(/The community catalog is not installed in this profile\./u)).toBeTruthy()
   })
 })

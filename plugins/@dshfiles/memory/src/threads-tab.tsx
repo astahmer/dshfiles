@@ -33,6 +33,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { memoryApi, type MemoryCitation, type PanelNote, type PanelThread } from './api.ts'
 import { PanelFormat } from './panel-format.ts'
+import { MemoryCopy } from './memory-copy.ts'
 
 type ThreadStatusFilter = 'all' | 'digested' | 'undigested'
 type ThreadSourceFilter = '' | 'trail' | 'model'
@@ -169,7 +170,7 @@ const DigestedThreadDetail = (props: {
   const timeline = useMemo(() => {
     const entries: { readonly at: number; readonly title: string; readonly detail?: string }[] = [
       { at: props.createdAt, title: 'Thread created' },
-      ...(thread.digestedAt === null ? [] : [{ at: thread.digestedAt, title: `Digested (${thread.source === 'model' ? 'cheap model' : 'BM25'})` }]),
+      ...(thread.digestedAt === null ? [] : [{ at: thread.digestedAt, title: `Digested ${MemoryCopy.digestSource(thread.source)}` }]),
       ...props.notes.map(note => ({ at: note.createdAt, title: 'Memory created', detail: PanelFormat.noteExcerpt(note.text, 120) })),
       ...props.citations.map(citation => ({
         at: citation.at,
@@ -203,7 +204,7 @@ const DigestedThreadDetail = (props: {
           <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
             <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">Thread digest</h4>
             <Button size="xs" variant="outline" onClick={props.redigest} disabled={props.redigesting}>
-              <RefreshCwIcon className={props.redigesting ? 'dshx:animate-spin' : undefined} /> Regenerate
+              <RefreshCwIcon className={props.redigesting ? 'dshx:animate-spin dshx:motion-reduce:animate-none' : undefined} /> Regenerate
             </Button>
           </div>
           <p className="dshx:text-sm dshx:font-medium">{thread.decision}</p>
@@ -284,7 +285,7 @@ const DigestedThreadDetail = (props: {
       </TabsContent>
       <TabsContent value="raw">
         {raw.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Reading the thread excerpt…</p> : null}
-        {raw.isError ? <p className="dshx:text-xs dshx:text-destructive">The thread excerpt could not be read.</p> : null}
+        {raw.isError ? <p className="dshx:text-xs dshx:text-destructive">The thread excerpt could not be read. Reopen the thread to retry.</p> : null}
         {raw.isSuccess ? (
           <pre className="dshx:max-h-96 dshx:overflow-auto dshx:whitespace-pre-wrap dshx:rounded-lg dshx:bg-muted/50 dshx:p-3 dshx:font-mono! dshx:text-2xs">
             {raw.data.summary}
@@ -500,7 +501,7 @@ export const ThreadsTab = (props: {
                 <span>·</span>
                 <span>Agent</span>
                 <span>·</span>
-                <span>{selected.digested ? `Digested (${selected.source === 'model' ? 'cheap model' : 'BM25'})` : 'Not digested'}</span>
+                <span>{selected.digested ? `Digested ${MemoryCopy.digestSource(selected.source)}` : 'Not digested'}</span>
                 {detail.data === undefined ? null : (
                   <>
                     <span>·</span>
@@ -534,7 +535,7 @@ export const ThreadsTab = (props: {
                     Memory digests a thread once it has been idle for a minute. You can write the digest now if you do not want to wait.
                   </p>
                   <Button size="sm" variant="outline" className="dshx:w-fit" onClick={() => redigest.mutate(selected.id)} disabled={redigest.isPending}>
-                    <RefreshCwIcon className={redigest.isPending ? 'dshx:animate-spin' : undefined} /> Write digest now
+                    <RefreshCwIcon className={redigest.isPending ? 'dshx:animate-spin dshx:motion-reduce:animate-none' : undefined} /> Write digest now
                   </Button>
                   {redigest.isError ? (
                     <p className="dshx:text-xs dshx:text-destructive">{errorMessage(redigest.error, 'The digest failed. Try it again.')}</p>

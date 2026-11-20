@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "resume-interrupted",
-      "title": "Resume the latest stopped task",
-      "summary": "Resume beside the latest task a restart or a failed model request stopped, while the Host confirms it remains idle; superseded history stays read-only.",
+      "title": "Resume the latest stopped turn",
+      "summary": "Resume a turn that a restart or a failed model request stopped.",
+      "details": "Resume beside the latest task a restart or a failed model request stopped, while the Host confirms it remains idle; superseded history stays read-only.",
       "surfaces": ["client", "tool"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -37,7 +38,8 @@
     {
       "id": "retry-failed-turn",
       "title": "Retry a turn that failed before any reply",
-      "summary": "Retry replaces Resume beside the latest turn that stopped before the model replied (a sign-in, quota or transport failure): the same request runs again behind a compact notice instead of a continue prompt.",
+      "summary": "Retry a turn that failed before the model replied, such as a sign-in or usage limit failure.",
+      "details": "Retry replaces Resume beside the latest turn that stopped before the model replied (a sign-in, quota or transport failure): the same request runs again behind a compact notice instead of a continue prompt.",
       "surfaces": ["client", "tool"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -75,7 +77,8 @@
     {
       "id": "windowed-transcript",
       "title": "Open a thread on its latest messages",
-      "summary": "A thread opens with the rows that fill the viewport mounted; older rows mount as the transcript scrolls up.",
+      "summary": "A thread opens on its latest messages and loads older ones as you scroll up.",
+      "details": "A thread opens with the rows that fill the viewport mounted; older rows mount as the transcript scrolls up.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -122,7 +125,8 @@
     {
       "id": "image-links",
       "title": "Open image links in the gallery",
-      "summary": "Opening an image link or read_image path shows it in the shared gallery, with the clicked image selected; the gallery defaults to the current Turn and can be configured to include the entire thread.",
+      "summary": "Image links in a thread open in the gallery, starting on the image you clicked.",
+      "details": "Opening an image link or read_image path shows it in the shared gallery, with the clicked image selected; the gallery defaults to the current Turn and can be configured to include the entire thread.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -183,7 +187,8 @@
     {
       "id": "focus-from-plugin",
       "title": "Scroll to a turn, step or tool call on request",
-      "summary": "Another plugin asks Chat to scroll to and highlight one turn, step or tool call: through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps through the turn rail, opens the folded process group with the beforematch event browser find uses, and outlines the row; Turn-footer entries get the thread's View opener.",
+      "summary": "Other features can scroll the thread to a turn, step or tool call and highlight it.",
+      "details": "Another plugin asks Chat to scroll to and highlight one turn, step or tool call: through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps through the turn rail, opens the folded process group with the beforematch event browser find uses, and outlines the row; Turn-footer entries get the thread's View opener.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -233,7 +238,8 @@
     {
       "id": "inline-references",
       "title": "Render inline references from other plugins",
-      "summary": "Other plugins add a matcher and a React renderer to the inline-reference registry (@dshfiles/chat/inline-references); Chat applies them to assistant Markdown text runs, inline code and the Referenced-session line while it renders, so `b:12`, `@{luna}`, `memory: n:3` or `jj:main` become links without any plugin rewriting the transcript DOM. Higher priority wins an overlap, fenced code and links are never matched, and a streaming message's frozen blocks keep their rendered references.",
+      "summary": "References such as b:12 or jj:main in a reply become links.",
+      "details": "Other plugins add a matcher and a React renderer to the inline-reference registry (@dshfiles/chat/inline-references); Chat applies them to assistant Markdown text runs, inline code and the Referenced-session line while it renders, so `b:12`, `@{luna}`, `memory: n:3` or `jj:main` become links without any plugin rewriting the transcript DOM. Higher priority wins an overlap, fenced code and links are never matched, and a streaming message's frozen blocks keep their rendered references.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -274,7 +280,8 @@
     {
       "id": "code-fences",
       "title": "Render fenced code blocks from other plugins",
-      "summary": "Other plugins add a component for fence languages to the code-fence registry (@dshfiles/chat/code-fences); while Chat renders Markdown (assistant answers through InlineReferenceMarkdown; reasoning, compaction summaries and other plugins' Markdown through FencedMarkdown, @dshfiles/chat/fenced-markdown) it swaps each native code card whose language a renderer claims for that component, handing it the source, whether the fence may still grow (as the native renderer reports it), the native card as `fallback` and the highlighted code without its header as `source`. It plugs into the native Markdown delegate, so every fence the native renderer draws counts, and a fence no renderer claims goes to the enclosing delegate; without renderers the native tree is unchanged.",
+      "summary": "Code blocks in some languages, such as diagrams, render as live views.",
+      "details": "Other plugins add a component for fence languages to the code-fence registry (@dshfiles/chat/code-fences); while Chat renders Markdown (assistant answers through InlineReferenceMarkdown; reasoning, compaction summaries and other plugins' Markdown through FencedMarkdown, @dshfiles/chat/fenced-markdown) it swaps each native code card whose language a renderer claims for that component, handing it the source, whether the fence may still grow (as the native renderer reports it), the native card as `fallback` and the highlighted code without its header as `source`. It plugs into the native Markdown delegate, so every fence the native renderer draws counts, and a fence no renderer claims goes to the enclosing delegate; without renderers the native tree is unchanged.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -324,7 +331,8 @@
     {
       "id": "folded-work",
       "title": "A finished turn folds its work under one Worked for row",
-      "summary": "While a turn runs, its tail reads \"Working for 12s\" with a shimmer (paused off screen, none under reduced motion). Once it settles, its tool calls fold under one \"Worked for 1m 12s\" row; a failed call (an error result or a shell command that exited non-zero), a question and any PinnedToolCalls deliverable stay outside the fold, so a folded turn still shows what failed.",
+      "summary": "A finished turn folds its tool calls under one Worked for row, and failures stay visible.",
+      "details": "While a turn runs, its tail reads \"Working for 12s\" with a shimmer (paused off screen, none under reduced motion). Once it settles, its tool calls fold under one \"Worked for 1m 12s\" row; a failed call (an error result or a shell command that exited non-zero), a question and any PinnedToolCalls deliverable stay outside the fold, so a folded turn still shows what failed.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -363,7 +371,8 @@
     {
       "id": "view-mode",
       "title": "Choose Summary, Normal or Verbose for tool work",
-      "summary": "Settings › General › View mode: Summary folds every turn’s tool work under one row, Normal folds finished turns, Verbose keeps every call open. Without a saved choice a touch phone gets Summary and other browsers Normal. The Agent reads it with transcript_view_get and sets or clears it with transcript_view_set (Chat’s own chat-view API on the same dshfiles-chat field), only when the user asked.",
+      "summary": "Choose in Settings whether tool work is folded always, only once a turn ends, or never.",
+      "details": "Settings › General › View mode: Summary folds every turn’s tool work under one row, Normal folds finished turns, Verbose keeps every call open. Without a saved choice a touch phone gets Summary and other browsers Normal. The Agent reads it with transcript_view_get and sets or clears it with transcript_view_set (Chat’s own chat-view API on the same dshfiles-chat field), only when the user asked.",
       "surfaces": ["client", "settings", "tool", "api"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -414,7 +423,8 @@
     {
       "id": "find-in-thread",
       "title": "Find text anywhere in a long thread",
-      "summary": "⌘F in a thread (or Find in thread in its ⋯ menu, the phone's way in) opens a find bar: it asks session-search's index for every match in the whole thread, shows \"n of N\" counted from the newest, steps with ↵ (older) and ⇧↵ (newer), pages an unloaded Turn in, opens the Worked for fold, folded prompt or closed tool row that hides the match and highlights it. A second ⌘F while its field has focus is the browser's find. Without the index (not installed, thread not indexed yet) it searches the loaded Turns and says so; a failed search shows the reason and Retry.",
+      "summary": "Press Cmd+F in a thread to find text anywhere in it, even in turns not loaded yet.",
+      "details": "⌘F in a thread (or Find in thread in its ⋯ menu, the phone's way in) opens a find bar: it asks session-search's index for every match in the whole thread, shows \"n of N\" counted from the newest, steps with ↵ (older) and ⇧↵ (newer), pages an unloaded Turn in, opens the Worked for fold, folded prompt or closed tool row that hides the match and highlights it. A second ⌘F while its field has focus is the browser's find. Without the index (not installed, thread not indexed yet) it searches the loaded Turns and says so; a failed search shows the reason and Retry.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -481,7 +491,8 @@
     {
       "id": "turn-map",
       "title": "Typed turn map with filters and Turn keys",
-      "summary": "The turn rail marks each Turn by what happened: a question (accent), a failure (danger), an edit (muted fill) or a plain prompt; a band shows the Turns on screen; previous / next buttons and [ / ] (or ⌥↑ / ⌥↓) step between Turns of the current filter (All, Questions, Errors, Edits). The facts come from turn-summary's whole-log projection, so unloaded Turns are typed too. On a phone or a narrow pane, Turns in the thread ⋯ menu opens a bottom sheet listing every prompt with its kind and the same filters; tapping one jumps there.",
+      "summary": "The turn rail marks questions, failures and edits, and steps between them with filters or keys.",
+      "details": "The turn rail marks each Turn by what happened: a question (accent), a failure (danger), an edit (muted fill) or a plain prompt; a band shows the Turns on screen; previous / next buttons and [ / ] (or ⌥↑ / ⌥↓) step between Turns of the current filter (All, Questions, Errors, Edits). The facts come from turn-summary's whole-log projection, so unloaded Turns are typed too. On a phone or a narrow pane, Turns in the thread ⋯ menu opens a bottom sheet listing every prompt with its kind and the same filters; tapping one jumps there.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -528,7 +539,8 @@
     {
       "id": "since-you-left",
       "title": "Since you left: divider and recap above the first unseen Turn",
-      "summary": "When a thread opens with Turns that finished while the user was away (its unread record, read before opening clears it), a divider marks the first unseen Turn and one card above it says what happened: \"3 turns · 7 files +120 −14 · 1 failed · 1 question waiting\", with chips that jump to each failed or questioning Turn and to the Turn that wrote each file. Built from turn-summary's facts, no model call; dismissible; never drawn for Turns already seen.",
+      "summary": "A card above the first turn you missed says what happened while you were away.",
+      "details": "When a thread opens with Turns that finished while the user was away (its unread record, read before opening clears it), a divider marks the first unseen Turn and one card above it says what happened: \"3 turns · 7 files +120 −14 · 1 failed · 1 question waiting\", with chips that jump to each failed or questioning Turn and to the Turn that wrote each file. Built from turn-summary's facts, no model call; dismissible; never drawn for Turns already seen.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -566,7 +578,8 @@
     {
       "id": "run-folds",
       "title": "Runs of background jobs and subagents fold into one summary row",
-      "summary": "Two or more consecutive background-job or subagent rows fold into one row: \"4 background jobs · 1 failed · 2 running · 1 done · longest 4m 10s\", \"3 subagents · 2 working · 1 finished\", or one combined row when both kinds stand together. The row keeps live state (phase-synced spinner, the oldest running job's time on the shared second clock) and expands on click or Enter to the individual rows, each still expandable for output and its Stop/Open verbs; the choice holds while the page lives. A failed job or a subagent that needs you keeps its own row outside the fold, counted in red or indigo right after the total so a narrow row never truncates it. One row never folds; Verbose shows every row. Kinds come from the TranscriptRunFolds registry (`@dshfiles/chat/run-folds`), filled by background-jobs and thread-sidebar; without providers nothing folds.",
+      "summary": "Several background jobs or subagents in a row fold into one summary row that expands.",
+      "details": "Two or more consecutive background-job or subagent rows fold into one row: \"4 background jobs · 1 failed · 2 running · 1 done · longest 4m 10s\", \"3 subagents · 2 working · 1 finished\", or one combined row when both kinds stand together. The row keeps live state (phase-synced spinner, the oldest running job's time on the shared second clock) and expands on click or Enter to the individual rows, each still expandable for output and its Stop/Open verbs; the choice holds while the page lives. A failed job or a subagent that needs you keeps its own row outside the fold, counted in red or indigo right after the total so a narrow row never truncates it. One row never folds; Verbose shows every row. Kinds come from the TranscriptRunFolds registry (`@dshfiles/chat/run-folds`), filled by background-jobs and thread-sidebar; without providers nothing folds.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -625,7 +638,8 @@
     {
       "id": "route-change-markers",
       "title": "Mark where the model or effort changed",
-      "summary": "A quiet row in the transcript where a request ran on another model, account or reasoning effort than the request before it, read from the Session's own request/header events, so fallbacks and account switches show too; it stays visible when the Turn is folded.",
+      "summary": "A quiet row marks where the model, account or effort changed during a thread.",
+      "details": "A quiet row in the transcript where a request ran on another model, account or reasoning effort than the request before it, read from the Session's own request/header events, so fallbacks and account switches show too; it stays visible when the Turn is folded.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -674,7 +688,8 @@
     {
       "id": "unread-final-answer",
       "title": "Open an unread thread at its final answer",
-      "summary": "A settled thread whose final answer this browser has not reached opens with that answer at the top, under a New divider, instead of at the end of the transcript. Reaching the end marks it read, so the next open lands at the end. Settings › General › Open unread threads at switches between Final answer (default) and Bottom.",
+      "summary": "An unread thread opens at its final answer instead of the end, and Settings can change this.",
+      "details": "A settled thread whose final answer this browser has not reached opens with that answer at the top, under a New divider, instead of at the end of the transcript. Reaching the end marks it read, so the next open lands at the end. Settings › General › Open unread threads at switches between Final answer (default) and Bottom.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",

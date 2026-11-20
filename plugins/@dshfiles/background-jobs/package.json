@@ -16,6 +16,10 @@
       "types": "./src/process-views.ts",
       "default": "./dist/process-views.js"
     },
+    "./running-threads": {
+      "types": "./src/running-threads.ts",
+      "default": "./dist/running-threads.js"
+    },
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },

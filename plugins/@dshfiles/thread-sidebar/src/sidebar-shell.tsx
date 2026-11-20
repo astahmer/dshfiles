@@ -82,6 +82,7 @@ import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { threadSidebarRestartApi } from './restart-api.js'
+import { RailActionsModel } from './rail-actions-model.js'
 import { RestartBridge } from './restart-bridge.js'
 import { useAutoRestart } from './restart-status-item.js'
 import { useRestartMachine } from './use-restart-machine.js'
@@ -90,6 +91,7 @@ import { SidebarContentSeat } from './sidebar-content-seat.js'
 import { DestinationShell, NEW_FOLDER_EVENT, SHOW_DESTINATION_EVENT, usePhoneLayout } from './destination-shell.js'
 import type { RailAction } from './rail-actions.js'
 import { DESTINATIONS, DestinationSections, Destinations } from './destinations.js'
+import { HOST_TOGGLE_SIDEBAR_COMMAND, SIDEBAR_VERB_GROUP, SidebarPaletteRows } from './sidebar-palette-rows.js'
 import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
 import { threadSidebarNavigationApi, type NavigationRecord } from './navigation-api.js'
 import { decodeClientRevisions } from './client-revisions.js'
@@ -237,7 +239,8 @@ const withRowActionHidden = (actions: readonly ThreadRowAction[], action: Thread
 const sameIds = (left: readonly string[], right: readonly string[]): boolean => left.length === right.length && left.every((id, index) => id === right[index])
 
 /** Commands that only reopen this palette are left out of its command list. */
-const SELF_COMMAND_IDS = new Set(['commandPalette.open'])
+// Commands the sidebar already lists a row for: the palette itself, and the left-sidebar toggle (its own Toggle sidebar).
+const SELF_COMMAND_IDS = new Set(['commandPalette.open', HOST_TOGGLE_SIDEBAR_COMMAND])
 
 const SETTINGS_COMMAND_ID = 'settings.open'
 /** `@dshfiles/workbench`'s right-pane toggle; on a phone that pane is the thread panel's bottom sheet. */
@@ -752,7 +755,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   // its confirmation dialog, so the status strip draws no second control while that Restart is on the rail.
   const autoRestart = useAutoRestart()
   const autoRestartPhase = autoRestart.status?.phase
-  const restartOnRail = preferences.showRailActions && restartAvailable
+  const restartOnRail = RailActionsModel.restartOnRail({ preferences, restartAvailable })
   useEffect(() => {
     RestartBridge.publish({ hostPlugins: pendingPlugins, available: restartAvailable, waitingLabel: restartPendingLabel, onRail: restartOnRail })
   }, [pendingPlugins, restartAvailable, restartPendingLabel, restartOnRail])
@@ -792,6 +795,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       : `${text(props.t, 'threadSidebarReloadPending')} (${String(staleClientPlugins.length)} ${text(props.t, staleClientPlugins.length === 1 ? 'threadSidebarUpdatesPlugin' : 'threadSidebarUpdatesPlugins')})`
   const applyPageReload = (): void => globalThis.location.reload()
   const runCommand = props.runCommand
+  const goToDestinations = useMemo(
+    () =>
+      SidebarPaletteRows.destinationsWithGoTo({
+        destinations,
+        listedPageIds: new Set(orderedHeaderEntries.flatMap(entry => (entry.kind === 'panel' && entry.panelId !== undefined ? [String(entry.panelId)] : []))),
+      }),
+    [destinations, orderedHeaderEntries],
+  )
   const paletteActions = useMemo<PaletteAction[]>(
     () => [
       ...orderedHeaderEntries
@@ -803,7 +814,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             id: `@dshfiles/thread-sidebar/header/${entry.id}`,
             group: 'destination',
             // "Observe › Usage"; the old "Usage: Analytics" label stays searchable.
-            label: owner === undefined || section === undefined ? entry.label : `${owner.label} › ${section.label}`,
+            label: owner === undefined || section === undefined ? entry.label : SidebarPaletteRows.pageLabel(owner.label, section.label),
             aliases: owner === undefined ? [] : [entry.label, ...(section?.formerLabels ?? [])],
             icon: headerIconFor(entry, 16),
             run: () => {
@@ -812,7 +823,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             },
           }
         }),
-      ...DESTINATIONS.map((destination): PaletteAction => ({
+      // One row per page: a destination whose list is a single page (the Inbox) has that page's row, not a second one.
+      ...DESTINATIONS.filter(destination => goToDestinations.has(destination.id)).map((destination): PaletteAction => ({
         id: `@dshfiles/thread-sidebar/destination/${destination.id}`,
         group: 'destination',
         label: `Go to ${destination.label}`,
@@ -831,20 +843,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           window.setTimeout(() => window.dispatchEvent(new CustomEvent(NEW_FOLDER_EVENT)), 0)
         },
       },
-      // Sidebar folders (b:952m): file any panel in one of the person's own folders from ⌘K.
-      ...folderUi.folders
-        .filter(folder => !folder.builtIn)
-        .flatMap(folder =>
-          folderUi.panels
-            .filter(panel => !folder.entries.some(entry => entry.viewId === panel.id))
-            .map((panel): PaletteAction => ({
-              id: `@dshfiles/thread-sidebar/sidebar-add/${folder.id}/${panel.id}`,
-              group: 'command',
-              label: `Add ${panel.title} to ${folder.title}`,
-              aliases: ['sidebar', 'folder', 'add panel'],
-              run: () => folderUi.actions.addPanel(panel.id, folder.id),
-            })),
-        ),
+      // Filing a panel in a folder is the folder's own verb (its + Add panel and each row's menu): one palette row per
+      // folder and panel pair was the largest block of the list and grew with every folder.
       {
         id: '@dshfiles/thread-sidebar/action/toggle-footer',
         group: 'command',
@@ -864,21 +864,21 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       },
       {
         id: '@dshfiles/thread-sidebar/action/toggle-sidebar',
-        group: 'destination',
+        group: SIDEBAR_VERB_GROUP,
         label: text(props.t, 'threadSidebarToggleSidebar'),
         icon: <PanelLeftIcon className="dshx:size-4" />,
         run: toggleSidebar,
       },
       {
         id: '@dshfiles/thread-sidebar/action/focus-composer',
-        group: 'destination',
+        group: SIDEBAR_VERB_GROUP,
         label: text(props.t, 'threadSidebarFocusComposer'),
         icon: <TextCursorInputIcon className="dshx:size-4" />,
         run: () => window.setTimeout(focusComposer, 0),
       },
       {
         id: '@dshfiles/thread-sidebar/action/customize-sidebar',
-        group: 'destination',
+        group: SIDEBAR_VERB_GROUP,
         label: text(props.t, 'threadSidebarCustomize'),
         icon: <SlidersHorizontalIcon className="dshx:size-4" />,
         run: openCustomize,
@@ -905,7 +905,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         ? [
             {
               id: '@dshfiles/thread-sidebar/action/restart-dsh',
-              group: 'destination' as const,
+              group: SIDEBAR_VERB_GROUP,
               label: pendingUpdatesLabel ?? text(props.t, 'threadSidebarRestart'),
               aliases: ['restart', 'reload host', 'apply updates'],
               icon: <RefreshCwIcon className="dshx:size-4" />,
@@ -918,7 +918,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         : [
             {
               id: '@dshfiles/thread-sidebar/action/pair-phone',
-              group: 'destination' as const,
+              group: SIDEBAR_VERB_GROUP,
               label: 'Pair a phone',
               aliases: ['qr', 'qr code', 'phone', 'pairing', 'mobile'],
               icon: <QrCodeIcon className="dshx:size-4" />,
@@ -930,7 +930,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         : [
             {
               id: '@dshfiles/thread-sidebar/action/copy-dsh-url',
-              group: 'destination' as const,
+              group: SIDEBAR_VERB_GROUP,
               label: text(props.t, 'threadSidebarCopyLaunchUrl'),
               aliases: ['token', 'url', 'dshx', 'agent access'],
               icon: <LinkIcon className="dshx:size-4" />,
@@ -970,10 +970,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       destinations,
       recordNavigation,
       preferences.showFooter,
-      folderUi.folders,
-      folderUi.panels,
-      folderUi.actions,
       updatePreferences,
+      goToDestinations,
     ],
   )
   // b:kgcc: Restart, a pending page reload, Copy DSH URL and Pair a phone sit on the rail above Settings (More › DSH on a
@@ -981,7 +979,15 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const railActionsShown = preferences.showRailActions
   const autoCountdownLabel = autoRestart.secondsLeft === null ? null : props.t('threadSidebarAutoRestartCountdown', { seconds: autoRestart.secondsLeft })
   const restartLabel = autoCountdownLabel ?? restartPendingLabel ?? pendingUpdatesLabel ?? text(props.t, 'threadSidebarRestart')
-  const railActions: readonly RailAction[] = !railActionsShown
+  // Which of them the rail draws is one rule (rail-actions-model): Restart only for someone who asked for it.
+  const railActionIds = RailActionsModel.shown({
+    preferences,
+    restartAvailable,
+    reloadPending: reloadPendingLabel !== null,
+    launchUrl: launchUrl !== null,
+    pairingAvailable,
+  })
+  const railCandidates: readonly RailAction[] = !railActionsShown
     ? []
     : [
         ...(restartAvailable
@@ -1036,6 +1042,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             ]
           : []),
       ]
+  const railActions = railCandidates.filter(action => railActionIds.some(id => id === action.id))
   // With the actions on the rail, nothing pending forces the row under the list back (b:kgcc).
   const footerHidden = !preferences.showFooter && (railActionsShown || (restartPendingLabel === null && reloadPendingLabel === null))
 
@@ -1359,6 +1366,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}
             edgeSwipePanels={preferences.phoneEdgeSwipePanels}
             phoneNavigation={preferences.phoneNavigation}
+            showDeveloperPages={preferences.showDeveloperPages}
             railActions={railActions}
           />,
           columnElement,
@@ -1400,6 +1408,18 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:pt-1 dshx:text-sm">
                 <Checkbox checked={preferences.showRailActions} onCheckedChange={checked => updatePreferences({ showRailActions: checked === true })} />
                 {text(props.t, 'threadSidebarShowRailActions')}
+              </label>
+              <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:pt-1 dshx:pl-6 dshx:text-sm">
+                <Checkbox
+                  checked={preferences.showRailRestart}
+                  disabled={!preferences.showRailActions}
+                  onCheckedChange={checked => updatePreferences({ showRailRestart: checked === true })}
+                />
+                {text(props.t, 'threadSidebarShowRailRestart')}
+              </label>
+              <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:pt-1 dshx:text-sm">
+                <Checkbox checked={preferences.showDeveloperPages} onCheckedChange={checked => updatePreferences({ showDeveloperPages: checked === true })} />
+                {text(props.t, 'threadSidebarShowDeveloperPages')}
               </label>
             </div>
             <section className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:px-2" aria-labelledby={`${headerRegionId}-rows`}>
@@ -1861,7 +1881,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             ) : null}
             {fanOutCatalog.error === null ? null : (
               <p role="alert" className="dshx:text-sm dshx:text-destructive">
-                {errorMessage(fanOutCatalog.error, 'Could not load model catalog.')}
+                {errorMessage(fanOutCatalog.error, 'Could not load models. Reopen this dialog to retry.')}
               </p>
             )}
           </div>

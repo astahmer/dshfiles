@@ -2,7 +2,7 @@
 
 ![Create and bind from a secret-reference field](docs/screenshots/inline-reference-setup.png)
 
-![Browse aliases by scope and environment](docs/screenshots/scoped-alias-catalog.png)
+![Browse secrets by scope and environment](docs/screenshots/scoped-alias-catalog.png)
 
 ![Add a Jev key from the Backlog setting](docs/screenshots/backlog-jev-setup.png)
 

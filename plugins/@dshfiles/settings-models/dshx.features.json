@@ -5,7 +5,8 @@
     {
       "id": "models-settings",
       "title": "Models settings and provider onboarding",
-      "summary": "The native Models settings page, the official DeepSeek credential onboarding step and the welcome notice, from one owned fork of the stock row. Behaviour is the native one; the Host reads behind the page follow Host change events in one refresh per burst and only while a surface shows the page's state.",
+      "summary": "The Models settings page and the DeepSeek sign-in step, refreshed only while you look at them.",
+      "details": "The native Models settings page, the official DeepSeek credential onboarding step and the welcome notice, from one owned fork of the stock row. Behaviour is the native one; the Host reads behind the page follow Host change events in one refresh per burst and only while a surface shows the page's state.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click button \"Models\"", "expect heading \"Models\""],
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",

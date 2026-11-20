@@ -4,7 +4,8 @@
     {
       "id": "queue-ordering",
       "title": "Reorder pending messages",
-      "summary": "Move a queued item up, down, or by drag while preserving its durable identity and respecting next-turn and next-step boundaries.",
+      "summary": "Move queued messages up, down or by drag.",
+      "details": "Move a queued item up, down, or by drag while preserving its durable identity and respecting next-turn and next-step boundaries.",
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -81,7 +82,8 @@
     {
       "id": "composer-message-editing",
       "title": "Edit queued messages in the composer",
-      "summary": "Move a queued message's text and attachments into the main composer, show an editing placeholder in its place, and put the edited (Submit) or original (Cancel/Escape) message back at the same position.",
+      "summary": "Edit a queued message in the composer, and it goes back to the same place in the queue.",
+      "details": "Move a queued message's text and attachments into the main composer, show an editing placeholder in its place, and put the edited (Submit) or original (Cancel/Escape) message back at the same position.",
       "surfaces": ["client", "host"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -185,7 +187,8 @@
     {
       "id": "queued-message-preview",
       "title": "Preview queued message text",
-      "summary": "Show a normalized one-line text preview, hide attachment payloads, and honor the configured character limit without splitting Unicode code points.",
+      "summary": "Each queued message shows a one-line preview of its text.",
+      "details": "Show a normalized one-line text preview, hide attachment payloads, and honor the configured character limit without splitting Unicode code points.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -236,7 +239,8 @@
     {
       "id": "queue-message-transfer",
       "title": "Move a queued message to another thread",
-      "summary": "Move to thread… opens a thread picker; the queued message, with its images and files, leaves this queue and lands in the chosen thread's queue when that thread is busy, or in its composer (and the thread opens) when it is idle.",
+      "summary": "Move a queued message, with its files, to another thread.",
+      "details": "Move to thread… opens a thread picker; the queued message, with its images and files, leaves this queue and lands in the chosen thread's queue when that thread is busy, or in its composer (and the thread opens) when it is idle.",
       "reach": [
         "click text \"Queue source\"",
         "click button \"Move queued message to another thread\"",
@@ -330,7 +334,8 @@
     {
       "id": "queued-attachment-previews",
       "title": "Preview queued attachments",
-      "summary": "Each queued message shows a small thumbnail for every image and a chip with the name for every other file, read from the session that holds them; a setting turns the previews off.",
+      "summary": "Queued messages show a thumbnail for each image and a name for each file.",
+      "details": "Each queued message shows a small thumbnail for every image and a chip with the name for every other file, read from the session that holds them; a setting turns the previews off.",
       "reach": ["seed queue-preview-thread", "expect group \"2 attachments\"", "expect img \"red.png\"", "expect text \"note.txt\""],
       "surfaces": ["client", "settings"],
       "surface": "composerContribution",
@@ -371,7 +376,8 @@
     {
       "id": "send-later",
       "title": "Send a message later",
-      "summary": "Schedule the composer's message from Send later (presets or a picked time); it waits above the composer with its time and optional model and effort, can be edited, sent now or cancelled back into the composer, survives a Host restart in plugin storage, and is sent once through the session controller under its own request id. Agent tools scheduled_send_list/create/update/cancel/now call the same Host methods.",
+      "summary": "Schedule a message to send later, and edit, send now or cancel it until then.",
+      "details": "Schedule the composer's message from Send later (presets or a picked time); it waits above the composer with its time and optional model and effort, can be edited, sent now or cancelled back into the composer, survives a Host restart in plugin storage, and is sent once through the session controller under its own request id. Agent tools scheduled_send_list/create/update/cancel/now call the same Host methods.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"Ship the weekly report\"",

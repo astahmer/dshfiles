@@ -1,16 +1,24 @@
-// Design-token check: off-scale styling in plugin sources, as a ratchet (visual refresh T4.1).
+// Design-token check: off-scale styling in plugin sources, as a ratchet (visual refresh T4.1, unslop guardrails).
 //
-// DESIGN.md names one scale for type, radius and colour, generated in `plugin-ui` and `ui-styles`. This script counts
-// what bypasses it, per rule and per plugin, in every owned and forked plugin's `src` (tests, generated files and the
-// token files themselves excluded):
+// DESIGN.md names one scale for type, radius, colour, elevation and motion, generated in `plugin-ui` and `ui-styles`.
+// This script counts what bypasses it, per rule and per plugin, in every owned and forked plugin's `src` (tests,
+// generated files and the token files themselves excluded):
 //
-//   arbitrary-text    `text-[…]` utilities (a size or colour off the type scale)
-//   arbitrary-radius  `rounded-[…]` utilities and literal `border-radius: <n>px` in CSS
-//   raw-colour        hex, rgb()/rgba(), hsl()/hsla() and oklch() literals outside the token files
-//   native-icons      `Icon…OutlineRegular` imports (the native icon family; lucide is the one family)
+//   arbitrary-text            `text-[…]` utilities (a size or colour off the type scale)
+//   arbitrary-radius          `rounded-[…]` utilities and literal `border-radius: <n>px` in CSS
+//   raw-colour                hex, rgb()/rgba(), hsl()/hsla() and oklch() literals outside the token files
+//   native-icons              `Icon…OutlineRegular` imports (the native icon family; lucide is the one family)
+//   default-shadow            Tailwind's shadow steps (`shadow-xs..2xl`) instead of the elevation steps `shadow-s0..s3`
+//   numeric-duration          `duration-<n>` instead of a `--dshx-duration-*` token
+//   viewport-variant          window breakpoints (`sm:`…`2xl:`, `max-*`) in a pane; a dialog's `max-w-*` is allowed
+//   solid-status-fill         solid `bg-info|success|warning` outside the kit
+//   palette-colour            numbered Tailwind palette classes (`bg-emerald-500`)
+//   uppercase                 `uppercase` and `text-transform: uppercase`
+//   unguarded-loop-animation  spin or pulse with no `motion-reduce:`/`motion-safe:` class in the same list
+//   outline-without-focus     a control's `outline-none` with no `focus-visible:` replacement in the same list
 //
 // It fails only when a rule's count for one plugin rises above `scripts/design-token-check.baseline.json`, so the
-// burn-down (T4.2–T4.3) can land plugin by plugin while new code stays on the tokens.
+// burn-down can land plugin by plugin while new code stays on the tokens.
 //
 //   node --run check:design-tokens             # compare with the baseline; fail on an increase
 //   node --run check:design-tokens -- --report # list every finding
@@ -32,6 +40,47 @@ export interface DesignTokenRule {
 const isCss = (file: string): boolean => file.endsWith('.css')
 
 const all = (pattern: RegExp, line: string): readonly string[] => [...line.matchAll(pattern)].map(match => match[0])
+
+export interface ClassToken {
+  /** The whole class as written, `dshx:hover:md:shadow-sm`. */
+  readonly text: string
+  /** Its variants in order, `['hover', 'md']`. */
+  readonly variants: readonly string[]
+  /** The utility after the last variant, `shadow-sm`, with a leading or trailing `!` dropped. */
+  readonly utility: string
+}
+
+/** Split on the colons outside brackets and parentheses (`[&:hover]:`, `text-[length:calc(…)]` keep theirs). */
+const splitVariants = (body: string): readonly string[] => {
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+  for (const char of body) {
+    if (char === '[' || char === '(') depth += 1
+    else if (char === ']' || char === ')') depth -= 1
+    if (char === ':' && depth === 0) {
+      parts.push(current)
+      current = ''
+    } else current += char
+  }
+  parts.push(current)
+  return parts
+}
+
+/** The `dshx:`-prefixed Tailwind classes on one line, parsed into variants and utility. */
+const classTokens = (line: string): readonly ClassToken[] =>
+  [...line.matchAll(/(?<![\w:-])dshx:[^\s'"`]+/g)].map(match => {
+    const parts = splitVariants(match[0].slice('dshx:'.length))
+    return { text: match[0], variants: parts.slice(0, -1), utility: (parts.at(-1) ?? '').replace(/^!|!$/g, '') }
+  })
+
+/** Classes on the line whose parsed token passes `test`, as excerpts; CSS files hold no classes. */
+const classes = (line: string, file: string, test: (token: ClassToken) => boolean): readonly string[] =>
+  isCss(file)
+    ? []
+    : classTokens(line)
+        .filter(test)
+        .map(token => token.text)
 
 export const designTokenRules: readonly DesignTokenRule[] = [
   {
@@ -57,6 +106,165 @@ export const designTokenRules: readonly DesignTokenRule[] = [
     id: 'native-icons',
     use: 'the lucide icon from @dshfiles/plugin-ui/icons',
     matches: (line, file) => (isCss(file) ? [] : all(/\bIcon[A-Z]\w*OutlineRegular\b/g, line)),
+  },
+  {
+    // The kit's @theme maps only shadow-s0..s3 onto the elevation tokens; xs..2xl draw Tailwind's default shadows.
+    id: 'default-shadow',
+    use: 'an elevation step (dshx:shadow-s1/s2/s3, var(--dshx-elevation-*)), or a border instead of depth',
+    matches: (line, file) => classes(line, file, token => /^shadow-(?:2xs|xs|sm|md|lg|xl|2xl)(?:\/[\w.[\]-]+)?$/.test(token.utility)),
+  },
+  {
+    // A number cannot follow the scale when it moves; the duration tokens name the job (hover, fade, menu, panel, sheet).
+    id: 'numeric-duration',
+    use: 'a duration token (dshx:duration-(--dshx-duration-fade|menu|panel|sheet)), or the kit component that already animates',
+    matches: (line, file) => classes(line, file, token => /^duration-(?:\d+|\[[^\]]+\])$/.test(token.utility)),
+  },
+  {
+    // A plugin renders in a pane, not the window: a split pane at 480 px on a wide screen still gets `md:`. A
+    // dialog's `sm:max-w-*` width is the one defensible use (the dialog portals to the window).
+    id: 'viewport-variant',
+    use: 'a container query (dshx:@container with dshx:@md:…), or the kit component that adapts',
+    matches: (line, file) =>
+      classes(line, file, token => token.variants.some(variant => /^(?:max-)?(?:sm|md|lg|xl|2xl)$/.test(variant)) && !/^max-w-/.test(token.utility)),
+  },
+  {
+    // Status colour belongs to the kit's StatusGlyph and badges; a plugin's own solid fill invents a tone table.
+    id: 'solid-status-fill',
+    use: 'StatusGlyph / Badge from the kit, or the tinted trio (dshx:bg-info/10 with var(--dshx-tone-*))',
+    matches: (line, file) =>
+      file.startsWith('plugins/@dshfiles/plugin-ui/') ? [] : classes(line, file, token => /^bg-(?:info|success|warning)$/.test(token.utility)),
+  },
+  {
+    // Tailwind's numbered palette (emerald-500) ignores the theme; the kit's own hues (teal, violet) carry no step.
+    id: 'palette-colour',
+    use: 'a semantic colour (bg-muted, text-info, var(--dshx-tone-*)) or a kit hue (teal, violet, graph-1..6)',
+    matches: (line, file) =>
+      classes(line, file, token =>
+        /^(?:bg|text|border(?:-[trblxyse])?|ring|ring-offset|outline|divide|fill|stroke|from|via|to|shadow|accent|caret|decoration|placeholder)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}(?:\/[\w.[\]-]+)?$/.test(
+          token.utility,
+        ),
+      ),
+  },
+  {
+    // DESIGN.md: labels are sentence case; ALL-CAPS labels are banned. A keyboard key cap is drawn by Kbd.
+    id: 'uppercase',
+    use: 'sentence case in the copy itself (a type token for the overline style), or Kbd for a key',
+    matches: (line, file) => (isCss(file) ? all(/text-transform:\s*uppercase\b/g, line) : classes(line, file, token => token.utility === 'uppercase')),
+  },
+]
+
+export interface ClassGroup {
+  /** Offset of the group's first literal in the file. */
+  readonly index: number
+  /** The literals' bodies joined by a space. */
+  readonly text: string
+  /** The JSX element whose attribute holds the list (`button`, `DropdownMenuTrigger`), when the list is inline. */
+  readonly element?: string
+  /** Whether that element's open tag says `role="button"` (or another widget role) before the list. */
+  readonly widgetRole?: boolean
+}
+
+/** Where a class list sits: the JSX element and whether its open tag gives it a widget role. */
+type ElementContext = Pick<ClassGroup, 'element' | 'widgetRole'>
+
+/**
+ * The JSX element a class list at `index` sits in: the nearest `<Tag` before it whose open tag has not closed. An
+ * arrow (`=>`) is not a closing `>`. A list held in a variable (`const inputClass = cn(…)`) has none.
+ */
+const elementAt = (text: string, index: number): ElementContext => {
+  const before = text.slice(Math.max(0, index - 800), index)
+  const open = [...before.matchAll(/<([A-Za-z][\w.]*)\b/g)].at(-1)
+  if (open === undefined) return {}
+  const attributes = before.slice(open.index + open[0].length)
+  if (/(?<!=)>|\/>|<\//.test(attributes.replace(/=>/g, ''))) return {}
+  return { element: open[1] ?? '', widgetRole: /\brole=["'{]*(?:button|link|tab|menuitem|option|switch|checkbox)\b/.test(attributes) }
+}
+
+/**
+ * The class lists of a file: each string literal (a template's `${…}` holes included, so their nested strings belong to
+ * it), merged with its neighbours when only `,` or `+` separates them, as in `cn('dshx:a', 'dshx:b')`. A line-based
+ * check over-reports, because a cn() call spreads one class list over several lines.
+ */
+const classGroups = (text: string): readonly ClassGroup[] => {
+  const literals: { readonly start: number; readonly end: number; readonly body: string }[] = []
+  let index = 0
+  while (index < text.length) {
+    const quote = text[index]
+    if (quote !== "'" && quote !== '"' && quote !== '`') {
+      index += 1
+      continue
+    }
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: `index` advances past the literal.
+    const start = index
+    let depth = 0
+    index += 1
+    while (index < text.length) {
+      const char = text[index]
+      if (char === '\\') {
+        index += 2
+        continue
+      }
+      if (quote === '`') {
+        if (char === '$' && text[index + 1] === '{') {
+          depth += 1
+          index += 2
+          continue
+        }
+        if (char === '}' && depth > 0) depth -= 1
+        else if (char === '`' && depth === 0) break
+      } else if (char === quote || char === '\n') break
+      index += 1
+    }
+    literals.push({ start, end: index + 1, body: text.slice(start + 1, index) })
+    index += 1
+  }
+  const groups: { index: number; text: string; end: number }[] = []
+  for (const literal of literals) {
+    const last = groups.at(-1)
+    if (last !== undefined && /^\s*[,+]\s*$/.test(text.slice(last.end, literal.start))) {
+      last.text += ` ${literal.body}`
+      last.end = literal.end
+    } else groups.push({ index: literal.start, text: literal.body, end: literal.end })
+  }
+  return groups.map(group => ({ index: group.index, text: group.text, ...elementAt(text, group.index) }))
+}
+
+export interface DesignTokenGroupRule {
+  readonly id: string
+  readonly use: string
+  /** The offending classes of one class group, as excerpts. */
+  readonly matches: (group: ClassGroup, file: string) => readonly string[]
+}
+
+/** Rules that need a whole class list, not one class: a class is fine only when another in its list compensates. */
+export const designTokenGroupRules: readonly DesignTokenGroupRule[] = [
+  {
+    // DESIGN.md Motion: loops stop under reduced motion. The kit Spinner carries motion-reduce:animate-none.
+    id: 'unguarded-loop-animation',
+    use: 'the kit Spinner, or add dshx:motion-reduce:animate-none (or write the loop as dshx:motion-safe:animate-*)',
+    matches: (group, file) => {
+      if (isCss(file) || !/animate-(?:spin|pulse)/.test(group.text)) return []
+      const tokens = classTokens(group.text)
+      if (tokens.some(token => token.variants.some(variant => variant === 'motion-reduce' || variant === 'motion-safe'))) return []
+      return tokens.filter(token => /^animate-(?:spin|pulse)$/.test(token.utility)).map(token => token.text)
+    },
+  },
+  {
+    // A hand-built trigger that removes the browser outline must draw a focus ring of its own. Only a control counts
+    // (button, link, summary, a *Trigger, or a widget role): a dialog, tab panel or drawer takes programmatic focus with
+    // no ring by design, and an input usually sits in a wrapper that draws a focus-within ring.
+    id: 'outline-without-focus',
+    use: 'the kit Button (asChild for a trigger), or a dshx:focus-visible:ring-* / focus-visible:outline-* in the same list',
+    matches: (group, file) => {
+      if (isCss(file) || !group.text.includes('outline-none')) return []
+      const element = group.element ?? ''
+      if (!(/^(?:button|a|summary)$/.test(element) || /Trigger$/.test(element) || group.widgetRole === true)) return []
+      const tokens = classTokens(group.text)
+      const replaced = tokens.some(
+        token => token.variants.some(variant => /focus-(?:visible|within)/.test(variant)) && !/^outline-(?:none|hidden)$/.test(token.utility),
+      )
+      return replaced ? [] : tokens.filter(token => token.utility === 'outline-none' && token.variants.length === 0).map(token => token.text)
+    },
   },
 ]
 
@@ -84,10 +292,13 @@ export interface DesignTokenFinding {
 const findingsInText = (input: { readonly plugin: string; readonly file: string; readonly text: string }): readonly DesignTokenFinding[] => {
   const findings: DesignTokenFinding[] = []
   const lines = input.text.split('\n')
+  // The comment-free text, line for line, for the group rules.
+  const code: string[] = []
   // An icon counts once per file (one import), however often it is drawn.
   const iconsSeen = new Set<string>()
   let inBlockComment = false
   lines.forEach((raw, index) => {
+    code.push('')
     let line = raw
     if (inBlockComment) {
       const end = line.indexOf('*/')
@@ -103,6 +314,7 @@ const findingsInText = (input: { readonly plugin: string; readonly file: string;
       inBlockComment = true
     }
     if (/^\s*\/\//.test(line)) return
+    code[index] = line
     for (const rule of designTokenRules) {
       if (rule.id === 'raw-colour' && isTokenFile(input.file)) continue
       for (const match of rule.matches(line, input.file)) {
@@ -114,6 +326,18 @@ const findingsInText = (input: { readonly plugin: string; readonly file: string;
       }
     }
   })
+  if (!isCss(input.file)) {
+    const text = code.join('\n')
+    // Groups come in file order, so the line number advances with them.
+    let line = 1
+    let counted = 0
+    for (const group of classGroups(text)) {
+      for (; counted < group.index; counted += 1) if (text.charCodeAt(counted) === 10) line += 1
+      for (const rule of designTokenGroupRules)
+        for (const match of rule.matches(group, input.file))
+          findings.push({ rule: rule.id, plugin: input.plugin, file: input.file, line, text: match.slice(0, 80) })
+    }
+  }
   return findings
 }
 
@@ -126,20 +350,12 @@ const walk = (directory: string, files: string[]): void => {
   }
 }
 
-/**
- * Whole native Loader rows vendored from upstream as forks that carry no styling delta of ours yet, so their native
- * styling is upstream's and is not counted. They arrived with the 2026-11-11 upstream merge
- * (the 2026-11-11 upstream merge); move one out of this set when its first styling delta lands, and tokenise it then.
- * `sidebar-terminal` left the set with its restyle (upstream UI fit). `deliverables` (the native changed-files
- * card, forked upstream for image previews) arrived with the 2026-11-12 merge (the 2026-11-12 upstream merge) and waits
- * for the same UI-fit step.
- */
-export const VENDORED_UNSTYLED_FORKS: ReadonlySet<string> = new Set(['cordis-cards', 'deliverables', 'schedule', 'settings-subagent'])
-
 /** Every finding in the repository's plugins (owned and forked), sorted for stable output. */
 const scanRepository = (root: string): readonly DesignTokenFinding[] => {
   const pluginsRoot = join(root, 'plugins/@dshfiles')
-  const plugins = readdirSync(pluginsRoot).filter(name => statSync(join(pluginsRoot, name)).isDirectory() && !VENDORED_UNSTYLED_FORKS.has(name))
+  // Vendored forks with no styling delta of ours yet (cordis-cards, deliverables, schedule, settings-subagent) count
+  // too: their upstream styling is still debt on our screens, and the baseline keeps it from growing.
+  const plugins = readdirSync(pluginsRoot).filter(name => statSync(join(pluginsRoot, name)).isDirectory())
   const findings: DesignTokenFinding[] = []
   for (const plugin of plugins) {
     const files: string[] = []
@@ -167,8 +383,10 @@ const countByRuleAndPlugin = (findings: readonly DesignTokenFinding[]): Readonly
   return Object.fromEntries(Object.entries(counts).toSorted(([left], [right]) => left.localeCompare(right)))
 }
 
+const ruleIds = (): readonly string[] => [...designTokenRules, ...designTokenGroupRules].map(rule => rule.id)
+
 const totalsByRule = (findings: readonly DesignTokenFinding[]): Readonly<Record<string, number>> =>
-  Object.fromEntries(designTokenRules.map(rule => [rule.id, findings.filter(finding => finding.rule === rule.id).length]))
+  Object.fromEntries(ruleIds().map(rule => [rule, findings.filter(finding => finding.rule === rule).length]))
 
 export interface DesignTokenComparison {
   readonly increased: readonly string[]
@@ -192,6 +410,9 @@ const baselineSchema = Schema.Struct({ totals: Schema.Record(Schema.String, Sche
 /** The design-token check's pure parts, exported for its tests. */
 export class DesignTokenCheck {
   static readonly rules = designTokenRules
+  static readonly groupRules = designTokenGroupRules
+  static readonly classTokens = classTokens
+  static readonly classGroups = classGroups
   static readonly isTokenFile = isTokenFile
   static readonly isSource = isSource
   static readonly findingsInText = findingsInText
@@ -218,7 +439,7 @@ const main = (): void => {
   }
   const baseline = ScriptJson.decodeJson(baselineSchema, readFileSync(baselineUrl, 'utf8')).counts
   const { increased, decreased } = compare({ baseline, current })
-  const use = new Map(designTokenRules.map(rule => [rule.id, rule.use]))
+  const use = new Map([...designTokenRules, ...designTokenGroupRules].map(rule => [rule.id, rule.use]))
   if (increased.length > 0) {
     console.error('design-token-check: off-scale styling increased (DESIGN.md tokens; visual refresh T4.1):')
     for (const line of increased) console.error(`  ${line} — use ${use.get(line.split('/')[0] ?? '') ?? 'a token'}`)

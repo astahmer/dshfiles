@@ -5,7 +5,8 @@
     {
       "id": "terminal-excerpts",
       "title": "Add terminal selection to chat",
-      "summary": "Attach the selected terminal output to its originating thread as an inspectable draft chip.",
+      "summary": "Add selected terminal output to the thread's draft as a chip.",
+      "details": "Attach the selected terminal output to its originating thread as an inspectable draft chip.",
       "reach": [
         "seed tool-call-thread",
         "click tab \"Fake thread title\"",

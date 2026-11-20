@@ -43,9 +43,11 @@ export function observeControlRow(row: HTMLElement, options: { readonly iconStep
     const style = getComputedStyle(row)
     const available = row.getBoundingClientRect().width
       - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
-    // An item that takes a line of its own (the phone place chip, b:4qjm) never competes for this one.
+    // An item that takes a line of its own (the phone place chip, b:4qjm) never competes for this one, and neither does
+    // one positioned out of the line (Send on a narrow card sits against the card, beside the row's box: unslop phone 6).
     const widths = flowItems(row)
       .filter(child => !child.hasAttribute('data-row-break') || getComputedStyle(child).flexBasis !== '100%')
+      .filter(child => !/^(absolute|fixed)$/u.test(getComputedStyle(child).position))
       .map(child => child.getBoundingClientRect().width)
       .filter(width => width > 0)
     const needed = widths.reduce((sum, width) => sum + width, 0)

@@ -83,7 +83,7 @@ export const ProjectMainBranchPanel = (props: ProjectSettingsPanelProps): JSX.El
           <span>
             {errorMessage(
               query.error,
-              'The Host could not read this project’s main branch. Check that the folder is a jj or git repository; after updating DSH, restart it to load this setting.',
+              'DSH could not read this project’s main branch. Check that the folder is a jj or git repository. After updating DSH, restart it to load this setting.',
             )}
           </span>
           <Button type="button" size="sm" variant="outline" onClick={() => void query.refetch()}>
@@ -137,7 +137,7 @@ export const ProjectMainBranchPanel = (props: ProjectSettingsPanelProps): JSX.El
       ) : null}
       {save.isError ? (
         <p role="alert" className="dshx:m-0 dshx:text-xs dshx:text-destructive">
-          {errorMessage(save.error, 'The main branch was not saved. Pick it again to retry; if it keeps failing, check the Host log.')}
+          {errorMessage(save.error, 'The main branch was not saved. Pick it again to retry. If it keeps failing, check the DSH log.')}
         </p>
       ) : null}
     </div>,

@@ -25,7 +25,7 @@ import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-
 import { VirtualThreadRows } from './virtual-thread-rows.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
-import { LiveActivityLine, useLiveTurns, type LiveTurnView } from './live-activity.js'
+import { LiveActivityLine, LiveElapsed, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
@@ -97,23 +97,26 @@ import {
   ArchiveRestoreIcon,
   BellIcon,
   BellOffIcon,
+  BellRingIcon,
   BookmarkPlusIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   CircleCheckIcon,
+  CircleDashedIcon,
   CirclePauseIcon,
   EllipsisIcon,
   GripVerticalIcon,
-  FolderIcon,
   GitBranchIcon,
   LayersIcon,
   LinkIcon,
   ListFilterIcon,
+  MailIcon,
   MonitorIcon,
   PanelRightOpenIcon,
   PauseIcon,
   PencilIcon,
   PinIcon,
+  PinOffIcon,
   PlayIcon,
   RefreshCwIcon,
   RotateCcwIcon,
@@ -124,7 +127,11 @@ import {
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { PhoneLayout } from './phone-layout.js'
+import { ThreadMenu, type ThreadMenuEntries, type ThreadMenuKit } from './thread-menu.js'
+import { ThreadMenuModel } from './thread-menu-model.js'
 import {
+  type CSSProperties,
   createContext,
   Fragment,
   memo,
@@ -200,7 +207,8 @@ import {
   type ThreadSelectionState,
 } from './thread-selection.js'
 import { createThreadMultiSelectionStore, useThreadMultiSelected, useThreadMultiSelectedIds, type ThreadMultiSelectionStore } from './thread-multi-selection.js'
-import { workingThreadIds } from './working-threads.js'
+import { ThreadSelectionBar } from './thread-selection-bar.js'
+import { workingThreadIds, WorkingThreadsProjection } from './working-threads.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -245,6 +253,7 @@ import { ViewedThreadModel } from './viewed-thread.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
 import { useThreadAttention } from './attention-client.js'
+import { useFailedTurns } from './failed-turns-client.js'
 import { useRowAgentHandles } from './use-row-agent-handles.js'
 import type { ThreadAttentionView } from './attention-api.js'
 import { SinceYouLeftModel } from '@dshfiles/chat/thread-tools'
@@ -521,7 +530,7 @@ interface BatchSelectionSnapshot {
   readonly anyMuted: boolean
 }
 
-interface RowActions {
+export interface RowActions {
   readonly open: (sessionId: SessionSummary['id']) => void
   readonly selection: () => ThreadSelectionState
   /** Rows read their own multi-selected state here, so a toggle re-renders only the rows it changes. */
@@ -592,7 +601,7 @@ export interface ThreadNotifyTarget {
   readonly choice: ThreadNotifyChoice
 }
 
-interface ThreadRowProps {
+export interface ThreadRowProps {
   readonly session: SessionSummary
   readonly unread: boolean
   readonly autoSettleOverride: AutoSettleOverride
@@ -679,6 +688,7 @@ const statusGroupLabelKeys = {
   working: 'threadSidebarStateWorking',
   ready: 'threadSidebarStateReady',
   idle: 'threadSidebarStateIdle',
+  draft: 'threadSidebarStateDrafts',
   done: 'threadSidebarStateDone',
 } as const satisfies Record<ThreadStatusGroup, Parameters<ThreadSidebarTranslate>[0]>
 
@@ -704,6 +714,15 @@ const agentPresetOf = (session: SessionSummary): string | undefined => {
   const preset = values.agentPreset
   // The shipped presets are the mode a thread runs in (shown by the composer), not an agent.
   return typeof preset === 'string' && preset.length > 0 && !BUILT_IN_PRESETS.has(preset) ? preset : undefined
+}
+
+/**
+ * A subagent's row title: the name its parent gave it (the `description` of the subagent call, kept as the child's
+ * creation label), which is what its card and the mention list call it. Its Session title is the prompt it was sent.
+ */
+const subagentRowTitle = (session: SessionSummary): string => {
+  const label = session.projectionValues?.subagent?.label?.trim()
+  return label === undefined || label === '' ? session.displayTitle : label
 }
 
 const finishedSubagentsLabels = {
@@ -833,7 +852,7 @@ const ChildThreadList = (props: {
               childStatus?.status === 'done' && 'dshx:text-muted-foreground',
             )}
           >
-            {child.displayTitle}
+            {subagentRowTitle(child)}
           </span>
           {childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed') ? null : (
             <span className="dshx:shrink-0 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{t(workStatusLabelKeys[childStatus.status])}</span>
@@ -939,7 +958,12 @@ const NotifyChoiceMenu = (props: {
   readonly t: ThreadSidebarTranslate
 }): JSX.Element => (
   <ContextMenuSub>
-    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">{props.t('threadSidebarNotifyOnFinish')}</ContextMenuSubTrigger>
+    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">
+      <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+        <BellRingIcon aria-hidden="true" />
+        {props.t('threadSidebarNotifyOnFinish')}
+      </span>
+    </ContextMenuSubTrigger>
     <ContextMenuSubContent className="dshx-root dshx:min-w-44 dshx:max-w-72">
       <ContextMenuLabel className="dshx:font-normal dshx:text-muted-foreground">
         {props.t('threadSidebarNotifyOnFinishFor', { title: props.subscriberTitle })}
@@ -957,6 +981,12 @@ const NotifyChoiceMenu = (props: {
   </ContextMenuSub>
 )
 
+/** A list key hint for a batch row, on a device that has the key. */
+const batchKeys = (keys: string): { readonly keys?: string } => {
+  const hint = ThreadMenuModel.keyHint(keys, coarsePointer())
+  return hint === undefined ? {} : { keys: hint }
+}
+
 const BatchThreadMenuItems = (props: {
   readonly snapshot: BatchSelectionSnapshot
   readonly actions: RowActions
@@ -969,24 +999,52 @@ const BatchThreadMenuItems = (props: {
       <ContextMenuLabel>{props.t('threadSidebarSelectedCount', { count: snapshot.ids.length })}</ContextMenuLabel>
       <ContextMenuSeparator />
       {snapshot.anyUnpinned ? (
-        <ContextMenuItem keys="P" onSelect={() => props.actions.batchMutate('pin')}>
+        <ContextMenuItem {...batchKeys('P')} onSelect={() => props.actions.batchMutate('pin')}>
+          <PinIcon aria-hidden="true" />
           {props.t('threadSidebarPin')}
         </ContextMenuItem>
       ) : null}
-      {snapshot.anyPinned ? <ContextMenuItem onSelect={() => props.actions.batchMutate('unpin')}>{props.t('threadSidebarUnpin')}</ContextMenuItem> : null}
-      {snapshot.anyUnparked ? <ContextMenuItem onSelect={() => props.actions.batchSetParked(true)}>{props.t('threadSidebarPark')}</ContextMenuItem> : null}
-      {snapshot.anyParked ? <ContextMenuItem onSelect={() => props.actions.batchSetParked(false)}>{props.t('threadSidebarUnpark')}</ContextMenuItem> : null}
+      {snapshot.anyPinned ? (
+        <ContextMenuItem onSelect={() => props.actions.batchMutate('unpin')}>
+          <PinOffIcon aria-hidden="true" />
+          {props.t('threadSidebarUnpin')}
+        </ContextMenuItem>
+      ) : null}
       {snapshot.anyUnsettled ? (
-        <ContextMenuItem keys="E" onSelect={() => props.actions.batchSetSettled(true)}>
+        <ContextMenuItem {...batchKeys('E')} onSelect={() => props.actions.batchSetSettled(true)}>
+          <CircleCheckIcon aria-hidden="true" />
           {props.t('threadSidebarSettle')}
         </ContextMenuItem>
       ) : null}
-      {snapshot.anySettled ? <ContextMenuItem onSelect={() => props.actions.batchSetSettled(false)}>{props.t('threadSidebarUnsettle')}</ContextMenuItem> : null}
-      <ContextMenuItem keys="U" onSelect={() => props.actions.batchMarkUnread()}>
+      {snapshot.anySettled ? (
+        <ContextMenuItem onSelect={() => props.actions.batchSetSettled(false)}>
+          <RotateCcwIcon aria-hidden="true" />
+          {props.t('threadSidebarUnsettle')}
+        </ContextMenuItem>
+      ) : null}
+      {snapshot.anyUnparked ? (
+        <ContextMenuItem onSelect={() => props.actions.batchSetParked(true)}>
+          <PauseIcon aria-hidden="true" />
+          {props.t('threadSidebarPark')}
+        </ContextMenuItem>
+      ) : null}
+      {snapshot.anyParked ? (
+        <ContextMenuItem onSelect={() => props.actions.batchSetParked(false)}>
+          <PlayIcon aria-hidden="true" />
+          {props.t('threadSidebarUnpark')}
+        </ContextMenuItem>
+      ) : null}
+      <ContextMenuItem {...batchKeys('U')} onSelect={() => props.actions.batchMarkUnread()}>
+        <MailIcon aria-hidden="true" />
         {props.t('threadSidebarMarkUnread')}
       </ContextMenuItem>
       <ContextMenuSub>
-        <ContextMenuSubTrigger>{props.t('threadSidebarMute')}</ContextMenuSubTrigger>
+        <ContextMenuSubTrigger>
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+            <BellIcon aria-hidden="true" />
+            {props.t('threadSidebarMute')}
+          </span>
+        </ContextMenuSubTrigger>
         <ContextMenuSubContent className="dshx-root dshx:min-w-44">
           {THREAD_MUTE_OPTIONS.map(option => (
             <ContextMenuItem key={option} onSelect={() => props.actions.batchMute(option)}>
@@ -999,7 +1057,10 @@ const BatchThreadMenuItems = (props: {
           </ContextMenuItem>
         </ContextMenuSubContent>
       </ContextMenuSub>
-      <ContextMenuItem onSelect={() => props.actions.batchCopyLinks()}>{props.t('threadSidebarCopyLinks')}</ContextMenuItem>
+      <ContextMenuItem onSelect={() => props.actions.batchCopyLinks()}>
+        <LinkIcon aria-hidden="true" />
+        {props.t('threadSidebarCopyLinks')}
+      </ContextMenuItem>
       {notifySubscriber === undefined ? null : (
         <NotifyChoiceMenu
           subscriberTitle={notifySubscriber.title}
@@ -1010,12 +1071,24 @@ const BatchThreadMenuItems = (props: {
         />
       )}
       <ContextMenuSeparator />
-      {snapshot.anyLive ? <ContextMenuItem onSelect={() => props.actions.batchMutate('archive')}>{props.t('threadSidebarArchive')}</ContextMenuItem> : null}
+      {snapshot.anyLive ? (
+        <ContextMenuItem onSelect={() => props.actions.batchMutate('archive')}>
+          <ArchiveIcon aria-hidden="true" />
+          {props.t('threadSidebarArchive')}
+        </ContextMenuItem>
+      ) : null}
       {snapshot.anyArchived ? (
-        <ContextMenuItem onSelect={() => props.actions.batchMutate('unarchive')}>{props.t('threadSidebarRestore')}</ContextMenuItem>
+        <ContextMenuItem onSelect={() => props.actions.batchMutate('unarchive')}>
+          <ArchiveRestoreIcon aria-hidden="true" />
+          {/* Two kinds of Restore can meet in one selection; this one says which it is. */}
+          {props.t(snapshot.anySettled ? 'threadSidebarRestoreArchived' : 'threadSidebarRestore')}
+        </ContextMenuItem>
       ) : null}
       <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => props.actions.clearSelection()}>{props.t('threadSidebarClearSelection')}</ContextMenuItem>
+      <ContextMenuItem onSelect={() => props.actions.clearSelection()}>
+        <XIcon aria-hidden="true" />
+        {props.t('threadSidebarClearSelection')}
+      </ContextMenuItem>
     </>
   )
 }
@@ -1036,11 +1109,19 @@ const RegisteredThreadRowActions = (props: { readonly target: ThreadRowActionTar
     <>
       {shown.map(action => (
         <ContextMenuItem key={action.id} data-thread-row-action={action.id} onSelect={() => action.run(props.target)}>
+          {action.icon === undefined ? <CircleDashedIcon aria-hidden /> : <action.icon aria-hidden />}
           {typeof action.label === 'string' ? action.label : action.label()}
         </ContextMenuItem>
       ))}
     </>
   )
+}
+
+/** A touch-first device (the phone rules apply under `pointer: coarse`); read once, it does not change mid-session. */
+let coarsePointerMatch: boolean | undefined
+const coarsePointer = (): boolean => {
+  coarsePointerMatch ??= typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+  return coarsePointerMatch
 }
 
 /** A scratch thread's own folder is its Session cwd, or its project folder when the summary carries none. */
@@ -1058,31 +1139,91 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   if (selection.sessionIds.length > 1 && selection.sessionIds.includes(session.id)) {
     return <BatchThreadMenuItems snapshot={props.actions.batch()} actions={props.actions} t={t} />
   }
-  // Lifecycle verbs lead (productivity pass E8): on a phone this menu is the row's action sheet, and Pin, Settle (the
-  // swipe's Done), Park, Archive and Mute are what a supervisor reaches for; the thread's other verbs follow.
-  return (
-    <>
-      {archived ? (
-        <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, 'unarchive')}>{t('threadSidebarRestore')}</ContextMenuItem>
-      ) : (
+  const copy = (value: string, done: ThreadSidebarLabelKey): void => void props.actions.copy(value, t(done))
+  const autoDone = (override: AutoSettleOverride, label: ThreadSidebarLabelKey): JSX.Element => (
+    <ContextMenuRadioItem
+      value={override}
+      onSelect={event => {
+        event.preventDefault()
+        props.actions.setAutoSettleOverride(session.id, override)
+      }}
+    >
+      {t(label)}
+    </ContextMenuRadioItem>
+  )
+  // One menu for a thread (`thread-menu-model.ts`): the header's `⋯` renders the same layout, so this body only says
+  // what each entry does for a row. On a phone it is the row's action sheet.
+  const entries: ThreadMenuEntries = {
+    pin: {
+      kind: 'item',
+      label: t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
+      keys: 'P',
+      ...(pinned ? { icon: <PinOffIcon aria-hidden="true" /> } : undefined),
+      onSelect: () => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin'),
+    },
+    done: {
+      kind: 'item',
+      label: t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle'),
+      keys: 'E',
+      disabled: session.running,
+      ...(settled ? { icon: <RotateCcwIcon aria-hidden="true" /> } : undefined),
+      onSelect: () => props.actions.toggleSettled(session.id),
+    },
+    snooze: {
+      kind: 'item',
+      label: t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
+      keys: 'H',
+      disabled: session.running,
+      ...(parked ? { icon: <PlayIcon aria-hidden="true" /> } : undefined),
+      onSelect: () => props.actions.toggleParked(session.id),
+    },
+    restore: { kind: 'item', label: t('threadSidebarRestore'), onSelect: () => void props.actions.mutate(session.id, 'unarchive') },
+    rename: { kind: 'item', label: t('threadSidebarRenameThread'), onSelect: () => props.actions.beginRename(session.id) },
+    ...(openAside === null ? undefined : { 'side-panel': { kind: 'item', label: t('threadSidebarOpenInSidePanel'), onSelect: () => openAside(session.id) } }),
+    // A draft nothing was sent in is not a thread to link to yet.
+    ...(session.blank
+      ? undefined
+      : {
+          'copy-link': {
+            kind: 'item',
+            label: t('threadSidebarCopyLink'),
+            onSelect: () => copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), 'threadSidebarLinkCopied'),
+          },
+        }),
+    ...(sidePanelDefinitions.length === 0
+      ? undefined
+      : {
+          'side-panel-views': {
+            kind: 'sub',
+            label: t('threadSidebarOpenPluginInSidePanel'),
+            content: sidePanelDefinitions.map(definition => (
+              <ContextMenuItem key={definition.id} onSelect={() => openRegisteredPanelAside(definition.id)}>
+                {definition.title}
+              </ContextMenuItem>
+            )),
+          },
+        }),
+    'continue-in': {
+      kind: 'sub',
+      label: t('threadSidebarContinueIn'),
+      disabled: session.running,
+      content: <ContinueInProjectItems t={t} continueIn={projectId => props.actions.continueIn(session.id, projectId)} Item={ContextMenuItem} />,
+    },
+    'copy-id': { kind: 'item', label: t('threadSidebarCopyId'), onSelect: () => copy(session.id, 'threadSidebarIdCopied') },
+    mention: { kind: 'item', label: t('threadSidebarInsertMention'), onSelect: () => requestThreadMentionInsertion(session.id) },
+    'follow-up': {
+      kind: 'item',
+      label: t('threadSidebarFollowUp'),
+      disabled: props.workspaceId === undefined,
+      onSelect: () => props.actions.followUp(session.id, props.workspaceId),
+    },
+    mute: {
+      kind: 'sub',
+      label: t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted'),
+      ...(props.mute === undefined ? undefined : { icon: <BellOffIcon aria-hidden="true" /> }),
+      contentClassName: 'dshx-root dshx:min-w-44',
+      content: (
         <>
-          <ContextMenuItem keys="P" onSelect={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}>
-            {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} keys="E" onSelect={() => props.actions.toggleSettled(session.id)}>
-            {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} keys="H" onSelect={() => props.actions.toggleParked(session.id)}>
-            {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} onSelect={() => void props.actions.mutate(session.id, 'archive')}>
-            {t('threadSidebarArchive')}
-          </ContextMenuItem>
-        </>
-      )}
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
           {THREAD_MUTE_OPTIONS.map(option => (
             <ContextMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
               {t(muteOptionLabelKeys[option])}
@@ -1092,118 +1233,88 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           <ContextMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
             {t('threadSidebarUnmute')}
           </ContextMenuItem>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
-      <ContextMenuItem disabled={props.workspaceId === undefined} onSelect={() => props.actions.followUp(session.id, props.workspaceId)}>
-        {t('threadSidebarFollowUp')}
-      </ContextMenuItem>
-      {archived ? null : (
-        <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={session.running}>{t('threadSidebarContinueIn')}</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-48 dshx:max-w-72" aria-label={t('threadSidebarContinueIn')}>
-            <ContinueInProjectItems t={t} continueIn={projectId => props.actions.continueIn(session.id, projectId)} Item={ContextMenuItem} />
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-      )}
-      {scratchThread(session, props.workspacePath, props.workspaceTitle) ? (
-        <ContextMenuItem onSelect={() => props.actions.turnIntoProject(session, props.workspacePath)}>{t('threadSidebarTurnIntoProject')}</ContextMenuItem>
-      ) : null}
-      <ContextMenuItem onSelect={() => props.actions.beginRename(session.id)}>{t('threadSidebarRenameThread')}</ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarCopy')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-          <ContextMenuItem onSelect={() => void props.actions.copy(session.id, t('threadSidebarIdCopied'))}>{t('threadSidebarCopyId')}</ContextMenuItem>
-          <ContextMenuItem
-            onSelect={() => void props.actions.copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), t('threadSidebarLinkCopied'))}
-          >
-            {t('threadSidebarCopyLink')}
-          </ContextMenuItem>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      {archived || openAside === null ? null : <ContextMenuItem onSelect={() => openAside(session.id)}>{t('threadSidebarOpenInSidePanel')}</ContextMenuItem>}
-      {!archived && sidePanelDefinitions.length > 0 ? (
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>{t('threadSidebarOpenPluginInSidePanel')}</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-            {sidePanelDefinitions.map(definition => (
-              <ContextMenuItem key={definition.id} onSelect={() => openRegisteredPanelAside(definition.id)}>
-                {definition.title}
-              </ContextMenuItem>
-            ))}
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-      ) : null}
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarReferencedBy')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>
-          <ThreadReferencesItems sessionId={session.id} t={t} openThread={props.actions.open} Item={ContextMenuItem} />
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      <RegisteredThreadRowActions target={{ sessionId: session.id, workspaceId: props.workspaceId, archived, running: session.running }} />
-      <ContextMenuSeparator />
-      {notifyTarget === undefined ? null : (
-        <NotifyChoiceMenu
-          subscriberTitle={notifyTarget.subscriberTitle}
-          choice={notifyTarget.choice}
-          defaultLevel={props.actions.notifyDefaultLevel()}
-          onChoose={choice => props.actions.setNotify(notifyTarget, choice)}
-          t={t}
-        />
-      )}
-      <ContextMenuItem disabled={unread} keys="U" onSelect={() => props.actions.markUnread(session.id)}>
-        {t('threadSidebarMarkUnread')}
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarAutoSettleBehavior')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-          <ContextMenuRadioGroup value={props.autoSettleOverride}>
-            <ContextMenuRadioItem
-              value="inherit"
-              onSelect={event => {
-                event.preventDefault()
-                props.actions.setAutoSettleOverride(session.id, 'inherit')
-              }}
-            >
-              {t('threadSidebarAutoSettleInherit')}
-            </ContextMenuRadioItem>
-            <ContextMenuRadioItem
-              value="enabled"
-              onSelect={event => {
-                event.preventDefault()
-                props.actions.setAutoSettleOverride(session.id, 'enabled')
-              }}
-            >
-              {t('threadSidebarAutoSettleEnabled')}
-            </ContextMenuRadioItem>
-            <ContextMenuRadioItem
-              value="disabled"
-              onSelect={event => {
-                event.preventDefault()
-                props.actions.setAutoSettleOverride(session.id, 'disabled')
-              }}
-            >
-              {t('threadSidebarAutoSettleDisabled')}
-            </ContextMenuRadioItem>
-          </ContextMenuRadioGroup>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarMoveToSection')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMoveToSection')}>
-          {SIDEBAR_SECTIONS.map(section => (
-            <ContextMenuItem key={section} disabled={section === props.section} onSelect={() => props.actions.moveToSection(session.id, section)}>
-              {t(sectionLabels[section])}
-            </ContextMenuItem>
-          ))}
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-    </>
+        </>
+      ),
+    },
+    'mark-unread': { kind: 'item', label: t('threadSidebarMarkUnread'), keys: 'U', disabled: unread, onSelect: () => props.actions.markUnread(session.id) },
+    ...(notifyTarget === undefined
+      ? undefined
+      : {
+          notify: {
+            kind: 'rows',
+            rows: (
+              <NotifyChoiceMenu
+                subscriberTitle={notifyTarget.subscriberTitle}
+                choice={notifyTarget.choice}
+                defaultLevel={props.actions.notifyDefaultLevel()}
+                onChoose={choice => props.actions.setNotify(notifyTarget, choice)}
+                t={t}
+              />
+            ),
+          },
+        }),
+    'auto-done': {
+      kind: 'sub',
+      label: t('threadSidebarAutoSettleBehavior'),
+      contentClassName: 'dshx-root dshx:min-w-44',
+      content: (
+        <ContextMenuRadioGroup value={props.autoSettleOverride}>
+          {autoDone('inherit', 'threadSidebarAutoSettleInherit')}
+          {autoDone('enabled', 'threadSidebarAutoSettleEnabled')}
+          {autoDone('disabled', 'threadSidebarAutoSettleDisabled')}
+        </ContextMenuRadioGroup>
+      ),
+    },
+    'move-to-group': {
+      kind: 'sub',
+      label: t('threadSidebarMoveToSection'),
+      contentClassName: 'dshx-root dshx:min-w-44',
+      content: SIDEBAR_SECTIONS.map(section => (
+        <ContextMenuItem key={section} disabled={section === props.section} onSelect={() => props.actions.moveToSection(session.id, section)}>
+          {t(sectionLabels[section])}
+        </ContextMenuItem>
+      )),
+    },
+    'referenced-by': {
+      kind: 'sub',
+      label: t('threadSidebarReferencedBy'),
+      contentClassName: 'dshx-root dshx:min-w-56 dshx:max-w-72',
+      content: <ThreadReferencesItems sessionId={session.id} t={t} openThread={props.actions.open} Item={ContextMenuItem} />,
+    },
+    ...(scratchThread(session, props.workspacePath, props.workspaceTitle)
+      ? {
+          'turn-into-project': {
+            kind: 'item',
+            label: t('threadSidebarTurnIntoProject'),
+            onSelect: () => props.actions.turnIntoProject(session, props.workspacePath),
+          },
+        }
+      : undefined),
+    'row-actions': {
+      kind: 'rows',
+      rows: <RegisteredThreadRowActions target={{ sessionId: session.id, workspaceId: props.workspaceId, archived, running: session.running }} />,
+    },
+    archive: { kind: 'item', label: t('threadSidebarArchive'), disabled: session.running, onSelect: () => void props.actions.mutate(session.id, 'archive') },
+  }
+  return (
+    <ThreadMenu
+      kit={CONTEXT_MENU_KIT}
+      entries={entries}
+      archived={archived}
+      phone={PhoneLayout.matches()}
+      coarsePointer={coarsePointer()}
+      labels={{ openIn: t('threadSidebarOpenIn'), copy: t('threadSidebarCopy'), more: t('threadSidebarMore') }}
+    />
   )
+}
+
+/** The list's menu parts, for the shared thread menu. */
+const CONTEXT_MENU_KIT: ThreadMenuKit = {
+  Item: ContextMenuItem,
+  Sub: ContextMenuSub,
+  SubTrigger: ContextMenuSubTrigger,
+  SubContent: ContextMenuSubContent,
+  Separator: ContextMenuSeparator,
 }
 
 /** Right-click menu of one thread, shared by thread rows and the usage-limit rows. */
@@ -1233,13 +1344,6 @@ const ThreadRowMenu = {
     row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: rect.left, clientY: rect.bottom }))
   },
 } as const
-
-/** A touch-first device (the phone rules apply under `pointer: coarse`); read once, it does not change mid-session. */
-let coarsePointerMatch: boolean | undefined
-const coarsePointer = (): boolean => {
-  coarsePointerMatch ??= typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
-  return coarsePointerMatch
-}
 
 /**
  * The 16px project mark that leads a thread row: the project's own icon (favicon, `dsh.project.json` icon) or its
@@ -1298,8 +1402,8 @@ const OwnWorkspaceIndicator = (props: {
   )
 }
 
-/** Memoized so a session update re-renders only its own row, not the whole list. */
-const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
+/** Memoized so a session update re-renders only its own row, not the whole list. Exported for its render test. */
+export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, settled, rowStyle } = props
   const rowRef = useRef<HTMLElement | null>(null)
   const multiSelected = useThreadMultiSelected(props.actions.multiSelection, session.id)
@@ -1349,11 +1453,14 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       ? undefined
       : (workStatus.detail ?? t(workStatusLabelKeys[workStatus.status]))
   // A working thread trades its static meta for what it is doing now (polish pass b:r4et): its step or the subagent
-  // rollup, with the working shimmer, then the elapsed time. Done, idle and attention rows keep the meta line.
+  // rollup, with the working shimmer. Under a status glyph the spinner and the group already say Working, so a turn
+  // with no known step keeps the meta line (where it runs) instead of naming the state again; the dot-only groupings
+  // keep the word. The elapsed time takes the first line's time slot, so the row shows one clock, not an age and a clock.
   const live = session.running && (workStatus === undefined || workStatus.status === 'working')
-  const liveStep = live ? (workStatus?.detail ?? props.liveTurn?.step ?? t('threadSidebarWorking')) : undefined
+  const liveStep = live ? (workStatus?.detail ?? props.liveTurn?.step ?? (workStatus === undefined ? t('threadSidebarWorking') : undefined)) : undefined
+  const liveStartedAt = live ? props.liveTurn?.startedAt : undefined
   const metaLine =
-    live ||
+    liveStep !== undefined ||
     (showMark && props.workspacePath !== undefined) ||
     showProject ||
     ownWorkspace !== undefined ||
@@ -1364,6 +1471,9 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     showAgent ||
     statusDetail !== undefined
   const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.integrationQueuedAt !== undefined || (props.subscriberCount ?? 0) > 0
+  // The inline verb sits at the end of the second line, so the title and the time keep the first (the rows that most
+  // need reading were the most truncated). A row with no second line keeps the verb beside its title.
+  const verbSeat = inlineVerb === undefined ? undefined : metaLine ? 'meta' : 'head'
   const openAside = useAsideOpen()
   /**
    * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
@@ -1481,6 +1591,18 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     )
   }
 
+  // The hover actions sit in the first line's time slot. While they show, that line gives them their width and the
+  // time steps aside, so the title truncates before them instead of being covered (each seat is a 24px button and a
+  // 2px gap; the last one is the row menu).
+  const hoverActions = nearViewport
+    ? props.rowActions.flatMap(action => {
+        const element = renderRowAction(action)
+        return element === null ? [] : [{ action, element }]
+      })
+    : []
+  const stripSeats = nearViewport ? hoverActions.length + 1 : 0
+  const stripStyle: CSSProperties & { readonly '--thread-row-strip': string } = { '--thread-row-strip': `${String(stripSeats * 1.625 + 0.25)}rem` }
+
   return (
     <ThreadContextMenu
       session={session}
@@ -1549,8 +1671,8 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
                 // Phone rows are 60pt two-line targets (T1.3), whatever the density preference.
                 'dshx:pointer-coarse:min-h-15 dshx:pointer-coarse:justify-center',
-                // Touch: the row's actions menu button takes the top-right corner, so the inline verb moves left of it.
-                inlineVerb !== undefined ? 'dshx:pr-20 dshx:pointer-coarse:pr-30' : 'dshx:pointer-coarse:pr-11',
+                // Touch: the row's actions menu button takes the top-right corner, so a verb on the first line moves left of it.
+                verbSeat === 'head' ? 'dshx:pr-20 dshx:pointer-coarse:pr-30' : 'dshx:pointer-coarse:pr-11',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
               )}
               data-thread-id={session.id}
@@ -1562,7 +1684,17 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               onDoubleClick={() => keepThreadTab(session.id)}
             >
               {headLine ? (
-                <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+                <span
+                  className={cn(
+                    'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2',
+                    // Wherever the strip can show (it hides on a coarse pointer, where the row menu button keeps its own corner).
+                    verbSeat !== 'head' &&
+                      stripSeats > 0 &&
+                      'dshx:not-pointer-coarse:group-hover/row:pr-(--thread-row-strip) dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:pr-(--thread-row-strip)',
+                  )}
+                  style={verbSeat !== 'head' && stripSeats > 0 ? stripStyle : undefined}
+                  data-thread-head=""
+                >
                   {(() => {
                     const status =
                       workStatus !== undefined ? (
@@ -1630,14 +1762,17 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                           {t('threadSidebarNotifySubscribers', { count: props.subscriberCount })}
                         </Badge>,
                       )}
-                  {rowStyle.time && inlineVerb === undefined ? (
+                  {rowStyle.time && verbSeat !== 'head' ? (
+                    // The spinner and the live activity line say Working; the time stays colourless (DESIGN.md).
                     <span
                       className={cn(
                         'dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
-                        // The spinner and the live activity line say Working; the time stays colourless (DESIGN.md).
+                        stripSeats > 0 &&
+                          'dshx:not-pointer-coarse:group-hover/row:hidden dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:hidden',
                       )}
+                      data-thread-time=""
                     >
-                      {props.age}
+                      {liveStartedAt === undefined ? props.age : <LiveElapsed active={nearViewport} startedAt={liveStartedAt} />}
                     </span>
                   ) : null}
                 </span>
@@ -1646,7 +1781,9 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 <span
                   className={cn(
                     'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
-                    childCount > 0 && 'dshx:pr-16',
+                    // Room for what sits at the end of this line: the subagent counter, the inline verb, or both.
+                    childCount > 0 && verbSeat !== 'meta' && 'dshx:pr-16',
+                    verbSeat === 'meta' && (childCount > 0 ? 'dshx:pr-36' : 'dshx:pr-20'),
                   )}
                   data-thread-where=""
                 >
@@ -1658,12 +1795,20 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     </span>
                   ) : null}
                   {liveStep === undefined ? null : (
-                    <LiveActivityLine active={nearViewport} startedAt={props.liveTurn?.startedAt} step={liveStep} className="dshx:min-w-0 dshx:flex-1" />
+                    <LiveActivityLine
+                      active={nearViewport}
+                      // With the time column off, the clock stays beside the step.
+                      startedAt={rowStyle.time ? undefined : liveStartedAt}
+                      step={liveStep}
+                      className="dshx:min-w-0 dshx:flex-1"
+                    />
                   )}
                   {liveStep !== undefined || statusDetail === undefined ? null : (
                     <span
                       className={cn(
-                        'dshx:min-w-0 dshx:max-w-[60%] dshx:shrink dshx:truncate',
+                        'dshx:min-w-0 dshx:shrink dshx:truncate',
+                        // Beside the verb the reason has the line to itself; otherwise the project name follows it.
+                        verbSeat === 'meta' ? 'dshx:flex-1' : 'dshx:max-w-[60%]',
                         (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
                       )}
                       data-testid="thread-row-status-detail"
@@ -1671,7 +1816,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {statusDetail}
                     </span>
                   )}
-                  {showProject && liveStep === undefined ? (
+                  {showProject && liveStep === undefined && !(verbSeat === 'meta' && statusDetail !== undefined) ? (
                     <span
                       className={cn(
                         // The first text to give way on a short row: it truncates, then hides, before the mark does.
@@ -1745,18 +1890,43 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )}
             </button>
           ) : null}
-          {props.renaming || (inlineVerb === undefined && !nearViewport) ? null : (
-            // The inline verb and the hover strip share one corner: the strip opens to the left of the verb, so
-            // neither ever covers the other (the verb is the row's visible action, not a hover affordance).
+          {props.renaming || verbSeat !== 'meta' || inlineVerb === undefined || workStatus === undefined ? null : (
+            // The row's visible action, at the end of the second line: left of the subagent counter when the row has
+            // one, and left of the touch menu button's column.
+            <div
+              data-verb-seat="meta"
+              className={cn(
+                // 2px from the row's bottom: the hover actions end 2px above it, so the two never touch (a 50px row).
+                'dshx:absolute dshx:bottom-0.5 dshx:flex dshx:items-center',
+                childCount > 0 ? 'dshx:right-17' : 'dshx:right-1.5 dshx:pointer-coarse:right-11',
+              )}
+            >
+              <Button
+                type="button"
+                size="xs"
+                variant={workStatus.status === 'ready' ? 'outline' : 'default'}
+                className="dshx:h-5 dshx:px-2"
+                data-testid="thread-row-verb"
+                data-verb={inlineVerb}
+                onClick={() => props.actions.actOnStatus(session.id, workStatus)}
+              >
+                {t(inlineVerbLabelKeys[inlineVerb])}
+              </Button>
+            </div>
+          )}
+          {props.renaming || (verbSeat !== 'head' && !nearViewport) ? null : (
+            // The first line's corner: the hover actions in the time slot. A verb on a one-line row shares it, and the
+            // actions then open to its left, so neither ever covers the other.
             <div
               data-testid="thread-row-overlay"
+              data-verb-seat={verbSeat === 'head' ? 'head' : undefined}
               className={cn(
                 'dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:items-center',
                 // Touch: the row's actions menu button takes the top-right corner, so the verb moves left of it.
-                inlineVerb !== undefined && 'dshx:pointer-coarse:right-10',
+                verbSeat === 'head' && 'dshx:pointer-coarse:right-10',
               )}
             >
-              {inlineVerb === undefined || workStatus === undefined ? null : (
+              {verbSeat !== 'head' || inlineVerb === undefined || workStatus === undefined ? null : (
                 <Button
                   type="button"
                   size="xs"
@@ -1772,14 +1942,32 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               {nearViewport ? (
                 <div
                   data-testid="thread-row-actions"
+                  data-row-strip=""
                   className={cn(
-                    'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
-                    inlineVerb === undefined ? 'dshx:top-0 dshx:right-0' : 'dshx:top-1/2 dshx:right-full dshx:mr-1 dshx:-translate-y-1/2',
+                    'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:opacity-0 dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
+                    verbSeat !== 'head'
+                      ? 'dshx:-top-0.5 dshx:right-0'
+                      : // Beside a first-line verb the strip has no slot of its own: it floats over the title's end.
+                        'dshx:top-1/2 dshx:right-full dshx:mr-1 dshx:-translate-y-1/2 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:shadow-xs',
                   )}
                 >
-                  {props.rowActions.map(action => (
-                    <Fragment key={action}>{renderRowAction(action)}</Fragment>
+                  {hoverActions.map(({ action, element }) => (
+                    <Fragment key={action}>{element}</Fragment>
                   ))}
+                  {/* Every other verb of the row: the same menu a right-click opens. */}
+                  {withTooltip(
+                    t('threadSidebarContextMenu'),
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t('threadSidebarContextMenu')}
+                      aria-haspopup="menu"
+                      onClick={event => ThreadRowMenu.open(rowRef.current, event.currentTarget)}
+                    >
+                      <EllipsisIcon className="dshx:size-3.5" aria-hidden="true" />
+                    </Button>,
+                  )}
                 </div>
               ) : null}
             </div>
@@ -1901,6 +2089,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   preferencesRef.current = preferences
   const stageShowsPage = useStageCovered()
   const attention = useThreadAttention({ enabled: sessionState.phase === 'ready' })
+  const failedTurns = useFailedTurns({ enabled: sessionState.phase === 'ready' })
   const agentHandleOf = useRowAgentHandles()
   const recoveryApi = useApi(threadSidebarRecoveryApi)
   const queryClient = useQueryClient()
@@ -3543,18 +3732,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       settledSessionIds,
     ],
   )
-  const workingThreadCountsBySource = useMemo(
-    () => ({
-      all: currentWorkingThreadIds.size + detachedThreadEntries.filter(entry => entry.session.running).length,
-      main: sectionEntries.filter(entry => currentWorkingThreadIds.has(entry.session.id) && ThreadViewModel.matchesSourceFilter(entry.session, 'main')).length,
-      subagents: [
-        ...childThreadEntries,
-        ...detachedThreadEntries,
-        ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents')),
-      ].filter(entry => entry.session.running).length,
-    }),
-    [childThreadEntries, currentWorkingThreadIds, detachedThreadEntries, sectionEntries],
-  )
   const nextMuteWake = useMemo(() => nextMuteExpiry(mutedThreads, now), [mutedThreads, now])
   const nextIdleAt = useMemo(
     () =>
@@ -3812,17 +3989,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         const status = childStatusById.get(child.id)
         return status === undefined ? [] : [status]
       })
+      // Top-level rows only: a subagent's failed turn is its parent's tool result, which the parent's own turn answers.
+      const failedTurn = failedTurns.get(entry.session.id)
       statuses.set(
         entry.session.id,
         ThreadStatusModel.statusOf(
           {
             running: entry.session.running,
             pinned: pinnedSessionIds.has(entry.session.id),
+            // Nothing sent yet: the row is listed (the journey of a saved draft finds it), under Drafts, not Idle.
+            draft: entry.session.blank,
             archived: archivedSessionIds.has(entry.session.id),
             settled: settledSessionIds.has(entry.session.id),
             unread: attention.records.has(entry.session.id),
             labels: attentionLabelsBySession.get(entry.session.id) ?? [],
             inbox: inbox.signals.get(entry.session.id),
+            failedTurn: failedTurn === undefined ? undefined : { at: failedTurn.failedAt, reason: failedTurn.reason },
+            unlanded: jjThreadBySession.get(entry.session.id)?.unlanded.length,
             activityAt: entry.activity.updatedAt,
             settledAt: preferences.settledAt[entry.session.id],
             now,
@@ -3837,7 +4020,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     attention.records,
     attentionLabelsBySession,
     childStatusById,
+    failedTurns,
     inbox.signals,
+    jjThreadBySession,
     now,
     pinnedSessionIds,
     preferences.settledAt,
@@ -3846,6 +4031,39 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     statusGlyphs,
     threadTree,
   ])
+  // The one Working count (unslop S3): the rows whose status is Working, subagents rolled up into their parent. The
+  // "Working (N)" group lists exactly these rows, and the status strip, the tab title and the Working preset read the
+  // same set, so a thread that waits for an answer (Needs you, though its turn still runs) is counted nowhere.
+  const projectedWorkingIds = useMemo(() => {
+    const statuses = new Map<string, WorkStatus>()
+    if (statusGlyphs) {
+      for (const [sessionId, status] of childStatusById) statuses.set(sessionId, status.status)
+      for (const [sessionId, status] of threadStatusById) statuses.set(sessionId, status.status)
+    }
+    return WorkingThreadsProjection.ids([...sectionEntries, ...detachedThreadEntries], {
+      statusOf: sessionId => statuses.get(sessionId),
+      waiting: waitingSessionIds,
+    })
+  }, [childStatusById, detachedThreadEntries, sectionEntries, statusGlyphs, threadStatusById, waitingSessionIds])
+  const projectedWorkingCount = projectedWorkingIds.size
+  useEffect(() => {
+    if (!isPrimarySurface || sessionState.phase !== 'ready') return
+    WorkingThreadsProjection.publish(projectedWorkingCount)
+  }, [isPrimarySurface, projectedWorkingCount, sessionState.phase])
+  // The strip falls back to its own count once no list publishes.
+  useEffect(() => (isPrimarySurface ? () => WorkingThreadsProjection.publish(null) : undefined), [isPrimarySurface])
+  const workingThreadCountsBySource = useMemo(
+    () => ({
+      all: projectedWorkingCount,
+      main: sectionEntries.filter(entry => projectedWorkingIds.has(entry.session.id) && ThreadViewModel.matchesSourceFilter(entry.session, 'main')).length,
+      subagents: [
+        ...childThreadEntries,
+        ...detachedThreadEntries,
+        ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents')),
+      ].filter(entry => entry.session.running).length,
+    }),
+    [childThreadEntries, detachedThreadEntries, projectedWorkingCount, projectedWorkingIds, sectionEntries],
+  )
   // One Host read every 3 s for every working row's step and start, only while one runs (polish pass b:r4et).
   const runningRowIds = useMemo(() => sectionEntries.filter(entry => entry.session.running).map(entry => entry.session.id), [sectionEntries])
   const liveTurns = useLiveTurns(runningRowIds, sessionState.phase === 'ready')
@@ -6357,7 +6575,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       data-thread-group-by-project=""
                       onCheckedChange={checked => selectThreadGroupBy(checked ? 'project' : 'state')}
                     >
-                      <FolderIcon aria-hidden="true" />
+                      {/* No icon: the check takes the icon column, so the label lines up with its neighbours. */}
                       <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.tSidebar('threadSidebarGroupByProject')}</span>
                     </DropdownMenuCheckboxItem>
                   ) : null}
@@ -7279,37 +7497,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
         </div>
         {selectedSessionIds.length > 0 ? (
-          <div
-            role="toolbar"
-            aria-label={props.tSidebar('threadSidebarSelection')}
-            title={props.tSidebar('threadSidebarSelectionHint')}
-            data-testid="thread-selection-bar"
-            className="dshx:mx-2 dshx:mb-2 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:bg-card dshx:p-1.5 dshx:text-xs"
-          >
-            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-medium" aria-live="polite">
-              {props.tSidebar('threadSidebarSelectedCount', { count: selectedSessionIds.length })}
-            </span>
-            <Button size="xs" variant="outline" onClick={() => void applyToSelection(allSelectedPinned ? 'unpin' : 'pin')}>
-              {allSelectedPinned ? <IconPinFillRegular size={13} /> : <PinIcon strokeWidth={1.5} size={13} />}
-              {props.tSidebar(allSelectedPinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-            </Button>
-            <Button size="xs" variant="outline" disabled={allSelectedSettled} onClick={settleSelection}>
-              <CircleCheckIcon strokeWidth={1.5} size={13} />
-              {props.tSidebar('threadSidebarSettle')}
-            </Button>
-            <Button size="xs" variant="outline" onClick={() => void applyToSelection('archive')}>
-              <ArchiveIcon strokeWidth={1.5} size={13} />
-              {props.tSidebar('threadSidebarArchive')}
-            </Button>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label={props.tSidebar('threadSidebarClearSelection')}
-              onClick={() => setThreadSelection(EMPTY_THREAD_SELECTION)}
-            >
-              <XIcon className="dshx:size-3.5" />
-            </Button>
-          </div>
+          <ThreadSelectionBar
+            count={selectedSessionIds.length}
+            allPinned={allSelectedPinned}
+            allSettled={allSelectedSettled}
+            onTogglePinned={() => void applyToSelection(allSelectedPinned ? 'unpin' : 'pin')}
+            onSettle={settleSelection}
+            onArchive={() => void applyToSelection('archive')}
+            onClear={() => setThreadSelection(EMPTY_THREAD_SELECTION)}
+            t={props.tSidebar}
+          />
         ) : null}
       </section>
       <ThreadViewManager

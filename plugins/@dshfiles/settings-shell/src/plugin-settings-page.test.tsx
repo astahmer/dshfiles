@@ -86,6 +86,11 @@ describe('plugin settings page', () => {
     expect(editor?.value.slice(editor.selectionStart, editor.selectionEnd)).toBe('"dense"')
   })
 
+  it('says nothing about scope while every setting applies everywhere', async () => {
+    await show({ visible: true })
+    expect(container.querySelector('[data-settings-page]')?.textContent).not.toContain('entry.scope')
+  })
+
   it('opens a focused field in the form when the form was showing', async () => {
     await show({ visible: true, focusPath: ['dense'] })
     expect(jsonEditor()).toBeNull()

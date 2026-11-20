@@ -30,7 +30,11 @@ const hide = async (page: Page, name: string, blank = false): Promise<void> => {
     const space = group(page, name).locator('.dv-void-container')
     await expect(space).toBeVisible()
     await space.click({ button: 'right', position: { x: 20, y: 12 } })
-  } else await tab(page, name).click({ button: 'right' })
+  } else {
+    // A tab's docking verbs sit under Layout; the blank row's own menu lists Hide tab row directly.
+    await tab(page, name).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Layout', exact: true }).click()
+  }
   const action = page.getByRole('menuitem', { name: 'Hide tab row', exact: true })
   await expect(action).toBeEnabled()
   await action.click()
@@ -97,7 +101,9 @@ Then('both tabs are shown and hiding a multiple-tab row is disabled', async ({ p
     await expect(group(page, SCRATCH).getByRole('tab', { name: THREADS, exact: true })).toBeVisible()
     await expect(tab(page, THREADS)).toHaveCount(1)
     await tab(page, SCRATCH).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Layout', exact: true }).click()
     await expect(page.getByRole('menuitem', { name: 'Hide tab row', exact: true })).toBeDisabled()
+    await page.keyboard.press('Escape')
     await page.keyboard.press('Escape')
     await tab(page, SCRATCH).click()
     await draftUnchanged(page)

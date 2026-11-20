@@ -72,14 +72,14 @@ export default defineClientPlugin({
         : {
             describe: async ref => {
               const result = await remoteCredentials.describe([ref])
-              if (!result.ok) throw new Error('Credential status is unavailable.')
+              if (!result.ok) throw new Error('Credential status did not load. Reopen this page to retry.')
               const info = result.value[ref]
-              if (info === undefined) throw new Error('Credential status is unavailable.')
+              if (info === undefined) throw new Error('Credential status did not load. Reopen this page to retry.')
               return info
             },
             set: async (ref, value) => {
               const result = await remoteCredentials.set(ref, value)
-              if (!result.ok) throw new Error('The key could not be stored in DSH credentials.')
+              if (!result.ok) throw new Error('The key was not stored in DSH credentials. Save it again.')
             },
           }
     const setupController = createAccountSetupController()

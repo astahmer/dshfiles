@@ -35,7 +35,7 @@ export const BackfillDialog = (props: {
     try {
       await props.run({ retriage })
     } catch (caught) {
-      props.onError(errorMessage(caught, 'The backfill could not be started.'))
+      props.onError(errorMessage(caught, 'The backfill did not start. Retry.'))
     }
   }
   const busy = job !== null && (job.state === 'queued' || job.state === 'running')
@@ -78,7 +78,7 @@ export const BackfillDialog = (props: {
             {busy ? 'Close and keep running' : result === null ? 'Cancel' : 'Close'}
           </Button>
           <Button onClick={() => void submit()} disabled={busy || props.triageOff}>
-            {busy ? <LoaderCircleIcon aria-hidden className="dshx:size-3.5 dshx:animate-spin" /> : <WandSparklesIcon aria-hidden className="dshx:size-3.5" />}
+            {busy ? <LoaderCircleIcon aria-hidden className="dshx:size-3.5 dshx:animate-spin dshx:motion-reduce:animate-none" /> : <WandSparklesIcon aria-hidden className="dshx:size-3.5" />}
             {busy ? 'Running…' : 'Run backfill'}
           </Button>
         </DialogFooter>

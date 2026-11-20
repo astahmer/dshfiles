@@ -4,11 +4,11 @@ import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo } from 'react'
-import { LiveActivityLine, useLiveTurns } from './live-activity.js'
+import { LiveActivityLine, LiveElapsed, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { HostSnapshotsModel } from './snapshots.js'
 
-type HeaderLiveActivityProps = Pick<PropsRuntime<'conversation.session.header.utilities'>, 'sessionId' | 'useSessions'> &
+type HeaderLiveActivityProps = Pick<PropsRuntime<'conversation.session.header.utilities'>, 'sessionId' | 'useSessions' | 'useSessionStatus'> &
   Pick<PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>, 't'>
 
 const NO_IDS: readonly string[] = []
@@ -20,16 +20,19 @@ const NO_IDS: readonly string[] = []
  *
  * b:czs9: it never shrinks below what it shows, so its elapsed time cannot spill onto the workspace chip beside it.
  * Instead it sheds parts by the header row's width (the row is an inline-size container): the elapsed time first,
- * then the step, leaving the spinner. The workspace chip sheds its label and count at narrower tiers.
+ * then the step, leaving the glyph. The workspace chip sheds its label and count at narrower tiers.
+ *
+ * A turn that waits for the user is not Working (unslop H8): it shows the Needs-you glyph and label, and the glyph is
+ * what stays in a narrow pane, so a blocked thread never reads as a busy one. That holds for a question (the turn's
+ * open call says so) and for an approval or any other pending interaction (the thread's own status says so).
  */
-const HeaderLiveActivityBody = (props: HeaderLiveActivityProps): JSX.Element | null => {
-  const sessionState = props.useSessions(HostSnapshotsModel.selectStableSessionListState)
-  const session = sessionState.byId[props.sessionId]
-  const running = session !== undefined && session.running && !session.blank
-  const ids = useMemo(() => (running ? [props.sessionId] : NO_IDS), [props.sessionId, running])
-  const turns = useLiveTurns(ids, sessionState.phase === 'ready')
-  if (!running) return null
-  const turn = turns.get(props.sessionId)
+export const HeaderLiveSignal = (props: {
+  readonly turn: LiveTurnView | undefined
+  /** The thread holds a pending interaction (an approval, a plan review, a question): nothing runs until the user acts. */
+  readonly waitingOnYou?: boolean
+  readonly labels: { readonly working: string; readonly needsYou: string }
+}): JSX.Element => {
+  const needsYou = props.turn?.needsYou === true || props.waitingOnYou === true
   return (
     <span
       className={cn(
@@ -37,11 +40,47 @@ const HeaderLiveActivityBody = (props: HeaderLiveActivityProps): JSX.Element | n
         'dshx:@max-[36rem]:[&_[data-live-elapsed]]:hidden dshx:@max-[36rem]:[&_[data-live-elapsed-separator]]:hidden dshx:@max-[32rem]:[&_[data-live-step]]:hidden',
       )}
       data-testid="thread-header-live-activity"
+      data-needs-you={needsYou ? '' : undefined}
       role="status"
     >
-      <StatusGlyph label={props.t('threadSidebarWorking')} status="working" />
-      <LiveActivityLine active startedAt={turn?.startedAt} step={turn?.step ?? props.t('threadSidebarWorking')} />
+      <StatusGlyph label={needsYou ? props.labels.needsYou : props.labels.working} status={needsYou ? 'needs-you' : 'working'} />
+      {needsYou ? (
+        // No shimmer: nothing progresses until the user answers. The clock says how long it has waited.
+        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-foreground">
+          <span className="dshx:min-w-0 dshx:truncate" data-live-step="">
+            {props.labels.needsYou}
+          </span>
+          {props.turn?.startedAt === undefined ? null : (
+            <>
+              <span aria-hidden="true" data-live-elapsed-separator="">
+                ·
+              </span>
+              <LiveElapsed active className="dshx:shrink-0 dshx:text-muted-foreground" startedAt={props.turn.startedAt} />
+            </>
+          )}
+        </span>
+      ) : (
+        <LiveActivityLine active startedAt={props.turn?.startedAt} step={props.turn?.step ?? props.labels.working} />
+      )}
     </span>
+  )
+}
+
+const HeaderLiveActivityBody = (props: HeaderLiveActivityProps): JSX.Element | null => {
+  const sessionState = props.useSessions(HostSnapshotsModel.selectStableSessionListState)
+  const session = sessionState.byId[props.sessionId]
+  const running = session !== undefined && session.running && !session.blank
+  const ids = useMemo(() => (running ? [props.sessionId] : NO_IDS), [props.sessionId, running])
+  const turns = useLiveTurns(ids, sessionState.phase === 'ready')
+  // An approval is not a tool call the live-turn fold can see: the thread's pending interaction is the signal.
+  const waitingOnYou = props.useSessionStatus(statuses => statuses.get(props.sessionId)?.pendingInteraction !== undefined)
+  if (!running) return null
+  return (
+    <HeaderLiveSignal
+      turn={turns.get(props.sessionId)}
+      waitingOnYou={waitingOnYou}
+      labels={{ working: props.t('threadSidebarWorking'), needsYou: props.t('threadSidebarStateNeedsYou') }}
+    />
   )
 }
 

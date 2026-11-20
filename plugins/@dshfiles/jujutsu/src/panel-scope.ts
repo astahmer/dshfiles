@@ -3,6 +3,7 @@ import * as Schema from 'effect/Schema'
 import { type Dispatch, type SetStateAction, useEffect, useState, useSyncExternalStore } from 'react'
 import { SchemaHelpers } from './schema-helpers.js'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { HistoryPage } from './history-page.js'
 
 /**
  * One Jujutsu panel, several contexts. The main view shows a single panel per key, so a tab that asks for another
@@ -132,10 +133,9 @@ export class PanelScopes {
     return (rememberedPathIsRegistered ? rememberedPath : undefined) ?? input.defaultPath ?? (ownPick ? '' : input.legacyPath)
   }
 
-  /** "Jujutsu · dshfiles" names the repository a scoped tab shows; the bare name is the panel default. */
+  /** "History · dshfiles" names the project a scoped tab shows; the bare page name is the panel default. */
   static title(root: string | null | undefined): string {
-    const name = root === null || root === undefined ? '' : (root.split('/').filter(Boolean).at(-1) ?? '')
-    return name.length === 0 ? 'Jujutsu' : `Jujutsu · ${name}`
+    return HistoryPage.tabTitle(root)
   }
 
   static publishTitle(scope: string, root: string | null | undefined): void {

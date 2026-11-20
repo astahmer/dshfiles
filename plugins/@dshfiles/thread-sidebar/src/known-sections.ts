@@ -18,6 +18,17 @@ export interface DestinationSection {
    * and the palette still find it by either.
    */
   readonly formerLabels?: readonly string[]
+  /**
+   * `developer`: a page for people who write plugins (a component reference, the extension catalog), not for someone
+   * supervising agents. It is listed in the Developer group at the end of Settings, which a sidebar setting hides.
+   */
+  readonly group?: 'developer'
+  /**
+   * Not listed under its destination: the page repeats what another page of the destination already shows, so the list
+   * would offer the same thing twice. The command palette and the New tab page still open it, and a person can file it
+   * in any folder.
+   */
+  readonly unlisted?: boolean
 }
 
 /**
@@ -31,14 +42,16 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     destination: 'threads',
     label: 'Board',
     description: 'The same threads as columns.',
-    formerLabels: ['Thread Sidebar: Board'],
+    // "Thread board" was its own palette row beside this page's; the page row answers to both names.
+    formerLabels: ['Thread Sidebar: Board', 'Thread board', 'Kanban'],
   },
   {
     panelId: 'attention-inbox',
     destination: 'inbox',
-    label: 'Needs you',
+    // The destination and its page share one name; "Needs you" is the view inside the page.
+    label: 'Inbox',
     description: 'Questions, approvals and failures waiting on you.',
-    formerLabels: ['Inbox'],
+    formerLabels: ['Inbox', 'Needs you'],
   },
   {
     panelId: 'jj-integration',
@@ -105,21 +118,6 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     order: 3,
     formerLabels: ['Agent Toolkit: Capabilities'],
   },
-  // capabilities-hub's two pages (merge 2026-11-11): filed with the agent's capabilities instead of Other pages.
-  {
-    panelId: 'dshfiles-capabilities-hub',
-    destination: 'agents',
-    label: 'Capabilities hub',
-    description: 'Where skills, MCP servers and plugins are managed.',
-    order: 4,
-  },
-  {
-    panelId: 'dshfiles-plugin-market',
-    destination: 'agents',
-    label: 'Plugin market',
-    description: 'Community plugins from dshmarket.com.',
-    order: 5,
-  },
   // Upstream (2026-11): retained thread events, including notifications missed while away.
   {
     panelId: 'dshfiles-notification-history',
@@ -185,14 +183,6 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     formerLabels: ['Resource Packs: Resources'],
   },
   {
-    panelId: 'component-gallery',
-    destination: 'knowledge',
-    label: 'Component gallery',
-    description: 'Every shared plugin component, live.',
-    order: 3,
-    formerLabels: ['Component Gallery: Components', 'Component gallery'],
-  },
-  {
     panelId: 'dshfiles-whiteboard',
     destination: 'knowledge',
     label: 'Whiteboard',
@@ -233,4 +223,37 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     formerLabels: ['Secret Catalog: Secrets', 'Secrets'],
   },
   { panelId: 'plugins', destination: 'settings', label: 'Plugins', description: 'Installed plugins and the marketplace.', order: 4, formerLabels: ['Plugins'] },
+  // capabilities-hub's two pages: beside the managers they open, after them (the plugin declares the same seats).
+  {
+    panelId: 'dshfiles-plugin-market',
+    destination: 'settings',
+    label: 'Plugin market',
+    description: 'Community plugins from dshmarket.com.',
+    order: 5,
+  },
+  {
+    panelId: 'dshfiles-capabilities-hub',
+    destination: 'settings',
+    label: 'Capabilities hub',
+    description: 'Where skills, MCP servers and plugins are managed.',
+    order: 6,
+  },
+  // Developer pages: for plugin authors, so they sit apart at the end of Settings instead of among the user's pages.
+  {
+    panelId: 'component-gallery',
+    destination: 'settings',
+    label: 'Component gallery',
+    description: 'Every shared plugin component, live.',
+    order: 1,
+    group: 'developer',
+    formerLabels: ['Component Gallery: Components', 'Component gallery'],
+  },
+  {
+    panelId: 'dshfiles-plugin-guide',
+    destination: 'settings',
+    label: 'Plugin guide',
+    description: 'Where a plugin can extend DSH.',
+    order: 2,
+    group: 'developer',
+  },
 ]

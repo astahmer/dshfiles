@@ -140,7 +140,65 @@ const changeSummary = (input: {
   return { titles, more: Math.max(0, input.revisions.length - shown), stat }
 }
 
+/** One precondition that holds, said in a few words on the card's muted line. */
+export interface LandFact {
+  readonly id: string
+  readonly text: string
+}
+
+/** One precondition that needs the user: the only kind that earns a chip. */
+export interface LandAttention {
+  readonly id: string
+  readonly label: string
+  readonly status: 'warning' | 'failed'
+  readonly summary?: string | undefined
+}
+
+const counted = (count: number, noun: string): string => `${String(count)} ${noun}${count === 1 ? '' : 's'}`
+
+/**
+ * The card's preconditions, split by whether anything is wrong. What holds is one muted line ("2 revisions to land ·
+ * up to date with main · described"); only a precondition that fails or asks for attention becomes
+ * a chip. Three green ticks to say "nothing is wrong" spent colour on a healthy state (DESIGN.md: a healthy system is
+ * quiet).
+ */
+const preconditions = (input: {
+  readonly thread: LandThread
+  readonly bookmark: string
+  readonly readiness: LandReadiness
+  readonly checkSummary: ReturnType<typeof checks>
+}): { readonly facts: readonly LandFact[]; readonly attention: readonly LandAttention[] } => {
+  const revisions = input.thread.unlanded.length
+  const behind = (input.thread.behindCount ?? (input.thread.behind ? 1 : 0)) > 0
+  const facts: LandFact[] = [{ id: 'revisions', text: revisions === 0 ? 'Nothing to land' : `${counted(revisions, 'revision')} to land` }]
+  const attention: LandAttention[] = []
+  if (behind) attention.push({ id: 'behind', label: behindText(input.thread, input.bookmark), status: 'warning', summary: 'Land moves this work onto its tip' })
+  else facts.push({ id: 'behind', text: `up to date with ${input.bookmark}` })
+  if (input.readiness.conflicts > 0)
+    attention.push({
+      id: 'conflicts',
+      label: `Conflicts in ${counted(input.readiness.conflicts, 'revision')}`,
+      status: 'failed',
+      summary: 'Resolve them in this workspace, or open History.',
+    })
+  if (input.readiness.undescribed > 0)
+    attention.push({
+      id: 'undescribed',
+      label: `${String(input.readiness.undescribed)} revision${input.readiness.undescribed === 1 ? ' needs' : 's need'} a description`,
+      status: 'warning',
+      summary: 'Ask the thread to describe its work, or describe it in History.',
+    })
+  else if (revisions > 0) facts.push({ id: 'described', text: 'described' })
+  const summary = input.checkSummary
+  if (summary !== undefined) {
+    if (summary.status === 'done') facts.push({ id: 'checks', text: summary.text.charAt(0).toLowerCase() + summary.text.slice(1) })
+    else attention.push({ id: 'checks', label: summary.text, status: summary.status === 'failed' ? 'failed' : 'warning', summary: summary.hint })
+  }
+  return { facts, attention }
+}
+
 export class LandCardModel {
+  static readonly preconditions = preconditions
   static readonly readiness = readiness
   static readonly behindText = behindText
   static readonly checks = checks

@@ -1,5 +1,6 @@
 import type { AttentionItem, AttentionSeverity, AttentionView } from './attention-api.js'
 import type { RowSwipeSide } from '@dshfiles/plugin-ui/hooks/row-gestures'
+import { InboxPreview } from './inbox-preview.js'
 
 /** Sources the inbox names in words; any other source shows its own id. */
 const SOURCE_LABELS = new Map([
@@ -73,7 +74,72 @@ const undoOf = (item: AttentionItem, view: AttentionView): 'reopen' | 'unsnooze'
 const resumableIds = (items: readonly AttentionItem[]): readonly string[] =>
   items.filter(item => item.doneAt === null && item.resolvedAt === null && item.verbs.includes('Resume')).map(item => item.id)
 
+/** Sources whose items wait on a question: only an answer moves the thread, so a queued prompt never does. */
+const QUESTION_SOURCES: ReadonlySet<string> = new Set(['agent-questions.child-question', 'agent-questions.native-question'])
+
+/** The item waits on a question, whether the Inbox can answer it in place or only its thread can. */
+const asksQuestion = (item: AttentionItem): boolean => QUESTION_SOURCES.has(item.source) || item.verbs.includes('Answer')
+
+/**
+ * Quick replies queue a canned prompt in a thread. They fit a thread that stopped (a failed turn, a usage limit), never
+ * one that asked a question: "Continue" does not answer "Which layout?".
+ */
+const offersQuickReplies = (item: AttentionItem, view: AttentionView): boolean =>
+  view !== 'closed' && view !== 'muted' && item.subject.kind === 'session' && item.severity !== 'ready' && !asksQuestion(item)
+
+/**
+ * What a row prints under its title: the first paragraph of the reason and the detail, both as plain words. Providers
+ * pass a question through as written (Markdown, a table, a fenced chart); the row clamps each to two lines.
+ */
+const textOf = (item: AttentionItem) => {
+  const reason = InboxPreview.firstParagraph(item.reason)
+  const detail = item.detail === null ? '' : InboxPreview.flat(item.detail)
+  return { reason: reason === '' ? sourceLabel(item.source) : reason, detail: detail === '' ? null : detail }
+}
+
+/** A page fills its pane (DESIGN.md); the words of a row keep a readable line length on a wide one. */
+const TEXT_MEASURE = 'dshx:max-w-[72ch]'
+
+export interface InboxPageAction {
+  readonly id: 'triage' | 'alerts'
+  readonly placement: 'inline' | 'overflow'
+}
+
+/**
+ * The header's actions besides the primary: Start triage (unless it is the primary, as on a phone), then this device's
+ * alert settings in the page menu. Settings never sit under the work list.
+ */
+const pageActions = (input: { readonly triagePrimary: boolean; readonly alertSettings: boolean }): readonly InboxPageAction[] => [
+  ...(input.triagePrimary ? [] : [{ id: 'triage', placement: 'inline' } as const]),
+  ...(input.alertSettings ? [{ id: 'alerts', placement: 'overflow' } as const] : []),
+]
+
+/** Sources whose question the thread does not show itself: a subagent's question lives in the child, not in the parent. */
+const THREAD_QUESTION_SOURCES: ReadonlySet<string> = new Set(['agent-questions.child-question'])
+
+/**
+ * The open questions a thread shows above its composer, answerable there with their options: the place "Answer" on a
+ * thread row lands. A native question form is left out, since its own card already takes the composer seat.
+ */
+const threadQuestions = (items: readonly AttentionItem[], sessionId: string): readonly AttentionItem[] =>
+  items.filter(
+    item =>
+      item.subject.kind === 'session' &&
+      item.subject.id === sessionId &&
+      THREAD_QUESTION_SOURCES.has(item.source) &&
+      item.verbs.includes('Answer') &&
+      item.choices.length > 0 &&
+      item.resolvedAt === null &&
+      item.doneAt === null,
+  )
+
 export class InboxView {
+  static readonly threadQuestions = threadQuestions
+  static readonly pageActions = pageActions
+  static readonly TEXT_MEASURE = TEXT_MEASURE
+  static readonly textOf = textOf
+  static readonly asksQuestion = asksQuestion
+  static readonly offersQuickReplies = offersQuickReplies
   static readonly openActionOf = openActionOf
   static readonly subjectTitleOf = subjectTitleOf
   static readonly sourceLabel = sourceLabel

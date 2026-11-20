@@ -7,7 +7,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type * as React from 'react'
 import type { AttentionItem } from './attention-api.js'
 import type { InboxTranslate } from './inbox-locales.js'
-import type { PrimaryAction } from './inbox-keys.js'
+import type { TriageAction } from './inbox-keys.js'
 
 /** Phone verb chips: 48pt in the thumb zone (T6.1), drawn as pills; a pointer keeps the compact buttons. */
 export const INBOX_CHIP = 'dshx:pointer-coarse:h-12 dshx:pointer-coarse:rounded-full dshx:pointer-coarse:px-4 dshx:pointer-coarse:text-sm'
@@ -17,37 +17,46 @@ export interface TriageBarProps {
   readonly index: number
   readonly total: number
   readonly item: AttentionItem
-  readonly primary: PrimaryAction
+  /** Every way to act on the item, each once; the one marked primary runs on Enter. */
+  readonly actions: readonly TriageAction[]
+  /** What Open is called for this item: "Open thread", "Review thread" or the page a provider registered. */
+  readonly openLabel: string
   readonly busy: boolean
   readonly error: string | null
-  readonly onPrimary: () => void
+  readonly onAction: (action: TriageAction) => void
   readonly onDone: () => void
   readonly onSnooze: () => void
   readonly onSkip: () => void
   readonly onExit: () => void
 }
 
-const primaryLabel = (props: Pick<TriageBarProps, 't' | 'primary'>): string => {
-  switch (props.primary.kind) {
+const actionLabel = (props: Pick<TriageBarProps, 't' | 'openLabel'>, action: TriageAction): string => {
+  switch (action.kind) {
     case 'answer':
-      return props.primary.label
+      return action.label
     case 'verb':
-      return props.primary.verb
+      return action.verb
     case 'land':
       return props.t('land')
+    case 'review':
+      return props.t('review')
     default:
-      return props.t('open')
+      return props.openLabel
   }
 }
 
+const actionKey = (action: TriageAction): string =>
+  action.kind === 'answer' ? `answer:${action.choiceId}` : action.kind === 'verb' ? action.verb : action.kind
+
 /**
- * The bar above the one item in Triage: `2 of 5 · ↵ primary · 1–9 choice · E Done · H Snooze · S skip · Esc`. Every key
- * is also a button, so a phone triages by touch; the keycaps hide on a coarse pointer, where there are no keys. On a
- * phone the bar sits under the card, at the bottom of the screen (the thumb zone), with 48pt chips (T6.1).
+ * The one action row of an item in Triage: `2 of 5 · its answers or verb · Open · Done · Snooze · Skip · Exit`. The card
+ * beside it shows the item only, so no verb appears twice. Every key is also a button, so a phone triages by touch; the
+ * keycaps hide on a coarse pointer, where there are no keys. On a phone the bar sits under the card, at the bottom of
+ * the screen (the thumb zone), with 48pt chips (T6.1).
  */
 export const TriageBar = (props: TriageBarProps): React.JSX.Element => {
   const { t } = props
-  const answers = props.item.verbs.includes('Answer') && props.item.choices.length > 0
+  const answers = props.actions.filter(action => action.kind === 'answer')
   return (
     <div
       data-triage-bar=""
@@ -58,22 +67,25 @@ export const TriageBar = (props: TriageBarProps): React.JSX.Element => {
       <span data-triage-progress="" className="dshx:px-1 dshx:text-sm dshx:font-medium dshx:tabular-nums">
         {t('triageProgress', { index: props.index, total: props.total })}
       </span>
-      <Button
-        size="sm"
-        variant="default"
-        disabled={props.busy}
-        onClick={props.onPrimary}
-        className={cn('dshx:max-w-full dshx:shrink', INBOX_CHIP, 'dshx:pointer-coarse:basis-full')}
-      >
-        <KeyHint keys="Enter" className="dshx:pointer-coarse:hidden" />
-        <span className="dshx:truncate">{primaryLabel(props)}</span>
-      </Button>
-      {answers ? (
-        <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground dshx:pointer-coarse:hidden">
-          <KeyHint keys={props.item.choices.slice(0, 9).map((_, index) => String(index + 1))} />
-          {t('triageChoice')}
-        </span>
-      ) : null}
+      {props.actions.map(action => {
+        const digit = action.kind === 'answer' ? answers.indexOf(action) + 1 : 0
+        return (
+          <Button
+            key={actionKey(action)}
+            size="sm"
+            variant={action.primary ? 'default' : action.kind === 'answer' ? 'outline' : 'ghost'}
+            disabled={props.busy && action.kind !== 'open' && action.kind !== 'review'}
+            data-triage-action={action.kind}
+            onClick={() => props.onAction(action)}
+            className={cn('dshx:max-w-full dshx:shrink', INBOX_CHIP, action.primary && 'dshx:pointer-coarse:basis-full')}
+          >
+            {action.primary ? <KeyHint keys="Enter" className="dshx:pointer-coarse:hidden" /> : null}
+            {!action.primary && digit >= 1 && digit <= 9 ? <KeyHint keys={String(digit)} className="dshx:opacity-70 dshx:pointer-coarse:hidden" /> : null}
+            <span className="dshx:truncate">{actionLabel(props, action)}</span>
+            {action.kind === 'answer' && action.primary ? <span className="dshx:sr-only"> ({t('recommended')})</span> : null}
+          </Button>
+        )
+      })}
       {props.item.verbs.includes('Done') ? (
         <Button size="sm" variant="outline" disabled={props.busy} className={INBOX_CHIP} onClick={props.onDone}>
           <CheckIcon aria-hidden className="dshx:pointer-fine:hidden" />
@@ -98,7 +110,9 @@ export const TriageBar = (props: TriageBarProps): React.JSX.Element => {
         <KeyHint keys="Escape" className="dshx:pointer-coarse:hidden" />
         {t('triageExit')}
       </Button>
-      {props.primary.kind === 'land' ? <span className="dshx:basis-full dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{t('triageLandHint')}</span> : null}
+      {props.actions.some(action => action.kind === 'land') ? (
+        <span className="dshx:basis-full dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{t('triageLandHint')}</span>
+      ) : null}
       {props.error === null ? null : (
         <span role="alert" className="dshx:basis-full dshx:px-1 dshx:text-xs dshx:text-destructive">
           {props.error} {t('loadFailedHint')}
@@ -122,7 +136,7 @@ export const TriageReply = (props: { readonly t: InboxTranslate; readonly reply:
   return (
     <section aria-label={props.t('peekLastReply')} className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3">
       <span className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.t('peekLastReply')}</span>
-      <p data-triage-reply="" className="dshx:text-sm dshx:break-words dshx:whitespace-pre-wrap">
+      <p data-triage-reply="" className="dshx:max-w-[72ch] dshx:text-sm dshx:break-words dshx:whitespace-pre-wrap">
         {replyText(props.t, reply)}
       </p>
     </section>

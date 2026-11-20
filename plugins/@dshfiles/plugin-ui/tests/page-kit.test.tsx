@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/dom'
 import { act, cleanup, render } from '@testing-library/react'
@@ -147,6 +149,23 @@ describe('Page', () => {
     { id: 'refresh', label: 'Refresh', onSelect: vi.fn() },
     { id: 'export', label: 'Export', onSelect: vi.fn(), placement: 'overflow' as const },
   ]
+
+  it('hides its h1 visually, not from screen readers, under the phone top bar that already names the page (unslop phone 25)', () => {
+    const view = render(<Page heading="Usage" meta={<span>0 logs indexed</span>} primaryAction={{ id: 'add', label: 'Add', onSelect: vi.fn() }} />)
+    // Still the page's one h1 for assistive technology.
+    const title = view.getByRole('heading', { level: 1, name: 'Usage' })
+    expect(title.closest('[data-slot="page-header"]')).not.toBeNull()
+    const styles = readFileSync(join(process.cwd(), 'src/styles.css'), 'utf8')
+    const rule = /html:has\(\[data-phone-top-bar\]:not\(\[data-phone-stage='thread'\]\)\) :where\(\[data-slot='page-header'\] h1\) \{([^}]*)\}/u.exec(styles)
+    expect(rule).not.toBeNull()
+    for (const declaration of ['position: absolute', 'width: 1px', 'height: 1px', 'overflow: hidden', 'clip-path: inset(50%)', 'white-space: nowrap']) {
+      expect(rule?.[1]).toContain(declaration)
+    }
+    expect(rule?.[1]).not.toMatch(/display:\s*none/u)
+    // Meta and the primary action keep their seats in the header row.
+    expect(view.getByText('0 logs indexed').closest('[data-slot="page-header"]')).not.toBeNull()
+    expect(view.getByRole('button', { name: 'Add' }).closest('[data-slot="page-header"]')).not.toBeNull()
+  })
 
   it('renders one h1, the description, count and at most one primary action', () => {
     const add = vi.fn()

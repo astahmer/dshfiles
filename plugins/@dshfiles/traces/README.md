@@ -60,7 +60,7 @@ interaction made as client spans and the Host spans those calls caused nested un
 ## Per-thread Traces facet
 
 Every thread gets a **Traces** facet in its thread panel (productivity pass Q5: the thread header has no view tabs; the
-stage is always Chat). Open it from the header's **More thread actions › Open Traces**, a turn's **Trace** button or any
+stage is always Chat). Open it from the header's **More thread actions › Open in › Traces**, a turn's **Trace** button or any
 pane's **Choose a view**, as a movable pane. It is still registered as a `conversation.view` entry
 (`order: 11`, after Trajectory at 10, which only shows with developer tools on); Rich Composer turns every non-Chat view
 into a facet (`@dshfiles/rich-composer/thread-views`). It shows that thread's telemetry only:

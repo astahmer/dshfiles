@@ -38,7 +38,7 @@ const ConfirmDialog = (props: { readonly request: RequestOf<'confirm'> | Request
   return (
     <AlertDialog open onOpenChange={open => !open && cancel()}>
       <AlertDialogContent
-        className="dshx-root"
+        className="dshx-root dshx:rounded-xl"
         aria-describedby={request.input.description === undefined ? undefined : descriptionId}
         onOpenAutoFocus={event => {
           event.preventDefault()
@@ -76,7 +76,7 @@ const PromptDialog = (props: { readonly request: RequestOf<'prompt'> }): JSX.Ele
   return (
     <Dialog open onOpenChange={open => !open && cancelRequest(request)}>
       <DialogContent
-        className="dshx-root"
+        className="dshx-root dshx:rounded-xl"
         showCloseButton={false}
         aria-describedby={request.input.description === undefined ? undefined : descriptionId}
         onOpenAutoFocus={event => {
@@ -130,7 +130,7 @@ const SelectDialog = (props: { readonly request: RequestOf<'select'> }): JSX.Ele
   const groups = useMemo(() => groupOptions(request.input.options), [request.input.options])
   return (
     <Dialog open onOpenChange={open => !open && cancelRequest(request)}>
-      <DialogContent className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0" showCloseButton={false} aria-describedby={undefined}>
+      <DialogContent className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:rounded-xl dshx:p-0" showCloseButton={false} aria-describedby={undefined}>
         <DialogHeader className="dshx:sr-only">
           <DialogTitle>{request.input.title}</DialogTitle>
         </DialogHeader>

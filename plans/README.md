@@ -26,6 +26,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Browser preview panel](browser-preview-panel.md) | Agent ↔ user hand-off (P5): an element highlight in the Agent browser and user annotations sent to the thread.                                           |
 | [Phone UI/UX](phone-ux/README.md) | Research done (competitors, platform, live audit); 33 ranked items across speed, back/navigation, composer, inbox, panels, PWA capabilities; nothing built. |
 | [Phone push notifications](phone-push-notifications/README.md) | Push finished turns and needs-you threads to the phone per category, with duplicate suppression and delivery health; nothing built. |
+| [Unslop](unslop/README.md)                        | UI/UX audit of 2026-11-16 (23/40) and its 14-step work list; all 14 steps done, follow-ups listed, the phone fixes still need a check on the real iPhone. |
 | [t3code parity](t3code-parity.md)                 | Remaining t3code gaps (push, MCP Apps, preview recording, PR picker, other forges, OAuth); a closed-rows index maps shipped IDs to their plugin docs.    |
 
 ## Testing, research and housekeeping

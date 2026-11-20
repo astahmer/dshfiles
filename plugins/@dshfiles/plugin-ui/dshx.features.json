@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "query-client-binding",
-      "title": "Provide host-backed client queries",
-      "summary": "Expose one query client per bundle and deliver typed query state to decorated children while preserving readable failures.",
+      "title": "Load data from DSH in plugin views",
+      "summary": "Plugin views load data from DSH with shared caching and readable errors.",
+      "details": "Expose one query client per bundle and deliver typed query state to decorated children while preserving readable failures.",
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -43,8 +44,9 @@
     },
     {
       "id": "schema-validated-persistent-values",
-      "title": "Persist schema-validated client values",
-      "summary": "Read fallback values for missing, malformed, or invalid storage, persist only schema-valid writes, react to other-tab changes, and report unavailable writes without losing in-memory state.",
+      "title": "Remember checked values in the browser",
+      "summary": "Plugin views remember checked values in the browser and follow changes from other tabs.",
+      "details": "Read fallback values for missing, malformed, or invalid storage, persist only schema-valid writes, react to other-tab changes, and report unavailable writes without losing in-memory state.",
       "surfaces": ["client", "storage"],
       "surface": "infrastructure",
       "destination": "none",
@@ -83,7 +85,8 @@
     {
       "id": "typed-forms-and-accessible-tables",
       "title": "Compose validated forms and accessible data tables",
-      "summary": "Show schema errors on submit, submit valid form state, sort tables from accessible header buttons, and render empty states across columns.",
+      "summary": "Forms show errors on submit, and tables sort from their headers and show an empty state.",
+      "details": "Show schema errors on submit, submit valid form state, sort tables from accessible header buttons, and render empty states across columns.",
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -122,7 +125,8 @@
     {
       "id": "debounced-client-values",
       "title": "Debounce fast-changing client input",
-      "summary": "Publish only the final value after the configured delay so search and preference consumers avoid redundant work.",
+      "summary": "Search fields wait until you stop typing before they search.",
+      "details": "Publish only the final value after the configured delay so search and preference consumers avoid redundant work.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -148,8 +152,9 @@
     },
     {
       "id": "touch-targets",
-      "title": "Give kit controls a 44px touch target",
-      "summary": "On a coarse pointer every kit button, toggle and toggle-group item gets a hit area of at least 44px centred on it through an absolutely positioned ::after (page tabs through ::before, since ::after draws their underline), and menu, select and command rows get a 44px row. The drawn size and the layout do not change, so the dense desktop layout is identical and a 24px icon button is still easy to hit on a phone. The rule sits in the base layer, so a positioning utility on a control still wins.",
+      "title": "Touch-sized controls",
+      "summary": "On a touch screen every button, toggle and menu row is at least 44 pixels tall to tap.",
+      "details": "On a coarse pointer every kit button, toggle and toggle-group item gets a hit area of at least 44px centred on it through an absolutely positioned ::after (page tabs through ::before, since ::after draws their underline), and menu, select and command rows get a 44px row. The drawn size and the layout do not change, so the dense desktop layout is identical and a 24px icon button is still easy to hit on a phone. The rule sits in the base layer, so a positioning utility on a control still wins.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -181,7 +186,8 @@
     {
       "id": "shared-motion",
       "title": "Animate components with one shared motion layer",
-      "summary": "Expose Motion's framework-free core with shared spring, duration, easing and enter presets, reduced-motion handling, FLIP lists, count-ups and rolling digits, so every animated plugin component moves the same way.",
+      "summary": "Animated parts of every plugin move the same way and respect reduced motion.",
+      "details": "Expose Motion's framework-free core with shared spring, duration, easing and enter presets, reduced-motion handling, FLIP lists, count-ups and rolling digits, so every animated plugin component moves the same way.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",

@@ -150,11 +150,9 @@ Then('the Workbench falls back to its default layout', async ({ page }: { page: 
 Then('the Editor tab stays as a closable placeholder', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-missing-plugin-keeps-a-placeholder', async () => {
     await expect(page.getByRole('tab', { name: viewNamePattern('Editor') })).toBeVisible()
-    await expect(
-      page.getByText('“dshfiles-editor.main” is not available. Its plugin may be disabled or removed; it comes back here once it registers again.', {
-        exact: true,
-      }),
-    ).toBeVisible()
+    // The placeholder names the panel by its last title (the editor's panel is titled "Files"), never by its id.
+    await expect(page.getByText(/^“[^”]+” is not available\. It comes back here when its plugin is turned on again\.$/u)).toBeVisible()
+    await expect(page.getByText('dshfiles-editor.main')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Close panel', exact: true })).toBeVisible()
   })
 })
@@ -162,8 +160,9 @@ Then('the Editor tab stays as a closable placeholder', async ({ page }: { page: 
 Then('the Editor tab shows the editor again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-placeholder-recovers-on-registration', async () => {
     await page.getByRole('tab', { name: viewNamePattern('Editor') }).click()
-    await expect(page.getByText('Open a session to browse and edit its files.', { exact: true })).toBeVisible()
-    await expect(page.getByText(/is not available\. Its plugin may be disabled/)).toHaveCount(0)
+    // The editor is back: its hint for no thread, or for a thread with no file picked yet.
+    await expect(page.getByText(/^(?:Open a session to browse and edit its files\.|Pick a file in the tree, or open one from another panel\.)$/u)).toBeVisible()
+    await expect(page.getByText(/is not available\. It comes back here/)).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -195,7 +194,7 @@ When('a thread is started and the New Session screen opens again', async ({ page
   await createWorkbenchWorkspace(page)
   await sendMessage(page, 'dock thread one')
   // Back to the screen with no thread on it: the dock must not depend on a session at all.
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await page.getByRole('button', { name: /^(?:New thread|New session)$/ }).first().click()
   await expect(page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
 })
 
@@ -967,7 +966,7 @@ Then('Main tabs settings still show disabled tabs and Preview opening', async ({
   await openSettingsDialog(page)
   const settings = mainSeat(page).locator('[data-settings-view]')
   await expect(settings).toBeVisible()
-  await settingsNavEntry(page, 'Main tabs').click()
+  await settingsNavEntry(page, 'Layout').click()
   const controls = settings.getByRole('region', { name: 'Main tabs', exact: true })
   await recordAssertion(page, acceptanceId(page, 'legacy-disabled-preview-settings-are-real'), async () => {
     await expect(controls.getByRole('switch', { name: 'Enabled', exact: true })).not.toBeChecked()
@@ -1508,6 +1507,8 @@ When('a Jujutsu preview is opened and closed from its Dockview tab', async ({ pa
   const tab = dockTab(mainDock(page), 'Jujutsu')
   await expect(tab.locator('[data-preview="true"]')).toBeVisible()
   await tab.click({ button: 'right' })
+  // A tab's docking verbs sit under Layout.
+  await page.getByRole('menuitem', { name: 'Layout', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Float panel', exact: true }).click()
   const floating = page.locator('.dv-groupview-floating').filter({ has: page.getByRole('tab', { name: viewNamePattern('Jujutsu') }) })
   await expect(floating).toBeVisible()

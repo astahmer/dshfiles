@@ -23,11 +23,6 @@ export interface ServerEditorProps {
   readonly bare?: boolean
 }
 
-const filledControls =
-  'dshx:[&_[data-slot=input]]:h-9 dshx:[&_[data-slot=input]]:border-transparent dshx:[&_[data-slot=input]]:bg-muted dshx:[&_[data-slot=input]]:shadow-none dshx:[&_[data-slot=textarea]]:border-transparent dshx:[&_[data-slot=textarea]]:bg-muted dshx:[&_[data-slot=textarea]]:shadow-none'
-
-const placeholderOnlyLabels = 'dshx:[&_[data-slot=field-label]]:sr-only'
-
 const Disclosure = (props: { readonly label: string; readonly defaultOpen: boolean; readonly children: ReactNode }): JSX.Element => (
   <Collapsible className="dshx:flex dshx:flex-col dshx:gap-3" defaultOpen={props.defaultOpen}>
     <CollapsibleTrigger className="dshx:group dshx:flex dshx:w-fit dshx:items-center dshx:gap-1.5 dshx:rounded-sm dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50">
@@ -87,7 +82,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
     </form.AppField>
   )
   const fields = (
-    <div className={cn('dshx:flex dshx:flex-col dshx:gap-4', filledControls)}>
+    <div className="dshx:flex dshx:flex-col dshx:gap-4">
       {props.hint === undefined ? null : (
         <Alert variant="info">
           <AlertDescription>{props.hint}</AlertDescription>
@@ -98,7 +93,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
         {transport =>
           transport === 'streamable-http' ? (
             <>
-              <div className={cn('dshx:grid dshx:gap-4 dshx:@pane-compact:grid-cols-2', placeholderOnlyLabels)}>
+              <div className="dshx:grid dshx:gap-4 dshx:@pane-compact:grid-cols-2">
                 <form.AppField listeners={nameListeners} name="name">
                   {field => <field.TextField label={t('name')} placeholder={t('namePlaceholder')} required />}
                 </form.AppField>
@@ -150,7 +145,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
             </>
           ) : (
             <>
-              <div className={cn('dshx:grid dshx:gap-4 dshx:@pane-compact:grid-cols-2', placeholderOnlyLabels)}>
+              <div className="dshx:grid dshx:gap-4 dshx:@pane-compact:grid-cols-2">
                 <form.AppField listeners={nameListeners} name="name">
                   {field => <field.TextField label={t('name')} placeholder={t('namePlaceholder')} required />}
                 </form.AppField>

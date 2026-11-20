@@ -380,9 +380,11 @@
   height: 0;
   display: flex;
   justify-content: flex-end;
+  /* dshfiles (unslop T19): the control sits in the gutter right of the text column, 12px clear of it, so it never
+     covers the last line of a user bubble or a row's timing. A pane too narrow for a gutter keeps the edge inset. */
   padding-right: max(
     calc(var(--dsh-composer-side-clearance) + 16px),
-    calc((100% - var(--dsh-chat-content-width)) / 2)
+    calc((100% - var(--dsh-chat-content-width)) / 2 - 34px - 12px)
   );
   pointer-events: none;
 }

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { DONE_AFTER_IDLE_MS, DONE_GROUP_KEY, DONE_GROUP_OPEN_KEY, ThreadStatusModel, type ThreadStatusInput } from './thread-status.js'
+import {
+  DONE_AFTER_IDLE_MS,
+  DONE_GROUP_KEY,
+  DONE_GROUP_OPEN_KEY,
+  FINISHED_TURN_SOURCE,
+  THREAD_STATUS_GROUPS,
+  ThreadStatusModel,
+  type ThreadStatusInput,
+} from './thread-status.js'
 
 const NOW = 10_000_000_000
 
@@ -46,6 +54,42 @@ describe('thread status', () => {
     expect(status).toMatchObject({ status: 'failed', group: 'needs-you', verb: 'Retry' })
   })
 
+  it('keeps a thread Failed after its failed turn was read, until a later turn runs or the thread is done', () => {
+    const failedTurn = { at: NOW - 30_000, reason: 'error' } as const
+    // Read: no inbox item and no unread record are left, only the Host's record of the failed last turn.
+    expect(ThreadStatusModel.statusOf(input({ failedTurn }))).toMatchObject({
+      status: 'failed',
+      group: 'needs-you',
+      detail: 'Turn failed',
+      since: NOW - 30_000,
+    })
+    expect(ThreadStatusModel.statusOf(input({ failedTurn: { at: NOW, reason: 'max-tokens' } })).detail).toBe('Stopped at the output limit')
+    // Not something idle time folds away.
+    expect(ThreadStatusModel.statusOf(input({ failedTurn, activityAt: NOW - DONE_AFTER_IDLE_MS - 1 })).status).toBe('failed')
+    // A retry in flight is Working; marking the thread done ends it.
+    expect(ThreadStatusModel.statusOf(input({ failedTurn, running: true })).status).toBe('working')
+    expect(ThreadStatusModel.statusOf(input({ failedTurn, settled: true })).status).toBe('done')
+    expect(ThreadStatusModel.statusOf(input({ failedTurn, archived: true })).status).toBe('done')
+  })
+
+  it('says why a failed turn failed instead of repeating the thread title', () => {
+    const inbox = {
+      itemId: 'i9',
+      severity: 'failed',
+      reason: '“Refactor pricing rounding” failed',
+      verb: undefined,
+      openedAt: NOW,
+      source: FINISHED_TURN_SOURCE,
+    } as const
+    expect(ThreadStatusModel.statusOf(input({ inbox, failedTurn: { at: NOW, reason: 'error' } })).detail).toBe('Turn failed')
+    // Another provider's failed item keeps its own reason.
+    expect(
+      ThreadStatusModel.statusOf(
+        input({ inbox: { ...inbox, source: 'jj.conflict', reason: 'Conflict in src/a.ts' }, failedTurn: { at: NOW, reason: 'error' } }),
+      ).detail,
+    ).toBe('Conflict in src/a.ts')
+  })
+
   it('uses the sidebar labels when the inbox is absent', () => {
     expect(ThreadStatusModel.statusOf(input({ labels: ['threadSidebarInputNeeded'] }))).toMatchObject({ status: 'needs-you', verb: 'Answer' })
     expect(ThreadStatusModel.statusOf(input({ labels: ['threadSidebarNeedsResume'] }))).toMatchObject({ status: 'needs-you', verb: 'Resume' })
@@ -56,6 +100,19 @@ describe('thread status', () => {
     expect(ThreadStatusModel.statusOf(input({ unread: true })).verb).toBeUndefined()
     const ready = ThreadStatusModel.statusOf(input({ inbox: { itemId: 'i3', severity: 'ready', reason: 'Ready to land.', verb: 'Land', openedAt: NOW } }))
     expect(ready).toMatchObject({ status: 'ready', verb: 'Land', itemId: 'i3' })
+  })
+
+  it('keeps a finished thread Ready while its workspace holds work that has not landed', () => {
+    // Read, nothing pending, but 2 revisions wait in its own workspace: finished and not landed is Ready, not Idle.
+    const waiting = ThreadStatusModel.statusOf(input({ unlanded: 2 }))
+    expect(waiting).toMatchObject({ status: 'ready', group: 'ready', verb: undefined })
+    // It does not fold into Done by age: landing is still to do.
+    expect(ThreadStatusModel.statusOf(input({ unlanded: 1, activityAt: NOW - DONE_AFTER_IDLE_MS - 1 })).status).toBe('ready')
+    // A running turn, a question or a failure still come first, and done is done.
+    expect(ThreadStatusModel.statusOf(input({ unlanded: 1, running: true })).status).toBe('working')
+    expect(ThreadStatusModel.statusOf(input({ unlanded: 1, labels: ['threadSidebarInputNeeded'] })).status).toBe('needs-you')
+    expect(ThreadStatusModel.statusOf(input({ unlanded: 1, settled: true })).status).toBe('done')
+    expect(ThreadStatusModel.statusOf(input({ unlanded: 0 })).status).toBe('idle')
   })
 
   it('rolls subagents up: a waiting or failed child lifts its parent, a running child keeps it Working', () => {
@@ -105,5 +162,24 @@ describe('thread status', () => {
     expect(clock('s', 'idle', 120, 2_000)).toBe(120)
     expect(clock('s', 'needs-you', 150, 3_000)).toBe(3_000)
     expect(clock('s', 'needs-you', 150, 4_000)).toBe(3_000)
+  })
+
+  it('lists an unsent draft under Drafts, so the Idle count is threads only', () => {
+    // The composer's open draft ("New thread") was counted as an idle thread: "Idle (2)" for one thread.
+    const draft = ThreadStatusModel.statusOf(input({ draft: true }))
+    expect(draft.group).toBe('draft')
+    // It keeps the idle glyph: nothing runs and nothing waits.
+    expect(draft.status).toBe('idle')
+    expect(ThreadStatusModel.statusOf(input()).group).toBe('idle')
+    const groups = ThreadStatusModel.groupEntries([
+      { thread: 'sent', status: ThreadStatusModel.statusOf(input()), cameBackAt: 2 },
+      { thread: 'unsent', status: draft, cameBackAt: 3 },
+    ])
+    expect(groups.map(group => [group.group, group.threads])).toEqual([
+      ['idle', ['sent']],
+      ['draft', ['unsent']],
+    ])
+    // Drafts sit after Idle and before the folded Done group.
+    expect(THREAD_STATUS_GROUPS.indexOf('draft')).toBe(THREAD_STATUS_GROUPS.indexOf('idle') + 1)
   })
 })

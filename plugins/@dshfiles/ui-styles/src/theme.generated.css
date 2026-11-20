@@ -143,6 +143,8 @@ html body {
   --dsw-specific-bubble: var(--dshx-tone-2);
   --dsw-specific-bubble-highlight: var(--dshx-tone-3);
   --dsw-specific-input-major: var(--dshx-tone-0);
+  --dsw-menu-surface-fill: var(--dshx-tone-0);
+  --dsw-menu-backdrop-filter: none;
   --shiki-token-comment: var(--dshx-tone-8);
   --shiki-token-punctuation: var(--dshx-tone-9);
   --shiki-token-constant: oklch(0.5 0.14 245);
@@ -290,6 +292,8 @@ body[data-ds-dark-theme][data-ds-dark-theme] {
   --dsw-specific-bubble: var(--dshx-tone-2);
   --dsw-specific-bubble-highlight: var(--dshx-tone-3);
   --dsw-specific-input-major: var(--dshx-tone-2);
+  --dsw-menu-surface-fill: var(--dshx-tone-2);
+  --dsw-menu-backdrop-filter: none;
   --shiki-token-comment: var(--dshx-tone-8);
   --shiki-token-punctuation: var(--dshx-tone-9);
   --shiki-token-constant: oklch(0.79 0.11 245);

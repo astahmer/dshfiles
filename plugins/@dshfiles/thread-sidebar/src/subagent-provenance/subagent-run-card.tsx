@@ -1,11 +1,16 @@
 import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { AgentRunStatus, type AgentRunStatusLabels } from '@dshfiles/plugin-ui/components/motion/agent-run-status'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { ArrowUpRightIcon, SquareIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useSyncExternalStore } from 'react'
 import { SubagentFeedModel, type SubagentFeed } from './subagent-feed.js'
-import { useChildFeed, type SubagentPreviewBindings, type SubagentPreviewTranslate } from './subagent-live-preview.js'
+import { useChildFeed, type SubagentPreviewBindings } from './subagent-live-preview.js'
 import { SubagentRouteLabelModel } from './route-label.js'
+import { LiveElapsed } from '../live-activity.js'
+import { ToolSteps } from '../tool-steps.js'
 
 type DockSessions = PropsRuntime<'conversation.input.dock'>['useSessions']
 
@@ -46,31 +51,55 @@ export const useSubagentRun = (input: {
   return { binding: feed.binding, model, tool: snapshot.tool, toolCalls: snapshot.toolCalls, startedAt }
 }
 
-/** One working subagent as the compact run card: current tool, route, elapsed time and the verbs the dock really has. */
+/**
+ * One working subagent as a compact card: the shared status glyph, its name, what it is doing in words, the model's
+ * name and one clock, with the verbs the dock really has. A child held by a question is not working: it shows the
+ * Needs-you glyph and "Waiting for an answer".
+ */
 export const SubagentRunCard = (props: {
   readonly run: SubagentRun
   readonly heading: string
-  readonly stepLabel: string
-  readonly openLabel: string
-  readonly labels: Partial<AgentRunStatusLabels>
+  readonly labels: { readonly working: string; readonly waiting: string; readonly stop: string; readonly open: string }
   readonly onStop: () => void
   readonly onOpen: () => void
-}): JSX.Element => (
-  <AgentRunStatus
-    className="dshx:my-1 dshx:shadow-none"
-    heading={props.heading}
-    {...(props.run.model === undefined ? {} : { model: props.run.model })}
-    steps={[{ id: props.run.tool, label: props.stepLabel, startedAt: props.run.startedAt }]}
-    stepIndex={props.run.toolCalls}
-    startedAt={props.run.startedAt}
-    state="running"
-    labels={props.labels}
-    onStop={props.onStop}
-    onOpen={props.onOpen}
-    openLabel={props.openLabel}
-  />
-)
-
-/** The step line names the tool in flight; the dock owns the locale. */
-export const subagentRunStepLabel = (input: { readonly t: SubagentPreviewTranslate; readonly tool: string }): string =>
-  input.t('subagentRunStepTool', { tool: input.tool })
+}): JSX.Element => {
+  const step = ToolSteps.ofName(props.run.tool)
+  const model = SubagentRouteLabelModel.modelName(props.run.model)
+  const stateLabel = step.waitsForAnswer ? props.labels.waiting : props.labels.working
+  return (
+    <div
+      className="dshx:my-1 dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background dshx:p-2.5"
+      data-subagent-run-card=""
+      data-waiting={step.waitsForAnswer ? '' : undefined}
+    >
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+        <StatusGlyph label={stateLabel} status={step.waitsForAnswer ? 'needs-you' : 'working'} />
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-medium">{props.heading}</span>
+        <LiveElapsed active className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground" startedAt={props.run.startedAt} />
+      </div>
+      <p className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" role="status">
+        <span className={cn('dshx:min-w-0 dshx:truncate', step.waitsForAnswer && 'dshx:text-foreground')} data-subagent-run-step="">
+          {step.waitsForAnswer ? props.labels.waiting : step.words}
+        </span>
+        {model === undefined ? null : (
+          <>
+            <span aria-hidden="true">·</span>
+            <span className="dshx:shrink-0" data-subagent-run-model="">
+              {model}
+            </span>
+          </>
+        )}
+      </p>
+      <div className="dshx:flex dshx:items-center dshx:gap-2">
+        <Button size="sm" variant="outline" className="dshx:shrink" onClick={props.onStop}>
+          <SquareIcon aria-hidden="true" />
+          <span className="dshx:@max-pane-narrow:sr-only">{props.labels.stop}</span>
+        </Button>
+        <Button size="sm" variant="ghost" className="dshx:ml-auto dshx:shrink dshx:text-muted-foreground" onClick={props.onOpen}>
+          {props.labels.open}
+          <ArrowUpRightIcon aria-hidden="true" />
+        </Button>
+      </div>
+    </div>
+  )
+}

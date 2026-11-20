@@ -62,3 +62,54 @@ describe('HeldOrder', () => {
     expect(HeldOrder.hold(items, null)).toBe(items)
   })
 })
+
+describe('triage bar actions', () => {
+  const base = { openable: true, reviewable: false }
+
+  it('carries every answer, so the bar is the only action row of the item', () => {
+    const question = item({
+      id: 'q',
+      verbs: ['Answer', 'Open', 'Done', 'Snooze'],
+      choices: [
+        { id: 'wait', label: 'Wait' },
+        { id: 'deploy', label: 'Deploy', recommended: true },
+      ],
+    })
+    expect(InboxKeys.triageActions(question, base)).toEqual([
+      { kind: 'answer', choiceId: 'wait', label: 'Wait', primary: false },
+      { kind: 'answer', choiceId: 'deploy', label: 'Deploy', primary: true },
+      { kind: 'open', primary: false },
+    ])
+  })
+
+  it('opens a question with no recommended answer on Enter, and still lists its answers', () => {
+    const question = item({
+      id: 'i',
+      verbs: ['Answer', 'Open'],
+      choices: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
+    })
+    expect(InboxKeys.triageActions(question, base)).toEqual([
+      { kind: 'answer', choiceId: 'a', label: 'A', primary: false },
+      { kind: 'answer', choiceId: 'b', label: 'B', primary: false },
+      { kind: 'open', primary: true },
+    ])
+  })
+
+  it('lists each verb once: the primary, Review for work that can land, and Open when it is not the primary', () => {
+    expect(InboxKeys.triageActions(item({ id: 'i', verbs: ['Open', 'Done', 'Snooze'] }), base)).toEqual([{ kind: 'open', primary: true }])
+    expect(InboxKeys.triageActions(item({ id: 'i', verbs: ['Land', 'Open', 'Done'] }), { openable: true, reviewable: true })).toEqual([
+      { kind: 'land', primary: true },
+      { kind: 'review', primary: false },
+      { kind: 'open', primary: false },
+    ])
+    expect(
+      InboxKeys.triageActions(item({ id: 'i', verbs: ['Retry', 'Done'], subject: { kind: 'url', id: 'https://example.test' } }), {
+        openable: false,
+        reviewable: false,
+      }),
+    ).toEqual([{ kind: 'verb', verb: 'Retry', primary: true }])
+  })
+})

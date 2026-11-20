@@ -64,5 +64,5 @@ it('keeps the selection when the click lands', () => {
 it('explains how to recover when the thread cannot take the excerpt', () => {
   render({ failed: true })
   expect(container.querySelector('[role="alert"]')?.textContent).toBe(en.excerptFailed)
-  expect(en.excerptFailed).toContain('Open this session and try again')
+  expect(en.excerptFailed).toContain('Open it, then retry')
 })

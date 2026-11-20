@@ -41,16 +41,16 @@ const KEY_FIELD = {
   codex: null,
   'github-copilot': null,
   claude: {
-    label: 'SETUP TOKEN',
-    hint: 'Optional `claude setup-token` reference. The value stays in DSH credentials or the Host environment.',
+    label: 'Setup token',
+    hint: 'Optional `claude setup-token` reference. The value stays in DSH credentials or DSH’s environment.',
     placeholder: 'CLAUDE_WORK_API_KEY',
   },
   'opencode-go': {
     label: 'API KEY',
-    hint: 'Name the key reference; the value stays in DSH credentials or the Host environment.',
+    hint: 'Name the key reference. The value stays in DSH credentials or DSH’s environment.',
     placeholder: 'OPENCODE_API_KEY',
   },
-  commandcode: { label: 'API KEY', hint: 'Name the key reference; empty falls back to `cmd login`.', placeholder: 'COMMANDCODE_API_KEY' },
+  commandcode: { label: 'API KEY', hint: 'Name the key reference. Empty falls back to `cmd login`.', placeholder: 'COMMANDCODE_API_KEY' },
   cursor: { label: 'ACCESS TOKEN', hint: 'Optional token reference. Empty uses the `cursor-agent login`.', placeholder: 'CURSOR_WORK_API_KEY' },
   mistral: {
     label: 'API KEY',
@@ -103,14 +103,14 @@ export const RuntimePathsSection = (props: {
   else if (credentialInfo?.configured === true)
     credentialStatus =
       credentialInfo.source === 'env'
-        ? 'Using the Host environment. To change this key, update that environment value and restart DSH; environment values take precedence over saved credentials.'
+        ? 'Using DSH’s environment, which wins over saved credentials. To change this key, update that variable and restart DSH.'
         : `Key is available from ${credentialInfo.source ?? 'a DSH credential source'}. You can replace or import it below; changes apply to the next request.`
   else if (credentialInfo?.configured === false && !credentialInfo.writable)
-    credentialStatus = 'This key comes from a read-only source. Change the source itself; saved-key setup is unavailable for this reference.'
+    credentialStatus = 'This key comes from a read-only source. Change the source itself. Saved-key setup is unavailable for this reference.'
   else if (credentialInfo?.configured === false) credentialStatus = 'No key is saved yet. Use Set up key to enter one or import it from Secret Catalog.'
   else if (props.state.credentialInfoUnavailable)
     credentialStatus =
-      'Credential status is unavailable. Check that DSH credential management is enabled; setup actions stay disabled until the source can be verified.'
+      'Credential status is unavailable. Check that DSH credential management is enabled. Setup actions stay disabled until the source can be verified.'
   return (
     <NumberedSection
       actions={

@@ -7,11 +7,20 @@ describe('UsagePlanBadge', () => {
     expect(renderToStaticMarkup(<UsagePlanBadge plan={plan} />)).toBe('')
   })
 
-  it.each(['plus', 'max', 'business', 'pro_200', 'Pro+', 'enterprise'])('preserves provider wording (%s)', plan => {
+  it.each([
+    ['plus', 'Plus'],
+    ['business', 'Business'],
+    ['pro_200', 'Pro 200'],
+    ['individual-pro', 'Individual Pro'],
+  ])('writes a provider plan id as a plain name (%s)', (plan, name) => {
     const markup = renderToStaticMarkup(<UsagePlanBadge plan={` ${plan} `} />)
-    expect(markup).toContain(`aria-label="Subscription plan: ${plan}"`)
+    expect(markup).toContain(`aria-label="Subscription plan: ${name}"`)
     expect(markup).not.toContain('title=')
-    expect(markup).toContain(`>${plan}</span>`)
+    expect(markup).toContain(`>${name}</span>`)
+  })
+
+  it.each(['Pro+', 'Enterprise', 'ChatGPT Team'])('keeps a name the provider already wrote for people (%s)', plan => {
+    expect(renderToStaticMarkup(<UsagePlanBadge plan={plan} />)).toContain(`>${plan.replace('+', '+')}</span>`)
   })
 
   it('bounds long plan text while keeping its full accessible name', () => {

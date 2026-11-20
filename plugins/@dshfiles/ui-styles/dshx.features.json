@@ -5,7 +5,8 @@
     {
       "id": "one-shared-stylesheet",
       "title": "One shared plugin stylesheet",
-      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner. The same sheet carries the generated default visual-refresh theme block (the first paint) (warm-stone palette, accent, status trios, radii, Shiki colours) that retunes the Host --dsw-* variables for native and plugin surfaces alike.",
+      "summary": "All plugins share one stylesheet loaded once per page.",
+      "details": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner. The same sheet carries the generated default visual-refresh theme block (the first paint) (warm-stone palette, accent, status trios, radii, Shiki colours) that retunes the Host --dsw-* variables for native and plugin surfaces alike.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -34,7 +35,8 @@
     {
       "id": "appearance-theme",
       "title": "Appearance theme: presets, palette and fonts",
-      "summary": "Settings › General › Appearance picks a colour preset (Warm stone default, Neutral, High contrast, Slate blue, Moss, Dracula), optional hue, tint, accent and contrast overrides, and the UI and code fonts. The client regenerates the palette with the plugin-ui generator and injects it over the static first-paint theme only when it differs from the default, so native core surfaces (--dsw-* remap) and plugins follow at once in light and dark; theme_get reads it and theme_set changes or resets it.",
+      "summary": "Pick a colour preset, adjust hue, accent and contrast, and choose fonts in Settings.",
+      "details": "Settings › General › Appearance picks a colour preset (Warm stone default, Neutral, High contrast, Slate blue, Moss, Dracula), optional hue, tint, accent and contrast overrides, and the UI and code fonts. The client regenerates the palette with the plugin-ui generator and injects it over the static first-paint theme only when it differs from the default, so native core surfaces (--dsw-* remap) and plugins follow at once in light and dark; theme_get reads it and theme_set changes or resets it.",
       "onboarding": {
         "firstAction": "Open Settings › General › Appearance and pick a preset, or change the accent and the interface font.",
         "doneWhen": "The whole app takes the new colours and fonts at once, light and dark."
@@ -119,8 +121,9 @@
     },
     {
       "id": "saved-themes",
-      "title": "Saved and gallery themes: any theme on request, Claude Code scenes, and Dracula",
-      "summary": "A theme is data: exact colours per scheme (eleven neutral steps, accent and status colours), optional syntax colours and an optional animated backdrop behind the conversation. The agent saves any theme the user asks for with theme_define and it applies live, no restart; theme_set customTheme switches between saved themes and presets; theme_remove deletes one. The built-in Dracula preset uses the same format: official Dracula Classic in dark with a night sky (twinkling stars, a violet moon), official Alucard Classic in light. Sixteen built-in gallery themes paint the twenty animated scenes of Claude Code’s theme-examples plugin (Apache-2.0, vendored, built on the Host and served to the client by the scene method), each under its glass in the scheme it is drawn for. Under the conversation column each theme lays the least veil its primary, secondary and tertiary text and icons need anywhere over its scene; readingBlur and readingTint add a blur (live over the moving scene where the browser composites on a GPU, a pre-blurred still without one) and more tint. The scene is one picture fixed behind the whole workbench, shown only behind conversation panes; the composer seat continues the veil, the turn rail and the user bubble get readable surfaces over the scene.",
+      "title": "Saved and gallery themes",
+      "summary": "Save any theme you ask the agent for, or pick one from the gallery such as Dracula.",
+      "details": "A theme is data: exact colours per scheme (eleven neutral steps, accent and status colours), optional syntax colours and an optional animated backdrop behind the conversation. The agent saves any theme the user asks for with theme_define and it applies live, no restart; theme_set customTheme switches between saved themes and presets; theme_remove deletes one. The built-in Dracula preset uses the same format: official Dracula Classic in dark with a night sky (twinkling stars, a violet moon), official Alucard Classic in light. Sixteen built-in gallery themes paint the twenty animated scenes of Claude Code’s theme-examples plugin (Apache-2.0, vendored, built on the Host and served to the client by the scene method), each under its glass in the scheme it is drawn for. Under the conversation column each theme lays the least veil its primary, secondary and tertiary text and icons need anywhere over its scene; readingBlur and readingTint add a blur (live over the moving scene where the browser composites on a GPU, a pre-blurred still without one) and more tint. The scene is one picture fixed behind the whole workbench, shown only behind conversation panes; the composer seat continues the veil, the turn rail and the user bubble get readable surfaces over the scene.",
       "onboarding": {
         "firstAction": "Ask the agent for a theme, for example “make DSH look like Nord”, or pick the Dracula preset in Settings › Appearance.",
         "doneWhen": "The app takes the theme's exact colours at once, with its backdrop behind the conversation if it has one."
@@ -267,7 +270,8 @@
     {
       "id": "touch-platform-baseline",
       "title": "Touch platform baseline",
-      "summary": "Page-global element rules in the shared sheet's base layer: no tap highlight or landscape text inflation, touch-action manipulation on native controls, no long-press selection on control labels under a coarse pointer, and a field floor of max(16px, inherited size) under a coarse pointer so iOS never zooms into a field.",
+      "summary": "On touch screens, controls skip the tap flash and fields never zoom the page.",
+      "details": "Page-global element rules in the shared sheet's base layer: no tap highlight or landscape text inflation, touch-action manipulation on native controls, no long-press selection on control labels under a coarse pointer, and a field floor of max(16px, inherited size) under a coarse pointer so iOS never zooms into a field.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",

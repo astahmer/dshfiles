@@ -7,6 +7,11 @@ export const ATTENTION_FINISH_REASONS = ['completed', 'aborted', 'blocked', 'err
 
 export type AttentionFinishReason = (typeof ATTENTION_FINISH_REASONS)[number]
 
+/** The finish reasons that leave a thread Failed until a later turn of it finishes without failing. */
+export const FAILED_FINISH_REASONS = ['error', 'max-tokens'] as const satisfies readonly AttentionFinishReason[]
+
+export type FailedFinishReason = (typeof FAILED_FINISH_REASONS)[number]
+
 export const MAX_ATTENTION_SESSIONS = 2000
 
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(128))
@@ -41,6 +46,23 @@ export const threadAttentionSnapshotSchema = SchemaHelpers.strictStruct(
     revision: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThan(0)),
     sessions: Schema.Array(threadAttentionViewSchema).check(Schema.isMaxLength(MAX_ATTENTION_SESSIONS)),
   }),
+)
+
+/**
+ * One thread whose last finished turn failed. Unlike the attention record it survives reading the thread: it is
+ * dropped only when a later turn of the thread finishes without failing.
+ */
+export const failedTurnSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    sessionId: sessionIdSchema,
+    /** When the failed turn ended. */
+    failedAt: timestampSchema,
+    reason: Schema.Literals(FAILED_FINISH_REASONS),
+  }),
+)
+
+export const failedTurnsSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({ sessions: Schema.Array(failedTurnSchema).check(Schema.isMaxLength(MAX_ATTENTION_SESSIONS)) }),
 )
 
 /**
@@ -185,6 +207,13 @@ export const threadSidebarAttentionApi = defineApi({
       output: threadAttentionChangesSchema,
       description: 'Run one attention write and answer the records changed since a revision the caller holds, instead of the whole state.',
     }),
+    failedTurns: method({
+      input: Schema.Void,
+      output: failedTurnsSchema,
+      description:
+        'Threads whose last finished turn failed (an error, or the output token limit), newest first. A thread stays listed after it is read, until a later turn of it finishes without failing. Read-only.',
+      tool: { name: 'thread_failed_turns', readOnly: true },
+    }),
     writeCapabilities: method({
       input: Schema.Void,
       output: threadAttentionWriteCapabilitiesSchema,
@@ -195,12 +224,14 @@ export const threadSidebarAttentionApi = defineApi({
   events: {
     changed: event({
       schema: Schema.Struct({ revision: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)) }),
-      description: 'Attention records changed (a turn finished, a thread was read or marked unread, an Inbox item was marked done); read the state again.',
+      description:
+        'Attention records or failed turns changed (a turn finished, a thread was read or marked unread, an Inbox item was marked done); read the state again.',
     }),
   },
 })
 
 export type ThreadAttentionView = Schema.Schema.Type<typeof threadAttentionViewSchema>
+export type FailedTurn = Schema.Schema.Type<typeof failedTurnSchema>
 export type ThreadAttentionWriteCommand = Schema.Schema.Type<typeof threadAttentionWriteCommandSchema>
 export type ThreadAttentionWriteDelta = Schema.Schema.Type<typeof threadAttentionWriteDeltaSchema>
 export type ThreadAttentionSnapshot = Schema.Schema.Type<typeof threadAttentionSnapshotSchema>

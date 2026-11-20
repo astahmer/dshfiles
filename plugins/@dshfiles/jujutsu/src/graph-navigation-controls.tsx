@@ -52,7 +52,7 @@ export const LandmarkControls = ({ navigation, onLocate }: LandmarkControlsProps
     })}
     {navigation.landmarksQuery.error !== null && (
       <span className="dshx:text-xs dshx:text-destructive" role="status">
-        {errorMessage(navigation.landmarksQuery.error, 'Landmark reads require the updated Host.')}
+        {errorMessage(navigation.landmarksQuery.error, 'Landmarks need an updated DSH. Update DSH and restart it.')}
       </span>
     )}
   </div>
@@ -199,7 +199,7 @@ export const RelationshipInspector = ({ navigation, selected, revisions, onLocat
       )}
       {navigation.relationshipQuery.error !== null && (
         <p className="dshx:text-destructive" role="status">
-          {errorMessage(navigation.relationshipQuery.error, 'Comparison unavailable. Updated Host required.')}
+          {errorMessage(navigation.relationshipQuery.error, 'Comparison needs an updated DSH. Update DSH and restart it.')}
         </p>
       )}
       {unavailableLandmark && navigation.relationshipQuery.error === null && (

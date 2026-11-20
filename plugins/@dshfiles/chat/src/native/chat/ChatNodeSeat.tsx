@@ -9,6 +9,7 @@ import type { ChatNodeStore } from '../contract/snapshot.ts'
 import { isAtOrOutside } from '../contract/group-tree.ts'
 import { turnProcessAlwaysOpen } from '../contract/turn-process.ts'
 import { turnProcessOpen } from '../stores.ts'
+import { isRoutineContextNode, showsRoutineContext } from './context-rows.ts'
 import { hiddenOrCollapsing } from './flow-motion.ts'
 import { revealRun, RunFoldSummary, useRunFoldHidden, type RunFoldPlacement } from './RunFold.tsx'
 import { SinceYouLeftContext } from './SinceYouLeftCard.tsx'
@@ -81,6 +82,8 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   }, [actions, processSpec, alwaysOpen])
   const foldCompleted = usePresentation(policy => policy.foldCompletedTurns)
   const keepReplies = usePresentation(policy => policy.foldedReplies === 'all')
+  // dshfiles (unslop T1): the context the Host injects on its own is a row only in the Verbose view mode.
+  const routineContextShown = usePresentation(policy => showsRoutineContext(policy.mode))
   // A loaded end makes a partial historical Turn eligible without its start.
   const processWindowReady = processSpec !== undefined
     && processPresentation !== undefined
@@ -123,13 +126,14 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       spec: processSpec,
       foldable,
       hasContent: !interleavedInput && (processSpec.inlineReasoning || (keepReplies
-        ? processPresentation?.hasNonReplyProcess === true
+        // A Turn whose only process rows are hidden Context has nothing to disclose.
+        ? processPresentation?.hasNonReplyProcess === true && (routineContextShown || !processPresentation.onlyRoutineContext)
         : processPresentation?.hasExternalProcess === true)),
       open: processOpen,
       setOpen,
     }, [
-    foldable, interleavedInput, keepReplies, processOpen, processSpec,
-    processPresentation?.hasExternalProcess, processPresentation?.hasNonReplyProcess, setOpen,
+    foldable, interleavedInput, keepReplies, processOpen, processSpec, routineContextShown,
+    processPresentation?.hasExternalProcess, processPresentation?.hasNonReplyProcess, processPresentation?.onlyRoutineContext, setOpen,
   ])
   const controllerInactive = routedNode?.kind === 'turn-process'
     && foldCompleted && !foldable
@@ -169,12 +173,15 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
     loadImage, useProjection, turnProcess,
   ])
   if (routedNode === undefined || owner === null) return null
+  // The seat stays mounted and empty: an empty seat takes no space (ChatView.module.css), and unmounting it would
+  // detach the element the fold's visibility hooks hold.
+  const routineContextHidden = !routineContextShown && isRoutineContextNode(routedNode)
   // Runtime dispatch owns the correlation: every Node's discriminant is the
   // keyed-slot entry passed alongside that same Node. TypeScript does not
   // distribute an object containing a union into a union of objects itself.
   const routedOwner = { ...owner, node: routedNode } as RoutedChatNodeOwner
   const flowKey = groupPart === undefined || groupPart === 'response' ? routedNode.key : JSON.stringify([routedNode.key, groupPart])
-  const content = renderSlot('conversation.chat.node', routedOwner, {
+  const content = routineContextHidden ? null : renderSlot('conversation.chat.node', routedOwner, {
     entryKey: routedNode.kind,
     hookContext,
     fallback: (
@@ -201,6 +208,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       data-turn-process-hidden={processHidden || undefined}
       data-run-fold-member={runFold === undefined ? undefined : runHead === undefined ? 'member' : 'head'}
       data-chat-final-answer={finalAnswer || undefined}
+      data-routine-context-hidden={routineContextHidden || undefined}
     >
       {sinceHere}
       {runFold === undefined || runHead === undefined ? content : (

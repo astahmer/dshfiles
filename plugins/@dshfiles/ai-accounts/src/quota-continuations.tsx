@@ -32,7 +32,7 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
       }
       if (input.duration === undefined) {
         const result = await accounts.resumeQuotaContinuation({ continuationId: input.continuationId })
-        return result.accepted ? 'Recovery prompt queued.' : 'This recovery was superseded or its thread is unavailable.'
+        return result.accepted ? 'Recovery prompt queued.' : 'This recovery was replaced or its thread is gone. Nothing was queued.'
       }
       const result = await accounts.snoozeQuotaContinuation({ continuationId: input.continuationId, duration: input.duration })
       return result.updated ? 'Recovery timing updated.' : 'This recovery is already queued or no longer active.'
@@ -91,12 +91,12 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
             const busy = busyId === item.continuationId
             const targetTime = Math.max(item.resetAt ?? item.retryAt ?? 0, item.snoozedUntil ?? 0) + (item.resetAt === null ? 0 : 60_000)
             const resetStatus =
-              item.resetAt === null ? `Reset time unknown; retries back off up to every 10 minutes.` : `Known reset ${formatTime(item.resetAt)}.`
+              item.resetAt === null ? `Reset time unknown. Retries back off up to every 10 minutes.` : `Known reset ${formatTime(item.resetAt)}.`
             const scheduleStatus = item.scheduled
               ? `Automatic resume expected ${formatTime(targetTime)}.`
               : scheduleAvailable
-                ? 'No automatic timer is set; resume manually.'
-                : 'Schedule service is not loaded; resume manually.'
+                ? 'No automatic timer is set. Resume manually.'
+                : 'Schedule service is not loaded. Resume manually.'
             const snoozes = [
               { duration: 'one-hour', label: 'Snooze 1h' },
               { duration: 'four-hours', label: 'Snooze 4h' },
@@ -106,7 +106,7 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
             return (
               <Item className="dshx:items-start dshx:gap-3 dshx:px-3 dshx:py-2" key={item.continuationId} role="listitem" size="sm" variant="outline">
                 <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
-                  <ItemTitle className="dshx:min-w-0 dshx:truncate dshx:text-sm">{item.title ?? `Session ${item.sessionId}`}</ItemTitle>
+                  <ItemTitle className="dshx:min-w-0 dshx:truncate dshx:text-sm">{item.title ?? `Thread ${item.sessionId}`}</ItemTitle>
                   <span className="dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{item.sessionId}</span>
                   <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-xs dshx:text-muted-foreground">
                     <span>Failed {formatTime(item.failedAt)}</span>
@@ -115,7 +115,7 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
                       {item.state === 'queued'
                         ? 'Recovery prompt queued.'
                         : item.ready
-                          ? 'Recovery time passed; ready for manual recovery.'
+                          ? 'Recovery time passed. Ready for manual recovery.'
                           : 'Quota-blocked turn.'}
                     </Badge>
                     <span>{resetStatus}</span>

@@ -14,7 +14,7 @@ const threadHeader = (page: Page, title: string) =>
   page
     .locator('[data-conversation-session]:visible')
     .getByText(title, { exact: true })
-    .or(page.getByRole('navigation', { name: 'Session hierarchy' }).getByText(title, { exact: true }))
+    .or(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ }).getByText(title, { exact: true }))
     .first()
 
 // A click while the previous turn settles can be dropped, so the New-thread screen is awaited and the click retried.
@@ -130,7 +130,7 @@ When('a new thread mentions {string} and is sent', async ({ page }: { page: Page
 
 Then('the sent message links to {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'mentions-sent-reference-is-a-link', async () => {
-    await expect(page.getByRole('link', { name: `Referenced session · ${title}` })).toBeVisible()
+    await expect(page.getByRole('link', { name: `Referenced thread · ${title}` })).toBeVisible()
     await expect(page.locator('[role="link"][data-dshfiles-session-link]:has([data-ref-chip="session"]):visible')).toHaveCount(1)
   })
 })

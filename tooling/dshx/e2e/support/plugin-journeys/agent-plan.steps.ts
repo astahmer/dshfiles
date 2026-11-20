@@ -21,8 +21,10 @@ const openFreshThread = async (page: Page, prefix: string): Promise<void> => {
 
 /** A finished turn folds its tool rows: open each folded turn, then each folded plan group, so the cards show. */
 const revealPlanCards = async (page: Page): Promise<void> => {
-  const folded = (text: RegExp) => page.locator('[aria-expanded="false"]').filter({ hasText: text })
-  for (const pattern of [/^Worked for/, /^Updated the plan/]) {
+  // Only folds on screen: a group header inside a folded turn is in the DOM but cannot be clicked yet. The owned Chat
+  // fork folds a turn under "Worked for"; the native Chat these compositions boot says "Completed in".
+  const folded = (text: RegExp) => page.locator('[aria-expanded="false"]').filter({ hasText: text, visible: true })
+  for (const pattern of [/^(Worked for|Completed in)/, /^Updated the plan/]) {
     while ((await folded(pattern).count()) > 0) await folded(pattern).first().click()
   }
 }
@@ -97,17 +99,18 @@ When('the fake provider rejects the next request in a fresh workspace', async ({
   await send(page, '[[fail The fake provider rejected this request]]')
 })
 
-Then('the failed turn offers Retry and Ask to fix', async ({ page }: { page: Page }) => {
-  const bar = page.locator('[data-dshfiles-agent-failure="turn-error"]')
+Then('the failed turn offers one Retry and Ask to fix in one row', async ({ page }: { page: Page }) => {
+  const actions = page.locator('[data-turn-error-actions]')
   await recordAssertion(page, 'agent-plan-failure-actions-visible', async () => {
-    await expect(bar).toBeVisible({ timeout: 60_000 })
-    await expect(bar.getByRole('button', { name: 'Retry' })).toBeVisible()
-    await expect(bar.getByRole('button', { name: 'Ask to fix' })).toBeVisible()
+    await expect(actions.getByRole('button', { name: 'Ask to fix' })).toBeVisible({ timeout: 60_000 })
+    // The card is one row of recovery actions: the Chat fork's Retry, then this plugin's Ask to fix.
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(1)
+    await expect(actions.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
   })
 })
 
 Then('Ask to fix puts the failure into the composer', async ({ page }: { page: Page }) => {
-  await page.locator('[data-dshfiles-agent-failure="turn-error"]').getByRole('button', { name: 'Ask to fix' }).click()
+  await page.locator('[data-dshfiles-agent-failure="turn-error"]').click()
   await recordAssertion(page, 'agent-plan-ask-to-fix-fills-composer', async () => {
     await expect(page.getByRole('textbox', { name: THREAD_COMPOSER })).toContainText('The fake provider rejected this request')
   })

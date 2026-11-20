@@ -44,6 +44,7 @@ import { ListHeaderExtras } from './list-header-extras.js'
 import { AddPanelButton, EntryMenu, FolderDialog, FolderGlyph, FolderMenu, FolderNotice, ViewGlyph, viewDrag, type SidebarFolderUi } from './sidebar-folders.js'
 import { SidebarTrees, type ResolvedEntry } from './sidebar-tree.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar } from './phone-shell.js'
+import { PhoneLayout } from './phone-layout.js'
 import { useEdgeSwipe } from './edge-swipe.js'
 import { runStackMotion } from './stack-motion.js'
 import { clearThreadUrl, pageLoadThreadRoute } from './thread-url.js'
@@ -123,8 +124,6 @@ const storedDestination = createStoredValue({
 const soleSection = (destination: ResolvedDestination): string | undefined =>
   destination.id !== 'threads' && destination.id !== 'settings' && destination.sections.length === 1 ? destination.sections[0]?.panelId : undefined
 
-const PHONE_QUERY = '(max-width: 639.98px)'
-
 /**
  * Opens `@dshfiles/settings-shell`'s Settings page in the stage through its documented cross-plugin request (plan §4.6).
  * False when the shell is not loaded: the rail then only shows its list, never the native Settings dialog.
@@ -136,15 +135,7 @@ const PHONE_NAV_HIDDEN_HEIGHT = 'env(safe-area-inset-bottom, 0px)'
 /** The phone top bar (Back, title, thread panels; the frame's status chip takes its trailing 48px). */
 const PHONE_TOP_HEIGHT = 'calc(44px + env(safe-area-inset-top, 0px))'
 
-const subscribePhone = (listener: () => void): (() => void) => {
-  if (typeof window.matchMedia !== 'function') return () => undefined
-  const query = window.matchMedia(PHONE_QUERY)
-  query.addEventListener('change', listener)
-  return () => query.removeEventListener('change', listener)
-}
-const readPhone = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches
-
-export const usePhoneLayout = (): boolean => useSyncExternalStore(subscribePhone, readPhone, () => false)
+export const usePhoneLayout = (): boolean => useSyncExternalStore(PhoneLayout.subscribe, PhoneLayout.matches, () => false)
 
 export interface DestinationShellProps {
   readonly panels: readonly DestinationPanel[]
@@ -182,6 +173,8 @@ export interface DestinationShellProps {
   readonly edgeSwipePanels?: boolean
   /** Phone model (Settings › phoneNavigation): the tab-bar stack, or the thread list as a drawer over the thread. */
   readonly phoneNavigation?: 'stack' | 'drawer'
+  /** Settings › Developer lists the pages for plugin authors; off hides the group (the palette still opens them). */
+  readonly showDeveloperPages?: boolean
   readonly toggleSidebar: () => void
   readonly record: (record: NavigationRecord) => void
   /** Sidebar folders (b:952m): the rail's folders and their verbs; absent, the rail lists the eight destinations. */
@@ -245,6 +238,7 @@ const entriesOfSections = (destination: ResolvedDestination): readonly ResolvedE
     mapped: true,
     description: section.description,
     unmapped: section.unmapped,
+    developer: section.group === 'developer',
   }))
 
 const railFoldersOf = (destinations: readonly ResolvedDestination[], folderUi: SidebarFolderUi | undefined): readonly RailFolder[] => {
@@ -370,6 +364,15 @@ const folderIcon = (props: Pick<DestinationShellProps, 'panels' | 'renderPanelIc
     destinationIcon(props, folder.destination, active, size)
   )
 
+/**
+ * A page glyph may draw a count over its icon (the Inbox's Needs you count): right for the 20px rail seat, but in a list
+ * row the count sat on the icon and touched the label. In a row the count is positioned against the row instead, at its
+ * trailing edge, clear of the label and of the row's menu.
+ */
+const SECTION_ROW_BADGE =
+  'dshx:[&_[data-attention-badge]]:static dshx:[&_[data-attention-badge]>span]:top-2 dshx:[&_[data-attention-badge]>span]:right-8 dshx:[&_[data-attention-badge]>span]:left-auto'
+const SECTION_ROW_BADGE_ROOM = "dshx:has-[[data-attention-badge]:not([data-attention-badge='0'])]:pr-14"
+
 /** One section: its label is the button's whole name, so a reach or a screen reader finds it by that alone. */
 const SectionButton = (props: {
   readonly label: string
@@ -416,14 +419,19 @@ const SectionButton = (props: {
         aria-describedby={props.description === undefined ? undefined : descriptionId}
         onClick={props.onSelect}
         className={cn(
-          'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-colors',
+          'dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-colors',
           'dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+          // A row whose glyph carries a count keeps room for it at its trailing edge, before the row's own menu.
+          SECTION_ROW_BADGE_ROOM,
           props.selected && 'dshx:bg-accent',
         )}
       >
         {props.icon === undefined || props.icon === null ? null : (
           <span
-            className="dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
+            className={cn(
+              'dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground',
+              SECTION_ROW_BADGE,
+            )}
             aria-hidden="true"
           >
             {props.icon}
@@ -432,7 +440,8 @@ const SectionButton = (props: {
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <span className={cn('dshx:truncate dshx:text-sm', props.selected && 'dshx:font-medium')}>{props.label}</span>
           {props.description === undefined ? null : (
-            <span id={descriptionId} className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+            // Two lines, not one: the list column is about 200px, which cut every description mid-word.
+            <span id={descriptionId} className="dshx:line-clamp-2 dshx:text-xs dshx:text-muted-foreground">
               {props.description}
             </span>
           )}
@@ -480,16 +489,21 @@ const FolderIndex = (props: {
   readonly folderUi: SidebarFolderUi | undefined
   /** Phone: the top bar already names the destination, so the heading stays for assistive tech only. */
   readonly phone?: boolean
+  /** List the pages for plugin authors, in their own group at the end of Settings. */
+  readonly showDeveloperPages?: boolean | undefined
 }): JSX.Element => {
   const { folder, folderUi } = props
   const [renaming, setRenaming] = useState(false)
   const resolved = folderUi?.folders.find(candidate => candidate.id === folder.id)
   // Settings lists the pages nobody mapped, and the panels of a deleted folder, under Other pages.
   const other = (entry: ResolvedEntry): boolean => entry.unmapped || (folder.id === 'settings' && !entry.mapped)
-  const mapped = folder.entries.filter(entry => !other(entry))
-  const unmapped = folder.entries.filter(other)
+  // Pages for plugin authors sit apart, after everything a user came for; a sidebar setting hides the group.
+  const developerEntries = folder.entries.filter(entry => entry.developer === true)
+  const developer = props.showDeveloperPages === false ? [] : developerEntries
+  const mapped = folder.entries.filter(entry => !other(entry) && entry.developer !== true)
+  const unmapped = folder.entries.filter(entry => other(entry) && entry.developer !== true)
   const settings = folder.id === 'settings' ? props.openSettings : null
-  const empty = mapped.length === 0 && unmapped.length === 0 && settings === null
+  const empty = mapped.length === 0 && unmapped.length === 0 && developer.length === 0 && settings === null
   const rows = (entries: readonly ResolvedEntry[], descriptions = true): JSX.Element => (
     <EntryRows
       folder={folder}
@@ -535,6 +549,12 @@ const FolderIndex = (props: {
           <section className="dshx:mt-3" aria-label="Other pages">
             <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Other pages</h3>
             <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(unmapped, false)}</div>
+          </section>
+        )}
+        {developer.length === 0 ? null : (
+          <section className="dshx:mt-3 dshx:border-t dshx:border-border dshx:pt-3" aria-label="Developer" data-destination-group="developer">
+            <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Developer</h3>
+            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(developer)}</div>
           </section>
         )}
       </div>
@@ -613,6 +633,7 @@ const ListPane = (
       renderPanelIcon={props.renderPanelIcon}
       folderUi={props.folderUi}
       phone={props.phone === true}
+      showDeveloperPages={props.showDeveloperPages}
     />
   )
 

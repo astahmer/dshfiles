@@ -42,6 +42,20 @@ export const accountConnectionStatus = (account: AccountProfile, usage: Accounts
   }
 }
 
+type ConnectionStatus = ReturnType<typeof accountConnectionStatus>
+const clockTime = (at: number): string => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+/**
+ * The one muted line of state in the account header. Healthy is quiet ("Checked 03:18 PM"); only a state that
+ * blocks routing keeps its name and the warning tone.
+ */
+export const accountStateLine = (status: ConnectionStatus, time: (at: number) => string = clockTime): { text: string; tone: 'muted' | 'warning' } => {
+  const checked = status.checkedAt === null ? null : time(status.checkedAt)
+  if (status.tone === 'warning') return { text: checked === null ? status.label : `${status.label} · checked ${checked}`, tone: 'warning' }
+  if (status.tone === 'success') return { text: checked === null ? status.label : `Checked ${checked}`, tone: 'muted' }
+  return { text: checked === null ? status.label : `${status.label} · checked ${checked}`, tone: 'muted' }
+}
+
 export const accountAuthenticationLabel = (account: Pick<AccountProfile, 'kind' | 'apiKeyEnv' | 'authSource'>): string => {
   if (account.kind === 'codex') return 'ChatGPT (OAuth)'
   if (account.kind === 'github-copilot') return 'GitHub (OAuth)'

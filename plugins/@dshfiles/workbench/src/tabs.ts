@@ -8,7 +8,8 @@ export type HostTarget =
 /** A tab shows a Host target, or the shared Start suggestions page. */
 export type TabTarget = HostTarget | { readonly kind: 'start' }
 
-export type TabStatus = 'running' | 'needsYou' | 'unread'
+/** `failed` is absent on older providers: a thread whose last finished turn failed, read or not. */
+export type TabStatus = 'running' | 'needsYou' | 'failed' | 'unread'
 
 export { CLOSE_BUTTON_POSITIONS, DEFAULT_CLOSE_BUTTON_POSITION, type CloseButtonPosition }
 
@@ -68,7 +69,10 @@ export interface WorkbenchTabsProvider {
   readonly renderStart: () => ReactNode
   /** Native-owner menu and localized labels; absent on older providers. */
   readonly renderTabMenu?: (tabId: string, onRename: () => void, onStatus?: (message: string) => void) => ReactNode
-  readonly label?: (key: 'newTab' | 'pinned' | 'running' | 'needsYou' | 'unread' | 'renameThread' | 'renameFailed' | 'closeTab', title?: string) => string
+  readonly label?: (
+    key: 'newTab' | 'pinned' | 'running' | 'needsYou' | 'failed' | 'unread' | 'renameThread' | 'renameFailed' | 'closeTab',
+    title?: string,
+  ) => string
 }
 
 const EMPTY_SNAPSHOT: WorkbenchTabsSnapshot = {
@@ -113,7 +117,7 @@ const createWorkbenchTabsChannel = () => {
     renderStart: (): ReactNode => provider?.renderStart() ?? null,
     renderTabMenu: (tabId: string, onRename: () => void, onStatus?: (message: string) => void): ReactNode =>
       provider?.renderTabMenu?.(tabId, onRename, onStatus) ?? null,
-    label: (key: 'newTab' | 'pinned' | 'running' | 'needsYou' | 'unread' | 'renameThread' | 'renameFailed' | 'closeTab', title?: string): string =>
+    label: (key: 'newTab' | 'pinned' | 'running' | 'needsYou' | 'failed' | 'unread' | 'renameThread' | 'renameFailed' | 'closeTab', title?: string): string =>
       provider?.label?.(key, title) ?? '',
     /** A replacement owns the channel immediately; a stale HMR disposer cannot clear it. */
     connect: (next: WorkbenchTabsProvider): (() => void) => {

@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { DesignTokenCheck } from './design-token-check.ts'
 
-const { compare, countByRuleAndPlugin, findingsInText, isSource, isTokenFile } = DesignTokenCheck
+const { classGroups, classTokens, compare, countByRuleAndPlugin, findingsInText, isSource, isTokenFile, scanRepository } = DesignTokenCheck
 
 const rulesIn = (file, text) => findingsInText({ plugin: 'demo', file, text }).map(finding => `${finding.rule}:${finding.text}`)
 
@@ -63,4 +66,133 @@ test('ratchets per rule and plugin, so one plugin cannot hide another', () => {
   const result = compare({ baseline: { 'raw-colour/a': 1, 'raw-colour/b': 5 }, current })
   assert.deepEqual(result.increased, ['raw-colour/a: 2 > baseline 1'])
   assert.deepEqual(result.decreased, ['raw-colour/b: 0 < baseline 5'])
+})
+
+const ruleHits = (rule, text, file = 'plugins/@dshfiles/demo/src/a.tsx') =>
+  findingsInText({ plugin: 'demo', file, text })
+    .filter(finding => finding.rule === rule)
+    .map(finding => finding.text)
+
+test('parses dshx classes into variants and utility, keeping colons inside brackets', () => {
+  assert.deepEqual(
+    classTokens("cn('dshx:hover:md:shadow-sm dshx:[&:hover]:flex dshx:text-[length:calc(var(--x)-1px)] dshx:shadow-md!')").map(token => [
+      token.variants,
+      token.utility,
+    ]),
+    [
+      [['hover', 'md'], 'shadow-sm'],
+      [['[&:hover]'], 'flex'],
+      [[], 'text-[length:calc(var(--x)-1px)]'],
+      [[], 'shadow-md'],
+    ],
+  )
+})
+
+test('default-shadow: Tailwind shadow steps, not the elevation steps', () => {
+  assert.deepEqual(ruleHits('default-shadow', "cn('dshx:shadow-sm dshx:hover:shadow-lg dshx:shadow-s2 dshx:shadow-none dshx:shadow-md/20 shadow-xl')"), [
+    'dshx:shadow-sm',
+    'dshx:hover:shadow-lg',
+    'dshx:shadow-md/20',
+  ])
+})
+
+test('numeric-duration: a number or an arbitrary time, not a motion token', () => {
+  assert.deepEqual(
+    ruleHits('numeric-duration', "cn('dshx:duration-200 dshx:hover:duration-[350ms] dshx:duration-(--dshx-duration-fade) dshx:transition-opacity')"),
+    ['dshx:duration-200', 'dshx:hover:duration-[350ms]'],
+  )
+})
+
+test('viewport-variant: window breakpoints, not container queries or dialog widths', () => {
+  assert.deepEqual(ruleHits('viewport-variant', "cn('dshx:md:text-sm dshx:max-sm:hidden dshx:hover:lg:flex dshx:@md:flex dshx:sm:max-w-lg dshx:smooth')"), [
+    'dshx:md:text-sm',
+    'dshx:max-sm:hidden',
+    'dshx:hover:lg:flex',
+  ])
+})
+
+test('solid-status-fill: a solid info, success or warning fill outside the kit', () => {
+  const line = "cn('dshx:bg-success dshx:hover:bg-warning dshx:bg-info/10 dshx:bg-success-foreground dshx:text-success dshx:bg-destructive')"
+  assert.deepEqual(ruleHits('solid-status-fill', line), ['dshx:bg-success', 'dshx:hover:bg-warning'])
+  assert.deepEqual(ruleHits('solid-status-fill', line, 'plugins/@dshfiles/plugin-ui/src/components/ui/badge.tsx'), [])
+})
+
+test('palette-colour: numbered Tailwind palette classes, not semantic colours or kit hues', () => {
+  assert.deepEqual(
+    ruleHits(
+      'palette-colour',
+      "cn('dshx:bg-emerald-500 dshx:dark:text-red-400/80 dshx:border-l-amber-300 dshx:bg-teal dshx:text-violet dshx:bg-muted dshx:text-info')",
+    ),
+    ['dshx:bg-emerald-500', 'dshx:dark:text-red-400/80', 'dshx:border-l-amber-300'],
+  )
+})
+
+test('uppercase: the class and the CSS declaration, not other text transforms', () => {
+  assert.deepEqual(ruleHits('uppercase', "cn('dshx:uppercase dshx:md:uppercase dshx:capitalize dshx:normal-case')"), ['dshx:uppercase', 'dshx:md:uppercase'])
+  assert.deepEqual(ruleHits('uppercase', '.a { text-transform: uppercase; }\n.b { text-transform: none; }', 'plugins/@dshfiles/demo/src/a.module.css'), [
+    'text-transform: uppercase',
+  ])
+})
+
+test('class groups join the literals of one cn() call across lines, holes included', () => {
+  const source = [
+    'cn(',
+    "  'dshx:animate-spin',",
+    "  'dshx:motion-reduce:animate-none',",
+    ')',
+    "const other = 'dshx:size-4'",
+    'const t = `dshx:flex ${open ? "dshx:block" : ""}`',
+  ].join('\n')
+  assert.deepEqual(
+    classGroups(source).map(group => group.text),
+    ['dshx:animate-spin dshx:motion-reduce:animate-none', 'dshx:size-4', 'dshx:flex ${open ? "dshx:block" : ""}'],
+  )
+})
+
+test('unguarded-loop-animation: spin or pulse with no motion variant in the same class list', () => {
+  const source = [
+    "const a = cn('dshx:animate-spin dshx:size-4')",
+    "const b = cn('dshx:animate-pulse',",
+    "  'dshx:motion-reduce:animate-none')",
+    "const c = 'dshx:motion-safe:animate-spin'",
+    "// const d = 'dshx:animate-spin'",
+  ].join('\n')
+  assert.deepEqual(
+    findingsInText({ plugin: 'demo', file: 'plugins/@dshfiles/demo/src/a.tsx', text: source })
+      .filter(finding => finding.rule === 'unguarded-loop-animation')
+      .map(finding => `${finding.line}:${finding.text}`),
+    ['1:dshx:animate-spin'],
+  )
+})
+
+test('outline-without-focus: a control with outline-none and no focus-visible replacement in the same class list', () => {
+  const source = [
+    '<button type="button" className="dshx:outline-none dshx:rounded-md" onClick={() => go()}>Go</button>',
+    "<DropdownMenuTrigger className={cn('dshx:outline-none',",
+    "  'dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring')} />",
+    '<div role="button" tabIndex={0} className="dshx:outline-none dshx:has-[:focus-visible]:outline-none" />',
+    '<a href="#x" className="dshx:outline-none dshx:group-focus-within:ring-1">x</a>',
+    '<div tabIndex={-1} className="dshx:outline-none">panel</div>',
+    '<input className="dshx:outline-none dshx:bg-transparent" />',
+    "const inputClass = cn('dshx:outline-none dshx:w-full')",
+  ].join('\n')
+  assert.deepEqual(
+    findingsInText({ plugin: 'demo', file: 'plugins/@dshfiles/demo/src/a.tsx', text: source })
+      .filter(finding => finding.rule === 'outline-without-focus')
+      .map(finding => `${finding.line}:${finding.text}`),
+    ['1:dshx:outline-none', '4:dshx:outline-none'],
+  )
+})
+
+test('counts vendored forks with the owned plugins instead of skipping them', () => {
+  const root = mkdtempSync(join(tmpdir(), 'design-token-check-'))
+  try {
+    for (const plugin of ['schedule', 'backlog']) {
+      mkdirSync(join(root, 'plugins/@dshfiles', plugin, 'src'), { recursive: true })
+      writeFileSync(join(root, 'plugins/@dshfiles', plugin, 'src/a.module.css'), '.a { border-radius: 6px; }\n')
+    }
+    assert.deepEqual(countByRuleAndPlugin(scanRepository(root)), { 'arbitrary-radius/backlog': 1, 'arbitrary-radius/schedule': 1 })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })

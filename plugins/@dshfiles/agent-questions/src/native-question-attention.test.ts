@@ -21,8 +21,8 @@ const form = (overrides: Partial<PendingUserQuestion> = {}): PendingUserQuestion
     ...overrides,
   }) as PendingUserQuestion
 
-const projected = (pending: PendingUserQuestion, live = true) =>
-  projectNativeQuestion({ sessionId: 'session-root', sessionLive: live, sessionPersisted: true, targetIsLiveRoot: live, pending, observedAt: 1 })
+const projected = (pending: PendingUserQuestion, live = true, openHeld = false) =>
+  projectNativeQuestion({ sessionId: 'session-root', sessionLive: live, sessionPersisted: true, targetIsLiveRoot: live, pending, observedAt: 1, openHeld })
 
 const itemFor = (draft: AttentionDraft): AttentionItem => ({
   ...draft,
@@ -75,6 +75,22 @@ describe('native question inbox provider', () => {
     expect(several).toMatchObject({ reason: 'Asks: Deploy the release now? (+1 more)', verbs: ['Open', 'Done', 'Snooze', 'MuteSource'] })
   })
 
+  it('states an open single-select form with its options once the Host holds its request', () => {
+    const open = form({ callId: ToolCallId('call-2'), state: 'open' })
+    const [held] = NativeQuestionAttention.draftsOf([projected(open, true, true)])
+    expect(held).toMatchObject({
+      dedupeKey: 'session-root:call-2',
+      detail: 'Choose an answer here, or open the thread to write your own.',
+      verbs: ['Answer', 'Open', 'Done', 'Snooze', 'MuteSource'],
+      choices: [
+        { id: '0', label: 'Deploy', recommended: true },
+        { id: '1', label: 'Wait' },
+      ],
+    })
+    // A form of a thread that stopped is not answerable from anywhere, held or not.
+    expect(NativeQuestionAttention.draftsOf([projected(open, false, true)])[0]).not.toHaveProperty('choices')
+  })
+
   it('states pending forms of live threads, answers one in place through the native answer API, and resolves it', async () => {
     const host = await createTestHost()
     const stated: (readonly AttentionDraft[])[] = []
@@ -115,6 +131,7 @@ describe('native question inbox provider', () => {
             { sessionId: 'session-root', sessionLive: true, sessionPersisted: true, targetIsLiveRoot: true },
             { sessionId: 'session-child', sessionLive: true, sessionPersisted: true, targetIsLiveRoot: false },
           ]),
+        holdsOpen: () => false,
         answer: input => {
           answers.push(input)
           forms = forms.filter(entry => entry.callId !== input.callId)
@@ -153,7 +170,7 @@ describe('native question inbox provider', () => {
       expect(await act({ item: itemFor(draft), verb: 'Answer', choiceId: '7' })).toMatchObject({ ok: false })
       expect(await act({ item: itemFor(draft), verb: 'Answer', choiceId: '0' })).toEqual({
         ok: true,
-        message: 'Answered “Deploy (Recommended)”. The thread continues once it reads the reply.',
+        message: 'Answered “Deploy”. The thread continues once it reads the reply.',
       })
       expect(answers).toEqual([{ sessionId: 'session-root', callId: 'call-1', answer: { answers: [{ id: 'deploy', selected: ['Deploy (Recommended)'] }] } }])
 

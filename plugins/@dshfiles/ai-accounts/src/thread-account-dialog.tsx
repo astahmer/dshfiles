@@ -70,7 +70,7 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
         </DialogHeader>
         {preview.isPending ? (
           <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
-            <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin" />
+            <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin dshx:motion-reduce:animate-none" />
             Checking available models…
           </p>
         ) : null}
@@ -84,7 +84,7 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
             </dl>
             <p className="dshx:text-sm dshx:text-muted-foreground">
               {plan.strategy === 'same-model'
-                ? 'Same model retained. Compatible reasoning effort is kept; otherwise this account’s reasoning default applies.'
+                ? 'Same model retained. Compatible reasoning effort is kept. Otherwise this account’s reasoning default applies.'
                 : plan.strategy === 'default-model'
                   ? 'Your current model is unavailable here. This account supports your deployment’s default model, shown above.'
                   : 'Your current and deployment-default models are unavailable here. The first model in this account’s preferred order is shown above.'}
@@ -120,7 +120,7 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
         )}
         {preview.isError || switching.isError ? (
           <p role="alert" className="dshx:text-sm dshx:text-destructive">
-            {errorMessage(switching.error ?? preview.error, 'Account switching is unavailable. The Host may need updating; no new request was started.')}
+            {errorMessage(switching.error ?? preview.error, 'Account not switched and no request was sent. Update DSH and restart it, then retry.')}
           </p>
         ) : null}
         <DialogFooter>
@@ -129,8 +129,12 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
           </Button>
           {switching.isSuccess ? null : (
             <Button disabled={plan === undefined || preview.isError || preview.isFetching || switching.isPending} onClick={() => switching.mutate()}>
-              {switching.isPending ? <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin" /> : <ArrowLeftRightIcon className="dshx:size-4" />}Use this
-              account
+              {switching.isPending ? (
+                <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin dshx:motion-reduce:animate-none" />
+              ) : (
+                <ArrowLeftRightIcon className="dshx:size-4" />
+              )}
+              Use this account
             </Button>
           )}
         </DialogFooter>

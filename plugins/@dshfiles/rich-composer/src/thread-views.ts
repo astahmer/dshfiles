@@ -10,6 +10,13 @@
  * - {@link ThreadViewsModel.open}: ask the owner to open one view of one thread in the thread panel; returns whether
  *   an owner took the request (false in a profile without Rich Composer or without a thread panel).
  *
+ * The header's own More menu (Copy as Markdown, Download log, Open in…, Feedback: actions native DSH plugins register
+ * for the `sessionHeader` menu target) folds into that same `⋯`, so the header has one menu:
+ *
+ * - {@link ThreadViewsModel.headerMenu}: one opening of that menu as plain data, for the thread menu to list.
+ * - {@link ThreadViewsModel.hostHeaderMenu}: the thread menu says it lists those actions; while it does, the header
+ *   draws no second `⋯`. Without a host (a profile without the thread menu) the header keeps its own.
+ *
  * The registry lives on `globalThis` because every client bundle that imports this module gets its own copy.
  */
 
@@ -26,6 +33,31 @@ export interface ThreadViewOpenRequest {
   readonly viewId: string
 }
 
+/** One row of the thread header's More menu, as plain data. */
+export interface ThreadHeaderMenuAction {
+  readonly id: string
+  readonly label: string
+  readonly disabled?: boolean
+  /** The Host's icon key (`session-log-download.copy`…): a renderer maps it onto its own icon set. */
+  readonly iconKey?: string
+  /** An image the action carries instead of a glyph (an application's icon). */
+  readonly iconSrc?: string
+  readonly separatorBefore?: boolean
+  readonly children?: readonly ThreadHeaderMenuAction[]
+}
+
+/** One opening of that menu: read `actions`, `select` one, and `dispose` it when the menu closes. */
+export interface ThreadHeaderMenu {
+  readonly subscribe: (listener: () => void) => () => void
+  /** The current rows; the same array until they change. */
+  readonly actions: () => readonly ThreadHeaderMenuAction[]
+  readonly select: (id: string) => void
+  readonly dispose: () => void
+}
+
+/** Owner side: resolve the menu for one thread, or undefined while the Host's menu service is absent. */
+export type ThreadHeaderMenuResolver = (sessionId: string) => ThreadHeaderMenu | undefined
+
 const OPEN_EVENT = 'dshfiles-conversation:open-thread-view'
 const CHANGED_EVENT = 'dshfiles-conversation:thread-views-changed'
 const FACET_PREFIX = 'dshfiles-thread-view.'
@@ -34,6 +66,9 @@ interface Registry {
   views: readonly ThreadView[]
   /** How many thread-panel owners host the views as facets; with none, the header keeps its view switch. */
   hosts?: number
+  /** How many thread menus list the header's More actions; with none, the header keeps its own More button. */
+  headerMenuHosts?: number
+  headerMenu?: ThreadHeaderMenuResolver
 }
 
 declare global {
@@ -85,6 +120,47 @@ export class ThreadViewsModel {
       if (released) return
       released = true
       current.hosts = Math.max(0, (current.hosts ?? 1) - 1)
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(CHANGED_EVENT))
+    }
+  }
+
+  /** Whether a thread menu lists the header's More actions, so the header draws no second `⋯`. */
+  static headerMenuHosted(): boolean {
+    return (registry().headerMenuHosts ?? 0) > 0
+  }
+
+  /** Thread-menu side: start listing the header's More actions; returns the release. */
+  static hostHeaderMenu(): () => void {
+    const current = registry()
+    current.headerMenuHosts = (current.headerMenuHosts ?? 0) + 1
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(CHANGED_EVENT))
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      current.headerMenuHosts = Math.max(0, (current.headerMenuHosts ?? 1) - 1)
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(CHANGED_EVENT))
+    }
+  }
+
+  /** Whether an owner can resolve the header's More actions (Rich Composer is loaded). */
+  static headerMenuAvailable(): boolean {
+    return registry().headerMenu !== undefined
+  }
+
+  /** One opening of the header's More menu for a thread; undefined without an owner or its menu service. */
+  static headerMenu(sessionId: string): ThreadHeaderMenu | undefined {
+    return registry().headerMenu?.(sessionId)
+  }
+
+  /** Owner side: serve the header's More actions; returns the withdrawal. */
+  static provideHeaderMenu(resolver: ThreadHeaderMenuResolver): () => void {
+    const current = registry()
+    current.headerMenu = resolver
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(CHANGED_EVENT))
+    return () => {
+      if (current.headerMenu !== resolver) return
+      delete current.headerMenu
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(CHANGED_EVENT))
     }
   }

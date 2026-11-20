@@ -129,7 +129,7 @@ const JobState = (props: { readonly check: UpdateCheck; readonly restartAvailabl
       {job.sync === null || job.sync.pluginsRebuilt.length === 0 ? null : <p className={HINT}>Rebuilt: {job.sync.pluginsRebuilt.join(', ')}</p>}
       {job.state === 'done' && job.sync?.restartNeeded === true ? (
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" data-testid="update-dsh-restart">
-          <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">DSH needs a restart to load the new Host code. It waits for running turns.</p>
+          <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">Restart DSH to finish the update. It waits for running turns.</p>
           {props.restartAvailable ? (
             <Button disabled={props.waitingLabel !== null} onClick={() => RestartBridge.request('restart-when-idle')} size="sm" type="button" variant="outline">
               <RotateCcwIcon aria-hidden className="dshx:size-3.5" />
@@ -314,9 +314,19 @@ const UpdateStatusView = (props: StatusItemProps): JSX.Element | null => {
   )
 }
 
-/** The status strip's Update item: hidden while DSH is up to date; it opens Settings › Update DSH. */
+/**
+ * The status strip's Update notice: hidden while DSH is up to date; it opens Settings › Update DSH. It shares the
+ * restart item's seat (it is that item's fallback), so the strip holds one control for "update, then restart".
+ */
 export const UpdateStatusItem = (props: StatusItemProps): JSX.Element => (
   <PluginQueryProvider>
-    <UpdateStatusView {...props} />
+    <button
+      type="button"
+      // Empty while DSH is up to date: an empty button takes no room and no tab stop.
+      className="dshx-root dshx:inline-flex dshx:h-5 dshx:min-w-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:empty:hidden"
+      onClick={openUpdateDshSettings}
+    >
+      <UpdateStatusView {...props} />
+    </button>
   </PluginQueryProvider>
 )

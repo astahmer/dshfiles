@@ -1,7 +1,8 @@
 // The `conversation.composer.context` seat this plugin fills (b:ysaj).
 import type {} from '@dshfiles/rich-composer/conversation-contract'
+// The failure card's action row this plugin adds "Ask to fix" to, declared by the owned Chat fork.
+import type { TurnErrorActionOwnerProps } from '@dshfiles/chat/turn-error-action'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
-import type { ChatNodeViewProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { Composer, defineClientPlugin, useContract, useSettings } from '@dshfiles/dshx/client'
@@ -10,12 +11,12 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ActivityStrip } from './activity-strip.js'
 import { CompactionMeter } from './compaction-meter.js'
 import { ConversationTargets } from './conversation-targets.js'
-import { FailureActions, type FailureComposer } from './failure-actions.js'
+import { AskToFix, type FailureComposer } from './failure-actions.js'
 import { Failure } from './failure.js'
 import { PlanCard, type PlanCallFacts } from './plan-card.js'
 import { PlanPin } from './plan-pin.js'
 import { PlanProgress } from './plan-progress.js'
-import { agentPlanSettings } from './settings.js'
+import { agentPlanSettings, showsTodoStrip } from './settings.js'
 import { markOwnComponent, wrapSlotEntries } from './slot-wrap.js'
 import { agentTargets, useTarget, type AgentTargets } from './targets.js'
 
@@ -97,32 +98,28 @@ const createViews = (targets: AgentTargets<SessionId>) => {
       )
     }
 
-  const wrapFailure = (kind: 'turn-error' | 'model-retry', Native: ComponentType<ChatNodeViewProps>): ComponentType<ChatNodeViewProps> =>
-    function AgentPlanFailure(props: ChatNodeViewProps): ReactNode {
+  /** The native To-dos strip above the composer, shown only where the pinned step chip does not already show the plan. */
+  const wrapTodoStrip = (Native: ComponentType<SessionSeatProps>): ComponentType<SessionSeatProps> =>
+    function AgentPlanTodoStrip(props: SessionSeatProps): ReactNode {
       const settings = useSettings(agentPlanSettings).value
-      const composer = useContract(Composer)
-      const sessionId = props.sessionId
-      const actions = useMemo<FailureComposer | undefined>(() => {
-        if (composer.status !== 'active') return undefined
-        const service = composer.value
-        return {
-          retry: text => service.setText({ sessionId, text }) && service.focus({ sessionId }),
-          askToFix: text => service.insert({ sessionId, text }) && service.focus({ sessionId }),
-        }
-      }, [composer, sessionId])
-      const native = createElement(Native, props)
-      if (!on(settings, 'failureCard')) return native
-      const data: unknown = props.node.data
-      const facts = kind === 'turn-error' ? Failure.fromTurnError(data) : Failure.fromModelRetry(data)
-      return (
-        <div data-dshfiles-agent-failure-frame="">
-          {native}
-          <FailureActions actions composer={actions} facts={facts} />
-        </div>
-      )
+      return showsTodoStrip(settings) ? createElement(Native, props) : null
     }
 
-  return { wrapTodoView, PlanPinSeat, ActivitySeat, CompactionSeat, beside, wrapFailure }
+  /** "Ask to fix" in the failure card's action row; the card itself (sentence, Retry, Details) is Chat's. */
+  const AskToFixSeat = (props: TurnErrorActionOwnerProps & { readonly sessionId: SessionId }): ReactNode => {
+    const settings = useSettings(agentPlanSettings).value
+    const composer = useContract(Composer)
+    const sessionId = props.sessionId
+    const actions = useMemo<FailureComposer | undefined>(() => {
+      if (composer.status !== 'active') return undefined
+      const service = composer.value
+      return { askToFix: text => service.insert({ sessionId, text }) && service.focus({ sessionId }) }
+    }, [composer, sessionId])
+    if (!on(settings, 'failureCard')) return null
+    return <AskToFix composer={actions} facts={Failure.fromTurnError(props)} />
+  }
+
+  return { wrapTodoView, wrapTodoStrip, PlanPinSeat, ActivitySeat, CompactionSeat, beside, AskToFixSeat }
 }
 
 export default defineClientPlugin({
@@ -152,6 +149,16 @@ export default defineClientPlugin({
       }),
     )
 
+    // The To-dos strip (rich-composer's `todo` dock entry) repeats the pinned step: it gives way while the pin is on.
+    api.lifecycle.onDispose(
+      wrapSlotEntries<SessionSeatProps>({
+        slots: ctx.slots,
+        slot: 'conversation.input.dock',
+        matches: entry => entry.options.id === 'todo' && notOurs(entry),
+        wrap: Native => api.bind(views.wrapTodoStrip(Native)),
+      }),
+    )
+
     // Composer seats are single slots held by native controls (plan mode, voice input): draw ours beside the occupant.
     for (const [slot, Seat] of [
       ['conversation.input.plan', PlanPinSeat],
@@ -168,16 +175,10 @@ export default defineClientPlugin({
     // Inside the context meter's panel (rich-composer, b:ysaj): the meter line keeps one context item.
     api.ui.register({ name: 'conversation.composer.context', id: 'agent-plan-compaction', order: 5 }, api.bind(views.CompactionSeat))
 
-    // Failure rows: the native row stays as drawn; the retry count and actions go under it.
-    for (const kind of ['turn-error', 'model-retry'] as const) {
-      api.lifecycle.onDispose(
-        wrapSlotEntries<ChatNodeViewProps>({
-          slots: ctx.slots,
-          slot: 'conversation.chat.node',
-          matches: entry => entry.options.key === kind && notOurs(entry),
-          wrap: Native => api.bind(views.wrapFailure(kind, Native)),
-        }),
-      )
-    }
+    // The failure card is Chat's: one sentence, one Retry. "Ask to fix" joins its action row, after Retry.
+    api.ui.register(
+      { name: 'conversation.chat.turnErrorAction', id: 'agent-plan-ask-to-fix', order: 0, inject: sessionId => ({ sessionId }) },
+      api.bind(views.AskToFixSeat),
+    )
   },
 })

@@ -228,7 +228,7 @@ export const EndpointSection = (): JSX.Element => {
       ) : null}
       {query.isError ? (
         <div role="alert" className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
-          <p className="dshx:m-0">The MCP endpoint Host plugin is not running. Restart DSH after installing it, then retry.</p>
+          <p className="dshx:m-0">The MCP endpoint is not running. Restart DSH, then retry.</p>
           <Button type="button" size="sm" variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
             Retry
           </Button>

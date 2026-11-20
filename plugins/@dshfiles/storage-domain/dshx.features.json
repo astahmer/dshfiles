@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "lazy-domain-hydration",
-      "title": "Hydrate a per-record domain one record at a time",
-      "summary": "Owned fork of the native storage domain form: a per-record domain whose records are disposable derived data indexes document keys at open and reads one record per table read behind a 64-row LRU, instead of materializing the whole unit into JS heap at open. The measured owner is session_projcache, whose ~2.8k checkpoints cost 252 MB of a 610 MB Host heap before this fork. Reads stay synchronous and schema-validated, writes stay durable before memory changes, and every domain that does not qualify (single layout, or per-record over authoritative records) keeps the upstream open-time loadAll. It also adds `KvTable.putMany`: a multi-record write that is ONE durable publish when the backend publishes the unit as one document (a `single`-layout unit's `putRecords`), instead of one full-document rewrite per record.",
+      "title": "Load stored records one at a time",
+      "summary": "Stored records load one at a time when read, instead of all at once at startup.",
+      "details": "Owned fork of the native storage domain form: a per-record domain whose records are disposable derived data indexes document keys at open and reads one record per table read behind a 64-row LRU, instead of materializing the whole unit into JS heap at open. The measured owner is session_projcache, whose ~2.8k checkpoints cost 252 MB of a 610 MB Host heap before this fork. Reads stay synchronous and schema-validated, writes stay durable before memory changes, and every domain that does not qualify (single layout, or per-record over authoritative records) keeps the upstream open-time loadAll. It also adds `KvTable.putMany`: a multi-record write that is ONE durable publish when the backend publishes the unit as one document (a `single`-layout unit's `putRecords`), instead of one full-document rewrite per record.",
       "surfaces": ["host", "storage"],
       "surface": "infrastructure",
       "destination": "none",

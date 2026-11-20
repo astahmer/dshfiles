@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PaletteApi } from './palette-api.js'
 import type { PaletteActionContext } from './palette-contract.js'
 import { ThreadPalette, type ThreadPaletteCopy } from './thread-palette.js'
@@ -536,5 +536,33 @@ describe('ThreadPalette thread actions and keycaps', () => {
     const newThread = options.find(option => option.textContent?.includes('New thread'))
     expect(newThread?.textContent).toContain('⌘⇧O')
     for (const dispose of disposers) dispose()
+  })
+})
+
+describe('ThreadPalette on a phone (unslop phone 27)', () => {
+  it('is a full-screen search sized to the visual viewport, with no key legend', async () => {
+    // The software keyboard leaves 508px of an 844px screen; the palette ends where it starts.
+    const listeners = new Map<string, () => void>()
+    const viewport = {
+      height: 508,
+      offsetTop: 0,
+      addEventListener: (type: string, listener: () => void) => listeners.set(type, listener),
+      removeEventListener: (type: string) => listeners.delete(type),
+    }
+    vi.stubGlobal('visualViewport', viewport)
+    mount()
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.style.getPropertyValue('--palette-height')).toBe('508px')
+    for (const phoneClass of ['dshx:phone:top-[var(--palette-top,0px)]', 'dshx:phone:h-[var(--palette-height,100dvh)]', 'dshx:phone:max-w-none!', 'dshx:phone:rounded-none']) {
+      expect(dialog.className).toContain(phoneClass)
+    }
+    expect(dialog.querySelector('[data-slot="command-list"]')?.className).toContain('dshx:phone:max-h-none')
+    viewport.height = 420
+    act(() => listeners.get('resize')?.())
+    expect(dialog.style.getPropertyValue('--palette-height')).toBe('420px')
+    // The ↑ ↓ / Enter / Esc legend is marked for the kit's touch rule, which hides it on a coarse pointer.
+    expect(screen.getByText('Navigate').closest('[data-key-legend]')).not.toBeNull()
+    // The prefix hint wraps under the tabs on a phone instead of truncating to "Type ? f…".
+    expect(screen.getByText('Type ? for prefixes').className).toContain('dshx:phone:basis-full')
   })
 })

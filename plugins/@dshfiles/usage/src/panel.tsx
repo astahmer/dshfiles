@@ -16,6 +16,7 @@ import * as Schema from 'effect/Schema'
 import { useState, useSyncExternalStore } from 'react'
 import { purposeSchema, usageApi } from './api.js'
 import { UsageCharts } from './charts.js'
+import { USAGE_PAGE_DESCRIPTION, indexedLogsLabel } from './page-copy.js'
 import { UsageFoldModel, type RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { RequestLog } from './request-log.js'
@@ -184,24 +185,16 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
       ? 'Connecting…'
       : status.indexing
         ? 'Indexing thread logs…'
-        : `${status.indexedFiles.toLocaleString()} logs indexed${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, now, relativeTime)}`}`
-  const indexError = status?.lastError == null ? null : `Indexing failed: ${status.lastError}`
-  const refreshError = refresh.isError ? errorMessage(refresh.error, 'Re-indexing failed.') : null
+        : `${indexedLogsLabel(status.indexedFiles)}${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, now, relativeTime)}`}`
+  const indexError = status?.lastError == null ? null : `Indexing failed. Re-index to retry. ${status.lastError}`
+  const refreshError = refresh.isError ? errorMessage(refresh.error, 'Re-indexing failed. Retry.') : null
 
   return (
     <Page
       scroll
       className="dshx:bg-background dshx:text-foreground"
       heading="Usage"
-      description={
-        <>
-          Cost and requests from thread logs, side calls included, beside each account's quota. Costs are list-price estimates from the models.dev price catalog
-          {status?.pricingFetchedAt == null
-            ? ' (no catalog cached yet)'
-            : ` (updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)})`}
-          ; subscription traffic is priced as if it were metered.
-        </>
-      }
+      description={USAGE_PAGE_DESCRIPTION}
       meta={
         <span aria-live="polite" className="dshx:text-xs dshx:text-muted-foreground">
           {indexState}
@@ -228,7 +221,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
             <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
               <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
               <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
-                Try again
+                Retry
               </Button>
             </AlertDescription>
           </Alert>
@@ -296,8 +289,8 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
             </ToggleGroup>
           </div>
 
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5" role="group" aria-label="Purpose">
-            <span className="dshx:text-xs dshx:text-muted-foreground">Purpose</span>
+          <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:overflow-x-auto" role="group" aria-label="Purpose">
+            <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">Purpose</span>
             <Button
               size="xs"
               variant={purposes === undefined ? 'secondary' : 'ghost'}
@@ -347,6 +340,11 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
               bucket={preferences.bucket}
               groupBy={preferences.groupBy}
               onGroupBy={groupBy => update({ groupBy })}
+              pricingNote={`List-price estimate from the models.dev price catalog (${
+                status?.pricingFetchedAt == null
+                  ? 'no catalog cached yet'
+                  : `updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)}`
+              }). Subscription traffic is priced as if it were metered.`}
               onShowRequests={(search, groupBy) => {
                 if (groupBy === 'purpose') {
                   const purpose = Schema.decodeUnknownOption(purposeSchema)(search)

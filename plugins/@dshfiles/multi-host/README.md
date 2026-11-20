@@ -221,7 +221,7 @@ and `multi_host_delegate` work on the other while both are online.
 2. Make a pairing code there: **New pairing code** (`multi_host_link_offer`).
    It works once, for ten minutes, and comes with a pairing link
    `http://<address>:3459/link#code=ABCD-EFGH-JKMN`.
-3. On the other machine, **Hosts → Pair a machine**: paste the link
+3. On the other machine, **Hosts → Link this machine → Pair a machine**: paste the link
    (`multi_host_link_pair { link }`). The first machine becomes a host there.
    **Link back** (on by default; `linkBack: true`) has it pair the other way
    at once, which needs linking on here too and one of these addresses reachable

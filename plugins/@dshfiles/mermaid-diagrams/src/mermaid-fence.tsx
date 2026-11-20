@@ -70,7 +70,7 @@ export const reduceCard = (state: CardState, event: CardEvent): CardState => {
   }
 }
 
-const messageOf = (error: unknown): string => (error instanceof Error && error.message !== '' ? error.message : 'The diagram could not be rendered.')
+const messageOf = (error: unknown): string => (error instanceof Error && error.message !== '' ? error.message : 'The diagram could not be drawn. Check its syntax.')
 
 /** pele colors a diagram through these; a standalone image cannot inherit them, so the expanded copy inlines them. */
 const PELE_VARIABLES = [

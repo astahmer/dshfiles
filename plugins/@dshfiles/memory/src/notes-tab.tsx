@@ -52,6 +52,7 @@ import { noteStatusBadge, noteStatusLabels, originLabels, originShortLabels, Pan
 import { noteForgetMachine } from './note-forget-machine.js'
 import { useNoteEditor } from './use-note-editor.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
+import { MemoryCopy } from './memory-copy.ts'
 
 const noteTypeOptions: readonly { readonly value: MemoryNoteType | ''; readonly label: string }[] = [
   { value: '', label: 'All types' },
@@ -635,142 +636,147 @@ export const NotesTab = (props: {
     forgetSnapshot.context.failure === null
       ? null
       : forgetSnapshot.context.failure.kind === 'partial'
-        ? `${String(forgetSnapshot.context.failure.forgotten)} forgotten; ${String(forgetSnapshot.context.failure.failed)} could not be forgotten.`
+        ? `${String(forgetSnapshot.context.failure.forgotten)} forgotten. ${String(forgetSnapshot.context.failure.failed)} could not be forgotten: try Forget selected again.`
         : errorMessage(forgetSnapshot.context.failure.error, 'The selected notes could not be forgotten. Try Forget selected again.')
   const forgetPending = forgetSnapshot.matches('forgetting')
   const confirmingForget = forgetSnapshot.matches('confirming') || forgetPending
   const selectMode = !forgetSnapshot.matches('browsing')
   const filtered = search.trim().length > 0 || type !== '' || status !== 'valid' || origin !== ''
+  const noteTotal = counts.data === undefined ? 0 : counts.data.active + counts.data.archived + counts.data.superseded + counts.data.forgotten
+  const hasNotes = filtered || noteTotal > 0 || visibleNotes.length > 0
   return (
     <TooltipProvider delayDuration={500}>
       <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:gap-4 dshx:overflow-hidden dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:overflow-auto dshx:@max-[64rem]:flex-col dshx:@max-[64rem]:overflow-auto">
         <section className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card/40 dshx:@max-[64rem]:h-[28rem] dshx:@max-[64rem]:flex-none">
-          <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:border-border dshx:p-3">
-            <div className="dshx:flex dshx:items-center dshx:gap-2">
-              <div className="dshx:flex dshx:h-9 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:px-2.5">
-                <SearchIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-                <input
-                  ref={searchRef}
-                  aria-label="Search memories"
-                  placeholder='Search memories (e.g. "jj workspace", "e2e tests", "plugin architecture")'
-                  value={search}
-                  onChange={event => setSearch(event.currentTarget.value)}
-                  className="dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:bg-transparent dshx:text-sm dshx:outline-none dshx:placeholder:text-muted-foreground"
-                />
-                <kbd className="dshx:rounded dshx:border dshx:border-border dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">/</kbd>
-              </div>
-              <div className="dshx:flex dshx:items-center dshx:gap-0.5">
-                <Button
-                  variant={view === 'list' ? 'secondary' : 'ghost'}
-                  size="icon-sm"
-                  aria-label="List view"
-                  aria-pressed={view === 'list'}
-                  onClick={() => setView('list')}
-                >
-                  <ListIcon />
-                </Button>
-                <Button
-                  variant={view === 'grid' ? 'secondary' : 'ghost'}
-                  size="icon-sm"
-                  aria-label="Grid view"
-                  aria-pressed={view === 'grid'}
-                  onClick={() => setView('grid')}
-                >
-                  <LayoutGridIcon />
-                </Button>
-              </div>
-            </div>
-            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
-              {filterSelect({
-                label: 'Filter by type',
-                value: type === '' ? 'all' : type,
-                display: type === '' ? 'Type' : PanelFormat.noteToneOf(type).label,
-                onChange: value => setType(noteTypeOf(value)),
-                children: noteTypeOptions.map(option => (
-                  <SelectItem key={option.value === '' ? 'all' : option.value} value={option.value === '' ? 'all' : option.value}>
-                    {option.label}
-                  </SelectItem>
-                )),
-              })}
-              {filterSelect({
-                label: 'Filter by status',
-                value: status,
-                display: status === 'valid' ? 'Status' : status === 'all' ? 'All statuses' : noteStatusLabels[status],
-                onChange: value => setStatus(noteStatusOf(value)),
-                children: [
-                  <SelectItem key="all" value="all">
-                    All statuses
-                  </SelectItem>,
-                  ...(['valid', 'superseded', 'forgotten', 'archived'] as const).map(value => (
-                    <SelectItem key={value} value={value}>
-                      {noteStatusLabels[value]}
-                    </SelectItem>
-                  )),
-                ],
-              })}
-              {filterSelect({
-                label: 'Filter by source',
-                value: origin === '' ? 'all' : origin,
-                display: origin === '' ? 'Source' : originShortLabels[origin],
-                onChange: value => setOrigin(noteOriginOf(value)),
-                children: [
-                  <SelectItem key="all" value="all">
-                    All sources
-                  </SelectItem>,
-                  ...(['user-requested', 'agent', 'panel'] as const).map(value => (
-                    <SelectItem key={value} value={value}>
-                      {originShortLabels[value]}
-                    </SelectItem>
-                  )),
-                ],
-              })}
-              {filterSelect({
-                label: 'Sort notes',
-                value: sort,
-                display: sort === 'newest' ? 'Newest' : sort === 'oldest' ? 'Oldest' : 'Most cited',
-                onChange: value => setSort(noteSortOf(value)),
-                children: [
-                  <SelectItem key="newest" value="newest">
-                    Newest
-                  </SelectItem>,
-                  <SelectItem key="oldest" value="oldest">
-                    Oldest
-                  </SelectItem>,
-                  <SelectItem key="cited" value="cited">
-                    Most cited
-                  </SelectItem>,
-                ],
-              })}
-              <span className="dshx:flex-1" />
-              <Button size="xs" variant="outline" disabled={review.isPending} onClick={() => review.mutate(undefined)}>
-                <SparklesIcon /> {review.isPending ? 'Reviewing…' : 'Review with Jev'}
-              </Button>
-              <Tooltip>
-                <TooltipTrigger asChild>
+          {/* Search, filters and counters have nothing to act on until a note exists. */}
+          {!hasNotes ? null : (
+            <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:border-border dshx:p-3">
+              <div className="dshx:flex dshx:items-center dshx:gap-2">
+                <div className="dshx:flex dshx:h-9 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:px-2.5">
+                  <SearchIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+                  <input
+                    ref={searchRef}
+                    aria-label="Search memories"
+                    placeholder="Search memories"
+                    value={search}
+                    onChange={event => setSearch(event.currentTarget.value)}
+                    className="dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:bg-transparent dshx:text-sm dshx:outline-none dshx:placeholder:text-muted-foreground"
+                  />
+                  <kbd className="dshx:rounded dshx:border dshx:border-border dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">/</kbd>
+                </div>
+                <div className="dshx:flex dshx:items-center dshx:gap-0.5">
                   <Button
-                    variant={selectMode ? 'secondary' : 'ghost'}
+                    variant={view === 'list' ? 'secondary' : 'ghost'}
                     size="icon-sm"
-                    aria-label="Select notes"
-                    aria-pressed={selectMode}
-                    onClick={() => {
-                      sendForget({ type: 'select.mode', on: !selectMode })
-                    }}
+                    aria-label="List view"
+                    aria-pressed={view === 'list'}
+                    onClick={() => setView('list')}
                   >
-                    <SquareCheckBigIcon />
+                    <ListIcon />
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent>Select notes</TooltipContent>
-              </Tooltip>
+                  <Button
+                    variant={view === 'grid' ? 'secondary' : 'ghost'}
+                    size="icon-sm"
+                    aria-label="Grid view"
+                    aria-pressed={view === 'grid'}
+                    onClick={() => setView('grid')}
+                  >
+                    <LayoutGridIcon />
+                  </Button>
+                </div>
+              </div>
+              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
+                {filterSelect({
+                  label: 'Filter by type',
+                  value: type === '' ? 'all' : type,
+                  display: type === '' ? 'Type' : PanelFormat.noteToneOf(type).label,
+                  onChange: value => setType(noteTypeOf(value)),
+                  children: noteTypeOptions.map(option => (
+                    <SelectItem key={option.value === '' ? 'all' : option.value} value={option.value === '' ? 'all' : option.value}>
+                      {option.label}
+                    </SelectItem>
+                  )),
+                })}
+                {filterSelect({
+                  label: 'Filter by status',
+                  value: status,
+                  display: status === 'valid' ? 'Status' : status === 'all' ? 'All statuses' : noteStatusLabels[status],
+                  onChange: value => setStatus(noteStatusOf(value)),
+                  children: [
+                    <SelectItem key="all" value="all">
+                      All statuses
+                    </SelectItem>,
+                    ...(['valid', 'superseded', 'forgotten', 'archived'] as const).map(value => (
+                      <SelectItem key={value} value={value}>
+                        {noteStatusLabels[value]}
+                      </SelectItem>
+                    )),
+                  ],
+                })}
+                {filterSelect({
+                  label: 'Filter by source',
+                  value: origin === '' ? 'all' : origin,
+                  display: origin === '' ? 'Source' : originShortLabels[origin],
+                  onChange: value => setOrigin(noteOriginOf(value)),
+                  children: [
+                    <SelectItem key="all" value="all">
+                      All sources
+                    </SelectItem>,
+                    ...(['user-requested', 'agent', 'panel'] as const).map(value => (
+                      <SelectItem key={value} value={value}>
+                        {originShortLabels[value]}
+                      </SelectItem>
+                    )),
+                  ],
+                })}
+                {filterSelect({
+                  label: 'Sort notes',
+                  value: sort,
+                  display: sort === 'newest' ? 'Newest' : sort === 'oldest' ? 'Oldest' : 'Most cited',
+                  onChange: value => setSort(noteSortOf(value)),
+                  children: [
+                    <SelectItem key="newest" value="newest">
+                      Newest
+                    </SelectItem>,
+                    <SelectItem key="oldest" value="oldest">
+                      Oldest
+                    </SelectItem>,
+                    <SelectItem key="cited" value="cited">
+                      Most cited
+                    </SelectItem>,
+                  ],
+                })}
+                <span className="dshx:flex-1" />
+                <Button size="xs" variant="outline" disabled={review.isPending} onClick={() => review.mutate(undefined)}>
+                  <SparklesIcon /> {review.isPending ? 'Reviewing…' : 'Review with Jev'}
+                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={selectMode ? 'secondary' : 'ghost'}
+                      size="icon-sm"
+                      aria-label="Select notes"
+                      aria-pressed={selectMode}
+                      onClick={() => {
+                        sendForget({ type: 'select.mode', on: !selectMode })
+                      }}
+                    >
+                      <SquareCheckBigIcon />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Select notes</TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-2 dshx:pt-0.5">
+                <span className="dshx:text-sm dshx:font-semibold">{PanelFormat.formatCount(visibleNotes.length)} memories</span>
+                <span className="dshx:flex-1" />
+                <span className="dshx:text-2xs dshx:text-muted-foreground">
+                  Active {PanelFormat.formatCount(counts.data?.active ?? 0)} · Archived {PanelFormat.formatCount(counts.data?.archived ?? 0)} · Superseded{' '}
+                  {PanelFormat.formatCount(counts.data?.superseded ?? 0)} · Forgotten {PanelFormat.formatCount(counts.data?.forgotten ?? 0)}
+                </span>
+              </div>
             </div>
-            <div className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-2 dshx:pt-0.5">
-              <span className="dshx:text-sm dshx:font-semibold">{PanelFormat.formatCount(visibleNotes.length)} memories</span>
-              <span className="dshx:flex-1" />
-              <span className="dshx:text-2xs dshx:text-muted-foreground">
-                Active {PanelFormat.formatCount(counts.data?.active ?? 0)} · Archived {PanelFormat.formatCount(counts.data?.archived ?? 0)} · Superseded{' '}
-                {PanelFormat.formatCount(counts.data?.superseded ?? 0)} · Forgotten {PanelFormat.formatCount(counts.data?.forgotten ?? 0)}
-              </span>
-            </div>
-          </div>
+          )}
           {selectMode && orderedIds.length > 0 ? (
             <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-4 dshx:py-1.5 dshx:text-xs">
               <input
@@ -846,11 +852,7 @@ export const NotesTab = (props: {
               {errorMessage(notes.error, 'Notes are unavailable. Switch to another tab and back to reload them.')}
             </p>
           ) : null}
-          {notes.isSuccess && visibleNotes.length === 0 ? (
-            <EmptyState>
-              {filtered ? 'No notes match these filters.' : 'No notes yet. Agents add them with memory_note when you correct or decide something.'}
-            </EmptyState>
-          ) : null}
+          {notes.isSuccess && visibleNotes.length === 0 ? <EmptyState>{filtered ? 'No notes match these filters.' : MemoryCopy.emptyNotes}</EmptyState> : null}
           <div
             className={cn(
               'dshx:min-h-0 dshx:flex-1 dshx:overflow-auto',

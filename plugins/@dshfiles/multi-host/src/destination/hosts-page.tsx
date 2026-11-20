@@ -13,6 +13,13 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -28,6 +35,7 @@ import {
   EyeOffIcon,
   GripVerticalIcon,
   LinkIcon,
+  MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -36,18 +44,20 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useState, type ReactNode } from 'react'
+import { Fragment, useRef, useState, type ReactNode } from 'react'
 import { multiHostApi, type HostSummary, type ResourcePoolEntry, type RuntimeSummary } from '../api.js'
 import { remoteDirectoryPicker } from './remote-folders.js'
 import { HostDialog, hostState, type HostDraft } from './hosts-dialog.js'
 import { moveHostId, shiftHostId } from './host-order.js'
+import { hostRowActions, type HostRowVerb } from './host-row-actions.js'
 import { CheckoutSyncDialog } from './checkout-sync-dialog.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
 import { ConnectionDiagnostics } from './connection-diagnostics.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
 import { FleetUpdateDialog } from './fleet-update-dialog.js'
 import { hostTargetLabel } from './host-target.js'
-import { LinkThisMachine, PairMachineDialog } from './link-machines.js'
+import { HostsHeader } from './hosts-header.js'
+import { LinkThisMachineDialog, PairMachineDialog } from './link-machines.js'
 import { linkBackNeedsPlainHttpConsent } from './link-urls.js'
 import { DisconnectGrace } from './disconnect-grace.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
@@ -57,13 +67,13 @@ type DirectoryData = { readonly hosts: readonly HostSummary[]; readonly runtimes
 const blankDraft: HostDraft = { name: '', sshTarget: '', remoteHome: '' }
 
 const failure = (result: { readonly ok: boolean; readonly code?: string; readonly message?: string }): Error =>
-  new Error(result.message === undefined ? 'The host request failed.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
+  new Error(result.message === undefined ? 'The host did not answer. Check it is running, then retry.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
 
 const ResourceUsage = (props: { readonly hostName: string; readonly resource: ResourcePoolEntry }) => {
   if (!props.resource.probe.ok) {
     return (
       <p data-testid={`host-resources-${props.resource.hostId}`} className="dshx:text-xs dshx:text-muted-foreground">
-        Resource data unavailable
+        Load and memory are unavailable. Reconnect this host to read them.
       </p>
     )
   }
@@ -101,31 +111,8 @@ const ResourceUsage = (props: { readonly hostName: string; readonly resource: Re
   )
 }
 
-/** An icon-only row control with a kit tooltip instead of a native `title`. */
-const IconAction = (props: {
-  readonly label: string
-  readonly hint: string
-  readonly onClick: () => void
-  readonly disabled?: boolean
-  readonly destructive?: boolean
-  readonly children: ReactNode
-}) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <Button
-        size="icon"
-        variant={props.destructive === true ? 'destructive' : 'ghost'}
-        className="dshx:size-7"
-        aria-label={props.label}
-        disabled={props.disabled === true}
-        onClick={props.onClick}
-      >
-        {props.children}
-      </Button>
-    </TooltipTrigger>
-    <TooltipContent>{props.hint}</TooltipContent>
-  </Tooltip>
-)
+/** Menu verbs that open a dialog or a picker, which then owns keyboard focus. */
+const DIALOG_VERBS: ReadonlySet<HostRowVerb> = new Set(['clone', 'sync', 'add-folder', 'link-back', 'edit', 'remove'])
 
 /** Hosts on the one status vocabulary: a healthy or idle host is quiet, only a failed one is coloured. */
 const hostWorkStatus = (tone: 'online' | 'idle' | 'error'): WorkStatus => (tone === 'error' ? 'failed' : 'idle')
@@ -160,7 +147,7 @@ const HostRow = (props: {
   const [popupBlocked, setPopupBlocked] = useState(false)
   const reconnect = useMutation({
     mutationFn: async () => {
-      if (runtime === undefined) throw new Error('This host has no runtime. Edit the host to set its remote DSH home, then reconnect.')
+      if (runtime === undefined) throw new Error('This host is not set up yet. Edit it to set its DSH home, then reconnect.')
       const result = await api.runtimeReconnect({ runtimeId: runtime.id })
       if (!result.ok) throw failure(result)
     },
@@ -168,7 +155,7 @@ const HostRow = (props: {
   })
   const remoteView = useMutation({
     mutationFn: async ({ action, tab }: { readonly action: 'copy' | 'open'; readonly tab?: Window }) => {
-      if (runtime === undefined) throw new Error('This host has no runtime. Edit the host to set its remote DSH home, then reconnect.')
+      if (runtime === undefined) throw new Error('This host is not set up yet. Edit it to set its DSH home, then reconnect.')
       if (action === 'open' && tab === undefined) throw new Error('Allow pop-ups to open the remote host.')
       const view = await api.runtimeOpenView({ runtimeId: runtime.id })
       if (action === 'open') {
@@ -186,7 +173,7 @@ const HostRow = (props: {
   const [plainHttpConsent, setPlainHttpConsent] = useState(false)
   const linkBack = useMutation({
     mutationFn: async (input: { readonly allowPlainHttp: boolean }) => {
-      if (runtime === undefined) throw new Error('This host has no runtime. Edit the host to set its remote DSH home, then reconnect.')
+      if (runtime === undefined) throw new Error('This host is not set up yet. Edit it to set its DSH home, then reconnect.')
       const result = await api.linkBack({ runtimeId: runtime.id, allowPlainHttp: input.allowPlainHttp })
       if (!result.ok) throw failure(result)
       return result
@@ -233,6 +220,37 @@ const HostRow = (props: {
       return
     }
     remoteView.mutate({ action: 'open', tab })
+  }
+  const runDiagnose = (): void => {
+    copyDiagnostics.reset()
+    diagnose.mutate()
+  }
+  const actions = hostRowActions({ kind: host.connector.kind, failed: runtime?.lastError !== undefined })
+  const afterClose = useRef<(() => void) | null>(null)
+  const noRuntime = runtime === undefined
+  const menuItems: Record<HostRowVerb, { readonly label: string; readonly icon: ReactNode; readonly onSelect: () => void; readonly disabled?: boolean }> = {
+    open: { label: 'Open host', icon: <ExternalLinkIcon />, onSelect: openHost, disabled: noRuntime || remoteView.isPending },
+    'copy-link': {
+      label: 'Copy host link',
+      icon: <CopyIcon />,
+      onSelect: () => remoteView.mutate({ action: 'copy' }),
+      disabled: noRuntime || remoteView.isPending,
+    },
+    diagnose: { label: 'Diagnose', icon: <SearchIcon />, onSelect: runDiagnose, disabled: diagnose.isPending },
+    clone: { label: 'Clone project', icon: <PlusIcon />, onSelect: props.onCloneProject, disabled: noRuntime },
+    sync: { label: 'Sync checkout', icon: <RefreshCwIcon />, onSelect: props.onSyncCheckout },
+    'add-folder': { label: 'Add folder', icon: <PlusIcon />, onSelect: props.onAddProject, disabled: noRuntime },
+    'link-back': { label: 'Link back', icon: <LinkIcon />, onSelect: startLinkBack, disabled: noRuntime || linkBack.isPending },
+    reconnect: { label: 'Reconnect', icon: <RefreshCwIcon />, onSelect: () => reconnect.mutate(), disabled: noRuntime || reconnect.isPending },
+    edit: { label: 'Edit', icon: <PencilIcon />, onSelect: props.onEdit },
+    hide: {
+      label: host.hidden ? 'Show in the destination picker' : 'Hide from the destination picker',
+      icon: host.hidden ? <EyeIcon /> : <EyeOffIcon />,
+      onSelect: () => props.onHide(!host.hidden),
+    },
+    'move-up': { label: 'Move up', icon: <ChevronUpIcon />, onSelect: () => props.onMove('up'), disabled: props.index === 0 },
+    'move-down': { label: 'Move down', icon: <ChevronDownIcon />, onSelect: () => props.onMove('down'), disabled: props.index === props.count - 1 },
+    remove: { label: 'Remove…', icon: <Trash2Icon />, onSelect: () => setConfirming(true) },
   }
   const target = (
     <Badge variant="outline" className="dshx:shrink-0 dshx:font-mono dshx:text-2xs">
@@ -342,7 +360,7 @@ const HostRow = (props: {
             <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-destructive">
               {errorMessage(reconnect.error, 'Reconnect failed.')}
               <Button size="xs" variant="outline" onClick={() => reconnect.mutate()} disabled={reconnect.isPending}>
-                Try again
+                Retry
               </Button>
             </span>
           ) : null}
@@ -371,7 +389,7 @@ const HostRow = (props: {
             <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-destructive">
               {errorMessage(linkBack.error, 'Link back failed.')}
               <Button size="xs" variant="outline" onClick={startLinkBack} disabled={linkBack.isPending}>
-                Try again
+                Retry
               </Button>
             </span>
           ) : null}
@@ -389,115 +407,98 @@ const HostRow = (props: {
       }
       trailing={
         <>
-          <IconAction label={`Move ${host.name} up`} hint="Move up" disabled={props.index === 0} onClick={() => props.onMove('up')}>
-            <ChevronUpIcon className="dshx:size-3.5" />
-          </IconAction>
-          <IconAction label={`Move ${host.name} down`} hint="Move down" disabled={props.index === props.count - 1} onClick={() => props.onMove('down')}>
-            <ChevronDownIcon className="dshx:size-3.5" />
-          </IconAction>
-          <IconAction
-            label={host.hidden ? `Show ${host.name}` : `Hide ${host.name}`}
-            hint={host.hidden ? 'Show in the destination picker' : 'Hide from the destination picker; keeps its records'}
-            onClick={() => props.onHide(!host.hidden)}
-          >
-            {host.hidden ? <EyeOffIcon className="dshx:size-3.5" /> : <EyeIcon className="dshx:size-3.5" />}
-          </IconAction>
-          {host.connector.kind === 'ssh' ? (
-            <>
-              <Button size="sm" variant="outline" disabled={runtime === undefined || remoteView.isPending} onClick={openHost}>
-                <ExternalLinkIcon className="dshx:size-3.5" />
-                Open host
+          {reconnect.isPending || linkBack.isPending ? <Spinner aria-label={`Working on ${host.name}`} className="dshx:size-3.5" /> : null}
+          {actions.inline === 'open' ? (
+            <Button size="sm" variant="outline" disabled={runtime === undefined || remoteView.isPending} onClick={openHost}>
+              <ExternalLinkIcon className="dshx:size-3.5" />
+              Open host
+            </Button>
+          ) : actions.inline === 'diagnose' ? (
+            <Button size="sm" variant="outline" aria-label={`Diagnose ${host.name}`} disabled={diagnose.isPending} onClick={runDiagnose}>
+              {diagnose.isPending ? <Spinner className="dshx:size-3.5" /> : <SearchIcon className="dshx:size-3.5" />}
+              Diagnose
+            </Button>
+          ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className="dshx:size-7" aria-label={`Actions for ${host.name}`}>
+                <MoreHorizontalIcon className="dshx:size-4" />
               </Button>
-              <IconAction
-                label={`Copy ${host.name} link`}
-                hint="Copy remote host link"
-                disabled={runtime === undefined || remoteView.isPending}
-                onClick={() => remoteView.mutate({ action: 'copy' })}
-              >
-                <CopyIcon className="dshx:size-3.5" />
-              </IconAction>
-              {runtime?.lastError === undefined ? null : (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Diagnose ${host.name}`}
-                  disabled={diagnose.isPending}
-                  onClick={() => {
-                    copyDiagnostics.reset()
-                    diagnose.mutate()
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="dshx-root"
+              // A verb that opens a dialog runs once the menu has closed, and keeps focus from returning to this trigger:
+              // two overlapping focus scopes would otherwise pull focus out of the dialog's first field.
+              onCloseAutoFocus={event => {
+                const open = afterClose.current
+                if (open === null) return
+                afterClose.current = null
+                event.preventDefault()
+                open()
+              }}
+            >
+              {actions.menu.map(verb => {
+                const item = menuItems[verb]
+                return (
+                  <Fragment key={verb}>
+                    {verb === 'hide' || verb === 'remove' ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuItem
+                      disabled={item.disabled === true}
+                      onSelect={() => {
+                        if (DIALOG_VERBS.has(verb)) afterClose.current = item.onSelect
+                        else item.onSelect()
+                      }}
+                      {...(verb === 'remove' ? { variant: 'destructive' as const } : {})}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </DropdownMenuItem>
+                  </Fragment>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AlertDialog open={plainHttpConsent} onOpenChange={open => (open ? undefined : setPlainHttpConsent(false))}>
+            <AlertDialogContent className="dshx-root">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Link back over plain HTTP?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This machine listens only on unencrypted addresses, so {host.name} would receive its link credential in clear. Use a Tailscale or https://
+                  address under Link this machine instead, or allow it on a network you trust.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={linkBack.isPending}
+                  onClick={event => {
+                    event.preventDefault()
+                    linkBack.mutate({ allowPlainHttp: true })
                   }}
                 >
-                  {diagnose.isPending ? <Spinner className="dshx:size-3.5" /> : <SearchIcon className="dshx:size-3.5" />}
-                  Diagnose
-                </Button>
-              )}
-              <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onCloneProject}>
-                <PlusIcon className="dshx:size-3.5" />
-                Clone project
-              </Button>
-              <Button size="sm" variant="outline" onClick={props.onSyncCheckout}>
-                <RefreshCwIcon className="dshx:size-3.5" />
-                Sync checkout
-              </Button>
-            </>
-          ) : null}
-          {host.connector.kind === 'local' ? null : (
-            <>
-              <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
-                <PlusIcon className="dshx:size-3.5" />
-                Add folder
-              </Button>
-              <Button size="sm" variant="outline" disabled={runtime === undefined || linkBack.isPending} onClick={startLinkBack}>
-                {linkBack.isPending ? <Spinner className="dshx:size-3.5" /> : <LinkIcon className="dshx:size-3.5" />}
-                Link back
-              </Button>
-              <AlertDialog open={plainHttpConsent} onOpenChange={open => (open ? undefined : setPlainHttpConsent(false))}>
-                <AlertDialogContent className="dshx-root">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Link back over plain HTTP?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This machine listens only on unencrypted addresses, so {host.name} would receive its link credential in clear. Use a Tailscale or https://
-                      address under Link this machine instead, or allow it on a network you trust.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      disabled={linkBack.isPending}
-                      onClick={event => {
-                        event.preventDefault()
-                        linkBack.mutate({ allowPlainHttp: true })
-                      }}
-                    >
-                      {linkBack.isPending ? <Spinner className="dshx:size-3.5" /> : null}
-                      Allow plain HTTP
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </>
-          )}
-          <IconAction
-            label={`Reconnect ${host.name}`}
-            hint="Reconnect"
-            disabled={runtime === undefined || reconnect.isPending}
-            onClick={() => reconnect.mutate()}
-          >
-            {reconnect.isPending ? <Spinner className="dshx:size-3.5" /> : <RefreshCwIcon className="dshx:size-3.5" />}
-          </IconAction>
-          {host.connector.kind === 'ssh' ? (
-            <IconAction label={`Edit ${host.name}`} hint="Edit" onClick={props.onEdit}>
-              <PencilIcon className="dshx:size-3.5" />
-            </IconAction>
-          ) : null}
-          <IconAction
-            label={confirming ? `Confirm remove ${host.name}` : `Remove ${host.name}`}
-            hint={confirming ? 'Click again to remove; remote data stays' : 'Remove'}
-            destructive={confirming}
-            onClick={() => (confirming ? props.onRemove() : setConfirming(true))}
-          >
-            <Trash2Icon className="dshx:size-3.5" />
-          </IconAction>
+                  {linkBack.isPending ? <Spinner className="dshx:size-3.5" /> : null}
+                  Allow plain HTTP
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AlertDialog open={confirming} onOpenChange={setConfirming}>
+            <AlertDialogContent className="dshx-root" size="sm">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove {host.name}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  It leaves this DSH and the destination picker. Nothing on that machine is deleted; add it again to reconnect.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" onClick={props.onRemove}>
+                  Remove host
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       }
     />
@@ -521,6 +522,9 @@ export const HostsPage = () => {
   const [syncHostId, setSyncHostId] = useState<string | null>(null)
   const [fleetOpen, setFleetOpen] = useState(false)
   const [pairOpen, setPairOpen] = useState(false)
+  const [linkOpen, setLinkOpen] = useState(false)
+  const linkStatus = useQuery(multiHostQueries.linkStatus(api, 30_000))
+  const linkChipStatus = linkStatus.data === undefined ? undefined : { enabled: linkStatus.data.settings.enabled, listening: linkStatus.data.listening }
   const [updateRequest, setUpdateRequest] = useState(0)
   const projectRuntime = directory.data?.runtimes.find(runtime => runtime.id === projectRuntimeId)
   const projectHost = projectRuntime === undefined ? undefined : hosts.find(host => host.id === projectRuntime.hostId)
@@ -584,7 +588,7 @@ export const HostsPage = () => {
       <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
         <span className="dshx:min-w-0">{input.message}</span>
         <Button size="xs" variant="outline" onClick={input.retry}>
-          {input.label ?? 'Try again'}
+          {input.label ?? 'Retry'}
         </Button>
       </AlertDescription>
     </Alert>
@@ -599,10 +603,19 @@ export const HostsPage = () => {
         heading="Hosts"
         description="Machines threads can run on. Hidden hosts keep their records but leave the destination picker."
         meta={
-          <Badge variant="secondary" className="dshx:text-2xs dshx:font-normal">
-            {hosts.length === 0 ? 'none' : `${hosts.length} registered`}
-            {hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}
-          </Badge>
+          <>
+            <Badge variant="secondary" className="dshx:text-2xs dshx:font-normal">
+              {hosts.length === 0 ? 'none' : `${hosts.length} registered`}
+              {hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}
+            </Badge>
+            {[HostsHeader.autoChip(resourcePool.data?.selected), HostsHeader.linkChip(linkChipStatus)].map(chip =>
+              chip === null ? null : (
+                <Badge key={chip} role="status" variant="secondary" className="dshx:text-2xs dshx:font-normal">
+                  {chip}
+                </Badge>
+              ),
+            )}
+          </>
         }
         primaryAction={{ id: 'add-host', label: 'Add host', icon: <PlusIcon className="dshx:size-4" />, onSelect: () => setForm(blankDraft) }}
         actions={[
@@ -613,23 +626,13 @@ export const HostsPage = () => {
             disabled: hosts.length === 0,
             onSelect: () => setFleetOpen(true),
           },
+          { id: 'link-this-machine', label: 'Link this machine', icon: <LinkIcon className="dshx:size-4" />, onSelect: () => setLinkOpen(true) },
         ]}
       >
         {directory.isError ? retryAlert({ message: errorMessage(directory.error, 'Hosts are unavailable.'), retry: () => void directory.refetch() }) : null}
         {resourcePool.isError
           ? retryAlert({ message: errorMessage(resourcePool.error, 'Host resources are unavailable.'), retry: () => void resourcePool.refetch() })
           : null}
-        {resourcePool.data?.selected === null ? (
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:px-3 dshx:py-2 dshx:text-sm">
-            <span className="dshx:font-medium">Auto destination</span>
-            <Badge variant="secondary">Unavailable</Badge>
-          </div>
-        ) : resourcePool.data?.selected === undefined ? null : (
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:px-3 dshx:py-2 dshx:text-sm" role="status">
-            <span className="dshx:font-medium">Auto destination</span>
-            <Badge variant="secondary">{resourcePool.data.selected.hostName}</Badge>
-          </div>
-        )}
         {hide.isError
           ? retryAlert({
               message: errorMessage(hide.error, 'The host visibility could not be saved.'),
@@ -662,7 +665,6 @@ export const HostsPage = () => {
               },
             })
           : null}
-        <LinkThisMachine api={api} onPair={() => setPairOpen(true)} />
         {directory.isPending ? <Spinner aria-label="Loading hosts" /> : null}
         {!directory.isPending && ordered.length === 0 ? (
           <EntityList aria-label="Registered hosts">
@@ -744,6 +746,16 @@ export const HostsPage = () => {
         ) : null}
         <CheckoutSyncDialog api={api} host={hosts.find(host => host.id === syncHostId)} onClose={() => setSyncHostId(null)} />
         <HostDialog api={api} draft={form} onOpenChange={open => (open ? undefined : setForm(null))} />
+        <LinkThisMachineDialog
+          api={api}
+          open={linkOpen}
+          onOpenChange={setLinkOpen}
+          onPair={() => {
+            // One dialog at a time: pairing replaces the link dialog instead of stacking on it.
+            setLinkOpen(false)
+            setPairOpen(true)
+          }}
+        />
         <PairMachineDialog api={api} open={pairOpen} onOpenChange={setPairOpen} />
         <FleetUpdateDialog
           api={api}

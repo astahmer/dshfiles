@@ -210,9 +210,18 @@ export const UsagePopoverContent = (props: {
   readonly order?: 'arranged' | 'remaining'
   readonly onOpenUsageHistory: () => void
   readonly onConnectAccount: (accountId: string) => void
+  readonly onAddAccount?: (() => void) | undefined
+  readonly onOpenAccounts?: (() => void) | undefined
   readonly close: () => void
 }): JSX.Element => {
   const { usage, refreshing, failure, refresh } = useAccountsUsage()
+  const closing = (action: (() => void) | undefined): (() => void) | undefined =>
+    action === undefined
+      ? undefined
+      : () => {
+          props.close()
+          action()
+        }
   return (
     <PopoverContent
       align="start"
@@ -234,6 +243,8 @@ export const UsagePopoverContent = (props: {
           props.close()
           props.onConnectAccount(accountId)
         }}
+        onAddAccount={closing(props.onAddAccount)}
+        onOpenAccounts={closing(props.onOpenAccounts)}
         onRefresh={() => void refresh()}
         order={props.order ?? 'arranged'}
         refreshing={refreshing}
@@ -265,7 +276,7 @@ const QuotaStripBody = (props: QuotaSurfaceProps): JSX.Element => {
   const withShortName = useShortNames()
   const stripRef = useRef<HTMLDivElement>(null)
   const items = UsageOverviewModel.stripItems(usage, arrangement.layout).map(withShortName)
-  const activeLabel = props.activeAccountRunning ? 'In use by active chat' : 'Last used by active chat'
+  const activeLabel = props.activeAccountRunning ? 'In use by this thread' : 'Last used by this thread'
   // Minutes and reset countdowns are all the closed strip shows, so its clock wakes on those boundaries instead of
   // every second; the open overview keeps its own second-resolution clock.
   const now = useQuotaClock({ resetsAt: items.map(item => ('unavailable' in item ? null : item.resetsAt)) })
@@ -401,7 +412,7 @@ const QuotaRailButton = (props: QuotaSurfaceProps): JSX.Element => {
   const critical =
     props.activeAccountId === null ? (UsageOverviewModel.mostCritical(items) ?? items[0]) : items.find(item => item.instanceId === props.activeAccountId)
   const activeLabel =
-    activeProfile === undefined ? label : `${activeProfile.displayName}. ${props.activeAccountRunning ? 'In use by active chat' : 'Last used by active chat'}`
+    activeProfile === undefined ? label : `${activeProfile.displayName}. ${props.activeAccountRunning ? 'In use by this thread' : 'Last used by this thread'}`
   const stripTitle = items.map(item => describeItem(item, now)).join('\n') || label
   return (
     <TooltipProvider delayDuration={500}>

@@ -498,8 +498,7 @@ export const ItemsView = (props: {
         </div>
         {entries.length === 0 && props.ready === true && !filtering ? (
           <EmptyState className="dshx:py-20">
-            Nothing is ready. Ready items are in the Inbox or Todo, not snoozed, wait on no open item, have no open sub-issue and nobody has claimed them. If
-            open work should be here, the running DSH Host may predate the ready queue: restart the DSH Host process.
+            Nothing is ready to start.
           </EmptyState>
         ) : null}
         {entries.length === 0 && filtering ? (

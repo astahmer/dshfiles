@@ -75,7 +75,7 @@ export const InboxView = (props: {
   const selection = useBacklogSelection({ items: rows.map(row => row.item), openId: props.openId, scope: filter })
   const countOf = (value: InboxFilter): number => inboxRows({ items: props.items, threads: props.threads, filter: value }).length
   return (
-    <div className="dshx:flex dshx:min-h-0 dshx:flex-1">
+    <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
       <section
         aria-label="Inbox"
         className="dshx:flex dshx:w-[400px] dshx:max-w-full dshx:shrink-0 dshx:flex-col dshx:border-r dshx:border-border dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-r-0"

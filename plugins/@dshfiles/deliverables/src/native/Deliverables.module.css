@@ -18,6 +18,10 @@
 .fileName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; line-height: 20px; }
 .description { overflow: hidden; color: var(--dsw-alias-label-tertiary); font-size: 10px; font-weight: 400; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .description[data-error='true'] { color: var(--dsw-alias-state-error-primary); }
+/* A phone reads the card's second line at the density minimum (12px), never 10px. */
+@media (pointer: coarse) {
+  .description { font-size: var(--dshx-density-text-min, 12px); }
+}
 .previewHint { display: none; }
 @media (hover: hover) {
   .file:hover .description:not([role='status']) .secondaryText { display: none; }

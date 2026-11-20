@@ -24,6 +24,19 @@ describe('touch targets', () => {
     expect(coarse).toMatch(new RegExp(`\\[data-slot='toggle-group-item'\\],[^{]*${escaped}\\s*\\)::after \\{`, 'u'))
   })
 
+  it('hides keycaps, menu shortcut slots and key legends on a coarse pointer, not keycaps in content (unslop phone 4)', () => {
+    const rule = /:where\(([^{]*)\)\s*\{\s*display: none !important;\s*\}/u.exec(coarse)
+    expect(rule).not.toBeNull()
+    const selectors = rule?.[1] ?? ''
+    for (const slot of ['kbd', 'kbd-group', 'key-hint', 'dropdown-menu-shortcut', 'context-menu-shortcut', 'command-shortcut']) {
+      expect(selectors).toContain(`[data-slot='${slot}']`)
+    }
+    expect(selectors).toContain('[data-key-legend]')
+    expect(selectors).toContain("[role='menuitem']")
+    // A bare `kbd` would also hide keys an assistant wrote in Markdown.
+    expect(selectors.split(',').map(part => part.trim())).not.toContain('kbd')
+  })
+
   it('gives menu, select and command rows a 44px row on a coarse pointer', () => {
     for (const slot of ['dropdown-menu-item', 'context-menu-item', 'select-item', 'command-item']) expect(coarse).toContain(`[data-slot='${slot}']`)
     expect(coarse).toContain('min-height: 44px;')

@@ -100,7 +100,7 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
     : "Your current account's usage limit is exhausted. Reset time is unknown, so retries back off from 30 seconds up to every 10 minutes."
   const pendingStatus = continuationsQuery.isFetching
     ? 'Quota exhausted. Recovery details are loading.'
-    : 'Quota exhausted. Reset details are unavailable; retry manually.'
+    : 'Quota exhausted. Reset details are unavailable. Retry manually.'
   const recoveryStatus = continuation === undefined ? pendingStatus : exhaustedStatus
   const status = continuationsQuery.isError ? 'Quota exhausted. Retry when your provider limit resets.' : recoveryStatus
   const busy = resume.isPending || dismiss.isPending
@@ -122,7 +122,7 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
             <Button disabled={busy} onClick={() => dismiss.mutate()} size="xs" type="button" variant="ghost">
               {dismiss.isPending ? 'Dismissing…' : 'Dismiss'}
             </Button>
-            {catalogQuery.isError ? <span className="dshx:text-xs dshx:text-muted-foreground">Model options are unavailable.</span> : null}
+            {catalogQuery.isError ? <span className="dshx:text-xs dshx:text-muted-foreground">Model options did not load. Reopen the thread to retry.</span> : null}
           </div>
           {showSelector && selection !== undefined && catalogQuery.data !== undefined ? (
             <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:p-2.5">

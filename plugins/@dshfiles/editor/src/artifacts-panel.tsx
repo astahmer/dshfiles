@@ -186,12 +186,12 @@ const ArtifactEditor = (props: {
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete artifact?</AlertDialogTitle>
-            <AlertDialogDescription>This permanently deletes the artifact and its saved content.</AlertDialogDescription>
+            <AlertDialogTitle>Delete “{title}”?</AlertDialogTitle>
+            <AlertDialogDescription>Its saved content is deleted too. This cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => remove.mutate()}>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={() => remove.mutate()}>Delete artifact</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

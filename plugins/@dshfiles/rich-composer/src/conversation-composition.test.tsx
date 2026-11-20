@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { createTestClient } from '@dshfiles/dshx/testing'
 import { PhoneThreadMenu, usePhoneThreadTool } from './phone-thread-menu.tsx'
@@ -310,6 +313,28 @@ describe('fixed Conversation content factory composition', () => {
     expect(widthFallbacks.get('embedded')).not.toBe(ConversationWidthControls)
   })
 
+  it('draws its own More button only while no thread menu lists those actions', () => {
+    const { header } = fixture('header-more')
+    const renderFactorySlot = vi.fn<ConversationSessionHeaderSlotProps['renderFactorySlot']>(() => null)
+    const moreButtons = (): number => renderFactorySlot.mock.calls.filter(([name]) => name === 'contextMenu.button').length
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() => root.render(<ConversationSessionHeader {...header} renderFactorySlot={renderFactorySlot} />))
+    expect(moreButtons()).toBeGreaterThan(0)
+    // The thread menu takes the actions over (DESIGN.md: the thread header is one row with one ⋯).
+    let release: (() => void) | undefined
+    act(() => {
+      release = ThreadViewsModel.hostHeaderMenu()
+    })
+    renderFactorySlot.mockClear()
+    act(() => root.render(<ConversationSessionHeader {...header} renderFactorySlot={renderFactorySlot} />))
+    expect(moreButtons()).toBe(0)
+    act(() => release?.())
+    expect(moreButtons()).toBeGreaterThan(0)
+  })
+
   it('keeps the title editor responsive after a rename fails', async () => {
     const { header } = fixture('rename-a')
     const rename = vi.fn<ConversationSessionHeaderSlotProps['rename']>().mockRejectedValueOnce(new Error('Host refused')).mockResolvedValue(undefined)
@@ -419,6 +444,31 @@ describe('fixed Conversation content factory composition', () => {
     expect(sheet?.querySelector('[role="tab"]')).toBeNull()
     act(() => document.body.querySelector<HTMLButtonElement>('[aria-label="session.closeMenu"]')?.click())
     expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
+  })
+
+  it('moves into the phone top bar on a phone turned sideways too (unslop U8)', () => {
+    const releaseHost = ThreadViewsModel.host()
+    dispose.push(releaseHost)
+    // 844x390 with a coarse pointer: only the landscape clause of the phone shell rule matches.
+    const sideways = (query: string): boolean => query.split(',').some(part => part.trim() === '(pointer: coarse) and (max-height: 500px)')
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: sideways(query), media: query, addEventListener() {}, removeEventListener() {} }))
+    document.documentElement.setAttribute('data-shell-phone-nav', '')
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      vi.unstubAllGlobals()
+    })
+    const a = fixture('phone-sideways')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() => root.render(<ConversationSessionHeader {...a.header} />))
+    expect(document.body.querySelector('[data-conversation-phone-bar] button[aria-label="session.menu"]')).not.toBeNull()
+    // Every phone-shell rule of the stage keys on the same media list as the shell itself.
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/ConversationRoot.module.css'), 'utf8')
+    const phoneBlocks = [...css.matchAll(/@media ([^{]*639\.98px[^{]*)\{/gu)].map(match => (match[1] ?? '').trim())
+    expect(phoneBlocks.length).toBeGreaterThan(0)
+    for (const block of phoneBlocks) expect(block).toBe('(max-width: 639.98px), (pointer: coarse) and (max-height: 500px)')
   })
 
   it('portals no phone bar for a conversation that is not on screen (kept-alive panels stacked their pills)', () => {

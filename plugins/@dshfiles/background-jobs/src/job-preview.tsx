@@ -15,6 +15,7 @@ import type { ToolCallSectionProps } from '@dshfiles/tool-meta/tool-call-section
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { backgroundJobsApi } from './api.js'
 import { JobPreviewModel, type JobPreviewView, type JobsClient } from './job-preview-model.js'
+import { JobTitles } from './job-titles.js'
 import type { BackgroundJobsTranslate } from './locales.js'
 import { STATUS_KEY, statusVariant } from './panel.js'
 
@@ -142,14 +143,18 @@ const JobPreviewCard = (
 ) => {
   const { jobs, t, sessionId, jobId, disclosure } = props
   const view = useJobView({ jobs, sessionId, jobId })
+  const readTitle = useCallback(() => JobTitles.titleOf(jobId), [jobId])
+  const title = useSyncExternalStore(JobTitles.subscribe, readTitle)
   const threadLabel = props.useThreadLabel()
   // A job the registry no longer holds (an earlier DSH process, or retention) has nothing live to show.
   if (view === undefined) return null
   const live = JobPreviewModel.isLive(view.status)
   const open = disclosure.expanded
+  // The call's description titles the job; the shell command it ran is the second line.
+  const name = title ?? view.label
   return (
     <section
-      aria-label={`${t('previewKind')}: ${view.label}`}
+      aria-label={`${t('previewKind')}: ${name}`}
       className={cn(
         'dshx-root dshx:@container dshx:my-1 dshx:text-xs',
         props.seat === 'tool-card' && 'dshx:ml-1 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background',
@@ -161,9 +166,14 @@ const JobPreviewCard = (
     >
       <ComposerRow
         icon={<SquareTerminalIcon />}
-        label={<span className="dshx:font-mono!">{view.label}</span>}
+        label={title === undefined ? <span className="dshx:font-mono!">{view.label}</span> : <span data-job-title="">{title}</span>}
         meta={
           <>
+            {title === undefined ? null : (
+              <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:@max-pane-narrow:hidden" data-job-command="">
+                {view.label}
+              </span>
+            )}
             <span className="dshx:shrink-0 dshx:@max-pane-narrow:sr-only">{t('previewKind')}</span>
             {view.progress === undefined ? null : <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:hidden">{view.progress}</span>}
             <span role="status" className="dshx:shrink-0">
@@ -175,7 +185,7 @@ const JobPreviewCard = (
         }
         expanded={open}
         onSelect={disclosure.toggle}
-        selectLabel={t('previewToggle', { label: view.label })}
+        selectLabel={t('previewToggle', { label: name })}
         variant={props.seat === 'dock' ? 'card' : 'plain'}
       />
       {open ? (
@@ -206,6 +216,11 @@ const JobPreviewCard = (
 export const JobPreviewSection = (props: ToolCallSectionProps & JobPreviewBindings): JSX.Element | null => {
   const text = textOfResult(props.owner)
   const jobId = text === undefined ? undefined : JobPreviewModel.jobIdOfResult({ toolName: props.owner.toolName, text })
+  const description = props.owner.phase === 'result' ? JobTitles.descriptionOf(props.owner.block.call?.argsRaw) : undefined
+  // The native registry keeps only the command; this card sees the call, so it names the job for the strip too.
+  useEffect(() => {
+    if (jobId !== undefined && description !== undefined) JobTitles.remember(jobId, description)
+  }, [jobId, description])
   return jobId === undefined ? null : <ToolCardPreview {...props} jobId={jobId} />
 }
 

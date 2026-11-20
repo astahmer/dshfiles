@@ -12,6 +12,8 @@ import { createPluginMarketPanel, MARKET_SECTION_ID } from './plugin-market-page
 
 const PANEL_ID = 'dshfiles-capabilities-hub'
 const MARKET_PANEL_ID = 'dshfiles-plugin-market'
+/** DSH core's Plugins page: where a plugin is added to the profile. */
+const PLUGINS_PANEL_ID = 'plugins'
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => <LayoutGridIcon aria-hidden size={props.size ?? 18} strokeWidth={1.6} />
 
@@ -19,13 +21,14 @@ export default defineClient({
   name: '@dshfiles/capabilities-hub',
   inject: ['slots', 'layout', 'remote', 'remote.pluginInventory'],
   setup(ctx, decorate, metadata) {
-    // Settings lists the hub beside the managers it opens; without the rail it stays a plain sidebar page.
+    // Settings lists the hub after the managers it opens, never as its first row; without the rail it stays a plain
+    // sidebar page.
     metadata?.plugin?.add(DestinationSections, {
       panelId: PANEL_ID,
       destination: 'settings',
       label: 'Capabilities hub',
       description: 'Skills, MCP servers and plugins in one place.',
-      order: 0,
+      order: 6,
     })
 
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
@@ -46,18 +49,19 @@ export default defineClient({
     metadata?.plugin?.add(DestinationSections, {
       panelId: MARKET_PANEL_ID,
       destination: 'settings',
-      label: 'Plugin Market',
-      description: 'Community plugins and themes, installed in one click.',
+      label: 'Plugin market',
+      description: 'Community plugins and themes.',
       order: 5,
     })
     const MarketGlyph = (props: { readonly size?: number }): JSX.Element => <StoreIcon aria-hidden size={props.size ?? 18} strokeWidth={1.6} />
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: MARKET_PANEL_ID, order: 8, label: () => 'Plugin Market' }, MarketGlyph),
+      ctx.slots.register({ name: 'sidebar.panellist', id: MARKET_PANEL_ID, order: 8, label: () => 'Plugin market' }, MarketGlyph),
     )
     // Reads the section ledger only: settings-shell stays the one `settings.section` declarer.
     const PluginMarketPanel = createPluginMarketPanel({
       subscribe: listener => ctx.slots.subscribe('settings.section', listener),
       installed: () => ctx.slots.entriesOfSlot('settings.section').some(entry => entry.options.id === MARKET_SECTION_ID),
+      ...(isMainPanelId(PLUGINS_PANEL_ID) ? { openPlugins: () => openPanel(PLUGINS_PANEL_ID) } : undefined),
     })
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: MARKET_PANEL_ID }, decorate(PluginMarketPanel)))
     ctx.slots.inject('main', () =>

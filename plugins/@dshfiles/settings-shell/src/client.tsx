@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { createSnapshotStore, type ObservableSnapshot, type SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
-import { resolveSlotLabel, type PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import { resolveSlotLabel, type PropsRenderSlots, type SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   createApiClient,
   defineClient,
@@ -52,7 +52,7 @@ import { SHELL_CHILDREN, type ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import { WELCOME_LOCALE_NAMESPACE, WELCOME_STEP_ID, WelcomeNotice, WelcomeNoticeStore, welcomeLocale, type WelcomeTranslate } from './native/welcome-notice.js'
 import { settingsShellApi } from './shell-api.js'
-import { bundleLabelsOf, type BundleLabel } from './bundle-labels.js'
+import { bundleLabelsOf, namespaceLabelOf, type BundleLabel } from './bundle-labels.js'
 import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
@@ -63,8 +63,9 @@ import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
 import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
-import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
+import { SettingsTab, type PluginPageHeading, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
+import { TAB_STRIP_SLOTS, tabStripLoaded } from './tab-strip.js'
 import { PORTED_FROM } from './upstream.js'
 import {
   createSettingsHubRouter,
@@ -77,7 +78,6 @@ import {
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
 const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
-const MAIN_TABS_OVERLAY_ID = 'dshfiles-main-tabs'
 const PUBLISH_SETTLE_MS = 250
 const OPEN_SETTINGS_COMMAND = 'settings.open'
 
@@ -225,12 +225,10 @@ export default defineClient({
     const installLabels = (rows: readonly BundleLabel[]): void => {
       const next = new Map<string, NamespaceLabel>()
       for (const row of rows) {
-        // A package name is no title; without manifest text the page falls back to the schema or the id.
-        const resolvedTitle = row.title === undefined ? '' : ctx.locale.resolveText(row.title)
-        next.set(row.rowId, {
-          title: resolvedTitle === row.bundleName || resolvedTitle === row.moduleName ? '' : resolvedTitle,
-          description: row.description === undefined ? (row.bundleDescription ?? '') : ctx.locale.resolveText(row.description),
-        })
+        next.set(
+          row.rowId,
+          namespaceLabelOf(row, text => ctx.locale.resolveText(text)),
+        )
       }
       labels.set(next)
     }
@@ -460,9 +458,15 @@ export default defineClient({
       openSettingsTarget: target => openSettingsTarget(target),
     }
 
+    // The frame's `shell.beforeMain` region is frame-layout's declaration, which this plugin does not depend on: the
+    // ledger itself is keyed by plain strings, so it is read through that face.
+    const slotLedger: Pick<SlotCore, 'entriesOfSlot' | 'subscribe'> = ctx.slots
     const mainTabsLoaded: ObservableSnapshot<boolean> = {
-      getSnapshot: () => ctx.slots.entriesOfSlot('shell.overlay').some(entry => entry.options.id === MAIN_TABS_OVERLAY_ID),
-      subscribe: listener => ctx.slots.subscribe('shell.overlay', listener),
+      getSnapshot: () => tabStripLoaded(slot => slotLedger.entriesOfSlot(slot).map(entry => entry.options.id)),
+      subscribe: listener => {
+        const disposers = TAB_STRIP_SLOTS.map(slot => slotLedger.subscribe(slot, listener))
+        return () => disposers.forEach(dispose => dispose())
+      },
     }
 
     const deps: ShellRootDeps = {
@@ -498,12 +502,13 @@ export default defineClient({
       shortcuts: input.shortcuts,
       renderSlot: input.renderSlot,
       pluginPages: SettingsGroups.searchablePages(input.groups),
-      renderPluginPage: (page: PluginSettingsPage, nested: boolean) => (
+      renderPluginPage: (page: PluginSettingsPage, heading: PluginPageHeading) => (
         <PluginSettingsPageView
-          entry={<PluginEntryCard namespace={page.ns} t={input.t} />}
+          entry={<PluginEntryCard namespace={page.ns} page={page.title} t={input.t} />}
           form={formFor(page.ns)}
           key={page.pageId}
-          nested={nested}
+          heading={heading}
+          namedByNavigation
           page={page}
           t={input.t}
           {...(input.field?.sectionId === page.pageId ? { focusPath: input.field.fieldPath } : {})}
@@ -617,7 +622,7 @@ export default defineClient({
       return (
         <PluginQueryProvider>
           <PluginSettingsPageView
-            entry={<PluginEntryCard namespace={props.page.ns} t={t} />}
+            entry={<PluginEntryCard namespace={props.page.ns} page={props.page.title} t={t} />}
             form={formFor(props.page.ns)}
             page={props.page}
             t={t}

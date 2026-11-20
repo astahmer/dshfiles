@@ -20,9 +20,9 @@ export class StalledStream {
 
   /** What a turn that stopped on a silent stream tells the user to do next; the retry rows above it name the route. */
   static readonly turnAdvice = (input: { readonly silentMs: number; readonly fallbackOn: boolean }): string => {
-    const stopped = `The model sent no data for ${silenceLabel(input.silentMs)}, so this turn stopped after its retries (see the retry rows above for the route). Resume to retry it, or pick another model in the composer first.`
+    const stopped = `The model sent no data for ${silenceLabel(input.silentMs)}, so this turn stopped after its retries (see the retry rows above for the route). Retry it, or pick another model in the composer first.`
     if (input.fallbackOn)
       return `${stopped} No fallback in this thread's model fallback chain could take it; add one from the model picker's Fallbacks section.`
-    return `${stopped} To move to the thread's model fallback chain automatically next time, turn on Fall back on stalled streams in Settings › AI Accounts › Failure recovery.`
+    return `${stopped} To move to the thread's model fallback chain automatically next time, turn on Fall back on stalled streams in Settings › AI accounts › Failure recovery › Edit.`
   }
 }

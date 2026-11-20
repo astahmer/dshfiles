@@ -117,7 +117,7 @@ export const ProjectCloneDialog = (props: {
             <div aria-live="polite" className="dshx:flex dshx:flex-col dshx:gap-2">
               <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-sm">
                 <span>
-                  {job.state === 'cancelled' ? 'Cancelled' : clonePhaseLabels[job.phase]}
+                  {job.state === 'cancelled' ? 'Stopped' : clonePhaseLabels[job.phase]}
                   {job.state === 'running' && job.progress.stage !== null ? ` · ${cloneStageLabels[job.progress.stage]}` : ''}
                 </span>
                 <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{job.progress.message}</span>
@@ -146,7 +146,7 @@ export const ProjectCloneDialog = (props: {
               </Button>
             )}
             <Button disabled={running || start.isPending} type="submit">
-              {job?.state === 'failed' || job?.state === 'cancelled' ? 'Try again' : 'Clone'}
+              {job?.state === 'failed' || job?.state === 'cancelled' ? 'Retry' : 'Clone'}
             </Button>
           </DialogFooter>
         </form>

@@ -11,7 +11,7 @@ export const agentTelemetrySettings = defineSettings({
     ])
       .default('environment')
       .description(
-        'Put message content on agent spans. Off by default: no prompt, reply, tool argument or tool result leaves the Host. The traces viewer still stores content as its size while redactGenAiContent is on.',
+        'Put prompts, replies and tool data on agent spans. Off by default: none of it leaves DSH.',
       ),
   }),
   applies: 'live',

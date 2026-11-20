@@ -4,7 +4,7 @@ import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
-import { backlogLabel, backlogRef } from './backlog-refs.js'
+import { backlogLabel, backlogRef, openBacklogCapture } from './backlog-refs.js'
 
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
 const toolDirective = (tool: string, input: object): string => `[[call ${tool} ${JSON.stringify(input)}]]`
@@ -33,7 +33,7 @@ const readClaim = async (page: Page, ordinal: number) => {
 const agentName = (actorId: string): string => `Agent ${actorId.replace(/^agent:(session-)?/u, '').slice(0, 6)}`
 
 When('{string} is captured as a work item', async ({ page }: { page: Page }, text: string) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   await capture.fill(text)
   await capture.press('Enter')
   await expect(capture).toHaveText('')

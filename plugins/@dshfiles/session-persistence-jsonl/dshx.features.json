@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "tool-catalog-dedupe",
-      "title": "Store a Session's request-header tool catalog once",
-      "summary": "Owned fork of the native JSONL session-persistence backend. Every request that begins a new message series appends a request/header event carrying the full assembled tool catalog \u2014 455 tools, ~270 KB in one measured Session, byte-identical on 31 of 34 headers. This fork writes that catalog into the artifact once and stores a digest reference on every later request whose catalog matches, expanding the reference inline on read so every existing reader sees the same events. Logs written before this fork, and logs without a repeated catalog, read identically. The header line carries a marker, so a harness without this fork refuses the artifact instead of reading a reference as an empty tool list.",
+      "title": "Store a thread's tool list once",
+      "summary": "A thread log stores its tool list once instead of with every request, so logs stay much smaller.",
+      "details": "Owned fork of the native JSONL session-persistence backend. Every request that begins a new message series appends a request/header event carrying the full assembled tool catalog \u2014 455 tools, ~270 KB in one measured Session, byte-identical on 31 of 34 headers. This fork writes that catalog into the artifact once and stores a digest reference on every later request whose catalog matches, expanding the reference inline on read so every existing reader sees the same events. Logs written before this fork, and logs without a repeated catalog, read identically. The header line carries a marker, so a harness without this fork refuses the artifact instead of reading a reference as an empty tool list.",
       "surfaces": ["host", "storage"],
       "surface": "infrastructure",
       "destination": "none",

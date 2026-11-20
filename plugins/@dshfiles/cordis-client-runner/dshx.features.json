@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "inspect-manifest-once",
-      "title": "Publish the Client inspect manifest once per connection",
-      "summary": "The native dynamic-package runner from one owned fork of the stock row. Behaviour is the native one; the page's inspect manifest is no longer sent before the connection is up and then again by the first reset: the first connected generation publishes it once, and every later generation publishes it again.",
+      "title": "Publish the page's plugin list once",
+      "summary": "The page sends its list of loaded plugins once per connection instead of twice.",
+      "details": "The native dynamic-package runner from one owned fork of the stock row. Behaviour is the native one; the page's inspect manifest is no longer sent before the connection is up and then again by the first reset: the first connected generation publishes it once, and every later generation publishes it again.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",

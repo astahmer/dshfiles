@@ -111,7 +111,7 @@ const ConnectionHomes = (props: ConnectionOptionsProps): JSX.Element => {
               <field.TextField
                 label={codex ? 'Shared Codex home' : 'CLAUDE_CONFIG_DIR'}
                 monospace
-                description={codex ? 'Shared state; custom homes need a separate auth overlay.' : 'Directory containing your Claude Code login.'}
+                description={codex ? 'Shared state. Custom homes need a separate auth overlay.' : 'Directory containing your Claude Code login.'}
               />
             )}
           </form.AppField>
@@ -172,7 +172,7 @@ export const ExistingConnectionReference = (props: ConnectionOptionsProps): JSX.
               label="Existing credential reference"
               monospace
               placeholder={example}
-              description="An existing DSH credential or Host environment variable."
+              description="An existing DSH credential or an environment variable DSH was started with."
             />
           )}
         </form.AppField>

@@ -163,15 +163,15 @@ describe('Resources UI', () => {
       return ref.id === missing.id ? 'This conversation is unavailable. Its reference has been preserved.' : null
     }
     provider(<ResourcesPanel api={seeded.api} openConversation={openConversation} />)
-    const known = await screen.findByRole('button', { name: 'Open conversation Conversation review' })
+    const known = await screen.findByRole('button', { name: 'Open thread Conversation review' })
     expect(known.hasAttribute('disabled')).toBe(false)
     expect(opened).toEqual([])
     fireEvent.click(known)
     expect(opened).toEqual([resource.ref])
-    fireEvent.click(screen.getByRole('button', { name: 'Open conversation Unregistered reference: dsh / conversation / unavailable-conversation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open thread Unregistered reference: dsh / conversation / unavailable-conversation' }))
     expect(opened).toEqual([resource.ref, missing])
     expect(await screen.findByRole('status')).toHaveProperty('textContent', 'This conversation is unavailable. Its reference has been preserved.')
-    expect(screen.queryByRole('button', { name: 'Open conversation Spec file' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open thread Spec file' })).toBeNull()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect((await seeded.api.get({ resourceId: row.id })).resource).toEqual(row)
   })
@@ -278,7 +278,7 @@ describe('Resources UI', () => {
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'This resource changed. Reload it before editing its metadata.')
     expect((await seeded.api.get({ resourceId: seeded.review.id })).resource).toEqual(concurrent)
     expect(closed).toBe(0)
-    fireEvent.click(screen.getByRole('button', { name: 'Open conversation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open thread' }))
     expect(screen.getByText('Archived or unavailable.')).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(closed).toBe(1)
@@ -314,7 +314,7 @@ describe('Resources UI', () => {
     const view = provider(<ResourcesPanel api={absent} openConversation={() => null} />)
     expect(await screen.findByRole('alert')).toHaveProperty(
       'textContent',
-      'Resources unavailable: the Host plugin is not active. No background retries will run. Reopen this page after the plugin is activated.',
+      'Resources did not load. Restart DSH, then reopen this page.',
     )
     const cache = view.queryClient.getQueryCache()
     const catalogQuery = cache.find({ queryKey: ['resource-packs', 'catalog'] })

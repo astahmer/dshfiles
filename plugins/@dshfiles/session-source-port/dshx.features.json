@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "session-source-registry",
-      "title": "One Host port for Sessions that live on another runtime",
-      "summary": "A registry the Session controller provides and remote sources register into; ownership is claimed from list answers and re-checked through owns() only when a Session id is not cached.",
+      "title": "Threads that live on another host",
+      "summary": "Threads that live on another host can appear and open here like local ones.",
+      "details": "A registry the Session controller provides and remote sources register into; ownership is claimed from list answers and re-checked through owns() only when a Session id is not cached.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",

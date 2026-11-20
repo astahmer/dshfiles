@@ -4,9 +4,10 @@
   "features": [
     {
       "id": "tool-call-timing",
-      "title": "Start time and duration on every tool call",
-      "summary": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took and when it started (\"1.2 s · 14:02:11\"). Wait calls also show elapsed time and an indeterminate bar, or a timeout countdown bar when an explicit limit is set. Users can interrupt through the existing composer controls.",
-      "reach": ["seed tool-call-thread", "click text \"Worked for*\"", "click text \"Ran commands\"", "expect note \"Took*\""],
+      "title": "How long each tool call took",
+      "summary": "Each tool call that takes a second or more shows how long it took.",
+      "details": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took once it reaches one second (\"1.2 s\"); hovering the duration gives the start time. A card that draws its own header or prints its own duration gets no label. Wait calls also show elapsed time and an indeterminate bar, or a timeout countdown bar when an explicit limit is set. Users can interrupt through the existing composer controls.",
+      "reach": ["seed tool-call-thread", "click text \"Worked for*\"", "expect note \"Took*\""],
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -15,14 +16,14 @@
         {
           "key": "enabled",
           "defaultValue": "true",
-          "constraints": "Boolean; show the timing line on tool cards.",
+          "constraints": "Boolean; show the duration of tool calls that took one second or more.",
           "choices": ["true", "false"],
           "coveredBy": ["tool-meta.settings"]
         },
         {
           "key": "timeFormat",
           "defaultValue": "absolute",
-          "constraints": "How the start time reads: clock time (with the day when not today) or relative to now.",
+          "constraints": "How the start time reads in the hover label: clock time (with the day when not today) or relative to now.",
           "choices": ["absolute", "relative"],
           "coveredBy": ["tool-meta.settings", "tool-meta.timing-unit-relative"]
         }
@@ -30,14 +31,14 @@
       "states": ["preparing", "running", "timed-wait", "untimed-wait", "finished", "start-out-of-window", "hidden"],
       "failureModes": [
         "No call time is shown while the model is still writing the arguments.",
-        "A result whose call fell outside the loaded history shows only when it ended.",
+        "A result whose call fell outside the loaded history has no duration to show.",
         "If DSH stops rendering tool cards through the keyed tool-call renderer and its renderSlot dispatch, the line disappears and the browser console logs one @dshfiles/tool-meta warning; the cards themselves are untouched."
       ],
       "externalDependencies": [],
       "onboarding": {
         "prerequisites": ["account"],
         "firstAction": "Ask the agent for a task that runs a tool.",
-        "doneWhen": "Each tool card shows when it started and how long it took."
+        "doneWhen": "A tool call that took a second or more shows its duration at the right of its row."
       },
       "verification": [
         {
@@ -96,7 +97,8 @@
     {
       "id": "read-code-card",
       "title": "File reads as a syntax-highlighted code card",
-      "summary": "A settled `read` renders as the shared CodeBlock instead of the native preview: the header names the file and how much of it this window holds (\"Showing 40 of 210 lines\"), the gutter counts from the offset the call asked for, the grammar follows the file extension, and wrap, copy and an open-at-the-line path are there. The card starts closed, a long window scrolls inside it, and a failed, running, nested or metadata-less read keeps the native row.",
+      "summary": "A file the agent read shows as highlighted code with its line numbers.",
+      "details": "A settled `read` renders as the shared CodeBlock instead of the native preview: the header names the file and how much of it this window holds (\"Showing 40 of 210 lines\"), the gutter counts from the offset the call asked for, the grammar follows the file extension, and wrap, copy and an open-at-the-line path are there. The card starts closed, a long window scrolls inside it, and a failed, running, nested or metadata-less read keeps the native row.",
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -147,7 +149,8 @@
     {
       "id": "file-diff-card",
       "title": "File edits as collapsible diffs",
-      "summary": "A settled `edit` or `write` and every stage of an `apply_patch` render as one card with the added/removed totals and one collapsible unified diff per hunk, through the shared PatchView. A failed apply_patch shows its rejection text. Calls with no applied hunks (a running edit, a failed one) keep the native row; `apply_patch` has no native card, so it always uses this one.",
+      "summary": "A file the agent edited shows as a diff that folds per change.",
+      "details": "A settled `edit` or `write` and every stage of an `apply_patch` render as one card with the added/removed totals and one collapsible unified diff per hunk, through the shared PatchView. A failed apply_patch shows its rejection text. Calls with no applied hunks (a running edit, a failed one) keep the native row; `apply_patch` has no native card, so it always uses this one.",
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -203,8 +206,9 @@
     },
     {
       "id": "approval-card",
-      "title": "The native approval request as a risk card",
-      "summary": "A native approval request renders in the composer as one card: a risk badge (Destructive for a command that deletes, overwrites or publishes, Read-only for a tool that only reads, Review otherwise), the tool name, the request's reason, the command the call runs, and Reject / Allow once with the Esc and Enter keys. The decision still goes through the native approval package's answer, so its waterfall, withdrawal and one-answer lock are unchanged; turning the card off shows the native panel.",
+      "title": "Approval requests as a risk card",
+      "summary": "An approval request shows its risk, the tool and the command it would run before you decide.",
+      "details": "A native approval request renders in the composer as one card: a risk badge (Destructive for a command that deletes, overwrites or publishes, Read-only for a tool that only reads, Review otherwise), the tool name, the request's reason, the command the call runs, and Reject / Allow once with the Esc and Enter keys. The decision still goes through the native approval package's answer, so its waterfall, withdrawal and one-answer lock are unchanged; turning the card off shows the native panel.",
       "surfaces": ["client", "settings"],
       "surface": "composerContribution",
       "destination": "composer",

@@ -25,6 +25,42 @@ const item = (overrides: Partial<AttentionItem> = {}): AttentionItem => ({
 })
 
 describe('inbox view', () => {
+  it('prints a Markdown question as two plain lines: the first paragraph, then the detail', () => {
+    const question = item({
+      source: 'agent-questions.native-question',
+      reason:
+        'Asks: Pick a layout for [the 0.2 release notes](https://example.test/notes)\n\nBoth drafts list the same **12 changes**:\n\n| Layout | Lines |\n| --- | ---: |\n| Grouped | 48 |\n\n```html preview Lines per layout\n<style>body{margin:8px',
+      detail: 'Options: Grouped by plugin · One flat list. Open the thread to choose.',
+    })
+    expect(InboxView.textOf(question)).toEqual({
+      reason: 'Asks: Pick a layout for the 0.2 release notes',
+      detail: 'Options: Grouped by plugin · One flat list. Open the thread to choose.',
+    })
+    // A plan under review is Markdown too: its words, without the markers.
+    expect(
+      InboxView.textOf(item({ reason: 'Asks: Approve this plan?', detail: '## Plan\n\n1. Rename `session` to **thread**\n\nOpen the thread.' })).detail,
+    ).toBe('Plan Rename session to thread Open the thread.')
+    // A reason with no prose at all still says something, and an absent detail stays absent.
+    expect(InboxView.textOf(item({ reason: '```ts\nconst a = 1\n```', detail: null }))).toEqual({ reason: 'Subagent question', detail: null })
+  })
+
+  it('never offers canned replies on an item that waits on a question', () => {
+    // A thread question the Inbox cannot answer in place: its form is still open in the thread.
+    const openForm = item({ source: 'agent-questions.native-question', verbs: ['Open', 'Done', 'Snooze', 'MuteSource'] })
+    expect(InboxView.offersQuickReplies(openForm, 'needs-you')).toBe(false)
+    // A subagent question, and any item a provider marks answerable, with or without choices.
+    expect(InboxView.offersQuickReplies(item(), 'needs-you')).toBe(false)
+    expect(InboxView.offersQuickReplies(item({ source: 'acme.poll', verbs: ['Answer', 'Open'] }), 'needs-you')).toBe(false)
+    // A failed turn still takes one: a queued prompt is how the user moves that thread.
+    const failedTurn = item({ source: 'thread-sidebar.finished-turn', severity: 'failed', verbs: ['Retry', 'Open', 'Done'] })
+    expect(InboxView.offersQuickReplies(failedTurn, 'needs-you')).toBe(true)
+    expect(InboxView.offersQuickReplies(failedTurn, 'closed')).toBe(false)
+    expect(InboxView.offersQuickReplies(item({ source: 'thread-sidebar.finished-turn', severity: 'ready', verbs: ['Open'] }), 'other')).toBe(false)
+    expect(
+      InboxView.offersQuickReplies(item({ source: 'backlog.attention', subject: { kind: 'backlog-item', id: 'b:1' }, verbs: ['Open'] }), 'needs-you'),
+    ).toBe(false)
+  })
+
   it('offers the reopen path for done and snoozed items, unmute for muted ones, and nothing for resolved ones', () => {
     expect(InboxView.undoOf(item({ doneAt: 5 }), 'closed')).toBe('reopen')
     expect(InboxView.undoOf(item({ snoozeUntilChange: true }), 'snoozed')).toBe('unsnooze')
@@ -100,5 +136,26 @@ describe('InboxSwipe', () => {
     expect(InboxSwipe.verb({ verbs: ['Done', 'Snooze'] }, 'muted', 'right')).toBeUndefined()
     expect(InboxSwipe.verb({ verbs: ['Done', 'Snooze'] }, 'snoozed', 'right')).toBeUndefined()
     expect(InboxSwipe.verb({ verbs: ['Done', 'Snooze'] }, 'snoozed', 'left')).toBe('done')
+  })
+})
+
+describe('a subagent question in its parent thread', () => {
+  const choices = [
+    { id: 'deploy', label: 'Deploy', recommended: true },
+    { id: 'wait', label: 'Wait' },
+  ]
+  const childQuestion = item({ id: 'child', subject: { kind: 'session', id: 'parent' }, reason: 'A subagent asks: Deploy the release now?', choices })
+
+  it('is answerable where Answer lands: the parent thread lists it with its options', () => {
+    expect(InboxView.threadQuestions([childQuestion, item({ id: 'elsewhere', choices })], 'parent')).toEqual([childQuestion])
+  })
+
+  it('leaves out what the thread already shows or cannot answer', () => {
+    // The native question card takes the composer seat in its own thread; a second copy would be noise.
+    const native = item({ id: 'native', source: 'agent-questions.native-question', subject: { kind: 'session', id: 'parent' }, choices })
+    const noChoices = item({ id: 'free-text', subject: { kind: 'session', id: 'parent' }, choices: [] })
+    const answered = item({ id: 'answered', subject: { kind: 'session', id: 'parent' }, choices, resolvedAt: 5 })
+    const done = item({ id: 'done', subject: { kind: 'session', id: 'parent' }, choices, doneAt: 5 })
+    expect(InboxView.threadQuestions([native, noChoices, answered, done], 'parent')).toEqual([])
   })
 })

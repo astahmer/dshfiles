@@ -11,7 +11,11 @@ const reusableViewNames = new Map([
   ['Sidebar actions', 'Sidebar controls'],
   ['Backlog', 'Backlog'],
   ['Editor', 'Files'],
-  ['Jujutsu', 'Revision graph'],
+  ['Jujutsu', 'History'],
+  // The Workspaces page was titled Land; journeys written before the rename still open it by that fixture name.
+  ['Land', 'Workspaces'],
+  // The page's former name; journeys written before the rename still open it by this fixture name.
+  ['Revision graph', 'History'],
   ['Scratchpad', 'Workbench: Scratchpad'],
   ['Ticker', 'Workbench: Ticker'],
   ['Plugins', 'Plugin Manager: Plugins'],
@@ -71,7 +75,7 @@ const moreDestinationsButton = (page: Page): Locator =>
  */
 const railLocations = new Map<string, { readonly destination: string; readonly section: string }>([
   ['Thread Sidebar: Board', { destination: 'Threads', section: 'Board' }],
-  ['Inbox', { destination: 'Inbox', section: 'Needs you' }],
+  ['Inbox', { destination: 'Inbox', section: 'Inbox' }],
   ['JJ Integration: Thread integration', { destination: 'Land', section: 'Workspaces' }],
   ['pulls.review: Reviews', { destination: 'Land', section: 'Review' }],
   ['Jujutsu: Revision graph', { destination: 'Land', section: 'History' }],
@@ -87,7 +91,7 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Multi-host: Hosts', { destination: 'Observe', section: 'Hosts' }],
   ['Memory: Browser', { destination: 'Knowledge', section: 'Memory' }],
   ['Resource Packs: Resources', { destination: 'Knowledge', section: 'Resources' }],
-  ['Component gallery', { destination: 'Knowledge', section: 'Component gallery' }],
+  ['Component gallery', { destination: 'Settings', section: 'Component gallery' }],
   ['Whiteboard', { destination: 'Knowledge', section: 'Whiteboard' }],
   ['Agent CLI threads', { destination: 'Knowledge', section: 'Agent CLI threads' }],
   ['AI Accounts: Accounts', { destination: 'Settings', section: 'AI accounts' }],
@@ -102,8 +106,8 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   // Plain labels the page-kit migration (docs/ade-ux Phase 1b) gave these pages.
   ['Review', { destination: 'Land', section: 'Review' }],
   ['Backlog', { destination: 'Work', section: 'Backlog' }],
-  ['Land', { destination: 'Land', section: 'Workspaces' }],
-  ['Revision graph', { destination: 'Land', section: 'History' }],
+  ['Workspaces', { destination: 'Land', section: 'Workspaces' }],
+  ['History', { destination: 'Land', section: 'History' }],
   ['Source control', { destination: 'Land', section: 'Source control' }],
   ['Board', { destination: 'Threads', section: 'Board' }],
   ['Usage', { destination: 'Observe', section: 'Usage' }],

@@ -220,3 +220,16 @@ describe('a resize the collapse caused itself', () => {
     stop()
   })
 })
+
+describe('Send positioned outside the line (unslop phone 6)', () => {
+  it('does not count Send, which a narrow card seats beside the row, so a bar that fits keeps the mode words', () => {
+    // + · "Can edit" · ⋯ · model fit 292px; Send (36px) sits against the card, outside the row's box.
+    const row = rowOf({ available: 292, expanded: [44, 105, 32, 95, 36], compact: [44, 30, 32, 95, 36], icon: [44, 30, 32, 32, 36] })
+    const send = row.lastElementChild
+    if (!(send instanceof HTMLElement)) throw new Error('the row has no Send')
+    send.style.position = 'absolute'
+    const stop = observeControlRow(row)
+    expect(row.hasAttribute('data-model-compact')).toBe(false)
+    stop()
+  })
+})

@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "otlp-receiver",
-      "title": "Local OTLP/HTTP receiver",
-      "summary": "The Host listens on a loopback OTLP/HTTP port (4318 by default) and accepts POST /v1/traces in JSON and protobuf, gzip or deflate, from any OpenTelemetry exporter; spans are validated, bounded and stored with whole-trace retention. Plugin, external and both modes decide whether this receiver owns the port and whether it forwards to an external viewer. In plugin and both modes the receiver publishes its bound address in-process, so this Host's dshx spans and usage metrics arrive without OTEL_EXPORTER_OTLP_ENDPOINT; traces_status and the panel carry a diagnosis of why nothing arrives (exporter elsewhere or off, port held, external mode).",
+      "title": "Built-in trace receiver",
+      "summary": "DSH receives traces from any OpenTelemetry exporter on this machine and keeps them.",
+      "details": "The Host listens on a loopback OTLP/HTTP port (4318 by default) and accepts POST /v1/traces in JSON and protobuf, gzip or deflate, from any OpenTelemetry exporter; spans are validated, bounded and stored with whole-trace retention. Plugin, external and both modes decide whether this receiver owns the port and whether it forwards to an external viewer. In plugin and both modes the receiver publishes its bound address in-process, so this Host's dshx spans and usage metrics arrive without OTEL_EXPORTER_OTLP_ENDPOINT; traces_status and the panel carry a diagnosis of why nothing arrives (exporter elsewhere or off, port held, external mode).",
       "reach": ["click tab \"Observe\"", "click button \"Traces\"", "expect heading \"Traces\""],
       "surfaces": ["host", "storage", "tool", "client", "integration"],
       "surface": "infrastructure",
@@ -186,7 +187,8 @@
     {
       "id": "trace-explorer",
       "title": "Trace list and span waterfall",
-      "summary": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible, keyboard-navigable span waterfall (the plugin-ui TraceWaterfall) on a time axis, colored by service with errors in red, totals of duration, cost, tokens, model and tool calls, and a side panel with the selected span's attributes, events (an exception.stacktrace read as call frames with the plugin-ui CallStackTree, or as raw text) and resource attributes, plus an Open thread link when a span carries dsh.session.id.",
+      "summary": "List traces with filters, and open one as a timeline of its spans.",
+      "details": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible, keyboard-navigable span waterfall (the plugin-ui TraceWaterfall) on a time axis, colored by service with errors in red, totals of duration, cost, tokens, model and tool calls, and a side panel with the selected span's attributes, events (an exception.stacktrace read as call frames with the plugin-ui CallStackTree, or as raw text) and resource attributes, plus an Open thread link when a span carries dsh.session.id.",
       "reach": [
         "seed otlp-sample-trace",
         "click tab \"Observe\"",
@@ -291,16 +293,19 @@
     },
     {
       "id": "thread-traces-tab",
-      "title": "Per-thread Traces facet",
-      "summary": "A Traces facet of the thread panel (opened from the thread header's More thread actions, a turn's Trace button or Choose a view; productivity pass Q5 moved it out of the header tabs) shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent turn, model and tool spans and the plugin spans nested under them), a summary of spans, errors, model and tool calls, total and p50/p95 durations and gen_ai.usage token totals and list-price cost, a turn timeline (the plugin-ui AgentTimeline) laying its newest traces, model calls and tool calls on three lanes with idle time squeezed out, a turn list that opens the span waterfall, and the thread's correlated logs. A Requests facet follows and reuses Usage's request log scoped to the open Session id. With nothing stored it says why, from the receiver's diagnosis.",
+      "title": "Traces tab in the thread panel",
+      "summary": "The thread panel's Traces tab shows only this thread's traces.",
+      "details": "A Traces facet of the thread panel (opened from the thread header's More thread actions, a turn's Trace button or Choose a view; productivity pass Q5 moved it out of the header tabs) shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent turn, model and tool spans and the plugin spans nested under them), a summary of spans, errors, model and tool calls, total and p50/p95 durations and gen_ai.usage token totals and list-price cost, a turn timeline (the plugin-ui AgentTimeline) laying its newest traces, model calls and tool calls on three lanes with idle time squeezed out, a turn list that opens the span waterfall, and the thread's correlated logs. A Requests facet follows and reuses Usage's request log scoped to the open Session id. With nothing stored it says why, from the receiver's diagnosis.",
       "reach": [
         "seed tool-call-thread",
         "seed otlp-session-turns",
         "click button \"More thread actions\"",
-        "click menuitem \"Open Traces\"",
+        "click menuitem \"Open in\"",
+        "click menuitem \"Traces\"",
         "expect region \"Thread telemetry summary\"",
         "click button \"More thread actions\"",
-        "click menuitem \"Open Requests\"",
+        "click menuitem \"Open in\"",
+        "click menuitem \"Requests\"",
         "expect region \"Request log\""
       ],
       "surfaces": ["client", "host", "tool", "storage"],
@@ -366,7 +371,8 @@
     {
       "id": "log-explorer",
       "title": "Log search with trace correlation",
-      "summary": "The receiver also accepts POST /v1/logs (JSON or protobuf); the Logs tab searches stored records newest first by text, service, minimum severity and one attribute value, a record with a trace id opens its trace, and a span or trace opens only its own logs. GenAI content events keep only their body size unless redaction is turned off.",
+      "summary": "Search stored logs and open the trace each one belongs to.",
+      "details": "The receiver also accepts POST /v1/logs (JSON or protobuf); the Logs tab searches stored records newest first by text, service, minimum severity and one attribute value, a record with a trace id opens its trace, and a span or trace opens only its own logs. GenAI content events keep only their body size unless redaction is turned off.",
       "reach": ["seed otlp-sample-trace", "click tab \"Observe\"", "click button \"Traces\"", "click tab \"Logs\"", "expect list \"Logs\""],
       "surfaces": ["client", "host", "tool", "storage"],
       "surface": "destinationSection",
@@ -438,13 +444,15 @@
     {
       "id": "trace-insights",
       "title": "Service and operation overview, error groups",
-      "summary": "A service strip and an Operations tab summarize span volume, error rate and p50/p95/p99 latency per service and operation over a chosen window; an Errors tab groups error spans by service, operation, error type and message shape with counts, first and last seen and a sample trace.",
-      "reach": ["click tab \"Observe\"", "click button \"Traces\"", "click tab \"Operations\"", "expect combobox \"Window\""],
+      "summary": "See volume, errors and latency per service and operation, and group errors by kind.",
+      "details": "An Operations view (under More views) summarizes span volume, error rate and p50/p95/p99 latency per service and operation over a chosen window; an Errors tab groups error spans by service, operation, error type and message shape with counts, first and last seen and a sample trace.",
+      "reach": ["click tab \"Observe\"", "click button \"Traces\"", "click button \"More views\"", "click menuitem \"Operations\"", "expect combobox \"Window\""],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
         "click button \"Traces\"",
-        "click tab \"Operations\"",
+        "click button \"More views\"",
+        "click menuitem \"Operations\"",
         "expect combobox \"Window\""
       ],
       "surfaces": ["client", "host", "tool"],
@@ -503,8 +511,9 @@
     {
       "id": "service-map",
       "title": "Service dependency map",
-      "summary": "A Service map tab draws every service seen in the window as a box with span count, error rate and p95, and every cross-service parent/child call as an arrow with call count and p50, red when a call failed; picking a service filters the trace list by it.",
-      "reach": ["seed otlp-sample-trace", "click tab \"Observe\"", "click button \"Traces\"", "click tab \"Service map\"", "expect img \"Service map\""],
+      "summary": "A map of services and the calls between them, with failing calls in red.",
+      "details": "A Service map tab draws every service seen in the window as a box with span count, error rate and p95, and every cross-service parent/child call as an arrow with call count and p50, red when a call failed; picking a service filters the trace list by it.",
+      "reach": ["seed otlp-sample-trace", "click tab \"Observe\"", "click button \"Traces\"", "click button \"More views\"", "click menuitem \"Service map\"", "expect img \"Service map\""],
       "surfaces": ["client", "host", "tool"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -552,8 +561,9 @@
     {
       "id": "metric-charts",
       "title": "Metric list with one chart per metric",
-      "summary": "The receiver stores POST /v1/metrics (JSON or protobuf): gauges, sums, histograms, exponential histograms and summaries. The Metrics tab lists every metric per service with type, series count and last value, and charts the selected one per attribute set: gauges and sums as their value, cumulative counters as their increase between exports, distributions as their mean.",
-      "reach": ["seed otlp-sample-trace", "click tab \"Observe\"", "click button \"Traces\"", "click tab \"Metrics\"", "expect img \"Chart of*\""],
+      "summary": "List every metric per service and chart the one you pick.",
+      "details": "The receiver stores POST /v1/metrics (JSON or protobuf): gauges, sums, histograms, exponential histograms and summaries. The Metrics tab lists every metric per service with type, series count and last value, and charts the selected one per attribute set: gauges and sums as their value, cumulative counters as their increase between exports, distributions as their mean.",
+      "reach": ["seed otlp-sample-trace", "click tab \"Observe\"", "click button \"Traces\"", "click button \"More views\"", "click menuitem \"Metrics\"", "expect img \"Chart of*\""],
       "surfaces": ["client", "host", "tool", "storage"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -612,7 +622,8 @@
     {
       "id": "alert-rules",
       "title": "Alert rules over stored telemetry",
-      "summary": "Rules evaluated on the Host every minute over the stored spans: error rate, latency percentile, throughput, span count and span duration over a threshold, each with a service, span-name (exact or prefix*) and attribute filter, window, threshold, comparator and severity. A rule is ok or firing, resolves after two clear evaluations so a flapping signal fires once, and keeps a bounded history. A firing rule shows in the Alerts tab with its value, sample trace and threads, marks the Alerts tab and the panel with a red count and a banner, announces itself in an in-app banner (and a browser notification when allowed) wherever the user is, and marks the threads its spans carry unread through thread-sidebar. Rules can be created, edited, enabled, muted and deleted (with confirmation) in the tab or by agent tools. Four built-in rules ship; only the two that name a failure (model call errors, jj latency) are enabled, and the long-turn and plugin API error-rate rules ship off.",
+      "summary": "Set alert rules on error rate, latency or volume, checked every minute.",
+      "details": "Rules evaluated on the Host every minute over the stored spans: error rate, latency percentile, throughput, span count and span duration over a threshold, each with a service, span-name (exact or prefix*) and attribute filter, window, threshold, comparator and severity. A rule is ok or firing, resolves after two clear evaluations so a flapping signal fires once, and keeps a bounded history. A firing rule shows in the Alerts tab with its value, sample trace and threads, marks the Alerts tab and the panel with a red count and a banner, announces itself in an in-app banner (and a browser notification when allowed) wherever the user is except on the Alerts view itself (a resolution only with announceResolved on), and marks the threads its spans carry unread through thread-sidebar. Rules can be created, edited, enabled, muted and deleted (with confirmation) in the tab or by agent tools. Four built-in rules ship; only the two that name a failure (model call errors, jj latency) are enabled, and the long-turn and plugin API error-rate rules ship off.",
       "reach": [
         "seed otlp-sample-trace",
         "click tab \"Observe\"",
@@ -780,12 +791,14 @@
     {
       "id": "boards-and-saved-views",
       "title": "Boards and saved views",
-      "summary": "A Boards tab breaks the window's spans down with built-in boards: slow tools (execute_tool by gen_ai.tool.name), failing plugins (dshx API dispatch by dshx.plugin.package), model latency by provider (chat spans with time to first token), jobs (by dsh.job.kind) and jj commands, each row with count, error rate and percentiles; a row opens the trace list filtered to its spans. A Views menu opens any board and saves or reapplies named views of the panel (tab, trace filters, log filters, window). traces_breakdown gives agents the same breakdowns. Not a dashboard builder.",
+      "summary": "Built-in boards show slow tools, failing plugins and model latency, and you can save your own views.",
+      "details": "A Boards tab breaks the window's spans down with built-in boards: slow tools (execute_tool by gen_ai.tool.name), failing plugins (dshx API dispatch by dshx.plugin.package), model latency by provider (chat spans with time to first token), jobs (by dsh.job.kind) and jj commands, each row with count, error rate and percentiles; a row opens the trace list filtered to its spans. A Views menu opens any board and saves or reapplies named views of the panel (tab, trace filters, log filters, window). traces_breakdown gives agents the same breakdowns. Not a dashboard builder.",
       "reach": [
         "seed otlp-sample-trace",
         "click tab \"Observe\"",
         "click button \"Traces\"",
-        "click tab \"Boards\"",
+        "click button \"More views\"",
+        "click menuitem \"Boards\"",
         "click radio \"Slow tools\"",
         "expect text \"execute_tool spans by gen_ai.tool.name, slowest p95 first.\""
       ],
@@ -852,7 +865,8 @@
     {
       "id": "browser-interaction-traces",
       "title": "Browser interaction traces",
-      "summary": "Slow GUI interactions (thread switch, New thread, panel open, composer send) arrive as dshfiles-web root spans, forwarded by the Host instead of posted from the page, with the dshx API calls they made as client children and the Host dispatch spans those calls caused nested under them: one trace from click to Host work.",
+      "summary": "Slow clicks in the page, such as switching threads, record traces down to the work they caused.",
+      "details": "Slow GUI interactions (thread switch, New thread, panel open, composer send) arrive as dshfiles-web root spans, forwarded by the Host instead of posted from the page, with the dshx API calls they made as client children and the Host dispatch spans those calls caused nested under them: one trace from click to Host work.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"New thread\"",
@@ -928,7 +942,8 @@
     {
       "id": "trace-transcript-links",
       "title": "Span ↔ transcript links",
-      "summary": "A span's Open in thread (Traces panel) or Show in chat (thread Traces tab) opens its thread's Chat scrolled to and highlighting the turn, step or tool call it belongs to — the nearest span carrying dsh.turn, dsh.step and gen_ai.tool.call.id, so a plugin span lands on its tool call. Each Turn footer has a Trace button that opens the thread's Traces tab on that turn's trace. Both directions use the native Conversation View focus request (openView/viewRequest) and the owned Chat fork's @dshfiles/chat/chat-focus contract.",
+      "summary": "Open a span in its thread, scrolled to the turn or tool call it belongs to.",
+      "details": "A span's Open in thread (Traces panel) or Show in chat (thread Traces tab) opens its thread's Chat scrolled to and highlighting the turn, step or tool call it belongs to — the nearest span carrying dsh.turn, dsh.step and gen_ai.tool.call.id, so a plugin span lands on its tool call. Each Turn footer has a Trace button that opens the thread's Traces tab on that turn's trace. Both directions use the native Conversation View focus request (openView/viewRequest) and the owned Chat fork's @dshfiles/chat/chat-focus contract.",
       "reach": [
         "seed tool-call-thread",
         "seed otlp-session-turns",
@@ -1004,12 +1019,14 @@
     {
       "id": "span-cost",
       "title": "List-price cost on traces",
-      "summary": "Sums the dshx.cost.usd agent telemetry puts on model-call spans (never the turn span that repeats them): the thread Traces tab shows the thread's total and each turn's cost, the span panel a call's own cost, the Operations tab model calls per service and model with tokens and cost, and traces_session_summary / traces_search / traces_list_services return the same.",
+      "summary": "Traces show what each thread, turn and model call cost at list price.",
+      "details": "Sums the dshx.cost.usd agent telemetry puts on model-call spans (never the turn span that repeats them): the thread Traces tab shows the thread's total and each turn's cost, the span panel a call's own cost, the Operations tab model calls per service and model with tokens and cost, and traces_session_summary / traces_search / traces_list_services return the same.",
       "reach": [
         "seed tool-call-thread",
         "seed otlp-session-turns",
         "click button \"More thread actions\"",
-        "click menuitem \"Open Traces\"",
+        "click menuitem \"Open in\"",
+        "click menuitem \"Traces\"",
         "expect region \"Thread telemetry summary\""
       ],
       "surfaces": ["client", "host", "tool"],
@@ -1068,7 +1085,8 @@
     {
       "id": "alert-inbox-items",
       "title": "Firing alerts in the Inbox",
-      "summary": "Every enabled alert rule that is firing and not muted is a Failed Inbox item with its last value, threshold and window. Each incident is its own item, so a rule that fires again shows again after the user marked the last one done. Muting the rule, disabling it or the rule resolving closes the item.",
+      "summary": "A firing alert shows in the Inbox with its value, threshold and window.",
+      "details": "Every enabled alert rule that is firing and not muted is a Failed Inbox item with its last value, threshold and window. Each incident is its own item, so a rule that fires again shows again after the user marked the last one done. Muting the rule, disabling it or the rule resolving closes the item.",
       "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
       "reachNarrow": ["click button \"Inbox\"", "expect heading \"Inbox\""],
       "surfaces": ["host", "integration"],
@@ -1117,8 +1135,9 @@
     },
     {
       "id": "event-loop-stalls",
-      "title": "Host event-loop stalls",
-      "summary": "A 100 ms timer-drift probe records a `host event-loop stall` root span whenever the DSH Host event loop was blocked past `eventLoopStallMs` (100 ms), at most 30 a minute. traces_stalls lists them with the spans that were open while each lasted, the work the stall fills most first, so a `sqlite lock wait`, an index pass or a tool call shows as the owner without a live CPU profile.",
+      "title": "DSH stalls",
+      "summary": "Each time DSH froze for more than 100 ms is recorded with the work that was running.",
+      "details": "A 100 ms timer-drift probe records a `host event-loop stall` root span whenever the DSH Host event loop was blocked past `eventLoopStallMs` (100 ms), at most 30 a minute. traces_stalls lists them with the spans that were open while each lasted, the work the stall fills most first, so a `sqlite lock wait`, an index pass or a tool call shows as the owner without a live CPU profile.",
       "surfaces": ["host", "tool"],
       "surface": "infrastructure",
       "destination": "none",
@@ -1190,7 +1209,8 @@
     {
       "id": "store-space",
       "title": "Span store space and Reclaim",
-      "summary": "traces_store_space reports the span store's pages, free pages and auto_vacuum mode; traces_reclaim_space (confirm: true, only on a user's request) gives the free pages back and reports the bytes freed. A store created before incremental auto_vacuum is converted by that one VACUUM; it is never converted on its own.",
+      "summary": "See how much space the trace store uses and give free space back to the disk.",
+      "details": "traces_store_space reports the span store's pages, free pages and auto_vacuum mode; traces_reclaim_space (confirm: true, only on a user's request) gives the free pages back and reports the bytes freed. A store created before incremental auto_vacuum is converted by that one VACUUM; it is never converted on its own.",
       "surfaces": ["host", "storage", "tool"],
       "surface": "infrastructure",
       "destination": "none",

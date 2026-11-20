@@ -47,6 +47,8 @@ button.header:disabled { cursor: progress; }
 .toggle svg { flex: none; width: 14px; height: 14px; }
 @media (pointer: coarse) {
   .row, .toggle { min-height: 44px; }
+  /* Line counts and file rows read at the density minimum: 12px on a phone, never the 10-11px desktop size. */
+  .stat, .row { font-size: var(--dshx-density-text-min, 12px); }
 }
 
 .preview { max-height: 100%; overflow: hidden; }

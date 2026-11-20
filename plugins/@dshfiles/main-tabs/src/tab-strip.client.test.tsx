@@ -146,6 +146,38 @@ const openAsideFromMenu = async (): Promise<void> => {
 }
 
 describe('TabStrip layout', () => {
+  it('marks a preview tab with a muted title instead of italics', () => {
+    mount(
+      undefined,
+      undefined,
+      tabs.map(tab => (tab.kind === 'panel' ? { ...tab, preview: true } : tab)),
+    )
+    const title = screen.getByText('Workbench')
+    expect(title.className).not.toContain('italic')
+    expect(title.className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(screen.getByText('Thread').className).not.toContain('dshx:text-(--dsw-alias-label-tertiary)')
+  })
+
+  it('draws the shared status glyph on a thread tab and never a coloured dot of its own', () => {
+    const withStatus = (status: TabView['status']): readonly TabView[] => tabs.map(tab => (tab.kind === 'thread' ? { ...tab, status } : tab))
+    const view = mount()
+    const glyph = () => view.container.querySelector('[role="tab"] [data-slot="status-glyph"]')
+    expect(glyph()?.getAttribute('data-status')).toBe('working')
+    expect(view.container.innerHTML).not.toMatch(/bg-info|bg-warning|animate-pulse/)
+    const draw = (status: TabView['status']): void =>
+      view.rerender(<TabStrip tabs={withStatus(status)} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} />)
+    draw('needsYou')
+    expect(glyph()?.getAttribute('data-status')).toBe('needs-you')
+    expect(view.container.innerHTML).not.toMatch(/bg-info|bg-warning|animate-pulse/)
+    draw('failed')
+    expect(glyph()?.getAttribute('data-status')).toBe('failed')
+    expect(screen.getByRole('tab', { name: 'Thread, failed' })).toBeDefined()
+    draw('unread')
+    expect(glyph()?.getAttribute('data-status')).toBe('ready')
+    draw(null)
+    expect(glyph()).toBeNull()
+  })
+
   it('places the close button on either side of the title and preserves close behavior', () => {
     const send = vi.fn()
     mount(send, async () => {}, tabs, 'left')

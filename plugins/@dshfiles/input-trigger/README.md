@@ -1,6 +1,6 @@
 # `@dshfiles/input-trigger`
 
-![Codex-style @ token targeting](docs/screenshots/codex-at-tokens.png)
+![Pick what an @ mention targets](docs/screenshots/codex-at-tokens.png)
 
 Owned MIT fork of DSH's shared `/`, `@` and `#` autocomplete engine. It preserves the upstream source/controller/menu pipeline and resolves typed `@` tokens the way Codex's composer does ([`src/caret-token.ts`](./src/caret-token.ts), ported from `codex-rs/tui/src/bottom_pane/chat_composer/completion_target.rs`):
 

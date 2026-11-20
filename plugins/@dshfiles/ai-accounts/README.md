@@ -435,7 +435,7 @@ unreset, and the reserve lasts, requests on that account go out as
 `gpt-reserve` (Settings › AI Accounts › Codex Luna Reserve, on by default);
 the picker and transcript keep the model you chose.
 
-Failure recovery (Settings › AI Accounts › Failure recovery) decides what a
+Failure recovery (Settings › AI Accounts › Failure recovery, behind **Edit**) decides what a
 failed request on an account route does, per kind: connection failure
 (resets, timeouts, 5xx, Envoy replay-buffer overflow, an overloaded provider such as
 Codex's "Our servers are currently overloaded"), rate limit, usage
@@ -474,7 +474,7 @@ same-provider fail-over step above: a failure whose kind fails over (connection,
 rate limit, exhausted by default) moves the work to the next enabled, healthy
 rung after the current one, never one the interrupted work already tried. Sticky
 distribution never walks the chain, except for a stalled stream: with **Fall
-back on stalled streams** (Settings › AI Accounts › Failure recovery,
+back on stalled streams** (Settings › AI Accounts › Failure recovery › Edit,
 `stalledStreamFallback`, off by default, needs transport fail-over on) a request
 that sends no data until its idle timeout (`pi-ai stream idle timeout after …ms`)
 moves to the thread's stored chain after its transport retries, under any

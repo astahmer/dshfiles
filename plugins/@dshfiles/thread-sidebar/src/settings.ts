@@ -68,22 +68,32 @@ export const threadSidebarSettings = defineSettings({
     phoneEdgeSwipePanels: Schema.boolean()
       .default(DEFAULT_PREFERENCES.phoneEdgeSwipePanels)
       .description(
-        "On a phone, inside a thread, a swipe in from the right screen edge opens the thread panel. Off by default because Android's back gesture also uses that edge; the swipe starts slightly inside it.",
+        'On a phone, swipe in from the right edge to open the thread panel (off by default: Android’s back gesture uses it).',
       ),
     phoneNavigation: Schema.union(['stack', 'drawer'] as const)
       .default(DEFAULT_PREFERENCES.phoneNavigation)
       .description(
-        'On a phone: stack shows a bottom tab bar and the thread list full screen, with Back from a thread; drawer keeps the thread on screen and slides the thread list in from the left (sidebar button or a swipe from the left edge), with Inbox, Land and More at its top.',
+        'On a phone, stack shows the thread list full screen with a tab bar, and drawer slides it in over the thread.',
       ),
     showFooter: Schema.boolean()
       .default(DEFAULT_PREFERENCES.showFooter)
       .description(
-        'Show the row of controls under the thread list (Settings, More; Restart DSH, Copy URL and Pair a phone too while Show DSH actions on the rail is off). Off: those live in the rail and ⌘K.',
+        'Show the row of controls under the thread list (off: they live in the rail and ⌘K).',
       ),
     showRailActions: Schema.boolean()
       .default(DEFAULT_PREFERENCES.showRailActions)
       .description(
-        'Show DSH actions on the rail: Restart DSH, Copy DSH URL for agents and Pair a phone, directly above Settings (on a phone, under More › DSH). Off: they move to the row under the list, which a pending restart or page reload then shows; ⌘K keeps them either way.',
+        'Show Copy DSH URL, Pair a phone and a pending reload on the rail above Settings.',
+      ),
+    showRailRestart: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.showRailRestart)
+      .description(
+        'Show Restart DSH on the rail (off: the status strip shows it while updates wait).',
+      ),
+    showDeveloperPages: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.showDeveloperPages)
+      .description(
+        'List the pages for plugin authors (Component gallery, Plugin guide) in a Developer group at the end of Settings. Off: ⌘K still opens them.',
       ),
     navigationDensity: Schema.union(['compact', 'comfortable'] as const)
       .default(DEFAULT_PREFERENCES.navigationDensity)
@@ -107,7 +117,7 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.projectColorPalette)
       .description('Choose the accessible color family used for project labels.'),
     threadRowTitle: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowTitle).description('Show the thread title.'),
-    threadRowMachine: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowMachine).description('Show the machine the DSH Host runs on.'),
+    threadRowMachine: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowMachine).description('Show the machine each thread runs on.'),
     threadRowPath: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowPath).description('Show the full working directory path.'),
     threadRowTime: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowTime).description('Show the last activity time.'),
     threadRowStatusDot: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot).description('Show the running / unread status dot.'),
@@ -138,7 +148,7 @@ export const threadSidebarSettings = defineSettings({
       .description('Semantic color used for each attention status dot and label.'),
     includeSubagentAttention: Schema.boolean()
       .default(DEFAULT_PREFERENCES.includeSubagentAttention)
-      .description('Include child session attention in groups, thread-row labels, and desktop alerts.'),
+      .description('Include subagent threads in attention groups, thread-row labels, and desktop alerts.'),
     desktopNotificationsEnabled: Schema.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled).hidden(),
     notificationCategories: notificationCategories.hidden(),
     notificationPlacement: Schema.union(THREAD_NOTIFICATION_PLACEMENTS).default(DEFAULT_PREFERENCES.notificationPlacement).hidden(),
@@ -146,7 +156,7 @@ export const threadSidebarSettings = defineSettings({
     resumeAfterRestart: Schema.boolean()
       .default(DEFAULT_PREFERENCES.resumeAfterRestart)
       .description(
-        'After a managed restart (Restart DSH, Restart when idle), continue each thread whose turn the restart cut off, once, with a note naming what was cut off. Off by default: each resume is one turn nobody asked for. Crashes and forced stops stay in Interrupted for a manual Resume.',
+        'After a managed restart, continue once each thread whose turn it cut off (off by default: it spends a turn).',
       ),
     resumeAfterRestartMaxThreads: Schema.natural()
       .min(1)
@@ -160,7 +170,7 @@ export const threadSidebarSettings = defineSettings({
     autoRestartWhenIdle: Schema.boolean()
       .default(false)
       .description(
-        'Off by default: it restarts DSH without anyone asking. On: restart DSH by itself to apply a plugin or profile update that needs a Host restart, once no turn, subagent, background job or open question has run for the quiet period. A 30 s notice with Postpone comes first. Needs DSH started through the supervised launcher (scripts/dsh-launcher); otherwise the notice shows that command and nothing restarts.',
+        'Restart DSH when idle to apply updates, after a 30 s notice (needs the supervised launcher).',
       ),
     autoRestartQuietSeconds: Schema.natural()
       .min(30)
@@ -170,16 +180,16 @@ export const threadSidebarSettings = defineSettings({
     subscriptionNoticeLevel: Schema.union(SUBSCRIPTION_NOTICE_LEVELS)
       .default('all')
       .description(
-        'Which turn ends of a subscribed thread reach the thread watching it, unless that subscription sets its own level: all, outcomes (landed, failed, asks a question), stuck (failed, asks a question, blocked, truncated) or never.',
+        'Which turn ends of a subscribed thread notify the thread watching it: all, outcomes, stuck or never.',
       ),
     subscriptionDelivery: Schema.union(SUBSCRIPTION_DELIVERY_MODES)
       .default('steer')
       .description(
-        'How a notice reaches a watching thread that is running: steer it into the live turn at its next step, or queue it for after that turn. Notices that arrive together merge into one either way.',
+        'Steer a notice into a watching thread’s live turn, or queue it for after that turn.',
       ),
     applyActionsToChildThreads: Schema.boolean()
       .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
-      .description('Apply manual pin, park, archive, and restore actions to all child threads.'),
+      .description('Apply manual pin, snooze, archive, and restore actions to all child threads.'),
     maxChildren: Schema.natural()
       .min(1)
       .max(50)
@@ -191,7 +201,7 @@ export const threadSidebarSettings = defineSettings({
     subagentRunCards: Schema.boolean()
       .default(DEFAULT_PREFERENCES.subagentRunCards)
       .description(
-        'Show each working subagent above the composer as a compact run card: its current tool, route, elapsed time, a Stop that interrupts the child and Open thread. Off keeps the one-line row with its expandable live progress. A child whose open turn, route or tool is not known yet keeps the row.',
+        'Show each working subagent above the composer as a run card with its tool, time and Stop.',
       ),
     archiveUndoEnabled: Schema.boolean()
       .default(DEFAULT_PREFERENCES.archiveUndoEnabled)
@@ -203,31 +213,31 @@ export const threadSidebarSettings = defineSettings({
       .description('How long the manual archive undo notice stays visible, in seconds.'),
     autoSettleEnabled: Schema.boolean()
       .default(DEFAULT_PREFERENCES.autoSettleEnabled)
-      .description('Settle idle threads automatically: they stay listed and openable, but run no model step until unsettled.'),
+      .description('Mark idle threads done automatically: they stay listed and openable, but run nothing until restored.'),
     rebasedThreadSettleDelay: Schema.union(THREAD_DELAYS)
       .default(DEFAULT_PREFERENCES.rebasedThreadSettleDelay)
-      .description('Settle successfully rebased threads immediately or after a delay. Running or waiting threads are never settled.'),
+      .description('Mark landed threads done immediately or after a delay. Running or waiting threads are never marked done.'),
     settledArchiveDelay: Schema.union(THREAD_DELAYS)
       .default(DEFAULT_PREFERENCES.settledArchiveDelay)
-      .description('Archive a settled thread once this delay has passed. Running, waiting, pinned or newly changed threads are never archived.'),
+      .description('Archive a done thread once this delay has passed. Running, waiting, pinned or newly changed threads are never archived.'),
     // Written with the settled ids; the banner and the archive delay read it back.
     settledAt: Schema.dict(Schema.natural()).default({}).hidden(),
     idleMinutes: Schema.natural()
       .min(15)
       .max(10080)
       .default(DEFAULT_PREFERENCES.idleMinutes)
-      .description('Idle threshold in minutes before threads move to Inactive; auto-settle uses the same threshold.'),
+      .description('Minutes without activity before a thread counts as idle; marking idle threads done uses the same threshold.'),
     subagentSettleHours: Schema.natural()
       .max(720)
       .default(DEFAULT_PREFERENCES.subagentSettleHours)
       .description(
-        'Settle a subagent thread idle for this many hours and stop the background jobs it left running. Pinned, opted-out, waiting or running threads stay. 0 turns it off.',
+        'Mark an idle subagent thread done after this many hours and stop its jobs (0 turns it off).',
       ),
     scanIntervalMinutes: Schema.natural()
       .min(1)
       .max(120)
       .default(DEFAULT_PREFERENCES.scanIntervalMinutes)
-      .description('How often auto-settle checks, in minutes.'),
+      .description('How often idle threads are checked, in minutes.'),
     paletteChord: Schema.union([Schema.const(null), Schema.string()])
       .default(DEFAULT_PREFERENCES.paletteChord)
       .hidden(),

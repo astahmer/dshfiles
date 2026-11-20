@@ -39,11 +39,11 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
   await dialog.getByRole('button', { name: 'Add view', exact: true }).click()
   await dialog.getByLabel('View name').fill('Needs focus')
   await selectViewOption(page, 'Group by', 'Date')
-  await selectViewStatuses(page, ['Needs attention', 'Archived'])
+  await selectViewStatuses(page, ['Needs you', 'Archived'])
   await selectViewOption(page, 'Source', 'Main threads')
   await dialog.getByRole('button', { name: 'Save view', exact: true }).click()
   await expect(dialog.getByRole('button', { name: 'Edit view Needs focus', exact: true })).toBeVisible()
-  await expect(dialog.getByRole('listitem').filter({ hasText: 'Needs focus' })).toContainText('Needs attention, Archived')
+  await expect(dialog.getByRole('listitem').filter({ hasText: 'Needs focus' })).toContainText('Needs you, Archived')
 
   for (let step = 0; step < 3; step += 1) {
     await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
@@ -118,7 +118,7 @@ const saveCurrentFiltersAs = async (page: Page, name: string): Promise<void> => 
   await expect(dialog).toHaveCount(0)
 }
 
-const statusLabels = ['All threads', 'Working', 'Needs attention', 'Archived'] as const
+const statusLabels = ['All threads', 'Working', 'Needs you', 'Archived'] as const
 
 When('two filter presets are saved from the Filter menu', async ({ page }: { page: Page }) => {
   const sidebar = threadSidebar(page)

@@ -15,6 +15,7 @@ import { useId, useState, type ReactNode } from 'react'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { DISTRIBUTION_HINT, DISTRIBUTION_LABEL, DISTRIBUTIONS } from './account-labels.js'
 import { aiAccountsApi, type AccountsFile, type UsageHistoryMeta } from './api.js'
+import { FailureHandlingDisclosure, failureHandlingSummary } from './failure-handling-disclosure.js'
 import { FAILURE_KINDS, type FailureKind, type KindPolicy } from './failure-policy.js'
 import { pricingStatusLine } from './pricing-status.js'
 import { RouteRules, RouteRuleTable } from './route-rule-table.js'
@@ -200,7 +201,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
       <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
         <div className="dshx:flex dshx:flex-col dshx:gap-0.5">
           <h2 className="dshx:text-base dshx:font-semibold">AI Accounts</h2>
-          <p className="dshx:text-xs dshx:text-muted-foreground">Codex, Claude, OpenCode Go, Command Code and Cursor accounts side by side.</p>
+          <p className="dshx:text-xs dshx:text-muted-foreground">Accounts, models and sign-in are on the AI accounts page. Preferences are below.</p>
         </div>
         <Button
           onClick={() => {
@@ -218,7 +219,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
 
       {settings.error?.kind === 'namespace-unregistered' || settings.error?.kind === 'provider-unavailable' ? (
         <Alert variant="warning">
-          <AlertDescription>Restart DSH to load these preferences; the running Host predates them. Defaults apply until then.</AlertDescription>
+          <AlertDescription>Restart DSH to load these settings. Defaults apply until then.</AlertDescription>
         </Alert>
       ) : readOnly && settings.status === 'ready' ? (
         <Alert variant="warning">
@@ -327,7 +328,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
       <FailureRecoveryGroup readOnly={readOnly} write={write} />
       {!preferences.failureRecovery.exhausted.failover ? (
         <Group
-          description="For exhausted limits. Automatic resume queues one minute after a known provider reset, or backs off from 30 seconds up to every 10 minutes when the provider names none; an account failover still takes the request first."
+          description="For exhausted limits. Automatic resume queues one minute after a known provider reset, or backs off from 30 seconds up to every 10 minutes when the provider names none. An account failover still takes the request first."
           heading="Quota retry"
         >
           <Row hint="Pre-check the per-turn choice in every thread. The default is on." label="Automatically resume after reset by default">
@@ -359,7 +360,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             <Switch checked={preferences.footerButton} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('footerButton', value))} />
           )}
         </Row>
-        <Row hint="Controls the governing window and collapsed rail; all-window layouts show percentages." label="Meter shows">
+        <Row hint="Controls the governing window and collapsed rail. All-window layouts show percentages." label="Meter shows">
           {id => (
             <Select
               disabled={readOnly || !preferences.footerButton}
@@ -408,7 +409,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             </Select>
           )}
         </Row>
-        <Row hint="The tag beside each meter in the wide strip; set one per account below." label="Short names in the strip">
+        <Row hint="The tag beside each meter in the wide strip. Set one per account below." label="Short names in the strip">
           {id => (
             <Switch
               checked={preferences.usageShortNames}
@@ -454,7 +455,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             />
           )}
         </Row>
-        <Row hint="How often open surfaces ask for fresh quota. Surfaces share one Host reading." label="Refresh usage every">
+        <Row hint="How often open surfaces ask for fresh quota. All surfaces share one reading." label="Refresh usage every">
           {id => (
             <NumberSelect
               disabled={readOnly}
@@ -473,7 +474,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
 
       <WorkHoursGroup readOnly={readOnly} write={write} />
 
-      <Group description="The Host records one quota snapshot per enabled account on this schedule." heading="Usage history">
+      <Group description="DSH records one quota snapshot per enabled account on this schedule." heading="Usage history">
         <Row label="Record every">
           {id => (
             <NumberSelect
@@ -675,7 +676,7 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
 
   return (
     <Group description="Estimated cost per thread beside the composer stats, priced from models.dev. An estimate, never an invoice." heading="Cost estimates">
-      <Row hint="Shows ≈$ beside the token stats; hover it for the breakdown." label="Show thread cost">
+      <Row hint="Shows ≈$ beside the token stats. Hover it for the breakdown." label="Show thread cost">
         {id => (
           <Switch
             checked={preferences.costEstimates}
@@ -723,7 +724,7 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
       >
         {() => (
           <Button disabled={pricing === null || refresh.isPending} onClick={() => refresh.mutate()} size="sm" type="button" variant="outline">
-            <RefreshCwIcon className={refresh.isPending ? 'dshx:animate-spin' : undefined} />
+            <RefreshCwIcon className={refresh.isPending ? 'dshx:animate-spin dshx:motion-reduce:animate-none' : undefined} />
             Refresh now
           </Button>
         )}
@@ -961,115 +962,121 @@ const FailureRecoveryGroup = (props: { readonly readOnly: boolean; readonly writ
     props.write(preferences.settings.set('failureRecovery', { ...policy, [kind]: { ...policy[kind], [field]: value } }))
 
   return (
-    <Group
-      description="Options run top to bottom: same account, Luna Reserve, next account of the same provider with the same model (in usage-strip order, hidden accounts skipped), wait, a smaller request. A switch shows as a retry row in the turn."
-      heading="Failure recovery"
-    >
-      {FAILURE_KINDS.map(kind => {
-        const copy = FAILURE_KIND_COPY[kind]
-        const current = policy[kind]
-        const shows = (field: keyof KindPolicy): boolean => copy.options.includes(field)
-        return (
-          <fieldset className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:pt-3 dshx:first-of-type:border-t-0 dshx:first-of-type:pt-0" key={kind}>
-            <legend className="dshx:flex dshx:flex-col dshx:gap-0.5">
-              <span className="dshx:text-sm dshx:font-medium">{copy.title}</span>
-              <span className="dshx:text-xs dshx:text-muted-foreground">{copy.hint}</span>
-            </legend>
-            {shows('retries') ? (
-              <Row label="Retry the same account">
+    <Group description="What a failed request does next, for each kind of failure." heading="Failure recovery">
+      <FailureHandlingDisclosure summary={failureHandlingSummary({ policy, stalledStreamFallback: preferences.stalledStreamFallback })}>
+        <p className="dshx:text-xs dshx:text-muted-foreground">
+          Options run top to bottom: same account, Luna Reserve, next account of the same provider with the same model (in usage-strip order, hidden accounts
+          skipped), wait, a smaller request. A switch shows as a retry row in the turn.
+        </p>
+        {FAILURE_KINDS.map(kind => {
+          const copy = FAILURE_KIND_COPY[kind]
+          const current = policy[kind]
+          const shows = (field: keyof KindPolicy): boolean => copy.options.includes(field)
+          return (
+            <fieldset className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:pt-3 dshx:first-of-type:border-t-0 dshx:first-of-type:pt-0" key={kind}>
+              <legend className="dshx:flex dshx:flex-col dshx:gap-0.5">
+                <span className="dshx:text-sm dshx:font-medium">{copy.title}</span>
+                <span className="dshx:text-xs dshx:text-muted-foreground">{copy.hint}</span>
+              </legend>
+              {shows('retries') ? (
+                <Row label="Retry the same account">
+                  {id => (
+                    <NumberSelect
+                      disabled={props.readOnly}
+                      format={value => (value === 0 ? 'Never' : `${String(value)}×`)}
+                      id={id}
+                      onChange={value => update(kind, 'retries', value)}
+                      options={RETRY_COUNTS}
+                      value={current.retries}
+                    />
+                  )}
+                </Row>
+              ) : null}
+              {shows('backoffMs') && current.retries > 0 ? (
+                <Row hint="Each further retry waits twice as long." label="First retry after">
+                  {id => (
+                    <NumberSelect
+                      disabled={props.readOnly}
+                      format={formatDuration}
+                      id={id}
+                      onChange={value => update(kind, 'backoffMs', value)}
+                      options={BACKOFF_MS}
+                      value={current.backoffMs}
+                    />
+                  )}
+                </Row>
+              ) : null}
+              {shows('lunaReserve') ? (
+                <Row hint="Codex accounts with reserve left, while Codex Luna Reserve is on." label="Continue on Luna Reserve">
+                  {id => (
+                    <Switch
+                      checked={current.lunaReserve}
+                      disabled={props.readOnly || !preferences.codexLunaReserve}
+                      id={id}
+                      onCheckedChange={value => update(kind, 'lunaReserve', value)}
+                    />
+                  )}
+                </Row>
+              ) : null}
+              {shows('failover') ? (
+                <Row hint="The failed account cools down. The thread returns to it once it recovers." label="Fail over to the next account">
+                  {id => <Switch checked={current.failover} disabled={props.readOnly} id={id} onCheckedChange={value => update(kind, 'failover', value)} />}
+                </Row>
+              ) : null}
+              {kind === 'transport' ? (
+                <Row
+                  hint="When a model sends no data until its idle timeout, move to the thread's model fallback chain under any distribution, not only Priority."
+                  label="Fall back on stalled streams"
+                >
+                  {id => (
+                    <Switch
+                      checked={preferences.stalledStreamFallback}
+                      disabled={props.readOnly || !current.failover}
+                      id={id}
+                      onCheckedChange={value => props.write(preferences.settings.set('stalledStreamFallback', value))}
+                    />
+                  )}
+                </Row>
+              ) : null}
+              {shows('waitSeconds') ? (
+                <Row hint="Waits out a provider-declared reset no longer than this, then retries once." label="Then wait up to">
+                  {id => (
+                    <NumberSelect
+                      disabled={props.readOnly}
+                      format={value => (value === 0 ? 'Never' : formatDuration(value * 1_000))}
+                      id={id}
+                      onChange={value => update(kind, 'waitSeconds', value)}
+                      options={WAIT_SECONDS}
+                      value={current.waitSeconds}
+                    />
+                  )}
+                </Row>
+              ) : null}
+              {shows('shrink') ? (
+                <Row
+                  hint="Last try: images the model already answered go as file placeholders. Large tool outputs are kept."
+                  label="Shrink before the last try"
+                >
+                  {id => <Switch checked={current.shrink} disabled={props.readOnly} id={id} onCheckedChange={value => update(kind, 'shrink', value)} />}
+                </Row>
+              ) : null}
+              <Row label="When nothing is left">
                 {id => (
-                  <NumberSelect
-                    disabled={props.readOnly}
-                    format={value => (value === 0 ? 'Never' : `${String(value)}×`)}
-                    id={id}
-                    onChange={value => update(kind, 'retries', value)}
-                    options={RETRY_COUNTS}
-                    value={current.retries}
-                  />
+                  <Select disabled={props.readOnly} onValueChange={value => update(kind, 'then', value === 'dsh' ? 'dsh' : 'fail')} value={current.then}>
+                    <SelectTrigger className="dshx:w-44" id={id} size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fail">Fail the turn</SelectItem>
+                      <SelectItem value="dsh">Hand to DSH</SelectItem>
+                    </SelectContent>
+                  </Select>
                 )}
               </Row>
-            ) : null}
-            {shows('backoffMs') && current.retries > 0 ? (
-              <Row hint="Each further retry waits twice as long." label="First retry after">
-                {id => (
-                  <NumberSelect
-                    disabled={props.readOnly}
-                    format={formatDuration}
-                    id={id}
-                    onChange={value => update(kind, 'backoffMs', value)}
-                    options={BACKOFF_MS}
-                    value={current.backoffMs}
-                  />
-                )}
-              </Row>
-            ) : null}
-            {shows('lunaReserve') ? (
-              <Row hint="Codex accounts with reserve left, while Codex Luna Reserve is on." label="Continue on Luna Reserve">
-                {id => (
-                  <Switch
-                    checked={current.lunaReserve}
-                    disabled={props.readOnly || !preferences.codexLunaReserve}
-                    id={id}
-                    onCheckedChange={value => update(kind, 'lunaReserve', value)}
-                  />
-                )}
-              </Row>
-            ) : null}
-            {shows('failover') ? (
-              <Row hint="The failed account cools down; the thread returns to it once it recovers." label="Fail over to the next account">
-                {id => <Switch checked={current.failover} disabled={props.readOnly} id={id} onCheckedChange={value => update(kind, 'failover', value)} />}
-              </Row>
-            ) : null}
-            {kind === 'transport' ? (
-              <Row
-                hint="When a model sends no data until its idle timeout, move to the thread's model fallback chain under any distribution, not only Priority."
-                label="Fall back on stalled streams"
-              >
-                {id => (
-                  <Switch
-                    checked={preferences.stalledStreamFallback}
-                    disabled={props.readOnly || !current.failover}
-                    id={id}
-                    onCheckedChange={value => props.write(preferences.settings.set('stalledStreamFallback', value))}
-                  />
-                )}
-              </Row>
-            ) : null}
-            {shows('waitSeconds') ? (
-              <Row hint="Waits out a provider-declared reset no longer than this, then retries once." label="Then wait up to">
-                {id => (
-                  <NumberSelect
-                    disabled={props.readOnly}
-                    format={value => (value === 0 ? 'Never' : formatDuration(value * 1_000))}
-                    id={id}
-                    onChange={value => update(kind, 'waitSeconds', value)}
-                    options={WAIT_SECONDS}
-                    value={current.waitSeconds}
-                  />
-                )}
-              </Row>
-            ) : null}
-            {shows('shrink') ? (
-              <Row hint="Last try: images the model already answered go as file placeholders. Large tool outputs are kept." label="Shrink before the last try">
-                {id => <Switch checked={current.shrink} disabled={props.readOnly} id={id} onCheckedChange={value => update(kind, 'shrink', value)} />}
-              </Row>
-            ) : null}
-            <Row label="When nothing is left">
-              {id => (
-                <Select disabled={props.readOnly} onValueChange={value => update(kind, 'then', value === 'dsh' ? 'dsh' : 'fail')} value={current.then}>
-                  <SelectTrigger className="dshx:w-44" id={id} size="sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fail">Fail the turn</SelectItem>
-                    <SelectItem value="dsh">Hand to DSH</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            </Row>
-          </fieldset>
-        )
-      })}
+            </fieldset>
+          )
+        })}
+      </FailureHandlingDisclosure>
     </Group>
   )
 }

@@ -4,9 +4,10 @@
   "features": [
     {
       "id": "app-dialogs",
-      "title": "App dialogs for every plugin",
+      "title": "Dialogs for every plugin",
       "reach": ["seed app-dialog-sample", "expect alertdialog \"Delete Old draft?\""],
-      "summary": "Provide the dshx Dialogs contract: confirm and alert open a plugin-ui alert dialog, prompt a dialog with one field, select a searchable grouped list; one request is open at a time and the rest wait in order.",
+      "summary": "Features open confirm, prompt and pick dialogs that look the same everywhere, one at a time.",
+      "details": "Provide the dshx Dialogs contract: confirm and alert open a plugin-ui alert dialog, prompt a dialog with one field, select a searchable grouped list; one request is open at a time and the rest wait in order.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -70,9 +71,10 @@
     },
     {
       "id": "app-toasts",
-      "title": "App toasts for every plugin",
+      "title": "Toasts for every plugin",
       "reach": ["seed app-dialog-sample", "expect text \"Draft saved\""],
-      "summary": "Provide the dshx Toasts contract: a bottom-right stack with tone colors, an optional action, auto-dismiss after the duration (5 s by default, 0 keeps it) and a dismiss function.",
+      "summary": "Features show short notices in the corner, one at a time, with an optional action.",
+      "details": "Provide the dshx Toasts contract: one bottom-right toast at a time with a tone icon, an optional action, auto-dismiss after the duration (5 s by default, 0 keeps it) and a dismiss function. Later toasts queue; the toast sits above a composer it would cover.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",

@@ -28,13 +28,18 @@ const Tile = (props: { readonly label: string; readonly value: string; readonly 
   </div>
 )
 
-export const JevUsageCard = (props: { readonly usage: JevUsageView | undefined; readonly error: unknown; readonly failed: boolean }): JSX.Element => {
+/**
+ * Jev usage this month. It draws nothing until DSH has recorded a Jev call (or failed to read them): someone who
+ * never set up Jev sees no block of zeros.
+ */
+export const JevUsageCard = (props: { readonly usage: JevUsageView | undefined; readonly error: unknown; readonly failed: boolean }): JSX.Element | null => {
   const credentialRows = props.usage?.byCredential ?? []
+  if (!props.failed && (props.usage === undefined || (props.usage.calls === 0 && credentialRows.length === 0))) return null
   const maximumInputTokens = Math.max(0, ...credentialRows.map(row => row.inputTokens))
   return (
     <Panel title="Jev API usage" description="DSH-local estimated usage · $0.042 per 1M input tokens · output free. Not provider account balance.">
       {props.failed ? (
-        <p className="dshx:text-xs dshx:text-destructive">{errorMessage(props.error, 'Jev usage could not be loaded.')}</p>
+        <p className="dshx:text-xs dshx:text-destructive">{errorMessage(props.error, 'Jev usage did not load. Reopen this page to retry.')}</p>
       ) : props.usage === undefined ? (
         <p className="dshx:text-xs dshx:text-muted-foreground">Loading…</p>
       ) : (
@@ -71,7 +76,7 @@ export const JevUsageCard = (props: { readonly usage: JevUsageView | undefined; 
                   aria-label={`${row.credential} share of input tokens this month`}
                   className="dshx:h-1.5 dshx:bg-muted"
                   value={maximumInputTokens === 0 ? 0 : (row.inputTokens / maximumInputTokens) * 100}
-                  aria-valuetext={`${UsageFormattingModel.formatCount(row.inputTokens)} input tokens; ${row.calls.toLocaleString()} requests; ${UsageFormattingModel.formatCost(row.estimatedCostUsd)} estimated cost this month; bars are relative to the most-used credential`}
+                  aria-valuetext={`${UsageFormattingModel.formatCount(row.inputTokens)} input tokens; ${row.calls.toLocaleString()} requests; ${UsageFormattingModel.formatCost(row.estimatedCostUsd)} estimated cost this month. Bars are relative to the most-used credential`}
                 />
                 <p className="dshx:text-2xs dshx:text-muted-foreground">
                   {UsageFormattingModel.formatCount(row.inputTokens)} input tokens · {UsageFormattingModel.formatCount(row.outputTokens)} output · Backlog{' '}

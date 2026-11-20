@@ -6,7 +6,8 @@
  * Plugins do not add rail entries. Their existing `sidebar.panellist` pages are re-homed here as sections: the table
  * below maps every page id the mounted profile registers today, and a plugin that ships a new page adds one
  * `DestinationSections` entry (`api.add(DestinationSections, { panelId, destination, label })`). A page nobody mapped
- * still shows, under Settings › Other pages, so nothing becomes unreachable.
+ * still shows, under Settings › Other pages, so nothing becomes unreachable. A page for plugin authors declares
+ * `group: 'developer'`: it is listed in the Developer group at the end of Settings, never among the user's pages.
  */
 import { defineRegistry } from '@dshfiles/dshx/client'
 import { DESTINATION_IDS, type DestinationId } from './destination-ids.js'
@@ -33,7 +34,7 @@ export interface DestinationDefinition {
 
 export const DESTINATIONS: readonly DestinationDefinition[] = [
   { id: 'threads', label: 'Threads', description: 'Every thread, grouped by status.', icon: 'messages-square' },
-  { id: 'inbox', label: 'Inbox', description: 'What needs you, answered in place.', icon: 'inbox', badgeFromPanel: 'attention-inbox' },
+  { id: 'inbox', label: 'Inbox', description: 'Questions, approvals and failures, answered in place.', icon: 'inbox', badgeFromPanel: 'attention-inbox' },
   { id: 'land', label: 'Land', description: 'Workspaces ready to land, and repository history.', icon: 'git-merge' },
   { id: 'work', label: 'Work', description: 'Backlog items and schedules that start threads.', icon: 'list-todo' },
   { id: 'agents', label: 'Agents', description: 'Configured agents and their messages.', icon: 'bot' },
@@ -82,6 +83,8 @@ const resolve = (panels: readonly DestinationPanel[], contributed: readonly Dest
   const byDestination = new Map<DestinationId, ResolvedSection[]>(DESTINATION_IDS.map(id => [id, []]))
   for (const panel of panels) {
     const section = mapped.get(panel.id)
+    // An unlisted page is mapped (so it is not an "other page") and shown in no list.
+    if (section?.unlisted === true) continue
     const resolved: ResolvedSection =
       section === undefined
         ? {
@@ -92,12 +95,15 @@ const resolve = (panels: readonly DestinationPanel[], contributed: readonly Dest
             formerLabels: [panel.label],
             unmapped: true,
           }
-        : { ...section, unmapped: false }
+        : // A developer page lives in Settings whatever destination its plugin named: the rail keeps user pages only.
+          { ...section, destination: section.group === 'developer' ? 'settings' : section.destination, unmapped: false }
     byDestination.get(resolved.destination)?.push(resolved)
   }
   return DESTINATIONS.map(destination => ({
     ...destination,
-    sections: [...(byDestination.get(destination.id) ?? [])].sort((left, right) => (left.order ?? 0) - (right.order ?? 0)),
+    sections: [...(byDestination.get(destination.id) ?? [])].sort(
+      (left, right) => Number(left.group === 'developer') - Number(right.group === 'developer') || (left.order ?? 0) - (right.order ?? 0),
+    ),
   }))
 }
 

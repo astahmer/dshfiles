@@ -431,7 +431,9 @@ const openImageLinkFixture = async (page: Page): Promise<void> => {
 
 When('a chat thread with a local image link is opened', async ({ page }: { page: Page }) => {
   await openImageLinkFixture(page)
-  const imageLink = page.getByRole('button', { name: 'red.png', exact: true })
+  // The turn's rows sit directly under "Worked for", so a read row at the end names red.png too: the reply's link,
+  // far up the transcript, is the first.
+  const imageLink = page.getByRole('button', { name: 'red.png', exact: true }).first()
   await imageLink.scrollIntoViewIfNeeded()
   const backToBottom = page.getByRole('button', { name: 'Back to bottom', exact: true })
   await expect(backToBottom).toBeVisible()
@@ -440,7 +442,7 @@ When('a chat thread with a local image link is opened', async ({ page }: { page:
 
 When('a read image tool summary path is opened', async ({ page }: { page: Page }) => {
   await openImageLinkFixture(page)
-  await page.getByRole('button', { name: 'Read images', exact: true }).last().click()
+  // "Worked for" lists the turn's rows directly: there is no "Read images" header to open first.
   await page.getByRole('button', { name: 'blue.png', exact: true }).click()
 })
 
@@ -451,7 +453,6 @@ When('thread gallery scope is selected and a read image path is opened', async (
   await page.getByRole('button', { name: 'Current turn', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Entire thread', exact: true }).click()
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Read images', exact: true }).last().click()
   await page.getByRole('button', { name: 'blue.png', exact: true }).click()
 })
 

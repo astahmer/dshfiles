@@ -2,7 +2,7 @@
   "name": "@dshfiles/tool-meta",
   "version": "0.1.0",
   "private": true,
-  "description": "Start time and duration on every tool call in the chat transcript, counting live while the call runs.",
+  "description": "How long each tool call took, in the chat transcript, counting live while the call runs.",
   "files": [
     "dist",
     "cordis.patch.yml"

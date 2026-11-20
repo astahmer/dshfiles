@@ -29,7 +29,7 @@ Then('the Activity Timeline shows safe receipt facts and current Project Checks 
     await expect(page.getByRole('button', { name: /Manual pass passed/ })).toHaveCount(0)
   })
   await attentionOnly.click()
-  await page.getByRole('button', { name: /^Detailed/ }).click()
+  await page.getByRole('button', { name: 'Every event', exact: true }).click()
 
   await recordAssertion(page, 'verification-evidence-safe-manual-projection', async () => {
     const pass = page.getByRole('button', { name: /Manual pass passed/ })
@@ -53,7 +53,7 @@ Then('the Activity Timeline shows safe receipt facts and current Project Checks 
 Then('each failed attempt is projected exactly once with safe metadata', async ({ page }: { page: Page }) => {
   expect(profileFor(page).expectedClientEntries).toContain('@dshfiles/activity-timeline')
   await openActivity(page)
-  await page.getByRole('button', { name: /^Detailed/ }).click()
+  await page.getByRole('button', { name: 'Every event', exact: true }).click()
   await page.getByRole('button', { name: 'Attention only', exact: true }).click()
   const completionRows = page.getByRole('button', { name: /Completion check failed/u })
 
@@ -104,7 +104,7 @@ Then('the Activity Timeline labels cancellation as notable, not failure', async 
 })
 
 When('the associated Session is opened from the Activity detail', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Open Session', exact: true }).click()
+  await page.getByRole('button', { name: 'Open thread', exact: true }).click()
   await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
 })
 
@@ -123,7 +123,7 @@ Then('the receipt is backfilled once after restarting the scratch Host', async (
   })
 
   await openActivity(page)
-  await page.getByRole('button', { name: /^Detailed/ }).click()
+  await page.getByRole('button', { name: 'Every event', exact: true }).click()
   await recordAssertion(page, 'verification-evidence-restart-backfill-deduplicates', async () => {
     await expect(page.getByRole('button', { name: /Manual pass passed/ })).toHaveCount(1, { timeout: 30_000 })
     await expect(page.getByRole('button', { name: /Manual failure failed/ })).toHaveCount(1)
@@ -132,7 +132,7 @@ Then('the receipt is backfilled once after restarting the scratch Host', async (
   })
 
   await page.getByRole('button', { name: /Manual pass passed/ }).click()
-  await page.getByRole('button', { name: 'Open Session', exact: true }).click()
+  await page.getByRole('button', { name: 'Open thread', exact: true }).click()
   await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
   await openProjectChecks(page)
   await recordAssertion(page, 'verification-evidence-manual-receipts-once', async () => {
@@ -158,17 +158,17 @@ Then('the receipt is backfilled once after restarting the scratch Host', async (
     await page.getByRole('menuitem', { name: 'Archived only', exact: true }).click()
     await expect(owningSession).toBeVisible({ timeout: 10_000 })
     await owningSession.hover()
-    await expect(owningSession.getByRole('button', { name: 'Unarchive session', exact: true })).toBeVisible()
+    await expect(owningSession.getByRole('button', { name: /^Unarchive (?:thread|session)$/ })).toBeVisible()
 
     await page.getByRole('button', { name: 'View options', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Hide archived', exact: true }).click()
     await expect(owningSession).toHaveCount(0, { timeout: 10_000 })
 
     await openActivity(page)
-    await page.getByRole('button', { name: /^Detailed/ }).click()
+    await page.getByRole('button', { name: 'Every event', exact: true }).click()
     await page.getByRole('button', { name: /Manual pass passed/ }).click()
-    await page.getByRole('button', { name: 'Open Session', exact: true }).click()
-    await expect(page.getByRole('alert').filter({ hasText: 'This Session is archived or unavailable and cannot be opened.' })).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Open thread', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'This thread is archived or unavailable. Restore it from the thread list to open it.' })).toBeVisible({ timeout: 10_000 })
     await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toHaveCount(0)
     await expect(owningSession).toHaveCount(0, { timeout: 10_000 })
   })

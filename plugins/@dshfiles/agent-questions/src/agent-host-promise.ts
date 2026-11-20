@@ -11,6 +11,7 @@ import { HostContext } from '@dshfiles/dshx/effect'
 import { SessionId } from '@dshfiles/dshx/ids'
 import { Context, Effect, Layer, Option, Schema } from 'effect'
 import { NotificationFailed, ParentUnavailable } from './errors.js'
+import { OpenQuestionRequests } from './open-question-requests.js'
 import { QuestionFacts, type SessionQuestionLoad, type SessionQuestionTarget } from './question-scan.js'
 import { questionWaitProjectionDefinition } from './question-wait-projection.js'
 
@@ -133,7 +134,7 @@ const liveSessionTargets = (input: {
 
 /**
  * Native `ask_user_question` forms across Sessions: which Sessions are live roots, the Session list to scan, one
- * Session's projected question facts, and the native answer API for continued forms.
+ * Session's projected question facts, the native answer API for continued forms, and the held requests of open ones.
  */
 export class NativeQuestions extends Context.Service<
   NativeQuestions,
@@ -144,11 +145,17 @@ export class NativeQuestions extends Context.Service<
       readonly liveRoots: ReadonlySet<string>
       readonly includeStopped: boolean
     }) => Effect.Effect<ReadonlyArray<SessionQuestionTarget>, SessionListFailed>
+    /** Whether the form of this tool call is still open and held on this Host, so `answer` can settle it. */
+    readonly holdsOpen: (sessionId: string, callId: string) => boolean
+    /**
+     * Answer a form of a live root Session. A continued form takes the reply through the native answer API (`queued`);
+     * a form still open is settled on its own waterfall request (`answered`), which is the tool call's result.
+     */
     readonly answer: (input: {
       readonly sessionId: string
       readonly callId: string
       readonly answer: AskUserQuestionAnswer
-    }) => 'queued' | 'not-continued' | 'session-not-live' | 'target-not-root'
+    }) => 'queued' | 'answered' | 'not-continued' | 'bad-answer' | 'session-not-live' | 'target-not-root'
   }
 >()('@dshfiles/agent-questions/NativeQuestions') {
   static readonly layer = Layer.effect(
@@ -159,6 +166,13 @@ export class NativeQuestions extends Context.Service<
       yield* Effect.acquireRelease(
         Effect.promise(() => context.sessionProjections.register(questionWaitProjectionDefinition)),
         handle => Effect.promise(() => handle.dispose()),
+      )
+      // One more answerer on the question waterfall, ahead of the browser's: it holds each open form so `answer` can
+      // settle it from the Inbox or a tool, and hands the request on unchanged otherwise.
+      const open = new OpenQuestionRequests()
+      yield* Effect.acquireRelease(
+        Effect.sync(() => context.on('user-questions/request', (request, next) => open.listener(request, next), { global: true, prepend: true })),
+        dispose => Effect.sync(() => void dispose()),
       )
       const liveRootIds = (): ReadonlySet<string> =>
         new Set(
@@ -189,8 +203,11 @@ export class NativeQuestions extends Context.Service<
           const targetAgent = Option.getOrUndefined(Option.flatMapNullishOr(sessionIdOf(input.sessionId), id => context.agents.get(id)))
           if (targetAgent === undefined) return 'session-not-live'
           if (!liveRootIds().has(String(targetAgent.id))) return 'target-not-root'
-          return context.userQuestions.answer(targetAgent, ToolCallId(input.callId), input.answer) ? 'queued' : 'not-continued'
+          if (context.userQuestions.answer(targetAgent, ToolCallId(input.callId), input.answer)) return 'queued'
+          const settled = open.answer(input)
+          return settled === 'not-held' ? 'not-continued' : settled
         },
+        holdsOpen: (sessionId, callId) => open.has(sessionId, callId),
       })
     }),
   )

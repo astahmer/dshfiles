@@ -109,7 +109,7 @@ export const BacklogItemMenu = (props: {
         sessionId: null,
       })
     } catch (error) {
-      BacklogNotices.show({ text: errorMessage(error, 'Tweet content could not be retrieved.'), kind: 'failure', sessionId: null })
+      BacklogNotices.show({ text: errorMessage(error, 'Tweet content could not be fetched. Retry.'), kind: 'failure', sessionId: null })
     }
   }
   const deleteSelection = async (): Promise<void> => {

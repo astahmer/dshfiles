@@ -34,6 +34,15 @@ const more = async (page: Page, body: Locator): Promise<Locator> => {
   await expect(menu).toBeVisible()
   return menu
 }
+/** One entry the thread menu keeps under a submenu (Open in, Copy or More): open the menu, then that submenu. */
+const moreItem = async (page: Page, body: Locator, submenu: 'Open in' | 'Copy' | 'More', name: string): Promise<Locator> => {
+  await (await more(page, body)).getByRole('menuitem', { name: submenu, exact: true }).click()
+  const item = page.getByRole('menu', { name: submenu, exact: true }).getByRole('menuitem', { name, exact: true })
+  // The menu keeps a submenu open only while the pointer travels towards it; a test pointer jumps, so walk it in.
+  const box = await item.boundingBox()
+  if (box !== null) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 })
+  return item
+}
 const pin = async (page: Page, body: Locator, name: 'Pin' | 'Unpin'): Promise<void> => {
   const direct = header(body).getByRole('button', { name, exact: true, includeHidden: true })
   if (await direct.isVisible()) {
@@ -148,17 +157,19 @@ Then('both visible headers address their own conversation and Pin and Copy targe
     await expect(header(a).getByRole('button', { name: FIRST, exact: true })).toBeVisible()
     await expect(header(b).getByRole('button', { name: SECOND, exact: true })).toBeVisible()
     expect(new URL(page.url()).searchParams.get('thread')).toBe(ids.second)
-    await (await more(page, a)).getByRole('menuitem', { name: 'Copy thread ID', exact: true }).click()
+    await (await moreItem(page, a, 'Copy', 'Copy thread ID')).click()
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(ids.first)
     await pin(page, a, 'Pin')
     const aMenu = await more(page, a)
     await expect(aMenu.getByRole('menuitem', { name: 'Copy thread link', exact: true })).toBeVisible()
-    for (const label of ['Park', 'Settle', 'Mute thread', 'Continue in project', 'Archive', 'Referenced by'])
-      await expect(aMenu.getByRole('menuitem', { name: label, exact: true })).toBeVisible()
-    await aMenu.getByRole('menuitem', { name: 'Settle', exact: true }).click()
+    for (const label of ['Snooze', 'Done', 'Open in', 'Copy', 'More']) await expect(aMenu.getByRole('menuitem', { name: label, exact: true })).toBeVisible()
+    await aMenu.getByRole('menuitem', { name: 'More', exact: true }).click()
+    for (const label of ['Mute thread', 'Referenced by', 'Archive'])
+      await expect(page.getByRole('menu', { name: 'More', exact: true }).getByRole('menuitem', { name: label, exact: true })).toBeVisible()
+    await aMenu.getByRole('menuitem', { name: 'Done', exact: true }).click()
     const unsettledMenu = await more(page, a)
-    await expect(unsettledMenu.getByRole('menuitem', { name: 'Unsettle', exact: true })).toBeVisible()
-    await unsettledMenu.getByRole('menuitem', { name: 'Unsettle', exact: true }).click()
+    await expect(unsettledMenu.getByRole('menuitem', { name: 'Restore', exact: true })).toBeVisible()
+    await unsettledMenu.getByRole('menuitem', { name: 'Restore', exact: true }).click()
     await pin(page, a, 'Pin')
     await pin(page, a, 'Unpin')
     await input(a).fill(DRAFT)
@@ -205,10 +216,12 @@ Then('the header remains usable with its Workbench tab row hidden and after relo
     const tab = outerTab(right(page), FIRST)
     const a = await bodyOf(page, tab)
     await tab.click({ button: 'right' })
+    // A tab's docking verbs sit under Layout.
+    await page.getByRole('menuitem', { name: 'Layout', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Hide tab row', exact: true }).click()
     await expect(tab).toHaveCount(0)
     await header(a).getByRole('button', { name: 'More thread actions', exact: true }).click()
-    await expect(page.getByRole('menuitem', { name: 'Copy thread ID', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Copy thread link', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
     await StartupDialogs.reloadPastProviderSetup(page)
     const restored = right(page)
@@ -227,9 +240,9 @@ Then('the header remains usable with its Workbench tab row hidden and after relo
     for (const width of [360, 480, 768, 1024]) {
       await page.setViewportSize({ width, height: 800 })
       await expect(header(b).getByRole('button', { name: 'More thread actions', exact: true })).toBeInViewport()
-      await (await more(page, b)).getByRole('menuitem', { name: 'Copy thread ID', exact: true }).click()
+      await (await moreItem(page, b, 'Copy', 'Copy thread ID')).click()
       await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(ids.second)
-      await (await more(page, b)).getByRole('menuitem', { name: 'Open Requests', exact: true }).click()
+      await (await moreItem(page, b, 'Open in', 'Requests')).click()
       await expect(page.getByTestId('requests-session-view').filter({ visible: true }).first()).toHaveAttribute('data-session-id', ids.second)
       if (width === 360) {
         await page.screenshot({ path: test.info().outputPath('restored-conversation-header-360.png'), animations: 'disabled' })

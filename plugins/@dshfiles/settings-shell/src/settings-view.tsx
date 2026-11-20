@@ -6,7 +6,7 @@ import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { ArrowUpRightIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { Fragment, useId, useRef, type KeyboardEvent, type ReactNode, type SyntheticEvent } from 'react'
+import { Fragment, useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
@@ -14,7 +14,7 @@ import type { PluginSettingsPage } from './plugin-settings.js'
 import { PageViewMemoryProvider } from './plugin-settings-page.js'
 import { Highlight } from './schema-form/settings-form.js'
 import type { SettingField } from './schema-form/schema-model.js'
-import { JEV_ENTRY_ID, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
+import { JEV_ENTRY_ID, SHARED_JEV_NAMESPACE, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult, type ShortcutRow } from './settings-search.js'
 
 export interface SectionRow {
@@ -30,7 +30,11 @@ const headerButton =
 const navCell =
   'dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-sm dshx:leading-5 dshx:font-normal dshx:text-foreground dshx:hover:bg-[var(--dshx-tone-2)]'
 const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)] dshx:font-medium'
-const navGroup = 'dshx:mt-3 dshx:px-3 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:first:mt-0'
+// A group label is a label, not one more row: 16 px above it (none above the first), 4 px between it and its entries.
+const navGroupBlock = 'dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5 dshx:first:mt-0'
+const navGroup = 'dshx:px-3 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground'
+
+export type PluginPageHeading = 'page' | 'section' | 'none'
 
 export interface SettingsViewProps {
   /** Every Settings entry, by task group (plan §4.6). */
@@ -39,7 +43,11 @@ export interface SettingsViewProps {
   readonly rows: readonly SectionRow[]
   /** Plugin pages as Settings shows them (human titles, Jev fields moved), for search. */
   readonly pluginPages: readonly PluginSettingsPage[]
-  readonly renderPluginPage: (page: PluginSettingsPage, nested: boolean) => ReactNode
+  /**
+   * Draws one plugin page. `heading` says what titles it: `page` when it is the whole entry (it draws the entry title),
+   * `section` for a subheading under an entry that has its own title, `none` when its title would repeat that one.
+   */
+  readonly renderPluginPage: (page: PluginSettingsPage, heading: PluginPageHeading) => ReactNode
   /** Matching settings of one page, drawn with the query highlighted. */
   readonly renderMatches: (page: PluginSettingsPage, fields: readonly SettingField[], query: string) => ReactNode
   readonly activeId: string | undefined
@@ -108,12 +116,14 @@ const Kbd = (props: { readonly children: ReactNode }): JSX.Element => (
   </kbd>
 )
 
+const matchesText = (t: ShellTranslate, count: number): string => (count === 1 ? t('search.matchesOne') : t('search.matches', { count }))
+
 /** VS Code's results view: a flat list of matching settings grouped by the page that holds them. */
 const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSearchResult }): JSX.Element => {
   const { result, t } = props
   if (result.total === 0) return <p className="dshx:py-6 dshx:text-sm dshx:text-muted-foreground">{t('search.none')}</p>
   return (
-    <div className="dshx-root dshx:flex dshx:max-w-[760px] dshx:flex-col dshx:gap-6" data-settings-results="">
+    <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-6" data-settings-results="">
       {result.sections.length > 0 && (
         <section aria-label={t('search.sections')} className="dshx:flex dshx:flex-col dshx:gap-1">
           <h3 className="dshx:m-0 dshx:text-sm dshx:font-semibold dshx:text-muted-foreground">{t('search.sections')}</h3>
@@ -147,7 +157,7 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
             <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">
               <Highlight query={props.query} text={group.label} />
             </h3>
-            <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.matches', { count: group.entries.length })}</span>
+            <span className="dshx:text-xs dshx:text-muted-foreground">{matchesText(t, group.entries.length)}</span>
           </button>
           {group.entries.map(entry => (
             <button
@@ -209,7 +219,7 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
             <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">
               <Highlight query={props.query} text={hit.page.title} />
             </h3>
-            <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.matches', { count: hit.fields.length })}</span>
+            <span className="dshx:text-xs dshx:text-muted-foreground">{matchesText(t, hit.fields.length)}</span>
           </button>
           {props.renderMatches(hit.page, hit.fields, SettingsSearch.highlightText(props.query))}
         </section>
@@ -218,20 +228,71 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
   )
 }
 
+/** "AI Accounts" and "AI accounts" are one title. */
+const sameTitle = (left: string, right: string): boolean => left.trim().replace(/\s+/gu, ' ').toLowerCase() === right.trim().replace(/\s+/gu, ' ').toLowerCase()
+
+const REPEATED_TITLE = 'data-settings-repeated-title'
+
+/**
+ * One title per entry. The shell titles every entry the same way, and several sections (native ones and other
+ * plugins') also print their name as the first thing they draw, so the page read "Built-in plugins / Built-in
+ * plugins". The first text a section draws is hidden when it is only that name; a section that starts with anything
+ * else, or with a control, is left alone. Sections render late and re-render, so the check follows their changes.
+ */
+const useSingleTitle = (label: string): RefObject<HTMLDivElement> => {
+  const section = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const root = section.current
+    if (root === null) return
+    const hideRepeatedTitle = (): void => {
+      const texts = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      let text = texts.nextNode()
+      while (text !== null && (text.textContent ?? '').trim() === '') text = texts.nextNode()
+      const first = text?.parentElement ?? null
+      const repeats =
+        first !== null &&
+        first !== root &&
+        sameTitle(first.textContent ?? '', label) &&
+        first.closest('button, a, label, input, select, textarea, summary, [role="button"], [role="tab"]') === null
+      for (const marked of root.querySelectorAll<HTMLElement>(`[${REPEATED_TITLE}]`)) {
+        if (repeats && marked === first) continue
+        marked.removeAttribute(REPEATED_TITLE)
+        marked.style.removeProperty('display')
+      }
+      if (!repeats || first.hasAttribute(REPEATED_TITLE)) return
+      first.setAttribute(REPEATED_TITLE, '')
+      // An inline style: a heading's own `display` rule would beat the `hidden` attribute.
+      first.style.setProperty('display', 'none')
+    }
+    hideRepeatedTitle()
+    const observer = new MutationObserver(hideRepeatedTitle)
+    observer.observe(root, { childList: true, subtree: true, characterData: true })
+    return () => observer.disconnect()
+  }, [label])
+  return section
+}
+
 /** What one entry shows: its heading, the page it links to, its section and the plugin settings merged into it. */
-const EntryView = (
-  props: SettingsViewProps & { readonly entry: SettingsEntry; readonly groupLabel: string; readonly jevNamespaces: ReadonlySet<string> },
-): JSX.Element => {
+const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; readonly jevNamespaces: ReadonlySet<string> }): JSX.Element => {
   const { entry, t } = props
   const link = entry.link
-  // A section draws its own rows; a lone plugin page draws its own heading, so the entry heading would repeat it.
-  const ownHeading = entry.sectionId !== undefined || entry.pages.length !== 1 || link !== undefined
-  const jevHere = entry.id === JEV_ENTRY_ID ? [] : entry.pages.filter(page => props.jevNamespaces.has(page.ns))
+  // A section draws its own rows; a plugin page that is the whole entry draws the entry's heading itself. A page that
+  // is one block of a task entry (Layout › Main tabs) keeps the task's heading above it, even while it is the only one.
+  const ownHeading = entry.sectionId !== undefined || entry.pages.length !== 1 || link !== undefined || entry.pages[0]?.pageId !== entry.id
+  // A plugin whose Jev switches moved gets a pointer to them. The shell's own namespace only lends the shared key: its
+  // page (the release check, under Update DSH) is not about Jev, so it says nothing.
+  const jevHere = entry.id === JEV_ENTRY_ID ? [] : entry.pages.filter(page => props.jevNamespaces.has(page.ns) && page.ns !== SHARED_JEV_NAMESPACE)
+  const section = useSingleTitle(entry.sectionLabel ?? entry.label)
+  const pages = entry.pages.map(page => <Fragment key={page.pageId}>{props.renderPluginPage(page, headingOf(page))}</Fragment>)
+  function headingOf(page: PluginSettingsPage): PluginPageHeading {
+    if (!ownHeading) return 'page'
+    return sameTitle(page.title, entry.label) ? 'none' : 'section'
+  }
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-5" data-settings-entry={entry.id}>
       {ownHeading && (
-        <header className="dshx:flex dshx:flex-col dshx:gap-0.5">
-          {props.groupLabel !== entry.label && <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{props.groupLabel}</p>}
+        // In a narrow pane the Sections select right above names the entry, so the title is not printed a second time.
+        <header className="dshx:@max-pane-compact:sr-only">
           <h2 className="dshx:m-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{entry.label}</h2>
         </header>
       )}
@@ -250,10 +311,15 @@ const EntryView = (
           </Button>
         </div>
       )}
-      {entry.sectionId !== undefined && <div>{props.renderSlot('settings.section', sectionOwnerWithTarget(props), { only: entry.sectionId })}</div>}
-      {entry.pages.map(page => (
-        <Fragment key={page.pageId}>{props.renderPluginPage(page, ownHeading)}</Fragment>
-      ))}
+      {/* A section that is one block of a task entry follows the plugin pages, under its own name. */}
+      {entry.sectionLabel !== undefined && pages}
+      {entry.sectionId !== undefined && (
+        <div className="dshx:flex dshx:flex-col dshx:gap-1" data-settings-section={entry.sectionId}>
+          {entry.sectionLabel !== undefined && <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{entry.sectionLabel}</h3>}
+          <div ref={section}>{props.renderSlot('settings.section', sectionOwnerWithTarget(props), { only: entry.sectionId })}</div>
+        </div>
+      )}
+      {entry.sectionLabel === undefined && pages}
       {jevHere.length > 0 && (
         <p className="dshx:m-0 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="note">
           {t('entry.jevMoved', { page: entry.label })}
@@ -278,15 +344,15 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
     shortcuts: props.shortcuts,
   })
   const active = SettingsGroups.entryFor(props.groups, props.activeId) ?? props.groups[0]?.entries[0]
-  const activeGroup = props.groups.find(group => group.entries.some(entry => entry.id === active?.id))?.group
   const jevNamespaces = new Set(
     props.groups.flatMap(group => group.entries.filter(entry => entry.id === JEV_ENTRY_ID).flatMap(entry => entry.pages.map(page => page.ns))),
   )
   const content = useRef<HTMLDivElement>(null)
   const countOf = (entry: SettingsEntry): number | undefined => {
     if (!searching) return undefined
-    const ids = [entry.id, ...(entry.sectionId === undefined || entry.sectionId === entry.id ? [] : [entry.sectionId]), ...entry.pages.map(page => page.pageId)]
-    return ids.reduce((sum, id) => sum + (result.counts.get(id) ?? 0), 0)
+    // A page that is the whole entry shares its id with it: each id counts once ("Main tabs 2" for one match).
+    const ids = new Set([entry.id, ...(entry.sectionId === undefined ? [] : [entry.sectionId]), ...entry.pages.map(page => page.pageId)])
+    return [...ids].reduce((sum, id) => sum + (result.counts.get(id) ?? 0), 0)
   }
   // While searching, a tree entry with matches scrolls to its results (VS Code filters the same way); others open.
   const select = (id: string): void => {
@@ -363,7 +429,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-end dshx:gap-1.5">
             {props.renderSlot('settings.action', {})}
             {props.onClose !== undefined && (
-              <button className={headerButton} onClick={props.onClose} type="button">
+              <button className={headerButton} data-settings-close="" onClick={props.onClose} type="button">
                 <XIcon strokeWidth={1.5} size={14} />
                 <span className="dshx:sr-only">{props.renderSlot('settings.close', {})}</span>
               </button>
@@ -387,7 +453,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4 dshx:@max-pane-compact:hidden"
           >
             {props.groups.map(({ group, entries }) => (
-              <div aria-label={group.label} className="dshx:flex dshx:flex-col dshx:gap-0.5" data-settings-group={group.id} key={group.id} role="group">
+              <div aria-label={group.label} className={navGroupBlock} data-settings-group={group.id} key={group.id} role="group">
                 <span className={navGroup}>{group.label}</span>
                 {entries.map(entry => (
                   <NavCell active={!searching && entry.id === active?.id} count={countOf(entry)} entry={entry} key={entry.id} onSelect={select} />
@@ -399,11 +465,10 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3"
             ref={content}
           >
-            <div className="dshx:max-w-[880px]">
+            {/* One reading width for every entry: sections, plugin pages and search results share this column. */}
+            <div className="dshx:max-w-[760px]" data-settings-column="">
               {searching && <SearchResults {...props} result={result} />}
-              {!searching && active !== undefined && (
-                <EntryView {...props} entry={active} groupLabel={activeGroup?.label ?? ''} jevNamespaces={jevNamespaces} key={active.id} />
-              )}
+              {!searching && active !== undefined && <EntryView {...props} entry={active} jevNamespaces={jevNamespaces} key={active.id} />}
             </div>
           </div>
         </div>

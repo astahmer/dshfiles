@@ -3,7 +3,7 @@
 ![Browse where a plugin can extend DSH](docs/screenshots/plugin-guide.png)
 
 A developer page for plugin authors: where a DSH plugin may extend the app, what each surface adds or replaces, and
-where its contract is declared. Open **Settings › Plugin guide**.
+where its contract is declared. Open **Settings › Developer › Plugin guide**.
 
 ## The catalog
 

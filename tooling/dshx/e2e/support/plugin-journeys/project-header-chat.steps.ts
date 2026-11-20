@@ -107,7 +107,7 @@ When('two local projects have conversations and the sidebar is grouped by projec
   await ThreadListFilter.selectView(page, sidebar(page), 'All threads')
   await ThreadListFilter.selectGroup(page, sidebar(page), 'Project')
   await openRow(page, betaThread)
-  await expect(sidebar(page).getByRole('button', { name: 'New chat in Alpha project', exact: true })).toBeVisible()
+  await expect(sidebar(page).getByRole('button', { name: 'New thread in Alpha project', exact: true })).toBeVisible()
   journeys.set(page, { call, alpha, beta, betaThread })
 })
 
@@ -124,12 +124,12 @@ Then('the project header plus creates in its own project without toggling collap
     }
     page.on('request', observe)
     try {
-      const sessionId = await createFromHeader(page, group.getByRole('button', { name: 'New chat in Alpha project', exact: true }))
+      const sessionId = await createFromHeader(page, group.getByRole('button', { name: 'New thread in Alpha project', exact: true }))
       await expect(collapsed).toBeVisible()
       await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).toHaveText('Alpha project')
       expect(Schema.decodeUnknownSync(listedSchema)(await journey.call('list', {})).threads.some(thread => thread.sessionId === sessionId)).toBe(false)
       await collapsed.click()
-      await expect(row(page, sessionId)).toContainText('New chat')
+      await expect(row(page, sessionId)).toContainText('New thread')
       await openRow(page, journey.betaThread)
       await expect(row(page, sessionId)).toHaveCount(0)
       expect(creates).toEqual([])
@@ -150,19 +150,19 @@ Then('the project header plus works with keyboard activation and a narrow sideba
     await resizeTo(page, 480)
     await openThreadList(page)
     const group = projectHeader(page, 'Beta project')
-    const create = group.getByRole('button', { name: 'New chat in Beta project', exact: true })
+    const create = group.getByRole('button', { name: 'New thread in Beta project', exact: true })
     for (const key of ['Enter', 'Space'] as const) {
       const sessionId = await createFromHeader(page, create, key)
       await openThreadList(page)
       await expect(group.getByRole('button', { expanded: true })).toBeVisible()
-      await expect(row(page, sessionId)).toContainText('New chat')
+      await expect(row(page, sessionId)).toContainText('New thread')
       expect(Schema.decodeUnknownSync(listedSchema)(await journey.call('list', {})).threads.some(thread => thread.sessionId === sessionId)).toBe(false)
     }
     const longTitle = 'Beta project with a very long title that should truncate instead of hiding the new chat button'
     await journey.call('projectRename', { projectId: journey.beta, title: longTitle })
     for (const width of [360, 480, 768, 1024]) {
       await resizeTo(page, width)
-      const longCreate = sidebar(page).getByRole('button', { name: `New chat in ${longTitle}`, exact: true })
+      const longCreate = sidebar(page).getByRole('button', { name: `New thread in ${longTitle}`, exact: true })
       await expect(async () => {
         await openThreadList(page)
         await expect(longCreate).toBeVisible({ timeout: 1_000 })
@@ -197,8 +197,8 @@ Then('the project header plus works with keyboard activation and a narrow sideba
 Then('typing saves independent unsent project chats that reopen from All threads', async ({ page, $testInfo }: { page: Page; $testInfo: TestInfo }) => {
   const journey = journeys.get(page)
   if (journey === undefined) throw new Error('The project-header journey was not prepared.')
-  const alphaCreate = sidebar(page).getByRole('button', { name: 'New chat in Alpha project', exact: true })
-  const betaCreate = sidebar(page).getByRole('button', { name: 'New chat in Beta project', exact: true })
+  const alphaCreate = sidebar(page).getByRole('button', { name: 'New thread in Alpha project', exact: true })
+  const betaCreate = sidebar(page).getByRole('button', { name: 'New thread in Beta project', exact: true })
   const fillDraft = async (id: string, text: string, projectId: string): Promise<void> => {
     await composer(page).fill(text)
     await expect(row(page, id)).toContainText(`Draft: ${text}`)
@@ -208,7 +208,7 @@ Then('typing saves independent unsent project chats that reopen from All threads
   }
   await recordAssertion(page, 'typed-project-drafts-save-before-send', async () => {
     journey.alphaDraft = await createFromHeader(page, alphaCreate)
-    await expect(row(page, journey.alphaDraft)).toContainText('New chat')
+    await expect(row(page, journey.alphaDraft)).toContainText('New thread')
     // Whitespace remains temporary and makes no Host conversation.
     await composer(page).fill('   ')
     expect(Schema.decodeUnknownSync(listedSchema)(await journey.call('list', {})).threads.some(thread => thread.sessionId === journey.alphaDraft)).toBe(false)
@@ -250,7 +250,7 @@ Then('sending one draft leaves other unsent chats intact and New chat stays fres
   await composer(page).press('Enter')
   await expect(page.getByText('This turn failed', { exact: false }).first()).toBeVisible({ timeout: 30_000 })
   await recordAssertion(page, 'project-header-starts-new-draft-after-send', async () => {
-    const freshId = await createFromHeader(page, sidebar(page).getByRole('button', { name: 'New chat in Alpha project', exact: true }))
+    const freshId = await createFromHeader(page, sidebar(page).getByRole('button', { name: 'New thread in Alpha project', exact: true }))
     expect(freshId).not.toBe(journey.alphaDraft)
     await expect(composer(page)).toHaveText('')
     expect(Schema.decodeUnknownSync(listedSchema)(await journey.call('list', {})).threads.some(thread => thread.sessionId === freshId)).toBe(false)
@@ -286,7 +286,7 @@ Then('model and preset choices remain local until typing creates the chat', asyn
   }
   page.on('request', observe)
   try {
-    const id = await createFromHeader(page, sidebar(page).getByRole('button', { name: 'New chat in Alpha project', exact: true }))
+    const id = await createFromHeader(page, sidebar(page).getByRole('button', { name: 'New thread in Alpha project', exact: true }))
     await recordAssertion(page, 'pretyping-model-and-preset-stay-local', async () => {
       const modelTrigger = page.getByRole('button', { name: /^Select model/ })
       await expect(modelTrigger).toBeVisible()
@@ -347,7 +347,7 @@ Then('the compact model picker stages its selection without creating an empty ch
   page.on('request', observe)
   try {
     await recordAssertion(page, 'compact-picker-stages-local-model', async () => {
-      const id = await createFromHeader(page, sidebar(page).getByRole('button', { name: 'New chat in Alpha project', exact: true }))
+      const id = await createFromHeader(page, sidebar(page).getByRole('button', { name: 'New thread in Alpha project', exact: true }))
       const trigger = page.getByRole('button').filter({ has: page.locator('[data-model-picker-text]') })
       await expect(trigger).toBeVisible()
       await trigger.click()

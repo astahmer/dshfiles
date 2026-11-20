@@ -1,12 +1,12 @@
 # @dshfiles/backlog
 
-![Share one backlog across Hosts](docs/screenshots/peer-hosts.png)
+![Share one backlog across hosts](docs/screenshots/peer-hosts.png)
 
 ![Conversation and work log in the item timeline](docs/screenshots/item-timeline-lanes.png)
 
 ![Configure remote sync connections and bindings](docs/screenshots/remote-sync-settings.png)
 
-![Retrieve public tweet context into a backlog item](docs/screenshots/tweet-context-enrichment.png)
+![Bring a tweet's text into an item](docs/screenshots/tweet-context-enrichment.png)
 
 ![Configure Jev triage from the Backlog panel](docs/screenshots/jev-settings.png)
 

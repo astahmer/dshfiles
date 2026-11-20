@@ -10,6 +10,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { usageApi, type ChartQuery } from './api.js'
 import { UsageBucketsModel } from './buckets.js'
 import { JevUsageCard } from './jev-usage-card.js'
+import { CostSummary, usageIsEmpty } from './cost-summary.js'
 import type { RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { UsageBreakdownTable, UsageCalendar } from './usage-history.js'
@@ -28,25 +29,6 @@ const Panel = (props: { readonly title: string; readonly description?: string; r
   </ChartFrame>
 )
 
-const Tile = (props: { readonly label: string; readonly value: string; readonly detail?: ReactNode }): JSX.Element => (
-  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:py-1">
-    <span className="dshx:text-xs dshx:text-muted-foreground">{props.label}</span>
-    <span className="dshx:text-base dshx:font-semibold dshx:tabular-nums">{props.value}</span>
-    {props.detail === undefined ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.detail}</span>}
-  </div>
-)
-
-const Change = (props: { readonly current: number; readonly previous: number }): JSX.Element => {
-  const ratio = UsageFormattingModel.changeRatio(props.current, props.previous)
-  if (ratio === null) return <>no earlier usage to compare</>
-  const up = ratio >= 0
-  return (
-    <span className={up ? 'dshx:text-warning' : 'dshx:text-success'}>
-      {up ? '▲' : '▼'} {Math.abs(ratio) >= 10 ? `${String(Math.round(ratio + 1))}×` : UsageFormattingModel.formatPercent(Math.abs(ratio))} vs previous period
-    </span>
-  )
-}
-
 export const UsageCharts = (props: {
   readonly range: { readonly from: number; readonly to: number }
   readonly purposes: readonly RequestPurpose[] | undefined
@@ -55,6 +37,8 @@ export const UsageCharts = (props: {
   readonly onGroupBy: (groupBy: ChartQuery['groupBy']) => void
   readonly onShowRequests: (search: string, groupBy: ChartQuery['groupBy']) => void
   readonly openThread: OpenThread
+  /** The estimate's caveat, shown as a tooltip on the cost number. */
+  readonly pricingNote: string
 }): JSX.Element => {
   const api = useApi(usageApi)
   const [now] = useState(() => Date.now())
@@ -298,61 +282,35 @@ export const UsageCharts = (props: {
       <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
         {errorMessage(charts.error, 'Charts could not be loaded.')}
         <Button variant="outline" size="xs" disabled={charts.isFetching} onClick={() => void charts.refetch()}>
-          Try again
+          Retry
         </Button>
       </p>
     )
   if (view === undefined) return <p className="dshx:text-xs dshx:text-muted-foreground">Loading…</p>
 
   const summary = view.summary
-  const tokens = summary.input + summary.cacheRead + summary.cacheWrite + summary.output
   const days = Math.max(1, (Math.min(now, props.range.to) - props.range.from) / DAY_MS)
-  const cacheHit = UsageFormattingModel.cacheHitRatio(summary)
+  // The Jev block is month to date, whatever range is selected, and draws nothing until a Jev call is recorded.
+  const jevCard = (
+    <div data-usage-jev-card>
+      <JevUsageCard usage={jevUsage.data} error={jevUsage.error} failed={jevUsage.isError} />
+    </div>
+  )
+  if (usageIsEmpty(summary))
+    return (
+      <div className="dshx:flex dshx:flex-col dshx:gap-3">
+        <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">
+          {props.purposes === undefined ? 'No usage in this range.' : 'No usage for these purposes in this range.'}
+        </EmptyState>
+        {jevCard}
+      </div>
+    )
 
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3">
-      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@min-[48rem]:grid-cols-3 dshx:@min-[80rem]:grid-cols-4">
-        <Tile
-          label="Cost (estimate)"
-          value={UsageFormattingModel.formatCost(summary.cost)}
-          detail={<Change current={summary.cost} previous={summary.previous.cost} />}
-        />
-        <Tile
-          label="Per day"
-          value={UsageFormattingModel.formatCost(summary.cost / days)}
-          detail={summary.unpriced === 0 ? 'all routes priced' : `${summary.unpriced.toLocaleString()} requests unpriced`}
-        />
-        <Tile label="Requests" value={summary.requests.toLocaleString()} detail={<Change current={summary.requests} previous={summary.previous.requests} />} />
-        <Tile
-          label="Failed / aborted"
-          value={`${summary.failed.toLocaleString()} / ${summary.aborted.toLocaleString()}`}
-          detail={UsageFormattingModel.formatPercent(summary.requests === 0 ? null : summary.failed / summary.requests)}
-        />
-        <Tile label="Tokens" value={UsageFormattingModel.formatCount(tokens)} detail={<Change current={tokens} previous={summary.previous.tokens} />} />
-        <Tile
-          label="Cache hit"
-          value={UsageFormattingModel.formatPercent(cacheHit)}
-          detail={`${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens`}
-        />
-        <Tile
-          label="Cache savings (estimate)"
-          value={UsageFormattingModel.formatCost(summary.cacheSavings)}
-          detail={
-            cacheHit === null
-              ? 'no prompt token read from cache'
-              : `${UsageFormattingModel.formatPercent(cacheHit)} of prompt tokens billed at the cache-read rate${summary.unpriced === 0 ? '' : ' · priced routes only'}`
-          }
-        />
-        <Tile
-          label="Cost per turn"
-          value={summary.turns === 0 ? '–' : UsageFormattingModel.formatCost(summary.cost / summary.turns)}
-          detail={summary.turns === 0 ? 'no turn recorded' : `${summary.turns.toLocaleString()} turns · ${summary.requests.toLocaleString()} requests`}
-        />
-      </div>
+      <CostSummary days={days} pricingNote={props.pricingNote} summary={summary} />
 
-      <div data-usage-jev-card>
-        <JevUsageCard usage={jevUsage.data} error={jevUsage.error} failed={jevUsage.isError} />
-      </div>
+      {jevCard}
 
       <Panel
         title={`${trendMetric === 'cost' ? 'Cost' : trendMetric === 'tokens' ? 'Tokens' : 'Requests'} over time`}

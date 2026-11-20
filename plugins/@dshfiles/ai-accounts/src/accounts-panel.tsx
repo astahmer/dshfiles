@@ -56,7 +56,7 @@ export const AccountsPanel = (props: {
         {state.notice === null ? null : (
           <div>
             <Button variant="outline" size="sm" type="button" onClick={() => void state.load()}>
-              Try again
+              Retry
             </Button>
           </div>
         )}

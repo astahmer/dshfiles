@@ -9,7 +9,6 @@ import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
-import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
 import { MessageSquarePlus, RefreshCw, X } from '@dshfiles/plugin-ui/icons'
@@ -20,7 +19,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { diffsReviewApi } from './api.js'
 import { FacetSessionStateModel, type FacetSessionPatch } from './changes-facet-state.js'
 import { ChangesKeysModel, type HunkCursor } from './changes-keys.js'
-import { ChangesScopeModel, changesScopeSchema, type ChangesRequest, type ChangesScope } from './changes-scope.js'
+import { ChangesScopeSwitch } from './changes-scope-switch.js'
+import { ChangesScopeModel, type ChangesRequest, type ChangesScope } from './changes-scope.js'
 import { ChangedImages } from './changed-images.js'
 import { CombinedReview } from './combined-review.js'
 import { orderReviewFiles } from './file-importance.js'
@@ -30,7 +30,6 @@ import { ReviewImageModel, WORKING_COPY } from './review-image-query.js'
 import { TurnChangesModel, type TurnChangesEvent } from './turn-changes.js'
 import { TurnDiffModel, type FacetDiff } from './turn-diff.js'
 import { useRangeViewedMarks, useTurnViewedMarks, type ViewedMarksView } from './viewed-marks.js'
-import { Schema } from 'effect'
 
 export interface ChangesFacetProps {
   readonly sessionId: string | undefined
@@ -50,7 +49,6 @@ interface UserQuestionsProjection {
   readonly userQuestions?: { readonly active: readonly unknown[] }
 }
 
-const isScope = Schema.is(changesScopeSchema)
 
 /** The outermost elements of a file's diff shadow root that match `selector`, in document order. */
 const shadowMatches = (container: Element, selector: string): readonly Element[] => {
@@ -472,25 +470,12 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
         />
       )}
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        <ToggleGroup
-          aria-label="Changes scope"
-          className="dshx:max-w-full dshx:flex-wrap"
-          onValueChange={value => {
-            if (isScope(value)) {
-              patchFacet({ scope: value, selection: null, hunk: null })
-            }
-          }}
-          size="sm"
-          type="single"
+        <ChangesScopeSwitch
+          label={option => ChangesScopeModel.label(option, bookmark)}
+          onChange={scope => patchFacet({ scope, selection: null, hunk: null })}
+          scopes={scopeChoices}
           value={activeScope}
-          variant="outline"
-        >
-          {scopeChoices.map(option => (
-            <ToggleGroupItem aria-label={ChangesScopeModel.label(option, bookmark)} className="dshx:px-2 dshx:text-xs" key={option} value={option}>
-              {ChangesScopeModel.label(option, bookmark)}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        />
         {activeScope === 'turn' && turnList.length > 1 ? (
           <Select onValueChange={value => patchFacet({ seq: Number(value) })} value={String(activeSeq ?? latestTurn?.seq ?? '')}>
             <SelectTrigger aria-label="Turn" className="dshx:h-7 dshx:w-auto dshx:text-xs" size="sm">
@@ -536,7 +521,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
         <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive" role="alert">
           <span className="dshx:min-w-0">{failure}</span>
           <Button onClick={refreshDiff} size="xs" variant="outline">
-            Try again
+            Retry
           </Button>
         </p>
       ) : null}
@@ -569,12 +554,12 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
           {diff.truncated ? <p className={HINT}>This diff is too large to show whole; only the first files are listed.</p> : null}
           {marks.unavailable ? (
             <p className={HINT} role="status">
-              Viewed marks are kept by the diff-viewed plugin, which is not loaded. Add @dshfiles/diff-viewed to the profile to mark files.
+              To mark files viewed, enable the diff-viewed plugin in Plugins and restart DSH.
             </p>
           ) : null}
           {marks.error === null || marks.error === undefined ? null : (
             <p className="dshx:text-xs dshx:text-destructive" role="alert">
-              {errorMessage(marks.error, 'Viewed marks could not be saved; try again.')}
+              {errorMessage(marks.error, 'Viewed marks could not be saved. Try again.')}
             </p>
           )}
           <ul aria-label="Changed files" className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-md dshx:border dshx:border-border">

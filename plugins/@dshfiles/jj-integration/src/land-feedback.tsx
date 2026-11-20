@@ -14,7 +14,7 @@ export const describeLandResult = (t: JjIntegrationTranslate, result: LandResult
     const listed = result.revisions.slice(0, LISTED_REVISIONS).map(revisionLabel)
     const hidden = result.revisions.length - listed.length
     const revisions = hidden > 0 ? `${listed.join(', ')} ${t('andMore', { count: hidden })}` : listed.join(', ')
-    const rebased = t('rebased', { count: result.revisions.length, bookmark: result.bookmark, revisions })
+    const rebased = t(result.revisions.length === 1 ? 'rebasedOne' : 'rebasedMany', { count: result.revisions.length, bookmark: result.bookmark, revisions })
     const summary =
       result.head === undefined
         ? rebased

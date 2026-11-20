@@ -99,3 +99,40 @@ describe('VitestReport.parse', () => {
     expect(VitestReport.parse('total 0\ndrwxr-xr-x  2 me  staff  64 Oct 19 .\n[exit code: 0]')).toBeUndefined()
   })
 })
+
+describe('the card headline and filters', () => {
+  const run = (failed: number, passed: number, skipped = 0, failedFiles = 0) => ({
+    testTally: { passed, failed, skipped, total: passed + failed + skipped },
+    fileTally: { passed: 1, failed: failedFiles, skipped: 0, total: 1 + failedFiles },
+  })
+
+  it('marks only the failed count as a failure, never "4 passed"', () => {
+    expect(VitestReport.summaryParts(run(1, 4))).toEqual([
+      { text: '1 failed', failed: true },
+      { text: '4 passed', failed: false },
+    ])
+    expect(VitestReport.summaryParts(run(0, 5, 2))).toEqual([
+      { text: '5 passed', failed: false },
+      { text: '2 skipped', failed: false },
+    ])
+    expect(VitestReport.summaryParts(run(0, 3, 0, 1))[0]).toEqual({ text: '1 test file failed', failed: true })
+  })
+
+  it('reads the same as the one-string label', () => {
+    for (const sample of [run(1, 4), run(0, 5, 2), run(0, 3, 0, 2), run(2, 0, 1)]) {
+      expect(
+        VitestReport.summaryParts(sample)
+          .map(part => part.text)
+          .join(' · '),
+      ).toBe(VitestReport.summaryLabel(sample))
+    }
+  })
+
+  it('offers no filter that would match nothing', () => {
+    const filters = ['all', 'failed', 'skipped', 'slow'] as const
+    expect(VitestReport.shownFilters(filters, { all: 5, failed: 1, skipped: 0, slow: 0 }, 'all')).toEqual(['all', 'failed'])
+    expect(VitestReport.shownFilters(filters, { all: 5, failed: 0, skipped: 0, slow: 0 }, 'all')).toEqual(['all'])
+    // The selected filter stays while it is selected, so the list never loses its own control.
+    expect(VitestReport.shownFilters(filters, { all: 5, failed: 0, skipped: 0, slow: 0 }, 'slow')).toEqual(['all', 'slow'])
+  })
+})

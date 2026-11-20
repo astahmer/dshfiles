@@ -5,7 +5,8 @@
     {
       "id": "thread-share-link",
       "title": "Share a thread as a read-only link",
-      "summary": "Settings › Thread sharing creates a read-only share link for one thread: live (re-read and redacted on every view) or a snapshot frozen at creation; anyone with the unguessable link, or link plus a passphrase kept only as a salted scrypt hash; expiring in 1 hour, 1 day, 7 days or never. The link is shown once (only its SHA-256 is stored). The list shows active shares with view counts and revokes one behind a confirmation; expired and revoked shares stay visible behind a switch. The page is served by a plugin-owned route, /thread-share/s/<token>, outside DSH's authenticated /api: it shows only that thread's user and assistant messages (no tools, attachments or other threads), redacts secret-shaped values and home or workspace paths, is rate-limited, and sends noindex, no-store, no-referrer and a script-free CSP. The agent can list (read-only), create and revoke (explicit confirm) shares.",
+      "summary": "Share a thread as a read-only link, live or frozen, with an optional passphrase and expiry.",
+      "details": "Settings › Thread sharing creates a read-only share link for one thread: live (re-read and redacted on every view) or a snapshot frozen at creation; anyone with the unguessable link, or link plus a passphrase kept only as a salted scrypt hash; expiring in 1 hour, 1 day, 7 days or never. The link is shown once (only its SHA-256 is stored). The list shows active shares with view counts and revokes one behind a confirmation; expired and revoked shares stay visible behind a switch. The page is served by a plugin-owned route, /thread-share/s/<token>, outside DSH's authenticated /api: it shows only that thread's user and assistant messages (no tools, attachments or other threads), redacts secret-shaped values and home or workspace paths, is rate-limited, and sends noindex, no-store, no-referrer and a script-free CSP. The agent can list (read-only), create and revoke (explicit confirm) shares.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Thread sharing\"", "expect button \"Create share link\""],
       "surfaces": ["client", "host", "settings", "api", "tool", "storage", "integration"],
       "surface": "settingsSection",
@@ -125,7 +126,8 @@
     {
       "id": "thread-share-snapshot-export",
       "title": "Freeze a snapshot or download a self-contained HTML export",
-      "summary": "A snapshot share stores the redacted transcript at creation (chunked under the 256 KiB storage value limit) and keeps showing it after the thread changes; revoking deletes it. Download HTML (and the thread_share_export tool) renders the same redacted page as one self-contained file with inline CSS, no script and no external resource, to host or upload anywhere when the Host route should not be reachable.",
+      "summary": "Freeze a shared thread as a snapshot, or download it as one HTML file.",
+      "details": "A snapshot share stores the redacted transcript at creation (chunked under the 256 KiB storage value limit) and keeps showing it after the thread changes; revoking deletes it. Download HTML (and the thread_share_export tool) renders the same redacted page as one self-contained file with inline CSS, no script and no external resource, to host or upload anywhere when the Host route should not be reachable.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Thread sharing\"", "expect button \"Download HTML\""],
       "surfaces": ["client", "host", "api", "tool", "storage"],
       "surface": "settingsSection",
@@ -171,7 +173,8 @@
     {
       "id": "thread-share-publish",
       "title": "Publish share pages through a time-bounded tunnel",
-      "summary": "Settings › Thread sharing detects tailscale and cloudflared and, only after the user confirms, runs one foreground `cloudflared tunnel --url` quick tunnel or `tailscale funnel --https=8443` for 15 minutes, 1 hour or 4 hours. The tunnel targets a separate loopback listener that answers only /thread-share/… and 404s everything else, so the DSH app and its API are never published; it stops on Stop, at its deadline, or with the plugin. New share links then include the public URL. Agents can read the status and stop the tunnel; starting it has no agent tool.",
+      "summary": "Publish share pages outside your network through a tunnel that closes after a set time.",
+      "details": "Settings › Thread sharing detects tailscale and cloudflared and, only after the user confirms, runs one foreground `cloudflared tunnel --url` quick tunnel or `tailscale funnel --https=8443` for 15 minutes, 1 hour or 4 hours. The tunnel targets a separate loopback listener that answers only /thread-share/… and 404s everything else, so the DSH app and its API are never published; it stops on Stop, at its deadline, or with the plugin. New share links then include the public URL. Agents can read the status and stop the tunnel; starting it has no agent tool.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Thread sharing\"", "expect button \"Start publishing\""],
       "surfaces": ["client", "host", "api", "tool", "integration"],
       "surface": "settingsSection",

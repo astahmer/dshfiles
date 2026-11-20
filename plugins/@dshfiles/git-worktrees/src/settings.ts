@@ -7,7 +7,7 @@ export const gitWorktreesSettings = defineSettings({
     isolate: Schema.boolean()
       .default(false)
       .description(
-        'Start an isolated thread (a backlog item, a caller asking for isolation) in its own git worktree. Off keeps every thread in the project checkout.',
+        'Start isolated threads in their own git worktree.',
       ),
     threadsDirectory: Schema.string()
       .default('')

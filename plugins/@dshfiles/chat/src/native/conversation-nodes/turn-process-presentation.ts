@@ -4,6 +4,7 @@ import type {
   ChatLocationNodeIndex, ChatNodeStore, ChatTurnProcessPresentation,
 } from '../contract/snapshot.ts'
 import { isAtOrOutside } from '../contract/group-tree.ts'
+import { isRoutineContextNode } from '../chat/context-rows.ts'
 
 function nodeTurn(node: ChatNode | undefined): number | undefined {
   const location = node?.location
@@ -21,6 +22,7 @@ function samePresentation(
     && left.turnClosed === right.turnClosed
     && left.hasExternalProcess === right.hasExternalProcess
     && left.hasNonReplyProcess === right.hasNonReplyProcess
+    && left.onlyRoutineContext === right.onlyRoutineContext
     && left.hasInterleavedInput === right.hasInterleavedInput)
 }
 
@@ -49,6 +51,7 @@ function derivePresentation(
 
   let hasExternalProcess = false
   let hasNonReplyProcess = false
+  let hasWorkProcess = false
   let hasInterleavedInput = false
   for (const key of keys) {
     const node = nodes.get(key) as ChatNode | undefined
@@ -66,6 +69,7 @@ function derivePresentation(
       if (node.kind !== 'assistant-step'
         || node.data.blocks.some(block => block.kind === 'reasoning' && block.text.trim() !== '')) {
         hasNonReplyProcess = true
+        if (!isRoutineContextNode(node)) hasWorkProcess = true
       }
     }
   }
@@ -76,6 +80,7 @@ function derivePresentation(
     turnClosed: location.turn.status === 'closed',
     hasExternalProcess,
     hasNonReplyProcess,
+    onlyRoutineContext: hasNonReplyProcess && !hasWorkProcess,
     hasInterleavedInput,
   }
 }

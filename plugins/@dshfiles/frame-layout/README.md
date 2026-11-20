@@ -1,6 +1,6 @@
 # @dshfiles/frame-layout
 
-![Hand the frame's regions to plugin surfaces](docs/screenshots/panel-seats.png)
+![Main area and side panels](docs/screenshots/panel-seats.png)
 
 ![On a phone the stage takes the full width above the sidebar's own tab bar](docs/screenshots/phone-navigation-seat.png)
 

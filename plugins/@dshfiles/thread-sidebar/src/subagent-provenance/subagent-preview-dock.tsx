@@ -1,31 +1,19 @@
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { AgentRunStatusLabels } from '@dshfiles/plugin-ui/components/motion/agent-run-status'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
-import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings, type SubagentPreviewTranslate } from './subagent-live-preview.js'
-import { SubagentRunCard, subagentRunStepLabel, useSubagentRun } from './subagent-run-card.js'
+import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
+import { SubagentRunCard, useSubagentRun } from './subagent-run-card.js'
 import { useSubagentStop } from './subagent-stop.js'
 
 type DockProps = Pick<PropsRuntime<'conversation.input.dock'>, 'useSessions' | 'useSessionStatus'>
 
 const ID_SEPARATOR = '\n'
 const ignoreTurnState = (): void => undefined
-
-/** The card's fixed labels come from the same namespace as the row it replaces. */
-const runLabels = (input: { readonly t: SubagentPreviewTranslate; readonly armed: boolean }): Partial<AgentRunStatusLabels> => ({
-  running: input.t('subagentPreviewWorking'),
-  done: input.t('subagentPreviewFinished'),
-  stopped: input.t('subagentPreviewInterrupted'),
-  failed: input.t('subagentPreviewFailedToStart'),
-  step: input.t('subagentRunStep'),
-  elapsed: input.t('subagentRunElapsed'),
-  stop: input.t(input.armed ? 'subagentPreviewConfirmStop' : 'subagentPreviewStop'),
-})
 
 const DockRow = (
   props: DockProps & { readonly parentId: string; readonly childId: string; readonly preview: SubagentPreviewBindings; readonly runCards: boolean },
@@ -74,9 +62,12 @@ const DockRow = (
           <SubagentRunCard
             run={run}
             heading={label}
-            stepLabel={subagentRunStepLabel({ t: preview.t, tool: run.tool })}
-            openLabel={preview.t('subagentPreviewOpenThread')}
-            labels={runLabels({ t: preview.t, armed })}
+            labels={{
+              working: preview.t('subagentPreviewWorking'),
+              waiting: preview.t('subagentRunWaiting'),
+              stop: preview.t(armed ? 'subagentPreviewConfirmStop' : 'subagentPreviewStop'),
+              open: preview.t('subagentPreviewOpenThread'),
+            }}
             onStop={requestStop}
             onOpen={() => preview.openChild(childId)}
           />
@@ -118,8 +109,8 @@ const DockRow = (
  * "N subagents working", closed by default like background-jobs' dock; the reader's choice holds while children start
  * and finish. Both selectors read plain strings, so unrelated list and status updates do not re-render it.
  *
- * A working child with a known open turn, route and tool becomes the compact run card; every missing part keeps the
- * one-line row, so the card never invents a step, a model or a clock.
+ * A working child with a known open turn and tool becomes the compact run card; a missing part keeps the one-line row,
+ * so the card never invents a step or a clock.
  */
 export const SubagentPreviewDock = (
   props: DockProps & {

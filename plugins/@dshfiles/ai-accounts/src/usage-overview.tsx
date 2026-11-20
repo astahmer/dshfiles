@@ -4,7 +4,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/p
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, PlusIcon, RefreshCwIcon, Settings2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import { KIND_GROUPS, KIND_LABEL } from './account-labels.js'
@@ -51,7 +51,6 @@ const BankedResets = (props: { readonly count: number; readonly expiries: readon
 
 const AccountUsageCard = (props: {
   readonly card: OverviewCard
-  readonly hostName: string
   readonly readAt: number
   readonly now: number
   readonly refreshing: boolean
@@ -91,12 +90,6 @@ const AccountUsageCard = (props: {
               <TooltipContent>The weekly limit is spent; Codex requests draw on Luna Reserve.</TooltipContent>
             </Tooltip>
           ) : null}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="dshx:max-w-[45%] dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{props.hostName}</span>
-            </TooltipTrigger>
-            <TooltipContent>{props.hostName}</TooltipContent>
-          </Tooltip>
         </header>
         {UsageOverviewModel.bindingWindow(props.card) === undefined && extraUsage?.enabled !== true ? (
           <div className="dshx:text-xs dshx:text-muted-foreground">
@@ -302,6 +295,9 @@ export const UsageOverview = (props: {
   readonly onOpenHistory: () => void
   readonly onConnectAccount: (accountId: string) => void
   readonly order?: 'arranged' | 'remaining'
+  /** The status strip is one item, so its two account tools open from here; other surfaces keep their own. */
+  readonly onAddAccount?: (() => void) | undefined
+  readonly onOpenAccounts?: (() => void) | undefined
 }): JSX.Element => {
   const [tab, setTab] = useState<ProviderTab>('all')
   const now = useQuotaClock({ resetsAt: [], precision: 'second' })
@@ -383,11 +379,31 @@ export const UsageOverview = (props: {
                 type="button"
                 variant="ghost"
               >
-                <RefreshCwIcon className={props.refreshing ? 'dshx:animate-spin' : undefined} />
+                <RefreshCwIcon className={props.refreshing ? 'dshx:animate-spin dshx:motion-reduce:animate-none' : undefined} />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Refresh usage</TooltipContent>
           </Tooltip>
+          {props.onAddAccount === undefined ? null : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button aria-label="Add AI account" className="dshx:shrink-0" onClick={props.onAddAccount} size="icon-xs" type="button" variant="ghost">
+                  <PlusIcon />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Add account</TooltipContent>
+            </Tooltip>
+          )}
+          {props.onOpenAccounts === undefined ? null : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button aria-label="AI account settings" className="dshx:shrink-0" onClick={props.onOpenAccounts} size="icon-xs" type="button" variant="ghost">
+                  <Settings2Icon />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>AI account settings</TooltipContent>
+            </Tooltip>
+          )}
         </header>
         {props.failure === null ? null : (
           <div className="dshx:shrink-0 dshx:px-2 dshx:pt-2">
@@ -425,7 +441,6 @@ export const UsageOverview = (props: {
               >
                 <AccountUsageCard
                   card={card}
-                  hostName={props.usage?.hostName ?? ''}
                   now={now}
                   readAt={props.usage?.readAt ?? now}
                   refreshing={props.refreshing}

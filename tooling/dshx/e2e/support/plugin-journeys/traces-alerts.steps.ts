@@ -1,14 +1,21 @@
 import { randomBytes } from 'node:crypto'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
+import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
+
+/** Opens one of the Traces views kept under More views (Service map, Metrics, Operations, Errors, Boards). */
+const openMoreTracesView = async (page: Page, name: string): Promise<void> => {
+  await page.getByRole('button', { name: 'More views', exact: true }).click()
+  await page.getByRole('menuitem', { name, exact: true }).click()
+}
 
 const hex = (bytes: number): string => randomBytes(bytes).toString('hex')
 
 const receiverEndpoint = async (page: Page): Promise<string> => {
-  const badge = page.getByTestId('traces-receiver-state')
-  await expect(badge).toHaveAttribute('data-state', 'listening', { timeout: 30_000 })
-  return (await badge.getAttribute('data-endpoint')) ?? ''
+  const summary = page.getByTestId('traces-store-summary')
+  await expect(summary).toHaveAttribute('data-receiver-state', 'listening', { timeout: 30_000 })
+  return (await summary.getAttribute('data-endpoint')) ?? ''
 }
 
 const alertsView = (page: Page) => page.getByTestId('traces-alerts-view')
@@ -32,8 +39,12 @@ When('an error-rate alert rule for {string} is created in the Alerts tab', async
   await recordAssertion(page, 'traces-alerts-rule-created', () => expect(ruleRow(page, RULE_NAME)).toHaveAttribute('data-status', 'ok'))
 })
 
-When('the alert rules are evaluated now', async ({ page }: { page: Page }) => {
-  await alertsView(page).getByRole('button', { name: 'Evaluate now' }).click()
+When('the alert rules are evaluated while the Traces tab is shown', async ({ page }: { page: Page }) => {
+  // The Alerts view already shows what fires, so the announcer stays quiet there: evaluate from another view.
+  await page.getByRole('tab', { name: 'Traces', exact: true }).click()
+  await expect(alertsView(page)).toHaveCount(0)
+  const call = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/traces', apiId: 'traces-alerts', version: 1 })
+  await call('evaluate', {})
 })
 
 Then('the rule fires with its value and its sample trace', async ({ page }: { page: Page }) => {
@@ -149,7 +160,7 @@ When('synthetic tool call spans are posted to the receiver', async ({ page }: { 
 const boardTable = (page: Page) => page.getByRole('table', { name: 'Slow tools' })
 
 Then('the Slow tools board lists each tool with its count and p95', async ({ page }: { page: Page }) => {
-  await page.getByRole('tab', { name: 'Boards', exact: true }).click()
+  await openMoreTracesView(page, 'Boards')
   await page.getByRole('radio', { name: 'Slow tools', exact: true }).click()
   await recordAssertion(page, 'traces-boards-slow-tools', async () => {
     const rows = boardTable(page).locator('tr[data-group]')

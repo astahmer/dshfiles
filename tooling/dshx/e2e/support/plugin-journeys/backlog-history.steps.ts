@@ -8,7 +8,7 @@ import { openGlobalPanel } from '../plugin-view-names.js'
 import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { createScratchDirectory, sendMessage, startThreadWithModel } from '../threads.js'
-import { backlogRef } from './backlog-refs.js'
+import { backlogRef, runBacklogPageAction } from './backlog-refs.js'
 
 const feed = (page: Page) => page.getByRole('feed', { name: 'Backlog feed' })
 const peek = (page: Page) => page.getByRole('complementary', { name: 'Item detail' })
@@ -62,7 +62,7 @@ const exportFiles = new WeakMap<Page, string>()
 When('the backlog is exported as JSON Lines from the settings tab', async ({ page }: { page: Page }) => {
   const target = join(mkdtempSync(join(tmpdir(), 'dshfiles-backlog-export-e2e-')), 'backlog.jsonl')
   exportFiles.set(page, target)
-  await page.getByRole('button', { name: 'Backlog settings', exact: true }).click()
+  await runBacklogPageAction(page, 'Settings')
   await page.getByRole('button', { name: 'Export…', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Export the backlog', exact: true })
   await dialog.getByRole('textbox', { name: 'Export file', exact: true }).fill(target)
@@ -119,7 +119,7 @@ When('two multi-host Hosts are seeded', async ({ page }: { page: Page }) => {
   await page.reload()
   await StartupDialogs.registerProviderSetupDismissal(page)
   await openGlobalPanel(page, 'Backlog')
-  await page.getByRole('button', { name: 'Backlog settings', exact: true }).click()
+  await runBacklogPageAction(page, 'Settings')
 })
 
 Then('the Hosts section lists both Hosts and where each runs automation', async ({ page }: { page: Page }) => {

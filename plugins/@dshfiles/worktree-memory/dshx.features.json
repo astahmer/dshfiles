@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "memory-board",
-      "title": "Process memory and Node origins",
-      "summary": "The RAM tab of Observe › Processes (and this thread's share in the thread panel's Jobs facet): One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate parent, and working directory. Node origin rows expose no argv or environment values, and their RSS excludes compressed or swapped memory. The Processes navigation glyph carries a pressure dot and the detached total; without @dshfiles/background-jobs the RAM page keeps its own entry with them.",
+      "title": "Process RAM",
+      "summary": "The RAM tab of Processes shows how much memory DSH and other Node processes use, by workspace.",
+      "details": "The RAM tab of Observe › Processes (and this thread's share in the thread panel's Jobs facet): One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate parent, and working directory. Node origin rows expose no argv or environment values, and their RSS excludes compressed or swapped memory. The Processes navigation glyph carries a pressure dot and the detached total; without @dshfiles/background-jobs the RAM page keeps its own entry with them.",
       "reach": ["click tab \"Observe\"", "click button \"Processes\"", "click tab \"RAM\"", "expect text \"Node process origins\""],
       "surfaces": ["host", "tool", "client"],
       "surface": "destinationSection",
@@ -139,8 +140,9 @@
     },
     {
       "id": "orphan-scratch-hosts",
-      "title": "Orphaned scratch DSH Hosts",
-      "summary": "Scratch DSH Hosts (--profile dshx-boot) are listed on the RAM tab by the owner their dshx record names (E2E or dshx dev, workspace, owner pid), with CPU and resident memory. A Host whose owner exited, or a pre-record Host init adopted more than 2 h ago, is flagged Orphan; one Stop orphans action (and the worktree_memory_stop_orphans agent tool with confirm: true) ends their process groups. While orphans use at least the configured CPU or memory, the frame status strip shows a warning that opens the RAM tab.",
+      "title": "Leftover test copies of DSH",
+      "summary": "Test copies of DSH left running are listed with their memory, and Stop orphans ends them.",
+      "details": "Scratch DSH Hosts (--profile dshx-boot) are listed on the RAM tab by the owner their dshx record names (E2E or dshx dev, workspace, owner pid), with CPU and resident memory. A Host whose owner exited, or a pre-record Host init adopted more than 2 h ago, is flagged Orphan; one Stop orphans action (and the worktree_memory_stop_orphans agent tool with confirm: true) ends their process groups. While orphans use at least the configured CPU or memory, the frame status strip shows a warning that opens the RAM tab.",
       "reach": ["click tab \"Observe\"", "click button \"Processes\"", "click tab \"RAM\"", "expect text \"Node process origins\""],
       "surfaces": ["host", "tool", "client", "settings"],
       "surface": "statusItem",

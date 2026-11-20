@@ -134,6 +134,10 @@ export interface SidebarPreferences {
    * on the rail, and under More › DSH on a phone (b:kgcc). Off: they go back to the row under the list.
    */
   showRailActions: boolean
+  /** Restart DSH among the rail's DSH actions; off leaves it to the status strip's restart item. */
+  showRailRestart: boolean
+  /** The Developer group at the end of Settings (pages for plugin authors); off hides it, the palette still opens them. */
+  showDeveloperPages: boolean
   headerRegionHeight: number | null
   headerOrder: string[]
   hiddenHeaderIds: string[]
@@ -238,6 +242,9 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   phoneNavigation: 'stack',
   showFooter: false,
   showRailActions: true,
+  // One restart control (DESIGN.md): the status strip's item. The rail button is for someone who asks for it.
+  showRailRestart: false,
+  showDeveloperPages: true,
   headerRegionHeight: null,
   headerOrder: [],
   hiddenHeaderIds: [],
@@ -264,7 +271,10 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   threadRowTime: true,
   threadRowStatusDot: true,
   arrowKeysSwitchThread: true,
-  hiddenRowActions: [],
+  // One verb beside the row menu (DESIGN.md: a row carries one inline verb): Done, plus the recovery pair on a row that
+  // needs a resume and Restore on an archived one. The rest stay in the row menu and on their keys; Customize sidebar
+  // shows any of them again.
+  hiddenRowActions: ['aside', 'pin', 'park', 'mute', 'archive'],
   rowActionOrder: [...DEFAULT_THREAD_ROW_ACTION_ORDER],
   approvalNeededDisplay: 'group',
   inputNeededDisplay: 'group',

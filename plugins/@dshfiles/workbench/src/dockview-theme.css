@@ -82,6 +82,21 @@
   opacity: 0;
 }
 
+/* A scrolled strip has no scrollbar: the edge that hides tabs fades out, so a cut-off title reads as "more this way"
+ * instead of a clipped glyph. tab-strip-edges.ts marks the strip and leaves out an edge the selected tab sits on, so
+ * the selected tab is never the faded one. A mask reads only alpha, so the opaque stop is the text colour, not a hex. */
+.dshfiles-workbench-theme .dv-tabs-container[data-workbench-tabs-clipped='start'] {
+  mask-image: linear-gradient(to right, transparent, currentColor 28px);
+}
+
+.dshfiles-workbench-theme .dv-tabs-container[data-workbench-tabs-clipped='end'] {
+  mask-image: linear-gradient(to left, transparent, currentColor 28px);
+}
+
+.dshfiles-workbench-theme .dv-tabs-container[data-workbench-tabs-clipped='both'] {
+  mask-image: linear-gradient(to right, transparent, currentColor 28px, currentColor calc(100% - 28px), transparent);
+}
+
 /* Touch has no hover (visual refresh T5.4): a tab's close stays visible and answers a 44pt tap. */
 @media (pointer: coarse) {
   .dshfiles-workbench-theme .dv-tab.dv-inactive-tab:not(:hover):not(:focus-within) [data-workbench-tab-close] {

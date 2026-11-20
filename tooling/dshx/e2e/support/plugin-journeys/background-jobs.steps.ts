@@ -75,7 +75,7 @@ When('a thread starts a running bash job whose label exceeds the wire bound', as
 
 Then('the board shows that job with its label clamped to the bound', async ({ page }: { page: Page }) => {
   await openJobs(page)
-  await page.getByRole('radio', { name: 'Running', exact: true }).click()
+  await page.getByRole('radio', { name: 'Working', exact: true }).click()
   await recordAssertion(page, 'background-jobs-clamps-an-oversized-live-label', async () => {
     const row = page.locator('[data-job-id]').filter({ hasText: 'oversized-label' }).first()
     await expect(row).toBeVisible({ timeout: 45_000 })
@@ -111,7 +111,7 @@ When('a thread starts two running bash jobs', async ({ page }: { page: Page }) =
 
 When('the Jobs panel lists both batch jobs in the Running scope', async ({ page }: { page: Page }) => {
   await openJobs(page)
-  await page.getByRole('radio', { name: 'Running', exact: true }).click()
+  await page.getByRole('radio', { name: 'Working', exact: true }).click()
   await expect(page.locator('[data-job-id]').filter({ hasText: 'batch-stop' })).toHaveCount(2, { timeout: 45_000 })
 })
 
@@ -139,7 +139,7 @@ Then('the category filter, the scope and the search narrow the board', async ({ 
   })
 
   await recordAssertion(page, 'background-jobs-finished-scope-excludes-interrupted-records', async () => {
-    await page.getByRole('radio', { name: 'Finished', exact: true }).click()
+    await page.getByRole('radio', { name: 'Done', exact: true }).click()
     await expect.poll(() => fixtureRows(page).count()).toBe(4)
     await expect(fixtureRows(page).filter({ hasText: 'sleep 600' })).toHaveCount(0)
   })
@@ -231,11 +231,16 @@ Then('the composer dock previews the running job and streams its output', async 
     await expect.poll(async () => ((await output.textContent()) ?? '').length, { timeout: 30_000 }).toBeGreaterThan(earlier.length)
     // The same job also keeps its card under the tool call, inside the folded turn.
     await page
-      .getByText(/^Worked for /)
+      .getByText(/^(Worked for|Completed in) /)
       .last()
       .click()
-    await page.getByText('Ran commands', { exact: true }).last().click()
-    await expect(page.locator('[data-dshfiles-live-preview-seat="tool-card"]')).toHaveAttribute('data-state', 'running')
+    // The owned Chat fork lists a finished turn's rows directly under "Worked for"; the native Chat ("Completed in")
+    // keeps a "Ran commands" header over them.
+    const toolCardSeat = page.locator('[data-dshfiles-live-preview-seat="tool-card"]')
+    const commandGroup = page.getByText('Ran commands', { exact: true }).last()
+    await expect(commandGroup.or(toolCardSeat).first()).toBeVisible()
+    if (!(await toolCardSeat.isVisible())) await commandGroup.click()
+    await expect(toolCardSeat).toHaveAttribute('data-state', 'running')
     const desktop = page.viewportSize()
     await page.setViewportSize({ width: 360, height: 780 })
     await expect(preview.getByRole('button', { name: 'Stop', exact: true })).toBeInViewport()

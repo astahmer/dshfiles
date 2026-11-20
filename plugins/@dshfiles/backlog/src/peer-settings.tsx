@@ -13,7 +13,7 @@ import { PeerAutomation, type PeerAutomationView } from './peer-automation.js'
 
 const PEER_STATUS_KEY = ['dshfiles-backlog', 'peer-status'] as const
 const THIS_HOST = ''
-const HOST_RESTART = 'This DSH Host predates backlog Hosts. Restart the DSH Host process to load them.'
+const HOST_RESTART = 'Restart DSH to share this backlog with other hosts.'
 
 const failureText = (error: unknown, fallback: string): string =>
   isApiError(error) && (error.kind === 'contract' || error.kind === 'unavailable') ? HOST_RESTART : errorMessage(error, fallback)
@@ -35,14 +35,14 @@ const automationDisagreement = (status: BacklogPeerStatusView): string | null =>
   const disagreements = PeerAutomation.disagreements(status)
   if (disagreements.length === 0) return null
   const where = disagreements.map(automationSentence).join('; ')
-  return `Hosts disagree on where automation runs: ${where}. Pick the same Host here and in each Host's Backlog settings › Hosts, or gate checks and main polling run twice.`
+  return `Hosts disagree on where automation runs: ${where}. Pick the same host here and in each host’s Backlog settings › Hosts, or checks run twice.`
 }
 
 /** What the section says instead of a Host list when there is nothing to list. */
 const emptyNote = (status: BacklogPeerStatusView): string | null => {
   if (!status.available)
-    return 'Multi-host is not loaded, so this backlog stays on this Host. Enable @dshfiles/multi-host and add a Host in the Hosts panel to share it.'
-  if (status.peers.length === 0) return 'No other Host yet. Add one in the Hosts panel, then turn it on here.'
+    return 'This backlog stays on this host. To share it, enable the multi-host plugin in Plugins and add a host on the Hosts page.'
+  if (status.peers.length === 0) return 'No other host yet. Add one on the Hosts page, then turn it on here.'
   return null
 }
 
@@ -67,14 +67,14 @@ const PeerRow = (props: {
         ) : null}
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2">
           <Button type="button" size="xs" variant="ghost" disabled={!peer.enabled || props.busy} onClick={props.onSync}>
-            <RefreshCwIcon aria-hidden className={cn('dshx:size-3', props.busy && 'dshx:animate-spin')} />
+            <RefreshCwIcon aria-hidden className={cn('dshx:size-3', props.busy && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
             Sync now
           </Button>
           <Switch size="sm" checked={peer.enabled} aria-label={`Share the backlog with ${peer.name}`} onCheckedChange={props.onToggle} />
         </span>
       </div>
       <p className="dshx:text-xs dshx:text-muted-foreground">
-        {props.automation === null ? 'Automation Host not reported yet' : `Automation on ${props.automation.label}`}
+        {props.automation === null ? 'Automation host not reported yet' : `Automation on ${props.automation.label}`}
       </p>
       {peer.error === null ? null : (
         <p role="alert" className="dshx:text-xs dshx:text-destructive">
@@ -97,7 +97,7 @@ export const BacklogHostsSettings = (): JSX.Element => {
   const disagreement = data === undefined ? null : automationDisagreement(data)
   const enabledCount = data?.peers.filter(peer => peer.enabled).length ?? 0
   const automationOptions: ComboboxOption[] = [
-    { value: THIS_HOST, label: 'This Host' },
+    { value: THIS_HOST, label: 'This host' },
     ...(data?.peers ?? []).flatMap(peer => (peer.remoteHostId === null ? [] : [{ value: peer.remoteHostId, label: peer.name }])),
   ]
   const mutationError = configure.error ?? sync.error
@@ -112,7 +112,7 @@ export const BacklogHostsSettings = (): JSX.Element => {
         </h3>
         {enabledCount > 0 ? (
           <Button type="button" size="xs" variant="outline" className="dshx:ml-auto" disabled={sync.isPending} onClick={() => sync.mutate(undefined)}>
-            <RefreshCwIcon aria-hidden className={cn('dshx:size-3', sync.isPending && 'dshx:animate-spin')} />
+            <RefreshCwIcon aria-hidden className={cn('dshx:size-3', sync.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
             Sync all
           </Button>
         ) : null}
@@ -143,7 +143,7 @@ export const BacklogHostsSettings = (): JSX.Element => {
               <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm">
                 <span>Automation runs on</span>
                 <Combobox
-                  label="Automation Host"
+                  label="Automation host"
                   value={data.automationHostId ?? THIS_HOST}
                   options={automationOptions}
                   disabled={configure.isPending}

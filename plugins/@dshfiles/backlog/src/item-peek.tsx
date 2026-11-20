@@ -35,7 +35,6 @@ import {
   PlusIcon,
   QuoteIcon,
   SparklesIcon,
-  Trash2Icon,
   WandSparklesIcon,
   XIcon,
   type LucideIcon,
@@ -100,7 +99,8 @@ import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import { ItemTimeline } from './item-timeline.js'
 import { BacklogReference } from './backlog-reference.js'
-import { BacklogMentionHandle } from './backlog-mention-handle.js'
+import { PeekHeading } from './peek-heading.js'
+import { DeleteReplyButton } from './delete-reply.js'
 
 type OpenThread = (sessionId: string) => void
 type ThreadLabel = (sessionId: string) => string
@@ -158,7 +158,7 @@ const eventIcons = {
 const Section = (props: { readonly title: string; readonly action?: ReactNode; readonly children: ReactNode }): JSX.Element => (
   <section className="dshx:flex dshx:flex-col dshx:gap-2">
     <div className="dshx:flex dshx:h-6 dshx:items-center dshx:justify-between">
-      <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.title}</h4>
+      <h4 className="dshx:text-sm dshx:font-semibold dshx:text-foreground">{props.title}</h4>
       {props.action}
     </div>
     {props.children}
@@ -336,7 +336,7 @@ const BodyField = (props: {
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
       <BacklogTextBox
         ariaLabel="Body"
-        placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads, projects and agents; paste or drop an image."
+        placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads, projects and agents. Paste or drop an image."
         value={autosave.draft}
         onChange={value => autosave.send({ type: 'edit', value })}
         threads={props.threads}
@@ -351,7 +351,7 @@ const BodyField = (props: {
       />
       {autosave.error === null ? null : (
         <p role="alert" className="dshx:text-2xs dshx:text-destructive">
-          {errorMessage(autosave.error, 'That attachment could not be saved.')}
+          {errorMessage(autosave.error, 'That attachment was not saved. Add it again.')}
         </p>
       )}
     </div>
@@ -499,7 +499,7 @@ const ReplyEditor = (props: {
   if (failedRead)
     return (
       <p role="alert" className="dshx:text-xs dshx:text-destructive">
-        A reply attachment could not be loaded.
+        A reply attachment did not load. Reopen the item.
       </p>
     )
   return (
@@ -535,7 +535,7 @@ const ReplyComposer = (props: {
     try {
       await props.onSave(ImageAttachmentReferenceModel.markdownImageReferences(submittedText, attachments.files), attachments.files)
     } catch (error) {
-      setFailed(errorMessage(error, 'The reply could not be saved.'))
+      setFailed(errorMessage(error, 'The reply was not saved. Send it again.'))
     } finally {
       setPending(false)
     }
@@ -544,7 +544,7 @@ const ReplyComposer = (props: {
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
       <BacklogTextBox
         ariaLabel="Edit reply"
-        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads, projects and agents; paste or drop an image"
+        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads, projects and agents. Paste or drop an image"
         value={text}
         onChange={setText}
         threads={props.threads}
@@ -653,20 +653,15 @@ const TimelineRuns = (props: {
                             >
                               <PencilIcon aria-hidden className="dshx:size-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label="Delete reply"
-                              className="dshx:text-muted-foreground dshx:hover:text-destructive"
-                              onClick={() => {
-                                if (commentId === undefined || !window.confirm('Delete this reply? This cannot be undone.')) return
+                            <DeleteReplyButton
+                              text={run.event.detail}
+                              onDelete={() => {
+                                if (commentId === undefined) return
                                 void actions.deleteComment
                                   .mutateAsync({ id: props.itemId, commentId })
-                                  .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be deleted.')))
+                                  .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be deleted. Try again, or reload the item.')))
                               }}
-                            >
-                              <Trash2Icon aria-hidden className="dshx:size-4" />
-                            </Button>
+                            />
                           </div>
                         ) : null}
                       </div>
@@ -860,9 +855,9 @@ const Conversation = (props: {
               aria-hidden
               className="dshx:z-10 dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border dshx:border-border dshx:bg-background"
             >
-              <StatusDot size="sm" tone="info" className="dshx:animate-pulse" />
+              <StatusDot size="sm" tone="info" className="dshx:animate-pulse dshx:motion-reduce:animate-none" />
             </span>
-            <span className="dshx:animate-pulse">Thinking…</span>
+            <span className="dshx:animate-pulse dshx:motion-reduce:animate-none">Working…</span>
           </li>
         ) : null}
       </TimelineRuns>
@@ -944,7 +939,7 @@ const CommentBox = (props: {
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
       <BacklogTextBox
         ariaLabel="Comment"
-        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads, projects and agents; paste or drop an image"
+        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads, projects and agents. Paste or drop an image"
         value={text}
         onChange={setText}
         threads={props.threads}
@@ -1010,7 +1005,7 @@ const ImageTitleNotice = (props: { readonly id: number; readonly job: BacklogIma
       </span>
       {pending ? null : (
         <Button size="xs" variant="ghost" disabled={actions.regenerateImageTitle.isPending} onClick={() => actions.regenerateImageTitle.mutate(props.id)}>
-          Try again
+          Retry
         </Button>
       )}
     </div>
@@ -1123,7 +1118,7 @@ const LinkRow = (props: {
             props.thread.running ? 'dshx:text-info' : 'dshx:text-muted-foreground',
           )}
         >
-          <StatusDot size="sm" tone={props.thread.running ? 'info' : 'muted'} className={props.thread.running ? 'dshx:animate-pulse' : undefined} />
+          <StatusDot size="sm" tone={props.thread.running ? 'info' : 'muted'} className={props.thread.running ? 'dshx:animate-pulse dshx:motion-reduce:animate-none' : undefined} />
           {props.thread.running ? 'running' : 'idle'}
         </span>
       )}
@@ -1255,16 +1250,7 @@ const PeekBody = (props: {
   return (
     <>
       <header className="dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-4">
-        <nav aria-label="Breadcrumb" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-          {item.project === null ? null : (
-            <>
-              <ItemGlyphs.ProjectLabel project={item.project} />
-              <span>/</span>
-            </>
-          )}
-          <BacklogMentionHandle item={item} className="dshx:text-foreground" />
-          {item.freshness === 'fresh' ? null : <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-2xs">{item.freshness}</span>}
-        </nav>
+        <PeekHeading item={item} />
         <TooltipProvider>
           <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
             <Tooltip>
@@ -1291,7 +1277,7 @@ const PeekBody = (props: {
                     aria-label="Run triage"
                     disabled={actions.triage.isPending}
                     onClick={() => actions.triage.mutate(item.id)}
-                    className={cn(actions.triage.isPending && 'dshx:animate-pulse')}
+                    className={cn(actions.triage.isPending && 'dshx:animate-pulse dshx:motion-reduce:animate-none')}
                   >
                     <WandSparklesIcon />
                   </Button>
@@ -1398,7 +1384,7 @@ const PeekBody = (props: {
             >
               {running.map(thread => (
                 <div key={thread.id} className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-xs">
-                  <StatusDot size="sm" tone="info" className="dshx:mt-1 dshx:animate-pulse" />
+                  <StatusDot size="sm" tone="info" className="dshx:mt-1 dshx:animate-pulse dshx:motion-reduce:animate-none" />
                   <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
                     <span className="dshx:text-muted-foreground">Running in</span>
                     <span className="dshx:truncate dshx:font-medium">{thread.title}</span>

@@ -1,8 +1,8 @@
 # @dshfiles/settings-shell
 
-![DSH release notice and TL;DR](docs/screenshots/dsh-release-notice.png)
+![DSH release notice and summary](docs/screenshots/dsh-release-notice.png)
 
-![Native Settings shell, ported](docs/screenshots/settings-shell-port.png)
+![Settings shell](docs/screenshots/settings-shell-port.png)
 
 ![One Settings hub inside the tabbed workspace](docs/screenshots/settings-workbench-panels.png)
 
@@ -20,11 +20,24 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
   (_Open Settings_, or _Settings: <entry>_ for each entry), or another plugin (below). Every one of them opens the same
   page; with `@dshfiles/main-tabs` it gets a tab like any other page. Picking that tab, or a reload that lands on it,
   reopens Settings; leaving it closes Settings. With no other tab left, main-tabs keeps showing Settings.
-- **Task groups**: the navigation lists **General** (appearance, language, shortcuts, the
-  thread list), **Models & accounts**, **Agents**, **Tools & MCP**, **Projects & workspaces**, **Hosts & network**,
-  **Security**, **Notifications**, **Plugins**, **About**, and **Other** for anything not placed yet. The map lives in
+- **Task groups**: the navigation lists **General** (appearance, shortcuts, the thread list, layout, composer,
+  transcript), **Models & accounts**, **Agents**, **Tools & MCP**, **Projects & workspaces**, **Hosts & network**,
+  **Security**, **Notifications**, **Plugins** and **About**. The map lives in
   [`src/settings-groups.ts`](src/settings-groups.ts): native `settings.section` ids, plugin settings namespaces, and the
   stage pages other plugins own. Entries carry a person's name, never a package id (`agent-loop` reads _Agent loop_).
+  Settings several plugins hold for one task share one entry, each plugin's fields under a subheading: **Layout**
+  (main tabs, docked panes, thread panel, status bar), **Composer**, **Transcript**, **Web search and fetch**,
+  **Checks and tests** and **Diagnostics**. Placing a namespace never moves or renames its keys.
+- **Adding a plugin**: give its settings namespace (and any `settings.section` it registers) a group in
+  `src/settings-groups.ts`, or the entry of the task it belongs to. `settings-groups.test.ts` reads every owned
+  plugin's sources and fails, naming the table to edit, when one would land under **Other**; that group is only for
+  a third-party plugin nobody placed.
+- **Section text**: a page shows a description only when its schema has one (`Schema.object({…}).description('…')`)
+  or its `locale/<lang>.json` `meta` gives the row a title and description written for people. A `package.json`
+  description is never shown.
+- **Advanced**: a field marked with schemastery's `.collapse()` (or held by an object marked so) sits under a closed
+  **Advanced (n)** control at the end of its page. It opens by itself when one of its settings is modified or
+  focused from a link, and search results never fold.
 - **Deep links**: **AI accounts**, **MCP servers**, **Secrets** and **Hosts** are entries that open the page their plugin
   owns (_Open MCP servers_); Settings links them instead of copying their UI. AI accounts appears once: its section,
   its plugin settings and the link to the accounts page share one entry. Every Jev setting (enable, key, thresholds) of
@@ -52,7 +65,7 @@ These are presentation-only panel registrations; setting reads/writes retain the
 
 ### DSH release notices
 
-The Settings trigger shows a small badge when GitHub has a release newer than the DSH version running on the Host. **Settings › General › Settings › Release check** (`releaseCheck`) turns the automatic check off: nothing asks GitHub on its own, the badge stays hidden, and **Check for DSH updates** still asks once when pressed. **General** links the installed and latest version numbers to their GitHub releases, dates each (relative, full date on hover or focus) and counts the releases between them, lists those releases, offers a concise English TL;DR, and links to the official release notes. Dismissal is browser-local and lasts until another release appears. Release checks run on the Host against the fixed public GitHub Releases API, are cached for one hour, and can be retried from General; an unavailable or unmatched history never guesses that an update exists. The read-only `dsh_release_status` Agent tool uses the same checked result.
+The Settings trigger shows a small badge when GitHub has a release newer than the DSH version running on the Host. **Settings › About › Update DSH › Release check** (`releaseCheck`) turns the automatic check off: nothing asks GitHub on its own, the badge stays hidden, and **Check for DSH updates** still asks once when pressed. **General** links the installed and latest version numbers to their GitHub releases, dates each (relative, full date on hover or focus) and counts the releases between them, lists those releases, offers a concise English TL;DR, and links to the official release notes. Dismissal is browser-local and lasts until another release appears. Release checks run on the Host against the fixed public GitHub Releases API, are cached for one hour, and can be retried from General; an unavailable or unmatched history never guesses that an update exists. The read-only `dsh_release_status` Agent tool uses the same checked result.
 
 ### Search
 
@@ -60,7 +73,7 @@ One field at the top of Settings searches every setting the shell can draw: thei
 (`thread sidebar children` finds `maxChildren` on the Thread list page), plus entry and group names ("models &
 accounts") and key bindings, by command name or keys ("open settings", "⌘,"). Every
 word must match; accents and case are ignored; hidden and secret fields never match. Results replace the section as a
-flat list grouped by page, with matches highlighted, editable in place, and a count ("6 Settings Found"). The tree
+flat list grouped by page, with matches highlighted, editable in place, and a count ("6 settings found"). The tree
 stays visible with a match count per entry; picking an entry with matches scrolls to its results. `Escape` clears the
 query. **Modified** beside the field toggles VS Code's `@modified` filter in the query: only fields the user layer
 sets are listed (alone, or narrowed by the other words); sections, published entries and key bindings carry no user
@@ -127,15 +140,21 @@ highlights it for two seconds. A field opened from search or a link while the pa
 editor selects the field's key, or says the overrides leave it out and that **Insert setting** adds it. Each Settings
 instance (the stage page, a docked hub) remembers each page's view while it is open.
 
-**Where a value comes from.** Under its key path each row names its source in words, never only by colour:
+**Where a value comes from.** A row whose value is the schema default shows only its label, description and control.
+A row that differs names its source in words, never only by colour:
 
-| Label                        | Meaning                                                                                      |
-| ---------------------------- | -------------------------------------------------------------------------------------------- |
-| Override · inherits _v_      | The user layer sets the field; Reset re-inherits _v_.                                        |
-| Override · same as inherited | An override equal to what it would inherit: still modified, still reset by Reset.            |
-| Profile composition          | No override; the merged composition base differs from the schema default.                    |
-| Default                      | No override; the value is the schema default.                                                |
-| Source unknown               | No override and the schema declares no default to compare with, so the Host view cannot say. |
+| Label                        | Meaning                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------- |
+| Override · inherits _v_      | The user layer sets the field; Reset re-inherits _v_.                             |
+| Override · same as inherited | An override equal to what it would inherit: still modified, still reset by Reset. |
+| Profile composition          | No override; the merged composition base differs from the schema default.         |
+
+A schema that declares no default gives nothing to compare with, so that row says nothing about its source. The
+config key shows when the pointer rests on the label, in the JSON view, and in a search that matched it.
+
+**Units.** A number whose key ends in a unit (`…Ms`, `…Bytes`, `…Seconds`) shows that unit once, beside the field, and
+the label drops it. Sizes and durations show in the unit their default reads well in (`streamIdleTimeoutMs` 300000
+as _300 s_, `maxRequestFilesBytes` 134217728 as _128 MB_); the stored value keeps the unit of the key.
 
 The Host's settings view gives each namespace three layers: `value` (resolved), `base` (schema defaults plus every
 composition layer, merged) and `user` (the profile's raw override section). Everything above is derived from them

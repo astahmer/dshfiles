@@ -3,8 +3,9 @@
   "features": [
     {
       "id": "dispatch-request-messages",
-      "title": "Dispatch agent/request-messages on stock DSH",
-      "summary": "Wrap the llm runtime's innermost adapter call so every agent-loop request runs the agent/request-messages waterfall and sends the messages its listeners return, with config, tools and tool history unchanged.",
+      "title": "Let plugins adjust each model request",
+      "summary": "Features can adjust the messages of each model request before it is sent.",
+      "details": "Wrap the llm runtime's innermost adapter call so every agent-loop request runs the agent/request-messages waterfall and sends the messages its listeners return, with config, tools and tool history unchanged.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",

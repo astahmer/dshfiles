@@ -106,7 +106,12 @@ const fixture = (
   const menu = () => {
     fireEvent.contextMenu(trigger(), { button: 2, clientX: 20, clientY: 20 })
   }
-  return { api, panel, actions, view, update, trigger, menu }
+  /** The docking verbs live one level down, under Layout. */
+  const layoutMenu = () => {
+    menu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Layout' }))
+  }
+  return { api, panel, actions, view, update, trigger, menu, layoutMenu }
 }
 
 describe('workbench semantic tab chrome', () => {
@@ -214,15 +219,43 @@ describe('workbench semantic tab chrome', () => {
     const tab = fixture()
     const trigger = tab.trigger()
     expect(screen.getByText('Thread A')).toBeTruthy()
-    expect(screen.getByLabelText('running')).toBeTruthy()
+    expect(screen.getByLabelText('Working')).toBeTruthy()
     expect(trigger.getAttribute('data-preview')).toBe('true')
     tab.update({ title: 'Renamed', status: 'unread', pinned: true, preview: false })
     expect(tab.trigger()).toBe(trigger)
     expect(screen.getByText('Renamed')).toBeTruthy()
-    expect(screen.getByLabelText('unread')).toBeTruthy()
+    expect(screen.getByLabelText('Ready')).toBeTruthy()
     expect(screen.getByLabelText('Pinned')).toBeTruthy()
-    expect(screen.queryByLabelText('running')).toBeNull()
+    expect(screen.queryByLabelText('Working')).toBeNull()
     expect(trigger.hasAttribute('data-preview')).toBe(false)
+  })
+
+  it('draws the shared status glyph for every tab status and never a coloured dot of its own', () => {
+    const tab = fixture()
+    const glyph = () => tab.view.container.querySelector('[data-slot="status-glyph"]')
+    expect(glyph()?.getAttribute('data-status')).toBe('working')
+    expect(tab.view.container.innerHTML).not.toMatch(/bg-info|bg-warning|animate-pulse/)
+    tab.update({ status: 'needsYou' })
+    expect(glyph()?.getAttribute('data-status')).toBe('needs-you')
+    expect(tab.view.container.innerHTML).not.toMatch(/bg-info|bg-warning|animate-pulse/)
+    tab.update({ status: 'failed' })
+    expect(glyph()?.getAttribute('data-status')).toBe('failed')
+    tab.update({ status: 'unread' })
+    expect(glyph()?.getAttribute('data-status')).toBe('ready')
+    tab.update({ status: null })
+    expect(glyph()).toBeNull()
+  })
+
+  it('marks a preview tab with a muted title instead of italics, and caps the title width with an ellipsis', () => {
+    const tab = fixture()
+    const title = screen.getByText('Thread A')
+    expect(tab.trigger().getAttribute('data-preview')).toBe('true')
+    expect(title.className).not.toContain('italic')
+    expect(title.className).toContain('dshx:text-muted-foreground')
+    expect(title.className).toContain('dshx:truncate')
+    expect(title.className).toContain('dshx:max-w-56')
+    tab.update({ preview: false })
+    expect(screen.getByText('Thread A').className).not.toContain('dshx:text-muted-foreground')
   })
 
   it('keeps a preview on double click and delegates close exactly once without archiving', () => {
@@ -307,6 +340,28 @@ describe('workbench semantic tab chrome', () => {
     fireEvent.keyDown(editor, { key: 'Escape' })
   })
 
+  it('keeps tab verbs at the top level and puts the docking verbs under one Layout submenu', () => {
+    const tab = fixture()
+    tab.menu()
+    const topLevel = (): string[] => screen.getAllByRole('menuitem').map(item => item.textContent ?? '')
+    expect(topLevel()).toEqual(['Keep tab', 'Pin tab', 'Move to side panel', 'Close tab', 'Close other tabs', 'Close tabs to the right', 'Layout'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Layout' }))
+    expect(screen.getByRole('menuitem', { name: 'Float panel' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Hide tab row' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Close panel' })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close tab' }))
+    expect(tab.actions.close).toHaveBeenCalledExactlyOnceWith('thread:a')
+  })
+
+  it('names the close verb of a panel without a semantic tab Close tab as well', () => {
+    const tab = fixture({ semantic: false })
+    tab.menu()
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Close tab', 'Close other tabs', 'Close tabs to the right', 'Layout'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close tab' }))
+    expect(tab.api.getPanel(tab.panel.id)).toBeUndefined()
+    expect(tab.actions.close).not.toHaveBeenCalled()
+  })
+
   it('closes the other native tabs of its group, or only those to its right', () => {
     const tab = fixture({ semantic: false })
     act(() => {
@@ -330,7 +385,7 @@ describe('workbench semantic tab chrome', () => {
 
   it('hides only a single native tab row without closing or navigating its panel', () => {
     const tab = fixture({ semantic: false })
-    tab.menu()
+    tab.layoutMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Hide tab row' }))
     expect(tab.panel.group.header.hidden).toBe(true)
     expect(tab.api.getPanel(tab.panel.id)).toBe(tab.panel)
@@ -340,19 +395,20 @@ describe('workbench semantic tab chrome', () => {
 
   it('disables hiding a multi-tab row and rechecks eligibility after the menu opens', () => {
     const tab = fixture()
-    tab.menu()
+    tab.layoutMenu()
     const hide = screen.getByRole('menuitem', { name: 'Hide tab row' })
     act(() => tab.api.addPanel({ id: 'second', component: 'body', position: { referenceGroup: tab.panel.group } }))
     fireEvent.click(hide)
     expect(tab.panel.group.header.hidden).toBe(false)
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
-    tab.menu()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    tab.layoutMenu()
     expect(screen.getByRole('menuitem', { name: 'Hide tab row' }).getAttribute('data-disabled')).toBe('')
   })
 
   it('floats the real panel and leaves the semantic actor unchanged', () => {
     const tab = fixture()
-    tab.menu()
+    tab.layoutMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Float panel' }))
     expect(tab.panel.group.api.location.type).toBe('floating')
     expect(tab.actions.close).not.toHaveBeenCalled()

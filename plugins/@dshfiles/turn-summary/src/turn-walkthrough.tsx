@@ -4,8 +4,11 @@ import { ArrowUpRightIcon, ChevronDownIcon, ChevronRightIcon, FileDiffIcon, Fold
 import type { TurnActivitySummary } from './turn-activity.js'
 import { TurnWalkthroughModel } from './turn-walkthrough-model.js'
 
-/** Whether the turn edited files, so the summary row offers its walkthrough at all. */
-export const hasWalkthrough = (summary: TurnActivitySummary): boolean => summary.editedFileStats.length > 0
+/** Whether the turn edited files, so the summary row names them as chips. */
+export const hasEditedFiles = (summary: TurnActivitySummary): boolean => summary.editedFileStats.length > 0
+
+/** Whether the summary row offers the walkthrough: only when it says more than the chips do. */
+export const hasWalkthrough = (summary: TurnActivitySummary, chipLimit: number): boolean => TurnWalkthroughModel.addsDetail(summary.editedFileStats, chipLimit)
 
 /**
  * The walkthrough toggle inside the turn summary row: a labelled control, so a closed walkthrough is never a lone
@@ -14,7 +17,7 @@ export const hasWalkthrough = (summary: TurnActivitySummary): boolean => summary
 export const TurnWalkthroughToggle = (props: { readonly open: boolean; readonly onToggle: () => void }): JSX.Element => (
   <button
     aria-expanded={props.open}
-    className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:hover:text-foreground"
+    className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:hover:text-foreground dshx:pointer-coarse:min-h-11"
     onClick={props.onToggle}
     type="button"
   >
@@ -37,6 +40,7 @@ export const TurnWalkthroughList = (props: {
         id: group.directory,
         label: group.directory,
         icon: <FolderIcon />,
+        // An empty summary draws no hint line.
         hint: group.summary,
         files: group.files.map(file => ({ ...file, onOpen: () => props.openFile(file.fullPath) })),
       }))}

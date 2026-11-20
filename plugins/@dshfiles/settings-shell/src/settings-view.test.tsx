@@ -1,8 +1,10 @@
-import { act } from 'react'
+import { act, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
+import type { PluginSettingsPage } from './plugin-settings.js'
+import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsGroups } from './settings-groups.js'
 import { SettingsTab, type SettingsViewProps } from './settings-view.js'
 
@@ -13,11 +15,11 @@ const rows = [
 ]
 const sectionEntries = [{ sectionId: 'appearance', sectionLabel: 'Appearance', id: 'theme', title: 'Theme', description: 'Light or dark' }]
 
-const mount = (overrides: Partial<SettingsViewProps>) => {
+const mount = (overrides: Partial<SettingsViewProps>, section: ReactNode = null) => {
   const sectionOwners: unknown[] = []
   const renderSlot: ShellRenderSlot = (name, owner) => {
     if (name === 'settings.section') sectionOwners.push(owner)
-    return null
+    return name === 'settings.section' ? section : null
   }
   const onReveal = vi.fn()
   const props: SettingsViewProps = {
@@ -71,6 +73,148 @@ describe('settings view: section entries', () => {
     const plain = mount({ sectionTarget: undefined })
     expect(plain.sectionOwners.at(-1)).not.toHaveProperty('target')
     plain.unmount()
+  })
+})
+
+describe('settings view: one title per entry', () => {
+  const entry = (view: { readonly host: HTMLElement }): HTMLElement | null => view.host.querySelector('[data-settings-entry]')
+  const shown = (element: Element | null | undefined): boolean => element instanceof HTMLElement && element.style.display !== 'none'
+
+  it('titles the entry with its own name and no group eyebrow above it', () => {
+    const view = mount({ activeId: 'appearance' })
+    const header = entry(view)?.querySelector('header')
+    expect(header?.querySelector('h2')?.textContent).toBe('Appearance')
+    expect(header?.textContent).toBe('Appearance')
+    view.unmount()
+  })
+
+  it('hides the heading a section draws when it repeats the entry title, whatever its case', () => {
+    const view = mount(
+      { activeId: 'appearance' },
+      <div>
+        <h2 data-own-title="">APPEARANCE</h2>
+        <p>Colours and fonts.</p>
+      </div>,
+    )
+    expect(shown(entry(view)?.querySelector('[data-own-title]'))).toBe(false)
+    expect(shown(entry(view)?.querySelector('header h2'))).toBe(true)
+    expect(entry(view)?.textContent).toContain('Colours and fonts.')
+    view.unmount()
+  })
+
+  it('keeps a section heading that says something else, and never hides a control', () => {
+    const other = mount({ activeId: 'appearance' }, <h3 data-own-title="">Theme</h3>)
+    expect(shown(entry(other)?.querySelector('[data-own-title]'))).toBe(true)
+    other.unmount()
+    const control = mount(
+      { activeId: 'appearance' },
+      <button data-own-title="" type="button">
+        Appearance
+      </button>,
+    )
+    expect(shown(entry(control)?.querySelector('[data-own-title]'))).toBe(true)
+    control.unmount()
+  })
+
+  it('gives a merged plugin page a subheading, unless it would repeat the entry title', () => {
+    const page = (ns: string, title: string): PluginSettingsPage => ({
+      pageId: `plugin:${ns}`,
+      ns,
+      title,
+      description: '',
+      group: 'plugins',
+      fields: [],
+      modifiedPaths: [],
+    })
+    const headings: string[] = []
+    const view = mount({
+      groups: [
+        {
+          group: { id: 'general', label: 'General', description: '' },
+          entries: [
+            {
+              id: 'appearance',
+              group: 'general',
+              label: 'Appearance',
+              order: 0,
+              sectionId: 'appearance',
+              pages: [page('theme', 'appearance'), page('fonts', 'Fonts')],
+              hiddenPages: [],
+              keywords: '',
+            },
+          ],
+        },
+      ],
+      renderPluginPage: (current, heading) => {
+        headings.push(`${current.ns}:${heading}`)
+        return null
+      },
+    })
+    expect(headings).toEqual(['theme:none', 'fonts:section'])
+    view.unmount()
+  })
+})
+
+describe('settings view: narrow panes', () => {
+  it('leaves the entry title to the Sections select when the navigation collapses into it', () => {
+    const view = mount({ activeId: 'appearance' })
+    const header = view.host.querySelector('[data-settings-entry] header')
+    // The select right above already reads "Appearance": the heading stays for assistive technology only.
+    expect(header?.className).toContain('dshx:@max-pane-compact:sr-only')
+    expect(header?.querySelector('h2')?.textContent).toBe('Appearance')
+    view.unmount()
+  })
+})
+
+describe('settings view: search counts', () => {
+  it('counts each matching setting once on its navigation row', () => {
+    // SAFETY: search reads only the key, path, title and description of a field.
+    const field = { key: 'maxTabs', path: ['maxTabs'], title: 'Max tabs', description: '', groups: [] } as unknown as SettingField
+    const example: PluginSettingsPage = {
+      pageId: 'plugin:example',
+      ns: 'example',
+      title: 'Example',
+      description: '',
+      group: 'plugins',
+      fields: [field],
+      modifiedPaths: [],
+    }
+    const view = mount({ groups: SettingsGroups.group({ sections: rows, pages: [example], panels: new Set() }), pluginPages: [example], query: 'max tabs' })
+    expect(view.host.querySelector('[data-nav-id="plugin:example"]')?.textContent).toBe('Example1')
+    view.unmount()
+  })
+})
+
+describe('settings view: Jev pointer', () => {
+  const jevField = (key: string): SettingField =>
+    // SAFETY: grouping reads only the key and path of a field.
+    ({ key, path: [key], title: key, description: '', groups: [] }) as unknown as SettingField
+  const page = (ns: string, keys: readonly string[]): PluginSettingsPage => ({
+    pageId: `plugin:${ns}`,
+    ns,
+    title: ns,
+    description: '',
+    group: 'plugins',
+    fields: keys.map(jevField),
+    modifiedPaths: [],
+  })
+  const groups = SettingsGroups.group({
+    sections: [...rows, { id: 'dshfiles-update-dsh', order: 20, label: 'Update DSH' }],
+    pages: [page('dshfiles-settings-shell', ['releaseCheck', 'jevSecret']), page('dshfiles-backlog', ['autoTriage', 'jevEnabled'])],
+    panels: new Set(),
+  })
+  const note = (view: { readonly host: HTMLElement }): string | undefined => view.host.querySelector('[role="note"]')?.textContent ?? undefined
+
+  it('points a plugin page at the Jev entry that holds its Jev settings', () => {
+    const view = mount({ groups, activeId: 'plugin:dshfiles-backlog' })
+    expect(note(view)).toContain('entry.jevMoved')
+    view.unmount()
+  })
+
+  it('says nothing on the page whose namespace only lends the shared key', () => {
+    const view = mount({ groups, activeId: 'dshfiles-update-dsh' })
+    expect(note(view)).toBeUndefined()
+    view.unmount()
   })
 })
 

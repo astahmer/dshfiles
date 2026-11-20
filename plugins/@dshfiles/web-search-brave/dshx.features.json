@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "brave-web-search",
-      "title": "Answer ctx.web searches with Brave Web Search",
-      "summary": "A Brave backend for the web search seam: the API key setting holds a Secret Catalog reference resolved on the Host per search (falling back to BRAVE_API_KEY), results are stripped of markup, deduplicated by URL and mapped to sources.",
+      "title": "Search the web with Brave",
+      "summary": "Web searches use Brave Search with a key kept in your secrets.",
+      "details": "A Brave backend for the web search seam: the API key setting holds a Secret Catalog reference resolved on the Host per search (falling back to BRAVE_API_KEY), results are stripped of markup, deduplicated by URL and mapped to sources.",
       "surfaces": ["host", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",

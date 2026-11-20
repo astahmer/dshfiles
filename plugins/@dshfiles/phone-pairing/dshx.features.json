@@ -5,7 +5,8 @@
     {
       "id": "phone-pairing",
       "title": "Pair a phone over a self-provisioned HTTPS tunnel",
-      "summary": "Opt-in public phone access with agent tools: the persisted setting decides whether DSH exposes the gateway, the tools enable, disable, print a fresh code and revoke devices, and the chosen provider provisions the tunnel (Tailscale first, public tunnel fallback). Redemption issues a persistent per-device cookie; the gateway proxies to the loopback native listener with its own exchanged cookie.",
+      "summary": "Off by default: pair a phone over a secure tunnel with a one-time code, and revoke it any time.",
+      "details": "Opt-in public phone access with agent tools: the persisted setting decides whether DSH exposes the gateway, the tools enable, disable, print a fresh code and revoke devices, and the chosen provider provisions the tunnel (Tailscale first, public tunnel fallback). Redemption issues a persistent per-device cookie; the gateway proxies to the loopback native listener with its own exchanged cookie.",
       "surfaces": ["host", "tool", "client"],
       "surface": "infrastructure",
       "destination": "none",

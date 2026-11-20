@@ -34,7 +34,7 @@
 ![Thread navigation icons and a pinned More menu in the collapsed sidebar](docs/screenshots/collapsed-sidebar-navigation.png)
 
 ![Thread sidebar list, with the thread board page open beside it](docs/screenshots/thread-classification.png)
-![Inbox › Waiting threads: one row per thread waiting on your answer, approval or review](docs/screenshots/waiting-threads-page.png)
+![Waiting threads: one row per thread waiting on your answer, approval or review](docs/screenshots/waiting-threads-page.png)
 ![Manage saved views with Inactive and Interrupted filters](docs/screenshots/thread-list-views.png)
 ![Synthetic saved view retained after reload over HTTP LAN access](docs/screenshots/saved-view-http-lan.png)
 ![Start a chat directly from an expanded or collapsed project header](docs/screenshots/project-header-chat.png)
@@ -152,13 +152,41 @@ the pages and the DSH actions below. It comes back from Customize sidebar › **
 **Sidebar: show the row under the list** (`showFooter`). Its entries stay mounted without tooltips.
 
 **DSH actions on the rail (b:kgcc).** A small group at the bottom of the rail, directly above Settings (below the
-folders and + New folder), expanded and collapsed alike: **Restart DSH** (only while the supervisor offers a restart;
-amber with a slow pulse while updates or a restart wait, its tooltip then names them), a pending **page reload** (amber;
+folders and + New folder), expanded and collapsed alike: a pending **page reload** (amber;
 opens the list of updated plugins), **Copy DSH URL for agents** (the tooltip says Copied) and **Pair a phone** (only
 with phone-pairing; opens the pairing dialog). Each has a tooltip and an accessible name. They are actions, not
 folders, so the folder model never lists them. On a phone they are rows of a **DSH** section at the end of the More
 tab. ⌘K keeps all of them. Customize sidebar › **Show DSH actions on the rail** (`showRailActions`, on by default)
 turned off puts them back in the row under the list, which a pending restart or page reload then shows.
+
+**One restart control.** Restart is the status strip's item: it shows what waits ("Restart pending · 2 plugins", the
+plugins named in plain words), offers **Restart DSH** and **Restart when idle** where the launcher can restart DSH, and
+otherwise says what to do (stop DSH in its terminal, start it again). The same seat shows the **Update DSH** notice
+while no restart waits, so update-then-restart is one item, not two. Customize sidebar › **Show Restart DSH on the
+rail** (`showRailRestart`, off by default) adds a Restart button to the rail's DSH actions (only while the supervisor
+offers a restart; amber with a slow pulse while updates or a restart wait); the strip then draws no restart item.
+
+**Palette rows.** The sidebar files one row per page ("Observe › Usage"; a page named like its destination is just
+"Inbox"), a "Go to" row for each destination that is more than one page, and its verbs (Toggle sidebar, Focus
+composer, Customize sidebar, Restart DSH, Pair a phone, Copy DSH URL) in the command group. It lists one row for the left-sidebar toggle (its own, not the built-in command beside it), and none per folder and panel: filing a panel in a folder is the
+folder's own **Add panel** and each row's menu (`src/sidebar-palette-rows.ts`).
+
+**Failed threads, one read.** `@dshfiles/thread-sidebar/failed-turns-client` is a dshx module: `useFailedTurns()` reads
+the Host's failed-turn record (re-read on every attention change) and `useFailedThreadIds(views)` /
+`FailedThreadsModel.ids` add the unread failed finish an older Host can only report. A surface that marks a failed
+thread imports it instead of restating the read and its cache times.
+
+**One Inbox.** The Inbox destination and its page share one name; "Needs you" is the view inside the page. The
+sidebar's own per-thread page (Waiting threads) groups the same inbox items by thread, so it is `unlisted`: the Inbox
+list does not offer it as a second row, the rail and the phone tab open the Inbox page at once, and the palette and the
+New tab page still open Waiting threads (it can also be filed in any folder). A page glyph that draws a count over its
+icon (the Inbox count) shows it at the trailing edge of its list row instead, clear of the label.
+
+**Developer pages.** A page for people who write plugins declares `group: 'developer'` in its destination section
+(Component gallery and Plugin guide do). Such a page is never listed among a destination's own pages: it sits in a
+labelled **Developer** group at the end of the Settings list, whatever destination its plugin named. Customize sidebar ›
+**Show developer pages in Settings** (`showDeveloperPages`, on by default) hides the group; the command palette and the
+New tab page still open those pages. A page a person filed in a folder of their own stays where they put it.
 
 **Rail and destinations.** The left column is a labelled rail of eight destinations (plan
 `docs/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread
@@ -334,7 +362,7 @@ context menu's Move to group submenu performs the same moves from the keyboard.
 
 **The thread board page.** The sidebar only ever shows the list; the board is a
 full-width page opened from the thread board row in the sidebar's panel list (or
-the "Thread board" command in the palette). It renders the same thread rows with
+the "Threads › Board" row in the palette, which also answers to "thread board" and "kanban"). It renders the same thread rows with
 each section as a column: it defaults to the six status lanes (including empty
 ones), and can also group its columns by project, date, or no grouping. The board
 shows only columns: the list's Interrupted, Needs resume, Usage limit and attention
@@ -356,7 +384,7 @@ range without opening, Home/End jump to the ends of the list, and Ctrl/Cmd+A
 selects every visible row. Shift+click and Ctrl/Cmd+click do the same from the
 pointer, ←/→ fold the containing group section or the row's subagent children,
 and Escape or a plain click clears the selection. A selected row paints in the
-info tone, and an "N selected" bar above the list offers Pin, Settle, Archive
+info tone, and an "N selected" bar above the list offers Pin, Done, Archive
 and Clear. Rows read their selected state from a small store on the shared row
 actions (`src/thread-multi-selection.ts`), so a toggle re-renders only the rows
 whose state changed; nothing writes the rendered rows' attributes.
@@ -537,7 +565,7 @@ without scrolling. A row wide enough keeps the full names. A status filter names
 shows, and several combine as OR: **Working**, **Not running**, **Needs attention** (any label),
 **Unread**, one filter per attention label (**Approval needed**, **Input
 needed**, **Turn finished**, **Needs resume**, **Interrupted**), **Inactive**,
-and the storage states **Muted**, **Settled** and **Archived**. Unread leaves archived and
+and the storage states **Muted**, **Done** and **Archived**. Unread leaves archived and
 settled rows out, and the attention filters see the label a root row shows for
 itself or a child. A saved view from an earlier build that still asks for **Not
 working** decodes to **Not running** without removing its other selectors. Muted,
@@ -563,11 +591,11 @@ reopens it. Persistent warnings — storage failures and restart requests — st
 in the list flow instead.
 
 **Settled composer.** A settled thread opens normally and reads as history: the
-composer carries a **Settled** status strip
+composer carries a **Done** status strip
 (`src/settled-thread-dock.tsx`), one compact line beside the jj rebase notice
 titled with the settle age once it stops reading "now", the archive deadline
 in the sidebar's own relative buckets beside it, and an **Archive** button next
-to the primary **Unsettle** that lifts the block, because the Host
+to the primary **Restore** that lifts the block, because the Host
 rejects the next model step while the thread is settled. The
 rejection is a `agent/pre-step` listener in `src/host.ts` over
 `src/settled-gate.ts`: a settled
@@ -622,14 +650,23 @@ unscrollable.
 ships **unbound**, so Settings › Shortcuts lists it without it owning a chord
 until the user picks one. Which buttons a row draws on hover, and in which order,
 is a preference: Customize sidebar › Hover actions lists every one (Resume,
-Dismiss, Open in side panel, Pin, Park, Settle, Mute, Archive, Restore), each row
+Dismiss, Open in side panel, Pin, Snooze, Done, Mute, Archive, Restore), each row
 carrying the button's own icon, a grip, Move up/Move down buttons and a visibility
 checkbox. Drag a row, or move it, to set the left-to-right order the buttons draw
 in; `rowActionOrder` stores that order and `hiddenRowActions` the ones a row hides
 — an absent id means shown, so a new action ships visible at the end of the saved
-order. The shipped order puts Settle in Archive's slot and Archive just before it,
-so a row that hides Archive ends on Settle. Hiding one removes only its hover
+order. The shipped order puts Done in Archive's slot and Archive just before it,
+so a row that hides Archive ends on Done. Hiding one removes only its hover
 button; the context menu keeps every action.
+
+By default a row shows **one** verb on hover, Done, and a `⋯` that opens the
+row menu (a row that needs a resume adds Resume and Dismiss; an archived row shows
+Restore instead): Open in side panel, Pin, Snooze, Mute and Archive ship hidden and
+stay in that menu and on their keys. The buttons sit in the first line's time slot
+and the line gives them their width while they show, so the title truncates before
+them instead of being covered. A row's inline verb (Answer, Approve, Retry, Resume,
+Land) sits at the end of its second line, which leaves the first line to the title
+and the time.
 
 **Pending restarts.** Client bundles hot-reload; Host code, `package.json` and
 `cordis.patch.yml` load only at boot. The Host half remembers a content hash of
@@ -723,7 +760,7 @@ launcher, brand and reopen badge remain sidebar chrome; Settings already has its
 generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
-unread**, per-thread auto-settle behavior, a **Settle**/**Unsettle** toggle, and a **Mute thread** menu. The session header's **More thread actions** menu also lets you settle or unsettle the open thread. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after` and a structured session-reference chip prefilled, labeled with the source thread title, and the caret on the next line; normal workspace isolation applies.
+unread**, per-thread auto-settle behavior, a **Done**/**Restore** toggle, and a **Mute thread** menu. The session header's **More thread actions** menu also lets you settle or unsettle the open thread. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after` and a structured session-reference chip prefilled, labeled with the source thread title, and the caret on the next line; normal workspace isolation applies.
 
 **Continue in project** (row menu and thread header menu) fixes a thread that
 started in the wrong folder, or whose work moved to another repository. It lists
@@ -750,7 +787,11 @@ survives even when every browser was closed while the thread finished. Watching
 a thread finish acknowledges that completion, and so does opening the thread
 from any tab; the acknowledgement carries the record version the browser
 rendered, so a turn that finishes in between stays unacknowledged, and it never
-clears a manual unread mark on the same thread. A browser that still holds markers
+clears a manual unread mark on the same thread. A failed turn is one more
+record, in the `thread_failed_turns` domain (`failedTurns` on the same API, the
+`thread_failed_turns` tool): it is not an unread mark, so reading the thread
+does not drop it. The row stays Failed until a later turn of the thread finishes
+without failing, or the thread is marked done. A browser that still holds markers
 from the older browser-local version hands them to the Host once and then drops
 its copy. A page reads the whole state once, then follows each `changed` event
 and its 30 s poll with `changesSince`, which returns only the records written
@@ -815,7 +856,21 @@ minutes; a refused send returns `rate-limited` with the seconds to wait. Nothing
 is queued for pages that open later, and it adds no history entry. Each send
 leaves a `thread-sidebar user notification send` span.
 
-**Park vs settle vs mute.** Park files a finished thread away: it moves to the
+**One thread menu.** A thread's row menu in the list and the header's `⋯` render one layout
+(`src/thread-menu-model.ts`, drawn by `src/thread-menu.tsx`): Pin, Done (or Restore), Snooze, Rename, Open in side
+panel and Copy thread link at the top, then the submenus **Open in** (the thread's views, Continue in project, other
+applications), **Copy** (thread ID, Markdown) and **More** (Turns, @Mention, Follow-up, Mute, Mark unread, Notify,
+Mark done when idle, Move to group, Referenced by, what other plugins add, and Archive last). Each surface fills in
+the entries it can run, in that order and with those icons; an entry it cannot run there is left out rather than
+shown disabled: the list has no Find in thread, the header no Rename, and a phone no side panel and no single-key
+hints. A row action another plugin registers (`ThreadRowActions`) may carry an `icon`; without one it gets a neutral
+mark so the labels stay in one column.
+
+**Snooze vs Done vs Mute (and Archive).** The labels follow the glossary: the action stored as _settled_ is shown as
+**Done** (its reverse **Restore**), the one stored as _parked_ as **Snooze** (**Unsnooze**); **Mute** and **Archive**
+keep their names because they are different actions. Settings keys, command ids, Host API methods and agent tool
+names (`thread_settle`, `parkedSessionIds`, …) keep the stored words, which the rest of this section uses.
+Park files a finished thread away: it moves to the
 Parked section, is skipped by auto-settle, and stays parked until unparked, but
 its alerts still fire and it still runs steps when something wakes it. Settle
 goes further: the thread moves to the Settled section and runs no step at all
@@ -1185,7 +1240,7 @@ directions (two threads that wake each other would keep each other running); an
 archived subscriber or target ends the edge — at once through this plugin's own
 archive path, and on the next notice pass for an archive made elsewhere — and a
 subscriber the Host no longer resolves loses its edge instead of retrying. The
-same state is the **Notify…** submenu in a thread row's context menu (also the
+same state is the **Notify when finished** submenu in a thread row's context menu (also the
 phone action sheet a long press opens) — headed "When this thread finishes,
 notify “…”", with **Use default (Every turn)** (naming the current default
 level), Every turn, Landed, failed or a question, Only when stuck, and Off for

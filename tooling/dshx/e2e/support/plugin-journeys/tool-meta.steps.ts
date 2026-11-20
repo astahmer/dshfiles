@@ -35,9 +35,11 @@ const revealSettledToolCard = async (page: Page): Promise<void> => {
   const group = page.getByText('Ran commands', { exact: true }).last()
   // The transcript re-renders while it reconnects after a settings save, so a fold toggle can land on a stale row.
   await expect(async () => {
+    if (await card.isVisible()) return
+    // The owned Chat fork folds a turn under "Worked for"; the native Chat these compositions boot says "Completed in".
     if (!(await group.isVisible()))
       await page
-        .getByText(/^Worked for /)
+        .getByText(/^(Worked for|Completed in) /)
         .last()
         .click()
     await expect(group.or(card).first()).toBeVisible({ timeout: 2_000 })
@@ -208,7 +210,7 @@ Then('once the turn settles the tool card shows how long the call took and when 
   await recordAssertion(page, 'tool-meta-settled-call-shows-duration-and-start', async () => {
     const note = page.getByRole('note', { name: /^Took \d+\.\d s, started \d{2}:\d{2}$/ })
     await expect(note).toBeVisible()
-    await expect(note).toHaveText(/^[3-9]\.\d s · \d{2}:\d{2}$/)
+    await expect(note).toHaveText(/^[3-9]\.\d s$/)
     await expect(page.getByRole('timer')).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
@@ -232,7 +234,7 @@ const saveAndReturnToThread = async (page: Page): Promise<void> => {
       .getByRole('treeitem', { name: /^Fake thread title/ })
       .first()
       .click()
-    await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('Fake thread title', { timeout: 2_000 })
+    await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('Fake thread title', { timeout: 2_000 })
   }).toPass({ timeout: 20_000 })
 }
 

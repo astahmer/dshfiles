@@ -7,7 +7,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { CaptureHints } from './capture-hints.js'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { Schema } from 'effect'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -16,7 +17,6 @@ import {
   LayoutTemplateIcon,
   CheckIcon,
   FolderIcon,
-  HashIcon,
   PaperclipIcon,
   SquareIcon,
   LinkIcon,
@@ -26,6 +26,7 @@ import {
   MicIcon,
   PlusIcon,
   RotateCcwIcon,
+  XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
@@ -190,6 +191,8 @@ export const Composer = (props: {
   readonly captureRequest?: { readonly id: number; readonly text: string }
   /** Template names from Backlog settings; picking one fills the capture's kind, tags, body and criteria on the Host. */
   readonly templates?: readonly string[]
+  /** Present where capture was opened on demand (any view but Feed): Escape and Close put it away again. */
+  readonly onDismiss?: () => void
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
@@ -344,7 +347,7 @@ export const Composer = (props: {
       }
       appendText(`${result.text.trim()} `)
     } catch (error) {
-      setFailed(errorMessage(error, 'The recording could not be transcribed.'))
+      setFailed(errorMessage(error, 'The recording was not transcribed. Record again.'))
     }
   }
 
@@ -352,7 +355,7 @@ export const Composer = (props: {
     if (voice.phase === 'idle') {
       const status = speech.data
       if (status === undefined || !status.available) {
-        setFailed(status?.reason ?? 'The voice-input bundle is not loaded.')
+        setFailed(status?.reason ?? 'Voice input is not installed. Add it from Plugins, then restart DSH.')
         return
       }
       if (!status.ready) {
@@ -409,7 +412,7 @@ export const Composer = (props: {
 
   const preview = useMemo(() => (text.trim() === '' ? null : BacklogItems.triage(serializeProjectReferenceDraft(text, props.projects))), [text, props.projects])
   const chat = props.variant === 'chat'
-  const speechReason = speech.data?.reason ?? 'The voice-input bundle is not loaded.'
+  const speechReason = speech.data?.reason ?? 'Voice input is not installed. Add it from Plugins, then restart DSH.'
   const voiceAvailable = speech.data?.available === true
   const inputClass = cn(
     'dshx:w-full dshx:overflow-y-auto dshx:whitespace-pre-wrap dshx:break-words dshx:rounded-md dshx:bg-transparent dshx:leading-relaxed dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
@@ -493,6 +496,7 @@ export const Composer = (props: {
           }
           if (event.key === 'Escape') {
             input.current?.element()?.blur()
+            props.onDismiss?.()
             return
           }
           if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
@@ -643,8 +647,14 @@ export const Composer = (props: {
         )}
 
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
+          {chat ? <CaptureHints /> : null}
           {recording ? <span className="dshx:text-2xs dshx:text-destructive">Recording…</span> : null}
           {transcribing ? <span className="dshx:text-2xs dshx:text-muted-foreground">Transcribing…</span> : null}
+          {props.onDismiss === undefined ? null : (
+            <Button type="button" variant="ghost" size="icon-sm" aria-label="Close capture" onClick={props.onDismiss} className="dshx:text-muted-foreground">
+              <XIcon aria-hidden />
+            </Button>
+          )}
           <ComposerTools
             {...BacklogComposerScope.capture(props.draftKey)}
             insertText={value => {
@@ -666,7 +676,7 @@ export const Composer = (props: {
             {recording ? (
               <SquareIcon className="dshx:size-3.5 dshx:fill-current" />
             ) : transcribing ? (
-              <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin" />
+              <LoaderCircleIcon className="dshx:size-4 dshx:animate-spin dshx:motion-reduce:animate-none" />
             ) : (
               <MicIcon className="dshx:size-4" />
             )}
@@ -688,20 +698,6 @@ export const Composer = (props: {
         </span>
       </div>
 
-      {chat ? (
-        <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
-          <span>
-            <Kbd>↵</Kbd> add · <Kbd>⇧↵</Kbd> new line · <Kbd>Tab</Kbd> complete
-          </span>
-          <span>
-            <code>bug:</code> <code>idea:</code> <code>note:</code> set the kind
-          </span>
-          <span>
-            <HashIcon aria-hidden className="dshx:inline dshx:size-3" /> tags · <code>@</code> items, threads and projects · <code>/project</code> ·{' '}
-            <code>/template</code> · paste or drop a file
-          </span>
-        </p>
-      ) : null}
 
       <ReferenceDialog
         mode={referenceMode}

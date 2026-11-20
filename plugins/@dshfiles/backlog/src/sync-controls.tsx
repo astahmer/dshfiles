@@ -64,7 +64,7 @@ import { BacklogQueries } from './use-backlog-actions.js'
 
 const SYNC_STATUS_KEY = [BacklogQueries.key, 'sync-status'] as const
 const ALL_PROJECTS = 'all-projects'
-const HOST_RESTART = 'This DSH Host predates connections and bindings. Restart the DSH Host process to load them.'
+const HOST_RESTART = 'Restart DSH to load connections and bindings.'
 
 const stateLabels = { synced: 'Synced', pending: 'Changes to sync', conflict: 'Conflict', error: 'Sync error' } as const satisfies Record<SyncState, string>
 const stateTones = {
@@ -75,8 +75,8 @@ const stateTones = {
 } as const satisfies Record<SyncState, string>
 const credentialLabels = {
   reference: 'vault key',
-  environment: 'Host environment',
-  fallback: 'Host environment or CLI login',
+  environment: 'DSH environment',
+  fallback: 'DSH environment or CLI sign-in',
   none: 'no key needed',
   missing: 'no key',
   cli: 'CLI login',
@@ -318,7 +318,7 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
         ? linked.conflicts.slice(-3).map(conflict => (
             <p key={`${conflict.field}-${String(conflict.at)}`} className="dshx:text-muted-foreground">
               {conflict.field}:{' '}
-              {conflict.kept === 'none' ? 'both sides differ; make them agree' : `kept the ${conflict.kept === 'remote' ? source : 'backlog'} value`}.
+              {conflict.kept === 'none' ? 'both sides differ. Make them agree' : `kept the ${conflict.kept === 'remote' ? source : 'backlog'} value`}.
             </p>
           ))
         : null}
@@ -329,7 +329,7 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
           disabled={actions.syncNow.isPending}
           onClick={() => actions.syncNow.mutate({ id: linked.itemId, ...(linked.bindingId !== undefined && { binding: linked.bindingId }) })}
         >
-          <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin')} />
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
           Sync now
         </Button>
         <Button
@@ -350,8 +350,8 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
 
 /** What signing a provider in looks like on the Host, shown next to a create that could not reach its tracker. */
 const signInHintOf = (providerKind: string): { readonly text: string; readonly command?: string } | undefined => {
-  if (providerKind === 'github') return { text: 'Sign the gh CLI in on the Host, or set GITHUB_TOKEN for the Host.', command: 'gh auth login' }
-  if (providerKind === 'linear') return { text: 'Set LINEAR_API_KEY for the Host, or save a secret:ALIAS reference in Remote sync.' }
+  if (providerKind === 'github') return { text: 'Sign in with the gh CLI on this host, or set GITHUB_TOKEN for DSH.', command: 'gh auth login' }
+  if (providerKind === 'linear') return { text: 'Set LINEAR_API_KEY for DSH, or save a secret:ALIAS reference in Remote sync.' }
   return undefined
 }
 
@@ -379,7 +379,7 @@ const CreateFailure = (props: { readonly providerKind: string; readonly text: st
       {hint === undefined ? null : <span className="dshx:text-muted-foreground">{hint.text}</span>}
       <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
         <Button size="xs" variant="outline" disabled={props.pending} onClick={props.retry}>
-          <RefreshCwIcon aria-hidden className={cn('dshx:size-3', props.pending && 'dshx:animate-spin')} />
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3', props.pending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
           Retry
         </Button>
         {hint?.command === undefined ? null : (
@@ -744,7 +744,7 @@ const ConnectionForm = (props: {
       </div>
       {isReferenceOrEmpty(credential) ? null : (
         <p role="alert" className="dshx:text-xs dshx:text-destructive">
-          Keys are stored as vault references. Pick one with the key button in the field, or clear it to use the Host environment.
+          Keys are stored as vault references. Pick one with the key button in the field, or clear it to use DSH’s environment.
         </p>
       )}
       {testedDraft ? <TestReport report={test.data} error={test.error} /> : null}
@@ -755,7 +755,7 @@ const ConnectionForm = (props: {
       )}
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <Button type="button" size="sm" variant="outline" disabled={test.isPending || !isReferenceOrEmpty(credential)} onClick={() => test.mutate(draft)}>
-          <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', test.isPending && 'dshx:animate-spin')} />
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', test.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
           Test connection
         </Button>
         <Button type="submit" size="sm" disabled={test.isPending || actions.saveConnection.isPending || label.trim() === '' || !isReferenceOrEmpty(credential)}>
@@ -1035,7 +1035,7 @@ const BindingRow = (props: {
       <span className="dshx:text-muted-foreground">{directionLabels[binding.direction]}</span>
       <span className="dshx:text-muted-foreground">{pollLabel(binding.pollEverySec)}</span>
       <span className="dshx:text-muted-foreground">{String(props.view.linked)} linked</span>
-      {props.view.owned ? null : <span className="dshx:text-warning">Runs on another Host</span>}
+      {props.view.owned ? null : <span className="dshx:text-warning">Runs on another host</span>}
       <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
         <Button
           type="button"
@@ -1045,7 +1045,7 @@ const BindingRow = (props: {
           onClick={() => actions.syncNow.mutate({ binding: binding.id })}
           aria-label={`Sync ${binding.id} now`}
         >
-          <RefreshCwIcon aria-hidden className={cn('dshx:size-3', actions.syncNow.isPending && 'dshx:animate-spin')} />
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3', actions.syncNow.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
           Sync now
         </Button>
         {binding.direction === 'push' ? null : (
@@ -1126,7 +1126,7 @@ const ConnectionCard = (props: {
           {props.view.available ? null : <span className="dshx:text-xs dshx:text-destructive">Provider not loaded: enable its plugin</span>}
           <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
             <Button type="button" size="xs" variant="ghost" disabled={test.isPending} onClick={() => test.mutate(connection)}>
-              <RefreshCwIcon aria-hidden className={cn('dshx:size-3', test.isPending && 'dshx:animate-spin')} />
+              <RefreshCwIcon aria-hidden className={cn('dshx:size-3', test.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
               Test
             </Button>
             <Button
@@ -1259,7 +1259,7 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
             ))}
             {(data?.items.length ?? 0) === 0 ? null : (
               <Button type="button" size="sm" variant="outline" disabled={actions.syncNow.isPending} onClick={() => actions.syncNow.mutate({})}>
-                <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin')} />
+                <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
                 Sync all now ({String(data?.items.length ?? 0)})
               </Button>
             )}

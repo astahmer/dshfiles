@@ -251,9 +251,19 @@ const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs:
       'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/jj-integration ...".',
     )
   }
+  // An open right pane (an earlier walk's Changes view) leaves the New thread screen a narrow column, where the project
+  // and workspace choices fold into one menu; this seed drives the two separate choices, so it closes the pane first.
+  const closePane = page.getByRole('button', { name: 'Close pane', exact: true }).filter({ visible: true })
+  for (let attempt = 0; attempt < 4 && (await closePane.count()) > 0; attempt += 1) await closePane.first().click({ timeout: timeoutMs })
+  const projectButton = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
+  // A started thread left on screen (a second walk of this seed) has a composer too, but no project or workspace
+  // choice: this seed needs the New thread screen.
+  if (!(await projectButton.isVisible()) && (await fakeProviderComposer(page).isVisible())) {
+    await page.getByRole('button', { name: NEW_THREAD_START_BUTTON_NAME }).first().click({ timeout: timeoutMs })
+    await projectButton.waitFor({ state: 'visible', timeout: timeoutMs })
+  }
   const composer = await openSeedThreadComposer(page, timeoutMs)
   const projectName = basename(state.project.path)
-  const projectButton = page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })
   if ((await projectButton.textContent())?.trim() !== projectName) {
     await projectButton.click({ timeout: timeoutMs })
     await page.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true }).fill(projectName, { timeout: timeoutMs })
@@ -285,13 +295,39 @@ const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs:
       'Run "dshx dev open jj-integration/thread-destination".',
     )
   }
+  const knownWorkspaces = await page
+    .locator('[data-workspace-place="own"][data-workspace-name]')
+    .evaluateAll(controls => controls.flatMap(control => control.getAttribute('data-workspace-name') ?? []))
   await composer.fill(REBASE_READY_THREAD_MESSAGE)
   await composer.press('Enter')
   await page
     .getByRole('navigation', { name: 'Session hierarchy', exact: true })
     .filter({ hasText: REBASE_READY_THREAD_MESSAGE })
     .waitFor({ state: 'visible', timeout: timeoutMs })
-  const threadPath = join(dirname(state.project.path), `${projectName}-threads`, threadName)
+  // The send can land in another prepared workspace than the one the composer named while the draft was written (a
+  // reused spare keeps its own folder), so the new thread's header control says where it really works. Earlier
+  // threads stay mounted in their tabs, so only a workspace no control named before the send counts.
+  const landedName = await page
+    .waitForFunction(
+      known => {
+        for (const control of document.querySelectorAll('[data-workspace-place="own"][data-workspace-name]')) {
+          const name = control.getAttribute('data-workspace-name')
+          if (name !== null && !known.includes(name)) return name
+        }
+        return null
+      },
+      knownWorkspaces,
+      { timeout: Math.min(timeoutMs, 20_000) },
+    )
+    .then(
+      handle => handle.jsonValue(),
+      () => null,
+    )
+  const threadPath = join(
+    dirname(state.project.path),
+    `${projectName}-threads`,
+    landedName !== null && /^thread-[\w-]+$/u.test(landedName) ? landedName : threadName,
+  )
   if (
     !(await stat(threadPath).then(
       info => info.isDirectory(),
@@ -300,7 +336,8 @@ const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs:
   ) {
     throw new ScratchError('seed-failed', `The thread workspace ${threadPath} does not exist.`, 'Check jj-integration threadsDirectory in the scratch profile.')
   }
-  await writeFile(join(threadPath, 'seeded-work.md'), 'Work a scratch thread is ready to rebase.\n')
+  // Named after its workspace: once a walk lands this file on main, the same text in the next thread would be no change.
+  await writeFile(join(threadPath, 'seeded-work.md'), `Work a scratch thread is ready to rebase (${basename(threadPath)}).\n`)
   runJj({ cwd: threadPath, home: state.home, args: ['describe', '--message', 'Seeded work to rebase'], purpose: 'describing the seeded thread work' })
 }
 
@@ -1245,16 +1282,18 @@ const tracesReceiverEndpoint = async (input: {
       .getByRole('button', { name: /^Traces(?::|$)/u })
       .first()
       .click({ timeout: timeoutMs })
-  const badge = page.getByTestId('traces-receiver-state')
-  await badge.waitFor({ state: 'visible', timeout: timeoutMs })
-  await page.waitForFunction(() => document.querySelector('[data-testid="traces-receiver-state"]')?.getAttribute('data-state') !== 'starting', undefined, {
+  // The header names the receiver only when it fails; its state and endpoint ride on the store summary.
+  const summary = page.getByTestId('traces-store-summary')
+  await summary.waitFor({ state: 'visible', timeout: timeoutMs })
+  await page.waitForFunction(() => document.querySelector('[data-testid="traces-store-summary"]')?.getAttribute('data-receiver-state') !== 'starting', undefined, {
     timeout: timeoutMs,
   })
-  const endpoint = (await badge.getAttribute('data-state')) === 'listening' ? await badge.getAttribute('data-endpoint') : null
+  const state = await summary.getAttribute('data-receiver-state')
+  const endpoint = state === 'listening' ? await summary.getAttribute('data-endpoint') : null
   if (endpoint === null) {
     throw new ScratchError(
       'seed-receiver-not-listening',
-      `The traces receiver is not listening (${(await badge.textContent()) ?? 'unknown state'}).`,
+      `The traces receiver is not listening (${state ?? 'unknown state'}).`,
       'Open the Traces panel for its message; a scratch binds a free port, so a failure here is a receiver bug.',
     )
   }

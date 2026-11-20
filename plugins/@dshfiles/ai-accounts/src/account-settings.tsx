@@ -2,10 +2,11 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
-import { BarChart3Icon, CheckIcon, CoinsIcon, CopyIcon, PencilIcon, RefreshCwIcon, SlidersHorizontalIcon, UserRoundIcon } from '@dshfiles/plugin-ui/icons'
+import { PageSection } from '@dshfiles/plugin-ui/components/page'
+import { CheckIcon, CopyIcon, PencilIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
-import { KIND_LABEL, routedKind } from './account-labels.js'
+import { KIND_LABEL, planLabel, routedKind } from './account-labels.js'
 import { accountAuthenticationLabel, accountConnectionStatus } from './account-connection-status.js'
 import { AccountIdentitySection } from './account-identity-section.js'
 import { ExtraUsageMeter } from './extra-usage-view.js'
@@ -14,11 +15,9 @@ import { RuntimePathsSection } from './runtime-paths-section.js'
 import type { AccountDraft, AccountsFile } from './api.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
-const cardClass =
-  'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4 dshx:rounded-lg dshx:border dshx:border-border/70 dshx:bg-card dshx:p-5 dshx:@max-pane-narrow:p-4'
+/** A section of the detail pane: the pane is the card, its sections separate by hairlines. */
+const sectionClass = 'dshx:gap-4 dshx:py-4'
 interface SettingsProps {
   readonly draft: AccountDraft
   readonly file: AccountsFile
@@ -54,7 +53,7 @@ const RoutingSwitch = (props: Pick<SettingsProps, 'draft' | 'state'>): JSX.Eleme
     <Switch
       aria-label={routedKind(props.draft.kind) ? 'Enable for model routing' : 'Enable quota tracking'}
       checked={props.draft.enabled}
-      className="dshx:mt-0.5 dshx:data-[state=checked]:bg-info"
+      className="dshx:mt-0.5"
       onCheckedChange={enabled => void props.state.persist({ enabled })}
     />
     <span>
@@ -66,15 +65,8 @@ const RoutingSwitch = (props: Pick<SettingsProps, 'draft' | 'state'>): JSX.Eleme
   </label>
 )
 const AccountRoutingSettings = (props: SettingsProps): JSX.Element => (
-  <section aria-label="Routing and priority" className={cardClass}>
-    <header className="dshx:flex dshx:items-start dshx:gap-3">
-      <BarChart3Icon className="dshx:mt-0.5 dshx:size-5 dshx:shrink-0" />
-      <div>
-        <h3 className="dshx:text-sm dshx:font-semibold">Routing & priority</h3>
-        <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">Control how this account is used when multiple accounts are available.</p>
-      </div>
-    </header>
-    <div className="dshx:grid dshx:grid-cols-[minmax(120px,0.7fr)_minmax(0,1fr)] dshx:items-center dshx:gap-3 dshx:border-t dshx:pt-4 dshx:@max-pane-narrow:grid-cols-1">
+  <PageSection className={sectionClass} description="How this account is used when several are available." heading="Routing and priority">
+    <div className="dshx:grid dshx:grid-cols-[minmax(120px,0.7fr)_minmax(0,1fr)] dshx:items-center dshx:gap-3 dshx:@max-pane-narrow:grid-cols-1">
       <span className="dshx:text-xs dshx:text-muted-foreground">Priority</span>
       <div className="dshx:min-w-0">
         <PriorityControl {...props} />
@@ -82,7 +74,7 @@ const AccountRoutingSettings = (props: SettingsProps): JSX.Element => (
       </div>
     </div>
     <RoutingSwitch draft={props.draft} state={props.state} />
-  </section>
+  </PageSection>
 )
 
 const ExtraUsageSettings = (props: SettingsProps): JSX.Element | null => {
@@ -91,17 +83,8 @@ const ExtraUsageSettings = (props: SettingsProps): JSX.Element | null => {
   if (card?.status !== 'ok' || card.extraUsage === undefined) return null
   const allowed = props.draft.useExtraUsage === true
   return (
-    <section aria-label="Extra usage" className={cardClass}>
-      <header className="dshx:flex dshx:items-start dshx:gap-3">
-        <CoinsIcon className="dshx:mt-0.5 dshx:size-5 dshx:shrink-0" />
-        <div>
-          <h3 className="dshx:text-sm dshx:font-semibold">Extra usage</h3>
-          <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">Paid overage past the plan limits, as this account's quota reports it.</p>
-        </div>
-      </header>
-      <div className="dshx:border-t dshx:pt-4">
-        <ExtraUsageMeter extra={card.extraUsage} now={usage?.readAt ?? 0} />
-      </div>
+    <PageSection className={sectionClass} description="Paid overage past the plan limits, as this account's quota reports it." heading="Extra usage">
+      <ExtraUsageMeter extra={card.extraUsage} now={usage?.readAt ?? 0} />
       <label className="dshx:flex dshx:items-start dshx:gap-3">
         <Switch
           aria-label="Use extra usage"
@@ -118,7 +101,7 @@ const ExtraUsageSettings = (props: SettingsProps): JSX.Element | null => {
           </span>
         </span>
       </label>
-    </section>
+    </PageSection>
   )
 }
 
@@ -140,7 +123,7 @@ const AccountAuthenticationDetails = (props: Pick<SettingsProps, 'draft' | 'stat
         <dt className="dshx:text-muted-foreground">Signed in as</dt>
         <dd className="dshx:break-words">{profile?.identity ?? 'Not reported by provider'}</dd>
         <dt className="dshx:text-muted-foreground">Token status</dt>
-        <dd className={status?.tone === 'success' ? 'dshx:text-success' : 'dshx:text-muted-foreground'}>
+        <dd className={status?.tone === 'warning' ? 'dshx:text-warning' : undefined}>
           {status?.authenticated ? 'Authenticated' : (status?.label ?? 'Not verified')}
         </dd>
         <dt className="dshx:text-muted-foreground">Last checked</dt>
@@ -157,11 +140,7 @@ export const AccountInlineSettings = (props: SettingsProps & { readonly onConnec
     onChange: (patch: Partial<AccountDraft>) => props.state.setDraft({ ...props.draft, ...patch }),
   }
   return (
-    <section aria-label="Inline account settings" className={cardClass}>
-      <header>
-        <h3 className="dshx:text-sm dshx:font-semibold">Settings</h3>
-        <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">Account-specific settings. Leave as default to use provider settings.</p>
-      </header>
+    <PageSection className={sectionClass} description="Account-specific settings. Leave as default to use provider settings." heading="Settings">
       <div className="dshx:grid dshx:grid-cols-3 dshx:items-start dshx:gap-4 dshx:@max-pane-compact:grid-cols-1">
         <label className="dshx:min-w-0 dshx:space-y-1.5">
           <span className="dshx:text-xs dshx:text-muted-foreground">Account name</span>
@@ -185,7 +164,7 @@ export const AccountInlineSettings = (props: SettingsProps & { readonly onConnec
       <div className="dshx:border-t dshx:pt-4">
         <AccountAuthenticationDetails draft={props.draft} state={props.state} onConnect={props.onConnect} />
       </div>
-    </section>
+    </PageSection>
   )
 }
 
@@ -195,20 +174,19 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
   const selected = props.state.selected
   const status = selected === null ? null : accountConnectionStatus(selected, props.state.usage)
   return (
-    <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
-      <section aria-label="Account details" className={cardClass}>
-        <header className="dshx:flex dshx:items-start dshx:gap-3">
-          <UserRoundIcon className="dshx:mt-0.5 dshx:size-5 dshx:shrink-0" />
-          <div className="dshx:min-w-0 dshx:flex-1">
-            <h3 className="dshx:text-sm dshx:font-semibold">Account details</h3>
-            <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">Basic information and authentication.</p>
-          </div>
+    <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:divide-y">
+      <PageSection
+        actions={
           <Button aria-pressed={editing} onClick={() => setEditing(!editing)} size="sm" type="button" variant="outline">
             <PencilIcon />
             {editing ? 'Done' : 'Edit'}
           </Button>
-        </header>
-        <dl className="dshx:grid dshx:grid-cols-[minmax(120px,0.7fr)_minmax(0,1fr)] dshx:items-center dshx:gap-x-6 dshx:gap-y-4 dshx:border-t dshx:pt-4 dshx:text-sm dshx:@max-pane-narrow:grid-cols-1">
+        }
+        className={sectionClass}
+        description="Basic information and authentication."
+        heading="Account details"
+      >
+        <dl className="dshx:grid dshx:grid-cols-[minmax(120px,0.7fr)_minmax(0,1fr)] dshx:items-center dshx:gap-x-6 dshx:gap-y-4 dshx:text-sm dshx:@max-pane-narrow:grid-cols-1">
           <dt className="dshx:text-xs dshx:text-muted-foreground">Name</dt>
           <dd className="dshx:min-w-0">
             {editing ? (
@@ -225,7 +203,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
           <dt className="dshx:text-xs dshx:text-muted-foreground">Provider</dt>
           <dd>{KIND_LABEL[props.draft.kind]}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Account type</dt>
-          <dd>{selected?.plan ?? 'Not reported by provider'}</dd>
+          <dd>{selected?.plan == null ? 'Not reported by provider' : planLabel(selected.plan)}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Email / identity</dt>
           <dd className="dshx:break-words">{selected?.identity ?? 'Not reported by provider'}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Account ID</dt>
@@ -248,8 +226,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
           <dt className="dshx:text-xs dshx:text-muted-foreground">Authentication</dt>
           <dd>{accountAuthenticationLabel(props.draft)}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Token status</dt>
-          <dd className={cn('dshx:inline-flex dshx:items-center dshx:gap-2', status?.tone === 'success' ? 'dshx:text-success' : 'dshx:text-muted-foreground')}>
-            <StatusDot tone="current" />
+          <dd className={status?.tone === 'warning' ? 'dshx:text-warning' : undefined}>
             {status?.authenticated ? 'Authenticated' : (status?.label ?? 'Not verified')}
           </dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Last checked</dt>
@@ -266,18 +243,15 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
             Reauthenticate
           </Button>
         </div>
-      </section>
+      </PageSection>
       <AccountRoutingSettings {...props} />
       <ExtraUsageSettings {...props} />
-      <details className="dshx:rounded-lg dshx:border dshx:bg-card">
-        <summary className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:p-5">
-          <SlidersHorizontalIcon className="dshx:size-5" />
-          <span>
-            <strong className="dshx:block dshx:text-sm dshx:font-semibold">Advanced settings</strong>
-            <span className="dshx:mt-1 dshx:block dshx:text-xs dshx:text-muted-foreground">Runtime, paths and other account-specific settings.</span>
-          </span>
+      <details className="dshx:py-4">
+        <summary className="dshx:cursor-pointer">
+          <strong className="dshx:text-sm dshx:font-semibold">Advanced settings</strong>
+          <span className="dshx:ml-2 dshx:text-xs dshx:text-muted-foreground">Runtime, paths and other account-specific settings.</span>
         </summary>
-        <div className="dshx:border-t dshx:px-5">
+        <div>
           <AccountIdentitySection advanced draft={props.draft} state={props.state} />
           <RuntimePathsSection draft={props.draft} folderPicker={props.folderPicker} state={props.state} />
         </div>

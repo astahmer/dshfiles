@@ -31,6 +31,10 @@
       "types": "./src/tabs.ts",
       "default": "./dist/tabs.js"
     },
+    "./tab-status": {
+      "types": "./src/tab-status.tsx",
+      "default": "./dist/tab-status.js"
+    },
     "./panel-occurrence": {
       "types": "./src/panel-occurrence.ts",
       "default": "./dist/panel-occurrence.js"

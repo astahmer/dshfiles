@@ -250,7 +250,10 @@ const TallyBar = (props: { readonly tally: TestRun['testTally'] }) => {
 
 const FILTERS = ['all', 'failed', 'skipped', 'slow'] as const satisfies readonly Filter[]
 
-/** A filter over one list, so a toggle group (one Tab stop, arrow keys) whose highlight slides to the selected filter. */
+/**
+ * A filter over one list, so a toggle group (one Tab stop, arrow keys) whose highlight slides to the selected filter.
+ * A filter that would match nothing ("Skipped 0", "Slow 0") is not offered.
+ */
 const FilterTabs = (props: { readonly value: Filter; readonly counts: Readonly<Record<Filter, number>>; readonly onChange: (filter: Filter) => void }) => {
   const { ref, indicatorRef } = useSlidingIndicator<HTMLDivElement, HTMLSpanElement>(props.value)
   return (
@@ -267,12 +270,11 @@ const FilterTabs = (props: { readonly value: Filter; readonly counts: Readonly<R
         type="single"
         value={props.value}
       >
-        {FILTERS.map(candidate => (
+        {VitestReport.shownFilters(FILTERS, props.counts, props.value).map(candidate => (
           <ToggleGroupItem
             className={cn(
               'dshx:relative dshx:h-auto dshx:min-w-0 dshx:px-2 dshx:py-0.5 dshx:font-normal dshx:capitalize dshx:transition-colors dshx:hover:bg-transparent dshx:data-[state=on]:bg-transparent dshx:data-[state=on]:text-foreground dshx:motion-reduce:transition-none',
               props.value === candidate ? 'dshx:font-medium dshx:text-foreground' : 'dshx:text-muted-foreground dshx:hover:text-foreground',
-              props.counts[candidate] === 0 && candidate !== 'all' && 'dshx:opacity-50',
             )}
             data-indicator-key={candidate}
             key={candidate}
@@ -307,7 +309,7 @@ export const TestRunCard = (props: {
   const files = props.run.files.filter(
     file => filter === 'all' || (filter === 'failed' && file.error !== undefined) || file.tests.some(test => matchesFilter(test, filter)),
   )
-  const headline = VitestReport.summaryLabel(props.run)
+  const headline = VitestReport.summaryParts(props.run)
   return (
     <ToolCard
       {...cardLabel('Ran tests')}
@@ -316,7 +318,18 @@ export const TestRunCard = (props: {
       onToggle={() => setOpen(value => !value)}
       open={open}
       status={failing ? 'failed' : 'passed'}
-      summary={headline}
+      // The card prints the run's own duration, so the tool-call timing label stays off it (tool-meta reads this mark).
+      // Only the failed count takes the failure colour: "4 passed" in red reads as four more failures.
+      summary={
+        <span data-tool-card-timing="own">
+          {headline.map((part, index) => (
+            <span className={part.failed ? 'dshx:text-destructive' : 'dshx:text-muted-foreground'} key={part.text}>
+              {index > 0 && ' · '}
+              {part.text}
+            </span>
+          ))}
+        </span>
+      }
     >
       <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-1" data-test-runs-card="">
         <TallyBar tally={tally} />

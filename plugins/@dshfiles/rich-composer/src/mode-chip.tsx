@@ -104,6 +104,8 @@ export const ModeChip = (props: ModeChipProps & { readonly host: ModeChipHost; r
             aria-label={`Access mode, current: ${label}`}
             className={cn(
               'dshx-root dshx:h-7 dshx:min-w-0 dshx:max-w-56 dshx:shrink dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent dshx:data-[state=open]:text-foreground',
+              // Compact bar: the chip keeps its words and stops shrinking, so the model name truncates first.
+              'dshx:in-data-model-compact:shrink-0 dshx:in-data-model-icon:shrink',
               current === 'danger-full-access' && 'dshx:text-foreground',
             )}
             data-composer-mode-chip=""
@@ -117,8 +119,9 @@ export const ModeChip = (props: ModeChipProps & { readonly host: ModeChipHost; r
             variant="ghost"
           >
             {planOn || current === undefined ? <ListChecksIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" /> : accessIcon(current)}
-            {/* Collapse order (plugin-ui): this label leaves before the model name truncates; the accessible name stays. */}
-            <span className="dshx:min-w-0 dshx:truncate dshx:in-data-model-compact:hidden" data-composer-mode-label="">
+            {/* Collapse order (DESIGN.md, unslop phone 6): the model name truncates before this label goes, because it says
+                whether the agent may edit; only the icon step of a very narrow pane drops it (the accessible name stays). */}
+            <span className="dshx:min-w-0 dshx:truncate dshx:in-data-model-icon:hidden" data-composer-mode-label="">
               {label}
             </span>
             <ChevronDownIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:opacity-60 dshx:in-data-model-compact:hidden" />
@@ -139,7 +142,7 @@ export const ModeChip = (props: ModeChipProps & { readonly host: ModeChipHost; r
                   <ModeRow label="Standard" detail="Works on the task directly." />
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="plan" data-composer-mode-option="plan">
-                  <ModeRow label="Plan" detail="Writes a plan first; nothing changes until you approve it." />
+                  <ModeRow label="Plan" detail="Writes a plan first. Nothing changes until you approve it." />
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
               {current === undefined ? null : <DropdownMenuSeparator />}

@@ -28,7 +28,7 @@ import { CodexSignIn } from './codex-sign-in.js'
 const CONNECTION_NOTES = new Map<AccountProfile['kind'], string>([
   [
     'claude',
-    'Claude Code checks local sign-in configuration using the selected directory and Host environment, including CLAUDE_CODE_OAUTH_TOKEN. This is not remote token validation; quota may be unavailable. API keys have separate billing; setup-token verification requires access to the free token-count endpoint.',
+    'Claude Code checks local sign-in configuration using the selected directory and DSH’s environment, including CLAUDE_CODE_OAUTH_TOKEN. This is not remote token validation. Quota may be unavailable. API keys have separate billing. Setup-token verification requires access to the free token-count endpoint.',
   ],
   [
     'codex',
@@ -182,7 +182,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
   const notice = noticeOf()
   const saveName = async (displayName: string): Promise<void> => {
     const next = await configureOnce({ displayName })
-    if (next.account?.displayName !== displayName) throw new Error('This Host does not support pending account names yet.')
+    if (next.account?.displayName !== displayName) throw new Error('This DSH cannot name an account before setup ends. Update DSH and restart it, then retry.')
   }
   const method = connection.data?.method ?? (account === undefined ? undefined : AccountConnectionMethodModel.defaultMethod(account.kind))
   const keyForm = account !== undefined && method === 'key'
@@ -298,15 +298,15 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
         ) : null}
         {snapshot.matches('error') ? (
           <div className="dshx:flex dshx:flex-col dshx:gap-3">
-            <p role="alert">Setup could not be prepared. No account was added. This Host must support provisional account connections.</p>
-            <Button onClick={() => send({ type: 'retry' })}>Try again</Button>
+            <p role="alert">Setup could not be prepared. No account was added. Update DSH and restart it, then retry.</p>
+            <Button onClick={() => send({ type: 'retry' })}>Retry</Button>
           </div>
         ) : null}
         {resultUnknown || snapshot.matches('failed') || connection.isError || connection.data?.status === 'discarded' ? (
           <div className="dshx:flex dshx:flex-col dshx:gap-3">
             <p role="alert" className="dshx:text-sm dshx:text-destructive">
               {resultUnknown
-                ? 'The connection result could not be read. Sign-in may already be saved; close setup and check your accounts.'
+                ? 'The connection result could not be read. Sign-in may already be saved. Close setup and check your accounts.'
                 : snapshot.matches('failed')
                   ? 'This connection attempt ended after verification failed. Start a new attempt to sign in again.'
                   : 'This connection is no longer active. Start a new attempt.'}
@@ -337,8 +337,8 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                     {account.kind === 'claude'
                       ? 'Use your Claude subscription. No API key needed.'
                       : account.kind === 'mistral'
-                        ? 'Use the Le Chat or Vibe plan key that `vibe --setup` (Launch browser) saved in ~/.vibe/.env on this Host. DSH reads it in place.'
-                        : 'Use an existing CLI login on this Host.'}
+                        ? 'Use the Le Chat or Vibe plan key that `vibe --setup` (Launch browser) saved in ~/.vibe/.env on this host. DSH reads it in place.'
+                        : 'Use an existing CLI sign-in on this host.'}
                   </p>
                   <details className="dshx:text-xs">
                     <summary className="dshx:cursor-pointer dshx:text-muted-foreground">Sign-in command</summary>
@@ -375,7 +375,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
               )}
               {step === 'signed-in' && (
                 <>
-                  <p className="dshx:text-sm">A credential is available. The Host will check the selected login before saving.</p>
+                  <p className="dshx:text-sm">A credential is available. DSH checks the selected sign-in before saving.</p>
                   <Button onClick={complete}>
                     {snapshot.matches('verifying') ? 'Verifying…' : newAccount ? 'Verify and add account' : 'Verify and reconnect'}
                   </Button>
@@ -397,7 +397,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                 />
               )}
               {step === 'unavailable' && (
-                <p className="dshx:text-sm dshx:text-muted-foreground">Credential management is unavailable on this Host. Setup cannot be completed here.</p>
+                <p className="dshx:text-sm dshx:text-muted-foreground">This DSH cannot store credentials, so setup cannot finish here. Update DSH and restart it, then retry.</p>
               )}
             </fieldset>
             <details className="dshx:text-xs dshx:text-muted-foreground">

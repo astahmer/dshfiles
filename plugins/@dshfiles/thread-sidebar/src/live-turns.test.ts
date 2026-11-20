@@ -36,6 +36,12 @@ describe('live turns', () => {
     expect(LiveTurnsModel.snapshot(state)).toEqual([{ sessionId: 'a', startedAt: 1_000, step: 'Running pnpm test' }])
   })
 
+  it('marks a turn that waits for the user to answer, until the answer comes back', () => {
+    const asking = [event('a', 'turn/start', 1_000), event('a', 'tool/call', 1_100, { name: 'mcp__dsh__ask_user_question', arguments: '{}' })]
+    expect(LiveTurnsModel.snapshot(fold(asking))).toEqual([{ sessionId: 'a', startedAt: 1_000, step: 'Asking you a question', needsYou: true }])
+    expect(LiveTurnsModel.snapshot(fold([...asking, event('a', 'tool/result', 1_200, {})]))).toEqual([{ sessionId: 'a', startedAt: 1_000, step: 'Thinking' }])
+  })
+
   it('counts the files a turn edits and thinks between calls', () => {
     const edit = (path: string, time: number) => event('a', 'tool/call', time, { name: 'mcp__dsh__edit', arguments: JSON.stringify({ file_path: path }) })
     const once = fold([event('a', 'turn/start', 1), edit('/repo/src/client.tsx', 2)])
@@ -54,7 +60,7 @@ describe('live turns', () => {
   })
 
   it('names other tools without leaking long arguments', () => {
-    const base = { startedAt: 0, step: null, edited: [] }
+    const base = { startedAt: 0, step: null, edited: [], needsYou: false }
     expect(LiveTurnsModel.describeCall(base, 'web_search', LiveTurnsModel.readArguments('{}')).step).toBe('Searching the web')
     expect(LiveTurnsModel.describeCall(base, 'subagent', LiveTurnsModel.readArguments('{}')).step).toBe('Delegating to a subagent')
     expect(LiveTurnsModel.describeCall(base, 'backlog_update', LiveTurnsModel.readArguments('not json')).step).toBe('Using backlog update')

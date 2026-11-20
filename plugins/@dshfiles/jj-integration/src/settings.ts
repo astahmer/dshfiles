@@ -7,23 +7,23 @@ export const jjIntegrationSettings = defineSettings({
     isolateByDefault: Schema.boolean()
       .default(false)
       .description(
-        'Start new threads in their own jj workspace by default. Automatic integration scope all forces this on; the composer toggle can override it per thread.',
+        'Start new threads in their own jj workspace (the composer toggle overrides it per thread).',
       ),
     autoIntegrationScope: Schema.union([
-      Schema.const('none').description('Keep integration manual.'),
-      Schema.const('isolated').description('Automatically integrate verified, isolated thread workspaces; new-thread isolation stays opt-in.'),
+      Schema.const('none').description('Keep landing manual.'),
+      Schema.const('isolated').description('Land verified, isolated thread workspaces automatically (new threads are isolated only when asked).'),
       Schema.const('all').description(
-        'Automatically isolate each new thread and land only its verified, uniquely owned thread workspace; existing shared checkouts stay manual.',
+        'Isolate each new thread and land its verified workspace automatically (shared checkouts stay manual).',
       ),
     ])
       .default('none')
       .description(
-        'Automatically land finished thread work after Project Checks pass. All scope also isolates new threads by default; existing shared checkouts stay manual.',
+        'Land finished thread work automatically once Project Checks pass.',
       ),
     autoIntegrationExcludedRepositories: Schema.array(Schema.string())
       .default([])
       .description(
-        'Repositories whose finished thread work never lands automatically, such as a checkout whose main only accepts pull requests. Manual Land still works. Each value is the absolute repository path; switch Auto off beside the project in Land to add it.',
+        'Repositories, by absolute path, whose work never lands automatically (manual Land still works).',
       ),
     integratedThreadActions: Schema.union([
       Schema.const('settle').description('Done: offer only Done in the “Landed on …” notice.'),
@@ -36,7 +36,7 @@ export const jjIntegrationSettings = defineSettings({
     bookmark: Schema.string()
       .default('main')
       .description(
-        'Fallback main branch: the exact local bookmark new threads start from and Land advances, for a project that sets none of its own, declares none in dsh.project.json, and whose origin names no default branch.',
+        'Fallback main branch for projects that set none and whose origin names no default.',
       ),
     repositoryBookmarks: Schema.array(
       Schema.object({
@@ -46,7 +46,7 @@ export const jjIntegrationSettings = defineSettings({
     )
       .default([])
       .description(
-        'Main branch per project: the bookmark new thread workspaces start from, Land advances, and source control and Changes compare against. Set it in Settings › Projects; it wins over dsh.project.json and the detected default branch.',
+        'Main branch per project, set in Settings › Projects.',
       ),
     threadsDirectory: Schema.string()
       .default('')
@@ -57,12 +57,12 @@ export const jjIntegrationSettings = defineSettings({
     syncWorkspaceAfterLand: Schema.string()
       .default('default')
       .description(
-        'After Land advances the bookmark, bring this jj workspace (the checkout running DSH) onto it in the background with `dshx checkout sync`, keeping its local edits and rebuilding what changed. Empty disables it.',
+        'After Land, move the workspace running DSH onto the new bookmark (empty turns it off).',
       ),
     updateCheckout: Schema.string()
       .default('')
       .description(
-        'Update DSH: the folder of the jj checkout DSH runs from (its workspace is the one named above, `default` when empty). Empty uses the checkout this plugin is loaded from. Set it on each machine; it is never shared.',
+        'Folder of the jj checkout DSH runs from, for Update DSH (empty uses this plugin’s checkout).',
       ),
     removeFinishedThreads: Schema.boolean()
       .default(true)
@@ -75,17 +75,17 @@ export const jjIntegrationSettings = defineSettings({
     stopWorkspaceProcesses: Schema.boolean()
       .default(true)
       .description(
-        'Before cleanup removes a thread workspace, stop your processes still running from inside it (a dev server or watcher an agent left in the background): SIGTERM, then SIGKILL after 5 seconds. A process with a terminal (your own shell) is kept, and the preview lists both. Other JJ workspaces are never touched.',
+        'Stop processes still running inside a thread workspace before cleanup removes it (your own shells are kept).',
       ),
     stopProjectActionsOnSettle: Schema.boolean()
       .default(false)
-      .description('When a thread is settled, cancel its Project Checks actions that are still queued or running, such as a dev server it started.'),
+      .description('When a thread is marked done, stop its queued or running Project Checks actions, such as a dev server.'),
     autoCleanup: Schema.object({
       enabled: Schema.boolean().default(true).description('Run “Clean up thread workspaces” on its own, on the interval below.'),
       kinds: Schema.array(
         Schema.union([
           Schema.const('empty').description('Empty: workspaces that never landed anything.'),
-          Schema.const('integrated').description('Integrated: workspaces whose work all landed.'),
+          Schema.const('integrated').description('Landed: workspaces whose work all landed.'),
           Schema.const('untracked').description('Untracked: threads-directory folders and files no jj workspace owns.'),
         ]),
       )
@@ -106,12 +106,12 @@ export const jjIntegrationSettings = defineSettings({
         .max(24 * 7)
         .default(2)
         .description(
-          'Only repositories whose checkout or one of whose thread workspaces changed in this many hours. 0 covers every registered repository, like the manual button.',
+          'Only clean repositories that changed in this many hours (0 covers all).',
         ),
       onSettle: Schema.boolean()
         .default(false)
         .description(
-          'Also remove a thread workspace as soon as its last thread is settled or archived, without waiting for the interval or the hours above. The kinds above still apply.',
+          'Also remove a thread workspace as soon as its last thread is done or archived.',
         ),
     }).description(
       [
@@ -131,7 +131,7 @@ export const jjIntegrationSettings = defineSettings({
       fastForwardBookmark: Schema.boolean()
         .default(false)
         .description(
-          'After fetching, move the local bookmark (see Bookmark) to its remote copy when it is a strict ancestor of it. Local commits are never moved or dropped.',
+          'After fetching, fast-forward the local bookmark to its remote copy (local commits are never moved).',
         ),
     }).description('Keep remote bookmarks such as main@origin fresh. Failures appear in the activity timeline.'),
   }),

@@ -27,6 +27,8 @@ export default defineConfig({
     'fan-out-request': 'src/fan-out-request.ts',
     // Plugins that group by project resolve a thread workspace (custom threads directory included) to its project.
     'thread-directories': 'src/thread-directories.ts',
+    // Surfaces that mark a failed thread (a tab strip) read the Host's failed-turn record through the list's own hook.
+    'failed-turns-client': 'src/failed-turns-client.ts',
   },
   build: { sourcemap: true, declarations: true, minify: true },
 })

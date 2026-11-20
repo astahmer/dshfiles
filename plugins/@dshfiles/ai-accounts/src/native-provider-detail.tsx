@@ -11,6 +11,8 @@ import { nativeProviderStatus } from './native-providers-list.js'
 import type { AccountSection } from './account-connection-status.js'
 import { AccountUsageSlot } from './account-usage-view.js'
 import { UsageMovedNotice, useUsageRedirect } from './usage-redirect.js'
+import { DETAIL_PANE_CLASS, DetailHeader } from './detail-header.js'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 export const NativeProviderDetail = (props: {
   readonly entryId: string
@@ -33,30 +35,26 @@ export const NativeProviderDetail = (props: {
   })
   if (provider === undefined)
     return (
-      <section className="dshx:rounded-xl dshx:border dshx:bg-card dshx:p-6">
-        <p role="status">{query.isError ? 'Built-in provider information is unavailable.' : 'Reading provider…'}</p>
+      <section className={cn(DETAIL_PANE_CLASS, 'dshx:p-4 dshx:text-sm dshx:text-muted-foreground')}>
+        <p role="status">{query.isError ? 'Built-in provider information did not load. Reopen this provider to retry.' : 'Reading provider…'}</p>
       </section>
     )
   const activeRoute = route !== null && provider.routes.includes(route) ? route : provider.routes[0]
   return (
-    <section aria-label="Selected built-in provider" className="dshx:@container dshx:min-w-0 dshx:rounded-xl dshx:border dshx:bg-card">
-      <header className="dshx:flex dshx:items-center dshx:gap-4 dshx:p-6">
-        <span className="dshx:grid dshx:size-16 dshx:place-items-center dshx:rounded-lg dshx:bg-muted dshx:text-muted-foreground">
-          <BoxIcon className="dshx:size-10" />
-        </span>
-        <div className="dshx:min-w-0 dshx:flex-1">
-          <h2 className="dshx:truncate dshx:text-2xl dshx:font-semibold">{provider.label}</h2>
-          <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">Built-in provider</p>
-        </div>
-        <span className="dshx:text-xs dshx:text-success">{nativeProviderStatus(provider, query.data?.liveReload ?? false)}</span>
+    <section aria-label="Selected built-in provider" className={DETAIL_PANE_CLASS}>
+      <DetailHeader
+        detail="Built-in provider"
+        mark={<BoxIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />}
+        state={{ text: nativeProviderStatus(provider, query.data?.liveReload ?? false), tone: 'muted' }}
+        title={<h2 className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold">{provider.label}</h2>}
+      >
         <Switch
           aria-label={`${provider.enabled ? 'Disable' : 'Enable'} ${provider.label}`}
           checked={provider.enabled}
-          className="dshx:data-[state=checked]:bg-info"
           disabled={toggle.isPending || provider.lockedReason !== null}
           onCheckedChange={enabled => toggle.mutate(enabled)}
         />
-      </header>
+      </DetailHeader>
       <Tabs
         onValueChange={value => {
           if (value === 'usage' && usageRedirect.open()) return
@@ -64,7 +62,7 @@ export const NativeProviderDetail = (props: {
         }}
         value={props.section}
       >
-        <TabsList aria-label="Provider sections" className="dshx:mx-4 dshx:mb-3">
+        <TabsList aria-label="Provider sections" className="dshx:mx-4 dshx:my-3">
           <TabsTrigger value="models">
             <LayersIcon />
             Models
@@ -83,9 +81,9 @@ export const NativeProviderDetail = (props: {
           <p className="dshx:mb-4 dshx:text-xs dshx:text-muted-foreground">
             This built-in provider owns its model catalog. It is separate from a saved account.
           </p>
-          <ul className="dshx:divide-y dshx:rounded-lg dshx:border">
+          <ul className="dshx:divide-y dshx:border-y">
             {provider.routes.map(id => (
-              <li className="dshx:p-3 dshx:font-mono! dshx:text-sm" key={id}>
+              <li className="dshx:py-2 dshx:font-mono! dshx:text-xs" key={id}>
                 {id}
               </li>
             ))}

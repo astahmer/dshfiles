@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "codex-at-tokens",
-      "title": "Codex-style @ token targeting",
-      "summary": "The shared tokenizer resolves the whitespace-delimited @ token the caret touches the way Codex's composer does, sends its whole span to registered @ sources and closes on whitespace; a quoted @\"\u2026 phrase still searches titles and paths with spaces. Slash-command behavior is unchanged.",
+      "title": "Pick what an @ mention targets",
+      "summary": "Type @ in the composer to mention a file or thread, as in Codex, with quotes for names with spaces.",
+      "details": "The shared tokenizer resolves the whitespace-delimited @ token the caret touches the way Codex's composer does, sends its whole span to registered @ sources and closes on whitespace; a quoted @\"\u2026 phrase still searches titles and paths with spaces. Slash-command behavior is unchanged.",
       "reach": [
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"deploy\"",
@@ -62,7 +63,8 @@
     {
       "id": "command-chip-restore",
       "title": "Restore a persisted command chip",
-      "summary": "The controller answers a persisted command chip's claim by polling each source's matchClaim in roster order (skipping sources without the hook and sources bound to another trigger) and aborting with the caller's reason when the restore signal is already aborted. The conversation input shell calls resolveClaim unguarded while seeding a draft whose leading token is a / command, so an engine without it throws inside a client-store subscriber and never rebuilds the chip.",
+      "summary": "A draft that starts with a command keeps its command chip after a reload.",
+      "details": "The controller answers a persisted command chip's claim by polling each source's matchClaim in roster order (skipping sources without the hook and sources bound to another trigger) and aborting with the caller's reason when the restore signal is already aborted. The conversation input shell calls resolveClaim unguarded while seeding a draft whose leading token is a / command, so an engine without it throws inside a client-store subscriber and never rebuilds the chip.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -96,8 +98,9 @@
     },
     {
       "id": "command-slash-entries",
-      "title": "Slash entries for dshx commands",
-      "summary": "Lists every dshx Command that names a slash entry in the composer's / menu at the start of the draft. Picking one runs it and clears its token; sending a line that is exactly the entry runs it as a command claim.",
+      "title": "Slash entries for commands",
+      "summary": "Commands with a slash name appear in the composer's / menu and run when picked.",
+      "details": "Lists every dshx Command that names a slash entry in the composer's / menu at the start of the draft. Picking one runs it and clears its token; sending a line that is exactly the entry runs it as a command claim.",
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -133,7 +136,8 @@
     {
       "id": "entity-registry",
       "title": "One mention and reference-preview registry",
-      "summary": "Every mentionable kind (files and threads, skills, MCP servers, backlog items, agents, memory) adds one EntityKinds item: input-trigger registers its @ source with the composer, publishes the scope prefixes it owns so each @ scope lists one kind, and draws its card in the one shared reference preview that follows the reference while the conversation scrolls.",
+      "summary": "Files, threads, skills, backlog items, agents and more share one @ menu and one preview card.",
+      "details": "Every mentionable kind (files and threads, skills, MCP servers, backlog items, agents, memory) adds one EntityKinds item: input-trigger registers its @ source with the composer, publishes the scope prefixes it owns so each @ scope lists one kind, and draws its card in the one shared reference preview that follows the reference while the conversation scrolls.",
       "surfaces": ["client"],
       "surface": "entityProvider",
       "destination": "none",

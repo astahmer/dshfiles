@@ -3,6 +3,7 @@ import { ConversationViewOpenerContext } from '../../chat-focus-reveal.ts'
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ChatNodeViewProps, PerformanceUsageInjected, TurnTailOwnerProps } from '../contract/slots.ts'
 import { MessageIconActions } from './MessageIconActions.tsx'
+import { showsTurnUsage } from './turn-usage-action.ts'
 import { TurnUsagePanel } from './TurnUsagePanel.tsx'
 import { assistantText } from './turn-assistant.ts'
 import type { ChatNode } from '../contract/chat-nodes.ts'
@@ -67,7 +68,7 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
         branchUnavailable={data.branchUnavailable || hasLaterChatNode}
         className={css.actions}
         extraActions={assistantActions}
-        usageAction={detailed && data.tokenUsage !== undefined
+        usageAction={detailed && data.tokenUsage !== undefined && showsTurnUsage(data.tokenUsage)
           ? <TurnUsagePanel
               usage={data.tokenUsage}
               estimatedCost={renderSlot('conversation.chat.turnUsageCost', { turn: data.turn, useProjection })}

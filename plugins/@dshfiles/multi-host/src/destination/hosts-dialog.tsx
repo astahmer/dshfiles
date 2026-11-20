@@ -13,6 +13,8 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 import { useState } from 'react'
 import type { RuntimeSummary } from '../api.js'
 import { ConnectionDiagnostics } from './connection-diagnostics.js'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { hostGlyph, hostState } from './host-status.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 import { setHostDestination } from './state.js'
@@ -29,28 +31,12 @@ export type HostDraft = {
 const WEIGHTS = [1, 2, 4] as const
 
 const failure = (result: { readonly ok: boolean; readonly code?: string; readonly message?: string }): Error =>
-  new Error(result.message === undefined ? 'The host request failed.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
+  new Error(result.message === undefined ? 'The host did not answer. Check it is running, then retry.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
 
-/** Status of one host as the chip and the dialog show it. */
-export const hostState = (runtime: RuntimeSummary | undefined): { readonly tone: 'online' | 'idle' | 'error'; readonly label: string } => {
-  if (runtime === undefined) return { tone: 'error', label: 'No DSH runtime registered' }
-  if (runtime.connected) return { tone: 'online', label: 'Connected' }
-  if (runtime.lastError !== undefined) return { tone: 'error', label: runtime.lastError.message }
-  return { tone: 'idle', label: runtime.lastSeenAt === undefined ? 'Not connected yet' : `Idle · last seen ${new Date(runtime.lastSeenAt).toLocaleString()}` }
-}
+export { hostState } from './host-status.js'
 
-export const StatusDot = (props: { readonly tone: 'online' | 'idle' | 'error' }) => (
-  <span
-    aria-hidden
-    className={
-      props.tone === 'online'
-        ? 'dshx:inline-block dshx:size-2 dshx:shrink-0 dshx:rounded-full dshx:bg-emerald-500'
-        : props.tone === 'error'
-          ? 'dshx:inline-block dshx:size-2 dshx:shrink-0 dshx:rounded-full dshx:bg-destructive'
-          : 'dshx:inline-block dshx:size-2 dshx:shrink-0 dshx:rounded-full dshx:bg-muted-foreground/50'
-    }
-  />
-)
+/** The host's state as a shared status glyph; the text beside it says which state. */
+export const StatusDot = (props: { readonly tone: 'online' | 'idle' | 'error' }) => <StatusGlyph decorative status={hostGlyph(props.tone)} />
 
 const HostForm = (props: { readonly api: MultiHostClient; readonly initial: HostDraft; readonly onDone: () => void; readonly onCancel: () => void }) => {
   const { api } = props
@@ -244,7 +230,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
         {discover.data !== undefined ? (
           discover.data.length === 0 ? (
             <span className="dshx:text-xs dshx:text-muted-foreground">
-              No running DSH found under the remote home. Start DSH there with @dshfiles/multi-host installed, then Find again.
+              No running DSH found under the remote home. Start DSH there with the multi-host plugin enabled, then Find again.
             </span>
           ) : (
             <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
@@ -256,7 +242,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
                   variant={home.path === draft.remoteHome ? 'secondary' : 'ghost'}
                   className="dshx:h-6 dshx:font-mono dshx:text-xs"
                   onClick={() => setDraft({ ...draft, remoteHome: home.path })}
-                  title={home.source === 'web-url' ? 'Started through dsh-web; needs @dshfiles/multi-host to be added' : undefined}
+                  title={home.source === 'web-url' ? 'Started through dsh-web. Enable the multi-host plugin there.' : undefined}
                 >
                   {home.path}
                 </Button>
@@ -315,7 +301,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
       {[discover, save, copyDiagnostics].map((mutation, index) =>
         mutation.isError ? (
           <Alert key={index} variant="destructive">
-            <AlertDescription>{errorMessage(mutation.error, 'The host request failed.')}</AlertDescription>
+            <AlertDescription>{errorMessage(mutation.error, 'The host did not answer. Check it is running, then retry.')}</AlertDescription>
           </Alert>
         ) : null,
       )}

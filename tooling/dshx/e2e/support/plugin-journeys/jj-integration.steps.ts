@@ -280,6 +280,10 @@ const closeSettings = async (page: Page): Promise<void> => {
 }
 
 const rebaseButton = (page: Page) => page.getByRole('button', { name: 'Land this thread on main', exact: true })
+/** Both Land buttons of the header's workspace control ask first: the dialog lists the revisions, then one confirm lands. */
+const confirmLand = async (page: Page): Promise<void> => {
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Land on main', exact: true }).click()
+}
 /** The same land action, one click from the answer: the row the newest completed turn renders. */
 const turnEndIntegrateOffer = (page: Page) => page.getByTestId('jj-inline-integrate-offer')
 /** The one header control: it names a thread workspace, or the shared checkout the thread runs in. */
@@ -742,7 +746,7 @@ When('a message is sent in the thread workspace', async ({ page }: { page: Page 
     await expect(composer).toContainText('jj integration rebase e2e thread', { timeout: 1_000 })
   }).toPass({ timeout: 20_000 })
   await composer.press('Enter')
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
+  await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('jj integration rebase e2e thread')
 })
 
 Then('the current thread header identifies its jj workspace', async ({ page }: { page: Page }) => {
@@ -754,7 +758,7 @@ Then('the current thread header identifies its jj workspace', async ({ page }: {
   await indicator.click()
   await expect(rebaseButton(page)).toBeVisible()
   await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Land', exact: true }).last()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Workspaces', exact: true }).last()).toBeVisible()
   await expect(indicator).toBeVisible()
 })
 
@@ -791,7 +795,7 @@ When('a message is sent in the shared checkout', async ({ page }: { page: Page }
   const composer = newThreadComposer(page)
   await composer.fill('jj integration shared checkout rebase e2e')
   await composer.press('Enter')
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration shared checkout rebase')
+  await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('jj integration shared checkout rebase')
 })
 
 When('{string} is typed in the New thread composer', async ({ page }: { page: Page }, text: string) => {
@@ -805,7 +809,7 @@ Then('the New thread composer contains {string}', async ({ page }: { page: Page 
 
 When('the carried draft is sent', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('Draft handoff regression')
+  await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('Draft handoff regression')
 })
 
 Then('the New thread composer is empty and no consumed draft remains stored', async ({ page }: { page: Page }) => {
@@ -1265,7 +1269,7 @@ Then('the thread header has no Rebase button', async ({ page }: { page: Page }) 
 Then('the rebase command advances main and reports success', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
   await recordAssertion(page, 'jj-integration-rebase-command-advances-main', async () => {
-    await expect(page.getByText(/Landed 1 revision\(s\) on main/)).toBeVisible()
+    await expect(page.getByText(/Landed 1 revision on main/)).toBeVisible()
     await expect.poll(() => descriptionOf(repository, 'main')).toBe('Rebase from command')
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
   })
@@ -1276,7 +1280,9 @@ Then('the rebase command refuses the shared checkout without moving main', async
   const repository = repositoryFor(page)
   await recordAssertion(page, 'jj-integration-rebase-command-refuses-shared-checkout', async () => {
     await expect(
-      page.getByText('This Session is not in a managed thread workspace. Use an isolated thread workspace to run /rebase.', { exact: true }),
+      page.getByText('This thread works in the project checkout, so there is nothing to land. Start a thread in its own workspace to use /rebase.', {
+        exact: true,
+      }),
     ).toBeVisible()
     expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
   })
@@ -1297,6 +1303,7 @@ Then('Rebase refuses the placeholder description and leaves main in place', asyn
   await expect(workspaceMenu(page)).toContainText('1 to land', { timeout: 10_000 })
   await expect(rebaseButton(page)).toBeEnabled()
   await rebaseButton(page).click()
+  await confirmLand(page)
   await recordAssertion(page, 'jj-integration-rebase-asks-for-a-description', async () => {
     await expect(page.getByRole('alert').filter({ hasText: /^Describe these revisions before landing: \w+\./ })).toBeVisible()
     expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
@@ -1308,9 +1315,15 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
   await openWorkspaceMenu(page)
   await expect(workspaceMenu(page)).toContainText('1 to land')
   await rebaseButton(page).click()
+  await recordAssertion(page, 'jj-integration-land-asks-before-it-moves-main', async () => {
+    await expect(page.getByRole('alertdialog', { name: 'Land 1 revision on main?', exact: true })).toContainText(description)
+    expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
+  })
+  await confirmLand(page)
   await recordAssertion(page, 'jj-integration-rebase-moves-the-bookmark', async () => {
-    const rebasedToast = page.getByRole('alert').filter({ hasText: 'Landed 1 revision(s) on main:' })
+    const rebasedToast = page.getByRole('alert').filter({ hasText: 'Landed 1 revision on main:' })
     await expect(rebasedToast).toContainText(description)
+    await openWorkspaceMenu(page)
     await expect(rebaseButton(page)).toBeDisabled()
     const notice = page.getByTestId('jj-thread-rebased-notice')
     await expect(notice).toHaveCount(1)
@@ -1348,7 +1361,7 @@ Then('the end of the turn offers one revision to integrate into main', async ({ 
   const offer = turnEndIntegrateOffer(page)
   await recordAssertion(page, 'jj-integration-turn-end-integrates-in-one-click', async () => {
     await expect(offer).toBeVisible({ timeout: 20_000 })
-    await expect(offer).toContainText('1 revision(s) ready to land on main.')
+    await expect(offer).toContainText('1 revision ready to land on main.')
     await expect(offer.getByRole('button', { name: 'Land on main', exact: true })).toBeEnabled()
     // The offer names the exact revisions the button moves, so landing is never blind.
     await offer.getByRole('button', { name: 'Show the revisions that will land' }).click()
@@ -1408,14 +1421,14 @@ When('the thread is settled from the rebase notice', async ({ page }: { page: Pa
 Then('the thread appears in the Settled sidebar section', async ({ page }: { page: Page }) => {
   await ThreadListFilter.selectView(page, await threadList(page), 'All threads')
   await ThreadSidebarJourney.arrangeManually(page)
-  const settledSection = (await threadList(page)).getByRole('button', { name: 'Settled (1)', exact: true })
+  const settledSection = (await threadList(page)).getByRole('button', { name: 'Done (1)', exact: true })
   await recordAssertion(page, 'jj-integration-rebased-thread-can-be-settled-from-notice', () => expect(settledSection).toBeVisible())
   await finishJourneyAssertions(page)
 })
 
 When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, 'Land')
-  await expect(page.getByRole('heading', { name: 'Land', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
 })
 
 Then('the Thread integration panel prioritises work needing attention', async ({ page }: { page: Page }) => {
@@ -1429,9 +1442,13 @@ When('the All integration view is selected', async ({ page }: { page: Page }) =>
 })
 
 Then('the Thread integration panel keeps its counts visible', async ({ page }: { page: Page }) => {
-  await expect(page.getByRole('button', { name: /^Needs you/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Completed/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Conflicts/ })).toBeVisible()
+  const filters = page.getByRole('navigation', { name: 'Filter thread workspaces', exact: true })
+  await expect(filters.getByRole('button', { name: /^Needs you\s*\d+$/ })).toBeVisible()
+  await expect(filters.getByRole('button', { name: /^Ready to land\s*\d+$/ })).toBeVisible()
+  await expect(filters.getByRole('button', { name: /^All\s*\d+$/ })).toHaveAttribute('aria-pressed', 'true')
+  // A filter that counts nothing takes no seat.
+  await expect(filters.getByRole('button', { name: /^Conflicts/ })).toHaveCount(0)
+  await expect(filters.getByRole('button', { name: /^Blocked/ })).toHaveCount(0)
 })
 
 Then('the thread row details show revisions, sessions, path and preview', async ({ page }: { page: Page }) => {
@@ -1604,13 +1621,13 @@ When('the conversation is opened from its workspace row', async ({ page }: { pag
     .getByRole('button', { name: /^Open thread:/ })
     .first()
     .click()
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
+  await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('jj integration rebase e2e thread')
 })
 
 When('the Thread workspaces side panel is opened', async ({ page }: { page: Page }) => {
   await openWorkspaceMenu(page)
   await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Land', exact: true }).last()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Workspaces', exact: true }).last()).toBeVisible()
 })
 
 Then('the thread header offers Rebase for its 1 revision', async ({ page }: { page: Page }) => {
@@ -1665,7 +1682,7 @@ When("{string} is chosen from the thread row's More menu", async ({ page }: { pa
 Then('the confirmation names the thread and its 1 revision to rebase', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'jj-integration-removal-confirmation', async () => {
     const dialog = page.getByRole('alertdialog')
-    await expect(dialog.getByRole('heading')).toHaveText(`Remove the workspace of “${REBASE_THREAD_TITLE}” and abandon 1 unlanded revision(s)?`)
+    await expect(dialog.getByRole('heading')).toHaveText(`Remove the workspace of “${REBASE_THREAD_TITLE}” and abandon 1 unlanded revision?`)
     await expect(dialog).toContainText('deletes its folder')
     await expect(dialog).toContainText('threads stay in DSH and are not archived')
   })
@@ -1682,7 +1699,7 @@ Then('the thread workspace is gone from jj and from the panel', async ({ page }:
     await expect.poll(() => workspaceNames(repository)).toEqual(['default'])
     await expect(threadRow(page)).toHaveCount(0)
     await expect(page.getByText(repository.repositoryPath, { exact: true })).toHaveCount(0)
-    await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
+    await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('jj integration rebase e2e thread')
   })
   await finishJourneyAssertions(page)
 })

@@ -1,6 +1,6 @@
 # DSH activity timeline
 
-![Unified agent activity feed](docs/screenshots/activity-feed.png)
+![Activity feed](docs/screenshots/activity-feed.png)
 
 One chronological activity feed across agents, sessions, communication, and jj
 workspaces — a shared activity room rather than another thread list. Observation
@@ -23,10 +23,19 @@ choices, **Review thread** for a finished turn, **Open thread**, **Open backlog 
 Land, Done, Snooze (1 h, 4 h, tomorrow, until it changes) and Mute source. Row actions are 44 px on touch input. Every open item a provider marks resumable also gets one page-level **Resume all**, so a batch of
 usage-limit stops leaves the list in one click. The history tabs offer Reopen, Unsnooze and Unmute, so every user
 transition can be undone. Browser
-alerts for new Needs you items (questions and failures) are opt-in, per browser, below the list: the notification is
+alerts for new Needs you items (questions and failures) are opt-in, per browser, in the page menu: the notification is
 titled with the thread, its body is the question or the failure, and a click opens that item's thread (or the Inbox
 when nothing else can show it). An item that can Land asks before it lands, showing what will land, and offers
 **Review**, which opens the thread's Changes view.
+
+A question a subagent asked its parent thread also shows in that thread, above its composer, with the same options
+(`src/thread-question-dock.tsx`): **Answer** on a thread row opens the thread, and this is the answerable card it lands
+on. It reads the Needs you list the badge reads, so answering in either place clears both.
+
+An item that asks a question never offers the prompt library's quick replies, and a row prints a question as plain
+words: the first paragraph of its Markdown, at most two lines (`src/inbox-preview.ts`). **Start triage** shows one item
+at a time with a single action row (the bar): the item's answers or verb, Open, Done, Snooze, Skip and Exit. This
+device's alert settings open from the page menu (**More actions › Alerts on this device**).
 
 ### The attention contract
 
@@ -55,7 +64,7 @@ are Ready, or Failed for an error or the token limit; opening the thread resolve
 
 ## Push for blocking items
 
-**Push blocking items to this device** (Inbox, under the in-tab alerts) sends each new Needs you or Failed item to a
+**Push blocking items to this device** (Inbox › More actions › Alerts on this device, under the in-tab alerts) sends each new Needs you or Failed item to a
 device even when no DSH tab is open; Ready items never push. Turning it on registers a service worker the Host serves
 from its own origin (`/dshfiles-web-push/sw.js`, scoped to its own folder so it controls no page), subscribes the
 browser with the Host's VAPID key and records the device. The Host keeps the keys and subscriptions in the
@@ -119,7 +128,7 @@ events and named milestones (`session.error`, `session.input`,
 of `workspace.sync_refused` events (jj-integration's safe "checkout kept as is"
 refusals): those with the same checkout and the same reason within thirty
 minutes fold into one attention row (`N× <summary>`), placed at the newest one.
-Selecting it shows the count, and **Detailed** expands each event. Folding is
+Selecting it shows the count, and **Every event** expands each event. Folding is
 read-only: nothing is retried or rebased. Every group carries the ids of its
 members, and the `detailed` filter expands every retained event.
 
@@ -130,7 +139,7 @@ attention-only, detailed), a chronological feed (oldest top, newest bottom),
 auto-scroll only when already near the bottom, a new-events indicator, jump to
 latest, "load older" cursor pagination, and a detail drawer with metadata,
 references, provenance, and correlated events. When an event names a Session,
-"Open Session" navigates through the public Client workspace API only if that
+"Open thread" navigates through the public Client workspace API only if that
 Session is in the current Host list. Missing or archived Sessions show an
 unavailable message without being revived or changed. Verification detail is a
 historical summary; open Project Checks for live source freshness and the full

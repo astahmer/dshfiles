@@ -39,6 +39,8 @@ vi.mock('@dshfiles/dshx/client', async importOriginal => ({
     threads: async (input: { readonly project: string }) =>
       [thread('in-one', '/one'), thread('in-two', '/two')].filter(item => input.project === '' || item.project === input.project),
     notes: async () => [],
+    panelNotes: async () => [],
+    noteCounts: async () => ({ active: 0, archived: 0, superseded: 0, forgotten: 0 }),
     citations: async () => [],
     threadDetail: async () => ({ createdAt: 1, messages: 2 }),
     preview: async () => ({ summary: '' }),
@@ -88,5 +90,27 @@ describe('memory panel focus', () => {
     await vi.waitFor(() => expect(container.querySelector('aside[aria-label="Thread detail"]')?.textContent).toContain('Thread in-two'))
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(container.querySelector('aside[aria-label="Thread detail"]')?.textContent).toContain('Thread in-two')
+  })
+})
+
+describe('memory notes with nothing saved', () => {
+  it('shows one plain sentence and no filters, counters or tool names', async () => {
+    stubPointerApis()
+    const container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    act(() =>
+      root?.render(
+        <PluginQueryProvider client={client}>
+          <MemoryPanel openThread={() => {}} projectPaths={['/one']} />
+        </PluginQueryProvider>,
+      ),
+    )
+    await vi.waitFor(() => expect(container.textContent).toContain('No notes yet. Agents save one when you correct them.'))
+    expect(container.textContent).not.toContain('memory_note')
+    expect(container.textContent).not.toMatch(/Active 0|Forgotten 0|0 memories/u)
+    for (const control of ['Filter by type', 'Filter by status', 'Filter by source', 'Sort notes', 'Select notes'])
+      expect(container.querySelector(`[aria-label="${control}"]`), control).toBeNull()
   })
 })

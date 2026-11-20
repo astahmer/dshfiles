@@ -182,7 +182,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
       <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-destructive">
         {errorMessage(query.error, 'Could not load tool activity.')}
         <Button variant="outline" size="xs" disabled={query.isFetching} onClick={() => void query.refetch()}>
-          Try again
+          Retry
         </Button>
       </p>
     )
@@ -248,7 +248,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
             />
           )}
         </Panel>
-        <Panel title="Most-used tools" description="Top 10 by the selected metric; returned tokens are text characters / 4.">
+        <Panel title="Most-used tools" description="Top 10 by the selected metric. Returned tokens are text characters / 4.">
           <ToggleGroup
             type="single"
             variant="outline"
@@ -320,7 +320,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
             </ol>
           )}
         </Panel>
-        <Panel title="Time by test runner" description="Recognized runners; outcomes are shell-call status, not parsed test output.">
+        <Panel title="Time by test runner" description="Recognized runners. Outcomes are shell-call status, not parsed test output.">
           {testRunDistribution.length === 0 ? (
             <EmptyState>No recognized test-run timings in this range.</EmptyState>
           ) : (
@@ -360,7 +360,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
                     Calls
                   </th>
                   <th scope="col" className="dshx:py-2 dshx:pr-3">
-                    Succeeded
+                    Done
                   </th>
                   <th scope="col" className="dshx:py-2 dshx:pr-3">
                     Errors

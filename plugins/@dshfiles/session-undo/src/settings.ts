@@ -7,7 +7,7 @@ export const sessionUndoSettings = defineSettings({
     turnRevisions: Schema.boolean()
       .default(true)
       .description(
-        'At each turn end in a jj workspace, name the revision the turn produced and show it under the turn with Restore to here. Off skips the turn-end snapshot and hides the action.',
+        'Name each turn’s jj revision and offer Restore to here under the turn.',
       ),
   }),
 })

@@ -18,6 +18,7 @@ import { ThreadAttention } from './attention-store.js'
 import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
 import { AutoSettle, AutoSettleSources } from './auto-settle-host.js'
 import { ClientModules } from './client-modules-promise.js'
+import { FailedTurns } from './failed-turns.js'
 import { FinishedTurnAttention } from './inbox-provider.js'
 import { InflightTurns } from './inflight-turns.js'
 import { LiveTurns } from './live-turns.js'
@@ -136,6 +137,7 @@ const restartWithUpdates = autoRestart.pipe(
 
 const services = Layer.mergeAll(
   ThreadAttention.layer,
+  FailedTurns.layer,
   NotificationHistory.layer,
   subscriptionNoticeHostLayer,
   ThreadSubscriptionActions.layer.pipe(Layer.provideMerge(ThreadSubscriptions.layer)),
@@ -271,6 +273,7 @@ export default DshxPlugin.make({
       markUnreadMany: input => ThreadAttention.use(attention => attention.markUnreadMany(input.sessionIds)),
       migrate: input => ThreadAttention.use(attention => attention.migrate(input.entries)),
       writeDelta: input => ThreadAttention.use(attention => attention.writeDelta(input)),
+      failedTurns: () => FailedTurns.use(failed => Effect.map(failed.list, sessions => ({ sessions: [...sessions] }))),
       writeCapabilities: (): Effect.Effect<{ readonly deltaVersion: 1 }> => Effect.succeed({ deltaVersion: 1 }),
     }),
     Api.bind(threadSidebarSessionArchiveApi, {

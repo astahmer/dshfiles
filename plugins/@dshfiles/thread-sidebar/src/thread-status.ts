@@ -1,16 +1,19 @@
 /**
  * One status per thread row, in the ADE vocabulary (plan `docs/ade-ux` §4.7), and the groups the default thread list
- * shows: Pinned on top, then Needs you · Working · Ready · Idle · Done.
+ * shows: Pinned on top, then Needs you · Working · Ready · Idle · Done. An unsent draft is not a thread in any of those
+ * states yet: it is listed in its own Drafts group after Idle, so the Idle count is threads only.
  *
  * "Needs you" and "Failed" are a projection of the inbox (§4.8): an open inbox item about the thread (subject kind
  * `session`) with blocking or failed severity, plus the thread states this sidebar already classifies (a pending
  * question or approval, a usage-limit stop, an interrupted turn). A parent rolls up its subagents, so it never looks
- * finished while a child failed or waits. Pure: the client passes every input, so tests cover the whole mapping.
+ * finished while a child failed or waits. A thread whose last finished turn failed stays Failed after it is read (the
+ * inbox item resolves on reading; the Host's failed-turn record does not), until a later turn runs or the thread is done.
+ * Pure: the client passes every input, so tests cover the whole mapping.
  */
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import type { ThreadAttentionLabel } from './attention-presentation.js'
 
-export const THREAD_STATUS_GROUPS = ['pinned', 'needs-you', 'working', 'ready', 'idle', 'done'] as const
+export const THREAD_STATUS_GROUPS = ['pinned', 'needs-you', 'working', 'ready', 'idle', 'draft', 'done'] as const
 export type ThreadStatusGroup = (typeof THREAD_STATUS_GROUPS)[number]
 
 /** A thread nobody touched for this long folds into Done on its own, unless it is pinned (§4.3). */
@@ -25,9 +28,14 @@ export const DONE_GROUP_OPEN_KEY = `${DONE_GROUP_KEY}:open`
 export const INLINE_VERBS = ['Answer', 'Approve', 'Retry', 'Resume', 'Land'] as const
 export type InlineVerb = (typeof INLINE_VERBS)[number]
 
+/** The inbox source of this sidebar's own items: a finished turn the user has not opened yet. */
+export const FINISHED_TURN_SOURCE = 'thread-sidebar.finished-turn'
+
 /** What the inbox says about one thread: its most urgent open item. */
 export interface InboxThreadSignal {
   readonly itemId: string
+  /** The provider that published the item. */
+  readonly source?: string
   readonly severity: 'blocking' | 'failed' | 'ready'
   readonly reason: string
   /** The first provider verb the item offers, if any. */
@@ -40,16 +48,31 @@ export interface InboxThreadSignal {
   readonly choices?: readonly { readonly id: string; readonly label: string; readonly recommended?: boolean }[]
 }
 
+/** The Host's record that the thread's last finished turn failed. */
+export interface FailedTurnSignal {
+  readonly at: number
+  readonly reason: 'error' | 'max-tokens'
+}
+
+/** Why the last turn failed, for the row's detail line. */
+const FAILED_TURN_DETAIL = { error: 'Turn failed', 'max-tokens': 'Stopped at the output limit' } as const satisfies Record<FailedTurnSignal['reason'], string>
+
 export interface ThreadStatusInput {
   readonly running: boolean
   readonly pinned: boolean
   readonly archived: boolean
   readonly settled: boolean
+  /** Nothing was sent yet: the composer's open draft, or one with text waiting. Listed under Drafts, not Idle. */
+  readonly draft?: boolean | undefined
   /** The Host still holds an unacknowledged finish (or a hand unread mark). */
   readonly unread: boolean
   /** The sidebar's own attention labels for this thread (not its children). */
   readonly labels: readonly ThreadAttentionLabel[]
   readonly inbox: InboxThreadSignal | undefined
+  /** Set while the thread's last finished turn is a failed one, read or not. */
+  readonly failedTurn?: FailedTurnSignal | undefined
+  /** Revisions in the thread's own workspace that have not landed; 0 or undefined for none or no workspace. */
+  readonly unlanded?: number | undefined
   /** Last activity: the newest of its update, finish or mute time. */
   readonly activityAt: number
   /** When it was settled, when known. */
@@ -101,15 +124,22 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
   const failedLabel = labelFor(FAILED_LABELS)
   if (inbox?.severity === 'failed' || failedLabel !== undefined) {
     const fromInbox = inbox?.severity === 'failed'
+    // The finished-turn item's headline leads with the thread title, which the row already shows: say why instead.
+    const ownFailure =
+      fromInbox && inbox.source === FINISHED_TURN_SOURCE && input.failedTurn !== undefined ? FAILED_TURN_DETAIL[input.failedTurn.reason] : undefined
     return {
       status: 'failed',
-      detail: fromInbox ? inbox.reason : undefined,
+      detail: ownFailure ?? (fromInbox ? inbox.reason : undefined),
       verb: (fromInbox ? inbox.verb : undefined) ?? (failedLabel === undefined ? undefined : LABEL_VERB[failedLabel]),
       itemId: fromInbox ? inbox.itemId : undefined,
       since: fromInbox ? inbox.openedAt : input.activityAt,
     }
   }
   if (input.running) return { status: 'working', detail: undefined, verb: undefined, itemId: undefined, since: input.activityAt }
+  // Reading a failed thread resolves its inbox item; the failure itself stays until a later turn finishes without failing.
+  if (input.failedTurn !== undefined) {
+    return { status: 'failed', detail: FAILED_TURN_DETAIL[input.failedTurn.reason], verb: undefined, itemId: undefined, since: input.failedTurn.at }
+  }
   if (input.unread || input.labels.includes('threadSidebarTurnFinished') || inbox?.severity === 'ready') {
     const fromInbox = inbox?.severity === 'ready'
     return {
@@ -121,6 +151,9 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
       since: fromInbox ? Math.max(inbox.openedAt, input.activityAt) : input.activityAt,
     }
   }
+  // Finished, read, and its work still sits in its own workspace: Ready until it lands (§4.7), whatever its age. The
+  // Land verb comes from the inbox item above when a provider publishes one.
+  if ((input.unlanded ?? 0) > 0) return { status: 'ready', detail: undefined, verb: undefined, itemId: undefined, since: input.activityAt }
   if (input.now - input.activityAt >= DONE_AFTER_IDLE_MS) {
     return { status: 'done', detail: undefined, verb: undefined, itemId: undefined, since: input.activityAt + DONE_AFTER_IDLE_MS }
   }
@@ -167,11 +200,11 @@ const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus
   } else if (own.status === 'working' && working.length > 0 && own.detail === undefined) {
     rolled = { ...own, detail: `${plural(working.length, 'subagent', 'subagents')} working` }
   }
-  return { ...rolled, group: groupOf(rolled.status, input.pinned) }
+  return { ...rolled, group: input.draft === true && !input.pinned ? 'draft' : groupOf(rolled.status, input.pinned) }
 }
 
 /** Pinned threads keep their glyph but sit above every group; Failed shares the Needs you group (§4.8). */
-const groupOf = (status: WorkStatus, pinned: boolean): ThreadStatusGroup => {
+const groupOf = (status: WorkStatus, pinned: boolean): Exclude<ThreadStatusGroup, 'draft'> => {
   if (pinned) return 'pinned'
   if (status === 'failed') return 'needs-you'
   return status

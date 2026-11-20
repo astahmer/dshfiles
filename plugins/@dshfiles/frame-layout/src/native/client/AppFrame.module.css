@@ -555,8 +555,11 @@
   opacity: 0.7;
 }
 
-/* An item with nothing to say renders null: its row leaves the list instead of showing a bare label. */
-.statusSheetRow:has(.statusItem:empty) {
+/* An item with nothing to say renders null (or an empty open button): its row leaves the list instead of showing a bare
+   label ("Working", "Orphans", "Restart" with no value on a phone). An item whose only child is an empty button, the
+   frame's open wrapper or its own control, has nothing to say either. */
+.statusSheetRow:has(.statusItem:empty),
+.statusSheetRow:has(.statusItem > button:only-child:empty) {
   display: none;
 }
 
@@ -596,10 +599,11 @@
 }
 
 /* Local delta (dshfiles): phone navigation. A left-column occupant that draws its own phone navigation (a bottom tab
-   bar and a full-screen list, plans/ade-ux §4.1) marks the document with data-shell-phone-nav. Below 640px the frame
-   then gives the whole width to the stage and leaves room for that bar; without the mark nothing changes, so a
-   sidebar with no phone navigation keeps the rail. The inline grid template is a JS solve, hence !important. */
-@media (max-width: 639.98px) {
+   bar and a full-screen list, plans/ade-ux §4.1) marks the document with data-shell-phone-nav. Below 640px, or on a
+   phone turned sideways (a coarse pointer under 500px tall: plugin-ui lib/phone-shell), the frame then gives the
+   whole width to the stage and leaves room for that bar; without the mark nothing changes, so a sidebar with no phone
+   navigation keeps the rail. The inline grid template is a JS solve, hence !important. */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   /* The occupant also publishes --dsh-phone-top-height (its top bar: Back, title, panels) and, while the software
      keyboard is open, --dsh-keyboard-inset with data-phone-keyboard on the document (its tab bar then hides). The
      frame sits between the bars on the dynamic viewport, so the composer stays just above whichever bar or keyboard

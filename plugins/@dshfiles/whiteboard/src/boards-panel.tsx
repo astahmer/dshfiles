@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/compone
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
@@ -47,7 +47,7 @@ function NewBoardDialog(props: {
         >
           <DialogHeader>
             <DialogTitle>New whiteboard</DialogTitle>
-            <DialogDescription>The board is saved on this DSH Host under the selected project.</DialogDescription>
+            <DialogDescription>The board is saved by this DSH under the selected project.</DialogDescription>
           </DialogHeader>
           <Input aria-label="Board title" autoFocus maxLength={120} value={title} onChange={event => setTitle(event.currentTarget.value)} />
           <DialogFooter>
@@ -118,7 +118,6 @@ function BoardsBody(props: {
   readonly hasProject: boolean
   readonly list: UseQueryResult<{ readonly boards: readonly BoardSummary[] }, unknown>
   readonly boards: readonly BoardSummary[]
-  readonly onCreate: () => void
   readonly onOpen: (board: BoardSummary) => void
   readonly onRename: (board: BoardSummary, title: string) => void
   readonly onDelete: (board: BoardSummary) => void
@@ -126,19 +125,14 @@ function BoardsBody(props: {
   const { list } = props
   if (!props.hasProject)
     return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyTitle>No project yet</EmptyTitle>
-          <EmptyDescription>Whiteboards belong to a project. Add a project folder to DSH, then come back here.</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">Whiteboards belong to a project. Add a project folder to DSH first.</EmptyState>
     )
   if (isApiOwnerMissing(list.error instanceof Error ? list.error : null))
     return (
       <Alert variant="warning">
-        <AlertTitle>The whiteboard Host plugin is not running</AlertTitle>
+        <AlertTitle>Whiteboards are not running</AlertTitle>
         <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          Retry once DSH is back; if it keeps failing, restart DSH so the updated @dshfiles/whiteboard Host bundle loads, then reload this page.
+          Retry once DSH is back. If it keeps failing, restart DSH, then refresh this page.
           <Button variant="outline" size="sm" onClick={() => void list.refetch()}>
             Retry
           </Button>
@@ -150,7 +144,7 @@ function BoardsBody(props: {
       <Alert variant="destructive">
         <AlertTitle>Whiteboards could not be listed</AlertTitle>
         <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          {errorMessage(list.error, 'The Host did not answer.')}
+          {errorMessage(list.error, 'DSH did not answer.')}
           <Button variant="outline" size="sm" onClick={() => void list.refetch()}>
             Retry
           </Button>
@@ -165,20 +159,8 @@ function BoardsBody(props: {
     )
   if (props.boards.length === 0)
     return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <PresentationIcon />
-          </EmptyMedia>
-          <EmptyTitle>No whiteboards yet</EmptyTitle>
-          <EmptyDescription>Sketch an idea yourself, or ask an agent to draw one with whiteboard_write.</EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <Button size="sm" onClick={props.onCreate}>
-            <PlusIcon /> New board
-          </Button>
-        </EmptyContent>
-      </Empty>
+      // The header's button is the one way in; the empty list says one sentence.
+      <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">No whiteboards yet. Sketch an idea, or ask an agent to draw one.</EmptyState>
     )
   return (
     <ul aria-label="Whiteboards" className="dshx:flex dshx:flex-col dshx:gap-2">
@@ -298,7 +280,6 @@ export function BoardsPanel(props: {
         hasProject={project !== null}
         list={list}
         boards={live}
-        onCreate={() => setCreating(true)}
         onOpen={props.onOpen}
         onRename={(board, title) => rename.mutate({ board, title })}
         onDelete={setDeleting}

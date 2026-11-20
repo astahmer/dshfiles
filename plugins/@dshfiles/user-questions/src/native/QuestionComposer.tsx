@@ -15,6 +15,7 @@ import type { PendingQuestion } from './contract/slots.ts'
 import type { QuestionDraftAnswer, QuestionDraftProgress } from './draft-store.ts'
 import { PlanReviewPanel } from './PlanReviewPanel.tsx'
 import { QuestionMarkdownText } from '../rich/question-markdown.ts'
+import { CardChrome } from '../card-chrome.ts'
 import { OptionDescription, QuestionMarkdown, QuestionTitle } from '../rich/QuestionMarkdown.tsx'
 import css from './QuestionComposer.module.css'
 
@@ -452,6 +453,8 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
     submitDrafts(nextDrafts)
   }
 
+  const exit = CardChrome.exitOf({ dismissal: pending.dismissal, review: review !== undefined })
+
   return (
     <div className={css.frame} data-question-key={pending.key}>
       <section
@@ -499,14 +502,26 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
             >
               {minimized ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}
             </button>
-            <button
-              type="button" className={css.iconButton}
-              aria-label={t(pending.dismissal === 'hide' ? 'nav.close' : 'nav.cancel')}
-              title={t(pending.dismissal === 'hide' ? 'nav.close' : 'nav.cancel')}
-              disabled={submitting} onClick={dismissFlow}
-            >
-              <IconCloseOutlineRegular />
-            </button>
+            {/* Owned delta: leaving a pending question says what it does ("Answer later") instead of a bare close icon
+                beside Collapse and Skip; a review card and an unkeyed request keep the close icon. */}
+            {exit === 'later'
+              ? (
+                <Tooltip label={t('nav.close')} side="top" portal>
+                  <button type="button" className={css.exitButton} disabled={submitting} onClick={dismissFlow}>
+                    {t('nav.later')}
+                  </button>
+                </Tooltip>
+              )
+              : (
+                <button
+                  type="button" className={css.iconButton}
+                  aria-label={t(exit === 'close' ? 'nav.close' : 'nav.cancel')}
+                  title={t(exit === 'close' ? 'nav.close' : 'nav.cancel')}
+                  disabled={submitting} onClick={dismissFlow}
+                >
+                  <IconCloseOutlineRegular />
+                </button>
+              )}
           </div>
         </header>
 
@@ -698,23 +713,26 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
             </div>
 
             <footer className={css.footer}>
-              <div className={css.pager}>
-                <button
-                  type="button" className={css.iconButton} aria-label={t('nav.prev')}
-                  disabled={index === 0 || submitting}
-                  onClick={() => { replaceProgress(index - 1, drafts); clearFeedback() }}
-                >
-                  <IconChevronLeftOutlineRegular />
-                </button>
-                <span className={css.progress}>{index + 1} / {questions.length}</span>
-                <button
-                  type="button" className={css.iconButton} aria-label={t('nav.next')}
-                  disabled={index === questions.length - 1 || submitting}
-                  onClick={() => { replaceProgress(index + 1, drafts); clearFeedback() }}
-                >
-                  <IconChevronRightOutlineRegular />
-                </button>
-              </div>
+              {/* Owned delta: a single question has nowhere to page to, so "1 / 1" between two dead arrows is not drawn. */}
+              {CardChrome.showsPager(questions.length) && (
+                <div className={css.pager}>
+                  <button
+                    type="button" className={css.iconButton} aria-label={t('nav.prev')}
+                    disabled={index === 0 || submitting}
+                    onClick={() => { replaceProgress(index - 1, drafts); clearFeedback() }}
+                  >
+                    <IconChevronLeftOutlineRegular />
+                  </button>
+                  <span className={css.progress}>{index + 1} / {questions.length}</span>
+                  <button
+                    type="button" className={css.iconButton} aria-label={t('nav.next')}
+                    disabled={index === questions.length - 1 || submitting}
+                    onClick={() => { replaceProgress(index + 1, drafts); clearFeedback() }}
+                  >
+                    <IconChevronRightOutlineRegular />
+                  </button>
+                </div>
+              )}
               <div className={css.feedback} role="status">
                 {feedback === null ? null : 'key' in feedback ? t(feedback.key) : feedback.text}
               </div>

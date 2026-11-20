@@ -1,8 +1,9 @@
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { EllipsisIcon, PlusIcon, SquareSplitHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { PlusIcon, SquareSplitHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { missingPanelMessage } from './missing-panel.js'
 import {
   DockviewReact,
   getPanelData,
@@ -33,6 +34,7 @@ import { WindowFloatingGeometry } from './window-floating.js'
 import { GroupMinimums } from './group-minimums.js'
 import { TabRows } from './tab-row-visibility.js'
 import { TabReveal } from './tab-reveal.js'
+import { TabStripEdges } from './tab-strip-edges.js'
 import { HiddenTabRowRestore, TabRowVoidMenu, type TabRowMenuTarget } from './tab-row-controls.js'
 import { PanelChromeContext, type PanelChrome } from './header-seat.js'
 import { usePhoneWidth } from './phone-sheet.js'
@@ -189,16 +191,14 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
         )
       }
       if (definition === undefined) {
+        // The saved layout keeps the id and the last title; only the title is fit to show.
+        const message = missingPanelMessage(id, panelProps.api.title)
         return (
-          <div
-            data-workbench-panel-id={id}
-            className="dshx-root dshx:group dshx:relative dshx:flex dshx:h-full dshx:flex-col dshx:items-start dshx:gap-3 dshx:p-4 dshx:text-sm dshx:text-muted-foreground"
-          >
+          <div data-workbench-panel-id={id} className="dshx-root dshx:group dshx:relative dshx:flex dshx:h-full dshx:flex-col dshx:justify-center">
             <HiddenTabRowRestore api={panelProps.api} containerApi={panelProps.containerApi} />
-            <p>{t('missingPanel', { id })}</p>
-            <Button size="sm" variant="outline" onClick={() => panelProps.api.close()}>
-              {t('closePanel')}
-            </Button>
+            <EmptyState action={{ label: t('closePanel'), onSelect: () => panelProps.api.close() }}>
+              {'params' in message ? t(message.key, message.params) : t(message.key)}
+            </EmptyState>
           </div>
         )
       }
@@ -283,7 +283,12 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
 
   useEffect(() => {
     if (api === null) return
-    return TabReveal.retain(api)
+    const releaseReveal = TabReveal.retain(api)
+    const releaseEdges = TabStripEdges.retain(api)
+    return () => {
+      releaseEdges()
+      releaseReveal()
+    }
   }, [api])
 
   const emptyPane = useRef({ visible: props.visible, onClose: props.onClose })
@@ -297,6 +302,8 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
     const mutation = api.onDidMutateLayout(event => {
       const emptied = panelCount > 0 && api.panels.length === 0
       panelCount = api.panels.length
+      // The pane's own stand-in chooser has done its job once a view sits beside it (after the mutation settles).
+      if (panelCount > 1) queueMicrotask(() => NewViewTabs.dropPlaceholders(api))
       if (event.kind === 'load' || event.kind === 'clear') return
       if (emptied && emptyPane.current.visible !== false) emptyPane.current.onClose?.()
     })
@@ -306,7 +313,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   useLayoutEffect(() => {
     // The retained API stays empty after auto-close. A manual reopen needs a
     // chooser, but an explicit resource admission already populated it first.
-    if (api !== null && region === 'right' && props.visible !== false && api.panels.length === 0) NewViewTabs.open(api)
+    if (api !== null && region === 'right' && props.visible !== false && api.panels.length === 0) NewViewTabs.openPlaceholder(api)
   }, [api, region, props.visible])
 
   // Admission is checked before native mutation too, not only after a drop.
@@ -576,14 +583,15 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
           },
           () => (permanentCentre ? MainSurfaceGuard.groups(groupProps.containerApi).length : groupProps.containerApi.groups.length),
         )
-        // A phone shows the dock as one sheet: no split to make, and the sheet's own Close already puts it away.
+        // A phone shows the dock as one sheet: no split to make, the sheet's own Close puts it away, and the rest of
+        // this menu (bottom panel, saved layouts, move a tab to another pane, reset) arranges panes a phone does not
+        // show. It stays in the header on a wider window, and Reset layout stays in the command palette.
         const phone = usePhoneWidth()
         const current = actions.current
-        const canClose = phone
-          ? false
-          : permanentCentre
-            ? MainSurfaceGuard.groups(groupProps.containerApi).some(group => group !== groupProps.group)
-            : current.props.onClose !== undefined || groupCount > 1
+        if (phone) return <></>
+        const canClose = permanentCentre
+          ? MainSurfaceGuard.groups(groupProps.containerApi).some(group => group !== groupProps.group)
+          : current.props.onClose !== undefined || groupCount > 1
         return (
           <div className="dshx-root dshx:flex dshx:items-center dshx:gap-0.5">
             <DropdownMenu
@@ -596,21 +604,16 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
             >
               <DropdownMenuTrigger asChild>
                 <SurfaceAction
-                  className={cn(phone && 'dshx:size-11')}
                   label="Pane options"
-                  icon={phone ? <EllipsisIcon aria-hidden /> : <SquareSplitHorizontalIcon aria-hidden />}
+                  icon={<SquareSplitHorizontalIcon aria-hidden />}
                   iconOnly
                   onPointerDown={event => event.stopPropagation()}
                 />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {current.props.headerActions?.({ api: current.api, openIds: current.openIds, menu: true })}
-                {!phone && (
-                  <>
-                    <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'right')}>Split right</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'below')}>Split down</DropdownMenuItem>
-                  </>
-                )}
+                <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'right')}>Split right</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => NewViewTabs.open(groupProps.containerApi, groupProps.group, 'below')}>Split down</DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
                     if (current.props.onResetLayout !== undefined) current.props.onResetLayout()

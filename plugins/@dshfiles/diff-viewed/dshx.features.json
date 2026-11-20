@@ -4,7 +4,8 @@
     {
       "id": "review-file-markers",
       "title": "Mark review files as viewed",
-      "summary": "Toggle viewed state for one file in one review-session change and show the viewed progress count.",
+      "summary": "Mark a file as viewed in a review and see how many are left.",
+      "details": "Toggle viewed state for one file in one review-session change and show the viewed progress count.",
       "surfaces": ["client", "api", "storage"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -77,8 +78,9 @@
     },
     {
       "id": "host-owned-view-state",
-      "title": "Retain viewed marks on the Host",
-      "summary": "Keep the marks in the Host's durable diff_viewed domain, capped at the 2000 most recent, fall back to browser-held marks until the Host serves the API, and adopt those browser marks once.",
+      "title": "Keep viewed marks across browsers",
+      "summary": "Viewed marks are kept by DSH, so they stay across browsers and restarts.",
+      "details": "Keep the marks in the Host's durable diff_viewed domain, capped at the 2000 most recent, fall back to browser-held marks until the Host serves the API, and adopt those browser marks once.",
       "surfaces": ["host", "api", "storage", "client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -155,7 +157,8 @@
     {
       "id": "revision-range-marks",
       "title": "One viewed-marks store for turns and revision ranges",
-      "summary": "Keep the thread Changes facet's and the Review page's per-file viewed marks next to the per-turn marks, keyed by workspace, base, head commit and path, with batch writes, per-range reads, a separate 5000-mark bound and the changes_viewed_files / changes_mark_viewed agent tools.",
+      "summary": "Viewed marks also work in the Changes tab and the Review page, per revision range.",
+      "details": "Keep the thread Changes facet's and the Review page's per-file viewed marks next to the per-turn marks, keyed by workspace, base, head commit and path, with batch writes, per-range reads, a separate 5000-mark bound and the changes_viewed_files / changes_mark_viewed agent tools.",
       "surfaces": ["host", "api", "storage", "tool"],
       "surface": "infrastructure",
       "destination": "none",

@@ -4,7 +4,8 @@
     {
       "id": "graph-navigation",
       "title": "Locate landmarks and compare revision ancestry",
-      "summary": "Jump to Current, main@origin, main or Default in one click; compare from toolbar or revision menu only when needed, then highlight the path, show changes since target, or open an ancestry view.",
+      "summary": "Jump to the working copy, main or main@origin in one click, and compare two revisions when you need to.",
+      "details": "Jump to Current, main@origin, main or Default in one click; compare from toolbar or revision menu only when needed, then highlight the path, show changes since target, or open an ancestry view.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -78,7 +79,8 @@
     {
       "id": "revision-graph",
       "title": "Browse and filter the revision graph",
-      "summary": "Browse one-height rows (the change ID with its unique prefix bold, coloured workspace, bookmark and tag labels, a muted (empty) / (no description), a trailing time column; stacked in the side panel) with authors and conflict/divergence markers, date headings, and a last-pushed boundary at the selected bookmark's remote-tracking revision; search descriptions, IDs and revision labels, and filter by author, mine, immutability, or date.",
+      "summary": "Browse the revision graph with bookmarks, workspaces, conflicts and dates, and filter it.",
+      "details": "Browse one-height rows (the change ID with its unique prefix bold, coloured workspace, bookmark and tag labels, a muted (empty) / (no description), a trailing time column; stacked in the side panel) with authors and conflict/divergence markers, date headings, and a last-pushed boundary at the selected bookmark's remote-tracking revision; search descriptions, IDs and revision labels, and filter by author, mine, immutability, or date.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -90,9 +92,9 @@
         "expect option \"sample*\"",
         "press Enter",
         "expect button \"Sample project*\"",
-        "expect checkbox \"Hide immutable\"",
-        "click checkbox \"Hide immutable\"",
-        "expect checkbox \"Hide immutable\"",
+        "click button \"Filter\"",
+        "click menuitemcheckbox \"Hide immutable\"",
+        "expect button \"Filter (1 on)\"",
         "expect text \"(no description)\"",
         "click button \"Choose repository\"",
         "click button \"Filter by scope\"",
@@ -230,7 +232,8 @@
     {
       "id": "revision-detail-and-diff",
       "title": "Inspect revisions and changed files",
-      "summary": "Open revision details, describe/full diff, browse files in flat or tree mode, and mark review status against the exact change; the Host stores review progress so every browser and CLI shares it.",
+      "summary": "Open a revision's description, files and full diff, and mark files reviewed.",
+      "details": "Open revision details, describe/full diff, browse files in flat or tree mode, and mark review status against the exact change; the Host stores review progress so every browser and CLI shares it.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -315,7 +318,8 @@
     {
       "id": "review-selection",
       "title": "Select revisions in the graph to review them together",
-      "summary": "Cmd/Ctrl-click toggles a revision, Shift-click extends the visible range and the revision menu offers Select for review for touch and keyboard; a plain click keeps opening the row's details. Review together hands the selection to the Changes contract, so the plugin that owns review opens it, and the graph stays usable without that plugin.",
+      "summary": "Cmd-click or Shift-click revisions in the graph, then review them together.",
+      "details": "Cmd/Ctrl-click toggles a revision, Shift-click extends the visible range and the revision menu offers Select for review for touch and keyboard; a plain click keeps opening the row's details. Review together hands the selection to the Changes contract, so the plugin that owns review opens it, and the graph stays usable without that plugin.",
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "land",
@@ -350,9 +354,10 @@
     },
     {
       "id": "composer-context",
-      "title": "See project and Jujutsu workspace context in the composer",
-      "summary": "The Changes pill in the thread header (and the phone top bar) reads the net file diff since branching from the selected base as +N −M, names the revisions present only on @ or only on that base in its tooltip, and opens the Changes view; the composer itself carries no changes bar.",
-      "reach": ["seed rebase-ready-thread", "click button \"Changes since branching from main*\"", "expect text \"seeded-work.md\""],
+      "title": "See a thread's changes in its header",
+      "summary": "A thread in its own workspace shows its changed lines in the header, and a click opens Changes.",
+      "details": "For a thread in its own workspace, the Changes pill in the thread header (and the phone top bar) reads the net file diff since branching from the selected base as +N −M and opens the Changes view. A thread in the project checkout has no pill; its workspace menu states the checkout's changes as the project's.",
+      "reach": ["seed rebase-ready-thread", "click button \"Review workspace changes: *\"", "expect text \"seeded-work.md\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -426,8 +431,9 @@
     },
     {
       "id": "previewed-revision-mutations",
-      "title": "Preview and confirm repository mutations",
-      "summary": "Create, squash, duplicate, revert, rebase, move workspaces and bookmarks, restore, split, and abandon changes only after a single-use preview bound to the exact state of the revisions, bookmark, remote and workspace it names. Open the overflow chip to drag or use actions on additional workspaces sharing a revision.",
+      "title": "Preview and confirm repository changes",
+      "summary": "Squash, rebase, split, abandon and other changes run only after a preview you confirm.",
+      "details": "Create, squash, duplicate, revert, rebase, move workspaces and bookmarks, restore, split, and abandon changes only after a single-use preview bound to the exact state of the revisions, bookmark, remote and workspace it names. Open the overflow chip to drag or use actions on additional workspaces sharing a revision.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -503,7 +509,8 @@
     {
       "id": "workspace-overflow",
       "title": "Move a workspace from a shared revision",
-      "summary": "Open the overflow chip to see, drag, or use actions on additional workspaces that share a revision.",
+      "summary": "When several workspaces share a revision, open the overflow chip to see and move them.",
+      "details": "Open the overflow chip to see, drag, or use actions on additional workspaces that share a revision.",
       "reach": [
         "seed shared-workspaces",
         "click tab \"Land\"",
@@ -540,7 +547,8 @@
     {
       "id": "workspace-at-revision",
       "title": "Create a workspace at a revision",
-      "summary": "Right-click a revision and choose New workspace here… to name and place an isolated JJ workspace in that row, then preview the setup only after explicit confirmation. Forking a session moved to the native Branch action.",
+      "summary": "Right-click a revision and choose New workspace here to create a workspace there.",
+      "details": "Right-click a revision and choose New workspace here… to name and place an isolated JJ workspace in that row, then preview the setup only after explicit confirmation. Forking a session moved to the native Branch action.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -613,7 +621,8 @@
     {
       "id": "chat-references",
       "title": "Open Jujutsu references from a chat message",
-      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity — a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name — hovering it previews a bounded revision graph around it — its neighbourhood plus the working copy, main, main@origin and the default workspace, with separate Commit ID and Change ID labels — and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the referenced revision's first-line description in the native session-reference chip style with its icon, truncated when long; the accessible label and hover tooltip retain the full title and reference. Chat renders the links through its inline-reference registry; the titles of every chip a render pass mounts arrive in one batched Host request (`referenceTitles`, also the `jj_reference_titles` tool), and a link falls back to the bare reference if a title is unavailable.",
+      "summary": "Revision ids and bookmarks in a message become links that preview a small graph around them.",
+      "details": "Inline code in a message becomes a link when it is an explicit JJ identity — a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name — hovering it previews a bounded revision graph around it — its neighbourhood plus the working copy, main, main@origin and the default workspace, with separate Commit ID and Change ID labels — and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the referenced revision's first-line description in the native session-reference chip style with its icon, truncated when long; the accessible label and hover tooltip retain the full title and reference. Chat renders the links through its inline-reference registry; the titles of every chip a render pass mounts arrive in one batched Host request (`referenceTitles`, also the `jj_reference_titles` tool), and a link falls back to the bare reference if a title is unavailable.",
       "reach": [
         "seed chat-reference-thread",
         "hover link \"Jujutsu bookmark: Sample project (main)\"",
@@ -625,7 +634,7 @@
         "click link \"Jujutsu bookmark: Sample project (main)\"",
         "expect button \"Jujutsu view settings\"",
         "click button \"Jujutsu view settings\"",
-        "expect text \"Open Jujutsu refs from chat\"",
+        "expect text \"Open Jujutsu refs from threads\"",
         "click menuitem \"Chat reference click (focus revision)\"",
         "expect text \"Focus revision\"",
         "expect text \"Compare with main/default and show history path\"",
@@ -733,8 +742,9 @@
     },
     {
       "id": "workspace-cleanup",
-      "title": "Clean up idle JJ workspaces",
-      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly selected; the Host checks unlanded work and Session activity, forgets only a missing secondary's JJ registration, and never removes its path. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. Every preview names why each kept workspace was kept. Other JJ workspaces remain manual-only and require explicit selection. A thread workspace row names the background processes its removal stops first (Stops vite, node) and the terminals it keeps.",
+      "title": "Clean up idle workspaces",
+      "summary": "Clean up workspaces idle for an hour, a day or a week, with a preview that protects unlanded work.",
+      "details": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly selected; the Host checks unlanded work and Session activity, forgets only a missing secondary's JJ registration, and never removes its path. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. Every preview names why each kept workspace was kept. Other JJ workspaces remain manual-only and require explicit selection. A thread workspace row names the background processes its removal stops first (Stops vite, node) and the terminals it keeps.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -814,7 +824,8 @@
     {
       "id": "workspace-removal",
       "title": "Remove a workspace from the graph",
-      "summary": "Right-click a workspace pill, or a revision that holds one, and choose Remove workspace…: the confirmation expands in that row, so a managed thread workspace is discarded whole after it names its unlanded revisions, while any other workspace is only forgotten and keeps its folder, files and commits.",
+      "summary": "Right-click a workspace to remove it, and a thread workspace first names its unlanded revisions.",
+      "details": "Right-click a workspace pill, or a revision that holds one, and choose Remove workspace…: the confirmation expands in that row, so a managed thread workspace is discarded whole after it names its unlanded revisions, while any other workspace is only forgotten and keeps its folder, files and commits.",
       "reach": [
         "seed rebase-ready-thread",
         "click tab \"Land\"",
@@ -875,7 +886,8 @@
     {
       "id": "source-control",
       "title": "Describe and review the working copy in Source Control",
-      "summary": "Source control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 … @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
+      "summary": "Describe the working copy and see its changed files and the revisions below it in Source control.",
+      "details": "Source control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 … @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
       "reach": [
         "click tab \"Land\"",
         "click button \"Source control\"",
@@ -945,8 +957,9 @@
     },
     {
       "id": "panel-scopes",
-      "title": "Keep one repository per Jujutsu tab, thread and dock",
-      "summary": "Revision graph and Source control are two separate panels in navigation, the main view and the Workbench; only the narrow per-thread side panel switches between both with tabs. Each Jujutsu surface keeps its own repository, view, filters, selection and expanded rows. The toolbar's copy-plus button opens the repository on screen in another main tab through @dshfiles/main-tabs, named after that repository and renamed after whichever one the tab shows later; picking another tab restores its own state. A thread's right-panel Jujutsu page opens on that thread's project instead of the last repository picked anywhere, and the global dock keeps its own.",
+      "title": "Keep one repository per Jujutsu tab",
+      "summary": "Each Jujutsu tab, thread and panel keeps its own repository, view, filters and selection.",
+      "details": "Revision graph and Source control are two separate panels in navigation, the main view and the Workbench; only the narrow per-thread side panel switches between both with tabs. Each Jujutsu surface keeps its own repository, view, filters, selection and expanded rows. The toolbar's copy-plus button opens the repository on screen in another main tab through @dshfiles/main-tabs, named after that repository and renamed after whichever one the tab shows later; picking another tab restores its own state. A thread's right-panel Jujutsu page opens on that thread's project instead of the last repository picked anywhere, and the global dock keeps its own.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -956,12 +969,12 @@
         "press Enter",
         "expect button \"Sample project*\"",
         "click button \"Open this repository in a new tab\"",
-        "expect tab \"Jujutsu · sample*\"",
+        "expect tab \"History · sample*\"",
         "expect button \"Locate Current\"",
         "click tab \"Land\"",
         "click button \"Source control\"",
         "expect textbox \"Working copy description\"",
-        "click tab \"Jujutsu · sample*\"",
+        "click tab \"History · sample*\"",
         "expect button \"Locate Current\""
       ],
       "surfaces": ["client", "storage", "integration"],

@@ -26,7 +26,7 @@ describe('TurnAdmissionDock', () => {
     expect(waitingLine({ ahead: 2, running: 3, limit: 3 })).toBe('Waits to start · 2 ahead · 3 of 3 running')
   })
 
-  it('turns a failed Start now into Try again with a way to Settings › General', async () => {
+  it('turns a failed Start now into Retry with a way to Settings › General', async () => {
     render(
       <PluginQueryProvider>
         <TurnAdmissionDock sessionId="session-a" />
@@ -47,7 +47,7 @@ describe('TurnAdmissionDock', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings › General' }))
     window.removeEventListener(OPEN_SETTINGS_EVENT, listener)
     expect(requests).toEqual([{ section: 'general', query: 'Running threads limit' }])
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     await waitFor(() => expect(forceStart).toHaveBeenCalledTimes(2))
   })
 })

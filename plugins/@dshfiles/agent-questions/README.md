@@ -66,11 +66,17 @@ time and timeout argument or request-schema default, so `remainingMs` is an
 estimate rather than the exact Client-attached Host timer. Missing or
 unrecognized timeout metadata is reported as unknown. Native forms on child
 Sessions and stopped/persisted Sessions are inspection-only: DSH's native answer
-service accepts only continued forms owned by a live root Agent. Forms still
-open on the answerer waterfall also remain unanswerable by this plugin.
-`answer_thread_question` submits a complete structured batch only to a continued
-form on a live root Agent; accepted replies are queued until that Agent admits
-them. The native projection does not expose this in-memory queue before
+service accepts only continued forms owned by a live root Agent. A form still
+open is asked through the `user-questions/request` waterfall: this plugin is one
+more answerer on it (`src/open-question-requests.ts`), ahead of the browser's. It
+hands each request on unchanged and holds it, so an answer from the Inbox or from
+`answer_thread_question` settles the tool call itself and the form the browser
+still shows is retracted through the request's cancellation signal. A form asked
+before this plugin started is not held and stays answerable only in its thread;
+`canAnswer` and `answerability` say which case applies.
+`answer_thread_question` submits a complete structured batch to a continued or
+held open form on a live root Agent; replies to a continued form are queued until
+that Agent admits them. The native projection does not expose this in-memory queue before
 admission, so a continued row may still appear while its answer is queued; the
 native service rejects duplicate submissions. `answer_parent_question` remains
 the answer path for direct-child plugin questions. Global native inspection and

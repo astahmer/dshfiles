@@ -1,6 +1,6 @@
 # DSH worktree memory
 
-![Process memory and Node origins](docs/screenshots/memory-board.png)
+![Process RAM](docs/screenshots/memory-board.png)
 
 System monitors show many `node` rows without context. This page adds a rule-based summary of current-user Node
 processes (known script labels, nearest app ancestor or immediate parent, and working directory) alongside DSH trees

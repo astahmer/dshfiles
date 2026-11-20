@@ -21,6 +21,13 @@
   cursor: default;
 }
 
+/* dshfiles (unslop, phone #20): on a touch screen the row that opens a turn's work was 24px tall. */
+@media (pointer: coarse) {
+  .root:not(:disabled) {
+    min-height: 44px;
+  }
+}
+
 @media (hover: hover) {
   .root:hover:not(:disabled) {
     color: var(--dsw-alias-label-secondary);

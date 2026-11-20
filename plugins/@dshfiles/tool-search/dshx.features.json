@@ -4,7 +4,8 @@
     {
       "id": "progressive-tool-disclosure",
       "title": "Search and disclose tools per agent",
-      "summary": "Keep a bounded global tool surface per agent and progressively reveal ranked global tools through Native Tool Mode search.",
+      "summary": "The agent starts with a small set of tools and finds others by searching for them.",
+      "details": "Keep a bounded global tool surface per agent and progressively reveal ranked global tools through Native Tool Mode search.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",

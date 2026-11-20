@@ -243,7 +243,7 @@ export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (s
             {graph.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Reading revisions…</p> : null}
             {graph.isError ? (
               <p className="dshx:text-xs dshx:text-destructive" role="alert">
-                That reference could not be read in the registered repositories.
+                That reference could not be read in your projects. Check the revision id.
               </p>
             ) : null}
             {graph.isSuccess && matches.length === 0 ? (

@@ -133,7 +133,7 @@ const Summary = (props: {
             </span>
             {stale ? <span className="dshx:rounded-full dshx:bg-warning/12 dshx:px-1.5 dshx:text-warning">Out of date</span> : null}
             <Button size="xs" variant="ghost" className="dshx:ml-auto" disabled={busy} onClick={() => summarize.mutate(true)}>
-              <RefreshCwIcon className={cn('dshx:size-3', busy && 'dshx:animate-spin')} />
+              <RefreshCwIcon className={cn('dshx:size-3', busy && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
               Regenerate
             </Button>
           </div>
@@ -142,7 +142,7 @@ const Summary = (props: {
       {summary === null ? (
         <div>
           <Button size="xs" variant="outline" disabled={busy} onClick={() => summarize.mutate(false)}>
-            <SparklesIcon className={cn('dshx:size-3', busy && 'dshx:animate-pulse')} />
+            <SparklesIcon className={cn('dshx:size-3', busy && 'dshx:animate-pulse dshx:motion-reduce:animate-none')} />
             {busy ? 'Summarizing…' : 'Summarize'}
           </Button>
         </div>
@@ -283,7 +283,7 @@ export const ShippedView = (props: {
             <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
               <span className="dshx:min-w-0">{errorMessage(shipped.error, 'What shipped could not be read.')}</span>
               <Button size="xs" variant="outline" onClick={() => void shipped.refetch()}>
-                Try again
+                Retry
               </Button>
             </p>
           )

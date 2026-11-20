@@ -144,7 +144,9 @@ export const createSettingsWorkbenchHub = (sources: {
               select(entry.sectionId)
               setTarget(entry.target)
             }}
-            onClose={close}
+            // A docked hub always sits in a pane whose tab closes it (and a phone shows Back above it): a header × would
+            // be a second control for the same thing. Sections still get `close` through their owner.
+            onClose={undefined}
             onSelect={select}
             onSearch={setQuery}
           />

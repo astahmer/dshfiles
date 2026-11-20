@@ -44,7 +44,7 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
   if (owner.data === null) return null
   if (owner.data === undefined) {
     if (isApiOwnerMissing(owner.error)) {
-      return <span className="dshx:text-xs dshx:text-muted-foreground">Remote host links need a newer DSH Host. Restart DSH when it is idle to load it.</span>
+      return <span className="dshx:text-xs dshx:text-muted-foreground">Remote host links need a newer DSH. Restart DSH when it is idle to load it.</span>
     }
     return null
   }
@@ -78,7 +78,7 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
           Hide this host
         </Button>
       ) : null}
-      {hideHost.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(hideHost.error, 'Could not hide the host.')}</span> : null}
+      {hideHost.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(hideHost.error, 'Could not hide the host. Retry.')}</span> : null}
       {outdatedVersion === undefined ? null : (
         <span data-remote-host-version-drift="" className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-warning">
           <TriangleAlertIcon className="dshx:size-3.5" aria-hidden />

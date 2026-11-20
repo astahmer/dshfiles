@@ -6,15 +6,17 @@ import {
   IconPlanOutlineRegular, IconSparkleRegular, IconThinkOutlineRegular, TextShimmer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { GroupKey, NodeReference } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatNode } from '../contract/chat-nodes.ts'
 import type { ProcessActivity, RunningProcessActivity } from '../contract/process-groups.ts'
 import type { ChatStoreState } from '../contract/store.ts'
 import type { ChatFlowSlotProps } from '../contract/slots.ts'
 import { turnProcessOpen } from '../stores.ts'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
+import { isRoutineContextNode, showsRoutineContext } from './context-rows.ts'
 import { hiddenOrCollapsing } from './flow-motion.ts'
 import { chatRenderKey } from './render-entry.ts'
 import { useRunFoldPlacements } from './RunFold.tsx'
-import { processTitle } from './step-process.ts'
+import { groupOwnsHeader, processTitle } from './step-process.ts'
 import { useDisclosure } from './use-disclosure.ts'
 import { useProcessScroll } from './use-process-scroll.ts'
 import css from './ChatGroupSeat.module.css'
@@ -139,6 +141,10 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
   const turn = useChatGroup(groupKey, group => group?.data.turn)
   const closed = useChatGroup(groupKey, group => group?.data.closed)
   const foldCompleted = props.usePresentation(policy => policy.foldCompletedTurns)
+  const routineContextShown = props.usePresentation(policy => showsRoutineContext(policy.mode))
+  const nodeStore = props.nodeStore
+  const onlyHiddenContext = useMemo(() => !routineContextShown && members !== undefined && members.length > 0
+    && members.every(member => isRoutineContextNode(nodeStore.get(member.key) as ChatNode | undefined)), [routineContextShown, members, nodeStore])
   const { expanded: open, setExpanded: setOpen } = useDisclosure()
   const firstKey = members?.[0]?.key ?? ''
   const bottom = props.useChatNodeBottom(firstKey)
@@ -148,9 +154,6 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
     const location = node?.location
     return location?.kind === 'turn' || location?.kind === 'step' ? location.turn : undefined
   })
-  // Detailed keeps the latest completed Turn flat, like a running one, until the next input.
-  const grouped = props.usePresentation(policy => policy.stepGrouping === 'collapsed'
-    || (policy.stepGrouping === 'history' && turnLocation?.status !== 'open' && !deferCollapse))
   const reason = turnLocation?.end?.data.reason.kind
   const alwaysOpen = presentation?.turnClosed === false || presentation?.hasInterleavedInput === true
     || reason === 'aborted' || reason === 'interrupted' || reason === 'error'
@@ -158,8 +161,14 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
   const selectOpen = useCallback((state: Readonly<ChatStoreState>) => spec !== undefined
     && turnProcessOpen(state, spec, deferCollapse), [spec, deferCollapse])
   const storedOpen = props.useStore(selectOpen)
-  const outerHidden = foldCompleted && presentation?.turnClosed === true && spec !== undefined
-    && !alwaysOpen && !storedOpen
+  // dshfiles (unslop T4): the Turn's "Worked for" row is this group's disclosure, so the group adds no second one.
+  const turnFolds = foldCompleted && presentation?.turnClosed === true && spec !== undefined && !alwaysOpen
+  const outerHidden = turnFolds && !storedOpen
+  // Detailed keeps the latest completed Turn flat, like a running one, until the next input.
+  const turnOpen = turnLocation?.status === 'open'
+  const grouped = props.usePresentation(policy => groupOwnsHeader({
+    stepGrouping: policy.stepGrouping, turnOpen, deferCollapse, turnFolds,
+  }))
   const revealOuter = useCallback(() => {
     if (spec !== undefined && !alwaysOpen) props.actions.setTurnProcessOpen(spec.turn, spec.answerStep ?? 0, true)
   }, [props.actions, spec, alwaysOpen])
@@ -174,9 +183,11 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
   }, [outerHidden, rootRef, setOpen])
   const reveal = useCallback(() => { setOpen(true) }, [setOpen])
   const bodyRef = props.useGroupAction(grouped && !open, reveal)
-  // A collapsed historical Turn keeps hundreds of tool rows hidden; mount them the first time the body shows.
-  const [membersMounted, setMembersMounted] = useState(!grouped || open)
-  if (!membersMounted && (!grouped || open)) setMembersMounted(true)
+  // A collapsed historical Turn keeps hundreds of tool rows hidden; mount them the first time the body shows:
+  // when the group's own header opens, or, for a group without one, when the Turn's "Worked for" row does.
+  const membersShown = grouped ? open : !outerHidden
+  const [membersMounted, setMembersMounted] = useState(membersShown)
+  if (!membersMounted && membersShown) setMembersMounted(true)
   const contentRef = useRef<HTMLDivElement>(null)
   const bodyId = useId()
   const { edges, events, initialize } = useProcessScroll(bodyRef, contentRef, open, grouped)
@@ -198,7 +209,10 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
     <div ref={rootRef} className={css.root} data-chat-group-key={groupKey}
       data-chat-flow-key={groupKey} data-chat-anchor-key={`group:${groupKey}`} data-chat-turn={turn}
       data-chat-paging-anchor={grouped && !open || undefined}
-      data-step-process data-group-expanded-mode={!grouped || undefined}>
+      data-step-process data-group-expanded-mode={!grouped || undefined}
+      // dshfiles (unslop T1): a group of nothing but hidden Context rows would be a header over an empty body. It
+      // stays mounted and takes no space, so the fold's visibility hooks keep their elements.
+      data-routine-context-only={onlyHiddenContext || undefined}>
       <div ref={headerRef}>
         <ProcessGroupHeader groupKey={groupKey} useChatGroup={useChatGroup}
           usePresentation={props.usePresentation} t={props.t} open={open} bodyId={bodyId} toggle={toggle} />

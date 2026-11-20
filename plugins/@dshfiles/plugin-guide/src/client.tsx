@@ -15,13 +15,14 @@ export default defineClient({
   name: '@dshfiles/plugin-guide',
   inject: ['slots', 'uiWorkspace'],
   setup(ctx, decorate, metadata) {
-    // A developer page: Settings lists it after Plugins; without the rail it stays a plain sidebar page.
+    // A page for plugin authors: the Developer group at the end of Settings; without the rail it stays a plain sidebar page.
     metadata?.plugin?.add(DestinationSections, {
       panelId: PANEL_ID,
       destination: 'settings',
       label: 'Plugin guide',
-      description: 'Where a plugin can extend DSH, for plugin authors.',
-      order: 5,
+      description: 'Where a plugin can extend DSH.',
+      order: 2,
+      group: 'developer',
     })
     // A new thread whose composer holds the guidance; the user reads and sends it, never this page.
     const draftForAgent = (text: string): void => ctx.uiWorkspace.startSession(undefined, { prompt: text })

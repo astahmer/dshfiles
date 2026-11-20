@@ -44,7 +44,7 @@ const isDarkTheme = (): boolean => document.body.hasAttribute('data-ds-dark-them
 const DIALOG_COPY = {
   approve: {
     title: 'Write this file to disk?',
-    description: 'The editor writes inside the session workspace only. Later saves of this tab will not ask again.',
+    description: 'The editor writes inside the thread’s workspace only. Later saves of this tab will not ask again.',
     action: 'Save',
   },
   conflict: {
@@ -75,7 +75,7 @@ const FilePreview = (props: { readonly document: OpenDocument; readonly remote: 
   })
   const openExternally = useMutation({
     mutationFn: async (action: 'default' | 'reveal') => {
-      if (absolutePath === null) throw new Error('The file has no Host path yet.')
+      if (absolutePath === null) throw new Error('Save the file first, then open it.')
       const result = await props.remote.session.openWorkspacePath(action === 'reveal' ? { path: absolutePath, action } : { path: absolutePath })
       if (!result.ok) throw new Error(result.error.message)
     },
@@ -228,7 +228,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   }, [state.documents, active, engine])
 
   if (props.sessionId === undefined) {
-    return <p className="dshx-root dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Open a session to browse and edit its files.</p>
+    return <p className="dshx-root dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Open a thread to browse and edit its files.</p>
   }
   const sessionId = props.sessionId
   const pendingSave = saveSnapshot.context.pending

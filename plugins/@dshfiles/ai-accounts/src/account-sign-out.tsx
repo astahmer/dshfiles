@@ -64,7 +64,7 @@ const AccountSignOutAction = ({ account, onSignedOut, disabled }: Parameters<typ
     if (disabled) return 'Finish the current account edit before signing out.'
     if (!account.signedIn) return 'This account is already signed out.'
     if (capability.isPending) return 'Checking sign-out availability…'
-    if (capability.isError) return 'Sign out needs the updated Host. Restart when idle, then retry.'
+    if (capability.isError) return 'Sign out needs an updated DSH. Restart DSH when idle, then retry.'
     return capability.data?.reason
   }
   const reason = blockedReason()

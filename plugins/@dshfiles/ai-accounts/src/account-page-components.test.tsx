@@ -63,7 +63,7 @@ describe('account page cards', () => {
       </TooltipProvider>,
     )
     expect(markup).toContain('real@example.test')
-    expect(markup).toContain('business')
+    expect(markup).toContain('Business')
     expect(markup).not.toContain('Last checked')
     expect(markup).not.toContain('Token valid')
   })

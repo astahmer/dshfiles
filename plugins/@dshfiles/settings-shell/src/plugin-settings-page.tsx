@@ -1,5 +1,6 @@
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { ShellTranslate } from './native/locales.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
@@ -21,9 +22,10 @@ export const PageViewMemoryProvider = (props: { readonly children: ReactNode }):
 
 /**
  * One plugin's settings: its title, description and every visible field, as the form or as its overrides in JSON.
- * Nested under an entry that already has a heading (a section with merged plugin settings), the title becomes a
- * subheading. The scope line is read-only: no plugin setting stores per-project or per-thread values today, so the page
- * says where it applies instead of offering a control it cannot honour. The JSON editor stays mounted while the form
+ * Under an entry that already has a heading (a section with merged plugin settings), the title becomes a subheading
+ * (`section`), or is left out when it would only repeat the entry's (`none`). There is no scope line: no plugin setting stores per-project or per-thread values today, so every page
+ * applies everywhere and saying so on each one is noise; a scope caption returns with the first namespace that stores
+ * a narrower scope. The JSON editor stays mounted while the form
  * shows, so switching views keeps an unsaved draft. A focused field opens in the view showing: the form scrolls to its
  * row, the JSON editor selects its key.
  */
@@ -32,8 +34,14 @@ export const PluginSettingsPageView = (props: {
   readonly form: ConfigForm<unknown>
   readonly t: ShellTranslate
   readonly focusPath?: readonly string[]
-  readonly nested?: boolean
-  /** The plugin entry behind the page, drawn under its scope line. */
+  /** `page` (default): the page titles itself. `section`: a subheading under an entry title. `none`: no title. */
+  readonly heading?: 'page' | 'section' | 'none'
+  /**
+   * The page sits under a Settings navigation that names it: once that navigation collapses into the Sections select
+   * (a narrow pane), the select reads the same words, so the page title stays for assistive technology only.
+   */
+  readonly namedByNavigation?: boolean
+  /** The plugin entry behind the page, drawn after its settings. */
   readonly entry?: ReactNode
 }): JSX.Element => {
   const memory = useContext(PageViewMemory)
@@ -47,13 +55,22 @@ export const PluginSettingsPageView = (props: {
   return (
     <section aria-label={props.page.title} className="dshx-root dshx:flex dshx:max-w-[760px] dshx:flex-col dshx:gap-1" data-settings-page={props.page.ns}>
       <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3">
-        {props.nested === true ? (
-          <h3 className="dshx:m-0 dshx:min-w-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{props.page.title}</h3>
-        ) : (
-          <h2 className="dshx:m-0 dshx:min-w-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{props.page.title}</h2>
+        {props.heading === 'section' && <h3 className="dshx:m-0 dshx:min-w-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{props.page.title}</h3>}
+        {(props.heading === undefined || props.heading === 'page') && (
+          <h2
+            className={cn(
+              'dshx:m-0 dshx:min-w-0 dshx:text-title dshx:font-semibold dshx:text-foreground',
+              props.namedByNavigation === true && 'dshx:@max-pane-compact:sr-only',
+            )}
+          >
+            {props.page.title}
+          </h2>
         )}
+        {/* Without a title the view switch keeps its place at the row's end. */}
+        {props.heading === 'none' && <span aria-hidden="true" />}
         <ToggleGroup
           aria-label={props.t('view.label')}
+          className="dshx:ml-auto"
           onValueChange={next => {
             if (next === 'form' || next === 'json') show(next)
           }}
@@ -71,8 +88,6 @@ export const PluginSettingsPageView = (props: {
         </ToggleGroup>
       </div>
       {props.page.description !== '' && <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">{props.page.description}</p>}
-      {props.nested !== true && <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground/80">{props.t('entry.scope')}</p>}
-      {props.entry}
       <div className="dshx:mt-3" hidden={view !== 'form'}>
         <SettingsForm
           fields={props.page.fields}
@@ -93,6 +108,7 @@ export const PluginSettingsPageView = (props: {
           />
         </div>
       )}
+      {props.entry}
     </section>
   )
 }

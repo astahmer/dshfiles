@@ -11,7 +11,7 @@ When('the Agent communication panel is opened', async ({ page }: { page: Page })
 
 Then('diagnostics show the connected Host and truthful activity history', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'communication-host-connection', async () => {
-    await expect(page.getByText('Host connected', { exact: true })).toBeVisible()
+    await expect(page.getByText('Connected to DSH', { exact: true })).toBeVisible()
     await expect(page.getByText(/Browsing never starts, resumes, or redirects an agent/)).toBeVisible()
   })
   await page.getByRole('tab', { name: 'Diagnostics', exact: true }).click()

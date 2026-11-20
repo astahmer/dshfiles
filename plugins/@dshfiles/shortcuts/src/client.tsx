@@ -136,7 +136,7 @@ const requireLayout = (resolve: () => Layout | undefined): Layout => {
   const layout = resolve()
   if (layout === undefined) {
     throw new Error(
-      'shortcuts: the layout service is unavailable, so this chord cannot act. The sidebar and panel shortcuts need @deepseek-ai/dsh-client-ui-layout mounted.',
+      'This shortcut is unavailable. Reload the page.',
     )
   }
   return layout

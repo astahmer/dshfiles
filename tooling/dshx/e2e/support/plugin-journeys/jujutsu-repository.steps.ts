@@ -198,9 +198,10 @@ Then('searching, filtering by author and hiding immutable revisions narrow the g
   const rootCommitId = jj(repository, ['--ignore-working-copy', 'log', '--no-graph', '-r', 'root()', '-T', 'commit_id']).trim()
   const rootRow = revisionsRegion(page).locator(`article[data-commit-id="${rootCommitId}"]`)
   await expect(rootRow).toHaveCount(1)
-  const hideImmutable = page.getByRole('checkbox', { name: 'Hide immutable', exact: true })
-  await hideImmutable.click()
-  await expect(hideImmutable).toBeChecked()
+  // Mine, Hide immutable and the date filter share the toolbar's Filter menu.
+  await page.getByRole('button', { name: 'Filter', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Hide immutable', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Filter (1 on)', exact: true })).toBeVisible()
   await recordAssertion(page, 'jujutsu-hide-immutable-drops-the-root', async () => {
     await expect(rootRow).toHaveCount(0)
     await expect(revisionRow(page, 'Feature work by Ada')).toBeVisible()
@@ -329,12 +330,12 @@ Then('the workspace {string} exists and a session opens in it only when asked', 
   await finishJourneyAssertions(page)
 })
 
-/** The composer meter line's Jujutsu location entry: "Own workspace · 1 ahead of main" (b:gyk7, b:212a). */
+/** The composer meter line's Jujutsu location entry: "Own workspace" (b:gyk7, b:212a); the header owns the land count. */
 const locationChip = (page: Page) =>
   page
     .locator('[data-composer-meta="location"] button')
     .filter({ visible: true })
-    .filter({ hasText: /^Own workspace · (\d+ )?ahead of main$/u })
+    .filter({ hasText: /^Own workspace( · \d+ behind)?$/u })
     .first()
 
 When('the repository is registered and a thread is started in it', async ({ page }: { page: Page }) => {

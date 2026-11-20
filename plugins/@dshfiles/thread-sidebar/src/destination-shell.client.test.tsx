@@ -103,6 +103,49 @@ describe('DestinationShell', () => {
     expect(shell.record).toHaveBeenCalledWith({ destination: 'observe', section: 'traces', surface: 'index' })
   })
 
+  it('lists pages for plugin authors in a Developer group at the end of Settings, which one setting hides', () => {
+    setPhone(false)
+    const developerPanels = [
+      ...panels,
+      { id: 'component-gallery', label: 'Component gallery', order: 90 },
+      { id: 'dshfiles-plugin-guide', label: 'Plugin guide', order: 8 },
+    ]
+    renderShell({ panels: developerPanels })
+    fireEvent.click(screen.getByRole('tab', { name: 'Knowledge' }))
+    expect(screen.queryByRole('button', { name: 'Component gallery' })).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+    const pages = within(screen.getByRole('navigation', { name: 'Settings pages' }))
+      .getAllByRole('button')
+      .map(button => button.getAttribute('aria-label'))
+    expect(pages).toEqual(['All settings', 'Plugins'])
+    const developer = screen.getByRole('region', { name: 'Developer' })
+    expect(
+      within(developer)
+        .getAllByRole('button')
+        .map(button => button.getAttribute('aria-label')),
+    ).toEqual(['Component gallery', 'Plugin guide'])
+    // The group follows everything a user came for.
+    expect(screen.getByRole('navigation', { name: 'Settings pages' }).compareDocumentPosition(developer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    cleanup()
+    DestinationSelection.set('settings')
+    renderShell({ panels: developerPanels, showDeveloperPages: false })
+    expect(screen.queryByRole('region', { name: 'Developer' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Component gallery' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Plugins' })).toBeTruthy()
+  })
+
+  it('lets a page description wrap to a second line instead of cutting it at the column edge', () => {
+    setPhone(false)
+    renderShell()
+    fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
+    const usage = screen.getByRole('button', { name: 'Usage' })
+    const description = document.getElementById(usage.getAttribute('aria-describedby') ?? '')
+    expect(description?.textContent).toBe('Cost, quota, requests and tools.')
+    // The 200px column cut every description after about 27 characters ("Cost, quota, requests and t…").
+    expect(description?.className).toContain('dshx:line-clamp-2')
+    expect(description?.className.split(' ')).not.toContain('dshx:truncate')
+  })
+
   it('lists the Settings pages without a layout switch: one sidebar layout (b:952m)', () => {
     setPhone(false)
     const shell = renderShell()
@@ -122,6 +165,54 @@ describe('DestinationShell', () => {
     expect(shell.startSession).toHaveBeenCalled()
     fireEvent.click(screen.getByRole('tab', { name: 'Land' }))
     expect(shell.toggleSidebar).toHaveBeenCalled()
+  })
+
+  it('opens the Inbox page at once, with its count at the trailing edge of its one row', () => {
+    setPhone(false)
+    const inboxPanels = [
+      ...panels,
+      { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 },
+      { id: 'thread-sidebar-waiting', label: 'Waiting threads', order: 3 },
+    ]
+    const contributed = [{ panelId: 'thread-sidebar-waiting', destination: 'inbox' as const, label: 'Waiting threads', order: 2, unlisted: true }]
+    const shell = renderShell({
+      panels: inboxPanels,
+      contributed,
+      // The Inbox glyph as its plugin draws it: a count over the icon.
+      renderPanelIcon: panelId =>
+        panelId === 'attention-inbox' ? (
+          <span data-attention-badge="2">
+            <svg />
+            <span>2</span>
+          </span>
+        ) : null,
+    })
+    fireEvent.click(screen.getByRole('tab', { name: 'Inbox' }))
+    // One page, so the rail opens it: no second row that lists the same threads.
+    expect(shell.selectPanel).toHaveBeenCalledWith('attention-inbox')
+    const rows = within(screen.getByRole('navigation', { name: 'Inbox pages' })).getAllByRole('button')
+    expect(rows.map(row => row.getAttribute('aria-label'))).toEqual(['Inbox'])
+    const row = rows[0] as HTMLElement
+    const seat = row.querySelector('[data-attention-badge]')?.parentElement
+    // The count is positioned against the row (its trailing edge), not over the 16px icon where it touched the label.
+    expect(row.className).toContain('dshx:relative')
+    expect(seat?.className).toContain('dshx:[&_[data-attention-badge]]:static')
+    expect(seat?.className).toContain('dshx:[&_[data-attention-badge]>span]:right-8')
+  })
+
+  it('on a phone, the Inbox tab opens the Inbox page directly', () => {
+    setPhone(true)
+    const inboxPanels = [
+      ...panels,
+      { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 },
+      { id: 'thread-sidebar-waiting', label: 'Waiting threads', order: 3 },
+    ]
+    const contributed = [{ panelId: 'thread-sidebar-waiting', destination: 'inbox' as const, label: 'Waiting threads', order: 2, unlisted: true }]
+    const shell = renderShell({ panels: inboxPanels, contributed, collapsed: true })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'Inbox' }))
+    // No intermediate two-row list (Needs you, Waiting threads) between the tab and the page.
+    expect(shell.selectPanel).toHaveBeenCalledWith('attention-inbox')
+    expect(screen.queryByRole('button', { name: 'Waiting threads' })).toBeNull()
   })
 
   it('replaces the rail with a bottom tab bar on a phone', () => {
@@ -144,6 +235,24 @@ describe('DestinationShell', () => {
     expect(shell.record).toHaveBeenCalledWith(expect.objectContaining({ destination: 'land', surface: 'tab-bar' }))
     cleanup()
     expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(false)
+  })
+
+  it('keeps the phone shell on a phone turned sideways (844x390, coarse pointer)', () => {
+    // Only the landscape clause of the phone rule matches: the viewport is 844px wide.
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({
+        matches: query.split(',').some(part => part.trim() === '(pointer: coarse) and (max-height: 500px)'),
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }),
+    })
+    renderShell({ collapsed: true })
+    expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(true)
+    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.getByRole('navigation', { name: 'Destinations' })).toBeTruthy()
+    cleanup()
   })
 
   it('on a phone, starts a thread from the + in the Threads list header and lists Land outside More', () => {

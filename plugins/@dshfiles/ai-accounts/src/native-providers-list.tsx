@@ -6,7 +6,6 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi, type NativeProviders } from './api.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export type NativeProviderRow = NativeProviders['providers'][number]
 export const nativeProviderStatus = (provider: NativeProviderRow, liveReload: boolean): string => {
@@ -15,6 +14,8 @@ export const nativeProviderStatus = (provider: NativeProviderRow, liveReload: bo
   if (liveReload) return provider.enabled ? 'Turning on…' : 'Turning off…'
   return provider.enabled ? 'On after restart' : 'Off after restart'
 }
+/** Settled: the provider runs exactly as its switch says, so the row needs no status text. */
+export const nativeProviderSettled = (provider: NativeProviderRow): boolean => provider.lockedReason === null && provider.enabled === provider.running
 /** Native rows share the visual list, but never masquerade as saved credential-bearing accounts. */
 export const NativeProvidersList = (props: {
   readonly compact?: boolean
@@ -43,7 +44,7 @@ export const NativeProvidersList = (props: {
             <li
               className={cn(
                 'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border/60 dshx:bg-card dshx:px-3 dshx:py-3',
-                props.selectedEntryId === provider.entryId && 'dshx:border-info/60 dshx:bg-info/5',
+                props.selectedEntryId === provider.entryId && 'dshx:bg-accent',
               )}
               key={provider.entryId}
             >
@@ -54,27 +55,19 @@ export const NativeProvidersList = (props: {
                 onClick={() => props.onSelect?.(provider.entryId)}
                 type="button"
               >
-                <span className="dshx:grid dshx:size-11 dshx:shrink-0 dshx:place-items-center dshx:rounded-lg dshx:bg-muted dshx:text-muted-foreground">
-                  <BoxIcon className="dshx:size-7" />
-                </span>
+                <BoxIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />
                 <span className="dshx:min-w-0">
                   <strong className="dshx:block dshx:truncate dshx:text-sm dshx:font-semibold">{provider.label}</strong>
                   <span className="dshx:mt-1 dshx:block dshx:text-2xs dshx:text-muted-foreground">Built-in provider</span>
                 </span>
               </button>
-              <span
-                className={cn(
-                  'dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs',
-                  provider.enabled && provider.running ? 'dshx:text-success' : 'dshx:text-muted-foreground',
-                )}
-              >
-                <StatusDot tone="current" />
-                <span className="dshx:@max-pane-narrow:hidden">{nativeProviderStatus(provider, state.liveReload)}</span>
-              </span>
+              {/* The switch already says on or off; text only while the two disagree or the row is locked. */}
+              {nativeProviderSettled(provider) ? null : (
+                <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">{nativeProviderStatus(provider, state.liveReload)}</span>
+              )}
               <Switch
                 aria-label={`${provider.enabled ? 'Disable' : 'Enable'} ${provider.label}`}
                 checked={provider.enabled}
-                className="dshx:data-[state=checked]:bg-info"
                 disabled={toggle.isPending || provider.lockedReason !== null}
                 onCheckedChange={enabled => toggle.mutate({ entryId: provider.entryId, enabled })}
                 size="sm"

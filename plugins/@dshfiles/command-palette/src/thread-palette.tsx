@@ -7,7 +7,7 @@ import { Kbd, KbdGroup, KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent } from 'react'
 import { useContentSearch, type ContentSearch } from './content-search-machine.js'
 import { PaletteFrecency, paletteFrecency } from './frecency.js'
 import { paletteNavigationMachine } from './palette-navigation-machine.js'
@@ -198,7 +198,33 @@ const VIEW_BY_PREFIX = {
 /** Host shortcut commands that do what a differently labelled palette entry already does. */
 const SAME_COMMAND_AS = new Map([['@dshfiles/thread-sidebar/command/session.new', 'new thread']])
 
+/**
+ * The visible part of the screen while the palette is open, as `--palette-height` and `--palette-top`: with the
+ * software keyboard up the visual viewport is what is left above it, so the phone palette's results end at the
+ * keyboard instead of under it. Desktop rules ignore both variables.
+ */
+const usePaletteViewport = (): CSSProperties | undefined => {
+  const [box, setBox] = useState<{ readonly height: number; readonly top: number } | null>(null)
+  useEffect(() => {
+    const viewport = typeof window === 'undefined' ? undefined : window.visualViewport
+    if (viewport === undefined || viewport === null) return undefined
+    const update = (): void => setBox({ height: Math.round(viewport.height), top: Math.round(viewport.offsetTop) })
+    update()
+    viewport.addEventListener('resize', update)
+    viewport.addEventListener('scroll', update)
+    return () => {
+      viewport.removeEventListener('resize', update)
+      viewport.removeEventListener('scroll', update)
+    }
+  }, [])
+  return useMemo(
+    () => (box === null ? undefined : ({ '--palette-height': `${String(box.height)}px`, '--palette-top': `${String(box.top)}px` } as CSSProperties)),
+    [box],
+  )
+}
+
 export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
+  const phoneViewport = usePaletteViewport()
   const [navigationSnapshot, sendNavigation, navigationActor] = useMachine(paletteNavigationMachine, { input: { mode: props.mode } })
   const { mode, query, backStack, notice, selected, ask } = navigationSnapshot.context
   const parsed = PaletteRules.parsePaletteQuery(query)
@@ -567,7 +593,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   return (
     <Dialog open onOpenChange={(open: boolean) => (open ? undefined : props.onClose())}>
       <DialogContent
-        className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl"
+        className={cn(
+          'dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl',
+          // A phone gets a full-screen search: the input at the top, results down to the software keyboard (the visual
+          // viewport, published below), no centred card.
+          'dshx:phone:top-[var(--palette-top,0px)] dshx:phone:left-0 dshx:phone:translate-x-0 dshx:phone:translate-y-0 dshx:phone:w-full dshx:phone:max-w-none! dshx:phone:h-[var(--palette-height,100dvh)] dshx:phone:max-h-none dshx:phone:flex dshx:phone:flex-col dshx:phone:rounded-none dshx:phone:border-0 dshx:phone:pt-[env(safe-area-inset-top,0px)] dshx:phone:shadow-none',
+        )}
+        style={phoneViewport}
         showCloseButton={false}
         onEscapeKeyDown={(event: KeyboardEvent) => {
           if (!ask && !subview && query.length === 0) return
@@ -583,7 +615,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           onValueChange={value => sendNavigation({ type: 'selection.change', value })}
           onKeyDown={onKeyDown}
           loop
-          className="dshx:rounded-none"
+          className="dshx:rounded-none dshx:phone:min-h-0 dshx:phone:flex-1"
         >
           <div className="dshx:relative">
             <CommandInput
@@ -613,7 +645,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               </button>
             ) : null}
           </div>
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
+          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground dshx:phone:flex-wrap">
             {ask || subview ? (
               <Button
                 type="button"
@@ -646,9 +678,9 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               </Tabs>
             )}
             {ask || subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
-            <span className="dshx:truncate">{notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}</span>
+            <span className="dshx:truncate dshx:phone:basis-full dshx:phone:whitespace-normal">{notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}</span>
           </div>
-          <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1">
+          <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1 dshx:phone:max-h-none dshx:phone:min-h-0 dshx:phone:flex-1">
             <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
               {ask && emptyQuery
                 ? props.copy.askEmpty
@@ -690,7 +722,10 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   const row: PaletteRow = { kind: 'help', ...help }
                   return (
                     <CommandItem key={help.prefix} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                      <Kbd className="dshx:min-w-7 dshx:justify-center">{help.prefix === '' ? '∅' : help.prefix}</Kbd>
+                      {/* A prefix is typed, on a phone keyboard too: a chip, not a keycap (the kit hides keycaps on touch). */}
+                      <span className="dshx:inline-flex dshx:h-5 dshx:min-w-7 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
+                        {help.prefix === '' ? '∅' : help.prefix}
+                      </span>
                       <span className="dshx:truncate dshx:text-sm">{help.label}</span>
                       {shortcut(row)}
                     </CommandItem>
@@ -811,19 +846,25 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             ) : null}
           </CommandList>
         </Command>
-        <footer className="dshx:flex dshx:items-center dshx:gap-4 dshx:border-t dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">
-          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+        <footer
+          className={cn(
+            'dshx:flex dshx:items-center dshx:gap-4 dshx:border-t dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground',
+            // On touch the key legend goes (the kit hides `data-key-legend`); the bar stays only for a files note.
+            (filesStatus === null || fileRows.length === 0) && 'dshx:pointer-coarse:hidden',
+          )}
+        >
+          <span data-key-legend="" className="dshx:flex dshx:items-center dshx:gap-1.5">
             <KbdGroup>
               <Kbd>↑</Kbd>
               <Kbd>↓</Kbd>
             </KbdGroup>
             {props.copy.navigate}
           </span>
-          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+          <span data-key-legend="" className="dshx:flex dshx:items-center dshx:gap-1.5">
             <Kbd>Enter</Kbd>
             {ask ? props.copy.askSend : props.copy.open}
           </span>
-          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+          <span data-key-legend="" className="dshx:flex dshx:items-center dshx:gap-1.5">
             <Kbd>Esc</Kbd>
             {escapeLabel}
           </span>

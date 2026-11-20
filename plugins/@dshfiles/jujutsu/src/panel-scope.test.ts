@@ -103,9 +103,9 @@ describe('panel scopes', () => {
   })
 
   it('names a scoped tab after the repository it shows, and the panel default when it shows none', () => {
-    expect(PanelScopes.title('/Users/me/dev/dshfiles')).toBe('Jujutsu · dshfiles')
-    expect(PanelScopes.title('/Users/me/dev/dshfiles/')).toBe('Jujutsu · dshfiles')
-    expect(PanelScopes.title(null)).toBe('Jujutsu')
+    expect(PanelScopes.title('/Users/me/dev/dshfiles')).toBe('History · dshfiles')
+    expect(PanelScopes.title('/Users/me/dev/dshfiles/')).toBe('History · dshfiles')
+    expect(PanelScopes.title(null)).toBe('History')
 
     const titles: unknown[] = []
     const onTitle = (event: Event): void => {
@@ -115,7 +115,7 @@ describe('panel scopes', () => {
 
     PanelScopes.publishTitle(DEFAULT_PANEL_SCOPE, '/work/project')
     PanelScopes.publishTitle('tab:one', '/work/project')
-    expect(titles).toEqual([{ panelId: JUJUTSU_PANEL_ID, scope: 'tab:one', title: 'Jujutsu · project' }])
+    expect(titles).toEqual([{ panelId: JUJUTSU_PANEL_ID, scope: 'tab:one', title: 'History · project' }])
     window.removeEventListener(PANEL_TAB_TITLE_EVENT, onTitle)
   })
 
@@ -129,7 +129,7 @@ describe('panel scopes', () => {
 
     PanelScopes.requestTab({ scope, path: '/work/project' })
 
-    expect(requests).toEqual([{ panelId: JUJUTSU_PANEL_ID, scope, title: 'Jujutsu · project' }])
+    expect(requests).toEqual([{ panelId: JUJUTSU_PANEL_ID, scope, title: 'History · project' }])
     expect(PanelScopes.persisted(scope).path).toBe('/work/project')
     window.removeEventListener(OPEN_PANEL_TAB_EVENT, onRequest)
   })

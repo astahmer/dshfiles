@@ -8,7 +8,7 @@ export const pullRequestSettings = defineSettings({
     refreshOnThreadEvents: Schema.boolean()
       .default(true)
       .description(
-        'Refresh a thread’s watched pull requests when its push command (jj git push, git push, gh pr …) returns, its turn ends or a link is added. Off leaves only the sweep below.',
+        'Refresh a thread’s pull requests after a push, at turn end and when a link is added.',
       ),
     eventDebounceSeconds: Schema.natural()
       .min(1)
@@ -24,7 +24,7 @@ export const pullRequestSettings = defineSettings({
       .max(4_900)
       .default(500)
       .description(
-        'GitHub GraphQL points (5,000 an hour, shared with every gh call on this account) the watcher leaves for everything else: once a read reports fewer remaining, polling waits until GitHub resets the budget. 0 never waits.',
+        'GitHub GraphQL points left for other gh calls before polling waits for the hourly reset (0 never waits).',
       ),
   }),
   applies: 'live',

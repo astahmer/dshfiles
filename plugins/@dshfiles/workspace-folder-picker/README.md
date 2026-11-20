@@ -1,6 +1,6 @@
 # Workspace Folder Picker
 
-![Add workspaces from the folder browser](docs/screenshots/workspace-folder-add-flow.png)
+![Add projects from the folder browser](docs/screenshots/workspace-folder-add-flow.png)
 
 Replaces the Add workspace directory flow in the header workspace menu and the
 sidebar browser with the shared `ProjectFolderPicker` opened directly in

@@ -303,7 +303,7 @@
 
 .turnErrorRow {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-columns: 10px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
   padding: 2px 0;
@@ -330,9 +330,48 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+/* dshfiles (unslop T8): the one row of recovery actions, under the sentence. */
+.turnErrorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.turnErrorActions:empty {
+  display: none;
+}
+
+.turnErrorDetails {
+  margin-top: 4px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.turnErrorDetailsSummary {
+  width: fit-content;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.turnErrorDetailsSummary:focus-visible {
+  outline: 1.5px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+
 .turnErrorCode {
+  display: block;
+  margin-top: 4px;
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-markdown-code-block-small);
+}
+
+.turnErrorRaw {
+  margin: 4px 0 0;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-markdown-code-block-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .maxTokensTitle {

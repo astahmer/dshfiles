@@ -29,8 +29,17 @@ import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { ChatReferenceTitleStore } from './chat-reference-titles.js'
 import { sessionProjectPath } from './session-project-path.js'
 import { JujutsuPanel } from './client.js'
+import { HistoryPage } from './history-page.js'
 import type {} from '@dshfiles/rich-composer/conversation-contract'
-import { ChangesPill, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
+import {
+  ChangesPill,
+  ComposerChips,
+  ConversationHeaderToggle,
+  ProjectChangesSection,
+  type ComposerJujutsuServices,
+  type ComposerSlotProps,
+} from './composer-context.js'
+import { WorkspaceMenuSections, type WorkspaceMenuSectionProps } from '@dshfiles/jj-integration/workspace-menu-sections'
 import { DEFAULT_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
@@ -138,6 +147,7 @@ export default defineClient({
             key={options.scope}
             scope={options.scope}
             defaultPath={options.defaultPath ?? null}
+            currentProjectPath={options.currentProjectPath ?? null}
             surface={options.surface}
             visible={options.visible ?? true}
             {...(options.view === undefined ? {} : { view: options.view })}
@@ -191,14 +201,21 @@ export default defineClient({
         defaultPath: defaultPath === undefined || defaultPath.length === 0 ? null : defaultPath,
       }
     }
+    /** The project of the thread last on screen: where the History and Source control pages open before any choice. */
+    const currentProjectPath = (): string | null => {
+      const sessionId = ctx.sidebarRight.mounted.getSnapshot() ?? lastThread
+      if (sessionId === undefined) return null
+      const projectPath = sessionProjectPath(sessionId, ctx.sessions.list.getSnapshot().byId, ctx.workspaces.list.getSnapshot().items)
+      return projectPath === undefined || projectPath.length === 0 ? null : projectPath
+    }
     const MainSurfacePanel = decorate((props: PropsRuntime<'main'>) => {
       const scope = useActiveJujutsuScope()
       const visible = SurfaceVisibility.useMainPanelVisible({ usePanelInfo: props.usePanelInfo, panelId: PANEL_ID })
-      return panel({ surface: 'main', scope, visible, view: 'graph' })
+      return panel({ surface: 'main', scope, visible, view: 'graph', currentProjectPath: currentProjectPath() })
     })
     const MainSourceControlPanel = decorate((props: PropsRuntime<'main'>) => {
       const visible = SurfaceVisibility.useMainPanelVisible({ usePanelInfo: props.usePanelInfo, panelId: SOURCE_CONTROL_PANEL_ID })
-      return panel({ surface: 'main', scope: DEFAULT_PANEL_SCOPE, visible, view: 'source' })
+      return panel({ surface: 'main', scope: DEFAULT_PANEL_SCOPE, visible, view: 'source', currentProjectPath: currentProjectPath() })
     })
     const SideSurfacePanel = decorate((props: PropsRuntime<'sidebar.right.pane.tab'>) => {
       const target = useMountedSession()
@@ -206,18 +223,18 @@ export default defineClient({
       return panel({ surface: 'side-panel', scope: target.scope, sessionId: target.sessionId, defaultPath: target.defaultPath, visible })
     })
     const DockSurfacePanel = decorate((props: WorkbenchPanelProps) =>
-      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'graph' }),
+      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'graph', currentProjectPath: currentProjectPath() }),
     )
     const DockSourceControlPanel = decorate((props: WorkbenchPanelProps) =>
-      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'source' }),
+      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'source', currentProjectPath: currentProjectPath() }),
     )
     const ScopedWorkbenchPanel = decorate((props: WorkbenchPanelProps & { readonly scope: string }) =>
-      panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph' }),
+      panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph', currentProjectPath: currentProjectPath() }),
     )
     ctx.effect(() => PanelScopes.listen(), 'dshfiles-jujutsu: the scope each main tab shows')
-    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Revision graph' }, PanelGlyph))
+    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: HistoryPage.titles.graph }, PanelGlyph))
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: SOURCE_CONTROL_PANEL_ID, order: 3, label: 'Source control' }, SourceControlGlyph),
+      ctx.slots.register({ name: 'sidebar.panellist', id: SOURCE_CONTROL_PANEL_ID, order: 3, label: HistoryPage.titles.source }, SourceControlGlyph),
     )
     ctx.effect(
       () =>
@@ -294,6 +311,15 @@ export default defineClient({
         composerSlot(ChangesPill),
       ),
     )
+    // H3 (unslop): a thread in the project checkout gets no pill; the workspace menu states the checkout's diff as the
+    // project's, with the same way into the Changes view.
+    const ProjectChanges = (props: WorkspaceMenuSectionProps): JSX.Element => (
+      <PluginQueryProvider>
+        <ProjectChangesSection dismiss={props.dismiss} jujutsu={composerServices} sessionId={SessionId(props.sessionId)} />
+      </PluginQueryProvider>
+    )
+    if (metadata?.plugin !== undefined)
+      metadata.plugin.add(WorkspaceMenuSections, { id: '@dshfiles/jujutsu/project-changes', order: 10, Component: metadata.plugin.bind(ProjectChanges) })
     // dshfiles (b:212a): the location chip stays our own meter-line entry after the run summary ("Own workspace · 1 ahead
     // of main"); upstream's conversation.composer.location seat was removed from rich-composer (b:ysaj).
     ctx.slots.inject('conversation.composer.dock', () =>
@@ -419,7 +445,7 @@ export default defineClient({
       () =>
         workbenchPanels().register({
           id: DOCK_PANEL_ID,
-          title: 'Revision graph',
+          title: HistoryPage.titles.graph,
           dockDefault: true,
           // The same feature's full main-view page, so the workbench offers "Move to main view" for the panel.
           mainPanelId: PANEL_ID,
@@ -432,7 +458,7 @@ export default defineClient({
       () =>
         workbenchPanels().register({
           id: SOURCE_CONTROL_DOCK_PANEL_ID,
-          title: 'Source control',
+          title: HistoryPage.titles.source,
           mainPanelId: SOURCE_CONTROL_PANEL_ID,
           component: DockSourceControlPanel,
         }),
@@ -446,6 +472,8 @@ interface SurfacePanelOptions {
   readonly surface: 'main' | 'side-panel' | 'dock'
   readonly scope: string
   readonly defaultPath?: string | null
+  /** The project of the thread last on screen: where a page opens when it remembers no repository of its own. */
+  readonly currentProjectPath?: string | null
   readonly visible?: boolean | undefined
   /** Omitted only on the narrow side panel, which switches between both views with tabs. */
   readonly view?: 'graph' | 'source'

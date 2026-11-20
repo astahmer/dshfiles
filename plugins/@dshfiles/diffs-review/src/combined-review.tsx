@@ -106,7 +106,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive" role="alert">
         <span className="dshx:min-w-0">{message}</span>
         <Button onClick={() => void query.refetch()} size="xs" variant="outline">
-          Try again
+          Retry
         </Button>
       </p>
     )
@@ -156,7 +156,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       {result.segments > 1 ? (
         <p className={HINT} role="status">
           {result.graphComplete === false
-            ? 'These revisions are not adjacent, so each one is shown as its own change. The history between them is too long to count here; select fewer or closer revisions to see the gaps.'
+            ? 'These revisions are not adjacent, so each one is shown as its own change. The history between them is too long to count here. Select fewer or closer revisions to see the gaps.'
             : 'These revisions are not adjacent, so each one is shown as its own change. Dashed lines mark revisions between them that are not in this review.'}
         </p>
       ) : null}
@@ -170,12 +170,12 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       ))}
       {marks.unavailable ? (
         <p className={HINT} role="status">
-          Viewed marks are kept by the diff-viewed plugin, which is not loaded. Add @dshfiles/diff-viewed to the profile to mark files.
+          To mark files viewed, enable the diff-viewed plugin in Plugins and restart DSH.
         </p>
       ) : null}
       {marks.error === null || marks.error === undefined ? null : (
         <p className="dshx:text-xs dshx:text-destructive" role="alert">
-          {errorMessage(marks.error, 'Viewed marks could not be saved; try again.')}
+          {errorMessage(marks.error, 'Viewed marks could not be saved. Try again.')}
         </p>
       )}
       {revisions.length === 0 ? <EmptyState>None of the selected revisions could be read. Select them again in the graph.</EmptyState> : null}

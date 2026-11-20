@@ -3,8 +3,9 @@
   "features": [
     {
       "id": "runtime-directory",
-      "title": "Register and identify local DSH runtimes",
-      "summary": "Maintain a bounded host/runtime directory with stable runtime identity; add hosts with a searchable SSH destination picker, then edit, test, reconnect and remove them on the Hosts page.",
+      "title": "Add and identify hosts",
+      "summary": "Add a host over SSH, then test, reconnect, edit or remove it on the Hosts page.",
+      "details": "Maintain a bounded host/runtime directory with stable runtime identity; add hosts with a searchable SSH destination picker, then edit, test, reconnect and remove them on the Hosts page.",
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -63,7 +64,8 @@
     {
       "id": "host-management",
       "title": "Manage hosts on a dedicated page",
-      "summary": "The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users open or copy a temporary remote-host link. Users can add existing folders or clone Git repositories with optional individually selected local-file copying. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed, and SSH rows with runtime errors can be diagnosed hop by hop.",
+      "summary": "The Hosts page lists your hosts with their load and memory, and adds projects to them.",
+      "details": "The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users open or copy a temporary remote-host link. Users can add existing folders or clone Git repositories with optional individually selected local-file copying. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed, and SSH rows with runtime errors can be diagnosed hop by hop.",
       "surfaces": ["client", "host", "storage"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -100,8 +102,9 @@
         "click button \"Hosts\"",
         "expect heading \"Hosts\"",
         "expect text \"3 registered*\"",
-        "expect button \"Open host\"",
-        "click button \"Clone project\"",
+        "expect button \"Diagnose Build box\"",
+        "click button \"Actions for Build box\"",
+        "click menuitem \"Clone project\"",
         "expect textbox \"Git repository URL\"",
         "fill textbox \"Git repository URL\" \"git@github.com:owner/repo.git\"",
         "expect checkbox \"Copy selected local files\"",
@@ -185,7 +188,8 @@
     {
       "id": "logical-project-grouping",
       "title": "Group remote threads under matching local projects",
-      "summary": "Read normalized Git origins on local projects and remote workspaces so matching clones share one thread-sidebar project group while remote rows keep their host badge.",
+      "summary": "Threads on another host group under the matching local project, with a host badge.",
+      "details": "Read normalized Git origins on local projects and remote workspaces so matching clones share one thread-sidebar project group while remote rows keep their host badge.",
       "surfaces": ["client", "host"],
       "configuration": [],
       "states": ["origin-unavailable", "origin-matched", "host-badged"],
@@ -236,7 +240,8 @@
     {
       "id": "fleet-update",
       "title": "Update every host from the Hosts page",
-      "summary": "Update hosts checks every visible SSH host: it fetches the host repository and dry-runs that host's own dshx checkout sync, then lists incoming and unpushed revisions and what would rebuild. Update all syncs each host that has changes (rebase onto main@origin, install, rebuild) and says per host whether DSH there needs a restart. Hosts are never restarted from here. Agents get the same operation as multi_host_update.",
+      "summary": "Check every host for updates and update them all from the Hosts page.",
+      "details": "Update hosts checks every visible SSH host: it fetches the host repository and dry-runs that host's own dshx checkout sync, then lists incoming and unpushed revisions and what would rebuild. Update all syncs each host that has changes (rebase onto main@origin, install, rebuild) and says per host whether DSH there needs a restart. Hosts are never restarted from here. Agents get the same operation as multi_host_update.",
       "surfaces": ["client", "host"],
       "configuration": [],
       "states": ["checking", "up-to-date", "update-available", "updating", "updated", "restart-needed", "failed"],
@@ -295,7 +300,8 @@
     {
       "id": "checkout-sync",
       "title": "Sync a jj checkout on another host",
-      "summary": "Sync checkout on a host row compares one jj checkout with its bookmark on origin: it fetches, simulates the rebase off disk and lists incoming and unpushed revisions, the bookmark state, which workspace this is and the others sharing the repository with the threads running in them. Confirming rebases the checkout, keeping undescribed local edits. Sync never pushes and never moves a bookmark. Agents get the same operation as multi_host_checkout_sync, and multi_host_doctor warns of a conflicted bookmark.",
+      "summary": "Compare a host's checkout with its bookmark on origin, then sync it after a preview.",
+      "details": "Sync checkout on a host row compares one jj checkout with its bookmark on origin: it fetches, simulates the rebase off disk and lists incoming and unpushed revisions, the bookmark state, which workspace this is and the others sharing the repository with the threads running in them. Confirming rebases the checkout, keeping undescribed local edits. Sync never pushes and never moves a bookmark. Agents get the same operation as multi_host_checkout_sync, and multi_host_doctor warns of a conflicted bookmark.",
       "surfaces": ["client", "host"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -340,7 +346,8 @@
         "click tab \"Observe\"",
         "click button \"Hosts\"",
         "expect heading \"Hosts\"",
-        "click button \"Sync checkout\"",
+        "click button \"Actions for Build box\"",
+        "click menuitem \"Sync checkout\"",
         "expect textbox \"Checkout on Build box\"",
         "expect button \"Check\""
       ],
@@ -385,7 +392,8 @@
     {
       "id": "host-settings",
       "title": "Weight Auto placement and fetch before new threads",
-      "summary": "Edit host sets an Auto weight (x1, x2, x4: Auto divides the host's resource pressure by it) and whether a thread started there first runs jj git fetch in its folder. A failed fetch never blocks the thread; the start result says why. Hiding a host also takes its threads out of the sidebar, and a remote thread whose host is unreachable offers Hide this host. A host that was online in the last 10 s reads as Reconnecting instead of turning red.",
+      "summary": "Weight how often Auto picks a host and whether new threads fetch first.",
+      "details": "Edit host sets an Auto weight (x1, x2, x4: Auto divides the host's resource pressure by it) and whether a thread started there first runs jj git fetch in its folder. A failed fetch never blocks the thread; the start result says why. Hiding a host also takes its threads out of the sidebar, and a remote thread whose host is unreachable offers Hide this host. A host that was online in the last 10 s reads as Reconnecting instead of turning red.",
       "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": ["weight-1", "weight-2", "weight-4", "fetch-on", "fetch-off", "reconnecting", "hidden"],
@@ -399,7 +407,8 @@
         "click tab \"Observe\"",
         "click button \"Hosts\"",
         "expect heading \"Hosts\"",
-        "click button \"Edit Build box\"",
+        "click button \"Actions for Build box\"",
+        "click menuitem \"Edit\"",
         "expect heading \"Edit host\"",
         "expect radio \"Weight 2\"",
         "expect switch \"Fetch jj before new threads\""
@@ -441,8 +450,9 @@
     },
     {
       "id": "remote-delegation",
-      "title": "Delegate a task to another machine",
-      "summary": "The multi_host_delegate agent tool runs a task as a thread on a named host, or on the least-loaded visible SSH host through Auto, waits for its turn and returns the final answer, like a subagent on that machine. A pending question on the host, a failed turn and a wait that runs out each come back with the thread id to follow; cancelling the call stops the remote turn.",
+      "title": "Delegate a task to another host",
+      "summary": "The agent can run a task as a thread on another host and get its answer back.",
+      "details": "The multi_host_delegate agent tool runs a task as a thread on a named host, or on the least-loaded visible SSH host through Auto, waits for its turn and returns the final answer, like a subagent on that machine. A pending question on the host, a failed turn and a wait that runs out each come back with the thread id to follow; cancelling the call stops the remote turn.",
       "surfaces": ["host"],
       "configuration": [],
       "states": ["finished", "failed", "waiting", "running", "no-auto-host"],
@@ -483,7 +493,8 @@
     {
       "id": "linked-machines",
       "title": "Link machines without SSH, both ways",
-      "summary": "Linking turns on a gateway in front of this DSH, on its Tailscale address by default. It makes single-use pairing codes (ten minutes) that another machine redeems for its own revocable credential. A paired machine becomes a direct host there: threads, remote views and multi_host_delegate run on it with no SSH. Link back asks the other machine to pair with this one, so agents on either side can start threads on the other while both are online. Unlinking a machine closes its open connections at once.",
+      "summary": "Link another machine with a short pairing code, without SSH, so threads can run on it.",
+      "details": "Linking turns on a gateway in front of this DSH, on its Tailscale address by default. It makes single-use pairing codes (ten minutes) that another machine redeems for its own revocable credential. A paired machine becomes a direct host there: threads, remote views and multi_host_delegate run on it with no SSH. Link back asks the other machine to pair with this one, so agents on either side can start threads on the other while both are online. Unlinking a machine closes its open connections at once.",
       "surfaces": ["client", "host", "storage"],
       "configuration": [
         {
@@ -532,7 +543,8 @@
         "click tab \"Observe\"",
         "click button \"Hosts\"",
         "expect heading \"Hosts\"",
-        "expect heading \"Link this machine\"",
+        "click button \"Link this machine\"",
+        "expect dialog \"Link this machine\"",
         "click button \"Pair a machine\"",
         "expect dialog \"Pair a machine\""
       ],
@@ -589,8 +601,9 @@
     },
     {
       "id": "ssh-runtime-connection",
-      "title": "Connect to an SSH-managed runtime",
-      "summary": "Discover a remote DSH through its launch file over SSH, verify pinned identity/capabilities, keep one pooled tunnel per runtime, and never accept unknown host keys or forward the agent.",
+      "title": "Connect to a host over SSH",
+      "summary": "DSH reaches a host over SSH with a verified identity and never accepts an unknown host key.",
+      "details": "Discover a remote DSH through its launch file over SSH, verify pinned identity/capabilities, keep one pooled tunnel per runtime, and never accept unknown host keys or forward the agent.",
       "surfaces": ["client", "host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -636,7 +649,8 @@
     {
       "id": "session-routing",
       "title": "Use the native composer for remote threads",
-      "summary": "The one-shot Auto destination selects the least-pressured visible remote host from fresh CPU and memory snapshots, then pins that runtime before folder selection; keep its model catalog, reasoning-effort picker, file attachments, and @ file references bound to the owning runtime, and follow/reply in the native chat.",
+      "summary": "Start a thread on another host from the normal composer, or let Auto pick the least busy one.",
+      "details": "The one-shot Auto destination selects the least-pressured visible remote host from fresh CPU and memory snapshots, then pins that runtime before folder selection; keep its model catalog, reasoning-effort picker, file attachments, and @ file references bound to the owning runtime, and follow/reply in the native chat.",
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -740,7 +754,8 @@
     {
       "id": "isolated-runtime-views",
       "title": "Open the host's own DSH UI",
-      "summary": "Lease the pooled tunnel for a stable loopback origin and open the remote runtime's UI in a new tab.",
+      "summary": "Open another host's own DSH in a new tab.",
+      "details": "Lease the pooled tunnel for a stable loopback origin and open the remote runtime's UI in a new tab.",
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "observe",
@@ -778,7 +793,8 @@
     {
       "id": "remote-thread-references",
       "title": "Mention remote threads safely",
-      "summary": "Remote thread references resolve only from recorded, authorized hosts; the host retrieves a bounded text-only snapshot and inserts it as explicitly untrusted read-only context before the native resolver handles local references.",
+      "summary": "Mention a thread on another host, and its text arrives as read-only context.",
+      "details": "Remote thread references resolve only from recorded, authorized hosts; the host retrieves a bounded text-only snapshot and inserts it as explicitly untrusted read-only context before the native resolver handles local references.",
       "surfaces": ["host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -826,7 +842,8 @@
     {
       "id": "remote-inventory",
       "title": "Every thread on every host",
-      "summary": "The remote threads panel merges threads started from this DSH with the sessions each host reports, grouped by host: threads started on the host itself carry a muted badge, an offline host shows one unavailable line, and status is polled only while the list is open.",
+      "summary": "One panel lists the threads on every host, grouped by host.",
+      "details": "The remote threads panel merges threads started from this DSH with the sessions each host reports, grouped by host: threads started on the host itself carry a muted badge, an offline host shows one unavailable line, and status is polled only while the list is open.",
       "surfaces": ["client", "host", "integration"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -868,7 +885,8 @@
     {
       "id": "remote-host-fallback",
       "title": "Open a mirrored thread on its host",
-      "summary": "The mirrored-thread header resolves its remote owner and opens that runtime's own DSH on the same thread, for what the mirror does not reach.",
+      "summary": "Open a thread from another host in that host's own DSH.",
+      "details": "The mirrored-thread header resolves its remote owner and opens that runtime's own DSH on the same thread, for what the mirror does not reach.",
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
@@ -910,7 +928,8 @@
     {
       "id": "remote-interactions",
       "title": "Answer a remote agent's questions and approvals in this client",
-      "summary": "While a mirrored thread is followed, this Host opens the owning runtime's forwarded-event stream as an owner client, holds what the runtime waits on, and shows it in the native question card or an approval panel in the same seat. Answers go back to that runtime, which stays the authority; the first answer from any client wins and nothing is delegated away from the owner's own UI.",
+      "summary": "Answer questions and approvals from a thread on another host right here.",
+      "details": "While a mirrored thread is followed, this Host opens the owning runtime's forwarded-event stream as an owner client, holds what the runtime waits on, and shows it in the native question card or an approval panel in the same seat. Answers go back to that runtime, which stays the authority; the first answer from any client wins and nothing is delegated away from the owner's own UI.",
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -1000,7 +1019,8 @@
     {
       "id": "remote-thread-jj",
       "title": "Work a remote thread's repository from this client",
-      "summary": "The thread workspace control, the integrate offer, the JJ side panel and the composer's changes bar of a mirrored thread read from the runtime that owns it, and land, queue, undo and prepared jujutsu actions run there. Each call is authorized for that Session and limited to its own folder or a repository id the owner issued for that folder.",
+      "summary": "Land, undo and other workspace actions on a thread from another host run on that host.",
+      "details": "The thread workspace control, the integrate offer, the JJ side panel and the composer's changes bar of a mirrored thread read from the runtime that owns it, and land, queue, undo and prepared jujutsu actions run there. Each call is authorized for that Session and limited to its own folder or a repository id the owner issued for that folder.",
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
@@ -1063,7 +1083,8 @@
     {
       "id": "remote-terminal-handoff",
       "title": "Open a remote thread's terminal on its host",
-      "summary": "A terminal tab on a mirrored thread replaces the native body, which has no agent to run against here, with a button that opens that thread in the host's own DSH. Every route into a terminal lands on it: the start page, the shortcut and a restored tab.",
+      "summary": "A terminal tab on another host's thread opens that thread in the host's own DSH.",
+      "details": "A terminal tab on a mirrored thread replaces the native body, which has no agent to run against here, with a button that opens that thread in the host's own DSH. Every route into a terminal lands on it: the start page, the shortcut and a restored tab.",
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "threads",

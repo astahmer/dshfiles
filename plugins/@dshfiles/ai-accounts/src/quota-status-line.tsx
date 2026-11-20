@@ -39,7 +39,7 @@ export interface QuotaStatusLineProps {
   readonly activeAccountRunning: boolean
   /** Route the open thread's next requests through an account (its right-click menu), when a thread is on stage. */
   readonly onUseForThread?: (accountId: string) => void
-  /** The strip's two quiet tools at its end: add an account, open AI account settings. */
+  /** Add an account and open AI account settings: two tools in the popover's header, so the strip stays one item. */
   readonly onAddAccount: () => void
   readonly onOpenAccounts: () => void
 }
@@ -417,31 +417,6 @@ export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null
     rootRef.current = element
     setRoot(current => (current === element ? current : element))
   }
-  const tools = (
-    // Phone: the tools sit in the opened list, never in the pill text.
-    <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center" {...(props.compact ? { 'data-status-detail': '' } : {})}>
-      <StripTool
-        label="Add AI account"
-        onClick={() => {
-          setOpen(false)
-          props.onAddAccount()
-        }}
-        tooltip="Add account"
-      >
-        <PlusIcon aria-hidden className="dshx:size-3.5" />
-      </StripTool>
-      <StripTool
-        label="AI account settings"
-        onClick={() => {
-          setOpen(false)
-          props.onOpenAccounts()
-        }}
-        tooltip="AI account settings"
-      >
-        <Settings2Icon aria-hidden className="dshx:size-3.5" />
-      </StripTool>
-    </span>
-  )
   return (
     <TooltipProvider delayDuration={300}>
       <Popover onOpenChange={setOpen} open={open}>
@@ -621,7 +596,6 @@ export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null
                 </span>
               </>
             )}
-            {tools}
             {arrangement.error === null ? null : (
               <span className="dshx:text-xs dshx:text-destructive" role="alert">
                 {arrangement.error}
@@ -632,7 +606,9 @@ export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null
         <UsagePopoverContent
           close={() => setOpen(false)}
           keepOpenWithin={rootRef}
+          onAddAccount={props.onAddAccount}
           onConnectAccount={props.onConnectAccount}
+          onOpenAccounts={props.onOpenAccounts}
           onOpenUsageHistory={props.onOpenUsageHistory}
           order="remaining"
         />

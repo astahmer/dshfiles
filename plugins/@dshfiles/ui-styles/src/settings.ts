@@ -46,26 +46,26 @@ export const appearanceSettings = defineSettings({
       .max(24)
       .default(0)
       .description(
-        'Blur under the conversation column while a backdrop scene shows, in px (0–24). The blur is a still of the scene, computed once, so it costs nothing per frame; the scene keeps moving on the sides.',
+        'Blur under the thread column while a backdrop scene shows, in px (0–24).',
       ),
     readingTint: Schema.natural()
       .min(0)
       .max(100)
       .default(0)
       .description(
-        'Extra tint of the theme background under the conversation column while a backdrop shows, in percent (0–100). Each theme already lays the least tint its text needs to stay readable over its scene.',
+        'Extra tint of the theme background under the thread column while a backdrop shows, in percent (0–100).',
       ),
     sceneFrameRate: Schema.natural()
       .min(SCENE_FRAME_RATE.min)
       .max(SCENE_FRAME_RATE.max)
       .default(SCENE_FRAME_RATE.default)
       .description(
-        `Most frames per second an animated backdrop scene is drawn at (${SCENE_FRAME_RATE.min}–${SCENE_FRAME_RATE.max}, default ${SCENE_FRAME_RATE.default}; the display's rate caps it). The scene is drawn on a canvas off the page's main thread; 0 shows a still picture. The backdrop only moves in the focused tab; every other tab holds its frame.`,
+        `Most frames per second for an animated backdrop, from ${SCENE_FRAME_RATE.min} to ${SCENE_FRAME_RATE.max} (0 shows a still picture).`,
       ),
     customTheme: Schema.string()
       .default('')
       .description(
-        'Id of a saved theme to use instead of the preset. Ask the agent for any theme ("a Nord theme", "Tokyo Night with falling snow"); it saves it and switches to it. Empty uses the preset.',
+        'Id of a saved theme to use instead of the preset (ask the agent to make one).',
       ),
     customThemes: Schema.array(Schema.any())
       .default([])

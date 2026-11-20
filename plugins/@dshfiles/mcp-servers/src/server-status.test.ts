@@ -33,12 +33,15 @@ describe('MCP server status model', () => {
   it('maps lifecycle and local process states to labels and a status dot', () => {
     const running = serverView()
     expect(McpServerStatusModel.lifecycleText({ server: running, t: translate })).toBe('clientLoaded')
-    expect(McpServerStatusModel.lifecycleDotClassName(running)).toBe('dshx:bg-success')
+    // Healthy is quiet: a connected server draws the idle ring, never a green dot.
+    expect(McpServerStatusModel.lifecycleGlyph(running)).toBe('idle')
+    expect(McpServerStatusModel.lifecycleGlyph(serverView({ clientLifecycle: 'starting' }))).toBe('working')
+    expect(McpServerStatusModel.lifecycleGlyph(serverView({ clientLifecycle: 'start-failed' }))).toBe('failed')
     expect(McpServerStatusModel.localProcessText({ server: running, t: translate })).toBe('localProcess: localRunning')
 
     const inactive = serverView({ clientLifecycle: 'inactive', localProcess: 'not-configured' })
     expect(McpServerStatusModel.lifecycleText({ server: inactive, t: translate })).toBe('clientStopped')
-    expect(McpServerStatusModel.lifecycleDotClassName(inactive)).toBe('dshx:bg-muted-foreground/50')
+    expect(McpServerStatusModel.lifecycleGlyph(inactive)).toBe('stopped')
     expect(McpServerStatusModel.localProcessText({ server: inactive, t: translate })).toBeUndefined()
   })
 

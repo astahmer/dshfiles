@@ -427,7 +427,7 @@ export const MemoryReferencePreview = (props: {
         ) : null}
         {preview.isError ? (
           <p role="alert" className="dshx:text-xs dshx:text-destructive">
-            {errorMessage(preview.error, 'This memory is unavailable; it may have been forgotten. Search Memory for it instead.')}
+            {errorMessage(preview.error, 'This memory is gone, perhaps forgotten. Search Memory for it instead.')}
           </p>
         ) : null}
         {card?.kind === 'note' ? (

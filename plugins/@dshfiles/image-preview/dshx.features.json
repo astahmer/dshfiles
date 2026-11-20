@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "image-preview-response",
-      "title": "One guarded way to serve and show a changed image",
-      "summary": "Name the previewable image types, answer with their bytes under nosniff and a sandboxing policy within an 8 MB cap, and read them into a blob URL in the browser.",
+      "title": "Show a changed image safely",
+      "summary": "Changed images up to 8 MB are served and shown safely in the browser.",
+      "details": "Name the previewable image types, answer with their bytes under nosniff and a sandboxing policy within an 8 MB cap, and read them into a blob URL in the browser.",
       "surfaces": ["host", "client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
