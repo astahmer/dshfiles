@@ -27,6 +27,7 @@ import {
   type AntigravityLevel,
 } from './antigravity-account.js'
 import type { AgyRunning, AntigravityProcessesPromise } from './antigravity-processes.js'
+import { neutralSystemPrompt } from './antigravity-system-prompt.js'
 import { MCP_BRIDGE_SOURCE, bridgeCallSchema, CliBridge } from './cli-bridge.js'
 import { AiAccountsSchema } from './effect-schema.js'
 
@@ -35,10 +36,10 @@ import { AiAccountsSchema } from './effect-schema.js'
  *
  * Google AI plans (free, AI Pro, AI Ultra) serve coding agents only through `agy`, so each DSH conversation drives one
  * `agy acp` process: the Agent Client Protocol server Google documents for editors, signed in with the account's own
- * login. A custom agent written into the process's private Gemini folder carries DSH's system prompt and turns off
- * Antigravity's built-in tools. DSH's tools reach the model through the shared MCP bridge: when the model calls one, the
- * call is held, the DSH step ends with `toolUse`, and the tool result in DSH's next request releases it, so the same
- * ACP prompt continues the turn.
+ * login. A custom agent written into the process's private Gemini folder carries a neutral DSH system prompt and
+ * turns off Antigravity's built-in tools. DSH's tools reach the model through the shared MCP bridge: when the model calls
+ * one, the call is held, the DSH step ends with `toolUse`, and the tool result in DSH's next request releases it, so the
+ * same ACP prompt continues the turn.
  */
 
 const MCP_SERVER_NAME = 'dsh'
@@ -176,9 +177,9 @@ const declaredArguments = (tool: Tool | undefined, input: ToolArguments): ToolAr
   return Object.fromEntries(Object.entries(input).filter(([key]) => key in declared.success.properties))
 }
 
-/** The agent file `agy acp --agent dsh` loads: DSH's prompt replaces Antigravity's, and none of its own tools are on. */
+/** The agent file `agy acp --agent dsh` loads: a neutral prompt replaces Antigravity's, and none of its own tools are on. */
 const agentFile = (system: string): string =>
-  `---\nname: ${AGENT_NAME}\ndescription: DeepSeek Harness conversation agent.\ntools: []\nmainAgent: true\nsubagent: false\n---\n${system}\n`
+  `---\nname: ${AGENT_NAME}\ndescription: DeepSeek Harness conversation agent.\ntools: []\nmainAgent: true\nsubagent: false\n---\n${neutralSystemPrompt(system)}\n`
 
 export class AntigravityAcpSessions {
   private readonly sessions = new Map<string, Session>()

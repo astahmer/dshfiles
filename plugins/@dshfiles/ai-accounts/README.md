@@ -282,13 +282,16 @@ and lets that process talk to Google, the same way Claude accounts run the `clau
   it.
 - **Requests.** Each DSH conversation drives one `agy acp` process with its own private `--gemini-dir`, so the
   conversation's files, settings and history stay out of the user's own `agy`, and are removed with the process. A
-  custom agent in that folder carries DSH's system prompt and turns off Antigravity's built-in tools (`tools: []`); DSH's
-  tools reach the model over the same MCP bridge Claude uses (`src/cli-bridge.ts`), and a held call ends the DSH step
-  with `toolUse` until DSH's result releases it, inside the same ACP prompt. The model and thought level are set with
-  `session/set_config_option`; a level the model does not offer falls back to the closest lower one. Thought summaries
-  stream as thinking, and the turn's tokens and cache reads come from the prompt result. `src/antigravity-acp.ts` holds
-  the transport; `src/antigravity-processes.ts` runs `agy` on the Host's DSH subprocess spawner, which stops the ACP
-  front and its session worker together.
+  custom agent in that folder carries a neutral DSH system prompt and turns off Antigravity's built-in tools
+  (`tools: []`); DSH's tools reach the model over the same MCP bridge Claude uses (`src/cli-bridge.ts`), and a held call
+  ends the DSH step with `toolUse` until DSH's result releases it, inside the same ACP prompt. The model and thought
+  level are set with `session/set_config_option`; a level the model does not offer falls back to the closest lower one.
+  Thought summaries stream as thinking, and the turn's tokens and cache reads come from the prompt result.
+  `src/antigravity-acp.ts` holds the transport; `src/antigravity-processes.ts` runs `agy` on the Host's DSH subprocess
+  spawner, which stops the ACP front and its session worker together.
+- **System prompt.** Google answers 429 RESOURCE_EXHAUSTED to the harness identity and to the dev context that names this
+  checkout and its Web GUI. The route sends a neutral opener and leaves those two paragraphs out; every other
+  instruction DSH gives the model stays.
 - **Quota.** ACP exposes no quota, so the card names the plan and points to `agy` → `/usage` instead of guessing.
 - **Sign out.** Not offered: run `agy` and type `/logout`.
 

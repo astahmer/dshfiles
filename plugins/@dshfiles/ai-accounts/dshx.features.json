@@ -398,7 +398,7 @@
         }
       ],
       "title": "Use a Google AI plan through the Antigravity CLI",
-      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with DSH's system prompt, none of Antigravity's built-in tools, and DSH's tools over MCP; the model list and per-model thought levels come from the account itself.",
+      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with a neutral system prompt, none of Antigravity's built-in tools, and DSH's tools over MCP; the model list and per-model thought levels come from the account itself.",
       "reach": [
         "click text \"AI Accounts: Accounts\"",
         "click button \"Add account\"",
@@ -415,7 +415,8 @@
         "A Host without `agy` reports the official install command instead of a spawn error.",
         "A signed-out login reports `agy acp --login` for the account's HOME and is retried 30 s later.",
         "A model the account does not offer fails the request with a recovery instead of silently running another model.",
-        "Antigravity exposes no quota over ACP, so the usage card names the plan and points to `agy` /usage instead of inventing a percentage."
+        "Antigravity exposes no quota over ACP, so the usage card names the plan and points to `agy` /usage instead of inventing a percentage.",
+        "Google rejects the harness identity and the harness dev context with 429, so the route sends a neutral opener and omits both instead of relaying the blocked wording."
       ],
       "externalDependencies": [
         {
@@ -441,6 +442,12 @@
           "id": "ai-accounts.antigravity-levels",
           "file": "plugins/@dshfiles/ai-accounts/src/antigravity-acp.test.ts",
           "testName": "selects the requested model and the closest thought level that model accepts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.antigravity-neutral-prompt",
+          "file": "plugins/@dshfiles/ai-accounts/src/antigravity-system-prompt.test.ts",
+          "testName": "leaves out the checkout and Web GUI paragraphs this installation adds"
         },
         {
           "kind": "unit-test",

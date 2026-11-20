@@ -20,11 +20,13 @@ import { createAntigravityProvider } from './antigravity-provider.js'
  */
 const FAKE_AGY = `#!/usr/bin/env node
 const { spawn } = require('node:child_process')
-const { writeFileSync } = require('node:fs')
+const { readFileSync, writeFileSync } = require('node:fs')
+const { join } = require('node:path')
 const { createInterface } = require('node:readline')
 const out = value => process.stdout.write(JSON.stringify(value) + '\\n')
 const update = (sessionId, value) => out({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: value } })
 if (process.env.FAKE_AGY_REPORT) writeFileSync(process.env.FAKE_AGY_REPORT, JSON.stringify({ argv: process.argv.slice(2), home: process.env.HOME, key: process.env.GEMINI_API_KEY ?? null }))
+if (process.env.FAKE_AGY_AGENT) writeFileSync(process.env.FAKE_AGY_AGENT, readFileSync(join(process.argv[process.argv.indexOf('--gemini-dir') + 1], 'config', 'agents', 'dsh.md'), 'utf8'))
 let model = 'gemini-fast'
 let level = 'high'
 const levels = () => (model === 'gemini-fast' ? ['low', 'medium', 'high'] : ['low', 'high', 'xhigh'])
@@ -243,6 +245,32 @@ it("runs agy with DSH's agent in a private Gemini folder, the account HOME and n
     )
     await cli.dispose()
     expect(existsSync(geminiDir)).toBe(false)
+  } finally {
+    vi.unstubAllEnvs()
+  }
+})
+
+it('sends a neutral system prompt, keeping every other instruction DSH gives the model', async () => {
+  const reportDirectory = mkdtempSync(join(tmpdir(), 'agy-acp-prompt-'))
+  directories.push(reportDirectory)
+  const agent = join(reportDirectory, 'agent.md')
+  vi.stubEnv('FAKE_AGY_AGENT', agent)
+  try {
+    const { cli, model } = setup()
+    const systemPrompt = [
+      'You are an AI agent powered by DeepSeek Harness.',
+      'The runtime context names the DeepSeek Harness implementation checkout. Never infer the working directory from the checkout path.',
+      'You are interacting with the user through the DeepSeek Harness Web GUI whose URL the runtime context names.',
+      'Prefer the repository check command.',
+    ].join('\n\n')
+    await finished(
+      cli.stream(model('gemini-fast'), normalizeContext({ systemPrompt, messages: [{ role: 'user', content: 'hi', timestamp: 1 }] }), {
+        sessionId: 'neutral',
+      }),
+    )
+    expect(readFileSync(agent, 'utf8')).toBe(
+      '---\nname: dsh\ndescription: DeepSeek Harness conversation agent.\ntools: []\nmainAgent: true\nsubagent: false\n---\nYou are an AI coding agent.\n\nPrefer the repository check command.\n',
+    )
   } finally {
     vi.unstubAllEnvs()
   }
