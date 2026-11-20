@@ -39,6 +39,10 @@ test('parses only a leading mention', () => {
   assert.deepEqual(Agents.mentionedHandles('find the docs @{dood-rapide}'), ['dood-rapide'])
   assert.deepEqual(Agents.mentionedHandles('@luna compare with @{nova} and @{luna}'), ['luna', 'nova'])
   assert.deepEqual(Agents.mentionedHandles('ping @nova, mail a@{b}'), [])
+  const agent = (handle: string, enabled: boolean, route: object | null) => ({ handle, enabled, route })
+  const roster = [agent('luna', true, null), agent('nova', true, { model: 'm' }), agent('off', false, { model: 'x' })]
+  assert.equal(Agents.firstRouted('@luna then @{nova} and @{off}', roster)?.handle, 'nova')
+  assert.equal(Agents.firstRouted('@{off} only', roster), undefined)
   assert.equal(Agents.parseMention('pony @reviewer look'), null)
   assert.equal(Agents.parseMention('email me at foo@reviewer'), null)
   assert.equal(Agents.parseMention('@Reviewer upper'), null)

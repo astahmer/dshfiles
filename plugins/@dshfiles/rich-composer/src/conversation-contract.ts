@@ -44,6 +44,8 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
     ): DraftInitializationResult
     /** Register a callback to run before sending a message (e.g., agent model selection). */
     registerBeforeSend?(hook: (ctx: { readonly sessionId: string; readonly isNewSession: boolean; readonly text: string }) => Promise<void>): () => void
+    /** Observe every change of any Session's draft text (e.g. an agent mention previewing its model). */
+    observeDrafts?(listener: (observation: { readonly sessionId: string; readonly isNewSession: boolean; readonly text: string }) => void): () => void
   }
 }
 

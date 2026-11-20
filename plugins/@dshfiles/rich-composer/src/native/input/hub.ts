@@ -17,7 +17,7 @@ import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { ModelSelectionProjection } from '@deepseek-ai/dsh-agent/types'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type {
-  BeforeSendContext, DraftAttachmentId, DraftAttachmentSerializationResult, DraftInitializationOptions, DraftInitializationResult, InputTriggerController,
+  BeforeSendContext, DraftAttachmentId, DraftObservation, DraftAttachmentSerializationResult, DraftInitializationOptions, DraftInitializationResult, InputTriggerController,
   SessionInputResolver, SessionInput, SubmitOutcome,
 } from '../contract/input.ts'
 import type { ComposerKeyboard } from '../contract/draft-editor.ts'
@@ -64,6 +64,7 @@ interface ConversationAttachmentFace {
 export class InputHub implements SessionInputResolver {
   private readonly shells = new WeakMap<SessionBinding, SessionInputShell>()
   private readonly beforeSendHooks = new Set<(ctx: BeforeSendContext) => Promise<void>>()
+  private readonly draftObservers = new Set<(observation: DraftObservation) => void>()
 
   /**
    * @param ctx - client root context (services resolved lazily per call — boot order stays free).
@@ -82,6 +83,16 @@ export class InputHub implements SessionInputResolver {
   registerBeforeSend = (hook: (ctx: BeforeSendContext) => Promise<void>): () => void => {
     this.beforeSendHooks.add(hook)
     return () => { this.beforeSendHooks.delete(hook) }
+  }
+
+  /**
+   * Observe every change of any Session's draft text.
+   * @param listener - called synchronously with the new text.
+   * @returns dispose function to unregister the listener.
+   */
+  observeDrafts = (listener: (observation: DraftObservation) => void): () => void => {
+    this.draftObservers.add(listener)
+    return () => { this.draftObservers.delete(listener) }
   }
 
   /**
@@ -173,6 +184,18 @@ export class InputHub implements SessionInputResolver {
       },
     })
     this.shells.set(binding, shell)
+    // The shell and its state store live exactly as long as the Session binding, so this subscription needs no disposer.
+    let observed = shell.state.getSnapshot().draft
+    shell.state.subscribe(() => {
+      const text = shell.state.getSnapshot().draft
+      if (text === observed) return
+      observed = text
+      if (this.draftObservers.size === 0) return
+      const observation: DraftObservation = { sessionId: session.sessionId, isNewSession: session.getSnapshot().blank, text }
+      for (const listener of [...this.draftObservers]) {
+        try { listener(observation) } catch (error) { console.warn('conversation.input: draft observer failed', error) }
+      }
+    })
     // The one teardown axis: listeners, shell, and map entries all ride the
     // scope fiber (nothing here outlives the scope).
     actx.effect(() => {

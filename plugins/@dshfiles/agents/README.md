@@ -28,7 +28,9 @@ where a thread starts.
   agent it names, before the message is sent; the Rich composer's `registerBeforeSend` hook runs it. A leading `@handle`
   or `@{handle}` counts, and so does any `@{handle}` later in the message (the spelling the `@` menu inserts; a plain
   `@word` mid-message stays a word). When the message names several agents that pin a route, a dialog asks which model the
-  thread uses; with no answer after 30 seconds the thread keeps its configured model. Only the model follows: the Agent
+  thread uses; with no answer after 30 seconds the thread keeps its configured model. While the message is typed, the model of the first mentioned agent that pins a route shows in the model picker after a
+  600 ms pause, and removing the mention puts the previous model back. A model picked by hand in the picker always wins:
+  the preview stops and neither the send-time choice nor the dialog changes it. Only the model follows: the Agent
   preset and instructions are fixed when the thread is created and are not applied, and the mention stays plain text the
   Agent reads. Later messages, an unknown or disabled handle and an agent without a route never change the model; a failed
   selection keeps the Host default and only logs a warning.

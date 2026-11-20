@@ -250,6 +250,15 @@ export interface BeforeSendContext {
   readonly text: string
 }
 
+/** One draft change, as an observer of the composer sees it. */
+export interface DraftObservation {
+  readonly sessionId: import('@deepseek-ai/dsh-session/types').SessionId
+  /** True while the Session is blank, so what is typed becomes its first message. */
+  readonly isNewSession: boolean
+  /** The draft text, reference chips in their sent spelling. */
+  readonly text: string
+}
+
 /** Session-addressed access to the per-session input facade. */
 export interface SessionInputResolver {
   /** Resolve the facade for one session-scope ctx. */
@@ -269,6 +278,12 @@ export interface SessionInputResolver {
    * @returns dispose function to unregister the hook.
    */
   registerBeforeSend?(hook: (ctx: BeforeSendContext) => Promise<void>): () => void
+  /**
+   * Observe every change of any Session's draft text, for plugins that react to what is typed (e.g. an agent mention
+   * previewing its model). The listener runs synchronously; debounce inside it.
+   * @returns dispose function to unregister the listener.
+   */
+  observeDrafts?(listener: (observation: DraftObservation) => void): () => void
 }
 
 /** Initial text for a target Session; attachments remain under their existing owner. */

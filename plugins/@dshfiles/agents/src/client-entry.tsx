@@ -13,6 +13,7 @@ import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
+import { manualModelChoices } from '@dshfiles/plugin-ui/lib/manual-model-choice'
 import { Agents } from './agent.js'
 import { AgentFocusModel } from './agent-focus.js'
 import { AgentInlineReference } from './agent-inline-reference.js'
@@ -42,6 +43,9 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
 /** How long the choice between several mentioned agents waits before the thread keeps its configured model. */
 const AGENT_CHOICE_TIMEOUT_MS = 30_000
 
+/** How long the composer text must stay still before a mentioned agent's model is shown in the model picker. */
+const AGENT_PREVIEW_DEBOUNCE_MS = 600
+
 export default defineClient({
   name: '@dshfiles/agents',
   inject: ['slots', 'layout', 'sessions', 'remote', 'remote.session', 'uiWorkspace', 'workspaces', 'uiConversation'],
@@ -57,10 +61,53 @@ export default defineClient({
     type ConversationFace = { readonly input?: { registerBeforeSend?: (hook: (ctx: { readonly sessionId: string; readonly isNewSession: boolean; readonly text: string }) => Promise<void>) => () => void } }
     const conversation = ctx.get('conversation') as ConversationFace | undefined
     const beforeSend = conversation?.input?.registerBeforeSend
+    // While a first message is typed, the model of the first mentioned agent shows in the model picker after a pause,
+    // unless the person picked a model by hand; removing the mention puts the previous model back.
+    type SelectionRoute = { readonly provider: string; readonly model: string; readonly reasoningEffort?: string }
+    type DirectoryFace = { readonly store: { getSnapshot(): { readonly current: SelectionRoute | null } }; select(selection: SelectionRoute): Promise<unknown> }
+    const directories = (ctx as unknown as { modelDirectories?: { directoryFor(sessionId: SessionId): DirectoryFace } }).modelDirectories
+    const previews = new Map<string, { timer?: ReturnType<typeof setTimeout>; applied?: string; baseline?: SelectionRoute | null }>()
+    const observeDrafts = (conversation?.input as { observeDrafts?: (listener: (observation: { readonly sessionId: string; readonly isNewSession: boolean; readonly text: string }) => void) => () => void } | undefined)?.observeDrafts
+    if (observeDrafts !== undefined && directories !== undefined) {
+      const preview = async (sessionId: string, text: string): Promise<void> => {
+        const state = previews.get(sessionId)
+        if (state === undefined || manualModelChoices().has(sessionId)) return
+        const directory = directories.directoryFor(sessionId as SessionId)
+        const { agents } = await api.list()
+        if (manualModelChoices().has(sessionId)) return
+        const agent = Agents.firstRouted(text, agents)
+        if (agent === undefined || agent.route === null) {
+          if (state.applied !== undefined && state.baseline != null) await directory.select(state.baseline)
+          delete state.applied
+          return
+        }
+        const route = agent.route
+        const key = `${route.provider}/${route.model}/${route.reasoningEffort ?? ''}`
+        if (state.applied === key) return
+        if (state.applied === undefined) state.baseline = directory.store.getSnapshot().current
+        state.applied = key
+        await directory.select(route.reasoningEffort === undefined ? { provider: route.provider, model: route.model } : { provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort })
+      }
+      ctx.effect(() => observeDrafts(observation => {
+        const state = previews.get(observation.sessionId) ?? {}
+        previews.set(observation.sessionId, state)
+        if (state.timer !== undefined) clearTimeout(state.timer)
+        if (!observation.isNewSession || manualModelChoices().has(observation.sessionId)) return
+        state.timer = setTimeout(() => {
+          preview(observation.sessionId, observation.text).catch((cause: unknown) => console.warn('agents: model preview failed', cause))
+        }, AGENT_PREVIEW_DEBOUNCE_MS)
+      }), 'agents: preview the mentioned agent model')
+    }
+
     if (beforeSend !== undefined) {
       ctx.effect(() => beforeSend(async (sendCtx) => {
+        const pending = previews.get(sendCtx.sessionId)
+        if (pending?.timer !== undefined) clearTimeout(pending.timer)
+        previews.delete(sendCtx.sessionId)
         // Only process first message of a new thread
         if (!sendCtx.isNewSession) return
+        // A model picked by hand in the picker stays, whatever agents the message names.
+        if (manualModelChoices().has(sendCtx.sessionId)) return
         const handles = Agents.mentionedHandles(sendCtx.text)
         if (handles.length === 0) return
         const { agents } = await api.list()

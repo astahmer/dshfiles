@@ -160,6 +160,15 @@ export class Agents {
     return found
   }
 
+  /** The first mentioned agent that is enabled and pins a route: the one whose model a message asks for. */
+  static firstRouted<T extends { readonly handle: string; readonly enabled: boolean; readonly route: unknown }>(text: string, agents: readonly T[]): T | undefined {
+    for (const handle of Agents.mentionedHandles(text)) {
+      const agent = agents.find(candidate => candidate.handle === handle && candidate.enabled && candidate.route !== null)
+      if (agent !== undefined) return agent
+    }
+    return undefined
+  }
+
   /** The `@handle` a message addresses, for the `@` menu to mark a row as already used. */
   static mentionedHandle(text: string): string | null {
     return Agents.parseMention(text)?.handle ?? null
