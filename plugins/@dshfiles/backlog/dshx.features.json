@@ -1963,7 +1963,7 @@
     {
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
-      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; copy the item ID, its clickable `b:<id>` reference or its Markdown from the Copy submenu; change status, kind, attention or project; pin or unpin; run triage when Jev or a triage model is configured; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named and linked. The Host adds every full item description and current reply in order, with every item and reply attachment; missing, unreadable or oversized context fails rather than silently omitting it, and upload or prompt failure reports the created Session id. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the banner says the work is under way, the thread opens only when the startThreadOpensCreated setting asks for it, or when the dialog's open box overrides it for one thread; an @agent comment follows the same setting, and the report carries an Open action otherwise. The Host verb behind it is the tool `backlog_start_thread`, which does not navigate the calling thread.",
+      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; copy the item ID, its clickable `b:<id>` reference or its Markdown from the Copy submenu; change status, kind, attention or project; pin or unpin; run triage when Jev or a triage model is configured; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project unless the Workspace field says otherwise, named and linked. The Host adds every full item description and current reply in order, with every item and reply attachment; missing, unreadable or oversized context fails rather than silently omitting it, and upload or prompt failure reports the created Session id. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the banner says the work is under way, the thread opens only when the startThreadOpensCreated setting asks for it, or when the dialog's open box overrides it for one thread; an @agent comment follows the same setting, and the report carries an Open action otherwise. The Host verb behind it is the tool `backlog_start_thread`, which does not navigate the calling thread.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2129,6 +2129,104 @@
           "id": "backlog.start-thread-own-workspace-folder",
           "file": "plugins/@dshfiles/backlog/src/start-thread-workspace.test.ts",
           "testName": "keeps a bare folder instead of provisioning a workspace for it"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "start-thread-workspace-choice",
+      "title": "Choose where a thread from an item works",
+      "summary": "For a project that is a jj or git repository, the start-thread dialog offers the New thread row choices in a Workspace field: a new workspace from the main branch (the default), the project checkout itself, or a new workspace from any local bookmark (git: branch) or fetched remote bookmark, which jj fetches again first. With one thread per item and no project picked, only the workspace-or-checkout choice carries over. backlog_start_thread takes the same choice as isolate and base; a base with isolate false, or without a project, is refused with what to change.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "click button \"Feed\"",
+        "fill textbox \"Capture\" \"Pick where the thread works\"",
+        "press Enter",
+        "expect text \"Pick where the thread works\"",
+        "rightclick text \"Pick where the thread works\"",
+        "click menuitem \"Start thread…\"",
+        "expect dialog \"Start thread\"",
+        "click combobox \"Thread project\"",
+        "click option \"sample*\"",
+        "click combobox \"Thread workspace\"",
+        "expect option \"New workspace*\"",
+        "expect option \"Project checkout*\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "click button \"Feed\"",
+        "fill textbox \"Capture\" \"Pick where the thread works\"",
+        "press Enter",
+        "expect text \"Pick where the thread works\"",
+        "rightclick text \"Pick where the thread works\"",
+        "click menuitem \"Start thread…\"",
+        "expect dialog \"Start thread\"",
+        "click combobox \"Thread project\"",
+        "click option \"sample*\"",
+        "click combobox \"Thread workspace\"",
+        "expect option \"New workspace*\"",
+        "expect option \"Project checkout*\""
+      ],
+      "surfaces": ["client", "host", "tool"],
+      "surface": "rowAction",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › Start thread › Workspace",
+      "configuration": [],
+      "states": ["own-workspace-main", "own-workspace-bookmark", "own-workspace-remote-bookmark", "project-checkout", "not-a-repository"],
+      "failureModes": [
+        "Outside a jj or git repository, or without jj-integration, the field is hidden and the thread gets the Host default: its own workspace when a provider claims the project.",
+        "A starting bookmark with isolate false, or without a project, is refused before anything is created, naming what to change."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/jj-integration",
+          "boundary": "Reads the project destination (bookmarks, remote bookmarks, main branch) through the jj-integration API; the version-control provider creates the workspace.",
+          "deterministicFake": "src/thread-start.test.ts fakes the version-control provider and the Host sessions."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "backlog.start-thread-workspace-browser",
+          "reason": "No Gherkin scenario yet: the reach walks the dialog to the open Workspace picker in a scratch DSH; the Host tests drive each choice through provisioning."
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.start-thread-workspace-base",
+          "file": "plugins/@dshfiles/backlog/src/thread-start.test.ts",
+          "testName": "cuts a new workspace from the bookmark the caller chose, a remote one included"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.start-thread-workspace-checkout",
+          "file": "plugins/@dshfiles/backlog/src/thread-start.test.ts",
+          "testName": "runs in the project checkout without creating a workspace when isolation is off"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.start-thread-workspace-refusal",
+          "file": "plugins/@dshfiles/backlog/src/thread-start.test.ts",
+          "testName": "refuses a starting bookmark for a thread kept in the checkout, before creating anything"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.start-thread-workspace-options",
+          "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
+          "testName": "offers the New thread row choices: a new workspace or the checkout, then local and remote bookmarks"
         }
       ],
       "telemetry": [

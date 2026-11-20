@@ -21,7 +21,7 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 import { Schema } from 'effect'
 import { useState } from 'react'
 import { AutomationDialog, type ProjectChoice } from './automation-dialog.js'
-import { AutomationFormModel, browserTimeZone, type AutomationForm } from './automation-form.js'
+import { AutomationFormModel, browserTimeZone, type AutomationForm, type CheckoutDestination } from './automation-form.js'
 import { automationsApi, automationViewSchema, runRecordSchema, type AutomationView, type RunRecord } from './automations-api.js'
 
 const keys = { all: ['project-automations'] as const, list: ['project-automations', 'list'] as const, runs: ['project-automations', 'runs'] as const }
@@ -155,6 +155,8 @@ export const AutomationsPanel = (props: {
   readonly projects: () => readonly ProjectChoice[]
   readonly threads: () => readonly { readonly sessionId: string; readonly title: string }[]
   readonly openThread: (sessionId: string) => void
+  /** The project's repository for the dialog's workspace picker; null outside a jj or git repository. */
+  readonly loadDestination?: ((projectId: string) => Promise<CheckoutDestination | null>) | undefined
 }): JSX.Element => {
   const api = useApi(automationsApi)
   const queryClient = useQueryClient()
@@ -272,6 +274,7 @@ export const AutomationsPanel = (props: {
             projects={projects}
             pending={save.isPending}
             threads={props.threads()}
+            loadDestination={props.loadDestination}
             error={save.error === null ? null : errorMessage(save.error, HOST_DOWN)}
             onOpenChange={open => (open ? undefined : setDialog(null))}
             onSubmit={form => save.mutate({ id: dialog.id, form })}

@@ -4,8 +4,9 @@ import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/compone
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
+import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useId } from 'react'
-import { automationFormProblem, type AutomationForm } from './automation-form.js'
+import { automationFormProblem, AutomationFormModel, type AutomationForm, type CheckoutDestination } from './automation-form.js'
 
 export interface ProjectChoice {
   readonly projectId: string
@@ -23,6 +24,65 @@ const WEEKDAYS = [
   ['7', 'Sun'],
 ] as const
 
+type LoadDestination = (projectId: string) => Promise<CheckoutDestination | null>
+
+/**
+ * Where each run's new thread edits files, as the New thread row offers it: the project checkout, or a new workspace
+ * of its own from the main branch or any local or fetched remote bookmark. Hidden outside a jj or git repository.
+ */
+const WorkspacePicker = (props: {
+  readonly projectId: string
+  readonly loadDestination: LoadDestination
+  readonly value: string
+  readonly onValueChange: (value: string) => void
+}): JSX.Element | null => {
+  const labelId = useId()
+  const query = useQuery({
+    queryKey: ['dshfiles-project-automations', 'destination', props.projectId],
+    enabled: props.projectId !== '',
+    queryFn: () => props.loadDestination(props.projectId),
+    staleTime: 30_000,
+    retry: false,
+  })
+  const destination = query.data ?? null
+  if (props.projectId === '' || (destination === null && !query.isPending)) return null
+  const options = destination === null ? [] : AutomationFormModel.checkoutOptions(destination, props.value)
+  const selected = options.find(option => option.value === props.value)
+  const base = props.value.startsWith('own:') ? props.value.slice('own:'.length) : undefined
+  return (
+    <Field>
+      <FieldLabel id={labelId}>Workspace</FieldLabel>
+      <Combobox
+        label="Thread workspace"
+        matchTriggerWidth
+        disabled={destination === null}
+        value={props.value}
+        placeholder={destination === null ? 'Reading the repository…' : 'Choose a workspace'}
+        emptyLabel="No bookmark matches."
+        searchAbove={0}
+        searchPlaceholder="Search bookmarks, remote ones included…"
+        options={options.map(option => ({
+          value: option.value,
+          label: option.label,
+          description: option.description,
+          group: option.group,
+          keywords: option.remote ? ['remote', option.group] : [option.group],
+        }))}
+        onValueChange={props.onValueChange}
+      />
+      {selected === undefined ? null : (
+        <FieldDescription>
+          {props.value === 'in-place'
+            ? 'Each run’s thread edits the project checkout itself.'
+            : base === undefined
+              ? `Each run’s thread gets a new workspace of its own from ${destination?.mainBookmark ?? 'the project’s main branch'}.`
+              : `Each run’s thread gets a new workspace of its own from ${base}${selected.remote ? ', fetched first' : ''}.`}
+        </FieldDescription>
+      )}
+    </Field>
+  )
+}
+
 /**
  * Create or edit one automation. The Host validates the schedule (time zone, cron, DST) and the template again and
  * answers with what to fix; that message is shown under the form.
@@ -33,6 +93,8 @@ export const AutomationDialog = (props: {
   readonly initial: AutomationForm
   readonly projects: readonly ProjectChoice[]
   readonly threads: readonly { readonly sessionId: string; readonly title: string }[]
+  /** The project's repository for the workspace picker; null outside one. Without it the picker is not shown. */
+  readonly loadDestination?: LoadDestination | undefined
   readonly pending: boolean
   readonly error: string | null
   readonly onOpenChange: (open: boolean) => void
@@ -40,6 +102,7 @@ export const AutomationDialog = (props: {
 }): JSX.Element => {
   const projectLabel = useId()
   const weekdaysLabel = useId()
+  const loadDestination = props.loadDestination
   const form = useAppForm({
     defaultValues: props.initial,
     validationLogic: revalidateLogic(),
@@ -78,13 +141,17 @@ export const AutomationDialog = (props: {
                     description: project.path,
                     keywords: [project.path],
                   }))}
-                  onValueChange={value => field.handleChange(value)}
+                  onValueChange={value => {
+                    field.handleChange(value)
+                    // Another project has other bookmarks: run in its checkout until a workspace is chosen again.
+                    form.setFieldValue('checkout', 'in-place')
+                  }}
                 />
               </Field>
             )}
           </form.Field>
-          <form.Subscribe selector={state => state.values.destinationKind}>
-            {destinationKind => (
+          <form.Subscribe selector={state => [state.values.destinationKind, state.values.projectId] as const}>
+            {([destinationKind, projectId]) => (
               <>
                 <form.AppField name="destinationKind">
                   {field => (
@@ -115,7 +182,18 @@ export const AutomationDialog = (props: {
                       </Field>
                     )}
                   </form.Field>
-                ) : null}
+                ) : loadDestination === undefined ? null : (
+                  <form.Field name="checkout">
+                    {field => (
+                      <WorkspacePicker
+                        projectId={projectId}
+                        loadDestination={loadDestination}
+                        value={field.state.value}
+                        onValueChange={value => field.handleChange(value)}
+                      />
+                    )}
+                  </form.Field>
+                )}
               </>
             )}
           </form.Subscribe>

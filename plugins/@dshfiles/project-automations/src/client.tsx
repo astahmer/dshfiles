@@ -3,10 +3,12 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { DestinationSections } from '@dshfiles/thread-sidebar/destinations'
+import type { CheckoutDestination } from './automation-form.js'
 import { AutomationsPanel } from './automations-panel.js'
 
 const PANEL_ID = 'project-automations'
@@ -48,6 +50,23 @@ export default defineClient({
         return [{ sessionId: session.id, title: session.displayTitle }]
       })
     }
+    const jj = createApiClient(ctx, jjIntegrationApi)
+    // The same answer the New thread row reads. A Host without jj-integration, or a folder outside a repository, hides
+    // the workspace picker and leaves each run in the project checkout.
+    const loadDestination = async (projectId: string): Promise<CheckoutDestination | null> => {
+      try {
+        const destination = await jj.destination({ workspaceId: projectId })
+        if (destination.vcs === 'none') return null
+        return {
+          vcs: destination.vcs,
+          mainBookmark: destination.targetBookmark ?? null,
+          bookmarks: destination.bookmarks,
+          remoteBookmarks: destination.remoteBookmarks ?? [],
+        }
+      } catch {
+        return null
+      }
+    }
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => 'Automations' }, PanelGlyph),
     )
@@ -56,7 +75,7 @@ export default defineClient({
         { name: 'main', key: PANEL_ID },
         decorate(() => (
           <PluginQueryProvider>
-            <AutomationsPanel openThread={openThread} projects={projects} threads={threads} />
+            <AutomationsPanel openThread={openThread} projects={projects} threads={threads} loadDestination={loadDestination} />
           </PluginQueryProvider>
         )),
       ),

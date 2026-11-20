@@ -13,6 +13,7 @@ import { AttentionSubjectOpeners } from '@dshfiles/activity-timeline/attention-o
 import type { ChatTurnActionExtras } from '@dshfiles/chat/chat-focus'
 import { InlineReferences } from '@dshfiles/chat/inline-references'
 import { RevisionSections, type RevisionSectionTarget } from '@dshfiles/jj-integration/revision-sections'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { createApiClient, defineClient, LinkHandler } from '@dshfiles/dshx/client'
 import type {} from '@dshfiles/input-trigger/client'
 import { EntityKinds, type EntityPreviewProps } from '@dshfiles/input-trigger/entity-registry'
@@ -40,7 +41,7 @@ import { MessageQuote } from './message-quote.js'
 import { QuoteReplyButton } from './quote-reply-button.js'
 import { BacklogReferencePreview } from './backlog-reference-preview.jsx'
 import { BacklogNotices, BacklogNoticeToast } from './notices.js'
-import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartThreadOutcome, type StartThreadRequest } from './start-thread.js'
+import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartThreadDestination, type StartThreadOutcome, type StartThreadRequest } from './start-thread.js'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-backlog-panel' satisfies typeof BACKLOG_PANEL_ID
@@ -80,6 +81,7 @@ export default defineClient({
       return () => window.removeEventListener('dshfiles:backlog-capture', openCapture)
     }, 'backlog: command palette capture')
     const agents = createApiClient(ctx, agentsApi)
+    const jj = createApiClient(ctx, jjIntegrationApi)
     const startOne = async (request: StartThreadRequest, report: boolean): Promise<StartThreadOutcome> => {
       const failed = (reason: string): StartThreadOutcome => {
         if (report) BacklogNotices.show({ text: reason, kind: 'failure', sessionId: null })
@@ -90,6 +92,8 @@ export default defineClient({
         ids: request.items.map(item => item.id),
         workspaceId: request.target.kind === 'project' ? request.target.projectId : undefined,
         cwd: request.target.kind === 'cwd' ? request.target.path : undefined,
+        isolate: request.checkout === undefined ? undefined : request.checkout.kind === 'own',
+        base: request.checkout?.kind === 'own' && request.target.kind === 'project' ? request.checkout.base : undefined,
         agent: request.agent?.handle,
         provider: request.provider ?? undefined,
         model: request.model ?? undefined,
@@ -122,6 +126,22 @@ export default defineClient({
         const result = await ctx.remote.session.modelCatalog()
         if (!result.ok) throw new Error(result.error.message)
         return StartThreadForm.catalog(result.value)
+      },
+      loadDestination: async (projectId: string): Promise<StartThreadDestination | null> => {
+        // The same answer the New thread row reads; a Host without jj-integration, or a folder outside a repository,
+        // leaves the thread to the Host default (its own workspace when a provider claims the project).
+        try {
+          const destination = await jj.destination({ workspaceId: projectId })
+          if (destination.vcs === 'none') return null
+          return {
+            vcs: destination.vcs,
+            mainBookmark: destination.targetBookmark ?? null,
+            bookmarks: destination.bookmarks,
+            remoteBookmarks: destination.remoteBookmarks ?? [],
+          }
+        } catch {
+          return null
+        }
       },
       listAgents: async () => {
         try {

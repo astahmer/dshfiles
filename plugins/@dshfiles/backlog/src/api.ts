@@ -1053,6 +1053,16 @@ export const backlogApi = defineApi({
         cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars))
           .pipe(Schema.optional)
           .annotate({ description: 'Bare folder to run the thread in when it is not a registered project. Exclusive with `workspaceId`.' }),
+        isolate: Schema.Boolean.pipe(Schema.optional).annotate({
+          description:
+            'Whether the thread gets its own new jj/git workspace cut from the project (default true) or runs in the project checkout itself (false). Applies to a project target only.',
+        }),
+        base: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
+          .pipe(Schema.optional)
+          .annotate({
+            description:
+              "Bookmark (git: branch) the new workspace starts from, such as `feature` or a remote one like `feature@origin` (git `origin/feature`), which is fetched first; the project's main branch by default. Requires a project target and is refused with `isolate: false`.",
+          }),
         agent: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))
           .pipe(Schema.optional)
           .annotate({ description: 'Agent handle (no `@`) whose preset, model route and instructions start the thread.' }),
@@ -1071,7 +1081,7 @@ export const backlogApi = defineApi({
         }),
       }),
       output: Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)), linked: Schema.Array(idSchema), missing: Schema.Array(itemKeySchema) }),
-      description: `Start one thread for these items in its own jj workspace of their project, named after the first item, given every item's description, replies and attachments, and linked to every item. Any missing item, file or upload rejects the start. ${writeNote}`,
+      description: `Start one thread for these items in its own jj workspace of their project (from \`base\` when given; in the project checkout with \`isolate: false\`), named after the first item, given every item's description, replies and attachments, and linked to every item. Any missing item, file or upload rejects the start. ${writeNote}`,
       tool: { name: 'backlog_start_thread', readOnly: false },
     }),
     syncStatus: method({

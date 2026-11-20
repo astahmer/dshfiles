@@ -9,6 +9,8 @@ import {
   StartThreadForm,
   type StartThreadAgentChoice,
   type StartThreadCatalog,
+  type StartThreadCheckout,
+  type StartThreadDestination,
   type StartThreadItem,
   type StartThreadProject,
   type StartThreadRequest,
@@ -30,6 +32,11 @@ export const StartThreadDialog = (props: {
   readonly loadCatalog: () => Promise<StartThreadCatalog>
   /** Every enabled agent, so the thread can start as one with its preset, route and instructions. */
   readonly listAgents: () => Promise<readonly StartThreadAgentChoice[]>
+  /**
+   * The project's repository as the New thread row sees it, so the thread can get a workspace of its own from any
+   * bookmark (remote ones included) or run in the checkout; null outside a repository or without jj-integration.
+   */
+  readonly loadDestination?: ((projectId: string) => Promise<StartThreadDestination | null>) | undefined
   readonly openByDefault: boolean
   readonly start: (request: StartThreadRequest) => void
   readonly close: () => void
@@ -37,6 +44,7 @@ export const StartThreadDialog = (props: {
   const targets = StartThreadForm.targets(props.items, props.projects)
   const [targetValue, setTargetValue] = useState(() => StartThreadForm.defaultTargetValue(props.items, props.projects))
   const [targetWasChosen, setTargetWasChosen] = useState(false)
+  const [checkoutValue, setCheckoutValue] = useState(() => StartThreadForm.checkoutValue({ kind: 'own', base: undefined }))
   const [agentHandle, setAgentHandle] = useState('')
   const [modelKey, setModelKey] = useState<string | null>(null)
   const [effort, setEffort] = useState<string | null>(null)
@@ -53,6 +61,19 @@ export const StartThreadDialog = (props: {
   const selected = rows.find(row => row.key === selectedKey)
   const effortValue = effort ?? (selected === undefined ? undefined : StartThreadForm.defaultEffort(selected))
   const target = targets.find(option => option.value === targetValue)?.target ?? { kind: 'default' }
+  const destinationProjectId = target.kind === 'project' ? target.projectId : null
+  const loadDestination = props.loadDestination
+  const destinationQuery = useQuery({
+    queryKey: ['dshfiles-backlog', 'start-thread', 'destination', destinationProjectId ?? ''],
+    enabled: destinationProjectId !== null && loadDestination !== undefined,
+    queryFn: () => (destinationProjectId === null || loadDestination === undefined ? Promise.resolve(null) : loadDestination(destinationProjectId)),
+    staleTime: 30_000,
+    retry: false,
+  })
+  const destination = destinationProjectId === null ? null : (destinationQuery.data ?? null)
+  const checkoutOptions = destination === null ? [] : StartThreadForm.checkoutOptions(destination)
+  const checkoutOption = checkoutOptions.find(option => option.value === checkoutValue) ?? checkoutOptions[0]
+  const checkout: StartThreadCheckout = StartThreadForm.checkoutOf(checkoutOption?.value ?? 'own')
   const projectIndex = (projectId: string): number => props.projects.findIndex(project => project.id === projectId)
   const projectOptions: readonly ComboboxOption[] = targets.map(option => {
     const optionTarget = option.target
@@ -97,8 +118,20 @@ export const StartThreadDialog = (props: {
     const picked = selection()
     if (picked === null) return
     props.close()
-    const startTarget = mode === 'per-item' && !targetWasChosen ? { kind: 'default' as const } : target
-    props.start({ items: props.items, mode, target: startTarget, ...picked, message: mode === 'per-item' ? instructions : picked.message, open })
+    const eachItemOwnProject = mode === 'per-item' && !targetWasChosen
+    const startTarget = eachItemOwnProject ? { kind: 'default' as const } : target
+    // Each item's own project has its own bookmarks, so only the checkout-or-workspace choice carries over to them.
+    const startCheckout: StartThreadCheckout | undefined =
+      destination === null ? undefined : eachItemOwnProject ? (checkout.kind === 'in-place' ? checkout : undefined) : checkout
+    const request: StartThreadRequest = {
+      items: props.items,
+      mode,
+      target: startTarget,
+      ...picked,
+      message: mode === 'per-item' ? instructions : picked.message,
+      open,
+    }
+    props.start(startCheckout === undefined ? request : { ...request, checkout: startCheckout })
   }
 
   return (
@@ -135,6 +168,8 @@ export const StartThreadDialog = (props: {
               onValueChange={value => {
                 setTargetWasChosen(true)
                 setTargetValue(value)
+                // Another project has other bookmarks: start again from its main branch.
+                setCheckoutValue(StartThreadForm.checkoutValue({ kind: 'own', base: undefined }))
               }}
               options={projectOptions}
               renderOption={option => {
@@ -154,6 +189,38 @@ export const StartThreadDialog = (props: {
               value={targetValue}
             />
           </label>
+          {destinationProjectId === null || props.loadDestination === undefined || (destination === null && !destinationQuery.isPending) ? null : (
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Workspace</span>
+              <Combobox
+                disabled={destination === null}
+                emptyLabel="No bookmark matches."
+                label="Thread workspace"
+                matchTriggerWidth
+                onValueChange={setCheckoutValue}
+                options={checkoutOptions.map(option => ({
+                  value: option.value,
+                  label: option.label,
+                  description: option.description,
+                  group: option.group,
+                  keywords: option.remote ? ['remote', option.group] : [option.group],
+                }))}
+                placeholder={destination === null ? 'Reading the repository…' : 'Choose a workspace'}
+                searchAbove={0}
+                searchPlaceholder="Search bookmarks, remote ones included…"
+                value={checkoutOption?.value ?? ''}
+              />
+              {checkoutOption === undefined ? null : (
+                <span className="dshx:text-2xs dshx:text-muted-foreground">
+                  {checkout.kind === 'in-place'
+                    ? 'The thread edits the project checkout itself, like a New thread without its own workspace.'
+                    : checkout.base === undefined
+                      ? `The thread gets its own new workspace from ${destination?.mainBookmark ?? "the project's main branch"}.`
+                      : `The thread gets its own new workspace from ${checkout.base}${checkoutOption.remote ? ', fetched first' : ''}.`}
+                </span>
+              )}
+            </label>
+          )}
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Agent</span>
             <Combobox
