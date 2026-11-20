@@ -122,6 +122,8 @@ export function createSidebarRightController(
   resident: ObservableSnapshot<ResidentSessions>
   /** How many threads besides the on-screen one stay resident; 0 keeps every one. */
   setResidentThreads: (count: number) => void
+  /** Whether to restore sidebar expanded state when switching threads. */
+  setRestoreSidebarState: (enabled: boolean) => void
   measure: (sessionId: SessionId, canSplitPane: RoomRule) => void
 } {
   const adopted = new Map<SessionId, Adoption>()
@@ -140,6 +142,7 @@ export function createSidebarRightController(
   }
   const recentlyShown: SessionId[] = []
   let residentThreads = DEFAULT_RESIDENT_THREADS
+  let restoreSidebarState = true
   const resident = createSnapshotStore<ResidentSessions>({ all: false, ids: new Set() })
   const settleResident = (): void => {
     resident.set(residentThreads === 0 ? { all: true } : { all: false, ids: new Set(recentlyShown.slice(-(residentThreads + 1))) })
@@ -154,6 +157,18 @@ export function createSidebarRightController(
       recentlyShown.push(sessionId)
       if (recentlyShown.length > MAX_RESIDENT_THREADS + 1) recentlyShown.shift()
       settleResident()
+      // Restore sidebar expanded state from the session's persisted layout in Workbench mode
+      if (restoreSidebarState && host.workbench?.() === true) {
+        const dock = host.dock?.()
+        const surface = adopted.get(sessionId)?.store.getSnapshot().bySession[sessionId]
+        if (dock !== undefined && surface !== undefined) {
+          const sessionExpanded = surface.layout.expanded
+          if (dock.isOpen() !== sessionExpanded) {
+            if (sessionExpanded) dock.open()
+            else dock.close()
+          }
+        }
+      }
     }
     layoutChanged()
   }
@@ -162,6 +177,9 @@ export function createSidebarRightController(
     if (next === residentThreads) return
     residentThreads = next
     settleResident()
+  }
+  const setRestoreSidebarState = (enabled: boolean): void => {
+    restoreSidebarState = enabled
   }
   const flashes = new Map<SessionId, SnapshotStore<SidebarRightFlash | undefined>>()
   const controller = new SidebarRightController(tabs, pin, host, { adopted, rooms, onScreen, openTabs: inventory.source, layoutChanges, show, flashes })
@@ -175,6 +193,7 @@ export function createSidebarRightController(
     show,
     resident,
     setResidentThreads,
+    setRestoreSidebarState,
     measure: (sessionId, canSplitPane) => {
       rooms.set(sessionId, canSplitPane)
     },
