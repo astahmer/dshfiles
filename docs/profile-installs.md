@@ -57,7 +57,13 @@ profile merely to make it match source; see
   changed them since, and any `@dshfiles/*` row the seed lacks; every other
   entry (a registry plugin added with `dsh plugin add`) stays;
 - restores the region between `# BEGIN NIX-MANAGED DSH PLUGINS` and
-  `# END NIX-MANAGED DSH PLUGINS` in `cordis.patch.yml`; the rest stays local;
+  `# END NIX-MANAGED DSH PLUGINS` in `cordis.patch.yml`; the rest stays local.
+  DSH's Settings append a row at the end of the file, which lands inside the
+  region when the region ends it: a region row whose id neither this seed nor
+  the previous one declares (recorded as `regionRowIds` in the sync state) is
+  moved below the region and logged instead of being dropped. If the profile
+  already declares that id outside the region, the stray copy is kept below it
+  as a comment and a warning names it;
 - runs `pnpm install --prefer-offline` (bounded to 180 s) only when the
   manifest differs from the last one it installed or `node_modules` is missing.
   An unchanged profile costs a few milliseconds.
