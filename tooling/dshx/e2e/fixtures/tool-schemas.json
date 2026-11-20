@@ -92,12 +92,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 680,
-  "apiToolBindings": 477,
-  "apiToolNameCount": 477,
-  "apiToolSchemas": 476,
+  "apiMethods": 682,
+  "apiToolBindings": 479,
+  "apiToolNameCount": 479,
+  "apiToolSchemas": 478,
   "definedTools": 24,
-  "tools": 500,
+  "tools": 502,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -5151,6 +5151,25 @@
       }
     },
     {
+      "name": "jj_bookmark_conflict",
+      "description": "The revisions a bookmark of the project holding a path points at while it is conflicted (default: the project’s main branch), each with its full commit id and first description line; empty targets when it points at one revision. A conflicted main branch is why a thread workspace was refused. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "bookmark": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "jj_cancel_workspace_setup",
       "description": "Cancel one queued or running setup action of a thread workspace. The durable task reports cancelled only after its process group exits, and effects applied before cancellation are not undone. Call only when the user asked to stop it.",
       "parameters": {
@@ -5892,6 +5911,37 @@
         },
         "required": [
           "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jj_resolve_bookmark_conflict",
+      "description": "Point a conflicted bookmark of the project holding a path at one of the revisions it holds (a full commit id from jj_bookmark_conflict), as the refused thread workspace’s Choose revision dialog does; the other revisions stay in the repository but leave the bookmark. Refuses a bookmark that is no longer conflicted and any revision it does not hold. Requires confirm: true. Call only when the user chose which revision to keep; never pick one yourself. The way back to the conflicted bookmark is `jj undo` in the project; `jj bookmark set <name> -r <commit>` keeps another of its revisions instead.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "bookmark": {
+            "type": "string"
+          },
+          "commitId": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "bookmark",
+          "commitId",
+          "confirm"
         ],
         "additionalProperties": false
       }

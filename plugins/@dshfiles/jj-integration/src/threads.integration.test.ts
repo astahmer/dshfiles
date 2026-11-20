@@ -378,6 +378,53 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       expect(threadFolders()).toEqual([])
     })
 
+    it('lists the revisions a conflicted bookmark holds, and none for a resolved one', async () => {
+      conflictBookmark(repo, 'forked')
+      const conflict = await threads.bookmarkConflict({ repoRoot: repo, bookmark: 'forked' })
+      expect(conflict.targets.map(target => target.commitId).sort()).toEqual(
+        [commitIdAt(repo, 'main'), commitIdAt(repo, 'description(exact:"right\n")')].sort(),
+      )
+      expect(conflict.targets.map(target => target.summary).sort()).toEqual(['base', 'right'].sort())
+      expect((await threads.bookmarkConflict({ repoRoot: repo, bookmark: 'main' })).targets).toEqual([])
+    })
+
+    it('points a conflicted bookmark at the chosen revision, then a thread starts from it', async () => {
+      conflictBookmark(repo, 'forked')
+      const chosen = commitIdAt(repo, 'description(exact:"right\n")')
+      await expect(threads.resolveBookmarkConflict({ repoRoot: repo, bookmark: 'forked', commitId: chosen })).resolves.toEqual({
+        bookmark: 'forked',
+        commitId: chosen,
+      })
+      expect(commitIdAt(repo, 'forked')).toBe(chosen)
+      const thread = await threads.provision(repo, 'forked', 'thread-c0ffee')
+      expect(commitIdAt(repo, 'thread-c0ffee@-')).toBe(chosen)
+      expect(thread.name).toBe('thread-c0ffee')
+    })
+
+    it('restores the conflict with jj undo, the documented way back', async () => {
+      conflictBookmark(repo, 'forked')
+      const chosen = commitIdAt(repo, 'description(exact:"right\n")')
+      await threads.resolveBookmarkConflict({ repoRoot: repo, bookmark: 'forked', commitId: chosen })
+      expect((await threads.bookmarkConflict({ repoRoot: repo, bookmark: 'forked' })).targets).toEqual([])
+      jj(repo, 'undo')
+      expect((await threads.bookmarkConflict({ repoRoot: repo, bookmark: 'forked' })).targets).toHaveLength(2)
+    })
+
+    it('refuses a revision the conflicted bookmark does not hold, and leaves it conflicted', async () => {
+      conflictBookmark(repo, 'forked')
+      const other = commitIdAt(repo, 'description(exact:"left\n")')
+      await expect(threads.resolveBookmarkConflict({ repoRoot: repo, bookmark: 'forked', commitId: other })).rejects.toThrow(
+        /not one the bookmark "forked" points at/u,
+      )
+      expect((await threads.bookmarkConflict({ repoRoot: repo, bookmark: 'forked' })).targets).toHaveLength(2)
+    })
+
+    it('refuses to move a bookmark that is not conflicted', async () => {
+      const before = commitIdAt(repo, 'main')
+      await expect(threads.resolveBookmarkConflict({ repoRoot: repo, bookmark: 'main', commitId: before })).rejects.toThrow(/no longer conflicted/u)
+      expect(commitIdAt(repo, 'main')).toBe(before)
+    })
+
     it('still gives the thread its name once a real destination is picked after a refusal', async () => {
       conflictBookmark(repo, 'forked')
       await expect(threads.provision(repo, 'forked', 'thread-c0ffee')).rejects.toThrow(/is conflicted/u)

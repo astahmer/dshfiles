@@ -107,6 +107,8 @@ const handlers = Api.handlers(jjIntegrationApi, {
   threadStatus: (input, call) => ThreadLifecycle.use(lifecycle => lifecycle.threadStatus(input, call.caller)),
   projectBookmark: input => ThreadLifecycle.use(lifecycle => lifecycle.projectBookmark(input)),
   setProjectBookmark: input => ThreadLifecycle.use(lifecycle => lifecycle.setProjectBookmark(input)),
+  bookmarkConflict: input => ThreadLifecycle.use(lifecycle => lifecycle.bookmarkConflict(input)),
+  resolveBookmarkConflict: input => ThreadLifecycle.use(lifecycle => lifecycle.resolveBookmarkConflict(input)),
   landThread: (input, call) => ThreadLifecycle.use(lifecycle => lifecycle.landThread(input, call.caller)),
   workspaceSync: () => WorkspaceSync.use(sync => Effect.map(sync.current, current => ({ sync: current }))),
   updateCheck: input => DshUpdate.use(update => update.check({ fetch: input.fetch ?? true })),

@@ -49,6 +49,31 @@ export const setProjectBookmarkInputSchema = Schema.Struct({
   bookmark: Schema.NullOr(projectBookmarkNameSchema),
 })
 
+const fullCommitIdSchema = Schema.String.check(Schema.isPattern(/^[0-9a-f]{40,64}$/u))
+
+export const bookmarkConflictInputSchema = Schema.Struct({
+  path: nonEmptyString,
+  /** The bookmark to read; omitted, the project's main branch. */
+  bookmark: Schema.optionalKey(projectBookmarkNameSchema),
+})
+
+export const bookmarkConflictOutputSchema = Schema.Struct({
+  bookmark: nonEmptyString,
+  /** Every revision the bookmark points at while conflicted; empty when it points at one. */
+  targets: Schema.Array(Schema.Struct({ commitId: fullCommitIdSchema, summary: Schema.String })),
+})
+
+export const resolveBookmarkConflictInputSchema = Schema.Struct({
+  path: nonEmptyString,
+  bookmark: projectBookmarkNameSchema,
+  /** One of the full commit ids `bookmarkConflict` returned. */
+  commitId: fullCommitIdSchema,
+  /** Explicit opt-in: moving the bookmark drops its other revisions from it. */
+  confirm: Schema.Literal(true),
+})
+
+export const resolveBookmarkConflictOutputSchema = Schema.Struct({ bookmark: nonEmptyString, commitId: fullCommitIdSchema })
+
 export const projectBookmarkOutputSchema = Schema.Struct({
   repositoryRoot: nonEmptyString,
   bookmark: nonEmptyString,

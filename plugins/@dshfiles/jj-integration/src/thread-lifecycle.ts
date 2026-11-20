@@ -192,6 +192,28 @@ const make = Effect.gen(function* () {
     return yield* projectBookmark({ path: location.repoRoot })
   })
 
+  /** The revisions the project's main branch (or `bookmark`) points at while it is conflicted; empty otherwise. */
+  const bookmarkConflict = Effect.fn('thread lifecycle bookmark conflict')(function* (input: {
+    readonly path: string
+    readonly bookmark?: string | undefined
+  }) {
+    const location = yield* threads.locate(input.path)
+    const bookmark = input.bookmark ?? (yield* projectBookmarks.bookmarkFor(location.repoRoot))
+    return yield* threads.bookmarkConflict({ repoRoot: location.repoRoot, bookmark })
+  })
+
+  /** The refusal's Choose revision dialog and `jj_resolve_bookmark_conflict`: keep one of a conflicted bookmark's revisions. */
+  const resolveBookmarkConflict = Effect.fn('thread lifecycle resolve bookmark conflict')(function* (input: {
+    readonly path: string
+    readonly bookmark: string
+    readonly commitId: string
+  }) {
+    const location = yield* threads.locate(input.path)
+    const resolved = yield* threads.resolveBookmarkConflict({ repoRoot: location.repoRoot, bookmark: input.bookmark, commitId: input.commitId })
+    yield* views.invalidate
+    return resolved
+  })
+
   const ownWorkspaceFor = Effect.fn('thread lifecycle own workspace')(function* (input: { readonly workspaceId: string }) {
     const unchanged = { workspaceId: input.workspaceId, branched: false }
     const source = yield* registry.get(input.workspaceId)
@@ -388,6 +410,8 @@ const make = Effect.gen(function* () {
     destination,
     projectBookmark,
     setProjectBookmark,
+    bookmarkConflict,
+    resolveBookmarkConflict,
     ownWorkspaceFor,
     classifyWorkspaces,
     projects,

@@ -20,6 +20,8 @@ describe('jj-integration tool exposure', () => {
       'jj_thread_projects',
       'jj_project_bookmark',
       'jj_set_project_bookmark',
+      'jj_bookmark_conflict',
+      'jj_resolve_bookmark_conflict',
       'jj_thread_repositories',
       'jj_thread_refresh_repositories',
       'jj_thread_isolate',
@@ -47,6 +49,7 @@ describe('jj-integration tool exposure', () => {
       'jj_thread_destination',
       'jj_thread_projects',
       'jj_project_bookmark',
+      'jj_bookmark_conflict',
       'jj_thread_repositories',
       'jj_thread_refresh_repositories',
       'jj_thread_review_history',
@@ -61,6 +64,15 @@ describe('jj-integration tool exposure', () => {
       expect(method.description ?? method.tool.description).toBeTruthy()
       expect(method.tool.render).toBeDefined()
     }
+  })
+
+  test('a conflicted bookmark moves only with an explicit confirm and a full commit id', async () => {
+    const input = jjIntegrationApi.methods.resolveBookmarkConflict.input
+    const choice = { path: '/repo', bookmark: 'main', commitId: 'a'.repeat(40) }
+    expect(await validate(input, choice)).toBe(true)
+    expect(await validate(input, { ...choice, confirm: false })).toBe(true)
+    expect(await validate(input, { ...choice, commitId: 'aaaaaaaaaaaa', confirm: true })).toBe(true)
+    expect(await validate(input, { ...choice, confirm: true })).toBe(false)
   })
 
   test('Update DSH applies only with an explicit confirm', async () => {
