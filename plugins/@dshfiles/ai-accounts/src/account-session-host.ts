@@ -12,6 +12,7 @@ import { createAccountSessionService, type AccountSessionService } from './accou
 import { CopilotCredentialModel } from './copilot-credentials.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 import type { AccountDraft } from './api.js'
+import { AntigravityAccountModel } from './antigravity-account.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 
 /** A reconnect cannot start writing a saved account's credential home while sign-out owns it. */
@@ -25,6 +26,7 @@ export const accountSessionRelatedIds = (file: AccountStoreFile, account: Accoun
       }
     }
     if (candidate.kind === 'claude') return [ClaudeAccountModel.resolveClaudeConfigDir(candidate.homePath)]
+    if (candidate.kind === 'antigravity') return [AntigravityAccountModel.resolveHome(candidate.homePath)]
     return [candidate.homePath, candidate.shadowHomePath]
   }
   const selected = homes(account).filter(home => home !== '')
@@ -82,6 +84,7 @@ const serviceFor = (ctx: Context, store: AccountStorePromise): AccountSessionSer
     onSignedOut: async account => {
       // Credentials are read per request; do not remove, disable or rewrite the account's route/profile.
       if (account.kind === 'claude') claudeAccountService.invalidateUsage(ClaudeAccountModel.resolveClaudeConfigDir(account.homePath))
+      if (account.kind === 'antigravity') AntigravityAccountModel.forget(AntigravityAccountModel.resolveHome(account.homePath))
       accountRuntime(ctx)?.usageCache?.invalidate()
     },
   })

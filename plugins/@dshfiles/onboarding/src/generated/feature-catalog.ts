@@ -70,9 +70,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "ai-accounts",
-      "description": "Per-account Codex, Claude, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
+      "description": "Per-account Codex, Claude, Antigravity, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
       "ui": true,
-      "features": 20
+      "features": 21
     },
     {
       "name": "annotations",
@@ -2874,6 +2874,47 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "tab",
           "name": "Models",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#antigravity-accounts",
+      "plugin": "ai-accounts",
+      "id": "antigravity-accounts",
+      "title": "Use a Google AI plan through the Antigravity CLI",
+      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with DSH's system prompt, none of Antigravity's built-in tools,…",
+      "destination": "settings",
+      "currentSurface": "dialog: Add AI account › Antigravity",
+      "reach": [
+        {
+          "text": "click text \"AI Accounts: Accounts\"",
+          "action": "click",
+          "by": "text",
+          "name": "AI Accounts: Accounts",
+          "value": null
+        },
+        {
+          "text": "click button \"Add account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add account",
+          "value": null
+        },
+        {
+          "text": "click button \"Antigravity account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Antigravity account",
+          "value": null
+        },
+        {
+          "text": "expect button \"Copy Antigravity sign-in command\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Copy Antigravity sign-in command",
           "value": null
         }
       ],

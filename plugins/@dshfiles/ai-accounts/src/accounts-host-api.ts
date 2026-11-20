@@ -81,6 +81,7 @@ const accountsFile = async (ctx: Context, store: AccountStorePromise): Promise<A
     accountRuntime(ctx)?.accounts?.pool.describe() ?? [],
     resolveKeyFromContext(ctx),
     async instanceId => (await createCopilotCredentialsService(ctx.get('credentials')).read(instanceId)) !== undefined,
+    accountRuntime(ctx)?.antigravity?.describe,
   )
 
 const pricingFor = (ctx: Context) => {
@@ -461,6 +462,7 @@ const readQuotaResetAt = async (ctx: Context, store: AccountStorePromise, accoun
       shadowRoot: file.shadowRoot,
       resolveCredential: resolveKeyFromContext(ctx),
       readCopilotCredential: createCopilotCredentialsService(ctx.get('credentials')).read,
+      describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
     }),
     Date.now(),
   )
@@ -489,7 +491,15 @@ const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signa
       enabled: account.enabled,
       usage: ProviderUsageModel.stamped(
         await boundedUsageRead({
-          read: readSignal => readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential, readCopilotCredential, signal: readSignal }),
+          read: readSignal =>
+            readAccountUsage({
+              account,
+              shadowRoot: file.shadowRoot,
+              resolveCredential,
+              readCopilotCredential,
+              describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
+              signal: readSignal,
+            }),
           timeoutMs: ACCOUNT_USAGE_READ_TIMEOUT_MS,
           signal,
         }),

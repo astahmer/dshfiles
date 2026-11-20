@@ -57,11 +57,13 @@ const KEY_FIELD = {
     hint: 'Optional key reference. Empty uses the Mistral Vibe login in ~/.vibe/.env (`vibe --setup`).',
     placeholder: 'MISTRAL_WORK_API_KEY',
   },
+  antigravity: null,
 } satisfies Record<AccountDraft['kind'], { readonly label: string; readonly hint: string; readonly placeholder: string } | null>
 
 const launchCommandFor = (draft: AccountDraft): string | null => {
   if (draft.kind === 'codex' && draft.shadowHomePath.trim() !== '') return ShellCommand.withEnvironment('CODEX_HOME', draft.shadowHomePath, 'codex')
   if (draft.kind === 'claude') return claudeLaunchCommand(draft.homePath.trim())
+  if (draft.kind === 'antigravity') return antigravityLaunchCommand(draft.homePath.trim())
   return null
 }
 
@@ -74,6 +76,13 @@ const claudeLaunchCommand = (homePath: string): string | null => {
   if (/^~\/\.claude\/?$/u.test(homePath)) return 'claude'
   if (homePath.startsWith('~/')) return `CLAUDE_CONFIG_DIR="$HOME"/${ShellCommand.posixQuote(homePath.slice(2))} claude`
   return ShellCommand.withEnvironment('CLAUDE_CONFIG_DIR', homePath, 'claude')
+}
+
+/** `agy` finds its login under `$HOME/.gemini`; an empty home is the user's own, and a quoted `~` would not expand. */
+const antigravityLaunchCommand = (homePath: string): string => {
+  if (homePath === '' || /^~\/?$/u.test(homePath)) return 'agy'
+  if (homePath.startsWith('~/')) return `HOME="$HOME"/${ShellCommand.posixQuote(homePath.slice(2))} agy`
+  return ShellCommand.withEnvironment('HOME', homePath, 'agy')
 }
 
 export const RuntimePathsSection = (props: {
@@ -156,6 +165,16 @@ export const RuntimePathsSection = (props: {
           label="CLAUDE_CONFIG_DIR"
           onChange={homePath => setDraft({ ...draft, homePath })}
           placeholder="~/.claude"
+          value={draft.homePath}
+        />
+      ) : null}
+      {draft.kind === 'antigravity' ? (
+        <PathField
+          ariaLabel="HOME for agy"
+          hint="Where the Antigravity CLI keeps this account's Google login (~/.gemini). Empty uses your own home; give each extra Google account its own folder."
+          label="HOME for agy"
+          onChange={homePath => setDraft({ ...draft, homePath })}
+          placeholder="empty: ~ (agy acp --login)"
           value={draft.homePath}
         />
       ) : null}

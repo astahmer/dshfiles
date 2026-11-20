@@ -1,10 +1,10 @@
 import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
 import { Context, Effect, Exit, Fiber, HashMap, Layer, Option, Ref } from 'effect'
-import type { KeyedRoute } from './provider-routes.js'
+import type { DiscoveringRoute } from './provider-routes.js'
 
 /** A discovered catalog is only valid for the keyed route it was fetched for. */
 export interface DiscoveredCatalog {
-  readonly route: KeyedRoute
+  readonly route: DiscoveringRoute
   readonly models: readonly LlmDiscoveredModel[]
 }
 
@@ -27,10 +27,14 @@ export class ModelCatalogs extends Context.Service<
   {
     /** The models discovered for this account, synchronously: route building reads them while it builds profiles. */
     readonly discovered: (instanceId: string) => readonly LlmDiscoveredModel[] | undefined
-    readonly record: (input: { readonly instanceId: string; readonly route: KeyedRoute; readonly models: readonly LlmDiscoveredModel[] }) => Effect.Effect<void>
+    readonly record: (input: {
+      readonly instanceId: string
+      readonly route: DiscoveringRoute
+      readonly models: readonly LlmDiscoveredModel[]
+    }) => Effect.Effect<void>
     readonly forget: (instanceId: string) => Effect.Effect<void>
     /** Drop every catalog whose route no longer matches, as a route rebuild does. */
-    readonly retain: (matches: (input: { readonly instanceId: string; readonly route: KeyedRoute }) => boolean) => Effect.Effect<void>
+    readonly retain: (matches: (input: { readonly instanceId: string; readonly route: DiscoveringRoute }) => boolean) => Effect.Effect<void>
     /** Begin one account's refresh, interrupting the one already running for it. */
     readonly start: <A, E, R>(instanceId: string, task: Effect.Effect<A, E, R>) => Effect.Effect<Fiber.Fiber<Option.Option<A>>, never, R>
     readonly isRefreshing: (instanceId: string) => Effect.Effect<boolean>
@@ -42,7 +46,7 @@ export class ModelCatalogs extends Context.Service<
 
     const record = Effect.fn('ai-accounts model catalog record')(function* (input: {
       readonly instanceId: string
-      readonly route: KeyedRoute
+      readonly route: DiscoveringRoute
       readonly models: readonly LlmDiscoveredModel[]
     }) {
       yield* Ref.update(discovered, current => HashMap.set(current, input.instanceId, { route: input.route, models: input.models }))

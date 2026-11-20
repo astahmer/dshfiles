@@ -3,6 +3,7 @@ import { providerFetch } from './provider-request.js'
 import type { AccountConnectionMethod } from './api.js'
 import { readAccountUsage } from './account-usage.js'
 import { ClaudeAccountModel } from './claude-account.js'
+import { AntigravityAccountModel } from './antigravity-account.js'
 import { verifyClaudeAuthStatus, type ClaudeAuthStatusRunner } from './claude-auth-status.js'
 import { AiAccountsSchema } from './effect-schema.js'
 
@@ -111,12 +112,15 @@ export const verifyAccountConnection = async (
       return
     }
 
+    // Admission needs fresh evidence: the description a sign-out or a failed check cached must not answer for a new login.
+    if (account.kind === 'antigravity') AntigravityAccountModel.forget(AntigravityAccountModel.resolveHome(account.homePath))
     let authenticated = false
     await (input.readAccountUsage ?? readAccountUsage)({
       account,
       shadowRoot: input.shadowRoot,
       resolveCredential,
       readCopilotCredential: input.readCopilotCredential,
+      describeAntigravity: input.describeAntigravity,
       signal: controller.signal,
       onAuthenticated: () => {
         if (!controller.signal.aborted) authenticated = true
