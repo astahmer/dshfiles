@@ -1,15 +1,18 @@
 /** Sidebar terminal screen and connection recovery. */
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import { PlusIcon, SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
 import type { TerminalViewState, TerminalView } from '@deepseek-ai/dsh-api-terminal-controller/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
+import { Browser, useContract, type BrowserService } from '@dshfiles/dshx/client'
 import type { TerminalBodyInjected } from './face.ts'
 import type {} from './locales.ts'
 import { TerminalExcerptAction } from './TerminalExcerptAction.tsx'
+import { TerminalLinkMenu, type TerminalLinkMenuState } from './TerminalLinkMenu.tsx'
 import type { TerminalExcerpt, TerminalSelectionSource } from './excerpt.ts'
 import type { TerminalExcerptTarget } from './excerpt-targets.ts'
 import { useTerminalExcerptTarget } from './use-terminal-excerpt-target.ts'
@@ -29,6 +32,9 @@ export function TerminalBody({ useTabInfo, useTerminal, useTheme, view, t, addEx
   const theme = useTheme(value => value)
   const model = view(tab.id)
   const state = useTerminal(tab.id)
+  // Browser contract for opening URLs in the preview pane
+  const browserContract = useContract(Browser)
+  const browserService = browserContract.status === 'active' ? browserContract.value : undefined
   useEffect(() => model.mount(), [model])
   if (state === undefined) return null
   const newTerminal = <Button variant="primary" size={state.issue === 'missingTerminal' ? 'md' : 'sm'}
@@ -64,7 +70,7 @@ export function TerminalBody({ useTabInfo, useTerminal, useTheme, view, t, addEx
           : <Button variant="outline" size="sm" onClick={() => { model.connect() }}>{t('reconnect')}</Button>)}
         {ended && newTerminal}
       </div>}
-      {state.info !== undefined && <TerminalScreen state={state} model={model} visible={tab.visible} label={t('title')} theme={theme} css={css} addExcerpt={addExcerpt} excerptOf={excerptOf} registerExcerptTarget={registerExcerptTarget} addLabel={t('addExcerpt')} failedLabel={t('excerptFailed')} />}
+      {state.info !== undefined && <TerminalScreen state={state} model={model} visible={tab.visible} label={t('title')} theme={theme} css={css} addExcerpt={addExcerpt} excerptOf={excerptOf} registerExcerptTarget={registerExcerptTarget} addLabel={t('addExcerpt')} failedLabel={t('excerptFailed')} browserService={browserService} />}
       {error !== undefined && <p className={css.error} role="alert">{t('failed', { message: error })}</p>}
     </section>
   )
@@ -81,7 +87,7 @@ const INPUT_GESTURES = ['keydown', 'beforeinput', 'paste', 'compositionend', 'dr
 const FOCUS_REPORTS = new Set(['\x1b[I', '\x1b[O'])
 
 /* oxlint-disable typescript/no-non-null-assertion -- React sets the DOM ref, then these effects initialize and use the emulator. */
-function TerminalScreen({ state, model, visible, label, theme, css, addExcerpt, excerptOf, registerExcerptTarget, addLabel, failedLabel }: {
+function TerminalScreen({ state, model, visible, label, theme, css, addExcerpt, excerptOf, registerExcerptTarget, addLabel, failedLabel, browserService }: {
   state: TerminalViewState
   model: TerminalView
   visible: boolean
@@ -93,9 +99,11 @@ function TerminalScreen({ state, model, visible, label, theme, css, addExcerpt, 
   registerExcerptTarget: (target: TerminalExcerptTarget) => () => void
   addLabel: string
   failedLabel: string
+  browserService: BrowserService | undefined
 }): ReactNode {
   const [selection, setSelection] = useState<TerminalExcerpt>()
   const [failed, setFailed] = useState(false)
+  const [linkMenu, setLinkMenu] = useState<TerminalLinkMenuState>()
   const element = useRef<HTMLDivElement>(null)
   const terminal = useRef<Terminal>()
   const fit = useRef<FitAddon>()
@@ -112,6 +120,19 @@ function TerminalScreen({ state, model, visible, label, theme, css, addExcerpt, 
   attachCurrent.current = attach
   useTerminalExcerptTarget({ register: registerExcerptTarget, screen: element, selection: excerpt, attach: attachCurrent })
 
+  // Track internal browser availability
+  const internalAvailable = useSyncExternalStore(
+    browserService?.available.subscribe ?? (() => () => {}),
+    browserService?.available.get ?? (() => false),
+    browserService?.available.get ?? (() => false),
+  )
+
+  // Stable reference to browser service for the effect
+  const browserServiceRef = useRef(browserService)
+  browserServiceRef.current = browserService
+  const setLinkMenuRef = useRef(setLinkMenu)
+  setLinkMenuRef.current = setLinkMenu
+
   useLayoutEffect(() => {
     const node = element.current!
     const xterm = new Terminal({
@@ -120,6 +141,22 @@ function TerminalScreen({ state, model, visible, label, theme, css, addExcerpt, 
     })
     const addon = new FitAddon()
     xterm.loadAddon(addon)
+    // Web links addon for clickable URLs
+    const webLinks = new WebLinksAddon((event, uri) => {
+      // Cmd/Ctrl+Click opens directly in external browser
+      if (event.metaKey || event.ctrlKey) {
+        window.open(uri, '_blank', 'noopener,noreferrer')
+        return
+      }
+      // Regular click shows context menu with options
+      const rect = node.getBoundingClientRect()
+      setLinkMenuRef.current({
+        url: uri,
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      })
+    })
+    xterm.loadAddon(webLinks)
     xterm.open(node)
     const palette = new TerminalTheme(xterm)
     colors.current = palette
@@ -151,6 +188,7 @@ function TerminalScreen({ state, model, visible, label, theme, css, addExcerpt, 
       selected.dispose()
       cursor.dispose()
       palette.dispose()
+      webLinks.dispose()
       xterm.dispose()
       terminal.current = undefined
       fit.current = undefined
@@ -197,9 +235,21 @@ function TerminalScreen({ state, model, visible, label, theme, css, addExcerpt, 
     terminal.current!.textarea?.setAttribute('aria-label', label)
   }, [label])
   useEffect(() => { if (visible && state.writable) terminal.current!.focus() }, [visible, state.writable])
+  const closeLinkMenu = useCallback(() => setLinkMenu(undefined), [])
+  const openInternal = useCallback((url: string) => browserService?.open(url) ?? false, [browserService])
+  const openExternal = useCallback((url: string) => window.open(url, '_blank', 'noopener,noreferrer'), [])
+
   return (
     <div className={css.viewport}>
       <TerminalExcerptAction excerpt={selection} attach={attach} failed={failed} label={addLabel} failedLabel={failedLabel} styles={css} />
+      <TerminalLinkMenu
+        state={linkMenu}
+        onClose={closeLinkMenu}
+        onOpenInternal={openInternal}
+        onOpenExternal={openExternal}
+        internalAvailable={internalAvailable}
+        css={css}
+      />
       <div className={css.screen} ref={element} />
     </div>
   )
