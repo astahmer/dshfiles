@@ -144,6 +144,22 @@ export class Agents {
     return { handle, text: text.slice(match[0].length).trim() }
   }
 
+  /**
+   * Every agent a message names, in order of appearance: a leading `@handle` or `@{handle}`, and any `@{handle}` after it.
+   * The braced spelling is what the `@` menu inserts, so it is the only one that counts mid-message; a plain `@word`
+   * there stays a word.
+   */
+  static mentionedHandles(text: string): readonly string[] {
+    const found: string[] = []
+    const leading = Agents.parseMention(text)
+    if (leading !== null) found.push(leading.handle)
+    for (const match of text.matchAll(/(?<![\w@/])@\{([a-z][a-z0-9-]{0,31})\}/gu)) {
+      const handle = match[1]
+      if (handle !== undefined && !found.includes(handle)) found.push(handle)
+    }
+    return found
+  }
+
   /** The `@handle` a message addresses, for the `@` menu to mark a row as already used. */
   static mentionedHandle(text: string): string | null {
     return Agents.parseMention(text)?.handle ?? null

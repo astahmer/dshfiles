@@ -39,6 +39,9 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   }
 }
 
+/** How long the choice between several mentioned agents waits before the thread keeps its configured model. */
+const AGENT_CHOICE_TIMEOUT_MS = 30_000
+
 export default defineClient({
   name: '@dshfiles/agents',
   inject: ['slots', 'layout', 'sessions', 'remote', 'remote.session', 'uiWorkspace', 'workspaces', 'uiConversation'],
@@ -58,15 +61,40 @@ export default defineClient({
       ctx.effect(() => beforeSend(async (sendCtx) => {
         // Only process first message of a new thread
         if (!sendCtx.isNewSession) return
-        // Parse agent mention from message start
-        const mention = Agents.parseMention(sendCtx.text)
-        if (mention === null) return
-        // Look up the agent
+        const handles = Agents.mentionedHandles(sendCtx.text)
+        if (handles.length === 0) return
         const { agents } = await api.list()
-        const agent = agents.find(a => a.handle === mention.handle && a.enabled)
-        if (agent === undefined || agent.route === null) return
-        // Update the model to match the agent's configuration
-        const route = agent.route
+        // Only enabled agents that pin a route can change the model; the rest stay plain mentions.
+        const candidates = handles.flatMap(handle => {
+          const agent = agents.find(candidate => candidate.handle === handle && candidate.enabled)
+          return agent === undefined || agent.route === null ? [] : [{ agent, route: agent.route }]
+        })
+        let chosen = candidates[0]
+        const dialogs = metadata?.plugin?.dialogs
+        if (candidates.length > 1 && dialogs !== undefined) {
+          // Two agents name two models: ask which one the thread uses. No answer in time keeps the configured model.
+          const timeout = new AbortController()
+          const timer = setTimeout(() => timeout.abort(), AGENT_CHOICE_TIMEOUT_MS)
+          // Without the app's dialogs plugin this falls back to a browser prompt, which cannot time out.
+          const handle = await dialogs.select({
+            title: `Which agent's model should this thread use? (keeps the current model after ${AGENT_CHOICE_TIMEOUT_MS / 1000}s)`,
+            options: candidates.map(({ agent, route }) => ({
+              title: `@${agent.handle} — ${agent.name}`,
+              description: route.reasoningEffort === undefined ? route.model : `${route.model} · ${route.reasoningEffort}`,
+              value: agent.handle,
+            })),
+            signal: timeout.signal,
+          })
+          clearTimeout(timer)
+          if (handle === undefined) {
+            console.info('agents: several agents mentioned and no choice made, the thread keeps its configured model')
+            return
+          }
+          chosen = candidates.find(({ agent }) => agent.handle === handle)
+        }
+        if (chosen === undefined) return
+        const mention = { handle: chosen.agent.handle }
+        const route = chosen.route
         const selection: AgentModelSelection =
           route.reasoningEffort === undefined
             ? { sessionId: sendCtx.sessionId as SessionId, provider: route.provider, model: route.model }

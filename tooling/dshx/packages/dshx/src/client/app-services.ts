@@ -43,6 +43,8 @@ export interface SelectInput<Value extends string> {
   readonly title: string
   readonly options: readonly SelectOption<Value>[]
   readonly current?: Value
+  /** Aborting closes the dialog and resolves undefined, as cancelling does; plain browser dialogs cannot be closed. */
+  readonly signal?: AbortSignal
 }
 
 /** Ask the user in the app's own dialogs. Cancelling resolves false or undefined. */
