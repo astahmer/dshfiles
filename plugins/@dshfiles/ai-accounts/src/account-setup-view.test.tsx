@@ -431,6 +431,12 @@ describe('actual account setup view with operation-owned QueryClient data', () =
     expect(field('API key or setup token value').type).toBe('password')
   })
 
+  it('warns that driving agy from another client is use-at-your-own-risk', async () => {
+    await mount()
+    await click('Antigravity account')
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Use at your own risk')
+  })
+
   it('returns OpenCode Go from an existing credential to manual key entry', async () => {
     await mount()
     await click('OpenCode Go account')
