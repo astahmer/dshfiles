@@ -128,7 +128,7 @@ export const PACKS: readonly Pack[] = [
     id: 'agents',
     title: 'Agents & orchestration',
     summary:
-      'Persistent agents that message each other, questions that wait for you, background jobs, threads on other hosts, and the tools, skills and MCP servers agents use.',
+      'Persistent agents that message each other, questions that wait for you, background jobs, threads on other hosts, agents that act in your window, and the tools, skills and MCP servers agents use.',
     core: false,
     plugins: [
       'agents',
@@ -140,6 +140,7 @@ export const PACKS: readonly Pack[] = [
       'capabilities-hub',
       'mcp-servers',
       'mcp-endpoint',
+      'client-bridge',
     ],
     prerequisites: ['account'],
     keySettings: [{ label: 'Stop background jobs that outlive their thread', entryId: 'dshfiles-background-jobs', fieldPath: ['stopOutlivedAfterMinutes'] }],
@@ -193,5 +194,9 @@ export const PACK_EXEMPTIONS: readonly PackExemption[] = [
   {
     plugin: 'loopback-access',
     reason: 'Network plumbing: its one setting only matters once the Web server binds a LAN address, which no pack does.',
+  },
+  {
+    plugin: 'sidebar-right',
+    reason: 'The native side panel every composition loads in place of the stock one; users never choose it, only the pages other plugins add to it.',
   },
 ]

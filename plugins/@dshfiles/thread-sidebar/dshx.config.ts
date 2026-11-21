@@ -16,6 +16,7 @@ export default defineConfig({
     'thread-views-api': 'src/thread-views-api.ts',
     snapshots: 'src/snapshots.ts',
     'thread-mention': 'src/thread-mention.ts',
+    'thread-reference': 'src/thread-reference.ts',
     // The shell's rail destinations and the section registry plugins add their pages to (docs/ade-ux §4.2).
     destinations: 'src/destinations.ts',
     'thread-row-actions': 'src/thread-row-actions.ts',

@@ -137,3 +137,33 @@ export const BRAND_MARKS: Record<BrandKey, BrandMarkArtwork> = {
     ],
   },
 }
+
+/** Tokens that name a model family; a model id or name carries at least one of them. */
+const BRAND_TOKENS: readonly { readonly brand: BrandKey; readonly tokens: readonly string[] }[] = [
+  { brand: 'openai', tokens: ['gpt', 'chatgpt', 'openai', 'codex'] },
+  { brand: 'claude', tokens: ['claude', 'anthropic', 'haiku', 'sonnet', 'opus'] },
+  { brand: 'google', tokens: ['gemini', 'google', 'gemma'] },
+  { brand: 'deepseek', tokens: ['deepseek'] },
+  { brand: 'meta', tokens: ['llama', 'meta'] },
+  { brand: 'qwen', tokens: ['qwen'] },
+  { brand: 'ling', tokens: ['ling', 'inclusionai'] },
+  { brand: 'kimi', tokens: ['kimi', 'moonshot'] },
+  { brand: 'mistral', tokens: ['mistral', 'devstral', 'codestral', 'magistral'] },
+  { brand: 'grok', tokens: ['grok', 'xai'] },
+  { brand: 'copilot', tokens: ['copilot'] },
+  { brand: 'zhipu', tokens: ['glm', 'zhipu', 'chatglm'] },
+]
+
+export const brandOfToken = (token: string): BrandKey | undefined => {
+  if (/^o[1-9]$/u.test(token)) return 'openai'
+  return BRAND_TOKENS.find(entry => entry.tokens.some(candidate => token === candidate || token.startsWith(candidate)))?.brand
+}
+
+/** The family mark of a model, read from its id and name rather than the account serving it. */
+export const brandOfModel = (model: { readonly id: string; readonly name: string }): BrandKey | undefined => {
+  for (const token of `${model.id} ${model.name}`.toLowerCase().split(/[^a-z0-9]+/u)) {
+    const brand = token.length === 0 ? undefined : brandOfToken(token)
+    if (brand !== undefined) return brand
+  }
+  return undefined
+}

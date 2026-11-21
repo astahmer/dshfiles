@@ -20,6 +20,10 @@
       "types": "./dist/client.d.ts",
       "default": "./dist/client.js"
     },
+    "./brand-mark": {
+      "types": "./src/brand-mark.tsx",
+      "default": "./dist/brand-mark.js"
+    },
     "./model-handoff-api": {
       "types": "./src/model-handoff-api.ts",
       "default": "./dist/model-handoff-api.js"

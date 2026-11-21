@@ -33,6 +33,7 @@
     "@dshfiles/chat": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
+    "@dshfiles/model-effort-picker": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "effect": "catalog:"

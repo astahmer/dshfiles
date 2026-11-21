@@ -24,11 +24,37 @@ import { ShellCommand } from './shell-command.js'
 
 export const accountKindSchema = Schema.Literals(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor', 'mistral', 'antigravity'])
 
-export const createSetupAccountInputSchema = Schema.Struct({ kind: accountKindSchema, requestId: Schema.String.check(Schema.isUUID()) })
+export const createSetupAccountInputSchema = Schema.Struct({
+  kind: accountKindSchema,
+  requestId: Schema.String.check(Schema.isUUID()).annotate({
+    description: 'A UUID you generate for this request (for example 7f3c2a1e-…); retrying with the same one returns the same connection.',
+  }),
+})
 export type CreateSetupAccountInput = typeof createSetupAccountInputSchema.Type
 
 /** Model-facing text for a structured result the tools below return. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
+
+/**
+ * What an Agent does after preparing a connection. Without it, an Agent that had the user sign in from a terminal
+ * read ai_accounts_login_status (which only tracks device sign-ins), saw "not started" and sent the user looking for a
+ * button instead of completing the connection.
+ */
+const connectionNextStep = (output: {
+  readonly operationId: string
+  readonly status: string
+  readonly account: { readonly loginHint?: string | null } | null
+}): string => {
+  if (output.status !== 'pending') return ''
+  const signIn =
+    output.account?.loginHint !== undefined && output.account.loginHint !== null && output.account.loginHint !== ''
+      ? 'the loginHint command runs in a terminal the user can see (terminal_open when the user asked you to run it, else they paste it) and they finish sign-in in the browser, never pasting codes to you'
+      : 'the user finishes sign-in or the key on Settings › AI accounts'
+  return `\nNext: ${signIn}; once they say it is done, call ai_accounts_complete_connection { operationId: "${output.operationId}" } to verify and save the account. ai_accounts_login_status does not track this sign-in.`
+}
+
+const renderConnection = <Output extends Parameters<typeof connectionNextStep>[0]>(output: Output): string =>
+  `${JSON.stringify(output)}${connectionNextStep(output)}`
 
 export const accountOrderDirectionSchema = Schema.Literals(['earlier', 'later'])
 
@@ -479,14 +505,15 @@ export const aiAccountsApi = defineApi({
       input: prepareAccountConnectionInputSchema,
       output: accountConnectionSnapshotSchema,
       description:
-        'Prepare a private provisional account connection without saving it or registering routes. Call only when the user asked to connect an account.',
-      tool: { name: 'ai_accounts_prepare_connection', render: compactJson },
+        'Prepare a private provisional account connection without saving it or registering routes; the result says the next step. After the user signs in (loginHint) call ai_accounts_complete_connection with the operationId to verify and save it. Call only when the user asked to connect an account.',
+      tool: { name: 'ai_accounts_prepare_connection', render: renderConnection },
     }),
     getAccountConnection: method({
       input: connectionIdentitySchema,
       output: accountConnectionSnapshotSchema,
-      description: 'Read a provisional account connection; contains metadata only, never credentials. Read-only.',
-      tool: { name: 'ai_accounts_connection', readOnly: true, render: compactJson },
+      description:
+        'Read a provisional account connection; contains metadata only, never credentials. pending with signedIn false is expected until ai_accounts_complete_connection verifies it. Read-only.',
+      tool: { name: 'ai_accounts_connection', readOnly: true, render: renderConnection },
     }),
     configureAccountConnection: method({
       input: configureAccountConnectionInputSchema,
@@ -517,7 +544,7 @@ export const aiAccountsApi = defineApi({
       input: connectionIdentitySchema,
       output: accountConnectionSnapshotSchema,
       description:
-        'Verify account authentication and atomically save a successful connection. Call only when the user asked to finish connecting that account.',
+        'Verify account authentication and atomically save a successful connection: the step after the user signed in (for example with the loginHint command of ai_accounts_prepare_connection). Call only when the user asked to connect or finish connecting that account.',
       tool: { name: 'ai_accounts_complete_connection', render: compactJson },
     }),
     discardAccountConnection: method({

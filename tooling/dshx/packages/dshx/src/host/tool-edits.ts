@@ -145,6 +145,18 @@ const installToolEdits = (ctx: Context, packageId: string, edits: readonly ToolE
   }, `${packageId}: tool edits`)
 }
 
+/**
+ * Mount DSH's PTC executor in one agent's own scope, as `toolEdits: [{ codeMode: true }]` does, for a plugin that
+ * decides per agent itself (tool-search keeps a Code Mode preset agent on PTC). An agent scope that ever held another
+ * executor keeps an unavailable selection after it is released, so the preset's executor alone would never be reached
+ * again; this one replaces it.
+ * @param ctx - the plugin's Host context, whose Loader imports the executor package.
+ * @param agent - the agent to put in Code Mode.
+ * @returns the disposer that unmounts it.
+ */
+const mountAgentCodeMode = async (ctx: Context, agent: Agent): Promise<() => void> => mountCodeMode(agent, await loadPtcExecutor(ctx))
+
 export class ToolEditsModel {
   static readonly install = installToolEdits
+  static readonly mountCodeMode = mountAgentCodeMode
 }

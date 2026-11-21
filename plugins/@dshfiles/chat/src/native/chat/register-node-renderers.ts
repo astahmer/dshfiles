@@ -16,6 +16,7 @@ import { RouteChangeNodeView } from './RouteChangeRow.tsx'
 import { TurnProcessNodeView } from './TurnProcessNodeView.tsx'
 import { TurnTailNodeView } from './TurnTailNodeView.tsx'
 import { TurnTriggerNodeView } from './TurnTriggerNodeView.tsx'
+import { FileReferenceLinks } from '../../file-reference-links.ts'
 
 /**
  * Register this package's business renderers behind the keyed Chat Node seat.
@@ -69,6 +70,16 @@ export function registerChatNodeRenderers(
       hooks: { presentation },
       resolveFilePath: sessionFilePath(ctx, sessionId),
       fileMentions: (owner, getFileTriggerProps) => ctx.get('chatFileMentions')?.forClosing(owner, sessionId, getFileTriggerProps),
+      fileReferences: openFile => FileReferenceLinks.create({
+        openFile,
+        // The thread's tool calls, read at click time: the file the Agent read is the one it meant.
+        toolCalls: () => (ctx.sessions.binding(sessionId)?.eventSource.getSnapshot().entries ?? [])
+          .flatMap(({ event }) => (event.type === 'tool/call' ? [JSON.stringify(event.data)] : [])),
+        search: async query => {
+          const reply = await ctx.remote.fileReferences.list(sessionId, query)
+          return reply.ok ? reply.value.filter(hit => hit.kind === 'file').map(hit => hit.path) : []
+        },
+      }),
     }),
   }, AssistantNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({

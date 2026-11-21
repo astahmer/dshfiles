@@ -24,8 +24,16 @@ where a thread starts.
   affect only new threads. Attachments stay on the backlog item rather than being copied into the queued message. The
   backlog reports the result in a toast whose **Open** action shows the thread. The backlog's
   Start thread dialog also picks an agent, which replaces its account/model fields with the agent's
-  preset, route and instructions. Inside a running thread the same text is a mention the Agent
-  reads, because a preset and system prompt are fixed when the thread is created.
+  preset, route and instructions. In the composer, the first message of a new thread selects the pinned provider, model and reasoning effort of an enabled
+  agent it names, before the message is sent; the Rich composer's `registerBeforeSend` hook runs it. A leading `@handle`
+  or `@{handle}` counts, and so does any `@{handle}` later in the message (the spelling the `@` menu inserts; a plain
+  `@word` mid-message stays a word). When the message names several agents that pin a route, a dialog asks which model the
+  thread uses; with no answer after 30 seconds the thread keeps its configured model. While the message is typed, the model of the first mentioned agent that pins a route shows in the model picker after a
+  600 ms pause, and removing the mention puts the previous model back. A model picked by hand in the picker always wins:
+  the preview stops and neither the send-time choice nor the dialog changes it. Only the model follows: the Agent
+  preset and instructions are fixed when the thread is created and are not applied, and the mention stays plain text the
+  Agent reads. Later messages, an unknown or disabled handle and an agent without a route never change the model; a failed
+  selection keeps the Host default and only logs a warning.
 - **The `@` menu.** `@agent:` (or `@a:`) lists agents right away; a partial handle such as `@rev`
   lists matching agents beside files and threads. A plain `@` stays with files and threads.
 - **One chip, one card.** Picking an agent in the `@` menu inserts the agent chip; a sent `@{handle}` and a

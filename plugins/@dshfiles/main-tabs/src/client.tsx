@@ -6,7 +6,18 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { createApiClient, defineClient, observeStandaloneDisplay, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import {
+  ClientTools,
+  createApiClient,
+  defineClient,
+  LinkHandler,
+  observeStandaloneDisplay,
+  runHostCommand,
+  useRegistry,
+  useSettings,
+} from '@dshfiles/dshx/client'
+import { MainTabsClientTools } from './main-tabs-client-tools.js'
+import { THREAD_LINK_SCHEME, ThreadReference } from '@dshfiles/thread-sidebar/thread-reference'
 import { modalSelector } from '@deepseek-ai/dsh-client-ui-primitives'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { handlePwaTabShortcut } from './pwa-tab-shortcuts.js'
@@ -150,6 +161,35 @@ export default defineClient({
       () => installThreadLinkClicks({ document, origin: window.location.origin, openThread: sessionId => requestThreadTab(sessionId, true) }),
       'main-tabs: open a clicked thread link in a tab',
     )
+
+    // A Markdown link hands its opener no event, so a Shift-click is read from the pointer that just went down.
+    let shiftPointerAt = Number.NEGATIVE_INFINITY
+    ctx.effect(() => {
+      const onPointerDown = (event: PointerEvent): void => {
+        if (event.shiftKey) shiftPointerAt = performance.now()
+      }
+      document.addEventListener('pointerdown', onPointerDown, true)
+      return () => document.removeEventListener('pointerdown', onPointerDown, true)
+    }, 'main-tabs: Shift-click on thread links')
+    const SHIFT_WINDOW_MS = 1000
+
+    // `[Fix auth](thread:session-…)` in a reply: a click opens the thread in a tab (or shows it when tabs are off);
+    // Shift-click shows it in the side panel beside the thread on screen.
+    metadata?.plugin?.add(LinkHandler, {
+      id: 'dshfiles-main-tabs.thread',
+      scheme: THREAD_LINK_SCHEME,
+      open: link => {
+        const resolution = ThreadReference.resolve({ reference: link.target, listed: ctx.sessions.list.getSnapshot().ids })
+        if (resolution.kind !== 'found') {
+          console.warn(`main-tabs: ${ThreadReference.explain(resolution)}`)
+          return
+        }
+        if (performance.now() - shiftPointerAt < SHIFT_WINDOW_MS && requestThreadAside(resolution.sessionId)) return
+        if (requestThreadTab(resolution.sessionId, true)) return
+        const listed = ctx.sessions.list.getSnapshot().ids.find(id => id === resolution.sessionId)
+        if (listed !== undefined) ctx.uiWorkspace.openSession(listed)
+      },
+    })
 
     ctx.effect(() => {
       const onOpenThread = (event: Event): void => {
@@ -333,17 +373,27 @@ export default defineClient({
       () => ctx.uiSession.adapter.current.getSnapshot().key,
     )
     ctx.effect(() => connectWorkbenchTabs(publication.provider), 'main-tabs: workbench semantics provider')
-    metadata?.plugin?.provide(
-      MainTabs,
-      createMainTabsService({
-        provider: publication.provider,
-        enabled: tabsEnabled,
-        currentSet,
-        isListedThread: sessionId => ctx.sessions.list.getSnapshot().ids.some(id => id === sessionId),
-        canReopen: () => actor.getSnapshot().can({ type: 'tab.reopenClosed' }),
-        send: event => actor.send(event),
-      }),
-    )
+    const mainTabsService = createMainTabsService({
+      provider: publication.provider,
+      enabled: tabsEnabled,
+      currentSet,
+      isListedThread: sessionId => ctx.sessions.list.getSnapshot().ids.some(id => id === sessionId),
+      canReopen: () => actor.getSnapshot().can({ type: 'tab.reopenClosed' }),
+      send: event => actor.send(event),
+    })
+    metadata?.plugin?.provide(MainTabs, mainTabsService)
+    // The same service, offered to Agents as client tools; a bridge plugin carries the calls.
+    ctx.effect(() => {
+      const releases = MainTabsClientTools.create(mainTabsService, {
+        listed: () => ctx.sessions.list.getSnapshot().ids,
+        title: sessionId => {
+          const list = ctx.sessions.list.getSnapshot()
+          const listed = list.ids.find(id => id === sessionId)
+          return listed === undefined ? undefined : list.byId[listed]?.displayTitle
+        },
+      }).map(tool => metadata?.plugin?.add(ClientTools, tool) ?? (() => {}))
+      return () => releases.forEach(release => release())
+    }, 'main-tabs: client tools for Agents')
 
     // Free-docking tabs (the workbench) get the same page names as the strip: the destination section labels.
     ctx.effect(() => {

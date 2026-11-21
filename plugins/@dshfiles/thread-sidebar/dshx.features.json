@@ -4640,6 +4640,44 @@
           "reason": "Client-only: the cards read existing Session and Inbox data and navigate; they start no Host work."
         }
       ]
+    },
+    {
+      "id": "thread-aside-client-tool",
+      "title": "Thread aside as a client tool",
+      "summary": "Through the client bridge, thread_open_aside shows another thread in the side panel beside the thread on screen, through the same opener as the row action Open in side panel. It accepts session-<uuid> or the short t:<id> memory prints and returns a thread: link.",
+      "surfaces": ["client"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "client tool: thread_open_aside (through client_tool_call)",
+      "configuration": [],
+      "states": ["opened", "no-thread-on-screen", "same-thread", "not-listed"],
+      "failureModes": ["No thread on screen, the thread already on screen, or an id that names no listed thread is refused with what to do instead."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.agent-opens-thread-aside",
+          "featureFile": "tooling/dshx/e2e/features/client-bridge.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-aside-tool-open",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-aside-client-tools.test.ts",
+          "testName": "opens a thread named by its short memory id beside the thread on screen, and returns its link"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-aside-tool-refusals",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-aside-client-tools.test.ts",
+          "testName": "refuses without a thread on screen, for the thread on screen itself, or for an unknown id, saying what to do"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-side tool: the client bridge records each call (execute_tool, client-tool invoke, client-tool execute and step spans)."
+        }
+      ]
     }
   ],
   "kind": "bundle"

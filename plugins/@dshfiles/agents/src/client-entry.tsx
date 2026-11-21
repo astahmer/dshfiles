@@ -13,6 +13,8 @@ import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
+import { manualModelChoices } from '@dshfiles/plugin-ui/lib/manual-model-choice'
+import { Agents } from './agent.js'
 import { AgentFocusModel } from './agent-focus.js'
 import { AgentInlineReference } from './agent-inline-reference.js'
 import { AgentMentionChip } from './agent-mention-chip.js'
@@ -38,6 +40,12 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   }
 }
 
+/** How long the choice between several mentioned agents waits before the thread keeps its configured model. */
+const AGENT_CHOICE_TIMEOUT_MS = 30_000
+
+/** How long the composer text must stay still before a mentioned agent's model is shown in the model picker. */
+const AGENT_PREVIEW_DEBOUNCE_MS = 600
+
 export default defineClient({
   name: '@dshfiles/agents',
   inject: ['slots', 'layout', 'sessions', 'remote', 'remote.session', 'uiWorkspace', 'workspaces', 'uiConversation'],
@@ -48,6 +56,101 @@ export default defineClient({
       ctx.slots.register({ name: 'conversation.user.text.node', key: 'agent', priority: 100 }, AgentMentionChip),
     )
     const api = createApiClient(ctx, agentsApi)
+
+    // Register before-send hook to update model when mentioning an agent in the first message
+    type ConversationFace = { readonly input?: { registerBeforeSend?: (hook: (ctx: { readonly sessionId: string; readonly isNewSession: boolean; readonly text: string }) => Promise<void>) => () => void } }
+    const conversation = ctx.get('conversation') as ConversationFace | undefined
+    const beforeSend = conversation?.input?.registerBeforeSend
+    // While a first message is typed, the model of the first mentioned agent shows in the model picker after a pause,
+    // unless the person picked a model by hand; removing the mention puts the previous model back.
+    type SelectionRoute = { readonly provider: string; readonly model: string; readonly reasoningEffort?: string }
+    type DirectoryFace = { readonly store: { getSnapshot(): { readonly current: SelectionRoute | null } }; select(selection: SelectionRoute): Promise<unknown> }
+    const directories = (ctx as unknown as { modelDirectories?: { directoryFor(sessionId: SessionId): DirectoryFace } }).modelDirectories
+    const previews = new Map<string, { timer?: ReturnType<typeof setTimeout>; applied?: string; baseline?: SelectionRoute | null }>()
+    const observeDrafts = (conversation?.input as { observeDrafts?: (listener: (observation: { readonly sessionId: string; readonly isNewSession: boolean; readonly text: string }) => void) => () => void } | undefined)?.observeDrafts
+    if (observeDrafts !== undefined && directories !== undefined) {
+      const preview = async (sessionId: string, text: string): Promise<void> => {
+        const state = previews.get(sessionId)
+        if (state === undefined || manualModelChoices().has(sessionId)) return
+        const directory = directories.directoryFor(sessionId as SessionId)
+        const { agents } = await api.list()
+        if (manualModelChoices().has(sessionId)) return
+        const agent = Agents.firstRouted(text, agents)
+        if (agent === undefined || agent.route === null) {
+          if (state.applied !== undefined && state.baseline != null) await directory.select(state.baseline)
+          delete state.applied
+          return
+        }
+        const route = agent.route
+        const key = `${route.provider}/${route.model}/${route.reasoningEffort ?? ''}`
+        if (state.applied === key) return
+        if (state.applied === undefined) state.baseline = directory.store.getSnapshot().current
+        state.applied = key
+        await directory.select(route.reasoningEffort === undefined ? { provider: route.provider, model: route.model } : { provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort })
+      }
+      ctx.effect(() => observeDrafts(observation => {
+        const state = previews.get(observation.sessionId) ?? {}
+        previews.set(observation.sessionId, state)
+        if (state.timer !== undefined) clearTimeout(state.timer)
+        if (!observation.isNewSession || manualModelChoices().has(observation.sessionId)) return
+        state.timer = setTimeout(() => {
+          preview(observation.sessionId, observation.text).catch((cause: unknown) => console.warn('agents: model preview failed', cause))
+        }, AGENT_PREVIEW_DEBOUNCE_MS)
+      }), 'agents: preview the mentioned agent model')
+    }
+
+    if (beforeSend !== undefined) {
+      ctx.effect(() => beforeSend(async (sendCtx) => {
+        const pending = previews.get(sendCtx.sessionId)
+        if (pending?.timer !== undefined) clearTimeout(pending.timer)
+        previews.delete(sendCtx.sessionId)
+        // Only process first message of a new thread
+        if (!sendCtx.isNewSession) return
+        // A model picked by hand in the picker stays, whatever agents the message names.
+        if (manualModelChoices().has(sendCtx.sessionId)) return
+        const handles = Agents.mentionedHandles(sendCtx.text)
+        if (handles.length === 0) return
+        const { agents } = await api.list()
+        // Only enabled agents that pin a route can change the model; the rest stay plain mentions.
+        const candidates = handles.flatMap(handle => {
+          const agent = agents.find(candidate => candidate.handle === handle && candidate.enabled)
+          return agent === undefined || agent.route === null ? [] : [{ agent, route: agent.route }]
+        })
+        let chosen = candidates[0]
+        const dialogs = metadata?.plugin?.dialogs
+        if (candidates.length > 1 && dialogs !== undefined) {
+          // Two agents name two models: ask which one the thread uses. No answer in time keeps the configured model.
+          const timeout = new AbortController()
+          const timer = setTimeout(() => timeout.abort(), AGENT_CHOICE_TIMEOUT_MS)
+          // Without the app's dialogs plugin this falls back to a browser prompt, which cannot time out.
+          const handle = await dialogs.select({
+            title: `Which agent's model should this thread use? (keeps the current model after ${AGENT_CHOICE_TIMEOUT_MS / 1000}s)`,
+            options: candidates.map(({ agent, route }) => ({
+              title: `@${agent.handle} — ${agent.name}`,
+              description: route.reasoningEffort === undefined ? route.model : `${route.model} · ${route.reasoningEffort}`,
+              value: agent.handle,
+            })),
+            signal: timeout.signal,
+          })
+          clearTimeout(timer)
+          if (handle === undefined) {
+            console.info('agents: several agents mentioned and no choice made, the thread keeps its configured model')
+            return
+          }
+          chosen = candidates.find(({ agent }) => agent.handle === handle)
+        }
+        if (chosen === undefined) return
+        const mention = { handle: chosen.agent.handle }
+        const route = chosen.route
+        const selection: AgentModelSelection =
+          route.reasoningEffort === undefined
+            ? { sessionId: sendCtx.sessionId as SessionId, provider: route.provider, model: route.model }
+            : { sessionId: sendCtx.sessionId as SessionId, provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort }
+        const selected = await ctx.remote.session.selectModel(selection)
+        if (!selected.ok) console.warn(`agents: first message @${mention.handle} kept the Host default model: ${selected.error.message}`)
+        else console.info(`agents: first message @${mention.handle} set model to ${route.provider}/${route.model}`)
+      }), 'agents: first message agent mention model selection')
+    }
 
     const startThread = async (request: AgentDispatchRequest): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> => {
       const target = AgentDispatch.creationArgs(request.target, ctx.workspaces.list.getSnapshot().items[0]?.workspaceId)

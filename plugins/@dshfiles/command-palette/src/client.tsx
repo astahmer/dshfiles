@@ -10,7 +10,7 @@ import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sideb
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
-import { Command, createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
+import { ClientTools, Command, createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
 import { PaletteRules } from './palette.js'
 import { paletteSettings, type PaletteSettings } from './settings.js'
 import { askDsh } from './ask-dsh.js'
@@ -28,9 +28,10 @@ import {
   type PaletteAction,
   type PaletteActionContext,
   type PaletteMode,
-  type PaletteWorkspace,
 } from './palette-contract.js'
 import { PaletteApi } from './palette-api.js'
+import { PaletteContext } from './palette-context.js'
+import { PaletteClientTools } from './palette-client-tools.js'
 import { ThreadPalette } from './thread-palette.js'
 
 const defaultSettings: PaletteSettings = paletteSettings.schema({})
@@ -85,21 +86,7 @@ const samePaletteSessions = (left: readonly SessionSummary[], right: readonly Se
     return candidate !== undefined && samePaletteSession(session, candidate)
   })
 
-const workspaceForSession = (
-  session: SessionSummary | undefined,
-  byId: Readonly<Record<string, SessionSummary>>,
-  workspaceBySession: ReadonlyMap<string, WorkspaceId>,
-): WorkspaceId | undefined => {
-  let cursor = session?.id
-  const visited = new Set<string>()
-  while (cursor !== undefined && !visited.has(cursor)) {
-    visited.add(cursor)
-    const workspaceId = workspaceBySession.get(cursor)
-    if (workspaceId !== undefined) return workspaceId
-    cursor = byId[cursor]?.parentId
-  }
-  return undefined
-}
+const workspaceForSession = PaletteContext.workspaceForSession
 
 interface PaletteCatalogProps extends PaletteOverlayProps {
   readonly mode: PaletteMode
@@ -126,35 +113,23 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
   // Ask DSH still targets the picked project while that blank New-thread Session is in the main view.
   const askWorkspaceId = selectedWorkspaceId ?? workspaceForSession(mainViewSession, sessionsById, workspaceBySession)
   const workspaces = useMemo(() => workspaceItems.map(workspace => ({ id: workspace.workspaceId, title: workspace.title })), [workspaceItems])
-  const workspaceById = useMemo<ReadonlyMap<string, PaletteWorkspace>>(
-    () => new Map<string, PaletteWorkspace>(workspaces.map(workspace => [String(workspace.id), workspace])),
-    [workspaces],
-  )
   const workspaceTitleById = useMemo<ReadonlyMap<string, string>>(
     () => new Map<string, string>(workspaces.map(workspace => [String(workspace.id), workspace.title])),
     [workspaces],
   )
   const archivedSessionIds = useMemo(() => new Set(archivedWorkspaceSessionIds), [archivedWorkspaceSessionIds])
-  const context = useMemo<PaletteActionContext>(() => {
-    const workspace = (selectedWorkspaceId === undefined ? undefined : workspaceById.get(selectedWorkspaceId)) ?? null
-    const pinned = new Set(pinnedWorkspaceSessionIds)
-    return {
-      thread:
-        selectedSession === undefined
-          ? null
-          : {
-              id: selectedSession.id,
-              title: selectedSession.displayTitle,
-              cwd: selectedSession.cwd ?? '',
-              workspaceId: selectedWorkspaceId,
-              pinned: pinned.has(selectedSession.id),
-              archived: archivedSessionIds.has(selectedSession.id),
-            },
-      workspace,
-      workspaces,
-      themePreference: themeSnapshot.preference,
-    }
-  }, [archivedSessionIds, selectedSession, selectedWorkspaceId, themeSnapshot.preference, workspaceById, pinnedWorkspaceSessionIds, workspaces])
+  // The same computation a client tool runs from the stores' snapshots, so an Agent's command sees what the palette does.
+  const context = useMemo<PaletteActionContext>(
+    () =>
+      PaletteContext.of({
+        sessions,
+        workspaceItems,
+        archivedSessionIds: archivedWorkspaceSessionIds,
+        pinnedSessionIds: pinnedWorkspaceSessionIds,
+        themePreference: themeSnapshot.preference,
+      }),
+    [sessions, workspaceItems, archivedWorkspaceSessionIds, pinnedWorkspaceSessionIds, themeSnapshot.preference],
+  )
   const workspacePathById = useMemo(
     () => new Map<string, string>(workspaceItems.map(workspace => [String(workspace.workspaceId), workspace.path])),
     [workspaceItems],
@@ -322,7 +297,7 @@ export const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null =
 export default defineClient({
   name: '@dshfiles/command-palette',
   locales: [commandPaletteLocale],
-  inject: ['slots', 'shortcuts', 'sessions', 'uiWorkspace', 'theme', 'connection', 'remote', 'remote.session'],
+  inject: ['slots', 'shortcuts', 'sessions', 'uiWorkspace', 'workspaces', 'theme', 'connection', 'remote', 'remote.session'],
   setup(ctx, decorate, metadata) {
     const plugin = metadata?.plugin
     if (plugin !== undefined) {
@@ -352,6 +327,23 @@ export default defineClient({
     const translate = ctx.locale.bind(COMMAND_PALETTE_LOCALE_NAMESPACE)
     const themeStore = createSnapshotStore(ctx.theme.getTheme())
     ctx.on('theme/change', snapshot => themeStore.set(snapshot))
+    // Every palette row, offered to Agents as client tools over the same context the palette computes; a bridge plugin
+    // carries the calls.
+    if (plugin !== undefined)
+      for (const tool of PaletteClientTools.create({
+        actions: () => PaletteApi.getSnapshot().actions,
+        context: () => {
+          const workspaces = ctx.workspaces.list.getSnapshot()
+          return PaletteContext.of({
+            sessions: selectPaletteSessions(ctx.sessions.list.getSnapshot()),
+            workspaceItems: workspaces.items,
+            archivedSessionIds: workspaces.archivedSessionIds,
+            pinnedSessionIds: workspaces.pinnedSessionIds,
+            themePreference: themeStore.getSnapshot().preference,
+          })
+        },
+      }))
+        plugin.add(ClientTools, tool)
     const searchContent = createThreadContentSearch({
       listApis: async () => (await createApiClient(ctx, dshxRegistryApi).list({})).apis,
       callFinder: async (api, input, signal) => {

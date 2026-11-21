@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { ScrollArea } from '@dshfiles/plugin-ui/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, SearchIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
+import { manualModelChoices } from '@dshfiles/plugin-ui/lib/manual-model-choice'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountColor } from './account-color.js'
 import { ModelDetails, type InspectedRoute } from './model-details.js'
@@ -194,6 +195,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   }
 
   const choose = (selection: ModelSelection): void => {
+    // A hand-picked model wins over any model a mentioned agent would pick for this thread.
+    manualModelChoices().add(sessionId)
     setInspected({ model: selection.model, provider: selection.provider })
     void submitSelection(selection)
   }

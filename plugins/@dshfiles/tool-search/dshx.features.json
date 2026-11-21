@@ -39,6 +39,12 @@
           "defaultValue": "true",
           "constraints": "When the global tool set changes mid-Session, the next step gets one reminder naming only the added tools (with a one-sentence description) and the removed names; false sends nothing.",
           "coveredBy": ["tool-search.tool-set-delta", "tool-search.cache-safe-fixed-list"]
+        },
+        {
+          "key": "codeModePresets",
+          "defaultValue": "[\"ptc\"]",
+          "constraints": "Agent preset ids whose own PTC executor (Code Mode, run_code) is kept; their program SDK holds the preset tools plus alwaysVisible globals. [] puts every agent on the native executor.",
+          "coveredBy": ["tool-search.code-mode-preset", "tool-search.code-mode-preset-switch"]
         }
       ],
       "states": ["deferred", "loaded", "unavailable"],
@@ -118,6 +124,18 @@
           "kind": "not-applicable",
           "id": "tool-search.no-browser-surface",
           "reason": "Agent-scoped tool visibility has no browser surface; the scratch Host and AgentLoop journey plus Host tests exercise registration and disclosure behavior."
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.code-mode-preset",
+          "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
+          "testName": "leaves a Code Mode preset agent its own executor and keeps deferred globals out of its program SDK"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.code-mode-preset-switch",
+          "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
+          "testName": "attaches again when a blank session switches to a Code Mode preset"
         }
       ],
       "telemetry": [
