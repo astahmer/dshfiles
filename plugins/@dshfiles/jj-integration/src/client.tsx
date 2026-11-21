@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { EmptyWorkspaceOwnerProps, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -113,6 +114,7 @@ export default defineClient({
     'sessions',
     'workspaces',
     'uiWorkspace',
+    'uiSession',
     'sidebarRight',
     'sidebarRightTabs',
     'conversation',
@@ -281,7 +283,14 @@ export default defineClient({
       openWorkspace: composerNavigation.open,
       pickWorkspace: composerNavigation.pickWorkspace,
       bindWorkspacePicker: composerNavigation.bind,
-      openSession: async sessionId => {
+      shownSessionId: {
+        getSnapshot: () => {
+          const key = ctx.uiSession.adapter.current.getSnapshot().key
+          return key === undefined ? undefined : SessionId(key)
+        },
+        subscribe: listener => ctx.uiSession.adapter.current.subscribe(listener),
+      },
+      openSession: async ({ sessionId, replacing }) => {
         const target = SessionId(sessionId)
         await ctx.sessions.refresh()
         if (ctx.sessions.list.getSnapshot().byId[target] === undefined) {
@@ -302,6 +311,7 @@ export default defineClient({
             if (ctx.sessions.list.getSnapshot().byId[target] !== undefined) finish()
           })
         }
+        if (replacing !== undefined && requestReplaceThreadTab(replacing, target)) return
         ctx.uiWorkspace.openSession(target)
       },
     }

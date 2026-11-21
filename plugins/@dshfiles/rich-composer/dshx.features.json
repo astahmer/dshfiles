@@ -485,6 +485,78 @@
       ]
     },
     {
+      "id": "held-send",
+      "title": "Send once the attachments finish uploading",
+      "summary": "Send or Enter while a file or image still uploads holds the message instead of refusing it: Send shows a filling ring, a status line above the composer reads 'Sending when uploads finish (40%)' with Cancel, and the message goes out by itself, in the queue or steer mode it was pressed for, once every upload is ready. Editing the text, attachments, quotes or plan mode, pressing the waiting Send again, or Cancel drops it.",
+      "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: held Send and its status line",
+      "configuration": [
+        {
+          "key": "sendWhenUploaded",
+          "defaultValue": "true",
+          "constraints": "Settings → dshfiles-rich-composer; applies live. Off: Send refuses with 'Files are still uploading' until the uploads finish.",
+          "coveredBy": ["rich-composer.held-send-setting-off"]
+        }
+      ],
+      "states": ["idle", "held", "sent", "cancelled", "upload-failed"],
+      "failureModes": [
+        "A failed upload drops the held send and shows the failure; the attachment chip keeps Retry and Remove, and Send works again once it is fixed.",
+        "Switching to another thread drops a held send; the draft stays."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "rich-composer.held-send",
+          "featureFile": "tooling/dshx/e2e/features/rich-composer.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.held-send-sends-when-ready",
+          "file": "plugins/@dshfiles/rich-composer/src/held-send.test.ts",
+          "testName": "waits while the upload runs, then sends once it is ready"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.held-send-edit-cancels",
+          "file": "plugins/@dshfiles/rich-composer/src/held-send.test.ts",
+          "testName": "cancels when the %s change while it waits"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.held-send-upload-failed",
+          "file": "plugins/@dshfiles/rich-composer/src/held-send.test.ts",
+          "testName": "cancels on a failed upload instead of sending without the file"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.held-send-keeps-mode",
+          "file": "plugins/@dshfiles/rich-composer/src/held-send.test.ts",
+          "testName": "keeps the steer or queue mode it was pressed for while a turn runs"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.held-send-bar",
+          "file": "plugins/@dshfiles/rich-composer/src/held-send-bar.test.tsx",
+          "testName": "waits with a visible held state, then sends by itself once the upload is ready"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.held-send-setting-off",
+          "file": "plugins/@dshfiles/rich-composer/src/held-send-bar.test.tsx",
+          "testName": "refuses with the notice when the setting is off"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the composer holds its own submit and starts no Host work beyond the ordinary prompt."
+        }
+      ]
+    },
+    {
       "id": "composer-run-row",
       "title": "Run row, send states and meter line",
       "summary": "A new thread carries its pre-send choices inside the composer card as quiet ghost pickers in the bottom bar: project · host · workspace · agent mode · file access after the + control, model and account beside Send. Each segment is the owner plugin’s own control placed through the composer’s slots, with its jargon explained in a tooltip; defaults come from each owner: host, agent mode and model from their last choice, the workspace from the project’s isolate-by-default setting, so a new thread with defaults needs no chip change. Send is one round button whose glyph says what a click does now (send, queue behind the running turn, steer into it, stop), with the context meter beside it. Once the thread has started the pickers collapse to one summary chip that leads the quiet meter line under the input (cost and activity readings · N queued); model and file access stay changeable in the toolbar. Below 560px the bar is one sideways-scrolling line with Send pinned, and the meter line scrolls instead of truncating.",

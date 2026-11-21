@@ -613,7 +613,7 @@ export function ChatView({
               </div>
             )}
             {transcript.hasMore && scroll.initialized && !loadingOlder && (
-              <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} onVisible={scroll.loadEarlier} fillSteps={fillSteps} />
+              <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} firstSeq={firstSeq} onVisible={scroll.loadEarlier} fillSteps={fillSteps} />
             )}
             {transcript.hasMore && loadingOlder && <div className={css.older}>{t('loading')}</div>}
             <MarkdownDelegateProvider

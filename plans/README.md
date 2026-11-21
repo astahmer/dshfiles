@@ -24,6 +24,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [ADE: remaining work](ade-ux/README.md)           | Native question forms in the Inbox, git-worktree scopes, a physical iPhone pass, e2e re-runs; design in [docs/ade-ux](../docs/ade-ux/README.md).         |
 | [Thread sharing](thread-share/README.md)          | v1 shipped as `@dshfiles/thread-share` (opt-in, not seeded); open: v2 collaborative threads (design only), opentunnel revisit.                           |
 | [Browser preview panel](browser-preview-panel.md) | Agent ↔ user hand-off (P5): an element highlight in the Agent browser and user annotations sent to the thread.                                           |
+| [Phone UI/UX](phone-ux/README.md) | Research done (competitors, platform, live audit); 33 ranked items across speed, back/navigation, composer, inbox, panels, PWA capabilities; nothing built. |
 | [Phone push notifications](phone-push-notifications/README.md) | Push finished turns and needs-you threads to the phone per category, with duplicate suppression and delivery health; nothing built. |
 | [t3code parity](t3code-parity.md)                 | Remaining t3code gaps (push, MCP Apps, preview recording, PR picker, other forges, OAuth); a closed-rows index maps shipped IDs to their plugin docs.    |
 

@@ -70,9 +70,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "ai-accounts",
-      "description": "Per-account Codex, Claude, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
+      "description": "Per-account Codex, Claude, Antigravity, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
       "ui": true,
-      "features": 20
+      "features": 21
     },
     {
       "name": "annotations",
@@ -246,7 +246,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "hmr-gate",
       "description": "Web client HMR transport that only announces a rebuilt plugin while its Host half is the code the running Host loaded.",
       "ui": true,
-      "features": 4
+      "features": 5
     },
     {
       "name": "html-render",
@@ -462,7 +462,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "rich-composer",
       "description": "Owned fork of DSH's native Conversation plugin with structured session-reference paste.",
       "ui": true,
-      "features": 11
+      "features": 12
     },
     {
       "name": "schedule",
@@ -475,12 +475,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "description": "Browse and manage secret CLI aliases for the selected project, without values crossing to the Client.",
       "ui": true,
       "features": 10
-    },
-    {
-      "name": "send-after-upload",
-      "description": "Queue the send when Enter or Send is pressed while an attachment is still uploading.",
-      "ui": true,
-      "features": 1
     },
     {
       "name": "session-controller",
@@ -612,7 +606,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "thread-sidebar",
       "description": "Replace the DSH sidebar with project-scoped thread groups and customizable navigation.",
       "ui": true,
-      "features": 55
+      "features": 56
     },
     {
       "name": "thread-transfer",
@@ -2880,6 +2874,47 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "tab",
           "name": "Models",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#antigravity-accounts",
+      "plugin": "ai-accounts",
+      "id": "antigravity-accounts",
+      "title": "Use a Google AI plan through the Antigravity CLI",
+      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with DSH's system prompt, none of Antigravity's built-in tools,…",
+      "destination": "settings",
+      "currentSurface": "dialog: Add AI account › Antigravity",
+      "reach": [
+        {
+          "text": "click text \"AI Accounts: Accounts\"",
+          "action": "click",
+          "by": "text",
+          "name": "AI Accounts: Accounts",
+          "value": null
+        },
+        {
+          "text": "click button \"Add account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add account",
+          "value": null
+        },
+        {
+          "text": "click button \"Antigravity account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Antigravity account",
+          "value": null
+        },
+        {
+          "text": "expect button \"Copy Antigravity sign-in command\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Copy Antigravity sign-in command",
           "value": null
         }
       ],
@@ -13031,6 +13066,26 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "hmr-gate#update-timing",
+      "plugin": "hmr-gate",
+      "id": "update-timing",
+      "title": "Plugin updates wait for a hidden or idle moment",
+      "summary": "The browser half holds graph and rebuilt frames until the Host connection is live again and the page is hidden, or the reader has been idle for 30 s with no focused field; nothing applies in the 10 s after the page comes back. Updates of the thread-drawing packages (chat, workbe…",
+      "destination": "none",
+      "currentSurface": "client: hmr-gate frame handling",
+      "reach": [
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "html-render#html-page-card",
       "plugin": "html-render",
       "id": "html-page-card",
@@ -14708,10 +14763,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "expect button \"Locate a landmark\"",
+          "text": "expect button \"Locate Current\"",
           "action": "expect",
           "by": "button",
-          "name": "Locate a landmark",
+          "name": "Locate Current",
           "value": null
         },
         {
@@ -20669,6 +20724,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "rich-composer#held-send",
+      "plugin": "rich-composer",
+      "id": "held-send",
+      "title": "Send once the attachments finish uploading",
+      "summary": "Send or Enter while a file or image still uploads holds the message instead of refusing it: Send shows a filling ring, a status line above the composer reads 'Sending when uploads finish (40%)' with Cancel, and the message goes out by itself, in the queue or steer mode it was pr…",
+      "destination": "composer",
+      "currentSurface": "composer: held Send and its status line",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "rich-composer#composer-run-row",
       "plugin": "rich-composer",
       "id": "composer-run-row",
@@ -21346,21 +21413,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": null,
       "onboarding": null
-    },
-    {
-      "key": "send-after-upload#send-after-upload",
-      "plugin": "send-after-upload",
-      "id": "send-after-upload",
-      "title": "Send when the attachment upload finishes",
-      "summary": "Enter, or a press on the disabled Send button, while a file attachment is still uploading queues the send behind a 'Sending when upload finishes…' composer pill whose menu has Cancel. Editing the text or the attachments, Escape or Cancel drops it; it sends on its own once every…",
-      "destination": "composer",
-      "currentSurface": "composer: Sending when upload finishes pill",
-      "reach": [],
-      "reachNarrow": null,
-      "onboarding": {
-        "firstAction": "Attach a large file and press Enter before it finishes uploading.",
-        "doneWhen": "The message sends by itself once the upload ends."
-      }
     },
     {
       "key": "session-controller#live-model-catalog",
@@ -25848,6 +25900,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "Below 640px the fixed layout is a stack (docs/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from…",
       "destination": "threads",
       "currentSurface": "shell: phone tab bar only; the stage kept the desktop tab strip and no Back",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "thread-sidebar#phone-drawer-navigation",
+      "plugin": "thread-sidebar",
+      "id": "phone-drawer-navigation",
+      "title": "Open the thread list as a drawer on a phone",
+      "summary": "With phoneNavigation set to drawer, a phone (below 640px) keeps the thread on screen instead of pushing it over a full-screen list, as stock DSH and the ChatGPT and Claude apps do. The top bar's leading control is Show threads and there is no bottom tab bar; only a thread opened…",
+      "destination": "threads",
+      "currentSurface": "shell: phone stack only (tab bar, full-screen list, Back)",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

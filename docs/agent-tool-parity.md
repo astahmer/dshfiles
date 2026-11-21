@@ -94,7 +94,6 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | agent-telemetry                                                                                             | 0                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 0             | 0                                        |
 | request-messages                                                                                            | 1                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 0             | 1                                        |
 | rich-composer                                                                                               | 2                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 0             | 2                                        |
-| send-after-upload                                                                                           | 2                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 1             | 1                                        |
 | attachment-gallery                                                                                          | 5                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 2             | 3                                        |
 | thread-transfer                                                                                             | 2                    | 4 (`thread_export`, `thread_bundle_inspect`, `thread_import`, `thread_import_destinations`)                                                                                                                                                                                                                                                                          | 0             | 0                                        |
 | thread-share                                                                                                | 8                    | 6 (`thread_share_list`, `thread_share_create`, `thread_share_revoke`, `thread_share_export`, `thread_share_publish_status`, `thread_share_publish_stop`); starting a public tunnel is user-only by design                                                                                                                                                            | 0             | 0                                        |
@@ -488,7 +487,7 @@ titles, content and memory`) — read-only `memory_projects`,
   types only, so they need schemas before they can publish tool schemas; settings
   go through `settings_set`.
 
-### editor, diff-viewed, queue-reorder, attachments, send-after-upload
+### editor, diff-viewed, queue-reorder, attachments, held send
 
 - `editor`: **`editor_write` is bound** (sibling revision `feat(editor): expose
 the guarded save as an agent tool`) — the sha256-guarded save, with `sessionId`
@@ -511,7 +510,7 @@ steer a queued message`). Still missing: `queue_move_to_thread` (the prompt half
   `QueueAction.edit` is text-only (a recorded Host gap).
 - `attachment-gallery`: `session_attach_file` (session attachment + upload),
   `session_read_attachment` (`session/attachment`).
-- `send-after-upload`: `session_queue_message` (queue-mode prompt, reachable as
+- `rich-composer` held send: `session_queue_message` (queue-mode prompt, reachable as
   `thread_prompt` with `mode: 'queue'`).
 
 ### Native DSH session, workspace, model
@@ -660,7 +659,7 @@ Profile-level plugin install/remove exists in core `plugin_manager`
 - **Right-sidebar tabs, left-sidebar grouping, tab strips, workbench docking**
   (workbench, main-tabs, thread-sidebar): client layout state.
 - **Composer and draft state** (rich-composer `insertReference`, prompt-stash
-  library and drafts, send-after-upload cancel banner, attachment draft retry):
+  library and drafts, held-send status line, attachment draft retry):
   the composer is client-owned; no Host RPC writes into a user's draft.
 - **Review marks** (diff-viewed, jujutsu, thread-sidebar read state): stored in
   `localStorage`, no Host projection.

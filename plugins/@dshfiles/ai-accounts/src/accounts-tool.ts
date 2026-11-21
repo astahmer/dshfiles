@@ -79,7 +79,7 @@ export const aiAccountsTool = Tool.make({
             ? account.shadowHomePath === ''
               ? account.homePath
               : account.shadowHomePath
-            : account.kind === 'claude'
+            : account.kind === 'claude' || account.kind === 'antigravity'
               ? account.homePath
               : account.apiBaseUrl,
         mode: account.mode,

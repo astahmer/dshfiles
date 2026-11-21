@@ -53,7 +53,6 @@ export const PACKS: readonly Pack[] = [
       'model-selection',
       'agent-preset',
       'input-trigger',
-      'send-after-upload',
       'user-questions',
       'deliverables',
       'cordis-cards',

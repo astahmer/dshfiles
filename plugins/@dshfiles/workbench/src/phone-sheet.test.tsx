@@ -48,51 +48,72 @@ describe('PhoneSheet', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
-  it('follows a header drag down, closes on a long pull and springs back from one that returns', () => {
-    // jsdom has neither PointerEvent nor pointer capture; browsers do.
-    HTMLElement.prototype.setPointerCapture ??= () => {}
-    if (typeof window.PointerEvent !== 'function')
-      Object.defineProperty(window, 'PointerEvent', {
-        configurable: true,
-        value: class extends MouseEvent {
-          readonly pointerId: number
-          readonly isPrimary: boolean
-          constructor(type: string, init: PointerEventInit = {}) {
-            super(type, init)
-            this.pointerId = init.pointerId ?? 0
-            this.isPrimary = init.isPrimary ?? false
-          }
-        },
-      })
-    const onClose = vi.fn()
-    const { container } = render(
-      <PhoneSheet shown heading="Thread panel" onClose={onClose}>
-        <p>Body</p>
-      </PhoneSheet>,
-    )
-    const sheet = container.ownerDocument.querySelector<HTMLElement>('[data-phone-sheet]')
-    const handle = container.ownerDocument.querySelector<HTMLElement>('[data-phone-sheet-handle]')
-    if (sheet === null || handle === null) throw new Error('sheet not rendered')
-    expect(handle.style.touchAction).toBe('none')
-    // jsdom lays nothing out: give the sheet a phone sheet's height, so a 200px pull is past 30% of it.
-    sheet.getBoundingClientRect = () => new DOMRect(0, 0, 390, 600)
-    const pointer = { pointerId: 1, isPrimary: true, button: 0 }
-    fireEvent.pointerDown(handle, { ...pointer, clientY: 100 })
-    fireEvent.pointerMove(handle, { ...pointer, clientY: 110 })
-    expect(sheet.style.transform).toBe('translateY(10px)')
-    fireEvent.pointerMove(handle, { ...pointer, clientY: 60 })
-    expect(sheet.style.transform).toBe('')
-    fireEvent.pointerUp(handle, { ...pointer, clientY: 60 })
-    expect(onClose).not.toHaveBeenCalled()
-    fireEvent.pointerDown(handle, { ...pointer, clientY: 100 })
-    fireEvent.pointerMove(handle, { ...pointer, clientY: 300 })
-    fireEvent.pointerUp(handle, { ...pointer, clientY: 300 })
-    expect(onClose).toHaveBeenCalledTimes(1)
-    expect(sheet.style.transform).toBe('')
-    // The header's Close keeps its tap: pressing it starts no drag.
-    fireEvent.pointerDown(screen.getAllByRole('button', { name: 'Close Thread panel' })[1] ?? handle, { ...pointer, clientY: 100 })
-    fireEvent.pointerMove(handle, { ...pointer, clientY: 300 })
-    expect(sheet.style.transform).toBe('')
+  it('follows a header drag down and closes on a long pull, grows to just under the top bar on a drag up, and keeps Close a tap', () => {
+    vi.useFakeTimers()
+    const media = window.matchMedia
+    window.matchMedia = (query: string): MediaQueryList =>
+      Object.assign(new EventTarget(), { matches: query.includes('max-width'), media: query, onchange: null, addListener: () => {}, removeListener: () => {} })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 })
+    const touch = (target: Element, type: string, y: number, time: number): Event => {
+      const event = new Event(type, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'touches', { value: type === 'touchend' ? [] : [{ clientX: 100, clientY: y }] })
+      Object.defineProperty(event, 'timeStamp', { value: time })
+      target.dispatchEvent(event)
+      return event
+    }
+    try {
+      const onClose = vi.fn()
+      const { container } = render(
+        <PhoneSheet shown heading="Thread panel" onClose={onClose}>
+          <div data-testid="list" style={{ overflowY: 'auto' }} />
+        </PhoneSheet>,
+      )
+      const sheet = container.ownerDocument.querySelector<HTMLElement>('[data-phone-sheet]')
+      const handle = container.ownerDocument.querySelector<HTMLElement>('[data-phone-sheet-handle]')
+      if (sheet === null || handle === null) throw new Error('sheet not rendered')
+      expect(handle.style.touchAction).toBe('none')
+      const ownHeight = sheet.style.height
+      // jsdom lays nothing out: a 500px sheet above a 56px tab bar, over a list with 600px more to scroll.
+      sheet.getBoundingClientRect = () => new DOMRect(0, 288, 390, 500)
+      // The phone shell's 44px top bar: the expanded sheet stops just under it.
+      const topBar = document.createElement('header')
+      topBar.setAttribute('data-phone-top-bar', '')
+      topBar.getBoundingClientRect = () => new DOMRect(0, 0, 390, 44)
+      document.body.append(topBar)
+      const list = screen.getByTestId('list')
+      Object.defineProperty(list, 'scrollHeight', { value: 1000 })
+      Object.defineProperty(list, 'clientHeight', { value: 400 })
+
+      touch(handle, 'touchstart', 300, 0)
+      touch(handle, 'touchmove', 100, 400)
+      expect(sheet.style.getPropertyValue('height')).toBe('700px')
+      touch(handle, 'touchend', 100, 800)
+      vi.advanceTimersByTime(300)
+      expect(sheet.style.getPropertyValue('height')).toBe('744px')
+      expect(onClose).not.toHaveBeenCalled()
+
+      touch(handle, 'touchstart', 100, 1000)
+      touch(handle, 'touchmove', 600, 1400)
+      expect(sheet.style.getPropertyValue('transform')).toBe('translateY(256px)')
+      touch(handle, 'touchend', 600, 1800)
+      vi.advanceTimersByTime(300)
+      expect(onClose).toHaveBeenCalledTimes(1)
+      vi.advanceTimersByTime(500)
+      // jsdom has no layout, so the sheet reads as put away: the owner's own height comes back.
+      expect(sheet.style.height).toBe(ownHeight)
+      expect(sheet.style.getPropertyValue('transform')).toBe('')
+
+      // The header's Close keeps its tap: a touch that does not move starts no drag.
+      const close = screen.getAllByRole('button', { name: 'Close Thread panel' })[1] ?? handle
+      touch(close, 'touchstart', 300, 3000)
+      touch(close, 'touchend', 300, 3050)
+      fireEvent.click(close)
+      expect(onClose).toHaveBeenCalledTimes(2)
+    } finally {
+      document.querySelector('[data-phone-top-bar]')?.remove()
+      window.matchMedia = media
+      vi.useRealTimers()
+    }
   })
 
   it('is one history entry while shown: the browser Back closes it, and closing it consumes the entry', async () => {

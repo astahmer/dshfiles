@@ -23,6 +23,12 @@ Feature: AI Accounts
     When the sidebar add-account shortcut is opened from the composer
     Then account setup closes without navigating away or losing the composer draft
 
+  @scenario:ai-accounts.antigravity-setup
+  Scenario: Offer the Antigravity CLI sign-in for a Google AI plan
+    Given the isolated provisional account connections profile is booted
+    When an Antigravity account is chosen from the sidebar add-account shortcut
+    Then the Antigravity CLI sign-in command is offered without a key field, and cancelling adds no account
+
   @scenario:ai-accounts.login-methods
   Scenario: Restore explicit CLI key-reference and custom-home sign-in choices
     Given the isolated provisional account connections profile is booted

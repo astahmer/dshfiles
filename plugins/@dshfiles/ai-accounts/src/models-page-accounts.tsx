@@ -28,6 +28,7 @@ const CREDENTIAL_FIELD = {
   commandcode: { key: 'apiKeyEnv', label: 'Key variable', placeholder: 'COMMANDCODE_API_KEY' },
   cursor: { key: 'apiKeyEnv', label: 'Token variable', placeholder: 'empty: cursor-agent login' },
   mistral: { key: 'apiKeyEnv', label: 'Key variable', placeholder: 'empty: vibe --setup login' },
+  antigravity: { key: 'homePath', label: 'HOME for agy', placeholder: 'empty: ~ (agy acp --login)' },
 } as const satisfies Record<AccountDraft['kind'], { readonly key: 'homePath' | 'apiKeyEnv'; readonly label: string; readonly placeholder: string } | null>
 
 const QuickEditor = (props: { readonly profile: AccountProfile; readonly saveDraft: (draft: AccountDraft) => Promise<AccountsFile> }): JSX.Element => {

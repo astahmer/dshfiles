@@ -4,6 +4,7 @@ import { useRef, useState, useSyncExternalStore } from 'react'
 import type { JSX, KeyboardEvent, ReactNode } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@dshfiles/plugin-ui/components/ui/sheet'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { QuotePreview } from '@deepseek-ai/dsh-client-ui-primitives'
 import { formatQuoteText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { QuoteSummary } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -16,7 +17,7 @@ import { createCommand, DecoratorNode } from 'lexical'
 export interface QuoteNodeLabels {
   readonly remove: string
   /** Comment copy; present when the owner turns a commented quote into an annotation (COMMENT_QUOTE_COMMAND). */
-  readonly comment?: { readonly edit: string; readonly selected: string; readonly placeholder: string } | undefined
+  readonly comment?: { readonly edit: string; readonly selected: string; readonly placeholder: string; readonly done: string } | undefined
 }
 
 const EMPTY_LABELS: QuoteNodeLabels = { remove: '' }
@@ -100,6 +101,10 @@ const CommentableQuote = ({ editor, nodeKey, text, copy, children }: {
             <SheetTitle className="dshx:text-sm">{copy.edit}</SheetTitle>
             <SheetDescription className="dshx:sr-only">{copy.placeholder}</SheetDescription>
             {body}
+            {/* A phone has no Enter-to-save habit and tapping outside to commit is invisible: confirm explicitly. */}
+            <Button type="button" className="dshx:min-h-11 dshx:self-end" data-quote-comment-done="" onClick={() => { openChange(false) }}>
+              {copy.done}
+            </Button>
           </SheetContent>
         </Sheet>
       </>
@@ -237,7 +242,8 @@ export class QuoteNode extends DecoratorNode<JSX.Element> {
   setLabels(labels: QuoteNodeLabels): void {
     const current = this.getLatest().__labels
     if (current.remove !== labels.remove || current.comment?.edit !== labels.comment?.edit
-      || current.comment?.selected !== labels.comment?.selected || current.comment?.placeholder !== labels.comment?.placeholder) {
+      || current.comment?.selected !== labels.comment?.selected || current.comment?.placeholder !== labels.comment?.placeholder
+      || current.comment?.done !== labels.comment?.done) {
       this.getWritable().__labels = labels
     }
   }

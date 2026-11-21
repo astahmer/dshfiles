@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import * as Schema from 'effect/Schema'
-import { expect, type Page } from '@playwright/test'
+import { expect, type Page, type Route } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import type {} from '../../../packages/dshx/src/client/broker.js'
 import type { ComposerService } from '../../../packages/dshx/src/client/app-services.js'
@@ -261,5 +261,98 @@ Then('the run row holds project, host, workspace and model, and sending with the
     await expect(runRow(page)).toHaveCount(0)
     await expect(page.locator('[data-run-summary]')).toBeVisible()
   })
+  await finishJourneyAssertions(page)
+})
+
+const UPLOAD_ROUTE = '**/api/session/uploadFileBinary**'
+const heldUploads = new WeakMap<Page, Route[]>()
+const heldStatus = (page: Page) => page.locator('[data-held-send]')
+const sendButton = (page: Page) => page.locator('[data-composer-card]:visible [data-send-mode]')
+// A sent user message, never the composer's own draft.
+const sentPrompt = (page: Page, text: string) => page.locator('[data-conversation-session]:visible [class*="_userRow"]').getByText(text, { exact: true })
+
+const attachHeldFile = async (page: Page, text: string): Promise<void> => {
+  await threadComposer(page).click()
+  await page.keyboard.type(text)
+  await page.locator('[data-composer-card] input[type="file"]').setInputFiles(join(attachmentFixtures, 'note.txt'))
+  await expect(page.getByText('Uploading…').first()).toBeVisible()
+}
+
+const releaseHeldUploads = async (page: Page): Promise<void> => {
+  const routes = heldUploads.get(page) ?? []
+  heldUploads.set(page, [])
+  for (const route of routes) await route.continue()
+}
+
+When('a thread composer holds its file uploads', async ({ page }: { page: Page }) => {
+  await openNewProjectThread(page, { title: 'Held send journey', folder: 'held-send-project', text: 'a thread to upload into' })
+  await expect(failedTurns(page)).toHaveCount(1, { timeout: 20_000 })
+  heldUploads.set(page, [])
+  await page.route(UPLOAD_ROUTE, route => {
+    heldUploads.get(page)?.push(route)
+  })
+})
+
+When('{string} is typed with a held file attached and Send is pressed', async ({ page }: { page: Page }, text: string) => {
+  await attachHeldFile(page, text)
+  await sendButton(page).click()
+})
+
+When('{string} is typed with a held file attached and Enter is pressed', async ({ page }: { page: Page }, text: string) => {
+  await attachHeldFile(page, text)
+  await page.keyboard.press('Enter')
+})
+
+Then('the composer shows the held send and keeps the draft', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'rich-composer-held-send-shows-status', async () => {
+    await expect(heldStatus(page)).toContainText('Sending when uploads finish')
+    await expect(sendButton(page)).toHaveAttribute('data-send-mode', 'held')
+    await expect(page.getByText('Files are still uploading; send after they finish')).toHaveCount(0)
+    await expect(threadComposer(page)).not.toHaveText('')
+  })
+})
+
+When('the held upload finishes', async ({ page }: { page: Page }) => {
+  await releaseHeldUploads(page)
+})
+
+Then('{string} is sent by itself', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'rich-composer-held-send-sends-when-ready', async () => {
+    await expect(sentPrompt(page, text)).toBeVisible({ timeout: 20_000 })
+    await expect(heldStatus(page)).toHaveCount(0)
+    await expectDraft(page, '')
+  })
+})
+
+When('the held draft is edited', async ({ page }: { page: Page }) => {
+  await expect(heldStatus(page)).toBeVisible()
+  await threadComposer(page).press('End')
+  await page.keyboard.type('!')
+})
+
+When('the waiting Send is pressed again', async ({ page }: { page: Page }) => {
+  await expect(heldStatus(page)).toBeVisible()
+  await sendButton(page).click()
+})
+
+Then('the held send is dropped and {string} is not sent after the upload', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, `rich-composer-held-send-cancelled-${text.replace(/\W+/gu, '-')}`, async () => {
+    await expect(heldStatus(page)).toHaveCount(0)
+    await releaseHeldUploads(page)
+    await expect(page.getByText('Uploading…')).toHaveCount(0)
+    await expect.poll(() => composerText(page)).toBe(text)
+    await expect(sentPrompt(page, text)).toHaveCount(0)
+  })
+  await threadComposer(page).click()
+  await page.keyboard.press('ControlOrMeta+A')
+  await page.keyboard.press('Backspace')
+  await page
+    .locator('[data-composer-card] button[aria-label^="Remove"]')
+    .first()
+    .click()
+    .catch(() => undefined)
+})
+
+Then('the held-send journey is complete', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })

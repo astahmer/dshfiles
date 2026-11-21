@@ -1,10 +1,12 @@
 import { expect, test } from 'vitest'
-import { shouldBootstrapRemoteSession } from './remote-session-bootstrap-policy.js'
+import { shouldBootstrapRemoteSession, type ShownSession } from './remote-session-bootstrap-policy.js'
+
+const blank = (sessionId: string): ShownSession => ({ kind: 'session', sessionId, blank: true })
 
 test('bootstrap waits for an existing session owner check', () => {
   expect(
     shouldBootstrapRemoteSession({
-      currentSessionId: 'session-1',
+      shown: blank('session-1'),
       ownerKnown: false,
       ownerRuntimeId: undefined,
       destinationRuntimeId: 'runtime-a',
@@ -15,7 +17,7 @@ test('bootstrap waits for an existing session owner check', () => {
 test('bootstrap skips the remote session it just opened', () => {
   expect(
     shouldBootstrapRemoteSession({
-      currentSessionId: 'session-1',
+      shown: blank('session-1'),
       ownerKnown: true,
       ownerRuntimeId: 'runtime-a',
       destinationRuntimeId: 'runtime-a',
@@ -26,7 +28,7 @@ test('bootstrap skips the remote session it just opened', () => {
 test('bootstrap can switch destinations from a thread owned by another runtime', () => {
   expect(
     shouldBootstrapRemoteSession({
-      currentSessionId: 'session-1',
+      shown: blank('session-1'),
       ownerKnown: true,
       ownerRuntimeId: 'runtime-b',
       destinationRuntimeId: 'runtime-a',
@@ -37,7 +39,7 @@ test('bootstrap can switch destinations from a thread owned by another runtime',
 test('bootstrap can start a new thread from a local or new-chat screen', () => {
   expect(
     shouldBootstrapRemoteSession({
-      currentSessionId: 'session-local',
+      shown: blank('session-local'),
       ownerKnown: true,
       ownerRuntimeId: null,
       destinationRuntimeId: 'runtime-a',
@@ -45,10 +47,32 @@ test('bootstrap can start a new thread from a local or new-chat screen', () => {
   ).toBe(true)
   expect(
     shouldBootstrapRemoteSession({
-      currentSessionId: undefined,
+      shown: { kind: 'none' },
       ownerKnown: false,
       ownerRuntimeId: undefined,
       destinationRuntimeId: 'runtime-a',
     }),
   ).toBe(true)
+})
+
+test('bootstrap stays off while the main view switches to a thread with turns', () => {
+  expect(
+    shouldBootstrapRemoteSession({
+      shown: { kind: 'session', sessionId: 'session-busy', blank: false },
+      ownerKnown: false,
+      ownerRuntimeId: undefined,
+      destinationRuntimeId: 'runtime-a',
+    }),
+  ).toBe(false)
+})
+
+test('bootstrap waits for the shown Session to be listed', () => {
+  expect(
+    shouldBootstrapRemoteSession({
+      shown: { kind: 'unlisted' },
+      ownerKnown: false,
+      ownerRuntimeId: undefined,
+      destinationRuntimeId: 'runtime-a',
+    }),
+  ).toBe(false)
 })

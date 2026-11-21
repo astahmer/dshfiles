@@ -6,7 +6,7 @@ import { SceneView } from '../src/scene-canvas/view.ts'
 
 const track = (values: number[], options: Partial<Track> = {}): Track => ({
   period: 1000,
-  count: values.length,
+  count: values.length - 1,
   stride: 1,
   hold: false,
   loop: true,
@@ -22,16 +22,19 @@ const at = (value: Track, time: number): number => {
 
 describe('scene canvas', () => {
   it('plays a sampled animation track: loops, holds steps and stops a finite one on its last value', () => {
-    const ramp = track([0, 10, 20, 30])
-    // Between two samples it blends; past the period it starts over, back to the first sample after the last.
+    // Snow falling 40 px a period: four steps, and the value as the period ends.
+    const ramp = track([0, 10, 20, 30, 40])
+    // Between two samples it blends; past the period it starts over.
     expect(at(ramp, 125)).toBeCloseTo(5)
     expect(at(ramp, 1125)).toBeCloseTo(5)
-    expect(at(ramp, 875)).toBeCloseTo(15)
+    // The last step keeps falling to the end value; it does not slide back up to the start (it jumps there, as CSS).
+    expect(at(ramp, 875)).toBeCloseTo(35)
+    expect(at(ramp, 1000)).toBeCloseTo(0)
     // A `steps()` animation holds each sample.
-    expect(at(track([0, 10, 20, 30], { hold: true }), 490)).toBe(10)
+    expect(at(track([0, 10, 20, 30, 40], { hold: true }), 490)).toBe(10)
     // A finite animation keeps its last value.
-    expect(at(track([0, 10, 20, 30], { loop: false }), 5000)).toBeCloseTo(30)
-    expect(at(ramp, -125)).toBeCloseTo(15)
+    expect(at(track([0, 10, 20, 30, 40], { loop: false }), 5000)).toBeCloseTo(40)
+    expect(at(ramp, -125)).toBeCloseTo(35)
   })
 
   it('moves a part by its animated transform about its origin', () => {
@@ -39,7 +42,7 @@ describe('scene canvas', () => {
       parent: -1,
       origin: [100, 50] as const,
       translate: [0, 0] as const,
-      rotate: track([0, 90], { period: 2000, hold: true }),
+      rotate: track([0, 90, 90], { period: 2000, hold: true }),
       scale: [1, 1] as const,
       transform: Affine.translate(0, 0),
       moves: true,

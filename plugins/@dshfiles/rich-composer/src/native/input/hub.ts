@@ -134,7 +134,7 @@ export class InputHub implements SessionInputResolver {
       defaultSink: (text, attachmentIds, mode, signal, accept) => this.sink(session, text, attachmentIds, mode, signal, accept),
       quoteLabels: () => ({
         remove: this.t('quote.remove'),
-        comment: { edit: this.t('annotation.edit'), selected: this.t('annotation.selected'), placeholder: this.t('annotation.placeholder') },
+        comment: { edit: this.t('annotation.edit'), selected: this.t('annotation.selected'), placeholder: this.t('annotation.placeholder'), done: this.t('annotation.done') },
       }),
       quoteInsertionAllowed: () => {
         const state = session.getSnapshot()

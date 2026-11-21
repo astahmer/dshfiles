@@ -76,7 +76,7 @@ export function ComposerContentEditable({ editor, editable, elementRef, ...rest 
       // A touch keyboard's return key breaks the line there (keymap `enterBreaksLine`): label it so.
       enterKeyHint="enter"
       data-composer-input
-      // Capture-phase Enter interceptors in other plugins (jj-integration, send-after-upload) leave a bare return here.
+      // Capture-phase Enter interceptors in other plugins (jj-integration) leave a bare return here.
       data-enter-newline={hasTouchKeyboard() ? '' : undefined}
       {...rest}
     />

@@ -29,6 +29,7 @@ export type ActivityEvent =
   | { readonly type: 'tool-result'; readonly callId: string }
   | { readonly type: 'job-registered'; readonly job: LiveJob }
   | { readonly type: 'job-settled'; readonly jobId: string }
+  | { readonly type: 'session-reopened' }
 
 export interface ActivityState {
   readonly turn: number | undefined
@@ -43,7 +44,11 @@ const EMPTY: ActivityState = { turn: undefined, tools: new Map(), jobs: new Map(
 export const LiveActivity = {
   empty: EMPTY,
 
-  /** Apply one event; a turn boundary closes calls left without a result (an interrupted turn). */
+  /**
+   * Apply one event; a turn boundary closes calls left without a result (an interrupted turn). A reopened Session
+   * (`session/end-seed`, written when a Host loads it) also drops jobs: the in-process job registry died with the Host
+   * that started them, so no `job/settled` will ever follow.
+   */
   apply(state: ActivityState, event: ActivityEvent): ActivityState {
     switch (event.type) {
       case 'turn-start':
@@ -72,6 +77,8 @@ export const LiveActivity = {
         jobs.delete(event.jobId)
         return { ...state, jobs }
       }
+      case 'session-reopened':
+        return state.tools.size === 0 && state.jobs.size === 0 ? state : { ...state, tools: new Map(), jobs: new Map() }
     }
   },
 

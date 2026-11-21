@@ -12,6 +12,7 @@ import type { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropi
 import type { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import type { createCommandCodeProvider } from './commandcode-provider.js'
 import type { createMistralProvider } from './mistral-provider.js'
+import type { createAntigravityProvider } from './antigravity-provider.js'
 
 /** DeepSeek's documented default effort when thinking is on and the request names none. */
 const DEEPSEEK_DEFAULT_EFFORT = 'high'
@@ -57,6 +58,33 @@ const OPENCODE_GO_STREAM_IDLE_TIMEOUT_MS = 300_000
 const streamIdleTimeoutMsFor = (upstreamId: string): number =>
   upstreamId === 'opencode-go' ? OPENCODE_GO_STREAM_IDLE_TIMEOUT_MS : SILENT_REASONING_STREAM_IDLE_TIMEOUT_MS
 
+/**
+ * Images one request may retain on a route, and how many of the oldest occurrences
+ * drop per overflow. The adapter refuses to dispatch above this budget and reports
+ * `IMAGE_OFFLOAD_REQUIRED`, which `dsh-compaction-image-offload` answers by replacing
+ * the oldest images with text and retrying. A budget above the provider's own ceiling
+ * never fires: the provider rejects the request instead and the turn ends with an
+ * unrecoverable `INVALID_REQUEST`.
+ */
+type ImageRequestBudget = {
+  /** Retained image occurrences one request may carry. */
+  readonly maxImages: number
+  /** Oldest occurrences offloaded per overflow; never above `maxImages`. */
+  readonly offloadQuantum: number
+}
+
+/**
+ * Mistral answers code 3051 (`Total number of images exceeds the maximum allowed of 20`)
+ * at the 21st image of one request, so a shared 50-image budget silently traded a
+ * recoverable offload for a failed turn.
+ */
+const MISTRAL_IMAGE_BUDGET: ImageRequestBudget = { maxImages: 20, offloadQuantum: 5 }
+
+/** No published ceiling under 50 on the OpenAI-compatible routes (Anthropic allows 100). */
+const DEFAULT_IMAGE_BUDGET: ImageRequestBudget = { maxImages: 50, offloadQuantum: 10 }
+
+const imageBudgetFor = (upstreamId: string): ImageRequestBudget => (upstreamId === 'mistral' ? MISTRAL_IMAGE_BUDGET : DEFAULT_IMAGE_BUDGET)
+
 const profilePins = new WeakMap<ResolvedPiAiProviderProfile, Readonly<Record<string, string>>>()
 const nativeModels = new WeakMap<ResolvedPiAiProviderProfile, ReadonlySet<string>>()
 
@@ -92,6 +120,7 @@ export class ProviderProfileModel {
       | ReturnType<typeof githubCopilotProvider>
       | ReturnType<typeof createCommandCodeProvider>
       | ReturnType<typeof createMistralProvider>
+      | ReturnType<typeof createAntigravityProvider>
     readonly provider: string
     readonly displayName: string
     readonly additionalModelIds: readonly string[]
@@ -160,6 +189,7 @@ export class ProviderProfileModel {
       }),
     )
 
+    const imageBudget = imageBudgetFor(params.upstream.id)
     const profile: ResolvedPiAiProviderProfile = {
       provider: params.provider,
       displayName: params.displayName,
@@ -169,8 +199,8 @@ export class ProviderProfileModel {
       maxRequestImageBytes: 20_971_520,
       requestImagePixelBudget: 4_194_304,
       requestImageMaxBytes: 1_048_576,
-      maxRequestImages: 50,
-      imageOffloadCountQuantum: 10,
+      maxRequestImages: imageBudget.maxImages,
+      imageOffloadCountQuantum: imageBudget.offloadQuantum,
       modelErrors: new Map(),
       configuredMaxTokens: new Map(),
       retryPolicy: {

@@ -1182,8 +1182,9 @@ export class ChatViewport {
     } else if (event.target instanceof HTMLElement && event.target.hasAttribute('data-step-process-body')) this.events?.scrollEnd(false)
   }
 
+  /** A finger still on the rows owns every scroll it makes: a touch drag renews no intent the way a wheel does. */
   private readerGesturing(): boolean {
-    return this.gesture.pointerHeld || performance.now() - this.gesture.at < READER_GESTURE_MS
+    return this.gesture.pointerHeld || this.historyTouch || performance.now() - this.gesture.at < READER_GESTURE_MS
   }
 
   private readonly onPointerRelease = (): void => {

@@ -120,6 +120,18 @@ ArrowUp in an empty composer shows this thread's previous prompt; ArrowUp again 
 
 A paste of 32 KiB or more of text becomes a `pasted-<date>-<time>.txt` file attachment through the same upload path as a picked file, instead of filling the draft. A notice above the composer offers **Paste as text**, which removes that attachment and inserts the text as an ordinary paste. Continuable subagent composers, which accept only images, keep the text inline.
 
+## Send while uploads run
+
+Send or Enter while a file or an image still uploads holds the message instead of refusing it. Send shows a ring that
+fills with the upload progress, and a status line above the card reads "Sending when uploads finish (40%)" with
+**Cancel**; on a phone it sits where composer alerts show, above the keyboard. Once every upload is ready the message
+goes out by itself, in the queue or steer mode it was pressed for (`src/held-send.ts`, pure, decides each step).
+Editing the text, the attachments, the quotes and notes or plan mode drops the held send, and so do Cancel, a second
+press on the waiting Send and switching threads; the draft stays. A failed upload drops it too and shows the failure,
+with Retry and Remove on the attachment chip. `sendWhenUploaded` (Plugins page, on by default, applies live) turns it
+off: Send then refuses with "Files are still uploading" as upstream does. This replaces the retired
+`@dshfiles/send-after-upload`, whose window capture never reached this composer's enabled Send button.
+
 ## Composer contract
 
 The fork provides dshx's `Composer` contract (`src/composer-service.ts`) over its per-session input shells, so other plugins read and edit the draft, add chips, pick the model and move focus without a slot of their own. Quote, note, terminal-excerpt and line-comment chips are reference chips of the `composer-snippet` input-trigger source (`src/composer-snippets.ts`): the chip carries its content in `ref`, so a restored draft still sends it, and the model reads a quote as a Markdown block quote, a note inside `<note>` tags, a terminal excerpt inside `<terminal-excerpt>` tags and a comment inside `<comment path lines>`. A terminal excerpt's label is the terminal line range it came from (`Terminal 12-14`), and activating the chip reveals the captured output the draft holds. File chips use the native `reference` source the composer's file drop already uses. A plain-text draft whose serialized references still name chips (`[Image 1]`, `b:<ref>`, `@{handle}`, a file or thread mention) is turned back into those chips with `restoreReferences()`: every trigger source's `restore` grammar supplies the spans and the draft text itself is unchanged. `setModel` goes through the `modelDirectories` service, the same path as the model picker.

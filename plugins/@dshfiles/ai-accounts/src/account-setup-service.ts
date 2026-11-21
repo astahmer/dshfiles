@@ -344,7 +344,8 @@ export const createAccountSetupService = (input: {
       if (
         (configuration.homePath !== undefined || configuration.shadowHomePath !== undefined) &&
         operation.draft.kind !== 'codex' &&
-        operation.draft.kind !== 'claude'
+        operation.draft.kind !== 'claude' &&
+        operation.draft.kind !== 'antigravity'
       )
         throw new Error('This provider does not use a configured CLI home.')
       if (method === 'key' && configuration.apiKeyEnv !== undefined && configuration.apiKeyEnv !== privateReference(operation.operationId))

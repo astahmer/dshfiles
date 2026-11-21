@@ -4,6 +4,7 @@ import { ClaudeAccountModel } from './claude-account.js'
 import { CodexHomeError, type CodexHomeLayout } from './codex-home.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 import { DEFAULT_MISTRAL_KEY_ENV, MISTRAL_KIND as M_KIND } from './mistral-account.js'
+import { ANTIGRAVITY_KIND as AG_KIND, AntigravityAccountModel } from './antigravity-account.js'
 
 export const CODEX_KIND = 'codex'
 export const OPENCODE_KIND = 'opencode-go'
@@ -11,6 +12,7 @@ export const COMMANDCODE_KIND = CC_KIND
 export const CLAUDE_KIND = 'claude'
 export const GITHUB_COPILOT_KIND = 'github-copilot'
 export const MISTRAL_KIND = M_KIND
+export const ANTIGRAVITY_KIND = AG_KIND
 
 const SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
 
@@ -60,7 +62,19 @@ export interface ClaudeRoute {
   readonly enabled: boolean
 }
 
-export type Route = CodexRoute | KeyedRoute | ClaudeRoute | GitHubCopilotRoute
+export interface AntigravityRoute {
+  readonly kind: typeof ANTIGRAVITY_KIND
+  readonly instanceId: string
+  readonly displayName: string
+  /** Resolved HOME for `agy`; its `.gemini` holds the account's login. */
+  readonly home: string
+  readonly enabled: boolean
+}
+
+export type Route = CodexRoute | KeyedRoute | ClaudeRoute | GitHubCopilotRoute | AntigravityRoute
+
+/** Routes whose model list is discovered from the account rather than read from a static catalog. */
+export type DiscoveringRoute = KeyedRoute | AntigravityRoute
 
 const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: string): string => {
   const explicit = account.shadowHomePath.trim()
@@ -151,6 +165,16 @@ export class ProviderRoutes {
         kind: GITHUB_COPILOT_KIND,
         instanceId,
         displayName: displayNameFor(account.displayName, GITHUB_COPILOT_KIND, instanceId),
+        enabled: account.enabled,
+      })
+    }
+    for (const account of config.antigravityAccounts) {
+      const instanceId = ProviderRoutes.normalizeInstanceId(account.instanceId, ANTIGRAVITY_KIND)
+      routes.set(instanceId, {
+        kind: ANTIGRAVITY_KIND,
+        instanceId,
+        displayName: displayNameFor(account.displayName, ANTIGRAVITY_KIND, instanceId),
+        home: AntigravityAccountModel.resolveHome(account.home),
         enabled: account.enabled,
       })
     }

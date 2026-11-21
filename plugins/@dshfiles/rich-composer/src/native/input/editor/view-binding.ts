@@ -4,7 +4,7 @@ import type { LexicalEditor } from 'lexical'
 import { $getRoot } from 'lexical'
 import { focusWithoutRing, isMobileDevice } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerKeyboard } from '../../contract/draft-editor.ts'
-import type { BusyEnterBehavior } from '../../contract/composer-submission.ts'
+import type { BusyEnterBehavior, InputSubmitMode } from '../../contract/composer-submission.ts'
 import { resolveSubmitMode } from '../submission-policy.ts'
 import { registerComposerKeymap } from './keymap.ts'
 import { PromptRecallModel } from '../../../prompt-recall.ts'
@@ -41,9 +41,8 @@ interface DraftViewGate {
   intakeFiles: (files: readonly File[], directories?: ReadonlySet<File>) => void
   pasteText: (text: string) => void
   uploadsPending: boolean
-  /** Toast text explaining why pending uploads hold the send. */
-  uploadsHeldText: string
-  showToast: (text: string) => void
+  /** A send pressed while uploads hold it: wait for them, or explain why it cannot. */
+  holdSend: (request: { readonly mode: InputSubmitMode; readonly source: 'click' | 'enter'; readonly freshDraft: boolean }) => void
   canAcceptDrop: boolean
   /** This thread's prompts, newest first; absent without a Session. */
   promptHistory: (() => readonly string[]) | undefined
@@ -183,7 +182,9 @@ export function installDraftKeymap(
         return
       }
       if (g.uploadsPending) {
-        g.showToast(g.uploadsHeldText)
+        const freshDraft = accelerated && g.draftPage
+        const gesture = accelerated && !freshDraft ? 'accelerated' : 'enter'
+        g.holdSend({ mode: resolveSubmitMode(g.busyEnter, g.running, gesture, g.steeringAvailable), source: 'enter', freshDraft })
         return
       }
       // On the new-thread page Primary+Enter starts this thread in the background: it sends, and the page comes
@@ -203,7 +204,7 @@ export function installDraftKeymap(
     submitAndNewDraft: () => {
       const g = gate.current
       if (g.uploadsPending) {
-        g.showToast(g.uploadsHeldText)
+        g.holdSend({ mode: resolveSubmitMode(g.busyEnter, g.running, 'enter', g.steeringAvailable), source: 'enter', freshDraft: true })
         return
       }
       keyboard.submit(resolveSubmitMode(g.busyEnter, g.running, 'enter', g.steeringAvailable), 'enter')

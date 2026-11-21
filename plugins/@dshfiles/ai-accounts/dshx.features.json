@@ -380,6 +380,84 @@
       ]
     },
     {
+      "id": "antigravity-accounts",
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        },
+        {
+          "kind": "custom",
+          "span": "antigravity describe",
+          "file": "plugins/@dshfiles/ai-accounts/src/antigravity-acp.test.ts",
+          "testName": "records an antigravity describe span with the model count, never the home, plan or model names"
+        }
+      ],
+      "title": "Use a Google AI plan through the Antigravity CLI",
+      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with a neutral system prompt, none of Antigravity's built-in tools, and DSH's tools over MCP; the model list and per-model thought levels come from the account itself.",
+      "reach": [
+        "click text \"AI Accounts: Accounts\"",
+        "click button \"Add account\"",
+        "click button \"Antigravity account\"",
+        "expect button \"Copy Antigravity sign-in command\""
+      ],
+      "surfaces": ["client", "host", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "dialog: Add AI account › Antigravity",
+      "configuration": [],
+      "states": ["cli-missing", "signed-out", "signed-in", "streaming", "awaiting-tools", "idle"],
+      "failureModes": [
+        "A Host without `agy` reports the official install command instead of a spawn error.",
+        "A signed-out login reports `agy acp --login` for the account's HOME and is retried 30 s later.",
+        "A model the account does not offer fails the request with a recovery instead of silently running another model.",
+        "Antigravity exposes no quota over ACP, so the usage card names the plan and points to `agy` /usage instead of inventing a percentage.",
+        "Google rejects the harness identity and the harness dev context with 429, so the route sends a neutral opener and omits both instead of relaying the blocked wording."
+      ],
+      "externalDependencies": [
+        {
+          "id": "antigravity-cli",
+          "boundary": "Google's Antigravity CLI (`agy acp`, ACP over stdio, tested with 1.5.13) and its login under $HOME/.gemini; DSH never reads or copies that login.",
+          "deterministicFake": "antigravity-acp.test.ts runs a fake `agy` that speaks ACP over stdio, starts the MCP bridge from session/new, and offers two models with their thought levels."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.antigravity-setup",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.antigravity-tool-round-trip",
+          "file": "plugins/@dshfiles/ai-accounts/src/antigravity-acp.test.ts",
+          "testName": "holds a tool call until DSH answers it, then continues the same ACP prompt in the same process"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.antigravity-levels",
+          "file": "plugins/@dshfiles/ai-accounts/src/antigravity-acp.test.ts",
+          "testName": "selects the requested model and the closest thought level that model accepts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.antigravity-neutral-prompt",
+          "file": "plugins/@dshfiles/ai-accounts/src/antigravity-system-prompt.test.ts",
+          "testName": "leaves out the checkout and Web GUI paragraphs this installation adds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.antigravity-describe",
+          "file": "plugins/@dshfiles/ai-accounts/src/antigravity-acp.test.ts",
+          "testName": "describes a signed-in account: plan, models and the thought levels each one accepts"
+        }
+      ]
+    },
+    {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
       "summary": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
@@ -1593,6 +1671,14 @@
     {
       "file": "src/claude-cli.ts",
       "reason": "Claude Code CLI transport of a model stream: each stream runs under agent-telemetry chat <model> span, and the CLI child lives as long as that stream."
+    },
+    {
+      "file": "src/antigravity-acp.ts",
+      "reason": "Antigravity CLI transport of a model stream: each stream runs under agent-telemetry chat <model> span, and the agy child lives as long as that conversation's streams."
+    },
+    {
+      "file": "src/cli-bridge.ts",
+      "reason": "Holds only the MCP bridge source that claude-cli.ts and antigravity-acp.ts hand their CLI; its socket is opened by that CLI's child under the chat <model> span of the stream."
     },
     {
       "file": "src/commandcode-cli.ts",

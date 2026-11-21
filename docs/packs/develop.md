@@ -22,7 +22,7 @@ None.
 
 ## Features
 
-From the onboarding feature catalog: 6 features, the 1 curated ones first.
+From the onboarding feature catalog: 7 features, the 1 curated ones first.
 
 ### Curated
 
@@ -35,6 +35,7 @@ From the onboarding feature catalog: 6 features, the 1 curated ones first.
 3. **Plugin updates waiting for a restart in the Inbox** (`hmr-gate`, inbox) — While any rebuilt plugin is held back because its new Host code is not loaded, the Inbox shows one Ready item about this DSH naming the waiting packages and how to apply them (restart when no agent is working). It offers no restart verb: restarting stays the user's decision. A c…
 4. **Held-back bundles join the one restart notice** (`hmr-gate`) — While a rebuilt plugin waits for a Host restart, hmr-gate lists it in thread-sidebar's restart sources, so the status strip's one Restart pending item names it beside the Host files thread-sidebar watches. thread-sidebar owns that item and its Restart DSH / Restart when idle ver…
 5. **Experimental in-process Host reload for opted-in plugins** (`hmr-gate`) — With the hmr-gate row's hostReload config on, a rebuilt Host half of a plugin whose package.json declares dshx.hostReload "safe" is replaced inside the running DSH: its own modules are evicted from the ESM cache and imported again, the Loader contract (name, inject, Config) is c…
+6. **Plugin updates wait for a hidden or idle moment** (`hmr-gate`) — The browser half holds graph and rebuilt frames until the Host connection is live again and the page is hidden, or the reader has been idle for 30 s with no focused field; nothing applies in the 10 s after the page comes back. Updates of the thread-drawing packages (chat, workbe…
 
 ## Enable it
 

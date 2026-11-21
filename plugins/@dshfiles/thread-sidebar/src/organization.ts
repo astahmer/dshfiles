@@ -120,6 +120,11 @@ export interface SidebarPreferences {
   /** On a phone, a swipe in from the right edge inside a thread opens the thread panel sheet. Off by default: Android's back gesture shares that edge. */
   phoneEdgeSwipePanels: boolean
   /**
+   * Phone navigation: `stack` (a bottom tab bar, the list full screen, a thread pushed over it with Back) or `drawer`
+   * (the thread stays on screen, the Threads list slides in from the left over it). Stack by default: the earlier model.
+   */
+  phoneNavigation: 'stack' | 'drawer'
+  /**
    * The foot row under the list (b:4v6p). Fixed layout hides it by default: its Settings, page links and More are the
    * rail's and ⌘K's, Restart and Copy URL are ⌘K commands, and a pending restart or page reload still shows it.
    */
@@ -230,6 +235,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   headerMode: 'compact',
   hideBrandLogo: false,
   phoneEdgeSwipePanels: false,
+  phoneNavigation: 'stack',
   showFooter: false,
   showRailActions: true,
   headerRegionHeight: null,

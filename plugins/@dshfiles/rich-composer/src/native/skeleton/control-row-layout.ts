@@ -10,6 +10,25 @@ export function flowItems(parent: Element): Element[] {
 }
 
 /**
+ * Whether the row's controls take more than one line, as the browser laid them out. The line's demand is not the sum of
+ * its items' widths: every pair costs a gap (empty plugin anchors included) and a control may carry a margin, so a
+ * summed estimate read a wrapped bar as fitting. The collapse then disagreed with the layout it reacts to, and the bar
+ * swapped between one and two lines on every pass. The tallest item is the single line's height; anything taller is a
+ * second line plus the row gap.
+ * @param row - Composer control row with its leading and trailing groups.
+ * @returns Whether the row's items share more than one line.
+ */
+const wraps = (row: HTMLElement): boolean => {
+  const style = getComputedStyle(row)
+  const content = row.getBoundingClientRect().height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+  const tallest = flowItems(row).reduce((height, item) => {
+    if (getComputedStyle(item).display === 'none') return height
+    return Math.max(height, item.getBoundingClientRect().height)
+  }, 0)
+  return content > tallest + 1
+}
+
+/**
  * Collapse the model text only when the expanded controls cannot share a line.
  * The model seat consumes the row's inherited display variables; wrapping remains
  * available when even the icon cannot fit. Mutations and font loads are measured synchronously; a resize is measured
@@ -34,15 +53,20 @@ export function observeControlRow(row: HTMLElement, options: { readonly iconStep
     return needed > available
   }
   // Ignore notifications caused by our own collapse. Re-expanding unchanged controls can
-  // change a wrapping row's height again and feed its ResizeObserver indefinitely.
-  const widths = (): number[] => [row.getBoundingClientRect().width, ...flowItems(row).map(item => item.getBoundingClientRect().width)]
-  let measured: number[] = []
+  // change a wrapping row's height again and feed its ResizeObserver indefinitely. The
+  // row's own width is the only resize that can re-decide the collapse: an item's width
+  // moves by a fraction of a pixel as the line re-flows, and re-measuring on that drift
+  // re-decided the collapse each frame, which is what made the bar flicker.
+  const rowWidth = (): number => row.getBoundingClientRect().width
+  let measured = 0
   const measure = (): void => {
     // Always measure expanded demand, including text changed while collapsed.
     row.removeAttribute('data-model-compact')
     row.removeAttribute('data-model-icon')
-    if (!overflows()) {
-      measured = widths()
+    // A wrapped row is ground truth; the summed estimate still covers a bar that cannot wrap, where the overflow is
+    // what the icon step answers.
+    if (!wraps(row) && !overflows()) {
+      measured = rowWidth()
       return
     }
     // First step: labels beside icons go (the effort, the mode chip's words).
@@ -51,15 +75,14 @@ export function observeControlRow(row: HTMLElement, options: { readonly iconStep
     // the model as an icon too (its name stays in the accessible name and tooltip) instead of running past Send.
     // The new-thread bar has room below: it wraps instead (its words are choices to read before the first message).
     row.toggleAttribute('data-model-icon', (options.iconStep?.() ?? true) && overflows())
-    measured = widths()
+    measured = rowWidth()
   }
   let frame: number | undefined
   const resize = new ResizeObserver(() => {
     if (frame !== undefined) cancelAnimationFrame(frame)
     frame = requestAnimationFrame(() => {
       frame = undefined
-      const current = widths()
-      if (current.length !== measured.length || current.some((width, index) => width !== measured[index])) measure()
+      if (Math.abs(rowWidth() - measured) >= 1) measure()
     })
   })
   resize.observe(row)

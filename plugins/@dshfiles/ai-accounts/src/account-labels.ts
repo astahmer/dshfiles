@@ -8,6 +8,7 @@ export const KIND_LABEL = {
   'github-copilot': 'GitHub Copilot',
   cursor: 'Cursor',
   mistral: 'Mistral',
+  antigravity: 'Antigravity',
 } satisfies Record<AccountProfile['kind'], string>
 
 export const KIND_ACCENT = {
@@ -18,10 +19,20 @@ export const KIND_ACCENT = {
   'github-copilot': '#24292F',
   cursor: '#6B7280',
   mistral: '#FA520F',
+  antigravity: '#4285F4',
 } satisfies Record<AccountProfile['kind'], string>
 
 /** Rail group headings, in the order the groups are listed. */
-export const KIND_GROUPS: readonly AccountProfile['kind'][] = ['codex', 'claude', 'github-copilot', 'mistral', 'opencode-go', 'commandcode', 'cursor']
+export const KIND_GROUPS: readonly AccountProfile['kind'][] = [
+  'codex',
+  'claude',
+  'antigravity',
+  'github-copilot',
+  'mistral',
+  'opencode-go',
+  'commandcode',
+  'cursor',
+]
 
 /** Kinds that publish a model route; the rest only track identity and quota. */
 export const routedKind = (kind: AccountProfile['kind']): boolean => kind !== 'cursor'
@@ -57,6 +68,8 @@ export const connectHintFor = (kind: AccountProfile['kind']): string => {
   if (kind === 'cursor') return 'Run cursor-agent login; this account tracks quota while sessions use the Cursor Agent runtime.'
   if (kind === 'commandcode') return 'Run `cmd login` or set COMMANDCODE_API_KEY and the picker publishes the route.'
   if (kind === 'github-copilot') return 'Sign in with GitHub to connect your Copilot subscription.'
+  if (kind === 'antigravity')
+    return 'Run `agy acp --login` with your Google account; the picker lists the models its plan offers (Gemini 4 needs Google AI Pro or Ultra).'
   if (kind === 'mistral') return 'Run `vibe --setup` (Launch browser) with your Le Chat plan, or store MISTRAL_API_KEY, and the picker publishes the route.'
   return 'Set OPENCODE_API_KEY (or a shared key on the ai-accounts entry) and the route serves.'
 }

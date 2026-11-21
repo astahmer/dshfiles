@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { mkdtempSync, promises as fsPromises, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -20,6 +20,7 @@ import {
 } from '@earendil-works/pi-ai'
 import * as Schema from 'effect/Schema'
 import { ClaudeAccountModel } from './claude-account.js'
+import { MCP_BRIDGE_SOURCE, bridgeCallSchema, CliBridge } from './cli-bridge.js'
 import { AiAccountsSchema } from './effect-schema.js'
 
 /**
@@ -42,60 +43,8 @@ const MAX_PROCESSES = 6
 /** Held tool calls wait for DSH, which may run a tool for hours. */
 const MCP_TOOL_TIMEOUT_MS = 24 * 60 * 60_000
 
-/** Stdio MCP server run by the CLI: lists DSH's tools from a file and forwards each call over a unix socket. */
-const MCP_BRIDGE_SOURCE = `
-import { createConnection } from 'node:net'
-import { readFileSync } from 'node:fs'
-import { createInterface } from 'node:readline'
-const [toolsFile, socketPath] = process.argv.slice(1)
-const tools = JSON.parse(readFileSync(toolsFile, 'utf8'))
-const send = message => process.stdout.write(JSON.stringify(message) + '\\n')
-const socket = createConnection(socketPath)
-socket.setEncoding('utf8')
-// The bridge lives only as long as its claude process (stdin) and the Host (the pipe): either ending stops it, so a
-// cancelled turn never leaves it running in, and locking, its working directory.
-socket.on('close', () => process.exit(0))
-socket.on('error', () => process.exit(0))
-let buffer = ''
-socket.on('data', chunk => {
-  buffer += chunk
-  let newline
-  while ((newline = buffer.indexOf('\\n')) >= 0) {
-    const reply = JSON.parse(buffer.slice(0, newline))
-    buffer = buffer.slice(newline + 1)
-    send({ jsonrpc: '2.0', id: reply.id, result: { content: reply.content, isError: reply.isError } })
-  }
-})
-createInterface({ input: process.stdin }).on('line', line => {
-  if (line.trim() === '') return
-  const request = JSON.parse(line)
-  if (request.method === 'initialize')
-    return send({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: request.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'dsh', version: '1' } } })
-  if (request.method === 'tools/list') return send({ jsonrpc: '2.0', id: request.id, result: { tools } })
-  if (request.method === 'tools/call') return socket.write(JSON.stringify({ id: request.id, name: request.params.name, arguments: request.params.arguments ?? {} }) + '\\n')
-  if (request.id !== undefined) send({ jsonrpc: '2.0', id: request.id, result: {} })
-}).on('close', () => process.exit(0))
-`
-
-/** One line the CLI or the bridge wrote, decoded; a non-JSON line (a warning, a stray log) fails like a malformed one. */
-const decodeJsonLine = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, line: string) => {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(line)
-  } catch {
-    parsed = undefined
-  }
-  return AiAccountsSchema.decodeResult(schema, parsed)
-}
-
 /** A tool_use block's streamed input: JSON text holding an object. */
 const toolInputSchema = Schema.Record(Schema.String, Schema.Json)
-
-const bridgeCallSchema = Schema.Struct({
-  id: Schema.Union([Schema.String, Schema.Number]),
-  name: Schema.String,
-  arguments: Schema.Record(Schema.String, Schema.Unknown),
-})
 
 const contentBlockSchema = Schema.Union([
   Schema.Struct({ type: Schema.Literal('text') }),
@@ -192,15 +141,11 @@ const actionableFailure = (message: string, configDir: string): string =>
     ? `Claude Code is not signed in for this account. Sign in again from AI Accounts, or run: ${ClaudeAccountModel.claudeLoginHint(configDir)}. Then retry. (${message})`
     : message
 
-const fingerprint = (json: string): string => createHash('sha256').update(json).digest('hex').slice(0, 16)
-
 const effortFor = (reasoning: SimpleStreamOptions['reasoning']): string | undefined => {
   if (reasoning === undefined) return undefined
   if (reasoning === 'minimal') return 'low'
   return reasoning
 }
-
-const toMcpTool = (tool: Tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.parameters })
 
 const userBlocks = (content: string | readonly (TextContent | ImageContent)[]) =>
   !Array.isArray(content)
@@ -210,40 +155,6 @@ const userBlocks = (content: string | readonly (TextContent | ImageContent)[]) =
           ? { type: 'text', text: block.text }
           : { type: 'image', source: { type: 'base64', media_type: block.mimeType, data: block.data } },
       )
-
-const toolResultContent = (content: readonly (TextContent | ImageContent)[]) =>
-  content.map(block => (block.type === 'text' ? { type: 'text', text: block.text } : { type: 'image', data: block.data, mimeType: block.mimeType }))
-
-/** Plain-text rendering of a transcript a new process must pick up, since stream-json input takes only user turns. */
-const renderTranscript = (messages: TranscriptContext['messages']): string => {
-  const lines: string[] = []
-  for (const message of messages) {
-    if (message.role === 'user')
-      lines.push(
-        `<user>\n${!Array.isArray(message.content) ? message.content : message.content.map(block => (block.type === 'text' ? block.text : '[image]')).join('\n')}\n</user>`,
-      )
-    if (message.role === 'assistant')
-      for (const block of message.content) {
-        if (block.type === 'text') lines.push(`<assistant>\n${block.text}\n</assistant>`)
-        if (block.type === 'toolCall') lines.push(`<tool_call name="${block.name}" id="${block.id}">${JSON.stringify(block.arguments)}</tool_call>`)
-      }
-    if (message.role === 'toolResult')
-      lines.push(
-        `<tool_result name="${message.toolName}" id="${message.toolCallId}"${message.isError ? ' error="true"' : ''}>\n${message.content.map(block => (block.type === 'text' ? block.text : '[image]')).join('\n')}\n</tool_result>`,
-      )
-  }
-  return lines.join('\n')
-}
-
-/**
- * First index of the trailing run of user messages DSH appends for one step. One CLI turn answers all of them
- * together, because the CLI treats every stdin line as a prompt of its own.
- */
-const trailingUserStart = (conversation: readonly { readonly role: string }[]): number => {
-  let start = conversation.length
-  while (start > 0 && conversation[start - 1]?.role === 'user') start -= 1
-  return start
-}
 
 export class ClaudeCliSessions {
   private readonly sessions = new Map<string, Session>()
@@ -338,11 +249,13 @@ export class ClaudeCliSessions {
     const system = getCurrentSystemPrompt(messages)
     const tools = getCurrentTools(messages)
     const effort = effortFor(streamOptions?.reasoning)
-    const signature = fingerprint(JSON.stringify({ model: model.id, provider: model.provider, system, tools: tools.map(toMcpTool), effort }))
+    const signature = CliBridge.fingerprint(
+      JSON.stringify({ model: model.id, provider: model.provider, system, tools: tools.map(CliBridge.toMcpTool), effort }),
+    )
     // Title, compaction and memory requests share the Session id but not its opening, so they get processes of their own.
     const firstUser = messages.find(message => message.role === 'user')
     const firstSystem = messages.find(message => message.role === 'system')
-    const key = `${streamOptions?.sessionId ?? ''}:${model.provider}:${fingerprint(JSON.stringify([firstSystem?.content ?? '', firstUser ?? '']))}`
+    const key = `${streamOptions?.sessionId ?? ''}:${model.provider}:${CliBridge.fingerprint(JSON.stringify([firstSystem?.content ?? '', firstUser ?? '']))}`
     const existing = this.sessions.get(key)
     if (existing !== undefined && this.continues(existing, signature, messages)) {
       // Map order is recency order for eviction.
@@ -361,23 +274,24 @@ export class ClaudeCliSessions {
     const session = this.spawn({ key, signature, model, system, tools, effort, provider: model.provider })
     this.sessions.set(key, session)
     const conversation = messages.filter(message => message.role !== 'system')
-    const pendingStart = trailingUserStart(conversation)
+    const pendingStart = CliBridge.trailingUserStart(conversation)
     const pending = conversation.slice(pendingStart).filter(message => message.role === 'user')
     const earlier = conversation.slice(0, pendingStart)
-    const opening = earlier.length === 0 ? [] : [{ type: 'text', text: `The conversation so far, which you are continuing:\n${renderTranscript(earlier)}` }]
+    const opening =
+      earlier.length === 0 ? [] : [{ type: 'text', text: `The conversation so far, which you are continuing:\n${CliBridge.renderTranscript(earlier)}` }]
     const blocks =
       pending.length === 0
         ? [...opening, { type: 'text', text: 'Continue from where the conversation stopped.' }]
         : [...opening, ...pending.flatMap(message => userBlocks(message.content))]
     this.send(session, blocks)
     session.synced = messages.length
-    session.lastFingerprint = fingerprint(JSON.stringify(messages.at(-1) ?? ''))
+    session.lastFingerprint = CliBridge.fingerprint(JSON.stringify(messages.at(-1) ?? ''))
     return session
   }
 
   private continues(session: Session, signature: string, messages: TranscriptContext['messages']): boolean {
     if (session.phase.kind === 'dead' || session.signature !== signature || messages.length < session.synced) return false
-    if (session.synced > 0 && fingerprint(JSON.stringify(messages[session.synced - 1] ?? '')) !== session.lastFingerprint) return false
+    if (session.synced > 0 && CliBridge.fingerprint(JSON.stringify(messages[session.synced - 1] ?? '')) !== session.lastFingerprint) return false
     let produced = session.produced
     for (const message of messages.slice(session.synced)) {
       if (message.role === 'system') return false
@@ -398,7 +312,8 @@ export class ClaudeCliSessions {
   private feed(session: Session, messages: TranscriptContext['messages']): void {
     const added = messages.slice(session.synced)
     for (const message of added) {
-      if (message.role === 'toolResult') this.answer(session, message.toolCallId, { content: toolResultContent(message.content), isError: message.isError })
+      if (message.role === 'toolResult')
+        this.answer(session, message.toolCallId, { content: CliBridge.toolResultContent(message.content), isError: message.isError })
     }
     const pending = added.filter(message => message.role === 'user')
     if (pending.length > 0)
@@ -408,7 +323,7 @@ export class ClaudeCliSessions {
       )
     session.produced = 0
     session.synced = messages.length
-    session.lastFingerprint = fingerprint(JSON.stringify(messages.at(-1) ?? ''))
+    session.lastFingerprint = CliBridge.fingerprint(JSON.stringify(messages.at(-1) ?? ''))
   }
 
   private send(session: Session, content: readonly unknown[]): void {
@@ -467,7 +382,7 @@ export class ClaudeCliSessions {
     // Pipe names are machine-wide, so the name is random: another local user cannot claim it first.
     const socketPath =
       process.platform === 'win32' ? `\\\\.\\pipe\\${basename(directory)}-${randomBytes(12).toString('hex')}-bridge` : join(directory, 'bridge.sock')
-    writeFileSync(join(directory, 'tools.json'), JSON.stringify(input.tools.map(toMcpTool)))
+    writeFileSync(join(directory, 'tools.json'), JSON.stringify(input.tools.map(CliBridge.toMcpTool)))
     writeFileSync(join(directory, 'system.md'), input.system)
     writeFileSync(
       join(directory, 'mcp.json'),
@@ -539,7 +454,7 @@ export class ClaudeCliSessions {
         buffer += chunk
         let newline = buffer.indexOf('\n')
         while (newline >= 0) {
-          const parsed = decodeJsonLine(bridgeCallSchema, buffer.slice(0, newline))
+          const parsed = CliBridge.decodeJsonLine(bridgeCallSchema, buffer.slice(0, newline))
           buffer = buffer.slice(newline + 1)
           if (parsed._tag === 'Success')
             this.matchCall(session, {
@@ -564,7 +479,7 @@ export class ClaudeCliSessions {
     })
     createInterface({ input: child.stdout }).on('line', line => {
       if (line.trim() === '') return
-      const parsed = decodeJsonLine(cliLineSchema, line)
+      const parsed = CliBridge.decodeJsonLine(cliLineSchema, line)
       if (parsed._tag !== 'Success') return
       const value = parsed.success
       if (value.type === 'stream_event' && 'event' in value) {
@@ -703,7 +618,7 @@ export class ClaudeCliSessions {
           if (target.type === 'text') stream.push({ type: 'text_end', contentIndex: block.contentIndex, content: target.text, partial: output })
           if (target.type === 'thinking') stream.push({ type: 'thinking_end', contentIndex: block.contentIndex, content: target.thinking, partial: output })
           if (target.type === 'toolCall') {
-            const parsed = decodeJsonLine(toolInputSchema, block.json === '' ? '{}' : block.json)
+            const parsed = CliBridge.decodeJsonLine(toolInputSchema, block.json === '' ? '{}' : block.json)
             target.arguments = parsed._tag === 'Success' ? parsed.success : {}
             session.emittedToolUses.push({ id: target.id, name: target.name, argumentsJson: JSON.stringify(target.arguments) })
             const pending = session.unmatchedCalls.splice(0)

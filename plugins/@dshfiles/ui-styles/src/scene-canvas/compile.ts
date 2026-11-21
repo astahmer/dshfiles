@@ -38,6 +38,8 @@ const ALPHA_CSS = { opacity: 'opacity', fillOpacity: 'fill-opacity', strokeOpaci
 const SAMPLE_RATE = 24
 const MIN_SAMPLES = 24
 const MAX_SAMPLES = 1440
+/** How long before the end of its period a track's last sample is read, in ms: the value as it ends, not its restart. */
+const END_BEFORE = 0.01
 /** Times at which a motion is sampled to find what it brings on screen. */
 const REACH_SAMPLES = 720
 /** How long the compiler works before it yields to the page, in ms. */
@@ -356,20 +358,22 @@ async function measure(root: Element, shadow: ShadowRoot, off: HTMLStyleElement,
       const period = loop ? duration * (alternate ? 2 : 1) : Math.max(1, Number(timing.endTime ?? duration))
       const count = Math.min(MAX_SAMPLES, Math.max(MIN_SAMPLES, Math.ceil((period / 1000) * SAMPLE_RATE)))
       const hold = effect.getKeyframes().some(keyframe => (keyframe.easing ?? '').startsWith('steps')) || (timing.easing ?? '').startsWith('steps')
-      tracks.push({ animation, element, prop, period, count, loop, hold, stride: STRIDE[prop], values: new Float32Array(count * STRIDE[prop]) })
+      tracks.push({ animation, element, prop, period, count, loop, hold, stride: STRIDE[prop], values: new Float32Array((count + 1) * STRIDE[prop]) })
     }
   const most = tracks.reduce((max, track) => Math.max(max, track.count), 0)
   const styles = new Map<Element, CSSStyleDeclaration>()
   for (const track of tracks) if (!styles.has(track.element)) styles.set(track.element, getComputedStyle(track.element))
-  for (let index = 0; index < most; index += 1) {
+  // `count + 1` samples per track: the last is the value just before the period ends, so a loop that restarts from
+  // another value (snow falling, then back at the top) jumps there as CSS does instead of sliding back.
+  for (let index = 0; index <= most; index += 1) {
     const stepped = new Set<Animation>()
     for (const track of tracks) {
-      if (index >= track.count || stepped.has(track.animation)) continue
-      track.animation.currentTime = (index * track.period) / track.count
+      if (index > track.count || stepped.has(track.animation)) continue
+      track.animation.currentTime = index === track.count ? track.period - END_BEFORE : (index * track.period) / track.count
       stepped.add(track.animation)
     }
     for (const track of tracks)
-      if (index < track.count) read(styles.get(track.element) ?? getComputedStyle(track.element), track.prop, track.values, index * track.stride)
+      if (index <= track.count) read(styles.get(track.element) ?? getComputedStyle(track.element), track.prop, track.values, index * track.stride)
     await yieldNow()
   }
   const trackOf = (element: Element, prop: Prop): Track | undefined => {

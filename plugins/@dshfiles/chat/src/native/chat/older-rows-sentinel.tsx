@@ -4,9 +4,11 @@ import { useEffect, useRef } from 'react'
  * Mounts the next older rows, or asks the Host for the next older page, once the reader nears the top. It unmounts
  * while a page loads, so a page that still leaves it in view observes it again and takes the next one.
  */
-export function OlderRowsSentinel({ listRef, hidden, onVisible, fillSteps }: {
+export function OlderRowsSentinel({ listRef, hidden, firstSeq, onVisible, fillSteps }: {
   listRef: { readonly current: HTMLDivElement | null }
   hidden: number
+  /** First Session sequence the mounted rows show: a Host page moves it while `hidden` stays 0. */
+  firstSeq: number | null
   onVisible: () => void
   /** Steps left that may widen a view the rows do not fill yet, without the reader scrolling. */
   fillSteps: { current: number }
@@ -15,7 +17,10 @@ export function OlderRowsSentinel({ listRef, hidden, onVisible, fillSteps }: {
   // Observed again after every step: a step that still leaves the sentinel in view must take the next one.
   useEffect(() => {
     const target = ref.current
-    const list = listRef.current
+    // A shared conversation scrollport (the phone layout) scrolls instead of the list, as in ChatViewport.attach: the
+    // list then never scrolls and always measures as an unfilled tail, so it can neither see the reader move up nor
+    // stop the opening fill steps.
+    const list = listRef.current?.closest<HTMLElement>('[data-conversation-scroll]') ?? listRef.current
     if (target === null || list === null || typeof IntersectionObserver !== 'function') return
     let near = false
     let fired = false
@@ -81,6 +86,6 @@ export function OlderRowsSentinel({ listRef, hidden, onVisible, fillSteps }: {
       list.removeEventListener('touchstart', onTouchStart)
       list.removeEventListener('touchmove', onTouchMove)
     }
-  }, [listRef, hidden, onVisible])
+  }, [listRef, hidden, firstSeq, onVisible])
   return <div ref={ref} aria-hidden="true" data-chat-older-rows="" />
 }
