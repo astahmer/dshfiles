@@ -1,0 +1,7 @@
+# Off by default: arming the chip is the user's per-thread decision, and a
+# resumed goal spends tokens on later rounds.
+- insert:
+    - id: goal-auto-retry
+      name: '@dshfiles/goal-auto-retry'
+      config:
+        marginMinutes: 3
