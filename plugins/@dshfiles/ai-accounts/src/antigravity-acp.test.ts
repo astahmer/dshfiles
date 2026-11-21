@@ -11,6 +11,7 @@ import { AccountsPlatformLive } from './platform-layer.js'
 import { AntigravityAcpSessions } from './antigravity-acp.js'
 import { AntigravityAccountModel } from './antigravity-account.js'
 import { createAntigravityProvider } from './antigravity-provider.js'
+import { ProviderProfileModel } from './provider-profile.js'
 
 /**
  * Stands in for `agy acp`: an ACP server over stdio that starts the MCP server `session/new` names, offers two models
@@ -346,4 +347,17 @@ it('fails a step whose plan is spent as a quota failure instead of waiting on ag
     ),
   ).rejects.toThrow(/^Antigravity quota exhausted: Google answers 429 RESOURCE_EXHAUSTED for this account's plan\./u)
   expect(cli.processCount).toBe(0)
+})
+
+it('names each account model with the name agy gives it, not its id', () => {
+  const { cli } = setup()
+  const profile = ProviderProfileModel.buildProfile({
+    upstream: createAntigravityProvider(cli),
+    provider: 'antigravity-work',
+    displayName: 'Antigravity Work',
+    additionalModelIds: ['gemini-unnamed'],
+    discoveredModels: [{ id: 'gemini-fast', name: 'Gemini Fast' }],
+  })
+  const names = Object.fromEntries((profile.piProvider?.getModels() ?? []).map(model => [model.id, model.name]))
+  expect(names).toEqual({ 'gemini-fast': 'antigravity-work/Gemini Fast', 'gemini-unnamed': 'antigravity-work/gemini-unnamed' })
 })
