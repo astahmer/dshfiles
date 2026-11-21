@@ -264,6 +264,9 @@ run at once. `src/claude-cli.ts` holds the transport; a setup-token or API key k
 
 ![Connect an Antigravity account with the official agy sign-in](docs/screenshots/antigravity-accounts.png)
 
+> **Use at your own risk.** Google does not support driving `agy` from another client, so this route depends on the
+> CLI as it ships today and may stop working at any time.
+
 Google serves its individual plans (free, Google AI Pro, Google AI Ultra) to coding agents only through its own
 [Antigravity CLI](https://antigravity.google/docs/cli/acp/), `agy`: Gemini CLI
 [stopped serving them](https://github.com/google-gemini/gemini-cli/discussions/28017) on 2026-06-18, and reusing a
