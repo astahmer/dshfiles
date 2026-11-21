@@ -32,6 +32,7 @@ const fixture = (
     readonly semantic?: boolean
     readonly closeButtonPosition?: CloseButtonPosition
     readonly projectNames?: Readonly<Record<string, string>>
+    readonly projectToneClasses?: Readonly<Record<string, string>>
     readonly presentation?: Pick<WorkbenchTabsProvider, 'renderTabMenu' | 'label'>
   } = {},
 ) => {
@@ -55,6 +56,7 @@ const fixture = (
   }
   if (options.closeButtonPosition !== undefined) snapshot = { ...snapshot, closeButtonPosition: options.closeButtonPosition }
   if (options.projectNames !== undefined) snapshot = { ...snapshot, projectNames: options.projectNames }
+  if (options.projectToneClasses !== undefined) snapshot = { ...snapshot, projectToneClasses: options.projectToneClasses }
   const listeners = new Set<() => void>()
   const actions: WorkbenchTabsActions = {
     activate: vi.fn(),
@@ -129,6 +131,12 @@ describe('workbench semantic tab chrome', () => {
     const title = screen.getByText('Thread A')
     expect(chip.getAttribute('data-workbench-tab-project')).toBe('')
     expect(chip.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('tints the project chip with its chosen tone', () => {
+    const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' }, projectToneClasses: { 'workspace-a': 'project-tone-balanced-3' } })
+    tab.update({ workspaceId: 'workspace-a' })
+    expect(screen.getByText('NixConfig').className).toContain('project-tone-balanced-3')
   })
 
   it('hides the project chip without a project name for the tab', () => {

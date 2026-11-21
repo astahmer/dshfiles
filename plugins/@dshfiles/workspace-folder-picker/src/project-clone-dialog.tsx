@@ -8,6 +8,8 @@ import { useEffect, useRef, useState } from 'react'
 import { cloneJobsQuery } from './clone-jobs-notice.js'
 import { clonePhaseLabels, cloneStageLabels } from './clone-labels.js'
 import { localCloneUrlSchema, projectFolderNameSchema, type ProjectLifecycleClient } from './project-lifecycle-api.js'
+import { defaultProjectTone } from './project-tone.js'
+import { ProjectTonePicker } from './project-tone-picker.js'
 import { WorkspaceFolderPickerSchema, type FormFieldErrors } from './schema.js'
 import { TextInput } from './text-input.js'
 
@@ -32,10 +34,12 @@ const folderNameFromUrl = (url: string): string =>
 export const ProjectCloneDialog = (props: {
   readonly api: ProjectLifecycleClient
   readonly home: string | undefined
-  readonly onCloned: (path: string) => void
+  readonly onCloned: (path: string, tone: number) => void
   readonly onClose: () => void
 }): JSX.Element => {
   const [form, setForm] = useState<CloneForm>({ repositoryUrl: '', parentPath: props.home ?? '~/', name: '' })
+  const [chosenTone, setChosenTone] = useState<number | null>(null)
+  const tone = chosenTone ?? defaultProjectTone(form.name)
   const [nameEdited, setNameEdited] = useState(false)
   const [errors, setErrors] = useState<FormFieldErrors>({})
   const [jobId, setJobId] = useState<string | null>(null)
@@ -53,9 +57,11 @@ export const ProjectCloneDialog = (props: {
 
   const onCloned = useRef(props.onCloned)
   onCloned.current = props.onCloned
+  const clonedTone = useRef(tone)
+  clonedTone.current = tone
   const clonedPath = job?.state === 'succeeded' ? job.path : null
   useEffect(() => {
-    if (clonedPath !== null) onCloned.current(clonedPath)
+    if (clonedPath !== null) onCloned.current(clonedPath, clonedTone.current)
   }, [clonedPath])
 
   const change = (patch: Partial<CloneForm>): void => {
@@ -130,6 +136,7 @@ export const ProjectCloneDialog = (props: {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+          <ProjectTonePicker name={form.name === '' ? 'Cloned project' : form.name} onChange={setChosenTone} tone={tone} />
           <DialogFooter>
             {running ? (
               <Button disabled={cancel.isPending} onClick={() => cancel.mutate(job.id)} type="button" variant="outline">

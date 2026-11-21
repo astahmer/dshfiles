@@ -23,6 +23,7 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
 import { Effect, Fiber, Schema } from 'effect'
 import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
+import { useProjectToneClass } from '@dshfiles/thread-sidebar/project-colors'
 import { ProjectNames } from './project-names.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
@@ -429,6 +430,13 @@ export default defineClient({
             () => (showProjectName ? ProjectNames.byWorkspaceId(workspaceItems, threadDirectories) : undefined),
             [showProjectName, threadDirectories, workspaceItems],
           )
+          const toneClassOf = useProjectToneClass()
+          // Workbench draws its own header, so it receives the finished class name and writes no colour logic of its own.
+          const projectToneClasses = useMemo(() => {
+            if (!showProjectName) return undefined
+            const paths = ProjectNames.pathsByWorkspaceId(workspaceItems, threadDirectories)
+            return Object.fromEntries([...paths].map(([workspaceId, path]) => [workspaceId, toneClassOf(path)] as const))
+          }, [showProjectName, threadDirectories, toneClassOf, workspaceItems])
           // Plain record, memoized: the publication fingerprints its snapshot as JSON, and a fresh object per render
           // would wake every tab. A Map would stringify to `{}` and hide changes entirely.
           const projectNameChips = useMemo(() => (projectNames === undefined ? undefined : Object.fromEntries(projectNames)), [projectNames])
@@ -591,11 +599,9 @@ export default defineClient({
               activeTabId: set?.activeTabId ?? null,
               tabs,
             }
-            publication.update(
-              projectNameChips === undefined ? published : { ...published, projectNames: projectNameChips },
-              () => <StartPage sections={startSections()} t={props.t} />,
-              startContentVersion,
-            )
+            const withProjects = projectNameChips === undefined ? published : { ...published, projectNames: projectNameChips }
+            const snapshotWithProjects = projectToneClasses === undefined ? withProjects : { ...withProjects, projectToneClasses }
+            publication.update(snapshotWithProjects, () => <StartPage sections={startSections()} t={props.t} />, startContentVersion)
           })
           if (!showStrip) return null
 
@@ -610,6 +616,7 @@ export default defineClient({
                 closeButtonPosition={closeButtonPosition}
                 fixedWidth={settings.value?.fixedTabWidth ?? false}
                 {...(projectNames === undefined ? {} : { projectNames })}
+                {...(projectToneClasses === undefined ? {} : { projectToneClasses })}
               />
               {startShown ? <StartPage sections={startSections()} t={props.t} /> : null}
             </div>

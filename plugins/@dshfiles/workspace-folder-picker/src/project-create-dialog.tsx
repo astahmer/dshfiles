@@ -6,6 +6,8 @@ import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
 import * as Schema from 'effect/Schema'
 import { useState } from 'react'
 import { projectFolderNameSchema, type ProjectLifecycleClient } from './project-lifecycle-api.js'
+import { defaultProjectTone } from './project-tone.js'
+import { ProjectTonePicker } from './project-tone-picker.js'
 import { WorkspaceFolderPickerSchema, type FormFieldErrors } from './schema.js'
 import { TextInput } from './text-input.js'
 
@@ -24,15 +26,17 @@ export const ProjectCreateDialog = (props: {
   readonly api: ProjectLifecycleClient
   readonly home: string | undefined
   readonly gitHubAvailable: boolean
-  readonly onCreated: (path: string) => void
+  readonly onCreated: (path: string, tone: number) => void
   readonly onClose: () => void
 }): JSX.Element => {
   const [form, setForm] = useState<CreateForm>({ parentPath: props.home ?? '~/', name: '', createGitHubRepository: false })
+  const [chosenTone, setChosenTone] = useState<number | null>(null)
   const [errors, setErrors] = useState<FormFieldErrors>({})
+  const tone = chosenTone ?? defaultProjectTone(form.name)
   const create = useMutation({
     mutationFn: (input: CreateForm) => props.api.createProject(input),
     onSuccess: created => {
-      if (created.warning === null) props.onCreated(created.path)
+      if (created.warning === null) props.onCreated(created.path, tone)
     },
   })
   const change = (patch: Partial<CreateForm>): void => {
@@ -100,12 +104,13 @@ export const ProjectCreateDialog = (props: {
               <AlertDescription>{created.warning}</AlertDescription>
             </Alert>
           )}
+          <ProjectTonePicker name={form.name === '' ? 'New project' : form.name} onChange={setChosenTone} tone={tone} />
           <DialogFooter>
             <Button onClick={props.onClose} type="button" variant="outline">
               Close
             </Button>
             {created !== undefined && created.warning !== null ? (
-              <Button onClick={() => props.onCreated(created.path)} type="button">
+              <Button onClick={() => props.onCreated(created.path, tone)} type="button">
                 Open project
               </Button>
             ) : (

@@ -4,7 +4,7 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { DirectoryFlowOwnerProps, DirectoryFlowSlotName } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, useApi } from '@dshfiles/dshx/client'
+import { defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { FolderPlusIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
@@ -18,6 +18,8 @@ import { ProjectCloneDialog } from './project-clone-dialog.js'
 import { ProjectCreateDialog } from './project-create-dialog.js'
 import { ProjectFolderSetup } from './project-folder-setup.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
+import { upsertProjectTone } from './project-tone.js'
+import { workspaceFolderPickerSettings } from './settings.js'
 import { ProjectSettingsSection } from './project-settings-section.js'
 
 const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']
@@ -29,6 +31,12 @@ type DirectoryFlowView = 'browse' | 'clone' | 'create' | 'inspect'
 const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): JSX.Element => {
   const browserApi = useApi(workspaceFolderBrowserApi)
   const lifecycleApi = useApi(projectLifecycleApi)
+  const settings = useSettings(workspaceFolderPickerSettings)
+  /** The colour chosen in the import dialog outlives it: chips and project labels read the same entry. */
+  const picked = (path: string, tone: number): void => {
+    void settings.set('projectTones', upsertProjectTone(settings.value?.projectTones ?? [], path, tone)).catch(() => undefined)
+    props.onPicked(path)
+  }
   // A surface that asked for New project or Clone (ProjectAddFlow.request) opens the flow on that view.
   const [view, setView] = useState<DirectoryFlowView>(() => ProjectAddFlow.take())
   const [candidate, setCandidate] = useState<string | null>(null)
@@ -52,7 +60,7 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
       <ProjectFolderSetup
         api={lifecycleApi}
         path={candidate}
-        onAdded={path => props.onPicked(path)}
+        onAdded={picked}
         onClose={() => {
           setCandidate(null)
           setView('browse')
@@ -61,7 +69,7 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
     )
   }
   if (view === 'clone') {
-    return <ProjectCloneDialog api={lifecycleApi} home={tools.data?.home} onClose={() => setView('browse')} onCloned={path => props.onPicked(path)} />
+    return <ProjectCloneDialog api={lifecycleApi} home={tools.data?.home} onClose={() => setView('browse')} onCloned={picked} />
   }
   if (view === 'create') {
     return (
@@ -70,7 +78,7 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
         gitHubAvailable={tools.data?.gh === true}
         home={tools.data?.home}
         onClose={() => setView('browse')}
-        onCreated={path => props.onPicked(path)}
+        onCreated={picked}
       />
     )
   }

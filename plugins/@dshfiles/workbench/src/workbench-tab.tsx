@@ -75,6 +75,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
     const closeButtonPosition = snapshot.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
     const title = definition?.newView ? 'New tab' : tab?.target.kind === 'thread' ? tab.title : (definition?.title ?? tab?.title ?? props.api.title)
     const project = tab?.kind === 'thread' && tab.workspaceId !== undefined ? snapshot.projectNames?.[tab.workspaceId] : undefined
+    const projectToneClass = tab?.kind === 'thread' && tab.workspaceId !== undefined ? snapshot.projectToneClasses?.[tab.workspaceId] : undefined
     const [renaming, setRenaming] = useState(false)
     const [notice, setNotice] = useState('')
     const closePanel = (panel: WorkbenchPanelIdentity): void => {
@@ -134,7 +135,13 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
             {project === undefined ? null : (
               <span
                 data-workbench-tab-project=""
-                className="dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:rounded-sm dshx:bg-(--dsh-main-tab-chip) dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none dshx:text-(--dsw-alias-label-secondary)"
+                className={cn(
+                  'dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none',
+                  projectToneClass === undefined
+                    ? 'dshx:bg-(--dsh-main-tab-chip) dshx:text-(--dsw-alias-label-secondary)'
+                    : cn('dshx:font-medium', projectToneClass),
+                )}
+                style={projectToneClass === undefined ? undefined : { backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)' }}
               >
                 {project}
               </span>

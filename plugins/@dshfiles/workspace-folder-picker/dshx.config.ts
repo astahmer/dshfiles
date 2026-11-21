@@ -13,6 +13,8 @@ export default defineConfig({
     'project-settings-panels': 'src/project-settings-panels.ts',
     'repository-setup-contract': 'src/repository-setup-contract.ts',
     'project-add-flow': 'src/project-add-flow.ts',
+    'project-tone': 'src/project-tone.ts',
+    settings: 'src/settings.ts',
   },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: { dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },

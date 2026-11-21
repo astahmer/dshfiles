@@ -38,6 +38,8 @@ interface TabStripProps {
   readonly fixedWidth?: boolean
   /** Project name per thread workspace id, shown before thread titles; absent hides project names. */
   readonly projectNames?: ReadonlyMap<string, string>
+  /** Palette class of the chosen project colour per thread workspace id, for the project chip. */
+  readonly projectToneClasses?: Readonly<Record<string, string>>
 }
 
 /** One dot per thread tab, most urgent first: a question or approval waits, then work in progress, then an unseen finish. */
@@ -236,6 +238,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
           const fullTitle = project === undefined ? tab.title : `${project} / ${tab.title}`
           const label = tab.status === null ? fullTitle : `${fullTitle}, ${t(statusLabel[tab.status])}`
           const previous = tabs[index - 1]
+          const projectToneClass = tab.kind === 'thread' && tab.workspaceId !== undefined ? props.projectToneClasses?.[tab.workspaceId] : undefined
           const closeButton = tab.pinned ? null : (
             <button
               type="button"
@@ -334,7 +337,13 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                           {project === undefined ? null : (
                             <span
                               data-tab-project=""
-                              className="dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:rounded-sm dshx:bg-(--dsh-main-tab-chip) dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none dshx:text-(--dsw-alias-label-secondary)"
+                              className={cn(
+                                'dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none',
+                                projectToneClass === undefined
+                                  ? 'dshx:bg-(--dsh-main-tab-chip) dshx:text-(--dsw-alias-label-secondary)'
+                                  : cn('dshx:font-medium', projectToneClass),
+                              )}
+                              style={projectToneClass === undefined ? undefined : { backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)' }}
                             >
                               {project}
                             </span>
