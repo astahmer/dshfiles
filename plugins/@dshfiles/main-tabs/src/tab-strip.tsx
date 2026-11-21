@@ -11,6 +11,7 @@ import type { MainTabsTranslate } from './locales.js'
 import { ASIDE_DROP_ATTRIBUTE, asideDropColumn } from './aside-drop.js'
 import { requestPanelAside } from './panel-aside.js'
 import { requestThreadAside } from './thread-aside.js'
+import { revealTabInStrip } from './strip-scroll.js'
 import { CompassGlyph } from './start-page.js'
 import { TabMenuItems } from './tab-menu-items.js'
 import type { TabsEvent } from './tabs-machine.js'
@@ -168,7 +169,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
     if (element === null) return
     const measure = (): void => {
       setOverflowing(element.scrollWidth > element.clientWidth + 1)
-      element.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      revealTabInStrip(element, element.querySelector('[role="tab"][aria-selected="true"]'))
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -178,7 +179,8 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
   }, [tabs.length])
 
   useEffect(() => {
-    scroller.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    const element = scroller.current
+    if (element !== null) revealTabInStrip(element, element.querySelector('[role="tab"][aria-selected="true"]'))
   }, [activeId])
 
   const focusTab = (index: number): void => {
@@ -242,9 +244,6 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
               className={cn(
                 'dshx:flex dshx:size-5 dshx:flex-none dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-(--dsw-alias-label-tertiary) dshx:hover:bg-accent dshx:hover:text-foreground',
                 closeButtonPosition === 'left' ? 'dshx:mr-1' : 'dshx:ml-1',
-                tab.active
-                  ? 'dshx:opacity-100'
-                  : 'dshx:pointer-events-none dshx:opacity-0 dshx:group-focus-within:pointer-events-auto dshx:group-focus-within:opacity-100 dshx:group-hover:pointer-events-auto dshx:group-hover:opacity-100',
               )}
               onClick={event => {
                 event.stopPropagation()
@@ -260,8 +259,8 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                 <span
                   aria-hidden
                   className={cn(
-                    'dshx:flex dshx:h-7 dshx:w-2.5 dshx:flex-none dshx:items-center dshx:justify-center dshx:before:h-3.5 dshx:before:w-[0.5px] dshx:before:content-[""]',
-                    previous.active || tab.active ? 'dshx:before:bg-transparent' : 'dshx:before:bg-(--dsw-alias-border-l4)',
+                    'dshx:flex dshx:h-7 dshx:w-px dshx:flex-none dshx:items-center dshx:justify-center dshx:before:h-full dshx:before:w-px dshx:before:content-[""]',
+                    previous.active || tab.active ? 'dshx:before:bg-transparent' : 'dshx:before:bg-(--dsh-main-tab-divider)',
                   )}
                 />
               )}
@@ -279,11 +278,11 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                         tabIndex={tab.active || (activeId === undefined && index === 0) ? 0 : -1}
                         draggable={renamingTabId !== tab.id}
                         className={cn(
-                          'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-sm) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
+                          'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:cursor-pointer dshx:items-center dshx:bg-(--dsh-main-tab-bg) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-(--dsh-main-tab-bg-hover) dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
                           props.fixedWidth === true
                             ? 'dshx:w-[160px] dshx:flex-none'
                             : cn('dshx:max-w-[190px] dshx:flex-[0_1_auto]', tab.pinned ? 'dshx:min-w-0' : 'dshx:min-w-[100px]'),
-                          tab.active && 'dshx:bg-(--dsw-alias-markdown-tag) dshx:text-foreground dshx:hover:bg-(--dsw-alias-markdown-tag)',
+                          tab.active && 'dshx:bg-background dshx:text-foreground dshx:hover:bg-background',
                           !tab.available && 'dshx:opacity-50',
                           dropIndex === index && DROP_CARET,
                         )}
@@ -333,8 +332,11 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                           {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
                           {tab.status === null ? null : <StatusDot size="sm" className={cn('dshx:flex-none', statusDotClass[tab.status])} />}
                           {project === undefined ? null : (
-                            <span data-tab-project="" className="dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:text-(--dsw-alias-label-tertiary)">
-                              {project} /
+                            <span
+                              data-tab-project=""
+                              className="dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:rounded-sm dshx:bg-(--dsh-main-tab-chip) dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none dshx:text-(--dsw-alias-label-secondary)"
+                            >
+                              {project}
                             </span>
                           )}
                           {tab.kind === 'thread' && renamingTabId === tab.id ? (

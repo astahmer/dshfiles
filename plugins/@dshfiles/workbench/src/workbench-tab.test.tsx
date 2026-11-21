@@ -7,6 +7,7 @@ import { createWorkbenchPanelRegistry, type WorkbenchPanelDefinition } from './r
 import { connectWorkbenchTabs, type CloseButtonPosition, type WorkbenchTab, type WorkbenchTabsActions, type WorkbenchTabsSnapshot } from './tabs.js'
 import { createWorkbenchTab, WorkbenchNewTabButton } from './workbench-tab.js'
 import { TabRows } from './tab-row-visibility.js'
+import { TabReveal } from './tab-reveal.js'
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class {
@@ -30,6 +31,7 @@ const fixture = (
     readonly pinned?: boolean
     readonly semantic?: boolean
     readonly closeButtonPosition?: CloseButtonPosition
+    readonly projectNames?: Readonly<Record<string, string>>
     readonly presentation?: Pick<WorkbenchTabsProvider, 'renderTabMenu' | 'label'>
   } = {},
 ) => {
@@ -52,6 +54,7 @@ const fixture = (
     tabs: [initial],
   }
   if (options.closeButtonPosition !== undefined) snapshot = { ...snapshot, closeButtonPosition: options.closeButtonPosition }
+  if (options.projectNames !== undefined) snapshot = { ...snapshot, projectNames: options.projectNames }
   const listeners = new Set<() => void>()
   const actions: WorkbenchTabsActions = {
     activate: vi.fn(),
@@ -110,28 +113,27 @@ const fixture = (
 }
 
 describe('workbench semantic tab chrome', () => {
-  it('reveals the active tab once React has laid out its final width', () => {
-    const reveal = vi.spyOn(HTMLElement.prototype, 'scrollIntoView')
+  it('leaves strip scrolling to Dockview when the tab mounts and its title changes', () => {
+    const reveal = vi.spyOn(TabReveal, 'reveal')
     const tab = fixture()
-    expect(reveal).toHaveBeenCalled()
-    reveal.mockClear()
-    tab.update({ title: 'Thread A with a much longer title than the placeholder' })
-    expect(reveal).toHaveBeenCalled()
-    reveal.mockRestore()
-  })
-
-  it('does not move the strip while another tab is active', () => {
-    const reveal = vi.spyOn(HTMLElement.prototype, 'scrollIntoView')
-    const tab = fixture()
-    let second: IDockviewPanel | undefined
-    act(() => {
-      second = tab.api.addPanel({ id: 'panel-b', component: 'body' })
-    })
-    act(() => second?.api.setActive())
-    reveal.mockClear()
+    expect(reveal).not.toHaveBeenCalled()
     tab.update({ title: 'Thread A with a much longer title than the placeholder' })
     expect(reveal).not.toHaveBeenCalled()
     reveal.mockRestore()
+  })
+
+  it('shows the project chip before a thread title when the provider publishes project names', () => {
+    const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' } })
+    tab.update({ workspaceId: 'workspace-a' })
+    const chip = screen.getByText('NixConfig')
+    const title = screen.getByText('Thread A')
+    expect(chip.getAttribute('data-workbench-tab-project')).toBe('')
+    expect(chip.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('hides the project chip without a project name for the tab', () => {
+    fixture({ projectNames: { 'workspace-a': 'NixConfig' } })
+    expect(document.querySelector('[data-workbench-tab-project]')).toBeNull()
   })
 
   it('defaults missing close-button metadata to the right of the Workbench tab title, VS Code style', () => {

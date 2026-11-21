@@ -40,6 +40,8 @@ export interface WorkbenchTabsSnapshot {
   /** Current native Conversation binding, independent of the selected semantic tool; absent on older providers. */
   readonly currentSessionId?: string | undefined
   readonly tabs: readonly WorkbenchTab[]
+  /** Project folder name per thread workspace id, for the tab's project chip; absent hides the chips. */
+  readonly projectNames?: Readonly<Record<string, string>>
 }
 
 export interface WorkbenchTabsActions {

@@ -424,11 +424,14 @@ export default defineClient({
             () => createThreadWorkspaceResolver({ byId, workspaces: workspaceItems, threadDirectories }),
             [byId, threadDirectories, workspaceItems],
           )
-          const showProjectName = settings.value?.showProjectName ?? false
+          const showProjectName = settings.value?.showProjectName ?? true
           const projectNames = useMemo(
             () => (showProjectName ? ProjectNames.byWorkspaceId(workspaceItems, threadDirectories) : undefined),
             [showProjectName, threadDirectories, workspaceItems],
           )
+          // Plain record, memoized: the publication fingerprints its snapshot as JSON, and a fresh object per render
+          // would wake every tab. A Map would stringify to `{}` and hide changes entirely.
+          const projectNameChips = useMemo(() => (projectNames === undefined ? undefined : Object.fromEntries(projectNames)), [projectNames])
           const statuses = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
           // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges,
           // and both read the one page-wide poll instead of each holding their own interval.
@@ -581,14 +584,15 @@ export default defineClient({
           }
 
           useLayoutEffect(() => {
+            const published = {
+              enabled: snapshot.matches('on'),
+              closeButtonPosition,
+              scopeKey: snapshot.context.scopeKey,
+              activeTabId: set?.activeTabId ?? null,
+              tabs,
+            }
             publication.update(
-              {
-                enabled: snapshot.matches('on'),
-                closeButtonPosition,
-                scopeKey: snapshot.context.scopeKey,
-                activeTabId: set?.activeTabId ?? null,
-                tabs,
-              },
+              projectNameChips === undefined ? published : { ...published, projectNames: projectNameChips },
               () => <StartPage sections={startSections()} t={props.t} />,
               startContentVersion,
             )
