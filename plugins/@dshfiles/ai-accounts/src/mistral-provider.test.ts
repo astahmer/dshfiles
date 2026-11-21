@@ -45,8 +45,8 @@ describe('Mistral template choice', () => {
 })
 
 describe('Mistral-hosted models', () => {
-  // pi-ai 1.5 catalogs DeepSeek V4.1 Flash 1017 itself (128 000 output, below Mistral's documented 131 072), so its
-  // entry wins over ours and only our image and effort corrections apply on top.
+  // pi-ai catalogs DeepSeek V4.1 Flash 1017 itself since 1.5 (128 000 output, below Mistral's documented 131 072) and
+  // with image input since 1.6, so its entry wins over ours and only our effort correction changes it.
   it('offers DeepSeek V4.1 Flash 1017 once, with the image input and efforts Mistral documents', () => {
     expect(catalogModel('deepseek-v4-1-flash-1017')).toMatchObject({
       name: 'DeepSeek V4.1 Flash 1017',

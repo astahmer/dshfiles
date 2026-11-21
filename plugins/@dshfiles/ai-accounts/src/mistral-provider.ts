@@ -24,8 +24,8 @@ const effortsFor = (id: string): readonly MistralEffort[] | undefined => EFFORT_
 
 /**
  * Models Mistral documents as reading images, with their dash variants (docs.mistral.ai/models, read 2026-11-06).
- * pi-ai 1.5 gives only Large 4 and GLM 5.3 Flash image input; DeepSeek V4.1 Flash is catalogued as text only. A catalog entry that
- * leaves vision out does not hide it.
+ * pi-ai 1.6 catalogs all three with image input; older pi-ai lists DeepSeek V4.1 Flash as text only, and a discovered
+ * entry (Mistral's `/v1/models`, a dated variant) can still leave vision out. Such an entry does not hide it.
  */
 const IMAGE_INPUT_MODELS = ['mistral-large-4', 'zai-glm-5-3-flash', 'deepseek-v4-1-flash']
 const TEXT_AND_IMAGE = ['text', 'image'] as const
