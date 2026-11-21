@@ -39,18 +39,29 @@ export interface AccountStoreFile {
   readonly accounts: readonly AccountDraft[]
 }
 
+const DEFAULT_COOLDOWN_MS = 300_000
+
 const emptyFile = (): AccountStoreFile => ({
   distribution: DEFAULT_DISTRIBUTION,
-  cooldownMs: 300_000,
+  cooldownMs: DEFAULT_COOLDOWN_MS,
   shadowRoot: DEFAULT_SHADOW_ROOT,
   accounts: [],
 })
 
-/** The store schema: drafts on disk, observed fields added on read. */
+/**
+ * The store schema: drafts on disk, observed fields added on read. A missing setting takes its default, so a minimal
+ * file such as the seeded `{"accounts":[]}` reads as empty instead of blocking every save; a present but invalid value
+ * still makes the file unreadable.
+ */
 const storeFileSchema = Schema.Struct({
   ...accountsFileSchema.fields,
-  distribution: accountsFileSchema.fields.distribution.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_DISTRIBUTION)))),
-  accounts: AiAccountsSchema.list(accountDraftSchema, 64),
+  distribution: accountsFileSchema.fields.distribution.pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_DISTRIBUTION))),
+    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_DISTRIBUTION)),
+  ),
+  cooldownMs: accountsFileSchema.fields.cooldownMs.pipe(Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_COOLDOWN_MS))),
+  shadowRoot: accountsFileSchema.fields.shadowRoot.pipe(Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_SHADOW_ROOT))),
+  accounts: AiAccountsSchema.list(accountDraftSchema, 64).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
 })
 
 const layoutFor = (profile: AccountDraft, file: AccountStoreFile) => AccountHomePolicy.codexLayoutFor(profile, file.shadowRoot)
