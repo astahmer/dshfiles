@@ -18,6 +18,7 @@ import { ProjectCloneDialog } from './project-clone-dialog.js'
 import { ProjectCreateDialog } from './project-create-dialog.js'
 import { ProjectFolderSetup } from './project-folder-setup.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
+import { ProjectAddChooser } from './project-add-chooser.js'
 import { upsertProjectTone } from './project-tone.js'
 import { workspaceFolderPickerSettings } from './settings.js'
 import { ProjectSettingsSection } from './project-settings-section.js'
@@ -26,9 +27,9 @@ const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.works
 
 const directoryFlowLabels = { heading: 'Add a project' } satisfies { readonly heading: string }
 
-type DirectoryFlowView = 'browse' | 'clone' | 'create' | 'inspect'
+type DirectoryFlowView = 'choose' | 'browse' | 'clone' | 'create' | 'inspect'
 
-const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): JSX.Element => {
+const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts & { readonly initialView?: DirectoryFlowView }): JSX.Element => {
   const browserApi = useApi(workspaceFolderBrowserApi)
   const lifecycleApi = useApi(projectLifecycleApi)
   const settings = useSettings(workspaceFolderPickerSettings)
@@ -37,8 +38,9 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
     void settings.set('projectTones', upsertProjectTone(settings.value?.projectTones ?? [], path, tone)).catch(() => undefined)
     props.onPicked(path)
   }
-  // A surface that asked for New project or Clone (ProjectAddFlow.request) opens the flow on that view.
-  const [view, setView] = useState<DirectoryFlowView>(() => ProjectAddFlow.take())
+  // A surface that asked for New project or Clone (ProjectAddFlow.request) opens the flow on that view; the Host's own
+  // add-workspace hole opens on the chooser instead of dropping the operator into a filesystem listing.
+  const [view, setView] = useState<DirectoryFlowView>(() => props.initialView ?? 'choose')
   const [candidate, setCandidate] = useState<string | null>(null)
   const tools = useQuery({ queryKey: ['workspace-folder-picker', 'project-tools'], queryFn: () => lifecycleApi.tools({}), retry: false, staleTime: 60_000 })
   const pickerCapabilities = useQuery({
@@ -54,6 +56,18 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
     pick: signal => props.directoryPicker.pick(signal),
     list: (path, signal) => browserApi.list(path === undefined ? {} : { path }, { signal }),
     createDirectory: (path, name) => browserApi.createDirectory({ path, name }),
+  }
+  if (view === 'choose') {
+    return (
+      <ProjectAddChooser
+        gitHubAvailable={tools.data?.gh === true}
+        onBrowse={() => setView('browse')}
+        onClone={() => setView('clone')}
+        onClose={props.onCancel}
+        onCreate={() => setView('create')}
+        open
+      />
+    )
   }
   if (view === 'inspect' && candidate !== null) {
     return (
@@ -145,7 +159,7 @@ const ProjectAddFlowHost = (props: WorkspacePickerPorts): JSX.Element | null => 
   const close = (): void => setOpen(false)
   return (
     <PluginQueryProvider>
-      <DirectoryFlowContent {...props} open busy={false} onPicked={close} onCancel={close} onError={() => undefined} />
+      <DirectoryFlowContent {...props} initialView={ProjectAddFlow.take()} open busy={false} onPicked={close} onCancel={close} onError={() => undefined} />
     </PluginQueryProvider>
   )
 }

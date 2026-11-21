@@ -124,7 +124,8 @@ export class ProjectFolderPickerModel {
   }
 
   static readonly movePickerSelection = (current: number, count: number, direction: PickerDirection): number => {
-    if (count < 1) return 0
+    if (count < 1) return -1
+    if (current < 0) return direction === 'down' ? 0 : count - 1
     const delta = direction === 'down' ? 1 : -1
     return (current + delta + count) % count
   }
@@ -145,6 +146,27 @@ export class ProjectFolderPickerModel {
         .filter(Boolean)
         .at(-1) ?? canonicalPath,
   })
+
+  /** The folder one level up for an Up button; the crumbs decide, else the path splits on its own separator. */
+  static readonly parentDirectoryPath = (listing: {
+    readonly path: string
+    readonly crumbs: readonly { readonly name: string; readonly path: string; readonly hidden?: boolean }[]
+  }): string | null => {
+    const parent = listing.crumbs.at(-2)?.path
+    if (parent !== undefined) return parent
+    if (listing.path === '/') return null
+    const separator = listing.path.includes('\\') ? '\\' : '/'
+    const trimmed = listing.path.replace(/[\\/]+$/u, '')
+    const index = trimmed.lastIndexOf(separator)
+    if (index > 0) return trimmed.slice(0, index)
+    return separator === '/' ? '/' : null
+  }
+
+  /** The crumbs an Up/breadcrumb row shows: hidden ancestors stay out, and the current folder always ends it. */
+  static readonly visibleCrumbs = (
+    crumbs: readonly { readonly name: string; readonly path: string; readonly hidden: boolean }[],
+  ): readonly { readonly name: string; readonly path: string; readonly hidden: boolean }[] =>
+    crumbs.filter((crumb, index) => !crumb.hidden || index === crumbs.length - 1)
 
   static readonly isPickerTab = (value: string): value is PickerTab => pickerTabs.some(tab => tab === value)
 

@@ -21,7 +21,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
-import { ChevronDownIcon, FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowUpIcon, ChevronDownIcon, ChevronRightIcon, FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
@@ -135,7 +135,8 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const [flow, dispatchFlow] = useReducer(pickerFlowReducer, props.mode, initialPickerFlow)
   const query = flow.query
   const browseTarget = flow.browse
-  const [selectedIndex, setSelectedIndex] = useState(0)
+  // -1: nothing is highlighted, so the primary action is the folder already open until the operator picks a row.
+  const [selectedIndex, setSelectedIndex] = useState(-1)
   const [newDirectoryName, setNewDirectoryName] = useState('')
   const [projectToRemove, setProjectToRemove] = useState<RegisteredProject | null>(null)
   const pickRequest = useRef<AbortController | null>(null)
@@ -164,6 +165,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   )
 
   const listing = browseTarget === null ? null : (listingQuery.data ?? null)
+  const parentPath = listing === null ? null : ProjectFolderPickerModel.parentDirectoryPath(listing)
   const absolutePath = query.trim()
   const hasAbsolutePath = ProjectFolderPickerModel.isAbsolutePath(absolutePath, pathStyle)
   const requestedPath = listing === null ? null : ProjectFolderPickerModel.resolvePathQuery(query, listing.home, pathStyle)
@@ -207,7 +209,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
 
   useEffect(() => () => pickRequest.current?.abort(), [])
 
-  useEffect(() => setSelectedIndex(0), [query, listing?.path, tab])
+  useEffect(() => setSelectedIndex(-1), [query, listing?.path, tab])
 
   useEffect(() => {
     if (listingQuery.data === undefined || listingQuery.isPlaceholderData || browseTarget === null) return
@@ -280,6 +282,21 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     if (entry !== undefined) props.onSelect(ProjectFolderPickerModel.pickerEntrySelection(entry))
   }
 
+  /** The folder the primary action adds: the highlighted row, else the folder already open. */
+  const highlightedFolder = listing === null ? null : (folderEntries[selectedIndex] ?? null)
+  const addTargetPath = highlightedFolder?.path ?? listing?.path ?? null
+  const addTargetName = highlightedFolder?.name ?? listing?.crumbs.at(-1)?.name ?? addTargetPath?.split(/[\\/]/u).filter(Boolean).at(-1) ?? null
+  const addTarget = (): void => {
+    if (addTargetPath === null) return
+    props.onSelect(ProjectFolderPickerModel.folderSelection(addTargetPath))
+  }
+
+  const openSelectedFolder = (): void => {
+    if (!pathMode) return
+    const entry = folderEntries[selectedIndex]
+    if (entry !== undefined) browse(entry.path)
+  }
+
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key) && !pathMode) {
       const entry = entries[Number(event.key) - 1]
@@ -296,25 +313,33 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
       setSelectedIndex(index => ProjectFolderPickerModel.movePickerSelection(index, itemCount, direction))
       return
     }
+    if (event.key === 'ArrowRight' && pathMode) {
+      if (itemCount === 0) return
+      event.preventDefault()
+      openSelectedFolder()
+      return
+    }
     if (event.key === 'Enter') {
       event.preventDefault()
       const pathQuery = query.trim()
       if (pathMode && pathQuery.length > 0) {
         const matchingPaths = listing === null ? null : ProjectFolderPickerModel.matchingDirectoryPaths(listing, pathQuery)
+        const entry = folderEntries[selectedIndex]
+        // A typed path adds the folder it names; browsing into it is the explicit →/double-click gesture.
         if (matchingPaths !== null && matchingPaths.length > 0) {
-          const entry = folderEntries[selectedIndex]
-          if (entry !== undefined) browse(entry.path)
+          if (entry !== undefined) addTarget()
           return
         }
         const requestedPath = ProjectFolderPickerModel.resolvePathQuery(pathQuery, listing?.home, pathStyle)
         if (ProjectFolderPickerModel.isHomeRelativePathQuery(pathQuery, pathStyle) && requestedPath === null) return
         const path = requestedPath ?? pathQuery
         if (listing?.path !== path) {
-          browse(path)
+          props.onSelect(ProjectFolderPickerModel.folderSelection(path))
           return
         }
       }
-      selectVisibleItem()
+      if (pathMode) addTarget()
+      else selectVisibleItem()
     }
   }
 
@@ -405,26 +430,71 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
           {pathMode ? (
             <>
               {listing !== null && (
-                <p className="dshx:px-4 dshx:pt-3 dshx:pb-1.5 dshx:font-mono dshx:text-xs dshx:break-all dshx:text-muted-foreground">{listing.path}</p>
+                <div
+                  aria-label="Folder path"
+                  className="dshx:flex dshx:items-center dshx:gap-0.5 dshx:overflow-x-auto dshx:border-b dshx:px-2 dshx:py-1.5"
+                  role="navigation"
+                >
+                  <Button
+                    aria-label="Up one folder"
+                    className="dshx:size-7 dshx:shrink-0 dshx:p-0"
+                    disabled={parentPath === null}
+                    onClick={() => browse(parentPath ?? undefined)}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <ArrowUpIcon aria-hidden className="dshx:size-4" />
+                  </Button>
+                  {ProjectFolderPickerModel.visibleCrumbs(listing.crumbs).map((crumb, index, crumbs) => (
+                    <span className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-0.5" key={crumb.path}>
+                      {index > 0 && <ChevronRightIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground" />}
+                      <button
+                        aria-current={index === crumbs.length - 1 ? 'page' : undefined}
+                        className={cn(
+                          'dshx:max-w-40 dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-1 dshx:text-xs dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+                          index === crumbs.length - 1 ? 'dshx:font-medium dshx:text-foreground' : 'dshx:text-muted-foreground',
+                        )}
+                        onClick={() => browse(crumb.path)}
+                        title={crumb.path}
+                        type="button"
+                      >
+                        {crumb.name}
+                      </button>
+                    </span>
+                  ))}
+                </div>
               )}
               <div aria-busy={listingQuery.isFetching} aria-label="Folders" className={cn(listClassName, listing === null && 'dshx:pt-2')} role="listbox">
                 {folderEntries.map((entry, index) => (
-                  <button
-                    aria-selected={index === selectedIndex}
-                    className={optionClassName(index === selectedIndex)}
-                    key={entry.path}
-                    onClick={() => browse(entry.path)}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    role="option"
-                    type="button"
-                  >
-                    <FolderIcon aria-hidden className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-                    <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-                      <span className="dshx:truncate dshx:text-sm">{entry.name}</span>
-                      <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{entry.path}</span>
-                    </span>
-                    {entry.hidden && <Badge variant="muted">Hidden</Badge>}
-                  </button>
+                  <div className="dshx:flex dshx:items-center" key={entry.path} role="none">
+                    <button
+                      aria-selected={index === selectedIndex}
+                      className={cn(optionClassName(index === selectedIndex), 'dshx:flex-1')}
+                      onClick={() => setSelectedIndex(index)}
+                      onDoubleClick={() => browse(entry.path)}
+                      onMouseEnter={() => setSelectedIndex(index)}
+                      role="option"
+                      type="button"
+                    >
+                      <FolderIcon aria-hidden className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+                      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                        <span className="dshx:truncate dshx:text-sm">{entry.name}</span>
+                        <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{entry.path}</span>
+                      </span>
+                      {entry.hidden && <Badge variant="muted">Hidden</Badge>}
+                    </button>
+                    <Button
+                      aria-label={`Open ${entry.name}`}
+                      className="dshx:mr-1 dshx:size-7 dshx:shrink-0 dshx:p-0"
+                      onClick={() => browse(entry.path)}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <ChevronRightIcon aria-hidden className="dshx:size-4 dshx:text-muted-foreground" />
+                    </Button>
+                  </div>
                 ))}
                 {listing === null && <p className={emptyClassName}>Type an absolute or ~/ folder path to browse.</p>}
                 {listing !== null && folderEntries.length === 0 && (
@@ -440,18 +510,18 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                     type="button"
                     variant={props.mode === 'directories' ? 'default' : 'outline'}
                   >
-                    {props.mode === 'directories' ? 'Use this folder' : 'Register project'}
+                    {props.mode === 'directories' ? 'Use this path' : 'Register project'}
                   </Button>
                 </div>
               )}
               {showListingActions && (
                 <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:p-2">
-                  <Button disabled={busy} onClick={() => props.onSelect(ProjectFolderPickerModel.folderSelection(listing.path))} size="sm" type="button">
-                    Select this folder
+                  <Button disabled={busy || addTargetPath === null} onClick={() => addTarget()} size="sm" type="button">
+                    {props.mode === 'directories' ? `Add ${addTargetName === null ? 'this folder' : `“${addTargetName}”`}` : 'Register project'}
                   </Button>
                   {props.mode !== 'directories' && (
                     <Button disabled={busy} onClick={() => registerCurrentFolder()} size="sm" type="button" variant="outline">
-                      Register project
+                      Register this folder
                     </Button>
                   )}
                   <form
@@ -527,11 +597,15 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                 <Kbd>↑</Kbd>
                 <Kbd>↓</Kbd>
               </KbdGroup>
-              Navigate
+              Choose
+            </span>
+            <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+              <Kbd>→</Kbd>
+              Open folder
             </span>
             <span className="dshx:flex dshx:items-center dshx:gap-1.5">
               <Kbd>Enter</Kbd>
-              Select / open
+              Add / select
             </span>
             <span className="dshx:flex dshx:items-center dshx:gap-1.5">
               <Kbd>Esc</Kbd>
