@@ -48,6 +48,16 @@ const bundleOriginOf = (bundle: BundleInfoLike): PluginBundleOrigin => {
   return 'community'
 }
 
+const bundlePendingRestart = (input: {
+  readonly target: boolean | undefined
+  readonly running: boolean
+  readonly hasRows: boolean
+}): PluginBundle['pendingRestart'] => {
+  if (input.target === undefined) return null
+  if (input.target === input.running && input.hasRows) return null
+  return input.target ? 'enable' : 'disable'
+}
+
 const SEED_START = '# BEGIN NIX-MANAGED DSH PLUGINS'
 const SEED_END = '# END NIX-MANAGED DSH PLUGINS'
 const TOP_LEVEL_ID = /^- id:\s*['"]?([^'"\s#]+)/u
@@ -164,7 +174,7 @@ export class PluginControls extends Context.Service<
               const activeRowCount = bundle.rows.filter(row => row.entryId !== undefined && runningIds.has(row.entryId)).length
               const target = awaiting.get(bundle.name)
               const running = activeRowCount > 0
-              const pendingRestart = target === undefined ? null : target === running && bundle.rows.length > 0 ? null : target ? 'enable' : 'disable'
+              const pendingRestart = bundlePendingRestart({ target, running, hasRows: bundle.rows.length > 0 })
               return {
                 name: bundle.name,
                 origin: bundleOriginOf(bundle),
