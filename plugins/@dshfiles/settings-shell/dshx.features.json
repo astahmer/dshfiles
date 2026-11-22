@@ -195,6 +195,11 @@
           "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "settings-shell.all-settings-keeps-tab",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "settings-shell.machine-unit-tab",
           "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",

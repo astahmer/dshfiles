@@ -244,8 +244,9 @@ const SETTINGS_COMMAND_ID = 'settings.open'
 const THREAD_PANEL_COMMAND_ID = 'workbench.toggleSidePanel'
 
 export const requestSettings = (runCommand: ((commandId: string) => boolean) | null): void => {
-  if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
+  // Open Settings without toggling it closed when already active; `settings.open` is the Mod+, toggle shortcut.
   if (dispatchOpenSettings()) return
+  if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
   // A native settings root owns the seat instead of the dshx shell: its trigger is the only public opener there.
   document.querySelector<HTMLButtonElement>('[data-footer-entry="settings"] button[aria-haspopup="dialog"]')?.click()
 }

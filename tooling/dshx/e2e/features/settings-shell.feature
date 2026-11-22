@@ -187,3 +187,9 @@ Feature: Settings shell
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
     When the Plugins panel is opened
     Then installed plugins can be filtered by text in the Plugins tab
+
+  @scenario:settings-shell.all-settings-keeps-tab
+  Scenario: Clicking All settings in the Settings sidebar keeps the Settings tab open
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When Settings is opened from the destination rail
+    Then clicking All settings keeps the Settings tab open without switching back to a conversation tab
