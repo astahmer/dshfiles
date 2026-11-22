@@ -12,6 +12,8 @@
 
 ![Global Dshfiles plugins quick-toggle page](docs/screenshots/dshfiles-plugins-page.png)
 
+![Quick-filter input in the Plugins tab](docs/screenshots/installed-plugins-filter.png)
+
 ![Edit plugin settings as JSON](docs/screenshots/settings-json-editor.png)
 
 DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the native shell has no seat for.
@@ -40,6 +42,8 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
   by functional area with live search, source (`dshfiles` / `Community` / `All`) and status (`All` / `Enabled` / `Disabled`)
   filters, quick enable/disable switches backed by `PluginManager.setBundleEnabled`, restart-required badges, and direct
   **Settings** links to jump to each plugin's configuration page.
+- **Installed plugins filter**: the native **Plugins** tab (**Installed** list) gains a live text filter input at the top
+  to narrow installed plugins by name, package id, status or description, hiding empty groups and clearing on `Escape`.
 - **Scope**: plugin pages say they apply to every project and thread. No setting stores a per-project or per-thread
   value today, so the page shows that as information instead of a scope control it could not honour. Project or
   thread scopes, VS Code's precedence rules, a JSON view of the YAML profile patch, migrating existing YAML or

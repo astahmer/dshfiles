@@ -57,6 +57,7 @@ import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
 import { DshfilesPluginsPage } from './dshfiles-plugins-page.js'
+import { InstalledPluginsFilter } from './installed-plugins-filter.js'
 import { PluginEntryCard } from './plugin-entry-card.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
@@ -881,6 +882,14 @@ export default defineClient({
           readonly dismissRelease: () => void
           readonly reloadPage: () => void
         }) => <HostReleasePrompt {...props} />,
+      ),
+    )
+
+    // Quick text filter inside DSH core's native Plugins tab ("Installed" list) without patching DSH core.
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register(
+        { name: 'shell.overlay', id: 'dshfiles-installed-plugins-filter', order: 122, locale: SHELL_LOCALE_NAMESPACE },
+        (props: { readonly t: ShellTranslate }) => <InstalledPluginsFilter t={props.t} />,
       ),
     )
 

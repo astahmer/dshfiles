@@ -932,6 +932,57 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "installed-plugins-filter",
+      "title": "Quick-filter installed plugins in the Plugins tab",
+      "summary": "Adds a live text filter input at the top of DSH's native Plugins tab (Installed list) so users can quickly find installed plugins by display name, package id, status, or description without scrolling. Hides emptied groups, shows a live match count, clears on Escape, and restores all cards cleanly.",
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Settings: Installed plugins\"",
+        "click option \"Settings: Installed plugins*\"",
+        "click button \"Open Installed plugins\"",
+        "fill searchbox \"Filter installed plugins\" \"main-tabs\"",
+        "expect text \"1 of *\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click combobox \"Sections\"",
+        "click option \"Installed plugins\"",
+        "click button \"Open Installed plugins\"",
+        "fill searchbox \"Filter installed plugins\" \"main-tabs\"",
+        "expect text \"1 of *\""
+      ],
+      "surfaces": ["client"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "plugins: Installed tab filter input",
+      "configuration": [],
+      "states": ["idle", "filtering", "empty"],
+      "failureModes": [
+        "When the Plugins panel is on the Market tab or inside a plugin's detail view, the filter input unmounts cleanly without altering React-managed children."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.installed-plugins-filter-unit",
+          "file": "plugins/@dshfiles/settings-shell/src/installed-plugins-filter.test.tsx",
+          "testName": "filters cards by name, package id or description, hides empty groups, and clears cleanly"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.installed-plugins-filter",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: filters already-rendered cards in the native Plugins tab DOM without making Host requests."
+        }
+      ]
     }
   ]
 }

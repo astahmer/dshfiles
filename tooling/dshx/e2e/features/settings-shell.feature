@@ -181,3 +181,9 @@ Feature: Settings shell
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
     When the Dshfiles plugins page is opened in Settings
     Then installed dshfiles plugins are listed with quick toggles and a Settings link for Main tabs
+
+  @scenario:settings-shell.installed-plugins-filter
+  Scenario: The Plugins tab offers a text input to filter installed plugins quickly
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When the Plugins panel is opened
+    Then installed plugins can be filtered by text in the Plugins tab

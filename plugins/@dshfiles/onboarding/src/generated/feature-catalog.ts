@@ -522,7 +522,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "settings-shell",
       "description": "VS Code-style DSH Settings shell with plugin settings, search, and notices for new DSH releases.",
       "ui": true,
-      "features": 16
+      "features": 17
     },
     {
       "name": "settings-subagent",
@@ -22933,6 +22933,111 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "switch",
           "name": "Enable *",
+          "value": null
+        }
+      ],
+      "onboarding": null
+    },
+    {
+      "key": "settings-shell#installed-plugins-filter",
+      "plugin": "settings-shell",
+      "id": "installed-plugins-filter",
+      "title": "Quick-filter installed plugins in the Plugins tab",
+      "summary": "Adds a live text filter input at the top of DSH's native Plugins tab (Installed list) so users can quickly find installed plugins by display name, package id, status, or description without scrolling. Hides emptied groups, shows a live match count, clears on Escape, and restores…",
+      "destination": "settings",
+      "currentSurface": "plugins: Installed tab filter input",
+      "reach": [
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: Installed plugins\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: Installed plugins"
+        },
+        {
+          "text": "click option \"Settings: Installed plugins*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: Installed plugins*",
+          "value": null
+        },
+        {
+          "text": "click button \"Open Installed plugins\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open Installed plugins",
+          "value": null
+        },
+        {
+          "text": "fill searchbox \"Filter installed plugins\" \"main-tabs\"",
+          "action": "fill",
+          "by": "searchbox",
+          "name": "Filter installed plugins",
+          "value": "main-tabs"
+        },
+        {
+          "text": "expect text \"1 of *\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1 of *",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
+          "value": null
+        },
+        {
+          "text": "click option \"Installed plugins\"",
+          "action": "click",
+          "by": "option",
+          "name": "Installed plugins",
+          "value": null
+        },
+        {
+          "text": "click button \"Open Installed plugins\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open Installed plugins",
+          "value": null
+        },
+        {
+          "text": "fill searchbox \"Filter installed plugins\" \"main-tabs\"",
+          "action": "fill",
+          "by": "searchbox",
+          "name": "Filter installed plugins",
+          "value": "main-tabs"
+        },
+        {
+          "text": "expect text \"1 of *\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1 of *",
           "value": null
         }
       ],
