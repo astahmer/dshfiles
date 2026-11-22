@@ -15,6 +15,9 @@ export const workspaceFolderPickerSettings = defineSettings({
     projectTones: Schema.array(projectToneEntry)
       .default([])
       .description('Colour per project, chosen when the folder is imported; a project without an entry keeps the automatic colour of its folder name.'),
+    projectParent: Schema.string()
+      .default('')
+      .description('Folder the Create project dialog starts in. Empty starts in your home folder; the dialog can remember the last one for you.'),
   }),
   applies: 'live',
 })

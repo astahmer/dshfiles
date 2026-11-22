@@ -36,19 +36,19 @@ export const ProjectAddChooser = (props: {
     <DialogContent className="dshx-root dshx:max-w-md">
       <DialogHeader>
         <DialogTitle>Add a project</DialogTitle>
-        <DialogDescription>Open a folder that is already on this machine, create one, or clone a repository.</DialogDescription>
+        <DialogDescription>Add a folder that already exists, create a new project, or clone a repository.</DialogDescription>
       </DialogHeader>
       <div className="dshx:flex dshx:flex-col dshx:gap-2">
         <ChoiceRow
-          hint="Register a folder you already have; its colour is picked next to it."
+          hint="A folder that already exists on this machine. Its colour is picked next."
           icon={<FolderOpenIcon aria-hidden size={16} />}
-          label="Open an existing folder"
+          label="Add folder"
           onClick={props.onBrowse}
         />
         <ChoiceRow
-          hint="Create a folder with a Jujutsu repository, a README and a first commit."
+          hint="A new folder with a Jujutsu repository, a README and a first commit."
           icon={<FolderPlusIcon aria-hidden size={16} />}
-          label="New project"
+          label="Create project"
           onClick={props.onCreate}
         />
         {props.gitHubAvailable && (

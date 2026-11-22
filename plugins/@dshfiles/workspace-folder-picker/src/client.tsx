@@ -89,19 +89,24 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
     return (
       <ProjectCreateDialog
         api={lifecycleApi}
+        defaultParent={settings.value?.projectParent}
         gitHubAvailable={tools.data?.gh === true}
         home={tools.data?.home}
         onClose={() => setView('browse')}
         onCreated={picked}
+        onRememberParent={parent => {
+          void settings.set('projectParent', parent.trim()).catch(() => undefined)
+        }}
       />
     )
   }
-  // New project and Clone were hidden behind a "New ▾" button (productivity pass Q5, T5.5): both are direct buttons.
+  // Creating a project and cloning were hidden behind a "New ▾" button (productivity pass Q5, T5.5): both are direct
+  // buttons, and each says whether it creates a project or adds a folder that already exists.
   const addActions = tools.isSuccess ? (
     <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
       <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.jj} type="button" variant="outline" onClick={() => setView('create')}>
         <FolderPlusIcon aria-hidden />
-        New project…
+        Create project…
       </Button>
       <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.git} type="button" variant="outline" onClick={() => setView('clone')}>
         <GitBranchIcon aria-hidden />
@@ -182,8 +187,8 @@ export default defineClient({
     const plugin = metadata?.plugin
     if (plugin !== undefined)
       for (const row of [
-        { id: 'new-project', label: 'New project…', view: 'create', aliases: ['Create project', 'Initialize repository', 'New repository'] },
-        { id: 'add-folder', label: 'Add folder as project…', view: 'browse', aliases: ['Open folder', 'Add workspace', 'Register project'] },
+        { id: 'new-project', label: 'Create project…', view: 'create', aliases: ['New project', 'Add project', 'Initialize repository', 'New repository'] },
+        { id: 'add-folder', label: 'Add folder…', view: 'browse', aliases: ['Add existing folder', 'Add folder as project', 'Open folder', 'Add workspace', 'Register project'] },
         { id: 'clone-repository', label: 'Clone repository…', view: 'clone', aliases: ['git clone', 'Clone project'] },
       ] as const)
         plugin.add(PaletteActions, {
