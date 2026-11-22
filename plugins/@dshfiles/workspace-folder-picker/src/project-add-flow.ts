@@ -5,15 +5,16 @@
  * composer's project menu, the thread list's project picker, ⌘K) open that flow in one call, on the view it names.
  * Importing it loads none of the picker's runtime.
  *
- * - {@link ProjectAddFlow.open} raises the flow: `browse` (Add folder), `create` (New project) or `clone`; it returns
- *   false when no owner is mounted (a profile without @dshfiles/workspace-folder-picker).
+ * - {@link ProjectAddFlow.open} raises the flow: `choose` (the Add a project chooser), `browse` (Add folder), `create`
+ *   (Create project) or `clone`; it returns false when no owner is mounted (a profile without
+ *   @dshfiles/workspace-folder-picker).
  * - {@link ProjectAddFlow.request} only records the view the next directory flow should start on, for an owner that
  *   opens the native flow itself (the composer's project menu).
  *
  * State lives on `globalThis` because every client bundle that imports this module gets its own copy.
  */
 
-export type ProjectAddView = 'browse' | 'create' | 'clone'
+export type ProjectAddView = 'choose' | 'browse' | 'create' | 'clone'
 
 const OPEN_EVENT = 'dshfiles-workspace-folder-picker:open-project-add'
 const INTENT_TTL_MS = 10_000
@@ -24,7 +25,7 @@ declare global {
   var __dshfilesProjectAddOwners: number | undefined
 }
 
-const isView = (value: unknown): value is ProjectAddView => value === 'browse' || value === 'create' || value === 'clone'
+const isView = (value: unknown): value is ProjectAddView => value === 'choose' || value === 'browse' || value === 'create' || value === 'clone'
 
 export class ProjectAddFlow {
   /** Record the view the next directory flow opens on (consumed by {@link ProjectAddFlow.take}). */
