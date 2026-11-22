@@ -88,4 +88,32 @@ describe('QuotaForecastModel.board', () => {
     expect(forecast.window.label).toBe('Weekly limit')
     expect(forecast.others.map(other => other.label)).toEqual(['Current session'])
   })
+
+  it('keeps a model-scoped weekly window out of the lead while a plan-wide one is reported', () => {
+    const resetsAt = now + 90 * HOUR
+    const claude = account(
+      'claude',
+      card([
+        { label: 'Weekly limit', percentRemaining: 63, resetsAt },
+        { label: 'Weekly Fable', percentRemaining: 72, resetsAt },
+      ]),
+      [point(now - HOUR, { 'Weekly limit': 64, 'Weekly Fable': 77 }, { 'Weekly limit': resetsAt, 'Weekly Fable': resetsAt })],
+    )
+
+    const forecast = QuotaForecastModel.board({ accounts: [claude], now }).accounts[0]
+    if (forecast?.status !== 'forecast') throw new Error('expected a forecast')
+
+    expect(forecast.window.label).toBe('Weekly limit')
+    expect(forecast.others.map(other => other.label)).toEqual(['Weekly Fable'])
+    expect(forecast.others[0]?.runsOutAt).not.toBeNull()
+  })
+
+  it('lets a model-scoped window govern when it is the only one reported', () => {
+    const resetsAt = now + 90 * HOUR
+    const only = account('only', card([{ label: 'Weekly Fable', percentRemaining: 72, resetsAt }]))
+
+    const forecast = QuotaForecastModel.board({ accounts: [only], now }).accounts[0]
+    if (forecast?.status !== 'forecast') throw new Error('expected a forecast')
+    expect(forecast.window.label).toBe('Weekly Fable')
+  })
 })
