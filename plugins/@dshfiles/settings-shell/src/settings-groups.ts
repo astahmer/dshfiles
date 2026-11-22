@@ -543,7 +543,13 @@ const filterByOrigin = (groups: readonly GroupedEntries[], filter: SettingsOrigi
   })
 }
 
-const originCounts = (groups: readonly GroupedEntries[]): { readonly all: number; readonly dsh: number; readonly plugin: number } => {
+export interface SettingsOriginCounts {
+  readonly all: number
+  readonly dsh: number
+  readonly plugin: number
+}
+
+const originCounts = (groups: readonly GroupedEntries[]): SettingsOriginCounts => {
   let dsh = 0
   let plugin = 0
   for (const group of groups) {
