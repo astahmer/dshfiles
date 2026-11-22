@@ -167,8 +167,7 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
 import { projectTextTone } from './project-tone.js'
-import { useProjectToneOverrides } from './project-colors.js'
-import { projectToneClass } from '@dshfiles/workspace-folder-picker/project-tone'
+import { useProjectChip } from './project-colors.js'
 import { useThreadDirectories } from './use-thread-directories.js'
 import {
   failedResumeNotice,
@@ -1303,7 +1302,8 @@ const OwnWorkspaceIndicator = (props: {
 /** Memoized so a session update re-renders only its own row, not the whole list. */
 const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, settled, rowStyle } = props
-  const toneOverride = useProjectToneOverrides()
+  const projectChipOf = useProjectChip()
+  const projectChip = props.workspacePath === undefined ? undefined : projectChipOf(props.workspacePath)
   const rowRef = useRef<HTMLElement | null>(null)
   const multiSelected = useThreadMultiSelected(props.actions.multiSelection, session.id)
   // Phone: swipe left for Done (settle), right for Pin (T1.3). Touch pointers only; desktop keeps drag-and-drop.
@@ -1681,13 +1681,11 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                         'dshx:min-w-0 dshx:shrink dshx:truncate dshx:@max-[11rem]/row:hidden',
                         rowStyle.projectColor &&
                           props.workspaceTitle !== undefined &&
-                          (() => {
-                            // A colour chosen at import wins; without one the name keeps its palette tint.
-                            const chosen = props.workspacePath === undefined ? undefined : toneOverride(props.workspacePath)
-                            return chosen === undefined ? projectTextTone(props.workspaceTitle, props.rowStyle.projectPalette) : projectToneClass(chosen)
-                          })(),
+                          // A colour chosen at import wins; without one the name keeps its palette tint.
+                          (projectChip?.className ?? projectTextTone(props.workspaceTitle, props.rowStyle.projectPalette)),
                       )}
                       data-testid="thread-row-project"
+                      style={rowStyle.projectColor && projectChip?.color !== undefined ? { color: projectChip.color } : undefined}
                     >
                       {props.workspaceTitle ?? t('threadSidebarUnassigned')}
                     </span>

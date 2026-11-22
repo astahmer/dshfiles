@@ -19,7 +19,7 @@ import { ProjectCreateDialog } from './project-create-dialog.js'
 import { ProjectFolderSetup } from './project-folder-setup.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
 import { ProjectAddChooser } from './project-add-chooser.js'
-import { upsertProjectTone } from './project-tone.js'
+import { upsertProjectColor, type ProjectColorChoice } from './project-tone.js'
 import { workspaceFolderPickerSettings } from './settings.js'
 import { ProjectSettingsSection } from './project-settings-section.js'
 
@@ -34,8 +34,8 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
   const lifecycleApi = useApi(projectLifecycleApi)
   const settings = useSettings(workspaceFolderPickerSettings)
   /** The colour chosen in the import dialog outlives it: chips and project labels read the same entry. */
-  const picked = (path: string, tone: number): void => {
-    void settings.set('projectTones', upsertProjectTone(settings.value?.projectTones ?? [], path, tone)).catch(() => undefined)
+  const picked = (path: string, choice: ProjectColorChoice): void => {
+    void settings.set('projectColors', upsertProjectColor(settings.value?.projectColors ?? [], path, choice)).catch(() => undefined)
     props.onPicked(path)
   }
   // A surface that asked for New project or Clone (ProjectAddFlow.request) opens the flow on that view; the Host's own
@@ -188,7 +188,12 @@ export default defineClient({
     if (plugin !== undefined)
       for (const row of [
         { id: 'new-project', label: 'Create project…', view: 'create', aliases: ['New project', 'Add project', 'Initialize repository', 'New repository'] },
-        { id: 'add-folder', label: 'Add folder…', view: 'browse', aliases: ['Add existing folder', 'Add folder as project', 'Open folder', 'Add workspace', 'Register project'] },
+        {
+          id: 'add-folder',
+          label: 'Add folder…',
+          view: 'browse',
+          aliases: ['Add existing folder', 'Add folder as project', 'Open folder', 'Add workspace', 'Register project'],
+        },
         { id: 'clone-repository', label: 'Clone repository…', view: 'clone', aliases: ['git clone', 'Clone project'] },
       ] as const)
         plugin.add(PaletteActions, {

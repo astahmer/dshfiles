@@ -42,8 +42,8 @@ export interface WorkbenchTabsSnapshot {
   readonly tabs: readonly WorkbenchTab[]
   /** Project folder name per thread workspace id, for the tab's project chip; absent hides the chips. */
   readonly projectNames?: Readonly<Record<string, string>>
-  /** Palette class of the chosen project colour per thread workspace id, same key as `projectNames`; absent leaves chips neutral. */
-  readonly projectToneClasses?: Readonly<Record<string, string>>
+  /** Resolved project colour per thread workspace id, same key as `projectNames`: a palette class or a custom `#rrggbb`. */
+  readonly projectChips?: Readonly<Record<string, { readonly className?: string; readonly color?: string }>>
 }
 
 export interface WorkbenchTabsActions {

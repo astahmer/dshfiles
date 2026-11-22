@@ -15,7 +15,7 @@ import { FolderOpenIcon, FolderPlusIcon, GitBranchIcon } from '@dshfiles/plugin-
 import { ProjectFolderSetup } from '@dshfiles/workspace-folder-picker/project-folder-setup'
 import { ProjectCloneDialog } from '@dshfiles/workspace-folder-picker/project-clone-dialog'
 import { ProjectCreateDialog } from '@dshfiles/workspace-folder-picker/project-create-dialog'
-import { projectFolderName, upsertProjectTone } from '@dshfiles/workspace-folder-picker/project-tone'
+import { projectFolderName, upsertProjectColor, type ProjectColorChoice } from '@dshfiles/workspace-folder-picker/project-tone'
 import { workspaceFolderPickerSettings } from '@dshfiles/workspace-folder-picker/settings'
 import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
@@ -232,8 +232,8 @@ export const HeroWorkspacePicker = (
   }
 
   /** The colour chosen in the create/clone dialog outlives it, and the new project is adopted straight away. */
-  const adoptCreated = (path: string, tone: number): void => {
-    void toneSettings.set('projectTones', upsertProjectTone(toneSettings.value?.projectTones ?? [], path, tone)).catch(() => undefined)
+  const adoptCreated = (path: string, choice: ProjectColorChoice): void => {
+    void toneSettings.set('projectColors', upsertProjectColor(toneSettings.value?.projectColors ?? [], path, choice)).catch(() => undefined)
     setAddDialog(null)
     void choose({ kind: 'directory', canonicalPath: path, title: projectFolderName(path) }).catch(() => props.onClose())
   }

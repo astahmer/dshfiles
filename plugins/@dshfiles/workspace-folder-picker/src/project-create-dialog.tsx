@@ -7,7 +7,7 @@ import * as Schema from 'effect/Schema'
 import { useState } from 'react'
 import { projectFolderNameSchema, type ProjectLifecycleClient } from './project-lifecycle-api.js'
 import { initialProjectParent } from './project-defaults.js'
-import { defaultProjectTone } from './project-tone.js'
+import { defaultProjectColor, type ProjectColorChoice } from './project-tone.js'
 import { ProjectTonePicker } from './project-tone-picker.js'
 import { WorkspaceFolderPickerSchema, type FormFieldErrors } from './schema.js'
 import { TextInput } from './text-input.js'
@@ -31,18 +31,22 @@ export const ProjectCreateDialog = (props: {
   readonly defaultParent?: string | undefined
   /** Remember the parent field as the default for the next project. */
   readonly onRememberParent?: ((parent: string) => void) | undefined
-  readonly onCreated: (path: string, tone: number) => void
+  readonly onCreated: (path: string, choice: ProjectColorChoice) => void
   readonly onClose: () => void
 }): JSX.Element => {
-  const [form, setForm] = useState<CreateForm>({ parentPath: initialProjectParent({ defaultParent: props.defaultParent, home: props.home }), name: '', createGitHubRepository: false })
-  const [chosenTone, setChosenTone] = useState<number | null>(null)
+  const [form, setForm] = useState<CreateForm>({
+    parentPath: initialProjectParent({ defaultParent: props.defaultParent, home: props.home }),
+    name: '',
+    createGitHubRepository: false,
+  })
+  const [chosenColor, setChosenColor] = useState<ProjectColorChoice | null>(null)
   const [remembered, setRemembered] = useState(false)
   const [errors, setErrors] = useState<FormFieldErrors>({})
-  const tone = chosenTone ?? defaultProjectTone(form.name)
+  const color = chosenColor ?? defaultProjectColor(form.name)
   const create = useMutation({
     mutationFn: (input: CreateForm) => props.api.createProject(input),
     onSuccess: created => {
-      if (created.warning === null) props.onCreated(created.path, tone)
+      if (created.warning === null) props.onCreated(created.path, color)
     },
   })
   const change = (patch: Partial<CreateForm>): void => {
@@ -128,12 +132,13 @@ export const ProjectCreateDialog = (props: {
               <AlertDescription>{created.warning}</AlertDescription>
             </Alert>
           )}
-          <ProjectTonePicker name={form.name === '' ? 'New project' : form.name} onChange={setChosenTone} tone={tone} />          <DialogFooter>
+          <ProjectTonePicker choice={color} name={form.name === '' ? 'Create project' : form.name} onChange={setChosenColor} />
+          <DialogFooter>
             <Button onClick={props.onClose} type="button" variant="outline">
               Close
             </Button>
             {created !== undefined && created.warning !== null ? (
-              <Button onClick={() => props.onCreated(created.path, tone)} type="button">
+              <Button onClick={() => props.onCreated(created.path, color)} type="button">
                 Open project
               </Button>
             ) : (

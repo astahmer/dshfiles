@@ -1,27 +1,22 @@
 import { useSettings } from '@dshfiles/dshx/client'
-import { defaultProjectTone, projectFolderName, projectToneClass } from '@dshfiles/workspace-folder-picker/project-tone'
+import { projectColorOf, projectToneClass, type ProjectColorChoice } from '@dshfiles/workspace-folder-picker/project-tone'
 import { workspaceFolderPickerSettings } from '@dshfiles/workspace-folder-picker/settings'
 import { useMemo } from 'react'
 
-const withoutTrailingSeparators = (path: string): string => path.replace(/[\\/]+$/u, '')
-
-/**
- * The colour chosen for a project when it was imported, if any, keyed by absolute folder. A project without an entry
- * keeps the tint its name hashes to (and the palette setting keeps choosing it), so the list never loses a colour.
- */
-export const useProjectToneClass = (): ((path: string) => string) => {
-  const overrides = useProjectToneOverrides()
-  return useMemo(() => (path: string) => projectToneClass(overrides(path) ?? defaultProjectTone(projectFolderName(path))), [overrides])
+/** What a chip or a project label paints: a palette class, or a custom `#rrggbb` the operator picked. */
+export interface ProjectChip {
+  readonly className?: string
+  readonly color?: string
 }
 
-export const useProjectToneOverrides = (): ((path: string) => number | undefined) => {
+const chipOf = (choice: ProjectColorChoice): ProjectChip => (choice.kind === 'tone' ? { className: projectToneClass(choice.tone) } : { color: choice.color })
+
+/**
+ * The colour chosen for a project when it was imported, resolved to a palette class or a custom colour. A project without
+ * an entry keeps the colour its folder name hashes to.
+ */
+export const useProjectChip = (): ((path: string) => ProjectChip) => {
   const settings = useSettings(workspaceFolderPickerSettings)
-  const tones = settings.value?.projectTones
-  return useMemo(() => {
-    if (tones === undefined || tones.length === 0) return () => undefined
-    return (path: string) => {
-      const normalized = withoutTrailingSeparators(path)
-      return tones.find(entry => withoutTrailingSeparators(entry.project) === normalized)?.tone
-    }
-  }, [tones])
+  const entries = settings.value?.projectColors
+  return useMemo(() => (path: string) => chipOf(projectColorOf(path, entries)), [entries])
 }

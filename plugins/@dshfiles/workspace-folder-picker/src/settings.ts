@@ -2,17 +2,19 @@ import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
 import { PROJECT_TONE_COUNT } from './project-tone.js'
 
-const projectToneEntry = Schema.object({
+const projectColorEntry = Schema.object({
   project: Schema.string().description('Absolute project folder.'),
   tone: Schema.natural()
     .max(PROJECT_TONE_COUNT - 1)
-    .description('Colour index of the project chip.'),
+    .default(0)
+    .description('Palette index, used when no custom colour is set.'),
+  color: Schema.string().default('').description('Custom #rrggbb colour; empty uses the palette index.'),
 })
 
 export const workspaceFolderPickerSettings = defineSettings({
   namespace: 'dshfiles-workspace-folder-picker',
   schema: Schema.object({
-    projectTones: Schema.array(projectToneEntry)
+    projectColors: Schema.array(projectColorEntry)
       .default([])
       .description('Colour per project, chosen when the folder is imported; a project without an entry keeps the automatic colour of its folder name.'),
     projectParent: Schema.string()

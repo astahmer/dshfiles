@@ -75,7 +75,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
     const closeButtonPosition = snapshot.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
     const title = definition?.newView ? 'New tab' : tab?.target.kind === 'thread' ? tab.title : (definition?.title ?? tab?.title ?? props.api.title)
     const project = tab?.kind === 'thread' && tab.workspaceId !== undefined ? snapshot.projectNames?.[tab.workspaceId] : undefined
-    const projectToneClass = tab?.kind === 'thread' && tab.workspaceId !== undefined ? snapshot.projectToneClasses?.[tab.workspaceId] : undefined
+    const projectChip = tab?.kind === 'thread' && tab.workspaceId !== undefined ? snapshot.projectChips?.[tab.workspaceId] : undefined
     const [renaming, setRenaming] = useState(false)
     const [notice, setNotice] = useState('')
     const closePanel = (panel: WorkbenchPanelIdentity): void => {
@@ -137,11 +137,18 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
                 data-workbench-tab-project=""
                 className={cn(
                   'dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none',
-                  projectToneClass === undefined
+                  projectChip === undefined
                     ? 'dshx:bg-(--dsh-main-tab-chip) dshx:text-(--dsw-alias-label-secondary)'
-                    : cn('dshx:font-medium', projectToneClass),
+                    : cn('dshx:font-medium', projectChip.className),
                 )}
-                style={projectToneClass === undefined ? undefined : { backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)' }}
+                style={
+                  projectChip === undefined
+                    ? undefined
+                    : {
+                        backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)',
+                        ...(projectChip.color === undefined ? {} : { color: projectChip.color }),
+                      }
+                }
               >
                 {project}
               </span>
