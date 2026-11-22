@@ -17,7 +17,11 @@ interface NamespaceDescription {
 export interface NamespaceLabel {
   readonly title: string
   readonly description: string
+  readonly bundleName?: string | undefined
+  readonly official?: boolean | undefined
 }
+
+export type SettingsPageOrigin = 'dsh' | 'plugin'
 
 export interface PluginSettingsPage {
   /** Nav id, prefixed so it never collides with a `settings.section` id. */
@@ -26,6 +30,8 @@ export interface PluginSettingsPage {
   readonly title: string
   readonly description: string
   readonly group: 'plugins' | 'more'
+  readonly origin?: SettingsPageOrigin | undefined
+  readonly bundleName?: string | undefined
   readonly fields: readonly SettingField[]
   /** Dotted paths of the fields the user layer sets, for the `@modified` search filter. */
   readonly modifiedPaths: readonly string[]
@@ -33,6 +39,14 @@ export interface PluginSettingsPage {
 
 const PAGE_PREFIX = 'plugin:'
 const translationsSchema = Schema.Record(Schema.String, Schema.String)
+
+const originOfLabel = (label: NamespaceLabel | undefined): SettingsPageOrigin | undefined => {
+  if (label === undefined) return undefined
+  if (label.bundleName?.startsWith('@dshfiles/')) return 'plugin'
+  if (label.official === true || label.bundleName?.startsWith('@deepseek-ai/')) return 'dsh'
+  if (label.bundleName !== undefined && label.bundleName !== '') return 'plugin'
+  return undefined
+}
 
 export class SettingsPluginPages {
   static pluginPageId = (ns: string): string => `${PAGE_PREFIX}${ns}`
@@ -54,6 +68,7 @@ export class SettingsPluginPages {
         if (fields.length === 0) return []
         const own = SettingsSchemaModel.namespaceText({ schema: namespace.schema, text: input.text })
         const label = input.labels.get(namespace.ns)
+        const origin = originOfLabel(label)
         return [
           {
             pageId: SettingsPluginPages.pluginPageId(namespace.ns),
@@ -61,6 +76,8 @@ export class SettingsPluginPages {
             title: label?.title || own.title || SettingsSchemaModel.humanizeKey(namespace.ns.replace(/^dshfiles-/u, '')),
             description: own.description || label?.description || '',
             group: namespace.autoGenerate ? ('plugins' as const) : ('more' as const),
+            ...(origin === undefined ? {} : { origin }),
+            ...(label?.bundleName === undefined ? {} : { bundleName: label.bundleName }),
             fields,
             modifiedPaths: fields.filter(field => SettingsSchemaModel.hasValueAt(namespace.user, field.path)).map(field => field.path.join('.')),
           },

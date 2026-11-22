@@ -1,12 +1,31 @@
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsSectionSearchProps } from '@dshfiles/dshx/client'
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
-import { ArrowUpRightIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  ArrowUpRightIcon,
+  BellIcon,
+  BlocksIcon,
+  BotIcon,
+  EllipsisIcon,
+  FolderGit2Icon,
+  InfoIcon,
+  LayersIcon,
+  PuzzleIcon,
+  SearchIcon,
+  ServerIcon,
+  ShieldIcon,
+  SlidersHorizontalIcon,
+  SparklesIcon,
+  WrenchIcon,
+  XIcon,
+  type LucideIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { Fragment, useId, useRef, type KeyboardEvent, type ReactNode, type SyntheticEvent } from 'react'
+import { Fragment, useId, useRef, useState, type KeyboardEvent, type ReactNode, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
@@ -14,23 +33,54 @@ import type { PluginSettingsPage } from './plugin-settings.js'
 import { PageViewMemoryProvider } from './plugin-settings-page.js'
 import { Highlight } from './schema-form/settings-form.js'
 import type { SettingField } from './schema-form/schema-model.js'
-import { JEV_ENTRY_ID, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
+import {
+  JEV_ENTRY_ID,
+  SettingsGroups,
+  type GroupedEntries,
+  type SettingsEntry,
+  type SettingsEntryOrigin,
+  type SettingsGroupId,
+  type SettingsOriginFilter,
+} from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult, type ShortcutRow } from './settings-search.js'
 
 export interface SectionRow {
   readonly id: string
   readonly order: number
   readonly label: string
+  readonly origin?: SettingsEntryOrigin
+  readonly bundleName?: string
   /** Words that find the row in search without showing: its group, namespaces, former names. */
   readonly keywords?: string
 }
 
 const headerButton =
-  'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-md dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-foreground dshx:hover:bg-[var(--dsw-alias-interactive-bg-hover)] dshx:[&_svg]:size-3.5'
+  'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-md dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-foreground dshx:transition-colors dshx:duration-100 dshx:hover:bg-[var(--dsw-alias-interactive-bg-hover)] dshx:[&_svg]:size-3.5'
 const navCell =
-  'dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-sm dshx:leading-5 dshx:font-normal dshx:text-foreground dshx:hover:bg-[var(--dshx-tone-2)]'
-const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)] dshx:font-medium'
-const navGroup = 'dshx:mt-3 dshx:px-3 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:first:mt-0'
+  'dshx:relative dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-sm dshx:leading-5 dshx:font-normal dshx:text-foreground/90 dshx:transition-colors dshx:duration-100 dshx:hover:bg-[var(--dshx-tone-2)] dshx:hover:text-foreground'
+const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)] dshx:font-medium dshx:text-foreground'
+const navGroup =
+  'dshx:mt-3.5 dshx:flex dshx:items-center dshx:gap-1.5 dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:font-semibold dshx:tracking-[0.01em] dshx:text-muted-foreground dshx:first:mt-0'
+
+const GROUP_ICONS: Readonly<Record<SettingsGroupId, LucideIcon>> = {
+  general: SlidersHorizontalIcon,
+  models: SparklesIcon,
+  agents: BotIcon,
+  tools: WrenchIcon,
+  projects: FolderGit2Icon,
+  hosts: ServerIcon,
+  security: ShieldIcon,
+  notifications: BellIcon,
+  plugins: BlocksIcon,
+  about: InfoIcon,
+  other: EllipsisIcon,
+}
+
+export interface PluginPageRenderMeta {
+  readonly groupLabel: string
+  readonly origin: SettingsEntryOrigin
+  readonly bundleName?: string
+}
 
 export interface SettingsViewProps {
   /** Every Settings entry, by task group (plan §4.6). */
@@ -39,7 +89,7 @@ export interface SettingsViewProps {
   readonly rows: readonly SectionRow[]
   /** Plugin pages as Settings shows them (human titles, Jev fields moved), for search. */
   readonly pluginPages: readonly PluginSettingsPage[]
-  readonly renderPluginPage: (page: PluginSettingsPage, nested: boolean) => ReactNode
+  readonly renderPluginPage: (page: PluginSettingsPage, nested: boolean, meta?: PluginPageRenderMeta) => ReactNode
   /** Matching settings of one page, drawn with the query highlighted. */
   readonly renderMatches: (page: PluginSettingsPage, fields: readonly SettingField[], query: string) => ReactNode
   readonly activeId: string | undefined
@@ -62,28 +112,119 @@ export interface SettingsViewProps {
   readonly onClose: (() => void) | undefined
 }
 
-/** A nav entry: name, a mark for a page that opens elsewhere and, while searching, how many matches it holds. */
+const OriginBadge = (props: { readonly origin: SettingsEntryOrigin; readonly bundleName?: string; readonly t: ShellTranslate }): JSX.Element => (
+  <span className="dshx:inline-flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
+    {props.origin === 'dsh' ? (
+      <Badge data-origin-badge="dsh" variant="secondary">
+        <LayersIcon aria-hidden="true" />
+        {props.t('origin.dshBadge')}
+      </Badge>
+    ) : (
+      <Badge data-origin-badge="plugin" variant="info">
+        <PuzzleIcon aria-hidden="true" />
+        {props.t('origin.pluginBadge')}
+      </Badge>
+    )}
+    {props.origin === 'plugin' && props.bundleName !== undefined && (
+      <code className="dshx:rounded dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{props.bundleName}</code>
+    )}
+  </span>
+)
+
+const OriginFilterBar = (props: {
+  readonly value: SettingsOriginFilter
+  readonly counts: { readonly all: number; readonly dsh: number; readonly plugin: number }
+  readonly t: ShellTranslate
+  readonly onChange: (next: SettingsOriginFilter) => void
+}): JSX.Element => {
+  const options: ReadonlyArray<{ readonly id: SettingsOriginFilter; readonly label: string; readonly count: number }> = [
+    { id: 'all', label: props.t('origin.all'), count: props.counts.all },
+    { id: 'dsh', label: props.t('origin.dsh'), count: props.counts.dsh },
+    { id: 'plugin', label: props.t('origin.plugins'), count: props.counts.plugin },
+  ]
+  return (
+    <div
+      aria-label={props.t('origin.filterLabel')}
+      className="dshx:grid dshx:grid-cols-3 dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:border-border/70 dshx:bg-muted/80 dshx:p-0.5"
+      data-settings-origin-filter=""
+      role="group"
+    >
+      {options.map(option => {
+        const active = props.value === option.id
+        return (
+          <button
+            aria-pressed={active}
+            className={cn(
+              'dshx:inline-flex dshx:h-6 dshx:min-w-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:gap-1 dshx:rounded-md dshx:border-none dshx:px-1.5 dshx:text-xs dshx:transition-colors dshx:duration-100',
+              active
+                ? 'dshx:bg-background dshx:font-medium dshx:text-foreground dshx:shadow-s1'
+                : 'dshx:bg-transparent dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
+            )}
+            data-origin-option={option.id}
+            key={option.id}
+            onClick={() => props.onChange(option.id)}
+            type="button"
+          >
+            <span className="dshx:truncate">{option.label}</span>
+            <span className={cn('dshx:text-2xs dshx:tabular-nums', active ? 'dshx:text-muted-foreground' : 'dshx:text-muted-foreground/75')}>
+              {option.count}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** A nav entry: name, visual DSH vs plugin origin cue (aria-hidden so accessible name stays pure), link mark, and search match count. */
 const NavCell = (props: {
   readonly entry: SettingsEntry
   readonly active: boolean
   readonly count: number | undefined
+  readonly showOriginCue: boolean
+  readonly t: ShellTranslate
   readonly onSelect: (id: string) => void
-}): JSX.Element => (
-  <button
-    aria-current={props.active ? 'page' : undefined}
-    className={cn(navCell, props.active && navCellActive, props.count === 0 && 'dshx:opacity-45')}
-    data-nav-id={props.entry.id}
-    onClick={() => props.onSelect(props.entry.id)}
-    type="button"
-  >
-    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.entry.label}</span>
-    {props.count !== undefined && props.count > 0 && (
-      <span className="dshx:rounded-full dshx:bg-secondary dshx:px-1.5 dshx:text-2xs dshx:leading-4 dshx:text-muted-foreground dshx:tabular-nums">
-        {props.count}
-      </span>
-    )}
-  </button>
-)
+}): JSX.Element => {
+  const originTitle =
+    props.entry.origin === 'dsh'
+      ? props.t('origin.dshBadge')
+      : props.entry.bundleName === undefined
+        ? props.t('origin.pluginBadge')
+        : `${props.t('origin.pluginBadge')} · ${props.entry.bundleName}`
+  return (
+    <button
+      aria-current={props.active ? 'page' : undefined}
+      className={cn(navCell, props.active && navCellActive, props.count === 0 && 'dshx:opacity-45')}
+      data-entry-origin={props.entry.origin}
+      data-nav-id={props.entry.id}
+      onClick={() => props.onSelect(props.entry.id)}
+      title={originTitle}
+      type="button"
+    >
+      {props.active && <span aria-hidden="true" className="dshx:absolute dshx:inset-y-1.5 dshx:left-0.5 dshx:w-0.5 dshx:rounded-full dshx:bg-info" />}
+      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.entry.label}</span>
+      {props.count === undefined && props.showOriginCue && props.entry.origin === 'dsh' && (
+        <span
+          aria-hidden="true"
+          className="dshx:shrink-0 dshx:rounded dshx:border dshx:border-border/80 dshx:bg-background/85 dshx:px-1.5 dshx:py-px dshx:text-2xs dshx:leading-3.5 dshx:font-medium dshx:text-muted-foreground"
+        >
+          {props.t('origin.dsh')}
+        </span>
+      )}
+      {props.count === undefined && props.showOriginCue && props.entry.origin === 'plugin' && (
+        <PuzzleIcon aria-hidden="true" className={cn('dshx:size-3 dshx:shrink-0', props.active ? 'dshx:text-info' : 'dshx:text-info/65')} />
+      )}
+      {props.count === undefined && props.entry.link !== undefined && (
+        <ArrowUpRightIcon aria-hidden="true" className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground/70" />
+      )}
+      {props.count !== undefined && props.count > 0 && (
+        <span className="dshx:rounded-full dshx:bg-secondary dshx:px-1.5 dshx:text-2xs dshx:leading-4 dshx:text-muted-foreground dshx:tabular-nums">
+          {props.count}
+        </span>
+      )}
+    </button>
+  )
+}
 
 /** Matching entries grouped by their section, in section order. */
 const entryGroups = (
@@ -127,6 +268,12 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
                 type="button"
               >
                 <Highlight query={props.query} text={section.label} />
+                {section.origin === 'dsh' && (
+                  <span aria-hidden="true" className="dshx:rounded dshx:bg-secondary dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">
+                    {t('origin.dsh')}
+                  </span>
+                )}
+                {section.origin === 'plugin' && <PuzzleIcon aria-hidden="true" className="dshx:size-3 dshx:text-info/80" />}
               </button>
             ))}
           </div>
@@ -202,13 +349,22 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
       {result.pages.map(hit => (
         <section aria-label={hit.page.title} className="dshx:flex dshx:scroll-mt-4 dshx:flex-col" data-results-page={hit.page.pageId} key={hit.page.pageId}>
           <button
-            className="dshx:flex dshx:cursor-pointer dshx:items-baseline dshx:gap-2 dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-left"
+            className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-left"
             onClick={() => props.onSelect(hit.page.pageId)}
             type="button"
           >
             <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">
               <Highlight query={props.query} text={hit.page.title} />
             </h3>
+            {hit.page.origin === 'dsh' && (
+              <Badge variant="secondary">{t('origin.dshBadge')}</Badge>
+            )}
+            {hit.page.origin === 'plugin' && (
+              <Badge variant="info">
+                <PuzzleIcon aria-hidden="true" />
+                {t('origin.pluginBadge')}
+              </Badge>
+            )}
             <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.matches', { count: hit.fields.length })}</span>
           </button>
           {props.renderMatches(hit.page, hit.fields, SettingsSearch.highlightText(props.query))}
@@ -228,20 +384,25 @@ const EntryView = (
   const ownHeading = entry.sectionId !== undefined || entry.pages.length !== 1 || link !== undefined
   const jevHere = entry.id === JEV_ENTRY_ID ? [] : entry.pages.filter(page => props.jevNamespaces.has(page.ns))
   return (
-    <div className="dshx:flex dshx:flex-col dshx:gap-5" data-settings-entry={entry.id}>
+    <div className="dshx:flex dshx:flex-col dshx:gap-5" data-settings-entry={entry.id} data-entry-origin={entry.origin}>
       {ownHeading && (
-        <header className="dshx:flex dshx:flex-col dshx:gap-0.5">
-          {props.groupLabel !== entry.label && <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{props.groupLabel}</p>}
+        <header className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:border-border/70 dshx:pb-4">
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            {props.groupLabel !== '' && props.groupLabel !== entry.label && (
+              <span className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.groupLabel}</span>
+            )}
+            <OriginBadge origin={entry.origin} t={t} {...(entry.bundleName === undefined ? {} : { bundleName: entry.bundleName })} />
+          </div>
           <h2 className="dshx:m-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{entry.label}</h2>
         </header>
       )}
       {link !== undefined && (
         <div
-          className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-b dshx:border-border dshx:pb-4"
+          className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:px-4 dshx:py-3.5"
           data-settings-link={link.panelId}
         >
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
-            <span className="dshx:text-base dshx:text-foreground">{link.description}</span>
+            <span className="dshx:text-base dshx:font-medium dshx:text-foreground">{link.description}</span>
             <span className="dshx:text-xs dshx:text-muted-foreground">{t('entry.opensPage')}</span>
           </div>
           <Button onClick={() => props.openPanel(link.panelId)} size="sm" variant="outline">
@@ -252,7 +413,13 @@ const EntryView = (
       )}
       {entry.sectionId !== undefined && <div>{props.renderSlot('settings.section', sectionOwnerWithTarget(props), { only: entry.sectionId })}</div>}
       {entry.pages.map(page => (
-        <Fragment key={page.pageId}>{props.renderPluginPage(page, ownHeading)}</Fragment>
+        <Fragment key={page.pageId}>
+          {props.renderPluginPage(page, ownHeading, {
+            groupLabel: props.groupLabel,
+            origin: entry.origin,
+            ...(entry.bundleName === undefined ? {} : { bundleName: entry.bundleName }),
+          })}
+        </Fragment>
       ))}
       {jevHere.length > 0 && (
         <p className="dshx:m-0 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="note">
@@ -269,7 +436,10 @@ const EntryView = (
 /** Search field, the grouped navigation and the active entry, or the search results. */
 const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): JSX.Element => {
   const { t } = props
+  const [originFilter, setOriginFilter] = useState<SettingsOriginFilter>('all')
   const searching = props.query.trim() !== ''
+  const counts = SettingsGroups.originCounts(props.groups)
+  const visibleGroups = SettingsGroups.filterByOrigin(props.groups, originFilter)
   const result = SettingsSearch.search({
     query: props.query,
     sections: props.rows,
@@ -277,7 +447,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
     entries: props.sectionEntries,
     shortcuts: props.shortcuts,
   })
-  const active = SettingsGroups.entryFor(props.groups, props.activeId) ?? props.groups[0]?.entries[0]
+  const active = SettingsGroups.entryFor(props.groups, props.activeId) ?? visibleGroups[0]?.entries[0] ?? props.groups[0]?.entries[0]
   const activeGroup = props.groups.find(group => group.entries.some(entry => entry.id === active?.id))?.group
   const jevNamespaces = new Set(
     props.groups.flatMap(group => group.entries.filter(entry => entry.id === JEV_ENTRY_ID).flatMap(entry => entry.pages.map(page => page.ns))),
@@ -301,17 +471,19 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
     else props.onSelect(id)
   }
   const foundText = result.total === 1 ? t('search.foundOne') : t('search.found', { count: result.total })
+  const showOriginCue = originFilter === 'all'
   return (
     <PageViewMemoryProvider>
-      <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-        <div className="dshx:box-border dshx:flex dshx:h-[58px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-4 dshx:@max-pane-compact:gap-2 dshx:@max-pane-compact:px-3">
+      <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:bg-background">
+        <div className="dshx:box-border dshx:flex dshx:h-[56px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:bg-background dshx:px-4 dshx:@max-pane-compact:gap-2 dshx:@max-pane-compact:px-3">
           <div
-            className="dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-base dshx:leading-6 dshx:font-medium dshx:text-foreground dshx:@max-pane-compact:sr-only"
+            className="dshx:flex dshx:w-[228px] dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-base dshx:leading-6 dshx:font-semibold dshx:text-foreground dshx:@max-pane-compact:sr-only"
             id={props.titleId}
           >
-            {props.renderSlot('settings.header', {})}
+            <SlidersHorizontalIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+            <span>{props.renderSlot('settings.header', {})}</span>
           </div>
-          <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:max-w-[560px] dshx:flex-1">
+          <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:max-w-[540px] dshx:flex-1">
             <InputGroupAddon>
               <SearchIcon />
             </InputGroupAddon>
@@ -370,33 +542,59 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             )}
           </div>
         </div>
-        <div className="dshx:hidden dshx:shrink-0 dshx:border-b dshx:border-border dshx:px-3 dshx:py-2 dshx:@max-pane-compact:block">
+        <div className="dshx:hidden dshx:shrink-0 dshx:flex-col dshx:gap-2 dshx:border-b dshx:border-border dshx:bg-[var(--dsw-specific-sidebar-fill)] dshx:px-3 dshx:py-2 dshx:@max-pane-compact:flex">
+          <OriginFilterBar counts={counts} onChange={setOriginFilter} t={t} value={originFilter} />
           <Combobox
             label={t('search.sections')}
             value={active?.id ?? ''}
-            options={props.groups.flatMap(({ group, entries }) =>
-              entries.map(entry => ({ value: entry.id, label: entry.label, keywords: [entry.keywords], group: group.label })),
+            options={visibleGroups.flatMap(({ group, entries }) =>
+              entries.map(entry => ({
+                value: entry.id,
+                label: entry.label,
+                keywords: [entry.keywords],
+                group: group.label,
+              })),
             )}
             onValueChange={select}
             matchTriggerWidth
           />
         </div>
         <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
-          <nav
-            aria-label={t('title')}
-            className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4 dshx:@max-pane-compact:hidden"
-          >
-            {props.groups.map(({ group, entries }) => (
-              <div aria-label={group.label} className="dshx:flex dshx:flex-col dshx:gap-0.5" data-settings-group={group.id} key={group.id} role="group">
-                <span className={navGroup}>{group.label}</span>
-                {entries.map(entry => (
-                  <NavCell active={!searching && entry.id === active?.id} count={countOf(entry)} entry={entry} key={entry.id} onSelect={select} />
-                ))}
-              </div>
-            ))}
-          </nav>
+          <aside className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[248px] dshx:flex-none dshx:flex-col dshx:border-r dshx:border-border dshx:bg-[var(--dsw-specific-sidebar-fill)] dshx:@max-pane-compact:hidden">
+            <div className="dshx:shrink-0 dshx:border-b dshx:border-border/70 dshx:px-3 dshx:py-2.5">
+              <OriginFilterBar counts={counts} onChange={setOriginFilter} t={t} value={originFilter} />
+            </div>
+            <nav aria-label={t('title')} className="dshx:box-border dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-2.5 dshx:pt-2.5 dshx:pb-4">
+              {visibleGroups.length === 0 ? (
+                <p className="dshx:px-2.5 dshx:py-4 dshx:text-xs dshx:text-muted-foreground">{t('origin.empty')}</p>
+              ) : (
+                visibleGroups.map(({ group, entries }) => {
+                  const GroupIcon = GROUP_ICONS[group.id]
+                  return (
+                    <div aria-label={group.label} className="dshx:flex dshx:flex-col dshx:gap-0.5" data-settings-group={group.id} key={group.id} role="group">
+                      <span className={navGroup}>
+                        <GroupIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground/75" />
+                        <span className="dshx:min-w-0 dshx:truncate">{group.label}</span>
+                      </span>
+                      {entries.map(entry => (
+                        <NavCell
+                          active={!searching && entry.id === active?.id}
+                          count={countOf(entry)}
+                          entry={entry}
+                          key={entry.id}
+                          onSelect={select}
+                          showOriginCue={showOriginCue}
+                          t={t}
+                        />
+                      ))}
+                    </div>
+                  )
+                })
+              )}
+            </nav>
+          </aside>
           <div
-            className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3"
+            className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:bg-background dshx:px-8 dshx:pt-6 dshx:pb-8 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-4"
             ref={content}
           >
             <div className="dshx:max-w-[880px]">

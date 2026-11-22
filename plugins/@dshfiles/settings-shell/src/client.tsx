@@ -230,6 +230,8 @@ export default defineClient({
         next.set(row.rowId, {
           title: resolvedTitle === row.bundleName || resolvedTitle === row.moduleName ? '' : resolvedTitle,
           description: row.description === undefined ? (row.bundleDescription ?? '') : ctx.locale.resolveText(row.description),
+          bundleName: row.bundleName,
+          official: row.official,
         })
       }
       labels.set(next)
@@ -373,7 +375,14 @@ export default defineClient({
     // Search rows: sections under their entry's name and group, so "Models & accounts" or "AI accounts" find them.
     const searchRows = (grouped: readonly GroupedEntries[]): readonly SectionRow[] =>
       grouped.flatMap(({ group, entries }) =>
-        entries.map(entry => ({ id: entry.id, order: entry.order, label: entry.label, keywords: `${group.label} ${entry.keywords}` })),
+        entries.map(entry => ({
+          id: entry.id,
+          order: entry.order,
+          label: entry.label,
+          origin: entry.origin,
+          ...(entry.bundleName === undefined ? {} : { bundleName: entry.bundleName }),
+          keywords: `${group.label} ${entry.keywords}`,
+        })),
       )
     let shortcutSource: readonly ShortcutCatalogEntry[] | undefined
     let shortcutRows: readonly ShortcutRow[] = []
@@ -498,7 +507,7 @@ export default defineClient({
       shortcuts: input.shortcuts,
       renderSlot: input.renderSlot,
       pluginPages: SettingsGroups.searchablePages(input.groups),
-      renderPluginPage: (page: PluginSettingsPage, nested: boolean) => (
+      renderPluginPage: (page: PluginSettingsPage, nested: boolean, meta) => (
         <PluginSettingsPageView
           entry={<PluginEntryCard namespace={page.ns} t={input.t} />}
           form={formFor(page.ns)}
@@ -506,6 +515,9 @@ export default defineClient({
           nested={nested}
           page={page}
           t={input.t}
+          {...(meta?.groupLabel === undefined ? {} : { groupLabel: meta.groupLabel })}
+          {...(meta?.origin === undefined ? {} : { origin: meta.origin })}
+          {...(meta?.bundleName === undefined ? {} : { bundleName: meta.bundleName })}
           {...(input.field?.sectionId === page.pageId ? { focusPath: input.field.fieldPath } : {})}
         />
       ),

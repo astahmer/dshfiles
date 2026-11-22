@@ -1,6 +1,7 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { errorMessage, PluginQueryProvider, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useId } from 'react'
@@ -26,21 +27,25 @@ const EntryCard = (props: { readonly entry: PluginEntry; readonly t: ShellTransl
     onSettled: () => queryClient.invalidateQueries({ queryKey: PLUGINS_QUERY_KEY }),
   })
   const verdict = change.data === undefined ? undefined : verdictText(change.data, t)
+  const dotTone = entry.pendingRestart !== null ? 'warning' : entry.enabled ? 'success' : 'muted'
   return (
     <div
-      className="dshx:@container dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:px-3 dshx:py-2"
+      className="dshx:@container dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:px-3.5 dshx:py-2.5"
       data-plugin-entry={entry.entryId}
     >
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-x-3 dshx:gap-y-1">
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:text-xs dshx:text-muted-foreground">
-          <span className="dshx:min-w-0 dshx:truncate">
-            <code className="dshx:font-mono dshx:text-foreground">{entry.entryId}</code>
-            {' · '}
-            {entry.bundle === null ? entry.moduleName : t('entryCard.from', { bundle: entry.bundle })}
-          </span>
-          {entry.configuredBy.length > 0 && (
-            <span className="dshx:min-w-0 dshx:truncate">{t('entryCard.changedBy', { bundles: entry.configuredBy.join(', ') })}</span>
-          )}
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-x-3 dshx:gap-y-1.5">
+        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2.5">
+          <StatusDot tone={dotTone} />
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:text-xs dshx:text-muted-foreground">
+            <span className="dshx:min-w-0 dshx:truncate">
+              <code className="dshx:font-mono dshx:text-foreground">{entry.entryId}</code>
+              {' · '}
+              {entry.bundle === null ? entry.moduleName : t('entryCard.from', { bundle: entry.bundle })}
+            </span>
+            {entry.configuredBy.length > 0 && (
+              <span className="dshx:min-w-0 dshx:truncate">{t('entryCard.changedBy', { bundles: entry.configuredBy.join(', ') })}</span>
+            )}
+          </div>
         </div>
         <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
           {entry.pendingRestart !== null && (

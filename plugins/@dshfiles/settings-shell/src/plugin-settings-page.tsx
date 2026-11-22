@@ -1,8 +1,10 @@
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { LayersIcon, PuzzleIcon } from '@dshfiles/plugin-ui/icons'
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { ShellTranslate } from './native/locales.js'
-import type { PluginSettingsPage } from './plugin-settings.js'
+import type { PluginSettingsPage, SettingsPageOrigin } from './plugin-settings.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsJsonEditor } from './schema-form/settings-json-editor.js'
 
@@ -33,6 +35,9 @@ export const PluginSettingsPageView = (props: {
   readonly t: ShellTranslate
   readonly focusPath?: readonly string[]
   readonly nested?: boolean
+  readonly groupLabel?: string
+  readonly origin?: SettingsPageOrigin
+  readonly bundleName?: string
   /** The plugin entry behind the page, drawn under its scope line. */
   readonly entry?: ReactNode
 }): JSX.Element => {
@@ -44,34 +49,63 @@ export const PluginSettingsPageView = (props: {
     memory?.set(props.page.ns, next)
     if (next === 'json') setJsonOpened(true)
   }
+  const resolvedOrigin = props.origin ?? props.page.origin
+  const resolvedBundle = props.bundleName ?? props.page.bundleName
+  const showStandaloneHeader = props.nested !== true
   return (
-    <section aria-label={props.page.title} className="dshx-root dshx:flex dshx:max-w-[760px] dshx:flex-col dshx:gap-1" data-settings-page={props.page.ns}>
-      <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3">
-        {props.nested === true ? (
-          <h3 className="dshx:m-0 dshx:min-w-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{props.page.title}</h3>
-        ) : (
-          <h2 className="dshx:m-0 dshx:min-w-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{props.page.title}</h2>
+    <section aria-label={props.page.title} className="dshx-root dshx:flex dshx:max-w-[780px] dshx:flex-col dshx:gap-1" data-settings-page={props.page.ns}>
+      <div className={showStandaloneHeader ? 'dshx:flex dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:border-border/70 dshx:pb-4' : 'dshx:flex dshx:flex-col dshx:gap-1'}>
+        {showStandaloneHeader && (props.groupLabel !== undefined || resolvedOrigin !== undefined) && (
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            {props.groupLabel !== undefined && props.groupLabel !== '' && props.groupLabel !== props.page.title && (
+              <span className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.groupLabel}</span>
+            )}
+            {resolvedOrigin === 'dsh' && (
+              <Badge data-origin-badge="dsh" variant="secondary">
+                <LayersIcon aria-hidden="true" />
+                {props.t('origin.dshBadge')}
+              </Badge>
+            )}
+            {resolvedOrigin === 'plugin' && (
+              <Badge data-origin-badge="plugin" variant="info">
+                <PuzzleIcon aria-hidden="true" />
+                {props.t('origin.pluginBadge')}
+              </Badge>
+            )}
+            {resolvedOrigin === 'plugin' && resolvedBundle !== undefined && (
+              <code className="dshx:rounded dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">
+                {resolvedBundle}
+              </code>
+            )}
+          </div>
         )}
-        <ToggleGroup
-          aria-label={props.t('view.label')}
-          onValueChange={next => {
-            if (next === 'form' || next === 'json') show(next)
-          }}
-          size="sm"
-          type="single"
-          value={view}
-          variant="outline"
-        >
-          <ToggleGroupItem className="dshx:px-3" value="form">
-            {props.t('view.form')}
-          </ToggleGroupItem>
-          <ToggleGroupItem className="dshx:px-3" value="json">
-            {props.t('view.json')}
-          </ToggleGroupItem>
-        </ToggleGroup>
+        <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3">
+          {props.nested === true ? (
+            <h3 className="dshx:m-0 dshx:min-w-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{props.page.title}</h3>
+          ) : (
+            <h2 className="dshx:m-0 dshx:min-w-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{props.page.title}</h2>
+          )}
+          <ToggleGroup
+            aria-label={props.t('view.label')}
+            onValueChange={next => {
+              if (next === 'form' || next === 'json') show(next)
+            }}
+            size="sm"
+            type="single"
+            value={view}
+            variant="outline"
+          >
+            <ToggleGroupItem className="dshx:px-3" value="form">
+              {props.t('view.form')}
+            </ToggleGroupItem>
+            <ToggleGroupItem className="dshx:px-3" value="json">
+              {props.t('view.json')}
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+        {props.page.description !== '' && <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">{props.page.description}</p>}
+        {showStandaloneHeader && <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground/80">{props.t('entry.scope')}</p>}
       </div>
-      {props.page.description !== '' && <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">{props.page.description}</p>}
-      {props.nested !== true && <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground/80">{props.t('entry.scope')}</p>}
       {props.entry}
       <div className="dshx:mt-3" hidden={view !== 'form'}>
         <SettingsForm

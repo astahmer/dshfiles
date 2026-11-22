@@ -93,4 +93,20 @@ describe('settings view: one grouped page', () => {
     expect(byKeys.host.querySelector('[data-settings-shortcut="settings.open"]')).not.toBeNull()
     byKeys.unmount()
   })
+
+  it('filters sidebar categories between default DSH and plugin origins and badges the active entry', () => {
+    const view = mount({ activeId: 'general' })
+    expect(view.host.querySelector('[data-origin-badge="dsh"]')).not.toBeNull()
+    const navButtons = () => [...view.host.querySelectorAll('nav button[data-nav-id]')].map(button => button.getAttribute('data-nav-id'))
+    expect(navButtons()).toEqual(['general', 'link:mcp-servers', 'appearance'])
+
+    const dshFilter = view.host.querySelector<HTMLButtonElement>('[data-settings-origin-filter] [data-origin-option="dsh"]')
+    act(() => dshFilter?.click())
+    expect(navButtons()).toEqual(['general'])
+
+    const pluginFilter = view.host.querySelector<HTMLButtonElement>('[data-settings-origin-filter] [data-origin-option="plugin"]')
+    act(() => pluginFilter?.click())
+    expect(navButtons()).toEqual(['link:mcp-servers', 'appearance'])
+    view.unmount()
+  })
 })
