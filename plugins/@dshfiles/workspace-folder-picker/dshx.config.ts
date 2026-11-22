@@ -14,6 +14,7 @@ export default defineConfig({
     'repository-setup-contract': 'src/repository-setup-contract.ts',
     'project-add-flow': 'src/project-add-flow.ts',
     'project-tone': 'src/project-tone.ts',
+    'project-name': 'src/project-name.ts',
     settings: 'src/settings.ts',
     'project-create-dialog': 'src/project-create-dialog.tsx',
     'project-clone-dialog': 'src/project-clone-dialog.tsx',

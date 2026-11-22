@@ -71,6 +71,10 @@
     "./project-clone-dialog": {
       "types": "./src/project-clone-dialog.tsx",
       "default": "./dist/project-clone-dialog.js"
+    },
+    "./project-name": {
+      "types": "./src/project-name.ts",
+      "default": "./dist/project-name.js"
     }
   },
   "scripts": {

@@ -1,4 +1,5 @@
 import { useSettings } from '@dshfiles/dshx/client'
+import { ProjectName } from '@dshfiles/workspace-folder-picker/project-name'
 import { ProjectTone, type ProjectColorChoice } from '@dshfiles/workspace-folder-picker/project-tone'
 import { workspaceFolderPickerSettings } from '@dshfiles/workspace-folder-picker/settings'
 import { useMemo } from 'react'
@@ -36,4 +37,11 @@ export const useSavedProjectChip = (): ((path: string) => ProjectChip | undefine
     },
     [entries],
   )
+}
+
+/** The display name chosen for a project, or `undefined` so callers fall back to the folder name. */
+export const useProjectDisplayName = (): ((path: string) => string | undefined) => {
+  const settings = useSettings(workspaceFolderPickerSettings)
+  const entries = settings.value?.projectNames
+  return useMemo(() => (path: string) => ProjectName.displayNameOf(path, entries), [entries])
 }

@@ -23,7 +23,7 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
 import { Effect, Fiber, Schema } from 'effect'
 import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
-import { useProjectChip } from '@dshfiles/thread-sidebar/project-colors'
+import { useProjectChip, useProjectDisplayName } from '@dshfiles/thread-sidebar/project-colors'
 import { ProjectNames } from './project-names.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
@@ -426,10 +426,14 @@ export default defineClient({
             [byId, threadDirectories, workspaceItems],
           )
           const showProjectName = settings.value?.showProjectName ?? true
-          const projectNames = useMemo(
-            () => (showProjectName ? ProjectNames.byWorkspaceId(workspaceItems, threadDirectories) : undefined),
-            [showProjectName, threadDirectories, workspaceItems],
-          )
+          const displayNameOf = useProjectDisplayName()
+          const projectNames = useMemo(() => {
+            if (!showProjectName) return undefined
+            const paths = ProjectNames.pathsByWorkspaceId(workspaceItems, threadDirectories)
+            return new Map(
+              [...paths].map(([workspaceId, path]) => [workspaceId, displayNameOf(path) ?? path.split(/[\\/]/u).filter(Boolean).at(-1) ?? path] as const),
+            )
+          }, [displayNameOf, showProjectName, threadDirectories, workspaceItems])
           const chipOf = useProjectChip()
           // Workbench draws its own header, so it receives the resolved paint (palette class or custom colour) and writes
           // no colour logic of its own.
