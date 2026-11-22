@@ -56,6 +56,7 @@ import { bundleLabelsOf, type BundleLabel } from './bundle-labels.js'
 import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
+import { DshfilesPluginsPage } from './dshfiles-plugins-page.js'
 import { PluginEntryCard } from './plugin-entry-card.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
@@ -963,6 +964,31 @@ export default defineClient({
         (props: PropsRenderSlots<'settings.general.item'> & SettingsSectionSearchProps) => (
           <GeneralSection banner={<ReleaseBanner t={t} />} renderSlot={props.renderSlot} target={props.target} />
         ),
+      ),
+    )
+    ctx.slots.inject('settings.section', () =>
+      ctx.slots.register(
+        {
+          name: 'settings.section',
+          id: 'dshfiles-plugins',
+          order: -5,
+          label: () => t('pluginsPage.nav'),
+          locale: SHELL_LOCALE_NAMESPACE,
+        },
+        decorate((props: { readonly t: ShellTranslate; readonly openSection?: (sectionId: string) => void }) => {
+          const grouped = useObservable(groups)
+          return (
+            <DshfilesPluginsPage
+              groups={grouped}
+              onOpenSettings={sectionId => {
+                if (props.openSection !== undefined) props.openSection(sectionId)
+                else openSettings(sectionId)
+              }}
+              resolveLocaleText={text => ctx.locale.resolveText(text)}
+              t={props.t}
+            />
+          )
+        }),
       ),
     )
     ctx.slots.inject('settings.general.item', () =>
