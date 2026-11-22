@@ -35,9 +35,9 @@ export const PluginSettingsPageView = (props: {
   readonly t: ShellTranslate
   readonly focusPath?: readonly string[]
   readonly nested?: boolean
-  readonly groupLabel?: string
-  readonly origin?: SettingsPageOrigin
-  readonly bundleName?: string
+  readonly groupLabel?: string | undefined
+  readonly origin?: SettingsPageOrigin | undefined
+  readonly bundleName?: string | undefined
   /** The plugin entry behind the page, drawn under its scope line. */
   readonly entry?: ReactNode
 }): JSX.Element => {
@@ -54,7 +54,11 @@ export const PluginSettingsPageView = (props: {
   const showStandaloneHeader = props.nested !== true
   return (
     <section aria-label={props.page.title} className="dshx-root dshx:flex dshx:max-w-[780px] dshx:flex-col dshx:gap-1" data-settings-page={props.page.ns}>
-      <div className={showStandaloneHeader ? 'dshx:flex dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:border-border/70 dshx:pb-4' : 'dshx:flex dshx:flex-col dshx:gap-1'}>
+      <div
+        className={
+          showStandaloneHeader ? 'dshx:flex dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:border-border/70 dshx:pb-4' : 'dshx:flex dshx:flex-col dshx:gap-1'
+        }
+      >
         {showStandaloneHeader && (props.groupLabel !== undefined || resolvedOrigin !== undefined) && (
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             {props.groupLabel !== undefined && props.groupLabel !== '' && props.groupLabel !== props.page.title && (

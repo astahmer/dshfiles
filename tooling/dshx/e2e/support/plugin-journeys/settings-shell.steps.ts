@@ -534,3 +534,40 @@ Then('the Subagent page renders the owned fork instead of a placeholder', async 
   })
   await finishJourneyAssertions(page)
 })
+
+Then('default DSH and plugin categories are marked and filterable in the sidebar', async ({ page }: { page: Page }) => {
+  const nav = settingsView(page).getByRole('navigation', { name: 'Settings', exact: true })
+  const filter = settingsView(page).locator('aside [data-settings-origin-filter]')
+  await recordAssertion(page, 'settings-shell-origin-distinction', async () => {
+    await expect(settingsView(page).locator('[data-origin-badge="dsh"]')).toBeVisible()
+    await expect(nav.locator('[data-nav-id="general"]')).toHaveAttribute('data-entry-origin', 'dsh')
+    await expect(nav.locator('[data-nav-id="plugin:dshfiles-main-tabs"]')).toHaveAttribute('data-entry-origin', 'plugin')
+    await filter.locator('[data-origin-option="dsh"]').click()
+    await expect(nav.locator('[data-nav-id="general"]')).toBeVisible()
+    await expect(nav.locator('[data-nav-id="plugin:dshfiles-main-tabs"]')).toHaveCount(0)
+    await filter.locator('[data-origin-option="plugin"]').click()
+    await expect(nav.locator('[data-nav-id="plugin:dshfiles-main-tabs"]')).toBeVisible()
+    await expect(nav.locator('[data-nav-id="general"]')).toHaveCount(0)
+    await filter.locator('[data-origin-option="all"]').click()
+    await expect(nav.locator('[data-nav-id="general"]')).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the Dshfiles plugins page is opened in Settings', async ({ page }: { page: Page }) => {
+  await openSettings(page)
+  await settingsNavEntry(page, 'Dshfiles plugins').click()
+  await expect(settingsView(page).locator('[data-dshfiles-plugins-page]')).toBeVisible()
+})
+
+Then('installed dshfiles plugins are listed with quick toggles and a Settings link for Main tabs', async ({ page }: { page: Page }) => {
+  const pluginsPage = settingsView(page).locator('[data-dshfiles-plugins-page]')
+  const mainTabsRow = pluginsPage.locator('[data-dshfiles-bundle="@dshfiles/main-tabs"]')
+  await recordAssertion(page, 'settings-shell-dshfiles-plugins-page', async () => {
+    await expect(mainTabsRow).toBeVisible()
+    await expect(mainTabsRow.getByRole('switch')).toBeChecked()
+    await mainTabsRow.getByRole('button', { name: 'Settings', exact: true }).click()
+    await expect(page.getByRole('region', { name: 'Main tabs', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

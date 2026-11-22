@@ -19,16 +19,7 @@ const PLUGINS_QUERY_KEY = ['settings-shell', 'plugins'] as const
 export type BundleScopeFilter = 'dshfiles' | 'community' | 'all'
 export type BundleStatusFilter = 'all' | 'enabled' | 'disabled'
 
-export type BundleCategoryId =
-  | 'workspace'
-  | 'models'
-  | 'agents'
-  | 'tools'
-  | 'projects'
-  | 'hosts'
-  | 'security'
-  | 'diagnostics'
-  | 'core'
+export type BundleCategoryId = 'workspace' | 'models' | 'agents' | 'tools' | 'projects' | 'hosts' | 'security' | 'diagnostics' | 'core'
 
 const BUNDLE_CATEGORIES = [
   { id: 'workspace', labelKey: 'pluginsPage.cat.workspace' },
@@ -42,125 +33,123 @@ const BUNDLE_CATEGORIES = [
   { id: 'core', labelKey: 'pluginsPage.cat.core' },
 ] as const satisfies ReadonlyArray<{ readonly id: BundleCategoryId; readonly labelKey: Parameters<ShellTranslate>[0] }>
 
-const DSHFILES_CATEGORY: Readonly<Record<string, BundleCategoryId>> = {
-  'ui-styles': 'workspace',
-  'frame-layout': 'workspace',
-  'main-tabs': 'workspace',
-  workbench: 'workspace',
-  'thread-sidebar': 'workspace',
-  'sidebar-right': 'workspace',
-  'sidebar-terminal': 'workspace',
-  'command-palette': 'workspace',
-  'rich-composer': 'workspace',
-  chat: 'workspace',
-  'queue-reorder': 'workspace',
-  'turn-summary': 'workspace',
-  'tool-meta': 'workspace',
-  annotations: 'workspace',
-  editor: 'workspace',
-  shortcuts: 'workspace',
-  'settings-shell': 'workspace',
-  dialogs: 'workspace',
-  onboarding: 'workspace',
-  pwa: 'workspace',
-  'attachment-gallery': 'workspace',
-  'html-render': 'workspace',
-  'mermaid-diagrams': 'workspace',
-  'cordis-cards': 'workspace',
-  whiteboard: 'workspace',
-  'component-gallery': 'workspace',
-  'ai-accounts': 'models',
-  'model-selection': 'models',
-  'model-effort-picker': 'models',
-  'settings-models': 'models',
-  usage: 'models',
-  'agent-loop': 'agents',
-  'agent-preset': 'agents',
-  'agent-plan': 'agents',
-  'agent-communication': 'agents',
-  'agent-questions': 'agents',
-  'agent-toolkit': 'agents',
-  agents: 'agents',
-  agentsview: 'agents',
-  'context-compaction': 'agents',
-  'goal-stall-guard': 'agents',
-  'goal-tool': 'agents',
-  memory: 'agents',
-  'worktree-memory': 'agents',
-  'tool-subagent': 'agents',
-  'settings-subagent': 'agents',
-  btw: 'agents',
-  'prompt-stash': 'agents',
-  schedule: 'agents',
-  'mcp-servers': 'tools',
-  'mcp-endpoint': 'tools',
-  'web-search-brave': 'tools',
-  'settings-web-search': 'tools',
-  'web-fetch-readable': 'tools',
-  'apply-patch': 'tools',
-  'fff-search': 'tools',
-  'tool-search': 'tools',
-  'tool-ask-user': 'tools',
-  'user-questions': 'tools',
-  'input-trigger': 'tools',
-  mentions: 'tools',
-  references: 'tools',
-  'tweet-context': 'tools',
-  deliverables: 'tools',
-  'capabilities-hub': 'tools',
-  'plugin-guide': 'tools',
-  backlog: 'projects',
-  'backlog-notion': 'projects',
-  'backlog-jira': 'projects',
-  'jj-integration': 'projects',
-  jujutsu: 'projects',
-  'git-worktrees': 'projects',
-  'workspace-folder-picker': 'projects',
-  'workspace-nav': 'projects',
-  'diff-viewed': 'projects',
-  'diffs-review': 'projects',
-  'project-checks': 'projects',
-  'project-automations': 'projects',
-  'test-runs': 'projects',
-  preview: 'projects',
-  'session-undo': 'projects',
-  'thread-transfer': 'projects',
-  'multi-host': 'hosts',
-  'phone-access': 'hosts',
-  'phone-pairing': 'hosts',
-  'loopback-access': 'hosts',
-  'secret-catalog': 'security',
-  policies: 'security',
-  'agent-telemetry': 'diagnostics',
-  traces: 'diagnostics',
-  'activity-timeline': 'diagnostics',
-  'background-jobs': 'diagnostics',
-  'hmr-gate': 'diagnostics',
-  'request-messages': 'diagnostics',
-  'session-search': 'diagnostics',
-  'shared-runtime': 'core',
-  'shared-streams': 'core',
-  'session-controller': 'core',
-  'session-persistence-jsonl': 'core',
-  'storage-domain': 'core',
-  'storage-json': 'core',
-  'subprocess-local': 'core',
-  'cordis-client-runner': 'core',
-}
+const DSHFILES_CATEGORY = new Map<string, BundleCategoryId>([
+  ['ui-styles', 'workspace'],
+  ['frame-layout', 'workspace'],
+  ['main-tabs', 'workspace'],
+  ['workbench', 'workspace'],
+  ['thread-sidebar', 'workspace'],
+  ['sidebar-right', 'workspace'],
+  ['sidebar-terminal', 'workspace'],
+  ['command-palette', 'workspace'],
+  ['rich-composer', 'workspace'],
+  ['chat', 'workspace'],
+  ['queue-reorder', 'workspace'],
+  ['turn-summary', 'workspace'],
+  ['tool-meta', 'workspace'],
+  ['annotations', 'workspace'],
+  ['editor', 'workspace'],
+  ['shortcuts', 'workspace'],
+  ['settings-shell', 'workspace'],
+  ['dialogs', 'workspace'],
+  ['onboarding', 'workspace'],
+  ['pwa', 'workspace'],
+  ['attachment-gallery', 'workspace'],
+  ['html-render', 'workspace'],
+  ['mermaid-diagrams', 'workspace'],
+  ['cordis-cards', 'workspace'],
+  ['whiteboard', 'workspace'],
+  ['component-gallery', 'workspace'],
+  ['ai-accounts', 'models'],
+  ['model-selection', 'models'],
+  ['model-effort-picker', 'models'],
+  ['settings-models', 'models'],
+  ['usage', 'models'],
+  ['agent-loop', 'agents'],
+  ['agent-preset', 'agents'],
+  ['agent-plan', 'agents'],
+  ['agent-communication', 'agents'],
+  ['agent-questions', 'agents'],
+  ['agent-toolkit', 'agents'],
+  ['agents', 'agents'],
+  ['agentsview', 'agents'],
+  ['context-compaction', 'agents'],
+  ['goal-stall-guard', 'agents'],
+  ['goal-tool', 'agents'],
+  ['memory', 'agents'],
+  ['worktree-memory', 'agents'],
+  ['tool-subagent', 'agents'],
+  ['settings-subagent', 'agents'],
+  ['btw', 'agents'],
+  ['prompt-stash', 'agents'],
+  ['schedule', 'agents'],
+  ['mcp-servers', 'tools'],
+  ['mcp-endpoint', 'tools'],
+  ['web-search-brave', 'tools'],
+  ['settings-web-search', 'tools'],
+  ['web-fetch-readable', 'tools'],
+  ['apply-patch', 'tools'],
+  ['fff-search', 'tools'],
+  ['tool-search', 'tools'],
+  ['tool-ask-user', 'tools'],
+  ['user-questions', 'tools'],
+  ['input-trigger', 'tools'],
+  ['mentions', 'tools'],
+  ['references', 'tools'],
+  ['tweet-context', 'tools'],
+  ['deliverables', 'tools'],
+  ['capabilities-hub', 'tools'],
+  ['plugin-guide', 'tools'],
+  ['backlog', 'projects'],
+  ['backlog-notion', 'projects'],
+  ['backlog-jira', 'projects'],
+  ['jj-integration', 'projects'],
+  ['jujutsu', 'projects'],
+  ['git-worktrees', 'projects'],
+  ['workspace-folder-picker', 'projects'],
+  ['workspace-nav', 'projects'],
+  ['diff-viewed', 'projects'],
+  ['diffs-review', 'projects'],
+  ['project-checks', 'projects'],
+  ['project-automations', 'projects'],
+  ['test-runs', 'projects'],
+  ['preview', 'projects'],
+  ['session-undo', 'projects'],
+  ['thread-transfer', 'projects'],
+  ['multi-host', 'hosts'],
+  ['phone-access', 'hosts'],
+  ['phone-pairing', 'hosts'],
+  ['loopback-access', 'hosts'],
+  ['secret-catalog', 'security'],
+  ['policies', 'security'],
+  ['agent-telemetry', 'diagnostics'],
+  ['traces', 'diagnostics'],
+  ['activity-timeline', 'diagnostics'],
+  ['background-jobs', 'diagnostics'],
+  ['hmr-gate', 'diagnostics'],
+  ['request-messages', 'diagnostics'],
+  ['session-search', 'diagnostics'],
+  ['shared-runtime', 'core'],
+  ['shared-streams', 'core'],
+  ['session-controller', 'core'],
+  ['session-persistence-jsonl', 'core'],
+  ['storage-domain', 'core'],
+  ['storage-json', 'core'],
+  ['subprocess-local', 'core'],
+  ['cordis-client-runner', 'core'],
+])
 
 export const bundleCategoryOf = (bundle: Pick<PluginBundle, 'name' | 'origin'>): BundleCategoryId => {
   if (bundle.origin === 'dshfiles') {
     const short = bundle.name.slice('@dshfiles/'.length)
-    return DSHFILES_CATEGORY[short] ?? 'tools'
+    return DSHFILES_CATEGORY.get(short) ?? 'tools'
   }
   if (bundle.origin === 'dsh') return 'core'
   return 'tools'
 }
 
-export const resolveBundleText = (
-  value: PluginBundle['title'],
-  resolveLocaleText: (text: NonNullable<PluginBundle['title']>) => string,
-): string => (value === null ? '' : resolveLocaleText(value))
+export const resolveBundleText = (value: PluginBundle['title'], resolveLocaleText: (text: NonNullable<PluginBundle['title']>) => string): string =>
+  value === null ? '' : resolveLocaleText(value)
 
 export const bundleDisplayTitle = (
   bundle: Pick<PluginBundle, 'name' | 'title'>,
@@ -233,10 +222,7 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
 
   const effectiveScope: BundleScopeFilter = scope === 'dshfiles' && scopeCounts.dshfiles === 0 && scopeCounts.all > 0 ? 'all' : scope
 
-  const scopedBundles = useMemo(
-    () => props.bundles.filter(bundle => matchesScope(bundle.origin, effectiveScope)),
-    [props.bundles, effectiveScope],
-  )
+  const scopedBundles = useMemo(() => props.bundles.filter(bundle => matchesScope(bundle.origin, effectiveScope)), [props.bundles, effectiveScope])
 
   const enabledCount = useMemo(() => scopedBundles.filter(bundle => bundle.enabled).length, [scopedBundles])
   const pendingRestartCount = useMemo(() => scopedBundles.filter(bundle => bundle.pendingRestart !== null).length, [scopedBundles])
@@ -414,7 +400,10 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
       </div>
 
       {props.error !== undefined && (
-        <div className="dshx:rounded-xl dshx:border dshx:border-destructive/40 dshx:bg-destructive/5 dshx:px-4 dshx:py-3 dshx:text-sm dshx:text-destructive" role="alert">
+        <div
+          className="dshx:rounded-xl dshx:border dshx:border-destructive/40 dshx:bg-destructive/5 dshx:px-4 dshx:py-3 dshx:text-sm dshx:text-destructive"
+          role="alert"
+        >
           {props.error}
         </div>
       )}
@@ -538,10 +527,7 @@ const ConnectedDshfilesPluginsPage = (props: {
   const toggleMutation = useMutation({
     mutationFn: (input: { readonly name: string; readonly enabled: boolean }) => api.setBundleEnabled(input),
     onSettled: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: BUNDLES_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: PLUGINS_QUERY_KEY }),
-      ])
+      await Promise.all([queryClient.invalidateQueries({ queryKey: BUNDLES_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: PLUGINS_QUERY_KEY })])
     },
   })
   return (

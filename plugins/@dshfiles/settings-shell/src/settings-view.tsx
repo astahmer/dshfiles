@@ -48,8 +48,8 @@ export interface SectionRow {
   readonly id: string
   readonly order: number
   readonly label: string
-  readonly origin?: SettingsEntryOrigin
-  readonly bundleName?: string
+  readonly origin?: SettingsEntryOrigin | undefined
+  readonly bundleName?: string | undefined
   /** Words that find the row in search without showing: its group, namespaces, former names. */
   readonly keywords?: string
 }
@@ -62,7 +62,7 @@ const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)] dsh
 const navGroup =
   'dshx:mt-3.5 dshx:flex dshx:items-center dshx:gap-1.5 dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:font-semibold dshx:tracking-[0.01em] dshx:text-muted-foreground dshx:first:mt-0'
 
-const GROUP_ICONS: Readonly<Record<SettingsGroupId, LucideIcon>> = {
+const GROUP_ICONS = {
   general: SlidersHorizontalIcon,
   models: SparklesIcon,
   agents: BotIcon,
@@ -74,12 +74,12 @@ const GROUP_ICONS: Readonly<Record<SettingsGroupId, LucideIcon>> = {
   plugins: BlocksIcon,
   about: InfoIcon,
   other: EllipsisIcon,
-}
+} satisfies Record<SettingsGroupId, LucideIcon>
 
 export interface PluginPageRenderMeta {
   readonly groupLabel: string
   readonly origin: SettingsEntryOrigin
-  readonly bundleName?: string
+  readonly bundleName?: string | undefined
 }
 
 export interface SettingsViewProps {
@@ -112,7 +112,7 @@ export interface SettingsViewProps {
   readonly onClose: (() => void) | undefined
 }
 
-const OriginBadge = (props: { readonly origin: SettingsEntryOrigin; readonly bundleName?: string; readonly t: ShellTranslate }): JSX.Element => (
+const OriginBadge = (props: { readonly origin: SettingsEntryOrigin; readonly bundleName?: string | undefined; readonly t: ShellTranslate }): JSX.Element => (
   <span className="dshx:inline-flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
     {props.origin === 'dsh' ? (
       <Badge data-origin-badge="dsh" variant="secondary">
@@ -184,47 +184,38 @@ const NavCell = (props: {
   readonly showOriginCue: boolean
   readonly t: ShellTranslate
   readonly onSelect: (id: string) => void
-}): JSX.Element => {
-  const originTitle =
-    props.entry.origin === 'dsh'
-      ? props.t('origin.dshBadge')
-      : props.entry.bundleName === undefined
-        ? props.t('origin.pluginBadge')
-        : `${props.t('origin.pluginBadge')} · ${props.entry.bundleName}`
-  return (
-    <button
-      aria-current={props.active ? 'page' : undefined}
-      className={cn(navCell, props.active && navCellActive, props.count === 0 && 'dshx:opacity-45')}
-      data-entry-origin={props.entry.origin}
-      data-nav-id={props.entry.id}
-      onClick={() => props.onSelect(props.entry.id)}
-      title={originTitle}
-      type="button"
-    >
-      {props.active && <span aria-hidden="true" className="dshx:absolute dshx:inset-y-1.5 dshx:left-0.5 dshx:w-0.5 dshx:rounded-full dshx:bg-info" />}
-      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.entry.label}</span>
-      {props.count === undefined && props.showOriginCue && props.entry.origin === 'dsh' && (
-        <span
-          aria-hidden="true"
-          className="dshx:shrink-0 dshx:rounded dshx:border dshx:border-border/80 dshx:bg-background/85 dshx:px-1.5 dshx:py-px dshx:text-2xs dshx:leading-3.5 dshx:font-medium dshx:text-muted-foreground"
-        >
-          {props.t('origin.dsh')}
-        </span>
-      )}
-      {props.count === undefined && props.showOriginCue && props.entry.origin === 'plugin' && (
-        <PuzzleIcon aria-hidden="true" className={cn('dshx:size-3 dshx:shrink-0', props.active ? 'dshx:text-info' : 'dshx:text-info/65')} />
-      )}
-      {props.count === undefined && props.entry.link !== undefined && (
-        <ArrowUpRightIcon aria-hidden="true" className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground/70" />
-      )}
-      {props.count !== undefined && props.count > 0 && (
-        <span className="dshx:rounded-full dshx:bg-secondary dshx:px-1.5 dshx:text-2xs dshx:leading-4 dshx:text-muted-foreground dshx:tabular-nums">
-          {props.count}
-        </span>
-      )}
-    </button>
-  )
-}
+}): JSX.Element => (
+  <button
+    aria-current={props.active ? 'page' : undefined}
+    className={cn(navCell, props.active && navCellActive, props.count === 0 && 'dshx:opacity-45')}
+    data-entry-origin={props.entry.origin}
+    data-nav-id={props.entry.id}
+    onClick={() => props.onSelect(props.entry.id)}
+    type="button"
+  >
+    {props.active && <span aria-hidden="true" className="dshx:absolute dshx:inset-y-1.5 dshx:left-0.5 dshx:w-0.5 dshx:rounded-full dshx:bg-info" />}
+    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.entry.label}</span>
+    {props.count === undefined && props.showOriginCue && props.entry.origin === 'dsh' && (
+      <span
+        aria-hidden="true"
+        className="dshx:shrink-0 dshx:rounded dshx:border dshx:border-border/80 dshx:bg-background/85 dshx:px-1.5 dshx:py-px dshx:text-2xs dshx:leading-3.5 dshx:font-medium dshx:text-muted-foreground"
+      >
+        {props.t('origin.dsh')}
+      </span>
+    )}
+    {props.count === undefined && props.showOriginCue && props.entry.origin === 'plugin' && (
+      <PuzzleIcon aria-hidden="true" className={cn('dshx:size-3 dshx:shrink-0', props.active ? 'dshx:text-info' : 'dshx:text-info/65')} />
+    )}
+    {props.count === undefined && props.entry.link !== undefined && (
+      <ArrowUpRightIcon aria-hidden="true" className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground/70" />
+    )}
+    {props.count !== undefined && props.count > 0 && (
+      <span className="dshx:rounded-full dshx:bg-secondary dshx:px-1.5 dshx:text-2xs dshx:leading-4 dshx:text-muted-foreground dshx:tabular-nums">
+        {props.count}
+      </span>
+    )}
+  </button>
+)
 
 /** Matching entries grouped by their section, in section order. */
 const entryGroups = (
@@ -356,9 +347,7 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
             <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">
               <Highlight query={props.query} text={hit.page.title} />
             </h3>
-            {hit.page.origin === 'dsh' && (
-              <Badge variant="secondary">{t('origin.dshBadge')}</Badge>
-            )}
+            {hit.page.origin === 'dsh' && <Badge variant="secondary">{t('origin.dshBadge')}</Badge>}
             {hit.page.origin === 'plugin' && (
               <Badge variant="info">
                 <PuzzleIcon aria-hidden="true" />
@@ -391,7 +380,7 @@ const EntryView = (
             {props.groupLabel !== '' && props.groupLabel !== entry.label && (
               <span className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.groupLabel}</span>
             )}
-            <OriginBadge origin={entry.origin} t={t} {...(entry.bundleName === undefined ? {} : { bundleName: entry.bundleName })} />
+            <OriginBadge bundleName={entry.bundleName} origin={entry.origin} t={t} />
           </div>
           <h2 className="dshx:m-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{entry.label}</h2>
         </header>
@@ -417,7 +406,7 @@ const EntryView = (
           {props.renderPluginPage(page, ownHeading, {
             groupLabel: props.groupLabel,
             origin: entry.origin,
-            ...(entry.bundleName === undefined ? {} : { bundleName: entry.bundleName }),
+            bundleName: entry.bundleName,
           })}
         </Fragment>
       ))}
@@ -564,7 +553,10 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             <div className="dshx:shrink-0 dshx:border-b dshx:border-border/70 dshx:px-3 dshx:py-2.5">
               <OriginFilterBar counts={counts} onChange={setOriginFilter} t={t} value={originFilter} />
             </div>
-            <nav aria-label={t('title')} className="dshx:box-border dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-2.5 dshx:pt-2.5 dshx:pb-4">
+            <nav
+              aria-label={t('title')}
+              className="dshx:box-border dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-2.5 dshx:pt-2.5 dshx:pb-4"
+            >
               {visibleGroups.length === 0 ? (
                 <p className="dshx:px-2.5 dshx:py-4 dshx:text-xs dshx:text-muted-foreground">{t('origin.empty')}</p>
               ) : (

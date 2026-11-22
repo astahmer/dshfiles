@@ -87,27 +87,27 @@ const CORE_NAMESPACES: ReadonlySet<string> = new Set([
 ])
 
 /** Known owning bundles for plugin-registered settings sections that do not merge a page carrying bundleName. */
-const SECTION_BUNDLES: Readonly<Record<string, string>> = {
-  'thread-sidebar': '@dshfiles/thread-sidebar',
-  'dshfiles-status-bar': '@dshfiles/frame-layout',
-  'thread-notifications': '@dshfiles/thread-sidebar',
-  'ai-accounts': '@dshfiles/ai-accounts',
-  'dshfiles-mcp-endpoint': '@dshfiles/mcp-endpoint',
-  'dshfiles-new-thread': '@dshfiles/workspace-folder-picker',
-  'dshfiles-network-access': '@dshfiles/phone-pairing',
-  'dshfiles-plugins': '@dshfiles/settings-shell',
-  'dshfiles-update-dsh': '@dshfiles/thread-sidebar',
-  market: 'dshmarket',
-}
+const SECTION_BUNDLES = new Map<string, string>([
+  ['thread-sidebar', '@dshfiles/thread-sidebar'],
+  ['dshfiles-status-bar', '@dshfiles/frame-layout'],
+  ['thread-notifications', '@dshfiles/thread-sidebar'],
+  ['ai-accounts', '@dshfiles/ai-accounts'],
+  ['dshfiles-mcp-endpoint', '@dshfiles/mcp-endpoint'],
+  ['dshfiles-new-thread', '@dshfiles/workspace-folder-picker'],
+  ['dshfiles-network-access', '@dshfiles/phone-pairing'],
+  ['dshfiles-plugins', '@dshfiles/settings-shell'],
+  ['dshfiles-update-dsh', '@dshfiles/thread-sidebar'],
+  ['market', 'dshmarket'],
+])
 
 /** Known owning bundles for stage pages linked from Settings. */
-const LINK_BUNDLES: Readonly<Record<string, string>> = {
-  'ai-accounts': '@dshfiles/ai-accounts',
-  'mcp-servers': '@dshfiles/mcp-servers',
-  'secret-catalog': '@dshfiles/secret-catalog',
-  'dshfiles-multi-host-hosts': '@dshfiles/multi-host',
-  'dshfiles-agents': '@dshfiles/agents',
-}
+const LINK_BUNDLES = new Map<string, string>([
+  ['ai-accounts', '@dshfiles/ai-accounts'],
+  ['mcp-servers', '@dshfiles/mcp-servers'],
+  ['secret-catalog', '@dshfiles/secret-catalog'],
+  ['dshfiles-multi-host-hosts', '@dshfiles/multi-host'],
+  ['dshfiles-agents', '@dshfiles/agents'],
+])
 
 /** Settings namespaces (Loader row ids), including DSH core rows that only have a package name for a title. */
 const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
@@ -266,7 +266,7 @@ export interface SettingsEntry {
   /** Whether this category belongs to stock DSH or a DSH plugin. */
   readonly origin: SettingsEntryOrigin
   /** Owning plugin bundle name when known (for example `@dshfiles/main-tabs`). */
-  readonly bundleName?: string
+  readonly bundleName?: string | undefined
   /** The native or plugin `settings.section` it renders. */
   readonly sectionId?: string
   /** Plugin settings pages it renders below the section, already stripped of fields shown elsewhere. */
@@ -371,7 +371,7 @@ const groupEntries = (input: {
   for (const section of input.sections) {
     const placement = placementOfSection(section.id)
     const origin = originOfSection(section.id)
-    const bundleName = SECTION_BUNDLES[section.id]
+    const bundleName = SECTION_BUNDLES.get(section.id)
     entries.set(section.id, {
       group: placement.group,
       label: placement.label ?? section.label,
@@ -467,11 +467,12 @@ const groupEntries = (input: {
       target.link = link
       target.label = link.label
       target.keywords.push(link.panelId)
-      if (target.bundleName === undefined && LINK_BUNDLES[link.panelId] !== undefined) target.bundleName = LINK_BUNDLES[link.panelId]
+      const linkedBundle = LINK_BUNDLES.get(link.panelId)
+      if (target.bundleName === undefined && linkedBundle !== undefined) target.bundleName = linkedBundle
       continue
     }
     const origin = originOfLink(link.panelId)
-    const bundleName = origin === 'plugin' ? LINK_BUNDLES[link.panelId] : undefined
+    const bundleName = origin === 'plugin' ? LINK_BUNDLES.get(link.panelId) : undefined
     entries.set(`link:${link.panelId}`, {
       group: link.group,
       label: link.label,
@@ -492,7 +493,7 @@ const groupEntries = (input: {
       label: entry.label,
       order: entry.order,
       origin: entry.origin,
-      ...(entry.bundleName === undefined ? {} : { bundleName: entry.bundleName }),
+      bundleName: entry.bundleName,
       pages: entry.pages,
       hiddenPages: entry.hiddenPages,
       keywords: entry.keywords.join(' '),

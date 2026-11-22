@@ -169,3 +169,15 @@ Feature: Settings shell
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/settings-subagent" is booted
     When the Subagent plugin page is opened in Settings
     Then the Subagent page renders the owned fork instead of a placeholder
+
+  @scenario:settings-shell.origin-distinction
+  Scenario: Settings distinguishes default DSH categories from plugin categories and filters by source
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When Settings is opened from the sidebar
+    Then default DSH and plugin categories are marked and filterable in the sidebar
+
+  @scenario:settings-shell.dshfiles-plugins-page
+  Scenario: The Dshfiles plugins page lists installed dshfiles bundles with quick toggles and settings links
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When the Dshfiles plugins page is opened in Settings
+    Then installed dshfiles plugins are listed with quick toggles and a Settings link for Main tabs

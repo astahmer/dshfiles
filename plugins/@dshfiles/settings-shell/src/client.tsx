@@ -381,7 +381,7 @@ export default defineClient({
           order: entry.order,
           label: entry.label,
           origin: entry.origin,
-          ...(entry.bundleName === undefined ? {} : { bundleName: entry.bundleName }),
+          bundleName: entry.bundleName,
           keywords: `${group.label} ${entry.keywords}`,
         })),
       )
@@ -510,15 +510,15 @@ export default defineClient({
       pluginPages: SettingsGroups.searchablePages(input.groups),
       renderPluginPage: (page: PluginSettingsPage, nested: boolean, meta) => (
         <PluginSettingsPageView
+          bundleName={meta?.bundleName}
           entry={<PluginEntryCard namespace={page.ns} t={input.t} />}
           form={formFor(page.ns)}
+          groupLabel={meta?.groupLabel}
           key={page.pageId}
           nested={nested}
+          origin={meta?.origin}
           page={page}
           t={input.t}
-          {...(meta?.groupLabel === undefined ? {} : { groupLabel: meta.groupLabel })}
-          {...(meta?.origin === undefined ? {} : { origin: meta.origin })}
-          {...(meta?.bundleName === undefined ? {} : { bundleName: meta.bundleName })}
           {...(input.field?.sectionId === page.pageId ? { focusPath: input.field.fieldPath } : {})}
         />
       ),
@@ -821,7 +821,7 @@ export default defineClient({
     const probeNow = (): void => {
       if (reachability.getSnapshot().probing) return
       reachability.set(ReachabilityModel.started(reachability.getSnapshot()))
-      void probeHost().then((reachable) => {
+      void probeHost().then(reachable => {
         const next = ReachabilityModel.settled(reachability.getSnapshot(), reachable)
         reachability.set(next.state)
         if (next.recovered) connection.reconnect()

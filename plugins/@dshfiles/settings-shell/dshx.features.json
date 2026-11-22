@@ -836,6 +836,102 @@
           "reason": "A settings field plus a one-time settings write through DSH's settings forms on Host start; no fetch, socket, process or long job. The Jev calls that use the key keep their jev classify span."
         }
       ]
+    },
+    {
+      "id": "settings-origin-distinction",
+      "title": "Distinguish default DSH categories from plugin categories",
+      "summary": "Every Settings category is classified as stock DSH or a DSH plugin from bundle metadata (with core namespace fallback). The sidebar offers an All / DSH / Plugins scope filter with counts, subtle per-row origin cues (DSH pill vs plugin icon), category icons, and origin badges in each entry header and search result.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect group \"Filter categories by source\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "expect group \"Filter categories by source\""
+      ],
+      "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: sidebar source filter and entry header badge",
+      "configuration": [],
+      "states": ["all", "dsh-only", "plugins-only"],
+      "failureModes": [
+        "Before bundle labels load from the Host, known stock DSH sections and namespaces fall back to DSH default while @dshfiles and unknown namespaces fall back to Plugin."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.origin-classification",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "classifies stock DSH defaults separately from DSH plugin categories and filters by origin"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.origin-filter-view",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-view.test.tsx",
+          "testName": "filters sidebar categories between default DSH and plugin origins and badges the active entry"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.origin-distinction",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: reads already-loaded bundle labels and filters rendered navigation entries without starting new Host work."
+        }
+      ]
+    },
+    {
+      "id": "dshfiles-plugins-page",
+      "title": "Global Dshfiles plugins quick-toggle page",
+      "summary": "Settings › Plugins › Dshfiles plugins lists global @dshfiles/* bundles installed in the profile grouped by functional area, with live search, source (dshfiles / Community / All) and status (All / Enabled / Disabled) filters, quick enable/disable switches backed by PluginManager.setBundleEnabled, restart indicators, and deep links to each plugin's settings page.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click button \"Dshfiles plugins\"", "expect switch \"Enable *\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click combobox \"Sections\"",
+        "click option \"Dshfiles plugins\"",
+        "expect switch \"Enable *\""
+      ],
+      "surfaces": ["client", "host", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Plugins › Dshfiles plugins",
+      "configuration": [],
+      "states": ["loading", "ready", "filtered", "toggling", "pending-restart", "error"],
+      "failureModes": [
+        "A Host without pluginManager returns plugin-manager-unavailable and the page displays an actionable alert instead of crashing.",
+        "Protected management bundles show a Protected badge and disable their switch.",
+        "Changes that require a Host restart display Starts/Stops after a restart without restarting DSH automatically."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.bundle-controls",
+          "file": "plugins/@dshfiles/settings-shell/src/plugin-controls.test.ts",
+          "testName": "lists bundles with origin classification and toggles enablement with restart tracking"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.dshfiles-plugins-view",
+          "file": "plugins/@dshfiles/settings-shell/src/dshfiles-plugins-page.test.tsx",
+          "testName": "defaults to dshfiles plugins, filters by status and scope, toggles enablement, and jumps to Settings"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.dshfiles-plugins-page",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ]
 }
