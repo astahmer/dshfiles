@@ -61,6 +61,7 @@ describe('BundleLabels', () => {
             rowId: 'dshfiles-thread-sidebar',
             moduleName: '@dshfiles/thread-sidebar',
             bundleName: '@dshfiles/thread-sidebar',
+            official: false,
             title: { en: 'Thread Sidebar', zh: '线程侧栏' },
             description: undefined,
             bundleDescription: 'Threads beside the chat',

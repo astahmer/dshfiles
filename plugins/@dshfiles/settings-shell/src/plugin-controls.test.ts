@@ -117,4 +117,68 @@ describe('plugin controls', () => {
       }),
     ),
   )
+
+  it.effect('lists bundles with origin classification and toggles enablement with restart tracking', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const calls: (readonly [string, boolean])[] = []
+        let mainTabsEnabled = true
+        const controls = yield* controlsFor({
+          listPlugins: async () => [
+            { entryId: 'include:dshfiles-main-tabs', moduleName: '@dshfiles/main-tabs', enabled: mainTabsEnabled, fiberPhase: 'active' },
+          ],
+          listBundles: async () => [
+            {
+              name: '@dshfiles/main-tabs',
+              official: false,
+              availability: 'profile',
+              version: '0.1.0',
+              description: 'Browser-like tabs for threads and panels.',
+              enabled: mainTabsEnabled,
+              installed: true,
+              rows: [{ rowId: 'dshfiles-main-tabs', entryId: 'include:dshfiles-main-tabs' }],
+              overrides: [],
+            },
+            {
+              name: '@deepseek-ai/dsh-base',
+              official: true,
+              availability: 'installation',
+              enabled: true,
+              installed: true,
+              readOnlyReason: 'management-required',
+              rows: [],
+              overrides: [],
+            },
+            {
+              name: 'dshmarket',
+              official: false,
+              availability: 'profile',
+              enabled: true,
+              installed: true,
+              rows: [{ rowId: 'market' }],
+              overrides: [],
+            },
+          ],
+          setPluginEnabled: async () => ({ changed: false, application: 'applied' }),
+          setBundleEnabled: async (name, enabled) => {
+            calls.push([name, enabled])
+            mainTabsEnabled = enabled
+            return { changed: true, application: 'restart-required', restartReason: 'host-module', enabled }
+          },
+        })
+        const before = yield* controls.listBundles
+        expect(before.map(bundle => [bundle.name, bundle.origin, bundle.enabled, bundle.activeRowCount, bundle.readOnlyReason])).toEqual([
+          ['@deepseek-ai/dsh-base', 'dsh', true, 0, 'management-required'],
+          ['@dshfiles/main-tabs', 'dshfiles', true, 1, null],
+          ['dshmarket', 'community', true, 0, null],
+        ])
+        const toggled = yield* controls.setBundleEnabled({ name: '@dshfiles/main-tabs', enabled: false })
+        expect(toggled).toMatchObject({ name: '@dshfiles/main-tabs', changed: true, enabled: false, application: 'restart-required' })
+        expect((yield* controls.listBundles).find(bundle => bundle.name === '@dshfiles/main-tabs')?.pendingRestart).toBe('disable')
+        const unknown = yield* Effect.flip(controls.setBundleEnabled({ name: '@dshfiles/missing', enabled: true }))
+        expect(unknown._tag).toBe('PluginBundleUnknown')
+        expect(calls).toEqual([['@dshfiles/main-tabs', false]])
+      }),
+    ),
+  )
 })
