@@ -63,6 +63,14 @@
     "./project-add-flow": {
       "types": "./src/project-add-flow.ts",
       "default": "./dist/project-add-flow.js"
+    },
+    "./project-create-dialog": {
+      "types": "./src/project-create-dialog.tsx",
+      "default": "./dist/project-create-dialog.js"
+    },
+    "./project-clone-dialog": {
+      "types": "./src/project-clone-dialog.tsx",
+      "default": "./dist/project-clone-dialog.js"
     }
   },
   "scripts": {

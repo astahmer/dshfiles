@@ -15,6 +15,8 @@ export default defineConfig({
     'project-add-flow': 'src/project-add-flow.ts',
     'project-tone': 'src/project-tone.ts',
     settings: 'src/settings.ts',
+    'project-create-dialog': 'src/project-create-dialog.tsx',
+    'project-clone-dialog': 'src/project-clone-dialog.tsx',
   },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: { dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },
