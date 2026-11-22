@@ -426,7 +426,6 @@ const threadSourceFilterLabelKeys = {
 
 const ALL_PROJECTS = '__all__'
 /** Picker entries that open the project add flow (productivity pass Q5, T5.5), never a filter value. */
-const ADD_PROJECT = '__add-project__'
 const ADD_FOLDER = '__add-folder__'
 const NEW_PROJECT = '__new-project__'
 /**
@@ -4586,8 +4585,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const selectProject = (value: string): void => {
     // Productivity pass Q5 (T5.5): the picker's last entries add a project instead of filtering.
-    if (value === ADD_PROJECT || value === ADD_FOLDER || value === NEW_PROJECT) {
-      ProjectAddFlow.open(value === NEW_PROJECT ? 'create' : value === ADD_FOLDER ? 'browse' : 'choose')
+    if (value === ADD_FOLDER || value === NEW_PROJECT) {
+      ProjectAddFlow.open(value === NEW_PROJECT ? 'create' : 'browse')
       return
     }
     setSettingsOpen(false)
@@ -4604,12 +4603,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     ...displayWorkspaces.map(workspace => ({ value: workspace.id, label: workspace.title })),
     ...(projectAddAvailable
       ? [
-          {
-            value: ADD_PROJECT,
-            label: props.tSidebar('threadSidebarAddProjectChooser'),
-            group: props.tSidebar('threadSidebarAddProject'),
-            keywords: ['add project', 'new project', 'add folder', 'open folder'],
-          },
           {
             value: ADD_FOLDER,
             label: props.tSidebar('threadSidebarAddFolder'),
