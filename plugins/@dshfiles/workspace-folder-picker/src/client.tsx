@@ -21,7 +21,7 @@ import { projectLifecycleApi } from './project-lifecycle-api.js'
 import { ProjectAddChooser } from './project-add-chooser.js'
 import { ProjectColorPanel } from './project-color-panel.js'
 import { ProjectSettingsPanels } from './project-settings-panels.js'
-import { upsertProjectColor, type ProjectColorChoice } from './project-tone.js'
+import { ProjectTone, type ProjectColorChoice } from './project-tone.js'
 import { workspaceFolderPickerSettings } from './settings.js'
 import { ProjectSettingsSection } from './project-settings-section.js'
 
@@ -37,12 +37,21 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
   const settings = useSettings(workspaceFolderPickerSettings)
   /** The colour chosen in the import dialog outlives it: chips and project labels read the same entry. */
   const picked = (path: string, choice: ProjectColorChoice): void => {
-    void settings.set('projectColors', upsertProjectColor(settings.value?.projectColors ?? [], path, choice)).catch(() => undefined)
+    void settings.set('projectColors', ProjectTone.upsertColor(settings.value?.projectColors ?? [], path, choice)).catch(() => undefined)
     props.onPicked(path)
   }
   // A surface that asked for New project or Clone (ProjectAddFlow.request) opens the flow on that view; the Host's own
   // add-workspace hole opens on the chooser instead of dropping the operator into a filesystem listing.
   const [view, setView] = useState<DirectoryFlowView>(() => props.initialView ?? 'choose')
+  const [returnView, setReturnView] = useState<'choose' | 'browse' | null>(() => (props.initialView === undefined ? 'choose' : null))
+  const openSubView = (next: 'create' | 'clone', from: 'choose' | 'browse'): void => {
+    setReturnView(from)
+    setView(next)
+  }
+  const closeSubView = (): void => {
+    if (returnView === null) props.onCancel()
+    else setView(returnView)
+  }
   const [candidate, setCandidate] = useState<string | null>(null)
   const tools = useQuery({ queryKey: ['workspace-folder-picker', 'project-tools'], queryFn: () => lifecycleApi.tools({}), retry: false, staleTime: 60_000 })
   const pickerCapabilities = useQuery({
@@ -64,9 +73,9 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
       <ProjectAddChooser
         gitHubAvailable={tools.data?.gh === true}
         onBrowse={() => setView('browse')}
-        onClone={() => setView('clone')}
+        onClone={() => openSubView('clone', 'choose')}
         onClose={props.onCancel}
-        onCreate={() => setView('create')}
+        onCreate={() => openSubView('create', 'choose')}
         open
       />
     )
@@ -85,7 +94,7 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
     )
   }
   if (view === 'clone') {
-    return <ProjectCloneDialog api={lifecycleApi} home={tools.data?.home} onClose={() => setView('browse')} onCloned={picked} />
+    return <ProjectCloneDialog api={lifecycleApi} home={tools.data?.home} onClose={closeSubView} onCloned={picked} />
   }
   if (view === 'create') {
     return (
@@ -94,7 +103,7 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
         defaultParent={settings.value?.projectParent}
         gitHubAvailable={tools.data?.gh === true}
         home={tools.data?.home}
-        onClose={() => setView('browse')}
+        onClose={closeSubView}
         onCreated={picked}
         onRememberParent={parent => {
           void settings.set('projectParent', parent.trim()).catch(() => undefined)
@@ -106,11 +115,11 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
   // buttons, and each says whether it creates a project or adds a folder that already exists.
   const addActions = tools.isSuccess ? (
     <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-      <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.jj} type="button" variant="outline" onClick={() => setView('create')}>
+      <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.jj} type="button" variant="outline" onClick={() => openSubView('create', 'browse')}>
         <FolderPlusIcon aria-hidden />
         Create project…
       </Button>
-      <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.git} type="button" variant="outline" onClick={() => setView('clone')}>
+      <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.git} type="button" variant="outline" onClick={() => openSubView('clone', 'browse')}>
         <GitBranchIcon aria-hidden />
         Clone repository…
       </Button>

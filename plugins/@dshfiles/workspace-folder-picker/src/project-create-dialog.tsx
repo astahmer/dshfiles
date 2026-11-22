@@ -7,7 +7,7 @@ import * as Schema from 'effect/Schema'
 import { useState } from 'react'
 import { projectFolderNameSchema, type ProjectLifecycleClient } from './project-lifecycle-api.js'
 import { initialProjectParent } from './project-defaults.js'
-import { defaultProjectColor, type ProjectColorChoice } from './project-tone.js'
+import { ProjectTone, type ProjectColorChoice } from './project-tone.js'
 import { ProjectTonePicker } from './project-tone-picker.js'
 import { WorkspaceFolderPickerSchema, type FormFieldErrors } from './schema.js'
 import { TextInput } from './text-input.js'
@@ -42,7 +42,7 @@ export const ProjectCreateDialog = (props: {
   const [chosenColor, setChosenColor] = useState<ProjectColorChoice | null>(null)
   const [remembered, setRemembered] = useState(false)
   const [errors, setErrors] = useState<FormFieldErrors>({})
-  const color = chosenColor ?? defaultProjectColor(form.name)
+  const color = chosenColor ?? ProjectTone.defaultColor(form.name)
   const create = useMutation({
     mutationFn: (input: CreateForm) => props.api.createProject(input),
     onSuccess: created => {

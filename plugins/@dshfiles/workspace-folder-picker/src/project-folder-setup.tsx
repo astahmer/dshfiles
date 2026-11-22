@@ -5,7 +5,7 @@ import { useContract } from '@dshfiles/dshx/client'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { FolderInspection, ProjectLifecycleClient } from './project-lifecycle-api.js'
-import { defaultProjectColor, projectFolderName, type ProjectColorChoice } from './project-tone.js'
+import { ProjectTone, type ProjectColorChoice } from './project-tone.js'
 import { ProjectTonePicker } from './project-tone-picker.js'
 import { RepositorySetup } from './repository-setup-contract.js'
 
@@ -27,8 +27,8 @@ export const ProjectFolderSetup = (props: {
   readonly onAdded: (path: string, choice: ProjectColorChoice) => void
   readonly onClose: () => void
 }): JSX.Element => {
-  const name = projectFolderName(props.path)
-  const [color, setColor] = useState<ProjectColorChoice>(() => defaultProjectColor(name))
+  const name = ProjectTone.projectFolderName(props.path)
+  const [color, setColor] = useState<ProjectColorChoice>(() => ProjectTone.defaultColor(name))
   const inspection = useQuery({
     queryKey: ['workspace-folder-picker', 'inspect', props.path],
     queryFn: () => props.api.inspect({ path: props.path }),

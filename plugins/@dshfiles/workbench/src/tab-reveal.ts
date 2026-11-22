@@ -71,19 +71,13 @@ export class TabReveal {
    * strip vibrating. A window resize still re-reveals the selected tab of every group.
    */
   static retain(api: DockviewApi): () => void {
-    let timer: ReturnType<typeof setTimeout> | undefined
     const revealAll = (): void => {
       for (const group of api.groups) TabReveal.reveal(group)
     }
-    const onResize = (): void => {
-      clearTimeout(timer)
-      timer = setTimeout(revealAll, REVEAL_SETTLE_MS)
-    }
-    window.addEventListener('resize', onResize)
+    window.addEventListener('resize', revealAll)
     const loaded = api.onDidLayoutFromJSON(revealAll)
     return () => {
-      window.removeEventListener('resize', onResize)
-      clearTimeout(timer)
+      window.removeEventListener('resize', revealAll)
       loaded.dispose()
       for (const group of api.groups) {
         const strip = group.element.querySelector(TABLIST_SELECTOR)

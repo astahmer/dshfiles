@@ -32,7 +32,7 @@ export const ProjectAddChooser = (props: {
   readonly onClose: () => void
   readonly gitHubAvailable: boolean
 }): JSX.Element => (
-  <Dialog open onOpenChange={(open: boolean) => (open ? undefined : props.onClose())}>
+  <Dialog open={props.open} onOpenChange={(open: boolean) => (open ? undefined : props.onClose())}>
     <DialogContent className="dshx-root dshx:max-w-md">
       <DialogHeader>
         <DialogTitle>Add a project</DialogTitle>

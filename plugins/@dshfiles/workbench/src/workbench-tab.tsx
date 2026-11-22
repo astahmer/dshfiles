@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { IDockviewPanelHeaderProps } from 'dockview-react'
 import { useState, useSyncExternalStore } from 'react'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
@@ -20,6 +21,13 @@ import { NewViewTabs } from './new-view.js'
 import { closeWorkbenchPanel, type WorkbenchPanelIdentity } from './panel-close.js'
 import { TabRows } from './tab-row-visibility.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+
+const projectChipStyle = (chip: { readonly color?: string } | undefined): CSSProperties | undefined => {
+  if (chip === undefined) return undefined
+  const style: CSSProperties = { backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)' }
+  if (chip.color !== undefined) style.color = chip.color
+  return style
+}
 
 /** The main seat's compact action drives the existing tab provider, never a second tab actor. */
 export const WorkbenchNewTabButton = (props: { readonly label: string }): JSX.Element | null => {
@@ -141,14 +149,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
                     ? 'dshx:bg-(--dsh-main-tab-chip) dshx:text-(--dsw-alias-label-secondary)'
                     : cn('dshx:font-medium', projectChip.className),
                 )}
-                style={
-                  projectChip === undefined
-                    ? undefined
-                    : {
-                        backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)',
-                        ...(projectChip.color === undefined ? {} : { color: projectChip.color }),
-                      }
-                }
+                style={projectChipStyle(projectChip)}
               >
                 {project}
               </span>

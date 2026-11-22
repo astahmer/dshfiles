@@ -15,7 +15,7 @@ import { FolderOpenIcon, FolderPlusIcon, GitBranchIcon } from '@dshfiles/plugin-
 import { ProjectFolderSetup } from '@dshfiles/workspace-folder-picker/project-folder-setup'
 import { ProjectCloneDialog } from '@dshfiles/workspace-folder-picker/project-clone-dialog'
 import { ProjectCreateDialog } from '@dshfiles/workspace-folder-picker/project-create-dialog'
-import { projectFolderName, upsertProjectColor, type ProjectColorChoice } from '@dshfiles/workspace-folder-picker/project-tone'
+import { ProjectTone, type ProjectColorChoice } from '@dshfiles/workspace-folder-picker/project-tone'
 import { workspaceFolderPickerSettings } from '@dshfiles/workspace-folder-picker/settings'
 import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
@@ -231,11 +231,12 @@ export const HeroWorkspacePicker = (
     props.onPick(workspaceId as Parameters<EmptyWorkspaceOwnerProps['onPick']>[0])
   }
 
-  /** The colour chosen in the create/clone dialog outlives it, and the new project is adopted straight away. */
-  const adoptCreated = (path: string, choice: ProjectColorChoice): void => {
-    void toneSettings.set('projectColors', upsertProjectColor(toneSettings.value?.projectColors ?? [], path, choice)).catch(() => undefined)
+  /** The colour chosen in the setup/create/clone dialog outlives it, and the project is adopted straight away. */
+  const adoptWithColor = (path: string, choice: ProjectColorChoice): void => {
+    void toneSettings.set('projectColors', ProjectTone.upsertColor(toneSettings.value?.projectColors ?? [], path, choice)).catch(() => undefined)
     setAddDialog(null)
-    void choose({ kind: 'directory', canonicalPath: path, title: projectFolderName(path) }).catch(() => props.onClose())
+    setInspecting(null)
+    void choose({ kind: 'directory', canonicalPath: path, title: ProjectTone.projectFolderName(path) }).catch(() => props.onClose())
   }
 
   const pickExistingFolder = (): void => {
@@ -252,10 +253,12 @@ export const HeroWorkspacePicker = (
 
   const addActions = (
     <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-      <Button className="dshx:shrink-0" onClick={pickExistingFolder} size="sm" type="button" variant="outline">
-        <FolderOpenIcon aria-hidden />
-        Add folder…
-      </Button>
+      {pickerCapabilities.data?.nativePicker === true ? (
+        <Button className="dshx:shrink-0" onClick={pickExistingFolder} size="sm" type="button" variant="outline">
+          <FolderOpenIcon aria-hidden />
+          Add folder…
+        </Button>
+      ) : null}
       <Button
         className="dshx:shrink-0"
         disabled={projectTools.data?.jj !== true}
@@ -284,25 +287,7 @@ export const HeroWorkspacePicker = (
   return (
     <>
       {bar}
-      {inspecting === null ? null : (
-        <ProjectFolderSetup
-          api={lifecycleApi}
-          path={inspecting}
-          onAdded={path => {
-            setInspecting(null)
-            void choose({
-              kind: 'directory',
-              canonicalPath: path,
-              title:
-                path
-                  .split(/[/\\]/u)
-                  .filter(part => part.length > 0)
-                  .at(-1) ?? path,
-            })
-          }}
-          onClose={() => setInspecting(null)}
-        />
-      )}
+      {inspecting === null ? null : <ProjectFolderSetup api={lifecycleApi} path={inspecting} onAdded={adoptWithColor} onClose={() => setInspecting(null)} />}
       {inspecting === null && addDialog === null ? (
         <ProjectFolderPicker
           projects={registered}
@@ -338,14 +323,14 @@ export const HeroWorkspacePicker = (
           gitHubAvailable={projectTools.data?.gh === true}
           home={projectTools.data?.home}
           onClose={() => setAddDialog(null)}
-          onCreated={adoptCreated}
+          onCreated={adoptWithColor}
           onRememberParent={parent => {
             void toneSettings.set('projectParent', parent.trim()).catch(() => undefined)
           }}
         />
       ) : null}
       {addDialog === 'clone' ? (
-        <ProjectCloneDialog api={lifecycleApi} home={projectTools.data?.home} onClose={() => setAddDialog(null)} onCloned={adoptCreated} />
+        <ProjectCloneDialog api={lifecycleApi} home={projectTools.data?.home} onClose={() => setAddDialog(null)} onCloned={adoptWithColor} />
       ) : null}
     </>
   )

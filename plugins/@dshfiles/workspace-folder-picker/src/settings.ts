@@ -1,11 +1,11 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import { PROJECT_TONE_COUNT } from './project-tone.js'
+import { ProjectTone } from './project-tone.js'
 
 const projectColorEntry = Schema.object({
   project: Schema.string().description('Absolute project folder.'),
   tone: Schema.natural()
-    .max(PROJECT_TONE_COUNT - 1)
+    .max(ProjectTone.count - 1)
     .default(0)
     .description('Palette index, used when no custom colour is set.'),
   color: Schema.string().default('').description('Custom #rrggbb colour; empty uses the palette index.'),

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { cloneJobsQuery } from './clone-jobs-notice.js'
 import { clonePhaseLabels, cloneStageLabels } from './clone-labels.js'
 import { localCloneUrlSchema, projectFolderNameSchema, type ProjectLifecycleClient } from './project-lifecycle-api.js'
-import { defaultProjectColor, type ProjectColorChoice } from './project-tone.js'
+import { ProjectTone, type ProjectColorChoice } from './project-tone.js'
 import { ProjectTonePicker } from './project-tone-picker.js'
 import { WorkspaceFolderPickerSchema, type FormFieldErrors } from './schema.js'
 import { TextInput } from './text-input.js'
@@ -39,7 +39,7 @@ export const ProjectCloneDialog = (props: {
 }): JSX.Element => {
   const [form, setForm] = useState<CloneForm>({ repositoryUrl: '', parentPath: props.home ?? '~/', name: '' })
   const [chosenColor, setChosenColor] = useState<ProjectColorChoice | null>(null)
-  const color = chosenColor ?? defaultProjectColor(form.name)
+  const color = chosenColor ?? ProjectTone.defaultColor(form.name)
   const [nameEdited, setNameEdited] = useState(false)
   const [errors, setErrors] = useState<FormFieldErrors>({})
   const [jobId, setJobId] = useState<string | null>(null)

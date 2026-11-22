@@ -21,6 +21,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowUpIcon, ChevronDownIcon, ChevronRightIcon, FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
@@ -446,23 +447,29 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                   >
                     <ArrowUpIcon aria-hidden className="dshx:size-4" />
                   </Button>
-                  {ProjectFolderPickerModel.visibleCrumbs(listing.crumbs).map((crumb, index, crumbs) => (
-                    <span className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-0.5" key={crumb.path}>
-                      {index > 0 && <ChevronRightIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground" />}
-                      <button
-                        aria-current={index === crumbs.length - 1 ? 'page' : undefined}
-                        className={cn(
-                          'dshx:max-w-40 dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-1 dshx:text-xs dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-                          index === crumbs.length - 1 ? 'dshx:font-medium dshx:text-foreground' : 'dshx:text-muted-foreground',
-                        )}
-                        onClick={() => browse(crumb.path)}
-                        title={crumb.path}
-                        type="button"
-                      >
-                        {crumb.name}
-                      </button>
-                    </span>
-                  ))}
+                  <TooltipProvider>
+                    {ProjectFolderPickerModel.visibleCrumbs(listing.crumbs).map((crumb, index, crumbs) => (
+                      <span className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-0.5" key={crumb.path}>
+                        {index > 0 && <ChevronRightIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground" />}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              aria-current={index === crumbs.length - 1 ? 'page' : undefined}
+                              className={cn(
+                                'dshx:max-w-40 dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-1 dshx:text-xs dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+                                index === crumbs.length - 1 ? 'dshx:font-medium dshx:text-foreground' : 'dshx:text-muted-foreground',
+                              )}
+                              onClick={() => browse(crumb.path)}
+                              type="button"
+                            >
+                              {crumb.name}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">{crumb.path}</TooltipContent>
+                        </Tooltip>
+                      </span>
+                    ))}
+                  </TooltipProvider>
                 </div>
               )}
               <div aria-busy={listingQuery.isFetching} aria-label="Folders" className={cn(listClassName, listing === null && 'dshx:pt-2')} role="listbox">
@@ -473,7 +480,6 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                       className={cn(optionClassName(index === selectedIndex), 'dshx:flex-1')}
                       onClick={() => setSelectedIndex(index)}
                       onDoubleClick={() => browse(entry.path)}
-                      onMouseEnter={() => setSelectedIndex(index)}
                       role="option"
                       type="button"
                     >

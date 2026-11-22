@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { ChevronDownIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import type { MainTabsTranslate } from './locales.js'
 import { ASIDE_DROP_ATTRIBUTE, asideDropColumn } from './aside-drop.js'
@@ -40,6 +40,13 @@ interface TabStripProps {
   readonly projectNames?: ReadonlyMap<string, string>
   /** Resolved project colour per thread workspace id: a palette class, or a custom `#rrggbb`. */
   readonly projectChips?: Readonly<Record<string, { readonly className?: string; readonly color?: string }>>
+}
+
+const projectChipStyle = (chip: { readonly color?: string } | undefined): CSSProperties | undefined => {
+  if (chip === undefined) return undefined
+  const style: CSSProperties = { backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)' }
+  if (chip.color !== undefined) style.color = chip.color
+  return style
 }
 
 /** One dot per thread tab, most urgent first: a question or approval waits, then work in progress, then an unseen finish. */
@@ -343,14 +350,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                                   ? 'dshx:bg-(--dsh-main-tab-chip) dshx:text-(--dsw-alias-label-secondary)'
                                   : cn('dshx:font-medium', projectChip.className),
                               )}
-                              style={
-                                projectChip === undefined
-                                  ? undefined
-                                  : {
-                                      backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)',
-                                      ...(projectChip.color === undefined ? {} : { color: projectChip.color }),
-                                    }
-                              }
+                              style={projectChipStyle(projectChip)}
                             >
                               {project}
                             </span>
