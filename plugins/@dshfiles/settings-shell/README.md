@@ -8,6 +8,10 @@
 
 ![Settings grouped by task, with deep links](docs/screenshots/settings-task-groups.png)
 
+![Settings sidebar distinguishing default DSH and plugin categories](docs/screenshots/settings-origin-distinction.png)
+
+![Global Dshfiles plugins quick-toggle page](docs/screenshots/dshfiles-plugins-page.png)
+
 ![Edit plugin settings as JSON](docs/screenshots/settings-json-editor.png)
 
 DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the native shell has no seat for.
@@ -29,6 +33,13 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
   owns (_Open MCP servers_); Settings links them instead of copying their UI. AI accounts appears once: its section,
   its plugin settings and the link to the accounts page share one entry. Every Jev setting (enable, key, thresholds) of
   every plugin sits under **Tools & MCP › Jev**; the plugin's own page says so and links there.
+- **Default DSH vs plugin categories**: every entry in the sidebar is classified by origin (`DSH default` vs `Plugin`),
+  marked with a `DSH` pill or plugin icon in the navigation rail and an origin badge in the section header. A segmented
+  **All / DSH / Plugins** filter at the top of the sidebar (and above the compact mobile picker) narrows the list by source.
+- **Dshfiles plugins page**: **Settings › Plugins › Dshfiles plugins** lists the profile's `@dshfiles/*` bundles grouped
+  by functional area with live search, source (`dshfiles` / `Community` / `All`) and status (`All` / `Enabled` / `Disabled`)
+  filters, quick enable/disable switches backed by `PluginManager.setBundleEnabled`, restart-required badges, and direct
+  **Settings** links to jump to each plugin's configuration page.
 - **Scope**: plugin pages say they apply to every project and thread. No setting stores a per-project or per-thread
   value today, so the page shows that as information instead of a scope control it could not honour. Project or
   thread scopes, VS Code's precedence rules, a JSON view of the YAML profile patch, migrating existing YAML or

@@ -145,7 +145,7 @@ const OriginFilterBar = (props: {
   return (
     <div
       aria-label={props.t('origin.filterLabel')}
-      className="dshx:grid dshx:grid-cols-3 dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:border-border/70 dshx:bg-muted/80 dshx:p-0.5"
+      className="dshx:flex dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:border-border/70 dshx:bg-muted/80 dshx:p-0.5"
       data-settings-origin-filter=""
       role="group"
     >
@@ -155,7 +155,7 @@ const OriginFilterBar = (props: {
           <button
             aria-pressed={active}
             className={cn(
-              'dshx:inline-flex dshx:h-6 dshx:min-w-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:gap-1 dshx:rounded-md dshx:border-none dshx:px-1.5 dshx:text-xs dshx:transition-colors dshx:duration-100',
+              'dshx:inline-flex dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:gap-1 dshx:rounded-md dshx:border-none dshx:px-2 dshx:text-xs dshx:whitespace-nowrap dshx:transition-colors dshx:duration-100',
               active
                 ? 'dshx:bg-background dshx:font-medium dshx:text-foreground dshx:shadow-s1'
                 : 'dshx:bg-transparent dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
@@ -165,7 +165,7 @@ const OriginFilterBar = (props: {
             onClick={() => props.onChange(option.id)}
             type="button"
           >
-            <span className="dshx:truncate">{option.label}</span>
+            <span>{option.label}</span>
             <span className={cn('dshx:text-2xs dshx:tabular-nums', active ? 'dshx:text-muted-foreground' : 'dshx:text-muted-foreground/75')}>
               {option.count}
             </span>
@@ -466,7 +466,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
       <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:bg-background">
         <div className="dshx:box-border dshx:flex dshx:h-[56px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:bg-background dshx:px-4 dshx:@max-pane-compact:gap-2 dshx:@max-pane-compact:px-3">
           <div
-            className="dshx:flex dshx:w-[228px] dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-base dshx:leading-6 dshx:font-semibold dshx:text-foreground dshx:@max-pane-compact:sr-only"
+            className="dshx:flex dshx:w-[240px] dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-base dshx:leading-6 dshx:font-semibold dshx:text-foreground dshx:@max-pane-compact:sr-only"
             id={props.titleId}
           >
             <SlidersHorizontalIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
@@ -549,7 +549,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           />
         </div>
         <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
-          <aside className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[248px] dshx:flex-none dshx:flex-col dshx:border-r dshx:border-border dshx:bg-[var(--dsw-specific-sidebar-fill)] dshx:@max-pane-compact:hidden">
+          <aside className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[260px] dshx:flex-none dshx:flex-col dshx:border-r dshx:border-border dshx:bg-[var(--dsw-specific-sidebar-fill)] dshx:@max-pane-compact:hidden">
             <div className="dshx:shrink-0 dshx:border-b dshx:border-border/70 dshx:px-3 dshx:py-2.5">
               <OriginFilterBar counts={counts} onChange={setOriginFilter} t={t} value={originFilter} />
             </div>
