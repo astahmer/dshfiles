@@ -19,6 +19,8 @@ import { ProjectCreateDialog } from './project-create-dialog.js'
 import { ProjectFolderSetup } from './project-folder-setup.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
 import { ProjectAddChooser } from './project-add-chooser.js'
+import { ProjectColorPanel } from './project-color-panel.js'
+import { ProjectSettingsPanels } from './project-settings-panels.js'
 import { upsertProjectColor, type ProjectColorChoice } from './project-tone.js'
 import { workspaceFolderPickerSettings } from './settings.js'
 import { ProjectSettingsSection } from './project-settings-section.js'
@@ -185,6 +187,8 @@ export default defineClient({
     const ports = createWorkspacePickerPorts(ctx.remote)
     // Users asked agents to create or add projects (productivity pass Q5, T5.5): ⌘K offers both directly.
     const plugin = metadata?.plugin
+    // Settings › Projects row for a colour chosen at import: the swatches and custom picker stay reachable afterwards.
+    if (plugin !== undefined) plugin.add(ProjectSettingsPanels, { id: 'project-color', order: -10, Panel: plugin.bind(ProjectColorPanel) })
     if (plugin !== undefined)
       for (const row of [
         { id: 'new-project', label: 'Create project…', view: 'create', aliases: ['New project', 'Add project', 'Initialize repository', 'New repository'] },
