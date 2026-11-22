@@ -10,8 +10,6 @@ afterEach(() => {
 describe('ProjectAddFlow', () => {
   it('hands a requested view to the next flow once, and falls back to browse', () => {
     expect(ProjectAddFlow.take()).toBe('browse')
-    ProjectAddFlow.request('choose')
-    expect(ProjectAddFlow.take()).toBe('choose')
     ProjectAddFlow.request('create')
     expect(ProjectAddFlow.take()).toBe('create')
     expect(ProjectAddFlow.take()).toBe('browse')

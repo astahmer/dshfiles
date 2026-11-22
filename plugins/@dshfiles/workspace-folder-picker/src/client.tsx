@@ -200,7 +200,6 @@ export default defineClient({
     if (plugin !== undefined) plugin.add(ProjectSettingsPanels, { id: 'project-color', order: -10, Panel: plugin.bind(ProjectColorPanel) })
     if (plugin !== undefined)
       for (const row of [
-        { id: 'add-project', label: 'Add a project…', view: 'choose', aliases: ['Add folder or create project', 'New or existing project'] },
         { id: 'new-project', label: 'Create project…', view: 'create', aliases: ['New project', 'Add project', 'Initialize repository', 'New repository'] },
         {
           id: 'add-folder',
