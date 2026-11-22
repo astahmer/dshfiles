@@ -139,7 +139,45 @@ const claudeUsageSchema = Schema.Struct({
   seven_day: claudeWindowSchema,
   seven_day_opus: claudeWindowSchema,
   seven_day_sonnet: claudeWindowSchema,
+  // Decoded entry by entry: one malformed limit must not cost the account the others.
+  limits: Schema.optional(Schema.NullOr(Schema.Array(Schema.Unknown))),
 })
+
+/**
+ * One entry of Claude's `limits` list. Model-scoped weekly caps (Fable) appear only here, as `weekly_scoped` with the
+ * model's display name; `percent` is percent used.
+ */
+const claudeLimitSchema = Schema.Struct({
+  kind: Schema.String,
+  percent: Schema.Number.check(Schema.isFinite()),
+  resets_at: Schema.optional(Schema.NullOr(Schema.String)),
+  scope: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        model: Schema.optional(Schema.NullOr(Schema.Struct({ display_name: Schema.optional(Schema.NullOr(Schema.String)) }))),
+      }),
+    ),
+  ),
+})
+
+const parseResetsAt = (value: string | null | undefined): number | null => {
+  const resetsAt = value === undefined || value === null ? Number.NaN : Date.parse(value)
+  return Number.isNaN(resetsAt) ? null : resetsAt
+}
+
+/** "Weekly Fable" for each model-scoped weekly cap the named windows do not already carry. */
+const scopedWeeklyWindows = (limits: readonly unknown[], known: ReadonlySet<string>): UsageWindow[] => {
+  const windows: UsageWindow[] = []
+  for (const entry of limits) {
+    const limit = AiAccountsSchema.decodeResult(claudeLimitSchema, entry)
+    if (limit._tag !== 'Success' || limit.success.kind !== 'weekly_scoped') continue
+    const model = limit.success.scope?.model?.display_name?.trim() ?? ''
+    const label = `Weekly ${model}`
+    if (model === '' || known.has(label) || windows.some(window => window.label === label)) continue
+    windows.push({ label, percentRemaining: ProviderUsageModel.remainingFromUsed(limit.success.percent), resetsAt: parseResetsAt(limit.success.resets_at) })
+  }
+  return windows
+}
 
 const CLAUDE_WINDOWS = [
   ['five_hour', 'Current session'],
@@ -213,9 +251,9 @@ export class ClaudeAccountModel {
     for (const [key, label] of CLAUDE_WINDOWS) {
       const window = parsed.success[key]
       if (window === undefined || window === null) continue
-      const resetsAt = window.resets_at === undefined || window.resets_at === null ? Number.NaN : Date.parse(window.resets_at)
-      windows.push({ label, percentRemaining: ProviderUsageModel.remainingFromUsed(window.utilization), resetsAt: Number.isNaN(resetsAt) ? null : resetsAt })
+      windows.push({ label, percentRemaining: ProviderUsageModel.remainingFromUsed(window.utilization), resetsAt: parseResetsAt(window.resets_at) })
     }
+    windows.push(...scopedWeeklyWindows(parsed.success.limits ?? [], new Set(windows.map(window => window.label))))
     const card: UsageCard = { status: 'ok', message: null, identity: null, plan: plan ?? null, windows, bankedResets: 0, bankedResetExpiries: [] }
     const block = parsed.success.extra_usage
     if (block === undefined || block === null) return card

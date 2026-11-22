@@ -83,6 +83,29 @@ describe('Claude usage', () => {
     ])
   })
 
+  it('adds a model-scoped weekly cap such as Fable from the limits list', () => {
+    const resets = '2026-11-26T03:00:00.807203+00:00'
+    const card = ClaudeAccountModel.parseClaudeUsage(
+      {
+        five_hour: null,
+        seven_day: { utilization: 34, resets_at: resets },
+        seven_day_sonnet: { utilization: 2, resets_at: null },
+        limits: [
+          { kind: 'weekly_all', group: 'weekly', percent: 34, resets_at: resets, scope: null },
+          { kind: 'weekly_scoped', group: 'weekly', percent: 23, resets_at: resets, scope: { model: { id: null, display_name: 'Fable' }, surface: null } },
+          { kind: 'weekly_scoped', percent: 50, scope: { model: { display_name: 'Sonnet' } } },
+          { kind: 'weekly_scoped', percent: 'broken' },
+        ],
+      },
+      'max',
+    )
+    expect(card.windows).toEqual([
+      { label: 'Weekly limit', percentRemaining: 66, resetsAt: Date.parse(resets) },
+      { label: 'Weekly Sonnet', percentRemaining: 98, resetsAt: null },
+      { label: 'Weekly Fable', percentRemaining: 77, resetsAt: Date.parse(resets) },
+    ])
+  })
+
   it('finds the login of a non-default config dir under its hashed keychain item', () => {
     expect(ClaudeAccountModel.resolveClaudeConfigDir('')).toBe(join(homedir(), '.claude'))
     expect(ClaudeAccountModel.claudeKeychainService(ClaudeAccountModel.resolveClaudeConfigDir('~/.claude'))).toBe('Claude Code-credentials')
