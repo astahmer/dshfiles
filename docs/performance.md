@@ -2204,3 +2204,56 @@ dominated by rendering the opened thread, so the saved listener time is below it
 ```sh
 pnpm --dir plugins/@dshfiles/thread-sidebar exec vitest run src/workbench-palette.test.ts src/sidebar-catalog.client.test.tsx
 ```
+
+## Zod compilation evaluation: attention storage (2026-11-23)
+
+[Upstream #111](https://github.com/astahmer/dshfiles/issues/111): **keep the current validators**. The live trace receiver
+was receiving, but read-only operation aggregates and the prior attention storage measurements above did not isolate
+validation as a cost. No live load, profiling, or configuration changes were made.
+
+The web seed at `main@origin` (`4c0774ed`) links the storage forks and Thread Sidebar. The workspace catalog and frozen
+install resolve Zod `4.6.6`; there's no separate Zod dependency in the seed manifest. `storage-domain`'s `z.object`
+configuration is Schemastery; record validation invokes the consuming schema's `.parse` on eager open or a lazy
+cache miss. Lazy hydration already avoids eager validation for opted-in per-record domains. The plugin schema search
+also found Schemastery settings and Effect-backed forms (e.g. [Prompt Stash's editor](../plugins/@dshfiles/prompt-stash/src/prompt-editor-form.tsx)):
+those aren't Zod candidates. Client [stored values](../plugins/@dshfiles/plugin-ui/src/hooks/stored-value.ts) already cache decoded reads.
+
+We measured the real [`thread_attention.sessions` schema](../plugins/@dshfiles/thread-sidebar/src/attention-store.ts)
+because the authoritative per-record unit validates the whole table on open. It uses
+[`zodSchemaFromEffect`](../tooling/dshx/packages/dshx/src/api/zod-view.ts): compilation wraps the synchronous callback,
+but doesn't generate code for the underlying Effect decoder. On this Zod pin `z.compile(schema, { strict: true })`
+returns a distinct schema for this adapter. Invalid input falls back to the original parser, so a rejecting callback
+can run twice. Declared async transforms throw in strict compilation and fall back to the original schema without
+`strict`; `parseAsync` isn't a compiled fast path. See the [compiler announcement](https://zod.dev/blog/introducing-z-compile).
+
+The [opt-in benchmark](ade-performance/bench-zod-attention.mjs) checks actual values and fresh output objects for
+1,024 synthetic records, including omitted optional fields and nulls. It checks complete issue arrays (including paths)
+and messages for 67 bad inputs, and compares the `invalid-record` detail and Zod cause from a corrupt JSON-backed unit.
+The disk benchmark times `DomainFacility.open` through the real per-record backend, including file reads, JSON decode,
+record validation and domain construction on success. Fixture creation, close and plugin startup are not timed. The
+OS file cache is warm; this is a local storage operation, not a Host boot or GUI measurement.
+
+| Operation | Standard median | Compiled median | Paired median change (p10–p90) |
+| --- | ---: | ---: | ---: |
+| Schema selection / one-time compile | 0.001 ms | 0.772 ms | +0.771 ms (+0.743 to +2.569) |
+| First valid parse | 1.522 ms | 1.293 ms | −0.126 ms (−0.493 to +0.329) |
+| Cold total, compile plus first parse | 1.523 ms | 2.065 ms | +0.637 ms (+0.232 to +4.463) |
+| Warm isolated parse, valid | 1.153 µs/row | 1.211 µs/row | −3.2% (−20.2% to +33.3%) |
+| Warm isolated parse, invalid | 21.871 µs/row | 23.547 µs/row | +8.5% (+4.3% to +15.0%) |
+| Warm isolated parse, 5.9% invalid | 2.244 µs/row | 2.309 µs/row | +2.9% (−1.7% to +18.4%) |
+| Warm JSON domain open, valid | 27.503 ms | 27.785 ms | +0.6% (−4.6% to +5.4%) |
+| Warm JSON domain open, one corrupt record | 31.725 ms | 34.453 ms | +4.9% (−9.3% to +27.3%) |
+
+Node 24.11.1, macOS arm64; 1-minute load averaged 18.14 on 10 logical cores at run start. Eight cold pairs use fresh
+Node processes and exclude imports. After warm-up, 16 parse pairs and 20 open pairs use seeded, balanced arm order;
+each parse pair shares the same shuffled inputs. Paired changes are computed per pair, not from the two arm medians.
+These noisy measurements don't rule out a small gain elsewhere, but show no repeatable end-to-end saving here.
+Revisit only when live aggregate evidence identifies a validation cost and the actual operation shows a meaningful gain
+with unchanged output, failure, and callback behavior.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm exec turbo run build --filter=@dshfiles/dshx
+node --experimental-transform-types docs/ade-performance/bench-zod-attention.mjs --check
+node --experimental-transform-types docs/ade-performance/bench-zod-attention.mjs
+```
