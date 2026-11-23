@@ -147,6 +147,8 @@ interface Session {
   prompting: boolean
   /** Number of tool-use steps already completed inside the running ACP prompt; `result.usage` sums every step. */
   promptSteps: number
+  /** The context size of the running prompt's latest LLM call, from `usage_update`; it outlives the DSH step that saw it. */
+  promptUsed: number | undefined
   readonly queued: AcpJson[]
   /** Transcript messages this process has seen, and the fingerprint of the last one. */
   synced: number
@@ -208,7 +210,7 @@ const fitReplayTranscript = (rendered: string, maxBytes: number): string => {
   if (buffer.length <= maxBytes) return rendered
   const markerBytes = Buffer.byteLength(replayOmissionMarker(buffer.length), 'utf8')
   const available = maxBytes - markerBytes
-  if (available <= 0) return ''
+  if (available <= 0) return replayOmissionMarker(buffer.length)
   const headBudget = Math.floor(available * REPLAY_HEAD_SHARE)
   const tailBudget = available - headBudget
   const head = sliceUtf8Head(buffer, headBudget)
@@ -337,7 +339,7 @@ export class AntigravityAcpSessions {
       pending.length === 0
         ? [{ type: 'text', text: 'Continue from where the conversation stopped.' }]
         : pending.flatMap(message => promptBlocks(message.content))
-    const pendingBytes = pendingBlocks.reduce((sum, block) => sum + ('text' in block ? Buffer.byteLength(block.text, 'utf8') : 0), 0)
+    const pendingBytes = pendingBlocks.reduce((sum, block) => sum + Buffer.byteLength('text' in block ? block.text : block.data, 'utf8'), 0)
     const openingPrefix = 'The conversation so far, which you are continuing:\n'
     const openingBudget = MAX_PROMPT_BYTES - pendingBytes - Buffer.byteLength(openingPrefix, 'utf8')
     const replay = earlier.length === 0 ? '' : fitReplayTranscript(CliBridge.renderTranscript(earlier), openingBudget)
@@ -389,6 +391,7 @@ export class AntigravityAcpSessions {
     }
     session.prompting = true
     session.promptSteps = 0
+    session.promptUsed = undefined
     void this.runPrompt(session, blocks)
   }
 
@@ -640,6 +643,7 @@ export class AntigravityAcpSessions {
       ready,
       prompting: false,
       promptSteps: 0,
+      promptUsed: undefined,
       queued: [],
       synced: 0,
       lastFingerprint: '',
@@ -738,16 +742,8 @@ export class AntigravityAcpSessions {
     let started = false
     let finished = false
     let toolCalls = 0
-    let stepUsed: number | undefined
     const applyStepUsage = (used: number): void => {
-      output.usage = {
-        ...output.usage,
-        input: used,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: used,
-      }
+      output.usage = { ...output.usage, input: used, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: used }
     }
     const finish = (): void => {
       finished = true
@@ -826,7 +822,7 @@ export class AntigravityAcpSessions {
           return
         }
         case 'usage':
-          stepUsed = event.used
+          session.promptUsed = event.used
           return
         case 'toolCall': {
           begin()
@@ -840,15 +836,15 @@ export class AntigravityAcpSessions {
         }
         case 'toolsHeld':
           if (toolCalls > 0) {
-            if (stepUsed !== undefined) applyStepUsage(stepUsed)
+            if (session.promptUsed !== undefined) applyStepUsage(session.promptUsed)
             session.promptSteps += 1
             done('toolUse')
           }
           return
         case 'turnEnded': {
           begin()
-          if (session.promptSteps > 0 && stepUsed !== undefined) {
-            applyStepUsage(stepUsed)
+          if (session.promptSteps > 0 && session.promptUsed !== undefined) {
+            applyStepUsage(session.promptUsed)
           } else {
             const usage = event.result.usage
             const inputTokens = usage?.inputTokens ?? 0
