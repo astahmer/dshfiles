@@ -28,9 +28,23 @@ test('real web reconciler seeds no accounts and preserves existing user choices 
     assert.equal(dirname(home), tmpdir())
     rmSync(home, { recursive: true, force: true })
   })
+  // Offline pnpm stand-in: it creates only the `link:` entries that profile sync verifies after an install, so the test
+  // never downloads the seed's registry dependencies.
   const bin = join(home, 'bin')
   mkdirSync(bin)
-  writeFileSync(join(bin, 'pnpm'), '#!/bin/sh\nexit 0\n', { mode: 0o700 })
+  const linkOnlyPnpm = `#!${process.execPath}
+const { lstatSync, mkdirSync, readFileSync, symlinkSync } = require('node:fs')
+const { dirname, join, resolve } = require('node:path')
+const { dependencies = {} } = JSON.parse(readFileSync('package.json', 'utf8'))
+for (const [name, spec] of Object.entries(dependencies)) {
+  if (!spec.startsWith('link:')) continue
+  const destination = join('node_modules', name)
+  if (lstatSync(destination, { throwIfNoEntry: false }) !== undefined) continue
+  mkdirSync(dirname(destination), { recursive: true })
+  symlinkSync(resolve(spec.slice('link:'.length)), destination, 'junction')
+}
+`
+  writeFileSync(join(bin, 'pnpm'), linkOnlyPnpm, { mode: 0o700 })
   const env = { ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` }
   const dsh = join(home, 'dsh')
   const run = () =>
