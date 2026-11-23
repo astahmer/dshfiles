@@ -95,7 +95,10 @@ const usageCommandOutputSchema = Schema.Struct({
 })
 
 const MAX_USAGE_WINDOWS = 6
-const USAGE_PROBE_TIMEOUT_MS = 15_000
+/** Below the usage panel's 8 s per-account budget; `agy -p /usage` answers in about 2 s. */
+const USAGE_PROBE_TIMEOUT_MS = 5_000
+/** Every surface polls usage, and each `agy` run writes a log under the account's `~/.gemini`, so one reading serves a minute. */
+const QUOTA_TTL_MS = 60_000
 
 const windowOrder = (window: string | undefined): number => {
   if (window === '5h') return 0
@@ -136,6 +139,25 @@ const probeFailure = (error: unknown, home: string): string => {
 }
 
 const describeCache = new Map<string, { readonly expiresAt: number; readonly description: Promise<AntigravityAccountDescription> }>()
+const quotaCache = new Map<string, { readonly expiresAt: number; readonly reading: Promise<AntigravityQuotaReading> }>()
+
+const cancelledReading: AntigravityQuotaReading = { status: 'error', detail: 'Antigravity usage read was cancelled.' }
+
+/** One caller giving up must not cancel a reading other callers share. */
+const untilAborted = async (reading: Promise<AntigravityQuotaReading>, signal: AbortSignal | undefined): Promise<AntigravityQuotaReading> => {
+  if (signal === undefined) return reading
+  if (signal.aborted) return cancelledReading
+  let onAbort: () => void = () => undefined
+  const aborted = new Promise<AntigravityQuotaReading>(resolve => {
+    onAbort = () => resolve(cancelledReading)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+  try {
+    return await Promise.race([reading, aborted])
+  } finally {
+    signal.removeEventListener('abort', onAbort)
+  }
+}
 
 export class AntigravityAccountModel {
   /** The values one select option offers, such as every model id or every thought level. */
@@ -203,17 +225,16 @@ export class AntigravityAccountModel {
     readonly readQuota?: (() => Promise<AntigravityQuotaReading>) | undefined
     readonly onAuthenticated?: (() => void) | undefined
   }): Promise<UsageCard> => {
-    const description = await input.describe()
+    const [description, quota] = await Promise.all([input.describe(), input.readQuota?.()])
     if (!description.signedIn) return ProviderUsageModel.emptyUsage('unauthenticated', description.detail)
+    if (quota?.status === 'unauthenticated') return ProviderUsageModel.emptyUsage('unauthenticated', quota.detail)
     input.onAuthenticated?.()
-    if (input.readQuota === undefined) {
+    if (quota === undefined) {
       return {
         ...ProviderUsageModel.emptyUsage('unsupported', 'Antigravity shows its five-hour and weekly limits only inside the CLI: run `agy` and type /usage.'),
         plan: description.plan ?? null,
       }
     }
-    const quota = await input.readQuota()
-    if (quota.status === 'unauthenticated') return ProviderUsageModel.emptyUsage('unauthenticated', quota.detail)
     if (quota.status === 'error') return { ...ProviderUsageModel.emptyUsage('error', quota.detail), plan: description.plan ?? null }
     return {
       status: 'ok',
@@ -284,11 +305,9 @@ export class AntigravityAccountModel {
   static probeUsage = (input: {
     readonly home: string
     readonly processes: AntigravityProcessesPromise
-    readonly executable?: string
-    readonly signal?: AbortSignal | undefined
+    readonly executable?: string | undefined
   }): Promise<AntigravityQuotaReading> =>
     withSpan('antigravity usage', { kind: 'client', attributes: { 'process.executable.name': ANTIGRAVITY_EXECUTABLE } }, async span => {
-      if (input.signal?.aborted) return { status: 'error', detail: 'Antigravity usage read was cancelled.' }
       const directory = mkdtempSync(join(tmpdir(), 'dsh-agy-usage-'))
       const lines: string[] = []
       let stderr = ''
@@ -350,10 +369,6 @@ export class AntigravityAccountModel {
       const cancelTimeout = input.processes.after(USAGE_PROBE_TIMEOUT_MS, () => {
         finish({ status: 'error', detail: `Antigravity CLI did not answer /usage within ${String(USAGE_PROBE_TIMEOUT_MS / 1000)} s.` })
       })
-      const onAbort = (): void => {
-        finish({ status: 'error', detail: 'Antigravity usage read was cancelled.' })
-      }
-      input.signal?.addEventListener('abort', onAbort, { once: true })
       try {
         const result = await done
         span.setAttribute('antigravity.usage.status', result.status)
@@ -361,7 +376,6 @@ export class AntigravityAccountModel {
         return result
       } finally {
         cancelTimeout()
-        input.signal?.removeEventListener('abort', onAbort)
         await running.stop()
         await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(() => undefined)
       }
@@ -378,9 +392,37 @@ export class AntigravityAccountModel {
       describeCache.set(input.home, { expiresAt: input.now + FAILURE_TTL_MS, description: input.description })
   }
 
-  /** Forget a cached description, after a sign-in or sign-out. */
+  /**
+   * The account's live quota, shared by every caller for a minute per home. A failed reading is not kept, and a signed-out
+   * one also drops the cached description so the account stops reporting itself signed in.
+   */
+  static readQuota = (input: {
+    readonly home: string
+    readonly processes: AntigravityProcessesPromise
+    readonly executable?: string
+    readonly signal?: AbortSignal | undefined
+    readonly now?: number
+  }): Promise<AntigravityQuotaReading> => {
+    const now = input.now ?? Date.now()
+    const cached = quotaCache.get(input.home)
+    if (cached !== undefined && cached.expiresAt > now) return untilAborted(cached.reading, input.signal)
+    const reading = AntigravityAccountModel.probeUsage({ home: input.home, processes: input.processes, executable: input.executable })
+    quotaCache.set(input.home, { expiresAt: now + QUOTA_TTL_MS, reading })
+    void AntigravityAccountModel.dropFailedQuota({ home: input.home, reading })
+    return untilAborted(reading, input.signal)
+  }
+
+  private static dropFailedQuota = async (input: { readonly home: string; readonly reading: Promise<AntigravityQuotaReading> }): Promise<void> => {
+    const result = await input.reading
+    if (result.status === 'ok' || quotaCache.get(input.home)?.reading !== input.reading) return
+    if (result.status === 'unauthenticated') AntigravityAccountModel.forget(input.home)
+    else quotaCache.delete(input.home)
+  }
+
+  /** Forget a cached description and quota, after a sign-in or sign-out. */
   static forget = (home: string): void => {
     describeCache.delete(home)
+    quotaCache.delete(home)
   }
 
   /**
