@@ -9,146 +9,20 @@ import { LockIcon, PuzzleIcon, RefreshCwIcon, SearchIcon, SlidersHorizontalIcon,
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, PluginQueryProvider, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useMemo, useState } from 'react'
+import { BUNDLE_CATEGORIES, bundleCategoryOf, type BundleCategoryId } from './bundle-categories.js'
 import type { ShellTranslate } from './native/locales.js'
-import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
-import { settingsShellApi, type PluginBundle, type PluginBundleChange, type PluginBundleOrigin } from './shell-api.js'
+import type { PluginBundleOrigin } from './origin.js'
+import { PLUGINS_QUERY_KEY } from './plugin-entry-card.js'
+import { SegmentedFilter } from './segmented-filter.js'
+import { DSHFILES_PLUGINS_SECTION_ID, SettingsGroups, type GroupedEntries } from './settings-groups.js'
+import { settingsShellApi, type PluginBundle, type PluginBundleChange } from './shell-api.js'
 
-export const BUNDLES_QUERY_KEY = ['settings-shell', 'bundles'] as const
-const PLUGINS_QUERY_KEY = ['settings-shell', 'plugins'] as const
+const BUNDLES_QUERY_KEY = ['settings-shell', 'bundles'] as const
 
-export type BundleScopeFilter = 'dshfiles' | 'community' | 'all'
-export type BundleStatusFilter = 'all' | 'enabled' | 'disabled'
+type BundleScopeFilter = 'dshfiles' | 'community' | 'all'
+type BundleStatusFilter = 'all' | 'enabled' | 'disabled'
 
-export type BundleCategoryId = 'workspace' | 'models' | 'agents' | 'tools' | 'projects' | 'hosts' | 'security' | 'diagnostics' | 'core'
-
-const BUNDLE_CATEGORIES = [
-  { id: 'workspace', labelKey: 'pluginsPage.cat.workspace' },
-  { id: 'models', labelKey: 'pluginsPage.cat.models' },
-  { id: 'agents', labelKey: 'pluginsPage.cat.agents' },
-  { id: 'tools', labelKey: 'pluginsPage.cat.tools' },
-  { id: 'projects', labelKey: 'pluginsPage.cat.projects' },
-  { id: 'hosts', labelKey: 'pluginsPage.cat.hosts' },
-  { id: 'security', labelKey: 'pluginsPage.cat.security' },
-  { id: 'diagnostics', labelKey: 'pluginsPage.cat.diagnostics' },
-  { id: 'core', labelKey: 'pluginsPage.cat.core' },
-] as const satisfies ReadonlyArray<{ readonly id: BundleCategoryId; readonly labelKey: Parameters<ShellTranslate>[0] }>
-
-const DSHFILES_CATEGORY = new Map<string, BundleCategoryId>([
-  ['ui-styles', 'workspace'],
-  ['frame-layout', 'workspace'],
-  ['main-tabs', 'workspace'],
-  ['workbench', 'workspace'],
-  ['thread-sidebar', 'workspace'],
-  ['sidebar-right', 'workspace'],
-  ['sidebar-terminal', 'workspace'],
-  ['command-palette', 'workspace'],
-  ['rich-composer', 'workspace'],
-  ['chat', 'workspace'],
-  ['queue-reorder', 'workspace'],
-  ['turn-summary', 'workspace'],
-  ['tool-meta', 'workspace'],
-  ['annotations', 'workspace'],
-  ['editor', 'workspace'],
-  ['shortcuts', 'workspace'],
-  ['settings-shell', 'workspace'],
-  ['dialogs', 'workspace'],
-  ['onboarding', 'workspace'],
-  ['pwa', 'workspace'],
-  ['attachment-gallery', 'workspace'],
-  ['html-render', 'workspace'],
-  ['mermaid-diagrams', 'workspace'],
-  ['cordis-cards', 'workspace'],
-  ['whiteboard', 'workspace'],
-  ['component-gallery', 'workspace'],
-  ['ai-accounts', 'models'],
-  ['model-selection', 'models'],
-  ['model-effort-picker', 'models'],
-  ['settings-models', 'models'],
-  ['usage', 'models'],
-  ['agent-loop', 'agents'],
-  ['agent-preset', 'agents'],
-  ['agent-plan', 'agents'],
-  ['agent-communication', 'agents'],
-  ['agent-questions', 'agents'],
-  ['agent-toolkit', 'agents'],
-  ['agents', 'agents'],
-  ['agentsview', 'agents'],
-  ['context-compaction', 'agents'],
-  ['goal-stall-guard', 'agents'],
-  ['goal-tool', 'agents'],
-  ['memory', 'agents'],
-  ['worktree-memory', 'agents'],
-  ['tool-subagent', 'agents'],
-  ['settings-subagent', 'agents'],
-  ['btw', 'agents'],
-  ['prompt-stash', 'agents'],
-  ['schedule', 'agents'],
-  ['mcp-servers', 'tools'],
-  ['mcp-endpoint', 'tools'],
-  ['web-search-brave', 'tools'],
-  ['settings-web-search', 'tools'],
-  ['web-fetch-readable', 'tools'],
-  ['apply-patch', 'tools'],
-  ['fff-search', 'tools'],
-  ['tool-search', 'tools'],
-  ['tool-ask-user', 'tools'],
-  ['user-questions', 'tools'],
-  ['input-trigger', 'tools'],
-  ['mentions', 'tools'],
-  ['references', 'tools'],
-  ['tweet-context', 'tools'],
-  ['deliverables', 'tools'],
-  ['capabilities-hub', 'tools'],
-  ['plugin-guide', 'tools'],
-  ['backlog', 'projects'],
-  ['backlog-notion', 'projects'],
-  ['backlog-jira', 'projects'],
-  ['jj-integration', 'projects'],
-  ['jujutsu', 'projects'],
-  ['git-worktrees', 'projects'],
-  ['workspace-folder-picker', 'projects'],
-  ['workspace-nav', 'projects'],
-  ['diff-viewed', 'projects'],
-  ['diffs-review', 'projects'],
-  ['project-checks', 'projects'],
-  ['project-automations', 'projects'],
-  ['test-runs', 'projects'],
-  ['preview', 'projects'],
-  ['session-undo', 'projects'],
-  ['thread-transfer', 'projects'],
-  ['multi-host', 'hosts'],
-  ['phone-access', 'hosts'],
-  ['phone-pairing', 'hosts'],
-  ['loopback-access', 'hosts'],
-  ['secret-catalog', 'security'],
-  ['policies', 'security'],
-  ['agent-telemetry', 'diagnostics'],
-  ['traces', 'diagnostics'],
-  ['activity-timeline', 'diagnostics'],
-  ['background-jobs', 'diagnostics'],
-  ['hmr-gate', 'diagnostics'],
-  ['request-messages', 'diagnostics'],
-  ['session-search', 'diagnostics'],
-  ['shared-runtime', 'core'],
-  ['shared-streams', 'core'],
-  ['session-controller', 'core'],
-  ['session-persistence-jsonl', 'core'],
-  ['storage-domain', 'core'],
-  ['storage-json', 'core'],
-  ['subprocess-local', 'core'],
-  ['cordis-client-runner', 'core'],
-])
-
-export const bundleCategoryOf = (bundle: Pick<PluginBundle, 'name' | 'origin'>): BundleCategoryId => {
-  if (bundle.origin === 'dshfiles') {
-    const short = bundle.name.slice('@dshfiles/'.length)
-    return DSHFILES_CATEGORY.get(short) ?? 'tools'
-  }
-  if (bundle.origin === 'dsh') return 'core'
-  return 'tools'
-}
-
-export const resolveBundleText = (value: PluginBundle['title'], resolveLocaleText: (text: NonNullable<PluginBundle['title']>) => string): string =>
+const resolveBundleText = (value: PluginBundle['title'], resolveLocaleText: (text: NonNullable<PluginBundle['title']>) => string): string =>
   value === null ? '' : resolveLocaleText(value)
 
 export const bundleDisplayTitle = (
@@ -169,7 +43,7 @@ export const settingsEntryIdForBundle = (groups: readonly GroupedEntries[], bund
   const rowSet = new Set(bundle.rowIds)
   for (const group of groups) {
     for (const entry of group.entries) {
-      if (entry.id === 'dshfiles-plugins') continue
+      if (entry.id === DSHFILES_PLUGINS_SECTION_ID) continue
       if (entry.bundleName === bundle.name) return entry.id
       if (entry.sectionId !== undefined && rowSet.has(entry.sectionId)) return entry.id
       if (entry.pages.some(page => rowSet.has(page.ns)) || entry.hiddenPages.some(page => rowSet.has(page.ns))) return entry.id
@@ -238,6 +112,11 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
       return `${title} ${bundle.name.toLowerCase()} ${description}`.includes(needle)
     })
   }, [scopedBundles, status, query, props.resolveLocaleText])
+
+  const settingsIds = useMemo(
+    () => new Map(props.bundles.map(bundle => [bundle.name, settingsEntryIdForBundle(props.groups, bundle)])),
+    [props.bundles, props.groups],
+  )
 
   const grouped = useMemo(() => {
     const buckets = new Map<BundleCategoryId, PluginBundle[]>()
@@ -331,72 +210,29 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
           )}
         </InputGroup>
 
-        <div
-          aria-label={t('pluginsPage.scopeLabel')}
-          className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:border-border/70 dshx:bg-muted/80 dshx:p-0.5"
-          role="group"
-        >
-          {(
-            [
-              { id: 'dshfiles', label: t('pluginsPage.scopeDshfiles'), count: scopeCounts.dshfiles },
-              ...(scopeCounts.community > 0 ? [{ id: 'community' as const, label: t('pluginsPage.scopeCommunity'), count: scopeCounts.community }] : []),
-              { id: 'all', label: t('pluginsPage.scopeAll'), count: scopeCounts.all },
-            ] as const
-          ).map(option => {
-            const active = effectiveScope === option.id
-            return (
-              <button
-                aria-pressed={active}
-                className={cn(
-                  'dshx:inline-flex dshx:h-6 dshx:cursor-pointer dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border-none dshx:px-2 dshx:text-xs dshx:transition-colors dshx:duration-100',
-                  active
-                    ? 'dshx:bg-background dshx:font-medium dshx:text-foreground dshx:shadow-s1'
-                    : 'dshx:bg-transparent dshx:text-muted-foreground dshx:hover:text-foreground',
-                )}
-                data-plugins-scope={option.id}
-                key={option.id}
-                onClick={() => setScope(option.id)}
-                type="button"
-              >
-                <span>{option.label}</span>
-                <span className="dshx:text-2xs dshx:text-muted-foreground/80 dshx:tabular-nums">{option.count}</span>
-              </button>
-            )
-          })}
-        </div>
+        <SegmentedFilter<BundleScopeFilter>
+          label={t('pluginsPage.scopeLabel')}
+          onChange={setScope}
+          optionAttribute="data-plugins-scope"
+          options={[
+            { id: 'dshfiles', label: t('pluginsPage.scopeDshfiles'), count: scopeCounts.dshfiles },
+            ...(scopeCounts.community > 0 ? [{ id: 'community' as const, label: t('pluginsPage.scopeCommunity'), count: scopeCounts.community }] : []),
+            { id: 'all', label: t('pluginsPage.scopeAll'), count: scopeCounts.all },
+          ]}
+          value={effectiveScope}
+        />
 
-        <div
-          aria-label={t('pluginsPage.statusLabel')}
-          className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:border-border/70 dshx:bg-muted/80 dshx:p-0.5"
-          role="group"
-        >
-          {(
-            [
-              { id: 'all', label: t('pluginsPage.statusAll') },
-              { id: 'enabled', label: t('pluginsPage.statusEnabled') },
-              { id: 'disabled', label: t('pluginsPage.statusDisabled') },
-            ] as const
-          ).map(option => {
-            const active = status === option.id
-            return (
-              <button
-                aria-pressed={active}
-                className={cn(
-                  'dshx:inline-flex dshx:h-6 dshx:cursor-pointer dshx:items-center dshx:rounded-md dshx:border-none dshx:px-2 dshx:text-xs dshx:transition-colors dshx:duration-100',
-                  active
-                    ? 'dshx:bg-background dshx:font-medium dshx:text-foreground dshx:shadow-s1'
-                    : 'dshx:bg-transparent dshx:text-muted-foreground dshx:hover:text-foreground',
-                )}
-                data-plugins-status={option.id}
-                key={option.id}
-                onClick={() => setStatus(option.id)}
-                type="button"
-              >
-                {option.label}
-              </button>
-            )
-          })}
-        </div>
+        <SegmentedFilter<BundleStatusFilter>
+          label={t('pluginsPage.statusLabel')}
+          onChange={setStatus}
+          optionAttribute="data-plugins-status"
+          options={[
+            { id: 'all', label: t('pluginsPage.statusAll') },
+            { id: 'enabled', label: t('pluginsPage.statusEnabled') },
+            { id: 'disabled', label: t('pluginsPage.statusDisabled') },
+          ]}
+          value={status}
+        />
       </div>
 
       {props.error !== undefined && (
@@ -437,7 +273,7 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
               {section.items.map(bundle => {
                 const title = bundleDisplayTitle(bundle, props.resolveLocaleText)
                 const description = bundleDisplayDescription(bundle, props.resolveLocaleText)
-                const settingsId = settingsEntryIdForBundle(props.groups, bundle)
+                const settingsId = settingsIds.get(bundle.name)
                 const toggling = pendingNames.has(bundle.name)
                 const message = rowMessages.get(bundle.name)
                 const dotTone = bundle.pendingRestart !== null ? 'warning' : bundle.enabled ? 'success' : 'muted'
@@ -463,6 +299,7 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
                               <span className="dshx:text-2xs dshx:text-muted-foreground/75 dshx:tabular-nums">v{bundle.version}</span>
                             )}
                             {bundle.origin === 'dsh' && <Badge variant="secondary">{t('origin.dsh')}</Badge>}
+                            {!bundle.installed && <Badge variant="danger">{t('pluginsPage.notInstalled')}</Badge>}
                             {bundle.readOnlyReason !== null && (
                               <Badge variant="muted">
                                 <LockIcon aria-hidden="true" />
@@ -496,7 +333,7 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
                       </div>
                     </div>
                     {message !== undefined && (
-                      <p className="dshx:m-0 dshx:pl-4 dshx:text-xs dshx:text-destructive" role="status">
+                      <p className="dshx:m-0 dshx:pl-4 dshx:text-xs dshx:text-destructive" role="alert">
                         {message}
                       </p>
                     )}
@@ -511,12 +348,14 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
   )
 }
 
-const ConnectedDshfilesPluginsPage = (props: {
+interface DshfilesPluginsPageProps {
   readonly groups: readonly GroupedEntries[]
   readonly resolveLocaleText: (text: NonNullable<PluginBundle['title']>) => string
   readonly t: ShellTranslate
   readonly onOpenSettings: (entryId: string) => void
-}): JSX.Element => {
+}
+
+const ConnectedDshfilesPluginsPage = (props: DshfilesPluginsPageProps): JSX.Element => {
   const api = useApi(settingsShellApi)
   const queryClient = useQueryClient()
   const bundlesQuery = useQuery({
@@ -548,12 +387,7 @@ const ConnectedDshfilesPluginsPage = (props: {
   )
 }
 
-export const DshfilesPluginsPage = (props: {
-  readonly groups: readonly GroupedEntries[]
-  readonly resolveLocaleText: (text: NonNullable<PluginBundle['title']>) => string
-  readonly t: ShellTranslate
-  readonly onOpenSettings: (entryId: string) => void
-}): JSX.Element => (
+export const DshfilesPluginsPage = (props: DshfilesPluginsPageProps): JSX.Element => (
   <PluginQueryProvider>
     <ConnectedDshfilesPluginsPage {...props} />
   </PluginQueryProvider>

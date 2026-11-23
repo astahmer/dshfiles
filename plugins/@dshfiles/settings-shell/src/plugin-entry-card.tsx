@@ -8,7 +8,7 @@ import { useId } from 'react'
 import type { ShellTranslate } from './native/locales.js'
 import { rowIdOf, settingsShellApi, type PluginChange, type PluginEntry } from './shell-api.js'
 
-const PLUGINS_QUERY_KEY = ['settings-shell', 'plugins'] as const
+export const PLUGINS_QUERY_KEY = ['settings-shell', 'plugins'] as const
 
 /** What a change's verdict asks of the person, when the switch and the entry's state do not say it already. */
 const verdictText = (change: PluginChange, t: ShellTranslate): string | undefined => {

@@ -35,11 +35,14 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
   every plugin sits under **Tools & MCP › Jev**; the plugin's own page says so and links there.
 - **Default DSH vs plugin categories**: every entry in the sidebar is classified by origin (`DSH default` vs `Plugin`),
   marked with a `DSH` pill or plugin icon in the navigation rail and an origin badge in the section header. A segmented
-  **All / DSH / Plugins** filter at the top of the sidebar (and above the compact mobile picker) narrows the list by source.
+  **All / DSH / Plugins** filter at the top of the sidebar (and above the compact mobile picker) narrows the list and the
+  search results by source. A stock DSH category stays DSH when a dshfiles fork serves it (Agent loop). Opening an entry
+  of the other source from elsewhere shows every entry again.
 - **Dshfiles plugins page**: **Settings › Plugins › Dshfiles plugins** lists the profile's `@dshfiles/*` bundles grouped
   by functional area with live search, source (`dshfiles` / `Community` / `All`) and status (`All` / `Enabled` / `Disabled`)
-  filters, quick enable/disable switches backed by `PluginManager.setBundleEnabled`, restart-required badges, and direct
-  **Settings** links to jump to each plugin's configuration page.
+  filters, quick enable/disable switches backed by `PluginManager.setBundleEnabled`, restart-required and Not installed
+  badges, and direct **Settings** links to jump to each plugin's configuration page. The functional area comes from
+  `src/bundle-categories.ts`; its test fails when a new `plugins/@dshfiles/*` bundle is not placed there.
 - **Scope**: plugin pages say they apply to every project and thread. No setting stores a per-project or per-thread
   value today, so the page shows that as information instead of a scope control it could not honour. Project or
   thread scopes, VS Code's precedence rules, a JSON view of the YAML profile patch, migrating existing YAML or

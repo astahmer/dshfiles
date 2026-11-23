@@ -2,6 +2,7 @@ import { defineApi, method } from '@dshfiles/dshx/api'
 import { settingsSearchEntryFields } from '@dshfiles/dshx/settings'
 import * as Schema from 'effect/Schema'
 import { bundleLabelSchema, displayTextSchema } from './bundle-labels.js'
+import { pluginBundleOriginSchema } from './origin.js'
 import { dshReleaseStatusSchema } from './release-status.js'
 
 /** One namespace's field patch: JSON values only, validated by the Host against that namespace's schema. */
@@ -49,13 +50,9 @@ const pluginChangeSchema = Schema.Struct({
 })
 export type PluginChange = typeof pluginChangeSchema.Type
 
-const pluginBundleOriginSchema = Schema.Literals(['dshfiles', 'dsh', 'community'])
-export type PluginBundleOrigin = typeof pluginBundleOriginSchema.Type
-
 const pluginBundleSchema = Schema.Struct({
   name: Schema.String,
   origin: pluginBundleOriginSchema,
-  official: Schema.Boolean,
   title: Schema.NullOr(displayTextSchema),
   description: Schema.NullOr(displayTextSchema),
   packageDescription: Schema.NullOr(Schema.String),

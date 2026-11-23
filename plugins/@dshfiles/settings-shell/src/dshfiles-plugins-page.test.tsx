@@ -1,7 +1,8 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { bundleCategoryOf, bundleDisplayTitle, DshfilesPluginsView, settingsEntryIdForBundle } from './dshfiles-plugins-page.js'
+import { bundleCategoryOf } from './bundle-categories.js'
+import { bundleDisplayTitle, DshfilesPluginsView, settingsEntryIdForBundle } from './dshfiles-plugins-page.js'
 import type { ShellTranslate } from './native/locales.js'
 import { SettingsGroups } from './settings-groups.js'
 import type { PluginBundle, PluginBundleChange } from './shell-api.js'
@@ -12,7 +13,6 @@ const sampleBundles: readonly PluginBundle[] = [
   {
     name: '@dshfiles/main-tabs',
     origin: 'dshfiles',
-    official: false,
     title: { en: 'Main tabs' },
     description: null,
     packageDescription: 'Browser-like tabs above the main view.',
@@ -28,7 +28,6 @@ const sampleBundles: readonly PluginBundle[] = [
   {
     name: '@dshfiles/backlog',
     origin: 'dshfiles',
-    official: false,
     title: null,
     description: null,
     packageDescription: 'Project backlog board and triage.',
@@ -44,7 +43,6 @@ const sampleBundles: readonly PluginBundle[] = [
   {
     name: '@deepseek-ai/dsh-base',
     origin: 'dsh',
-    official: true,
     title: 'DSH Base',
     description: null,
     packageDescription: 'Core DSH runtime.',
@@ -60,7 +58,6 @@ const sampleBundles: readonly PluginBundle[] = [
   {
     name: 'dshmarket',
     origin: 'community',
-    official: false,
     title: 'Plugin Market',
     description: null,
     packageDescription: 'Community plugin marketplace.',
@@ -155,7 +152,17 @@ describe('dshfiles plugins page', () => {
 
     const allScope = container.querySelector<HTMLButtonElement>('[data-plugins-scope="all"]')
     await act(async () => allScope?.click())
-    expect(shownBundles()).toEqual(['@dshfiles/main-tabs', 'dshmarket', '@dshfiles/backlog', '@deepseek-ai/dsh-base'])
+    expect(shownBundles()).toEqual(['@dshfiles/main-tabs', '@dshfiles/backlog', '@deepseek-ai/dsh-base', 'dshmarket'])
+
+    const search = container.querySelector<HTMLInputElement>('input[aria-label="pluginsPage.searchPlaceholder"]')
+    await act(async () => {
+      if (search === null) return
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(search, 'backlog')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(shownBundles()).toEqual(['@dshfiles/backlog'])
+    await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="search.clear"]')?.click())
+    expect(shownBundles()).toHaveLength(4)
 
     const mainTabsRow = container.querySelector('[data-dshfiles-bundle="@dshfiles/main-tabs"]')
     const settingsBtn = [...(mainTabsRow?.querySelectorAll('button') ?? [])].find(btn => btn.textContent?.includes('pluginsPage.configure'))
@@ -165,5 +172,66 @@ describe('dshfiles plugins page', () => {
     const switchBtn = mainTabsRow?.querySelector<HTMLButtonElement>('[role="switch"]')
     await act(async () => switchBtn?.click())
     expect(toggled).toEqual([['@dshfiles/main-tabs', false]])
+  })
+
+  it('marks protected, restart-pending and missing bundles and announces a failed toggle', async () => {
+    const bundles: readonly PluginBundle[] = sampleBundles.map(bundle =>
+      bundle.name === '@dshfiles/backlog' ? { ...bundle, pendingRestart: 'enable', installed: false, availability: 'missing' } : bundle,
+    )
+    const onToggle = async (name: string, enabled: boolean): Promise<PluginBundleChange> => ({
+      name,
+      changed: false,
+      enabled,
+      application: 'failed',
+      restartReason: null,
+      error: 'profile locked',
+      warnings: [],
+    })
+    await act(async () => {
+      root.render(
+        <DshfilesPluginsView
+          bundles={bundles}
+          error={undefined}
+          groups={groups}
+          loading={false}
+          onOpenSettings={() => {}}
+          onRefresh={() => {}}
+          onToggle={onToggle}
+          refreshing={false}
+          resolveLocaleText={value => (typeof value === 'string' ? value : value.en)}
+          t={t}
+        />,
+      )
+    })
+    const backlogRow = container.querySelector('[data-dshfiles-bundle="@dshfiles/backlog"]')
+    expect(backlogRow?.querySelector('[data-pending-restart="enable"]')?.textContent).toBe('entryCard.startsAfterRestart')
+    expect(backlogRow?.textContent).toContain('pluginsPage.notInstalled')
+    expect(container.querySelector('[data-plugins-pending-restart]')?.textContent).toBe('pluginsPage.pendingRestart {"count":1}')
+    expect(container.querySelector('[data-plugins-category="projects"]')?.getAttribute('aria-label')).toBe('pluginsPage.cat.projects')
+
+    await act(async () => backlogRow?.querySelector<HTMLButtonElement>('[role="switch"]')?.click())
+    expect(backlogRow?.querySelector('[role="alert"]')?.textContent).toBe('entryCard.failed {"reason":"profile locked"}')
+  })
+
+  it('shows the load error as an alert', async () => {
+    await act(async () => {
+      root.render(
+        <DshfilesPluginsView
+          bundles={[]}
+          error="Host unreachable"
+          groups={groups}
+          loading={false}
+          onOpenSettings={() => {}}
+          onRefresh={() => {}}
+          onToggle={async () => {
+            throw new Error('unused')
+          }}
+          refreshing={false}
+          resolveLocaleText={value => (typeof value === 'string' ? value : value.en)}
+          t={t}
+        />,
+      )
+    })
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Host unreachable')
   })
 })

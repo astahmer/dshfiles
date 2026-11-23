@@ -123,6 +123,7 @@ describe('plugin controls', () => {
       Effect.gen(function* () {
         const calls: (readonly [string, boolean])[] = []
         let mainTabsEnabled = true
+        let nextApplication: 'applied' | 'restart-required' | 'failed' = 'restart-required'
         const controls = yield* controlsFor({
           listPlugins: async () => [
             { entryId: 'include:dshfiles-main-tabs', moduleName: '@dshfiles/main-tabs', enabled: mainTabsEnabled, fiberPhase: 'active' },
@@ -130,7 +131,6 @@ describe('plugin controls', () => {
           listBundles: async () => [
             {
               name: '@dshfiles/main-tabs',
-              official: false,
               availability: 'profile',
               version: '0.1.0',
               description: 'Browser-like tabs for threads and panels.',
@@ -141,7 +141,6 @@ describe('plugin controls', () => {
             },
             {
               name: '@deepseek-ai/dsh-base',
-              official: true,
               availability: 'installation',
               enabled: true,
               installed: true,
@@ -151,7 +150,6 @@ describe('plugin controls', () => {
             },
             {
               name: 'dshmarket',
-              official: false,
               availability: 'profile',
               enabled: true,
               installed: true,
@@ -162,8 +160,9 @@ describe('plugin controls', () => {
           setPluginEnabled: async () => ({ changed: false, application: 'applied' }),
           setBundleEnabled: async (name, enabled) => {
             calls.push([name, enabled])
+            if (nextApplication === 'failed') return { changed: false, application: 'failed', error: { code: 'plugin-manager/unknown-bundle' } }
             mainTabsEnabled = enabled
-            return { changed: true, application: 'restart-required', restartReason: 'host-module', enabled }
+            return { changed: true, application: nextApplication, restartReason: 'host-module', enabled }
           },
         })
         const before = yield* controls.listBundles
@@ -174,10 +173,26 @@ describe('plugin controls', () => {
         ])
         const toggled = yield* controls.setBundleEnabled({ name: '@dshfiles/main-tabs', enabled: false })
         expect(toggled).toMatchObject({ name: '@dshfiles/main-tabs', changed: true, enabled: false, application: 'restart-required' })
-        expect((yield* controls.listBundles).find(bundle => bundle.name === '@dshfiles/main-tabs')?.pendingRestart).toBe('disable')
-        const unknown = yield* Effect.flip(controls.setBundleEnabled({ name: '@dshfiles/missing', enabled: true }))
-        expect(unknown._tag).toBe('PluginBundleUnknown')
-        expect(calls).toEqual([['@dshfiles/main-tabs', false]])
+        const pendingOf = (name: string) => Effect.map(controls.listBundles, bundles => bundles.find(bundle => bundle.name === name)?.pendingRestart)
+        expect(yield* pendingOf('@dshfiles/main-tabs')).toBe('disable')
+        expect(yield* pendingOf('@deepseek-ai/dsh-base')).toBeNull()
+
+        nextApplication = 'failed'
+        const unknown = yield* controls.setBundleEnabled({ name: '@dshfiles/missing', enabled: true })
+        expect(unknown).toMatchObject({ application: 'failed', error: 'plugin-manager/unknown-bundle' })
+        expect(yield* pendingOf('@dshfiles/main-tabs')).toBe('disable')
+
+        nextApplication = 'applied'
+        yield* controls.setBundleEnabled({ name: '@dshfiles/main-tabs', enabled: true })
+        expect(yield* pendingOf('@dshfiles/main-tabs')).toBeNull()
+
+        mainTabsEnabled = false
+        expect(yield* pendingOf('@dshfiles/main-tabs')).toBe('disable')
+        expect(calls).toEqual([
+          ['@dshfiles/main-tabs', false],
+          ['@dshfiles/missing', true],
+          ['@dshfiles/main-tabs', true],
+        ])
       }),
     ),
   )

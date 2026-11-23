@@ -2,8 +2,16 @@ import type {} from '@deepseek-ai/dsh-plugin-manager'
 import { HostContext } from '@dshfiles/dshx/effect'
 import { Context, Effect, FileSystem, Layer, Option, Ref, Schema } from 'effect'
 import { NativeSettings } from './native-settings-promise.js'
-import { MAX_REASON, PluginManagerFailed, pluginManagerCalls, type BundleInfoLike, type PluginManagerSurface } from './plugin-manager-promise.js'
-import { rowIdOf, type PluginBundle, type PluginBundleChange, type PluginBundleOrigin, type PluginChange, type PluginEntry } from './shell-api.js'
+import { Origin } from './origin.js'
+import {
+  MAX_REASON,
+  PluginManagerFailed,
+  pluginManagerCalls,
+  type BundleInfoLike,
+  type PluginChangeResult,
+  type PluginManagerSurface,
+} from './plugin-manager-promise.js'
+import { rowIdOf, type PluginBundle, type PluginBundleChange, type PluginChange, type PluginEntry } from './shell-api.js'
 
 /**
  * The profile's Loader entries and their enablement, through the plugin manager that owns the profile patch. It persists
@@ -32,31 +40,44 @@ export class PluginEntryUnknown extends Schema.TaggedError<PluginEntryUnknown>()
   }
 }
 
-export class PluginBundleUnknown extends Schema.TaggedError<PluginBundleUnknown>()(
-  'PluginBundleUnknown',
-  { name: Schema.String, cause: Schema.optional(Schema.Defect()) },
-  { dshxWireCode: 'plugin-bundle-unknown' },
-) {
-  override get message(): string {
-    return `No bundle ${this.name} in this profile.`
-  }
-}
-
-const bundleOriginOf = (bundle: BundleInfoLike): PluginBundleOrigin => {
-  if (bundle.name.startsWith('@dshfiles/')) return 'dshfiles'
-  if (bundle.official === true || bundle.name.startsWith('@deepseek-ai/')) return 'dsh'
-  return 'community'
-}
-
+/**
+ * What the next start does to a bundle. A bundle without Loader rows runs nothing, so a restart changes nothing for it.
+ * A disabled bundle whose rows still run stops at the next start even when another surface (the Plugins tab) disabled it.
+ */
 const bundlePendingRestart = (input: {
-  readonly target: boolean | undefined
+  readonly awaiting: boolean | undefined
+  readonly enabled: boolean
   readonly running: boolean
   readonly hasRows: boolean
 }): PluginBundle['pendingRestart'] => {
-  if (input.target === undefined) return null
-  if (input.target === input.running && input.hasRows) return null
-  return input.target ? 'enable' : 'disable'
+  if (!input.hasRows) return null
+  const target = input.awaiting ?? (!input.enabled && input.running ? false : undefined)
+  if (target === undefined || target === input.running) return null
+  return target ? 'enable' : 'disable'
 }
+
+/**
+ * The awaited start state after one write: a restart-required change records its target; an applied or overridden one
+ * leaves nothing to wait for; a failed or cancelled one changed nothing, so the earlier record stands.
+ */
+const nextAwaiting = (input: {
+  readonly awaiting: ReadonlyMap<string, boolean>
+  readonly key: string
+  readonly enabled: boolean
+  readonly application: PluginChangeResult['application']
+}): ReadonlyMap<string, boolean> => {
+  if (input.application === 'restart-required') return new Map(input.awaiting).set(input.key, input.enabled)
+  if (input.application === 'failed' || input.application === 'cancelled') return input.awaiting
+  return new Map([...input.awaiting].filter(([key]) => key !== input.key))
+}
+
+const changeError = (result: PluginChangeResult): string | null =>
+  result.error === undefined
+    ? null
+    : [result.error.code, result.error.diagnostic]
+        .filter(part => part !== undefined)
+        .join(': ')
+        .slice(0, MAX_REASON)
 
 const SEED_START = '# BEGIN NIX-MANAGED DSH PLUGINS'
 const SEED_END = '# END NIX-MANAGED DSH PLUGINS'
@@ -94,7 +115,7 @@ export class PluginControls extends Context.Service<
     readonly setBundleEnabled: (input: {
       readonly name: string
       readonly enabled: boolean
-    }) => Effect.Effect<PluginBundleChange, PluginManagerMissing | PluginManagerFailed | PluginBundleUnknown>
+    }) => Effect.Effect<PluginBundleChange, PluginManagerMissing | PluginManagerFailed>
   }
 >()('@dshfiles/settings-shell/PluginControls') {
   static readonly layerFrom = <Id extends string>(
@@ -105,8 +126,8 @@ export class PluginControls extends Context.Service<
       PluginControls,
       Effect.gen(function* () {
         // What a change this Host relayed waits for: the next start enables or disables the entry. A restart clears it.
-        const awaitingRestart = yield* Ref.make(new Map<string, boolean>())
-        const awaitingBundleRestart = yield* Ref.make(new Map<string, boolean>())
+        const awaitingRestart = yield* Ref.make<ReadonlyMap<string, boolean>>(new Map())
+        const awaitingBundleRestart = yield* Ref.make<ReadonlyMap<string, boolean>>(new Map())
         // Bundle records only name owners: when the manager cannot read them, the entries still list, without one.
         const bundles = (found: PluginManagerSurface<Id>): Effect.Effect<readonly BundleInfoLike[]> =>
           pluginManagerCalls(found).listBundles.pipe(Effect.orElseSucceed(() => []))
@@ -150,17 +171,12 @@ export class PluginControls extends Context.Service<
             enabled: result.enabled ?? null,
             application: result.application,
             restartReason: result.restartReason ?? null,
-            error:
-              result.error === undefined
-                ? null
-                : [result.error.code, result.error.diagnostic]
-                    .filter(part => part !== undefined)
-                    .join(': ')
-                    .slice(0, MAX_REASON),
+            error: changeError(result),
             warnings: (result.warnings ?? []).slice(0, 50),
           }
-          if (result.application === 'restart-required') yield* Ref.update(awaitingRestart, map => new Map(map).set(input.entryId, input.enabled))
-          if (result.application === 'applied') yield* Ref.update(awaitingRestart, map => new Map([...map].filter(([id]) => id !== input.entryId)))
+          yield* Ref.update(awaitingRestart, awaiting =>
+            nextAwaiting({ awaiting, key: input.entryId, enabled: input.enabled, application: result.application }),
+          )
           return change
         })
         const listBundles = Effect.gen(function* () {
@@ -172,18 +188,21 @@ export class PluginControls extends Context.Service<
           return bundleRows
             .map((bundle): PluginBundle => {
               const activeRowCount = bundle.rows.filter(row => row.entryId !== undefined && runningIds.has(row.entryId)).length
-              const target = awaiting.get(bundle.name)
-              const running = activeRowCount > 0
-              const pendingRestart = bundlePendingRestart({ target, running, hasRows: bundle.rows.length > 0 })
+              const enabled = bundle.enabled ?? false
+              const pendingRestart = bundlePendingRestart({
+                awaiting: awaiting.get(bundle.name),
+                enabled,
+                running: activeRowCount > 0,
+                hasRows: bundle.rows.length > 0,
+              })
               return {
                 name: bundle.name,
-                origin: bundleOriginOf(bundle),
-                official: bundle.official === true,
+                origin: Origin.ofBundle(bundle),
                 title: bundle.meta?.title ?? null,
                 description: bundle.meta?.description ?? null,
                 packageDescription: bundle.description ?? null,
                 version: bundle.version ?? null,
-                enabled: bundle.enabled ?? false,
+                enabled,
                 installed: bundle.installed ?? bundle.availability !== 'missing',
                 availability: bundle.availability ?? 'profile',
                 readOnlyReason: bundle.readOnlyReason ?? null,
@@ -196,27 +215,20 @@ export class PluginControls extends Context.Service<
         }).pipe(Effect.withSpan('settings-shell bundle inventory read'))
         const setBundleEnabled = Effect.fn('settings-shell bundle enablement write')(function* (input: { readonly name: string; readonly enabled: boolean }) {
           const found = yield* current
-          const bundleRows = yield* pluginManagerCalls(found).listBundles
-          const bundle = bundleRows.find(candidate => candidate.name === input.name)
-          if (bundle === undefined) return yield* Effect.fail(new PluginBundleUnknown({ name: input.name }))
-          const result = yield* pluginManagerCalls(found).setBundleEnabled(bundle.name, input.enabled)
+          // The manager rejects an unknown name itself (`plugin-manager/unknown-bundle`); listing first would read every bundle.
+          const result = yield* pluginManagerCalls(found).setBundleEnabled(input.name, input.enabled)
           const change: PluginBundleChange = {
             name: input.name,
             changed: result.changed,
             enabled: result.enabled ?? null,
             application: result.application,
             restartReason: result.restartReason ?? null,
-            error:
-              result.error === undefined
-                ? null
-                : [result.error.code, result.error.diagnostic]
-                    .filter(part => part !== undefined)
-                    .join(': ')
-                    .slice(0, MAX_REASON),
+            error: changeError(result),
             warnings: (result.warnings ?? []).slice(0, 50),
           }
-          if (result.application === 'restart-required') yield* Ref.update(awaitingBundleRestart, map => new Map(map).set(input.name, input.enabled))
-          if (result.application === 'applied') yield* Ref.update(awaitingBundleRestart, map => new Map([...map].filter(([id]) => id !== input.name)))
+          yield* Ref.update(awaitingBundleRestart, awaiting =>
+            nextAwaiting({ awaiting, key: input.name, enabled: input.enabled, application: result.application }),
+          )
           return change
         })
         return PluginControls.of({ list, setEnabled, listBundles, setBundleEnabled })

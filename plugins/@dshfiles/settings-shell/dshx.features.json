@@ -195,11 +195,6 @@
           "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
         },
         {
-          "kind": "gherkin",
-          "id": "settings-shell.all-settings-keeps-tab",
-          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
-        },
-        {
           "kind": "unit-test",
           "id": "settings-shell.machine-unit-tab",
           "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",
@@ -873,7 +868,19 @@
           "kind": "unit-test",
           "id": "settings-shell.origin-filter-view",
           "file": "plugins/@dshfiles/settings-shell/src/settings-view.test.tsx",
-          "testName": "filters sidebar categories between default DSH and plugin origins and badges the active entry"
+          "testName": "narrows the navigation and moves off an entry the filter hides"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.origin-filter-search",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-view.test.tsx",
+          "testName": "searches only the entries of the chosen origin"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.origin-forked-core",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "keeps a stock DSH category DSH when a dshfiles fork serves it, and trusts bundle labels over the core prefix guess"
         },
         {
           "kind": "gherkin",
@@ -909,7 +916,10 @@
       "failureModes": [
         "A Host without pluginManager returns plugin-manager-unavailable and the page displays an actionable alert instead of crashing.",
         "Protected management bundles show a Protected badge and disable their switch.",
-        "Changes that require a Host restart display Starts/Stops after a restart without restarting DSH automatically."
+        "Changes that require a Host restart display Starts/Stops after a restart without restarting DSH automatically.",
+        "A bundle disabled elsewhere (the Plugins tab) while its rows still run shows Stops after a restart; a failed or cancelled toggle keeps the earlier restart notice.",
+        "A bundle the profile names but whose files are missing shows Not installed.",
+        "A dshfiles bundle missing from the category map lands in Other; bundle-categories.test.ts fails until it is placed."
       ],
       "externalDependencies": [],
       "verification": [
@@ -924,6 +934,18 @@
           "id": "settings-shell.dshfiles-plugins-view",
           "file": "plugins/@dshfiles/settings-shell/src/dshfiles-plugins-page.test.tsx",
           "testName": "defaults to dshfiles plugins, filters by status and scope, toggles enablement, and jumps to Settings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.dshfiles-plugins-badges",
+          "file": "plugins/@dshfiles/settings-shell/src/dshfiles-plugins-page.test.tsx",
+          "testName": "marks protected, restart-pending and missing bundles and announces a failed toggle"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.bundle-categories",
+          "file": "plugins/@dshfiles/settings-shell/src/bundle-categories.test.ts",
+          "testName": "places every bundle under plugins/@dshfiles in a functional area"
         },
         {
           "kind": "gherkin",
