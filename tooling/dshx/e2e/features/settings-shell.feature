@@ -181,3 +181,9 @@ Feature: Settings shell
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
     When Plugins by category is opened in Settings
     Then installed dshfiles plugins are listed with quick toggles and a Settings link for Main tabs
+
+  @scenario:settings-shell.plugin-list-launcher
+  Scenario: The Plugins manager lists a card that opens Plugins by category as a panel
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When Plugins by category is opened from its card in the Plugins manager
+    Then installed dshfiles plugins are listed with quick toggles and a Settings link for Main tabs

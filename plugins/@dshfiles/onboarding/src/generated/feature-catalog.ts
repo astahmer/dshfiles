@@ -22866,7 +22866,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "dshfiles-plugins-page",
       "title": "Plugins by category: a second plugin view in Settings and as a panel",
-      "summary": "Plugins by category, a second view beside DSH core's Plugins manager, is a Settings › Plugins section and a stage panel (dshfiles-plugin-list) the sidebar can pin. It lists global @dshfiles/* bundles installed in the profile grouped by functional area, with live search, source (…",
+      "summary": "Plugins by category, a second view beside DSH core's Plugins manager, is a Settings › Plugins section and a stage panel (dshfiles-plugin-list) the sidebar can pin; DSH core's Plugins manager lists a first card (its plugins.item seat) that opens it. It lists global @dshfiles/* bu…",
       "destination": "settings",
       "currentSurface": "settings: Plugins › Plugins by category",
       "reach": [

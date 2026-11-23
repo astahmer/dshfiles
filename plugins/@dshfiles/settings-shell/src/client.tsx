@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ClientReleaseChange } from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 
@@ -57,7 +58,7 @@ import { bundleLabelsOf, type BundleLabel } from './bundle-labels.js'
 import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
-import { DshfilesPluginsPage } from './dshfiles-plugins-page.js'
+import { DshfilesPluginsPage, PluginListLauncher } from './dshfiles-plugins-page.js'
 import { PluginEntryCard } from './plugin-entry-card.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
@@ -1011,6 +1012,15 @@ export default defineClient({
             <h2 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{t('pluginsPage.nav')}</h2>
             <PluginsByCategory />
           </section>
+        )),
+      ),
+    )
+    // DSH core's Plugins manager has no banner seat; its first card group (plugins.item) points to this view instead.
+    ctx.slots.inject('plugins.item', () =>
+      ctx.slots.register(
+        { name: 'plugins.item', id: PLUGIN_LIST_PANEL_ID, order: 0, label: () => t('pluginsPage.nav') },
+        decorate((props: { readonly view: 'summary' | 'page' }) => (
+          <PluginListLauncher onOpen={() => openPanel(PLUGIN_LIST_PANEL_ID)} t={t} view={props.view} />
         )),
       ),
     )

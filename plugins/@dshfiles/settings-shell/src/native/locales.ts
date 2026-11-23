@@ -98,6 +98,8 @@ const shellEn = {
   'pluginsPage.subtitle':
     'A second view of your installed plugins, grouped by area with status filters and Settings shortcuts. Add it to the sidebar as a panel; install and update plugins in the Plugins manager.',
   'pluginsPage.openManager': 'Open Plugins manager',
+  'pluginsPage.openView': 'Open Plugins by category',
+  'pluginsPage.launcherSummary': 'Another view of this list: by area, with Enabled/Disabled filters and Settings shortcuts.',
   'pluginsPage.pendingRestart': '{count} pending restart',
   'pluginsPage.refresh': 'Refresh',
   'pluginsPage.searchPlaceholder': 'Filter plugins by name or description…',
@@ -255,6 +257,8 @@ const shellZh = {
   'pluginsPage.summary': '已启用 {enabled} / {total}',
   'pluginsPage.subtitle': '已安装插件的第二种视图：按领域分组，带状态筛选和设置快捷入口。可作为面板添加到侧边栏；安装和更新插件请使用插件管理器。',
   'pluginsPage.openManager': '打开插件管理器',
+  'pluginsPage.openView': '打开按类别查看插件',
+  'pluginsPage.launcherSummary': '此列表的另一种视图：按领域分组，带启用/禁用筛选和设置快捷入口。',
   'pluginsPage.pendingRestart': '{count} 项等待重启',
   'pluginsPage.refresh': '刷新',
   'pluginsPage.searchPlaceholder': '按名称或说明筛选插件…',

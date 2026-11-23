@@ -560,6 +560,15 @@ When('Plugins by category is opened in Settings', async ({ page }: { page: Page 
   await expect(page.locator('[data-dshfiles-plugins-page]')).toBeVisible()
 })
 
+When('Plugins by category is opened from its card in the Plugins manager', async ({ page }: { page: Page }) => {
+  await openSettings(page)
+  await settingsNavEntry(page, 'Installed plugins').click()
+  await page.getByRole('button', { name: 'Open Installed plugins', exact: true }).click()
+  await page.locator('[data-plugin-item="dshfiles-plugin-list"]').getByRole('button').first().click()
+  await page.getByRole('button', { name: 'Open Plugins by category', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Plugins by category', exact: true }).locator('[data-dshfiles-plugins-page]')).toBeVisible()
+})
+
 Then('installed dshfiles plugins are listed with quick toggles and a Settings link for Main tabs', async ({ page }: { page: Page }) => {
   const pluginsPage = page.locator('[data-dshfiles-plugins-page]')
   const mainTabsRow = pluginsPage.locator('[data-dshfiles-bundle="@dshfiles/main-tabs"]')

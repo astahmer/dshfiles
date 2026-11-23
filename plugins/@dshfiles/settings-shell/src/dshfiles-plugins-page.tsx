@@ -403,3 +403,17 @@ export const DshfilesPluginsPage = (props: DshfilesPluginsPageProps): JSX.Elemen
     <ConnectedDshfilesPluginsPage {...props} />
   </PluginQueryProvider>
 )
+
+/** The card DSH core's Plugins manager lists first: a pointer to Plugins by category, not a copy of it. */
+export const PluginListLauncher = (props: { readonly view: 'summary' | 'page'; readonly t: ShellTranslate; readonly onOpen: () => void }): JSX.Element => {
+  if (props.view === 'summary') return <span>{props.t('pluginsPage.launcherSummary')}</span>
+  return (
+    <section className="dshx-root dshx:flex dshx:flex-col dshx:items-start dshx:gap-3" data-plugin-list-launcher="">
+      <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">{props.t('pluginsPage.subtitle')}</p>
+      <Button onClick={props.onOpen} size="sm">
+        <PuzzleIcon aria-hidden="true" className="dshx:size-3.5" />
+        {props.t('pluginsPage.openView')}
+      </Button>
+    </section>
+  )
+}
