@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
@@ -28,10 +28,7 @@ test('real web reconciler seeds no accounts and preserves existing user choices 
     assert.equal(dirname(home), tmpdir())
     rmSync(home, { recursive: true, force: true })
   })
-  const bin = join(home, 'bin')
-  mkdirSync(bin)
-  writeFileSync(join(bin, 'pnpm'), '#!/bin/sh\nexit 0\n', { mode: 0o700 })
-  const env = { ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` }
+  const env = { ...process.env, HOME: home }
   const dsh = join(home, 'dsh')
   const run = () =>
     spawnSync(process.execPath, ['--experimental-strip-types', join(root, 'scripts/profile-sync.ts'), '--profile', 'web', '--home', dsh], {

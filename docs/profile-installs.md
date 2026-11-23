@@ -58,9 +58,14 @@ profile merely to make it match source; see
   entry (a registry plugin added with `dsh plugin add`) stays;
 - restores the region between `# BEGIN NIX-MANAGED DSH PLUGINS` and
   `# END NIX-MANAGED DSH PLUGINS` in `cordis.patch.yml`; the rest stays local;
-- runs `pnpm install --prefer-offline` (bounded to 180 s) only when the
-  manifest differs from the last one it installed or `node_modules` is missing.
-  An unchanged profile costs a few milliseconds.
+- uses `pnpm install --prefer-offline` (bounded to 180 s) for a new or
+  changed install, or when only non-link dependencies are missing. When the
+  previously installed manifest is unchanged and a `link:` dependency is
+  missing, sync instead restores just the absent link
+  from its declared source. It refuses unsafe repairs, such as replacing an
+  existing entry, rather than asking pnpm to rebuild `node_modules`. Sync also
+  fails if pnpm exits successfully but a declared link still has no package
+  manifest. A complete, unchanged install needs no pnpm run.
 
 `pnpm verify:web-profile-contract` (included in `pnpm check:green`) checks that
 profile bundles link their source packages, every external and direct owned-plugin

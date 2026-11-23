@@ -15,6 +15,7 @@ import {
   renameSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeSync,
 } from 'node:fs'
 import { homedir } from 'node:os'
@@ -38,7 +39,8 @@ import { Preflight } from './dsh-compat/preflight.mjs'
  * A profile with a seed (`profiles/<name>/`) is reconciled from it: missing seed files are copied in, the seed's
  * dependencies (relative links resolved against the seed folder) and bundles are applied, entries a previous sync
  * managed and the seed dropped are removed unless the user changed them, `@dshfiles/*` rows are exactly the seed's, the
- * marked Cordis region is restored, and `pnpm install` runs only when the manifest differs from the last installed one.
+ * marked Cordis region is restored, and the install is checked. Missing local links on an unchanged install are repaired
+ * without running `pnpm install`.
  * Every other entry is the user's and stays. Without a seed the profile gets every owned bundle; `--bundle` adds or
  * refreshes the named bundles with the owned bundles their client keeps external, and leaves the other rows alone. Writes happen under DSH's `package.json.lock` and are
  * atomic.
@@ -225,8 +227,50 @@ const signalGroup = (processGroupId: number, signal: NodeJS.Signals): void => {
   }
 }
 
+const modulesDirectory = join(profileDirectory, 'node_modules')
+const missingLinkedDependencies = (dependencies: Readonly<Record<string, string>>): [name: string, spec: string][] =>
+  Object.entries(dependencies).filter(([name, spec]) => spec.startsWith('link:') && !existsSync(join(modulesDirectory, name, 'package.json')))
+
+const assertLinkedDependencies = (dependencies: Readonly<Record<string, string>>, action: string): void => {
+  const stillMissing = missingLinkedDependencies(dependencies).map(([name]) => name)
+  if (stillMissing.length > 0) {
+    throw new Error(`Local dependencies still missing after ${action}: ${stillMissing.join(', ')}. Check their declared sources and rerun profile sync.`)
+  }
+}
+
+const linkedPackageSchema = Schema.Struct({ name: Schema.String })
+const requireDirectory = (directory: string): void => {
+  if (!lstatSync(directory, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new Error(`Cannot repair local links through ${directory}; check the profile's install layout before running pnpm install manually.`)
+  }
+}
+
+const repairMissingLinks = (missing: readonly [name: string, spec: string][]): void => {
+  // Repeat installs can skip a missing link, while bypassing that shortcut can let pnpm rebuild all of node_modules
+  // after a layout change, even with a frozen lockfile. For a previously installed manifest, only recreate absent links.
+  requireDirectory(profileDirectory)
+  requireDirectory(modulesDirectory)
+  const links = missing.map(([name, spec]) => {
+    if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i.test(name)) {
+      throw new Error(`Cannot repair an invalid package name ${JSON.stringify(name)}; check the profile manifest.`)
+    }
+    const destination = join(modulesDirectory, name)
+    requireDirectory(dirname(destination))
+    if (lstatSync(destination, { throwIfNoEntry: false }) !== undefined) {
+      throw new Error(`Cannot repair ${name}: ${destination} already exists. Inspect that entry and the declared source before retrying.`)
+    }
+    const source = resolve(profileDirectory, spec.slice('link:'.length))
+    const sourceManifest = join(source, 'package.json')
+    if (!statSync(sourceManifest, { throwIfNoEntry: false })?.isFile() || readJson(linkedPackageSchema, sourceManifest).name !== name) {
+      throw new Error(`Cannot repair ${name}: ${sourceManifest} does not declare ${name}. Check the declared link source before retrying.`)
+    }
+    return { source, destination }
+  })
+  for (const { source, destination } of links) symlinkSync(source, destination, 'junction')
+}
+
 // pnpm leads its own process group so a timeout also reaches the children it spawns.
-const installProfile = async (): Promise<void> => {
+const installProfile = async (dependencies: Readonly<Record<string, string>>): Promise<void> => {
   const startedAt = Date.now()
   log(`pnpm install in ${profileDirectory}`)
   // The reconciler edits the manifest on purpose; CI=true would otherwise make pnpm refuse to update the lockfile.
@@ -255,6 +299,7 @@ const installProfile = async (): Promise<void> => {
     throw new Error(`pnpm install exceeded ${installTimeoutMs / 1000}s`)
   }
   if (outcome !== 0) throw new Error(`pnpm install failed with status ${String(outcome)}`)
+  assertLinkedDependencies(dependencies, 'pnpm install')
   log(`installed in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`)
 }
 
@@ -363,8 +408,11 @@ const syncSeededProfile = async (): Promise<void> => {
     const manifestChanged = nextText !== currentText
     // Whether the install is still on disk: every dependency linked under node_modules. pnpm 10 writes no
     // node_modules/.modules.yaml for a profile of links alone, so that file cannot stand for an install.
-    const installPresent = Object.keys(dependencies).every(name => existsSync(join(profileDirectory, 'node_modules', name)))
-    const installNeeded = manifestChanged || previous?.installedManifestHash !== nextHash || !installPresent
+    const missingLinks = missingLinkedDependencies(dependencies)
+    const otherDependenciesPresent = Object.entries(dependencies).every(([name, spec]) => spec.startsWith('link:') || existsSync(join(modulesDirectory, name)))
+    const unchangedInstall = !manifestChanged && previous?.installedManifestHash === nextHash
+    const repairLinks = unchangedInstall && missingLinks.length > 0
+    const installNeeded = !unchangedInstall || !otherDependenciesPresent || missingLinks.length > 0
     const state: SyncState = { dependencies: desiredDependencies, bundles: desiredBundles, installedManifestHash: previous?.installedManifestHash }
     const stateText = (value: SyncState): string => `${JSON.stringify(value, null, 2)}\n`
     const statePath = join(profileDirectory, stateFilename)
@@ -378,7 +426,8 @@ const syncSeededProfile = async (): Promise<void> => {
     for (const name of removed) console.log(`  - ${name}`)
     if (nextPatch !== currentPatch) console.log('  ~ cordis.patch.yml managed region')
     if (dryRun) {
-      if (installNeeded) console.log('  would run pnpm install')
+      if (repairLinks) console.log('  would repair missing local links without pnpm install')
+      else if (installNeeded) console.log('  would run pnpm install')
       return
     }
 
@@ -387,7 +436,14 @@ const syncSeededProfile = async (): Promise<void> => {
     atomicWrite(statePath, stateText(state))
     rmSync(join(profileDirectory, legacyStateFilename), { force: true })
     if (!installNeeded) return
-    await installProfile()
+    if (repairLinks) {
+      if (!otherDependenciesPresent) {
+        throw new Error('Cannot repair local links while other declared dependencies are missing; check the profile before running pnpm install manually.')
+      }
+      repairMissingLinks(missingLinks)
+      assertLinkedDependencies(dependencies, 'link repair')
+      log(`restored missing local links without pnpm install: ${missingLinks.map(([name]) => name).join(', ')}`)
+    } else await installProfile(dependencies)
     atomicWrite(statePath, stateText({ ...state, installedManifestHash: nextHash }))
   })
 }
@@ -436,7 +492,7 @@ const syncOwnedBundles = async (): Promise<void> => {
     for (const name of manifest.dsh.profile.bundles.filter(name => isOwned(name) && !bundles.includes(name))) console.log(`  - ${name}`)
     if (dryRun) return
     atomicWrite(manifestPath, `${JSON.stringify(next, null, 2)}\n`)
-    await installProfile()
+    await installProfile(dependencies)
   })
 }
 

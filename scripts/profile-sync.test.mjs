@@ -5,7 +5,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, test } from 'node:test'
+import { parse } from 'yaml'
 
+const { packageManager } = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json'), 'utf8'))
 const script = join(import.meta.dirname, 'profile-sync.ts')
 const webSeed = JSON.parse(readFileSync(join(import.meta.dirname, '../profiles/web/package.json'), 'utf8'))
 const patchRegion = '# BEGIN NIX-MANAGED DSH PLUGINS\n- id: managed\n# END NIX-MANAGED DSH PLUGINS\n'
@@ -29,13 +31,15 @@ const writeSeed = bundles =>
   writeJson(join(seedDirectory, 'package.json'), {
     name: 'dsh-profile-web',
     private: true,
+    packageManager,
     dependencies: Object.fromEntries(bundles.map(name => [`@dshfiles/${name}`, `link:../../plugins/@dshfiles/${name}`])),
     dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', ...bundles.map(name => `@dshfiles/${name}`)] } },
   })
-const sync = (...args) => {
-  const result = spawnSync(process.execPath, [script, '--profile', 'web', '--home', home, '--seed', seedDirectory, ...args], { encoding: 'utf8' })
+const syncWithEnv = (env, ...args) => {
+  const result = spawnSync(process.execPath, [script, '--profile', 'web', '--home', home, '--seed', seedDirectory, ...args], { encoding: 'utf8', env })
   return { status: result.status, output: `${result.stdout}${result.stderr}` }
 }
+const sync = (...args) => syncWithEnv(process.env, ...args)
 
 beforeEach(() => {
   root = realpathSync(mkdtempSync(join(tmpdir(), 'profile-sync-test-')))
@@ -232,9 +236,81 @@ test('keeps an empty root when nothing follows it', () => {
 
 test('reinstalls when a linked dependency is missing from node_modules', () => {
   assert.equal(sync().status, 0)
-  rmSync(join(profileDirectory(), 'node_modules/@dshfiles/alpha'), { recursive: true, force: true })
+  const modules = join(profileDirectory(), 'node_modules')
+  const unrelated = join(modules, 'unrelated/package.json')
+  const lockfile = join(profileDirectory(), 'pnpm-lock.yaml')
+  const beforeLockfile = readFileSync(lockfile, 'utf8')
+  write(unrelated, '{"name":"unrelated"}\n')
+  rmSync(join(modules, '@dshfiles/alpha'), { recursive: true, force: true })
+
+  const preview = sync('--dry-run')
+  assert.equal(preview.status, 0, preview.output)
+  assert.match(preview.output, /would repair missing local links without pnpm install/)
+  assert.ok(!existsSync(join(modules, '@dshfiles/alpha')))
+
   const result = sync()
   assert.equal(result.status, 0, result.output)
-  assert.match(result.output, /pnpm install/)
-  assert.ok(existsSync(join(profileDirectory(), 'node_modules/@dshfiles/alpha/package.json')))
+  assert.match(result.output, /restored missing local links without pnpm install: @dshfiles\/alpha/)
+  assert.doesNotMatch(result.output, /^profile-sync: pnpm install in /m)
+  assert.ok(existsSync(join(modules, '@dshfiles/alpha/package.json')))
+  assert.ok(existsSync(join(modules, '@dshfiles/beta/package.json')))
+  assert.equal(readFileSync(unrelated, 'utf8'), '{"name":"unrelated"}\n')
+  assert.equal(readFileSync(lockfile, 'utf8'), beforeLockfile)
+
+  const unchanged = sync()
+  assert.equal(unchanged.status, 0, unchanged.output)
+  assert.match(unchanged.output, /is up to date/)
+  assert.doesNotMatch(unchanged.output, /pnpm install/)
+})
+
+test('repairs a missing link without pruning node_modules after the user changes nodeLinker', () => {
+  write(join(seedDirectory, 'pnpm-workspace.yaml'), 'nodeLinker: hoisted\n')
+  const env = { ...process.env, CI: 'true' }
+  const first = syncWithEnv(env)
+  assert.equal(first.status, 0, first.output)
+  const modules = join(profileDirectory(), 'node_modules')
+  const metadata = join(modules, '.modules.yaml')
+  const installedLayout = readFileSync(metadata, 'utf8')
+  assert.equal(parse(installedLayout).nodeLinker, 'hoisted')
+  const config = join(profileDirectory(), 'pnpm-workspace.yaml')
+  write(config, 'nodeLinker: isolated\n')
+  const unrelated = join(modules, 'unrelated/package.json')
+  write(unrelated, '{"name":"unrelated"}\n')
+  const link = join(modules, '@dshfiles/alpha')
+  rmSync(link, { recursive: true, force: true })
+
+  const result = syncWithEnv(env)
+  assert.equal(readFileSync(unrelated, 'utf8'), '{"name":"unrelated"}\n', result.output)
+  assert.equal(readFileSync(metadata, 'utf8'), installedLayout)
+  assert.equal(readFileSync(config, 'utf8'), 'nodeLinker: isolated\n')
+  assert.equal(result.status, 0, result.output)
+  assert.equal(realpathSync(link), join(root, 'checkout/plugins/@dshfiles/alpha'))
+})
+
+test('refuses to overwrite an occupied path for a missing declared link', () => {
+  assert.equal(sync().status, 0)
+  const destination = join(profileDirectory(), 'node_modules/@dshfiles/alpha')
+  rmSync(destination, { recursive: true, force: true })
+  const marker = join(destination, 'keep.txt')
+  write(marker, 'keep me\n')
+
+  const result = sync()
+  assert.equal(result.status, 1, result.output)
+  assert.match(result.output, /Cannot repair @dshfiles\/alpha: .*already exists/)
+  assert.doesNotMatch(result.output, /^profile-sync: pnpm install in /m)
+  assert.equal(readFileSync(marker, 'utf8'), 'keep me\n')
+})
+
+test('reports a local package still missing after pnpm exits successfully', () => {
+  assert.equal(sync().status, 0)
+  // A changed manifest still takes the ordinary install path, where pnpm may report success for an unusable link.
+  writeJson(join(profileDirectory(), 'package.json'), { ...readProfile(), description: 'Changed profile' })
+  const sourceManifest = join(root, 'checkout/plugins/@dshfiles/alpha/package.json')
+  rmSync(sourceManifest)
+
+  const result = sync()
+  assert.equal(result.status, 1, result.output)
+  assert.match(result.output, /^profile-sync: pnpm install in /m)
+  assert.match(result.output, /still missing after pnpm install: @dshfiles\/alpha/)
+  assert.doesNotMatch(result.output, /profile-sync: installed in/)
 })
