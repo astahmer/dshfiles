@@ -1,5 +1,6 @@
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
+import { Origin, type SettingsEntryOrigin } from './origin.js'
 import { SettingsSchemaModel, type JsonValue, type LocalizedTextReader, type SettingField } from './schema-form/schema-model.js'
 
 /** One settings namespace, as `settings.describe` reports it. */
@@ -21,8 +22,6 @@ export interface NamespaceLabel {
   readonly official?: boolean | undefined
 }
 
-export type SettingsPageOrigin = 'dsh' | 'plugin'
-
 export interface PluginSettingsPage {
   /** Nav id, prefixed so it never collides with a `settings.section` id. */
   readonly pageId: string
@@ -30,7 +29,8 @@ export interface PluginSettingsPage {
   readonly title: string
   readonly description: string
   readonly group: 'plugins' | 'more'
-  readonly origin?: SettingsPageOrigin | undefined
+  /** From the bundle manifest; absent until the bundle labels load. */
+  readonly origin?: SettingsEntryOrigin | undefined
   readonly bundleName?: string | undefined
   readonly fields: readonly SettingField[]
   /** Dotted paths of the fields the user layer sets, for the `@modified` search filter. */
@@ -40,13 +40,8 @@ export interface PluginSettingsPage {
 const PAGE_PREFIX = 'plugin:'
 const translationsSchema = Schema.Record(Schema.String, Schema.String)
 
-const originOfLabel = (label: NamespaceLabel | undefined): SettingsPageOrigin | undefined => {
-  if (label === undefined) return undefined
-  if (label.bundleName?.startsWith('@dshfiles/')) return 'plugin'
-  if (label.official === true || label.bundleName?.startsWith('@deepseek-ai/')) return 'dsh'
-  if (label.bundleName !== undefined && label.bundleName !== '') return 'plugin'
-  return undefined
-}
+const originOfLabel = (label: NamespaceLabel | undefined): SettingsEntryOrigin | undefined =>
+  label?.bundleName === undefined || label.bundleName === '' ? undefined : Origin.settingsOfBundle({ name: label.bundleName, official: label.official })
 
 export class SettingsPluginPages {
   static pluginPageId = (ns: string): string => `${PAGE_PREFIX}${ns}`

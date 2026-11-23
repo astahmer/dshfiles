@@ -1,10 +1,10 @@
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { LayersIcon, PuzzleIcon } from '@dshfiles/plugin-ui/icons'
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { ShellTranslate } from './native/locales.js'
-import type { PluginSettingsPage, SettingsPageOrigin } from './plugin-settings.js'
+import { OriginBadge } from './origin-badge.js'
+import type { SettingsEntryOrigin } from './origin.js'
+import type { PluginSettingsPage } from './plugin-settings.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsJsonEditor } from './schema-form/settings-json-editor.js'
 
@@ -36,7 +36,7 @@ export const PluginSettingsPageView = (props: {
   readonly focusPath?: readonly string[]
   readonly nested?: boolean
   readonly groupLabel?: string | undefined
-  readonly origin?: SettingsPageOrigin | undefined
+  readonly origin?: SettingsEntryOrigin | undefined
   readonly bundleName?: string | undefined
   /** The plugin entry behind the page, drawn under its scope line. */
   readonly entry?: ReactNode
@@ -64,23 +64,7 @@ export const PluginSettingsPageView = (props: {
             {props.groupLabel !== undefined && props.groupLabel !== '' && props.groupLabel !== props.page.title && (
               <span className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.groupLabel}</span>
             )}
-            {resolvedOrigin === 'dsh' && (
-              <Badge data-origin-badge="dsh" variant="secondary">
-                <LayersIcon aria-hidden="true" />
-                {props.t('origin.dshBadge')}
-              </Badge>
-            )}
-            {resolvedOrigin === 'plugin' && (
-              <Badge data-origin-badge="plugin" variant="info">
-                <PuzzleIcon aria-hidden="true" />
-                {props.t('origin.pluginBadge')}
-              </Badge>
-            )}
-            {resolvedOrigin === 'plugin' && resolvedBundle !== undefined && (
-              <code className="dshx:rounded dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">
-                {resolvedBundle}
-              </code>
-            )}
+            {resolvedOrigin !== undefined && <OriginBadge bundleName={resolvedBundle} origin={resolvedOrigin} t={props.t} />}
           </div>
         )}
         <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3">

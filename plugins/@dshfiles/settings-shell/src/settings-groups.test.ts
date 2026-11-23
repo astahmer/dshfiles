@@ -205,4 +205,19 @@ describe('settings groups', () => {
     expect(dshOnly.flatMap(group => group.entries)).toHaveLength(counts.dsh)
     expect(pluginOnly.flatMap(group => group.entries)).toHaveLength(counts.plugin)
   })
+
+  it('keeps a stock DSH category DSH when a dshfiles fork serves it, and trusts bundle labels over the core prefix guess', () => {
+    const labelled = SettingsGroups.group({
+      sections: [],
+      pages: [
+        { ...page('agent-loop', 'Agent loop', ['maxSteps']), origin: 'plugin', bundleName: '@dshfiles/agent-loop' },
+        { ...page('tool-community-thing', 'Community thing', ['enabled']), origin: 'plugin', bundleName: 'community-thing' },
+        page('tool-unlabelled', 'Unlabelled', ['enabled']),
+      ],
+      panels: new Set(),
+    }).flatMap(group => group.entries)
+    expect(labelled.find(entry => entry.id === 'plugin:agent-loop')).toMatchObject({ origin: 'dsh', bundleName: undefined })
+    expect(labelled.find(entry => entry.id === 'plugin:tool-community-thing')).toMatchObject({ origin: 'plugin', bundleName: 'community-thing' })
+    expect(labelled.find(entry => entry.id === 'plugin:tool-unlabelled')?.origin).toBe('dsh')
+  })
 })

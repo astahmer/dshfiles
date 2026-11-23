@@ -62,7 +62,7 @@ import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
-import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
+import { DSHFILES_PLUGINS_SECTION_ID, SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
@@ -970,7 +970,7 @@ export default defineClient({
       ctx.slots.register(
         {
           name: 'settings.section',
-          id: 'dshfiles-plugins',
+          id: DSHFILES_PLUGINS_SECTION_ID,
           order: -5,
           label: () => t('pluginsPage.nav'),
           locale: SHELL_LOCALE_NAMESPACE,
@@ -980,10 +980,7 @@ export default defineClient({
           return (
             <DshfilesPluginsPage
               groups={grouped}
-              onOpenSettings={sectionId => {
-                if (props.openSection !== undefined) props.openSection(sectionId)
-                else openSettings(sectionId)
-              }}
+              onOpenSettings={props.openSection ?? openSettings}
               resolveLocaleText={text => ctx.locale.resolveText(text)}
               t={props.t}
             />

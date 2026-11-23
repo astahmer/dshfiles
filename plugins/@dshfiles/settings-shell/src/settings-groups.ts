@@ -1,5 +1,9 @@
+import { Origin, type SettingsEntryOrigin } from './origin.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
 import type { SettingField } from './schema-form/schema-model.js'
+
+/** The section that lists every dshfiles bundle with its switch. */
+export const DSHFILES_PLUGINS_SECTION_ID = 'dshfiles-plugins'
 
 /**
  * The task groups of the one Settings page (plan `docs/ade-ux` §4.6). Settings are grouped by what the user is doing,
@@ -54,7 +58,7 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   'dshfiles-new-thread': { group: 'projects', order: 0 },
   'dshfiles-network-access': { group: 'hosts', order: 20 },
   plugins: { group: 'plugins', order: 0 },
-  'dshfiles-plugins': { group: 'plugins', label: 'Dshfiles plugins', order: -5 },
+  [DSHFILES_PLUGINS_SECTION_ID]: { group: 'plugins', label: 'Dshfiles plugins', order: -5 },
   // thread-sidebar's Update DSH (fetch, What's new, sync and rebuild, then Restart when idle).
   'dshfiles-update-dsh': { group: 'about', label: 'Update DSH', order: 5 },
   // dshmarket's own settings section: the community catalog, a full page of its own. Unplaced, it landed under "Other".
@@ -64,7 +68,10 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
 /** Sections shipped as stock DSH defaults (even when ported or extended by a dshfiles shell). */
 const CORE_SECTIONS: ReadonlySet<string> = new Set(['general', 'account', 'models', 'agent-presets', 'archived-sessions', 'plugins'])
 
-/** Settings namespaces shipped by stock DSH core, used as fallback before bundle metadata loads. */
+/**
+ * Settings namespaces of stock DSH. They stay DSH defaults when a dshfiles fork now serves them (`agent-loop` from
+ * `@dshfiles/agent-loop`): the category is DSH's, whoever draws it.
+ */
 const CORE_NAMESPACES: ReadonlySet<string> = new Set([
   'locale',
   'ui-theme',
@@ -95,7 +102,7 @@ const SECTION_BUNDLES = new Map<string, string>([
   ['dshfiles-mcp-endpoint', '@dshfiles/mcp-endpoint'],
   ['dshfiles-new-thread', '@dshfiles/workspace-folder-picker'],
   ['dshfiles-network-access', '@dshfiles/phone-pairing'],
-  ['dshfiles-plugins', '@dshfiles/settings-shell'],
+  [DSHFILES_PLUGINS_SECTION_ID, '@dshfiles/settings-shell'],
   ['dshfiles-update-dsh', '@dshfiles/thread-sidebar'],
   ['market', 'dshmarket'],
 ])
@@ -251,9 +258,6 @@ const SECTIONS_LINKING_THEIR_PAGE: ReadonlySet<string> = new Set(['ai-accounts']
 /** The entry that holds every Jev setting (key, enable, thresholds), wherever the plugin that uses it stores them. */
 export const JEV_ENTRY_ID = 'jev'
 
-/** Whether a Settings category ships with stock DSH or comes from a DSH plugin bundle. */
-export type SettingsEntryOrigin = 'dsh' | 'plugin'
-
 export type SettingsOriginFilter = 'all' | SettingsEntryOrigin
 
 /** One row in the Settings navigation: what opens when it is picked. */
@@ -295,12 +299,13 @@ const placementOfSection = (id: string): Placement => SECTION_PLACEMENT[id] ?? {
 
 const originOfSection = (id: string): SettingsEntryOrigin => (CORE_SECTIONS.has(id) ? 'dsh' : 'plugin')
 
+/** DSH core's one-row-per-tool-or-model namespaces, assumed DSH only until the bundle labels name their owner. */
+const CORE_NAMESPACE_PREFIXES = ['tool-', 'agent-'] as const
+
 const originOfPage = (page: PluginSettingsPage): SettingsEntryOrigin => {
-  if (page.bundleName?.startsWith('@dshfiles/')) return 'plugin'
-  if (page.origin !== undefined) return page.origin
   if (CORE_NAMESPACES.has(page.ns)) return 'dsh'
-  if ((page.ns.startsWith('tool-') || page.ns.startsWith('agent-')) && !page.ns.startsWith('dshfiles-')) return 'dsh'
-  return 'plugin'
+  if (page.origin !== undefined) return page.origin
+  return CORE_NAMESPACE_PREFIXES.some(prefix => page.ns.startsWith(prefix)) ? 'dsh' : 'plugin'
 }
 
 const originOfLink = (panelId: string): SettingsEntryOrigin => (panelId === 'plugins' ? 'dsh' : 'plugin')
@@ -381,7 +386,7 @@ const groupEntries = (input: {
       sectionId: section.id,
       pages: [],
       hiddenPages: [],
-      keywords: [section.id, section.label, origin === 'dsh' ? 'dsh default core' : 'plugin', ...(bundleName === undefined ? [] : [bundleName])],
+      keywords: [section.id, section.label, ...Origin.keywords({ origin, bundleName })],
     })
   }
   const jevPages: PluginSettingsPage[] = []
@@ -440,7 +445,7 @@ const groupEntries = (input: {
       bundleName,
       pages: [page],
       hiddenPages: [],
-      keywords: [page.ns, page.title, origin === 'dsh' ? 'dsh default core' : 'plugin', ...(bundleName === undefined ? [] : [bundleName])],
+      keywords: [page.ns, page.title, ...Origin.keywords({ origin, bundleName })],
     })
   }
   if (jevPages.length > 0) {
@@ -482,7 +487,7 @@ const groupEntries = (input: {
       pages: [],
       hiddenPages: [],
       link,
-      keywords: [link.panelId, link.description, origin === 'dsh' ? 'dsh default core' : 'plugin', ...(bundleName === undefined ? [] : [bundleName])],
+      keywords: [link.panelId, link.description, ...Origin.keywords({ origin, bundleName })],
     })
   }
   const byGroup = new Map<SettingsGroupId, SettingsEntry[]>()
