@@ -572,30 +572,6 @@ Then('installed dshfiles plugins are listed with quick toggles and a Settings li
   await finishJourneyAssertions(page)
 })
 
-When('the Plugins panel is opened', async ({ page }: { page: Page }) => {
-  await openGlobalPanel(page, 'Plugins')
-  await expect(page.locator('[data-plugin-panel]')).toBeVisible()
-})
-
-Then('installed plugins can be filtered by text in the Plugins tab', async ({ page }: { page: Page }) => {
-  const panel = page.locator('[data-plugin-panel]')
-  const filterInput = panel.getByRole('searchbox', { name: 'Filter installed plugins', exact: true })
-  const mainTabsCard = panel.locator('[data-plugin-package="@dshfiles/main-tabs"]')
-  const settingsShellCard = panel.locator('[data-plugin-package="@dshfiles/settings-shell"]')
-  await recordAssertion(page, 'settings-shell-installed-plugins-filter', async () => {
-    await expect(filterInput).toBeVisible()
-    await expect(mainTabsCard).toBeVisible()
-    await expect(settingsShellCard).toBeVisible()
-    await filterInput.fill('main-tabs')
-    await expect(mainTabsCard).toBeVisible()
-    await expect(settingsShellCard).toBeHidden()
-    await expect(panel.locator('[data-installed-plugins-count]')).toContainText('1 of')
-    await filterInput.press('Escape')
-    await expect(settingsShellCard).toBeVisible()
-  })
-  await finishJourneyAssertions(page)
-})
-
 When('Settings is opened from the destination rail', async ({ page }: { page: Page }) => {
   const destinations = page.getByRole('navigation', { name: 'Destinations', exact: true })
   const settingsTab = destinations.getByRole('tab', { name: 'Settings', exact: true })

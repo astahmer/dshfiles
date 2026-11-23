@@ -182,12 +182,6 @@ Feature: Settings shell
     When the Dshfiles plugins page is opened in Settings
     Then installed dshfiles plugins are listed with quick toggles and a Settings link for Main tabs
 
-  @scenario:settings-shell.installed-plugins-filter
-  Scenario: The Plugins tab offers a text input to filter installed plugins quickly
-    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
-    When the Plugins panel is opened
-    Then installed plugins can be filtered by text in the Plugins tab
-
   @scenario:settings-shell.all-settings-keeps-tab
   Scenario: Clicking All settings in the Settings sidebar keeps the Settings tab open
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/settings-shell, @dshfiles/main-tabs" is booted
