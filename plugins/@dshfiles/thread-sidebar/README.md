@@ -370,6 +370,83 @@ the Host once per row, archive refuses while a selected thread is running, and
 every verb honors the Apply actions to child threads preference. Archive keeps
 its undo notice and clears the selection when it succeeds.
 
+<a name="branching-and-ownership"></a>
+
+**Branching and ownership ([#168](https://github.com/astahmer/dshfiles/issues/168)).**
+On DSH 0.2.2-rc.2, the chat reply's **Branch** action cuts at that reply's
+[turn end](../chat/src/native/chat/TurnTailNodeView.tsx#L60-L67); the native
+Workspace menu also has a [fork action](../workspace-nav/src/native/session-actions/context-menus.tsx#L51-L54).
+Both use `session/fork`. The sidebar has no Branch row action; `thread_fork`
+is the existing Agent tool (latest completed turn by default, or an explicit
+cut). A new ordinary fork has a new Session ID and a seeded prefix, but no
+`parentSession` or durable source ID. The sidebar's archive cascade does not
+target this root. It passes the **Main threads** filter, but [Done's preset
+filters](src/thread-view-preferences.ts#L76-L83) and other view rules still
+decide visibility. In particular, [Not running](src/thread-view.ts#L143-L163)
+does not select settled, archived, or muted threads; the **Done** group in
+**All threads** is a separate status grouping. A fork can still share the
+source's cwd and Workspace. A separate conversation is not a separate checkout.
+
+A **historical fork** can have `parentSession` without `origin: subagent`.
+DSH treats that ID as history, but the sidebar still uses raw parent IDs in
+its [action target expansion](src/thread-children.ts#L36-L64), [workspace
+attribution and nesting](src/organization.ts#L461-L509), [attention
+filter](src/organization.ts#L304-L306), and [child auto-settle scan](src/auto-settle-scan.ts#L66-L94).
+With **Apply actions to child threads** on, sidebar archive makes a native
+archive call for each selected descendant, including a listed historical fork.
+Off, it calls only the selected row; this does not unnest children. The native
+archive endpoint archives one ID, and `thread_archive` calls it once rather than
+applying the UI cascade. A cross-project historical fork can already look like
+a root while remaining a cascade target; browser nesting is not the authority.
+**Parent thread unavailable** is an orphan group, not an independent root; it
+still has its original parent ID.
+
+A **subagent**, including one that was seeded from a fork, is not an ordinary
+fork. Native archive admission still blocks it under an archived ancestor
+with the cascade preference off, and continuation and panel reads still require
+its [parent-bound address and child-owned descriptor](../session-controller/src/native/history.ts#L179-L224).
+The [header switcher](src/subagent-provenance/SubagentHeaderLineage.tsx#L778-L799)
+reads that address or the parent's subagent catalog. The sidebar's
+[Referenced by](src/thread-references.ts#L56-L66) reads stored parent IDs with
+an `origin` check, so it can show historical forks but cannot reconstruct the
+source of a new native fork. Neither the inherited prefix nor a display label
+is authority to make a child into a root.
+
+A sidebar **Branch** that creates a new ordinary root and remembers its
+origin is an owned feature, not a native parent transfer. It can use the
+[existing fork path](../session-controller/src/native/commands.ts#L275-L364)
+and a [Host-owned storage domain](src/subscriptions-store.ts#L94-L117) for
+its own provenance. A write after a successful RPC alone is insufficient:
+the child ID is allocated inside the fork, and the fork can publish a child
+before Workspace attachment or the reply succeeds. An inert fixture against
+the pinned command reproduced an attachment failure after publication; retrying
+the same request generated a different child ID. A retry-safe route is to
+reserve the child ID and source/cut under an explicit operation key before
+creation, pass that ID to the producer, and inspect that same ID on retry.
+An incomplete attachment must not cause a second fork or be reported as a
+completed attachment. Both the row and the Agent tool would use this one Host
+verb, without fallback to the older fork RPC. Recheck that the source is local,
+readable, unarchived, and an eligible ordinary Session at the write boundary;
+do not silently migrate or revive a log. Show origin only from the owned
+record and give a safe fallback when the source is no longer readable. This
+flow is not shipped yet.
+
+A second owned change could treat the recorded parent of a positively identified
+historical ordinary fork as provenance, not as a sidebar action or grouping
+edge. That requires the same policy in list, view filters, archive, attention,
+and child auto-settle; don't erase the header or borrow the orphan policy. It
+would not change subagent continuation or Workspace ownership.
+
+A real managed child cannot be promoted by hiding its parent in the browser.
+The existing [Continue in workspace](../session-controller/src/continuation-host.ts#L13-L25)
+path creates a different Session, and the sidebar's **Continue in project**
+and `thread_continue_in` also try to settle the source. Workspace cleanup
+considers actual [memberships and activity](../jj-integration/src/workspace-cleanup.ts#L45-L79),
+not sidebar nesting; a quiet unarchived fork does not by itself keep a shared
+folder from all cleanup modes. The [Host gap ledger](../../../plans/dsh-host-gaps.md#the-ledger)
+covers native ownership transfer and unrecorded native provenance, not the
+owned Branch action.
+
 **Project attribution.** A thread workspace is attributed to its owning
 repository. Its folder comes from the VCS providers (jj-integration,
 git-worktrees) through `@dshfiles/vcs-provider-port`'s `threadsDirectories`,
