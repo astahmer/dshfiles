@@ -571,25 +571,3 @@ Then('installed dshfiles plugins are listed with quick toggles and a Settings li
   })
   await finishJourneyAssertions(page)
 })
-
-When('Settings is opened from the destination rail', async ({ page }: { page: Page }) => {
-  const destinations = page.getByRole('navigation', { name: 'Destinations', exact: true })
-  const settingsTab = destinations.getByRole('tab', { name: 'Settings', exact: true })
-  await expect(settingsTab).toBeVisible()
-  await settingsTab.click()
-  await expect(settingsView(page)).toBeVisible()
-})
-
-Then('clicking All settings keeps the Settings tab open without switching back to a conversation tab', async ({ page }: { page: Page }) => {
-  const allSettings = page.getByRole('button', { name: 'All settings', exact: true })
-  await recordAssertion(page, 'settings-shell-all-settings-keeps-tab', async () => {
-    await expect(allSettings).toBeVisible()
-    await expect(allSettings).toHaveAttribute('aria-current', 'page')
-    await allSettings.click()
-    await expect(settingsView(page)).toBeVisible()
-    await expect(allSettings).toHaveAttribute('aria-current', 'page')
-    await allSettings.click()
-    await expect(settingsView(page)).toBeVisible()
-  })
-  await finishJourneyAssertions(page)
-})

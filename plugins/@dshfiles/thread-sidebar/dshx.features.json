@@ -3735,6 +3735,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "thread-sidebar.all-settings-keeps-tab",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
           "kind": "not-applicable",
           "id": "thread-sidebar.destination-rail-browser",
           "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (docs/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
