@@ -3,6 +3,39 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Scratch DSH Strobe baseline (2026-11-23)
+
+The [four scratch benchmarks](../tooling/dshx/bench/strobe/README.md) passed on
+macOS after fixture seeding moved out of Strobe's `prepare` hook. Strobe already
+has a working CDP connection at that point; Strobe 0.6.0 then opens a second
+connection through Playwright before entering the hook. The November 4 run
+failed at that second connection. On this run the original one-case check
+reached the hook but timed out on a stale project-picker selector. The standalone
+seeder now prepares two short Sessions and one roughly 500 KB transcript; each
+Strobe block uses those fixtures without another CDP client.
+
+Same-build A/A: stock DSH 0.2.2-rc.2, dshfiles `4c0774ed` (102 scratch bundle
+rows), Strobe 0.6.0, Chrome 157.0.8103.79 (1440 × 900 requested window), and
+arm64 macOS 26.6.2 on a 10-core M2 Pro. Six alternating pairs of fresh browser
+launches per case; five measured iterations per launch after Strobe's warmup.
+Page load measures authenticated navigation to a short thread, not browser
+startup. No builds or attribution runs overlapped the timing run. One-minute
+load was 9.43 at the start and 6.16 at the end; a sample during the run reached
+15.51, and Strobe reported 41% CPU busy at preflight.
+
+| Case                       | Primary phase       | A median | A median (paired) | A/A change [Strobe interval] |
+| -------------------------- | ------------------- | -------: | ----------------: | ---------------------------- |
+| Page load to interactive   | `phase.interactive` | 747.8 ms |          748.9 ms | +0.6% [−2.6%, +4.1%]         |
+| Thread switch with history | `phase.switch`      | 141.6 ms |          147.7 ms | +3.4% [−1.8%, +12.4%]        |
+| New thread composer        | `phase.composer`    | 139.6 ms |          138.8 ms | +0.1% [−8.1%, +9.0%]         |
+| Large thread open          | `phase.history`     | 214.3 ms |          214.7 ms | 0.0% [−3.6%, +2.4%]          |
+
+All 24 pairs completed. Strobe's paired intervals (96.9% actual coverage)
+include zero for all four cases. The run gives a same-build baseline and a
+measure of its noise, not proof of ±2% equivalence or a live-GUI SLO. Thread
+switch was the noisiest; rerun on a quieter machine before interpreting small
+changes.
+
 ## Backdrop scenes (2026-11-15)
 
 Complaint: an animated theme (Snow Pines and others) drove the CPU very high.

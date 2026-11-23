@@ -1,58 +1,64 @@
-import { createRequire } from 'node:module'
-import { readFile, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { chromium } from 'playwright'
+import { StartupDialogs } from '../../packages/dshx/dist/project/startup-dialogs.js'
+import { largeThreadMarker, scratchFixture, shortThreadA, viewport } from './fixtures.ts'
+import { selectProject } from './select-project.mjs'
 
-const stateRoot = process.env.DSHX_DEV_STATE_ROOT ?? join(tmpdir(), 'dshx-dev')
-const statePath = join(stateRoot, 'strobe-bench', 'state.json')
-const state = JSON.parse(await readFile(statePath, 'utf8'))
-if (state.name !== 'strobe-bench' || typeof state.launchUrl !== 'string') {
-  throw new Error('Expected the isolated strobe-bench scratch instance state.')
-}
-
-const require = createRequire(new URL('../../package.json', import.meta.url))
-const { chromium } = require('@playwright/test')
+const { launchUrl, stateDir, projectName } = scratchFixture()
 const browser = await chromium.launch({ headless: true })
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+const page = await browser.newPage({ viewport })
 
+let stage = 'opening scratch DSH'
 try {
-  await page.goto(state.launchUrl)
-  const notice = page.getByRole('dialog', { name: 'Preview Notice', exact: true })
-  if (await notice.isVisible().catch(() => false)) {
-    await notice.getByRole('button', { name: 'Continue', exact: true }).click()
-  }
-  const setup = page.getByRole('dialog', { name: /^(Add an API key to get started|Get started)$/ })
-  if (await setup.isVisible().catch(() => false)) {
-    const later = setup.getByRole('button', { name: 'Configure later', exact: true })
-    if (await later.isVisible().catch(() => false)) await later.click()
-    else await setup.getByRole('button', { name: 'Close', exact: true }).click()
-  }
+  await StartupDialogs.markSetupWizardSkipped(page)
+  await page.goto(launchUrl)
+  await StartupDialogs.dismissPreviewNotice(page)
+  await StartupDialogs.registerPreviewNoticeDismissal(page)
+  await StartupDialogs.dismissProviderSetupDuringStartup(page)
 
-  const seedThread = async message => {
+  const newThread = page.getByRole('button', { name: 'New thread', exact: true }).filter({ visible: true }).first()
+  stage = 'selecting the sample project'
+  await selectProject(page, projectName)
+
+  const seedThread = async (label, message) => {
+    stage = `opening ${label}`
     const previousId = new URL(page.url()).searchParams.get('thread')
-    await page.getByRole('button', { name: 'New thread', exact: true }).click()
-    await page.waitForFunction(before => {
-      const current = new URL(window.location.href).searchParams.get('thread')
-      return current !== null && current !== before
-    }, previousId)
-    const id = new URL(page.url()).searchParams.get('thread')
-    if (id === null) throw new Error('New thread did not get a Session id.')
-    const composer = page.locator('[contenteditable="true"]').last()
-    await composer.waitFor({ state: 'visible' })
+    await newThread.click()
+    const composer = await selectProject(page, projectName)
+    await StartupDialogs.dismissProviderSetupIfShown(page)
+    stage = `sending the ${label} prompt`
     await composer.fill(message)
     await composer.press('Enter')
-    await page.locator(`[data-thread-main-action][data-thread-id=${JSON.stringify(id)}]`).waitFor({ state: 'visible' })
-    await page.locator(`[data-conversation-session=${JSON.stringify(id)}] [data-chat-flow]`).waitFor({ state: 'visible' })
+    stage = `waiting for the ${label} history`
+    await page.waitForFunction(before => {
+      const id = new URL(window.location.href).searchParams.get('thread')
+      return (
+        id !== null &&
+        id !== before &&
+        Array.from(document.querySelectorAll('[data-thread-main-action]')).some(row => row.getAttribute('data-thread-id') === id)
+      )
+    }, previousId)
+    const id = new URL(page.url()).searchParams.get('thread')
+    const history = page.locator(`[data-conversation-session=${JSON.stringify(id)}] [data-chat-flow]`).filter({ hasText: message.slice(0, 90) })
+    await history.first().waitFor({ state: 'visible' })
     return id
   }
 
   const ids = {
-    a: await seedThread('Strobe benchmark A'),
-    b: await seedThread('Strobe benchmark B'),
-    large: await seedThread(`Strobe benchmark large history\n\nstrobe large history marker\n\n${'synthetic scratch-only history content '.repeat(13_000)}`),
+    a: await seedThread('first short Session', shortThreadA),
+    b: await seedThread('second short Session', 'Strobe benchmark B'),
+    large: await seedThread(
+      'large Session',
+      `Strobe benchmark large history\n\n${largeThreadMarker}\n\n${'synthetic scratch-only history content '.repeat(13_000)}`,
+    ),
   }
-  await writeFile(join(state.stateDir, 'strobe-bench-fixtures.json'), JSON.stringify(ids), { mode: 0o600 })
-  process.stdout.write('Seeded three scratch-only sessions; large prompt is approximately 500 KB.\n')
+  stage = 'saving fixture IDs'
+  await writeFile(join(stateDir, 'strobe-bench-fixtures.json'), JSON.stringify(ids), { mode: 0o600 })
+  process.stdout.write('Seeded three scratch-only Sessions; large prompt is approximately 500 KB.\n')
+} catch {
+  // Playwright navigation errors can contain the authenticated launch URL.
+  throw new Error(`Stopped while ${stage}. Check dshx dev doctor --name strobe-bench and retry on a fresh scratch instance.`)
 } finally {
   await browser.close()
 }
