@@ -554,14 +554,17 @@ Then('default DSH and plugin categories are marked and filterable in the sidebar
   await finishJourneyAssertions(page)
 })
 
-When('the Dshfiles plugins page is opened in Settings', async ({ page }: { page: Page }) => {
+When('the Dshfiles plugins tab is opened from the Plugins link in Settings', async ({ page }: { page: Page }) => {
   await openSettings(page)
-  await settingsNavEntry(page, 'Dshfiles plugins').click()
-  await expect(settingsView(page).locator('[data-dshfiles-plugins-page]')).toBeVisible()
+  await expect(settingsNavEntry(page, 'Dshfiles plugins')).toHaveCount(0)
+  await settingsNavEntry(page, 'Plugins').click()
+  await page.getByRole('button', { name: 'Open Plugins', exact: true }).click()
+  await page.getByRole('tab', { name: 'Dshfiles plugins', exact: true }).click()
+  await expect(page.locator('[data-dshfiles-plugins-page]')).toBeVisible()
 })
 
 Then('installed dshfiles plugins are listed with quick toggles and a Settings link for Main tabs', async ({ page }: { page: Page }) => {
-  const pluginsPage = settingsView(page).locator('[data-dshfiles-plugins-page]')
+  const pluginsPage = page.locator('[data-dshfiles-plugins-page]')
   const mainTabsRow = pluginsPage.locator('[data-dshfiles-bundle="@dshfiles/main-tabs"]')
   await recordAssertion(page, 'settings-shell-dshfiles-plugins-page', async () => {
     await expect(mainTabsRow).toBeVisible()

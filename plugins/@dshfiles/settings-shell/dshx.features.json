@@ -897,20 +897,29 @@
     },
     {
       "id": "dshfiles-plugins-page",
-      "title": "Global Dshfiles plugins quick-toggle page",
-      "summary": "Settings › Plugins › Dshfiles plugins lists global @dshfiles/* bundles installed in the profile grouped by functional area, with live search, source (dshfiles / Community / All) and status (All / Enabled / Disabled) filters, quick enable/disable switches backed by PluginManager.setBundleEnabled, restart indicators, and deep links to each plugin's settings page.",
-      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click button \"Dshfiles plugins\"", "expect switch \"Enable *\""],
+      "title": "Dshfiles plugins tab in the Plugins panel",
+      "summary": "The Plugins panel's Dshfiles plugins tab (the plugins.tab seat beside Installed) lists global @dshfiles/* bundles installed in the profile grouped by functional area, with live search, source (dshfiles / Community / All) and status (All / Enabled / Disabled) filters, quick enable/disable switches backed by PluginManager.setBundleEnabled, restart indicators, and deep links to each plugin's settings page.",
+      "reach": [
+        "click button \"Account menu\"",
+        "click menuitem \"Settings*\"",
+        "click button \"Plugins\"",
+        "click button \"Open Plugins\"",
+        "click tab \"Dshfiles plugins\"",
+        "expect switch \"Enable *\""
+      ],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
         "click combobox \"Sections\"",
-        "click option \"Dshfiles plugins\"",
+        "click option \"Plugins\"",
+        "click button \"Open Plugins\"",
+        "click tab \"Dshfiles plugins\"",
         "expect switch \"Enable *\""
       ],
-      "surfaces": ["client", "host", "settings"],
-      "surface": "settingsSection",
+      "surfaces": ["client", "host"],
+      "surface": "destinationSection",
       "destination": "settings",
-      "currentSurface": "settings: Plugins › Dshfiles plugins",
+      "currentSurface": "settings: Plugins panel › Dshfiles plugins tab",
       "configuration": [],
       "states": ["loading", "ready", "filtered", "toggling", "pending-restart", "error"],
       "failureModes": [

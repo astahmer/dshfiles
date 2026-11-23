@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ClientReleaseChange } from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 
@@ -62,7 +63,7 @@ import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
-import { DSHFILES_PLUGINS_SECTION_ID, SettingsGroups, type GroupedEntries } from './settings-groups.js'
+import { DSHFILES_PLUGINS_TAB_ID, SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
@@ -966,25 +967,18 @@ export default defineClient({
         ),
       ),
     )
-    ctx.slots.inject('settings.section', () =>
+    ctx.slots.inject('plugins.tab', () =>
       ctx.slots.register(
         {
-          name: 'settings.section',
-          id: DSHFILES_PLUGINS_SECTION_ID,
-          order: -5,
+          name: 'plugins.tab',
+          id: DSHFILES_PLUGINS_TAB_ID,
+          order: 5,
           label: () => t('pluginsPage.nav'),
           locale: SHELL_LOCALE_NAMESPACE,
         },
-        decorate((props: { readonly t: ShellTranslate; readonly openSection?: (sectionId: string) => void }) => {
+        decorate((props: { readonly t: ShellTranslate }) => {
           const grouped = useObservable(groups)
-          return (
-            <DshfilesPluginsPage
-              groups={grouped}
-              onOpenSettings={props.openSection ?? openSettings}
-              resolveLocaleText={text => ctx.locale.resolveText(text)}
-              t={props.t}
-            />
-          )
+          return <DshfilesPluginsPage groups={grouped} onOpenSettings={openSettings} resolveLocaleText={text => ctx.locale.resolveText(text)} t={props.t} />
         }),
       ),
     )

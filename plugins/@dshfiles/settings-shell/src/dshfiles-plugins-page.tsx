@@ -14,7 +14,7 @@ import type { ShellTranslate } from './native/locales.js'
 import type { PluginBundleOrigin } from './origin.js'
 import { PLUGINS_QUERY_KEY } from './plugin-entry-card.js'
 import { SegmentedFilter } from './segmented-filter.js'
-import { DSHFILES_PLUGINS_SECTION_ID, SettingsGroups, type GroupedEntries } from './settings-groups.js'
+import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { settingsShellApi, type PluginBundle, type PluginBundleChange } from './shell-api.js'
 
 const BUNDLES_QUERY_KEY = ['settings-shell', 'bundles'] as const
@@ -43,7 +43,6 @@ export const settingsEntryIdForBundle = (groups: readonly GroupedEntries[], bund
   const rowSet = new Set(bundle.rowIds)
   for (const group of groups) {
     for (const entry of group.entries) {
-      if (entry.id === DSHFILES_PLUGINS_SECTION_ID) continue
       if (entry.bundleName === bundle.name) return entry.id
       if (entry.sectionId !== undefined && rowSet.has(entry.sectionId)) return entry.id
       if (entry.pages.some(page => rowSet.has(page.ns)) || entry.hiddenPages.some(page => rowSet.has(page.ns))) return entry.id
