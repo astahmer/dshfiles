@@ -1,0 +1,15 @@
+{
+  "name": "editor-137-scratch",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.2.2-rc.2",
+    "modern-monaco": "0.4.2",
+    "monaco-editor": "0.57.0",
+    "playwright": "1.56.1",
+    "tm-grammars": "1.31.15",
+    "tm-themes": "1.12.2",
+    "typescript": "6.0.3",
+    "vite": "8.3.2"
+  }
+}
