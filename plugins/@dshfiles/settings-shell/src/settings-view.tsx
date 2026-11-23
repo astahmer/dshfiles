@@ -373,12 +373,18 @@ const EntryView = (
 /** Search field, the grouped navigation and the active entry, or the search results. */
 const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): JSX.Element => {
   const { t } = props
-  const [chosenOrigin, setChosenOrigin] = useState<SettingsOriginFilter>('all')
+  const [originFilter, setOriginFilter] = useState<SettingsOriginFilter>('all')
+  const [lastActiveId, setLastActiveId] = useState(props.activeId)
   const searching = props.query.trim() !== ''
   const counts = SettingsGroups.originCounts(props.groups)
   const requested = SettingsGroups.entryFor(props.groups, props.activeId)
-  // An entry of the other origin opened from elsewhere (a link, the Dshfiles plugins page) shows every entry again.
-  const originFilter = requested === undefined || chosenOrigin === 'all' || requested.origin === chosenOrigin ? chosenOrigin : 'all'
+  // An entry of the other origin opened from elsewhere (a link, the Dshfiles plugins page) resets the filter to All.
+  if (props.activeId !== lastActiveId && requested !== undefined) {
+    setLastActiveId(props.activeId)
+    if (originFilter !== 'all' && requested.origin !== originFilter) {
+      setOriginFilter('all')
+    }
+  }
   const visibleGroups = SettingsGroups.filterByOrigin(props.groups, originFilter)
   const visibleIds = new Set(visibleGroups.flatMap(group => group.entries.map(entry => entry.id)))
   const filtering = originFilter !== 'all'
@@ -391,7 +397,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   })
   const active = SettingsGroups.entryFor(visibleGroups, props.activeId) ?? visibleGroups[0]?.entries[0]
   const changeOrigin = (next: SettingsOriginFilter): void => {
-    setChosenOrigin(next)
+    setOriginFilter(next)
     const nextGroups = SettingsGroups.filterByOrigin(props.groups, next)
     if (active === undefined || SettingsGroups.entryFor(nextGroups, active.id) !== undefined) return
     const first = nextGroups[0]?.entries[0]

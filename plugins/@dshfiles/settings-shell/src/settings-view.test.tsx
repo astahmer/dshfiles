@@ -170,6 +170,11 @@ describe('settings view: origin filter', () => {
     expect(view.shownEntry()).toBe('general')
     expect(view.navButtons()).toEqual(['general', 'link:mcp-servers', 'appearance'])
     expect(view.host.querySelector('[data-origin-option="all"]')?.getAttribute('aria-pressed')).toBe('true')
+
+    act(() => view.host.querySelector<HTMLButtonElement>('nav button[data-nav-id="appearance"]')?.click())
+    expect(view.shownEntry()).toBe('appearance')
+    expect(view.navButtons()).toEqual(['general', 'link:mcp-servers', 'appearance'])
+    expect(view.host.querySelector('[data-origin-option="all"]')?.getAttribute('aria-pressed')).toBe('true')
     view.unmount()
   })
 
