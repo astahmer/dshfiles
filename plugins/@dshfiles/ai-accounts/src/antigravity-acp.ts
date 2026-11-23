@@ -56,7 +56,15 @@ const MAX_PROCESSES = 6
  */
 const QUOTA_ATTEMPTS = 3
 const QUOTA_RETRY_LINE = /Run: attempt (\d+) failed \(RESOURCE_EXHAUSTED/u
+/**
+ * `agy acp` truncates a single `session/prompt` past ~192 KB (`<truncated N bytes>`), which silently drops the
+ * trailing prompt blocks (the compaction instruction or the user's latest message). Capping the replayed transcript
+ * below that limit keeps the trailing prompt intact.
+ */
+const MAX_PROMPT_BYTES = 160_000
+const REPLAY_HEAD_SHARE = 0.25
 
+const finiteCount = Schema.optional(Schema.Number.check(Schema.isFinite()))
 const toolArgumentsSchema = Schema.Record(Schema.String, Schema.Json)
 type ToolArguments = typeof toolArgumentsSchema.Type
 const textBlockSchema = Schema.Struct({ type: Schema.Literal('text'), text: Schema.String })
@@ -66,6 +74,7 @@ const sessionUpdateSchema = Schema.Struct({
   update: Schema.Union([
     Schema.Struct({ sessionUpdate: Schema.Literal('agent_message_chunk'), content: textBlockSchema }),
     Schema.Struct({ sessionUpdate: Schema.Literal('agent_thought_chunk'), content: textBlockSchema }),
+    Schema.Struct({ sessionUpdate: Schema.Literal('usage_update'), used: finiteCount, size: finiteCount }),
     Schema.Struct({
       sessionUpdate: Schema.Literal('tool_call'),
       toolCallId: Schema.String,
@@ -81,7 +90,6 @@ const permissionRequestSchema = Schema.Struct({
   options: Schema.Array(Schema.Struct({ optionId: Schema.String, kind: Schema.String })),
 })
 
-const finiteCount = Schema.optional(Schema.Number.check(Schema.isFinite()))
 const promptResultSchema = Schema.Struct({
   stopReason: Schema.String,
   usage: Schema.optional(Schema.Struct({ inputTokens: finiteCount, outputTokens: finiteCount, cachedReadTokens: finiteCount, cachedWriteTokens: finiteCount })),
@@ -113,6 +121,7 @@ type SessionPhase =
 type AcpEvent =
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'thought'; readonly text: string }
+  | { readonly kind: 'usage'; readonly used: number }
   | { readonly kind: 'toolCall'; readonly id: string; readonly name: string; readonly arguments: ToolArguments }
   /** The model is blocked on a DSH tool call that DSH has not answered yet. */
   | { readonly kind: 'toolsHeld' }
@@ -136,6 +145,8 @@ interface Session {
   readonly ready: Promise<string>
   /** Whether an ACP prompt is running; a user message DSH adds meanwhile waits in `queued` for the next one. */
   prompting: boolean
+  /** Number of tool-use steps already completed inside the running ACP prompt; `result.usage` sums every step. */
+  promptSteps: number
   readonly queued: AcpJson[]
   /** Transcript messages this process has seen, and the fingerprint of the last one. */
   synced: number
@@ -169,6 +180,42 @@ const promptBlocks = (content: string | readonly (TextContent | ImageContent)[])
   !Array.isArray(content)
     ? [{ type: 'text', text: content }]
     : content.map(block => (block.type === 'text' ? { type: 'text', text: block.text } : { type: 'image', mimeType: block.mimeType, data: block.data }))
+
+const sliceUtf8Head = (buffer: Buffer, maxBytes: number): Buffer => {
+  let end = Math.min(buffer.length, maxBytes)
+  while (end > 0) {
+    const byte = buffer[end]
+    if (byte === undefined || (byte & 0xc0) !== 0x80) break
+    end -= 1
+  }
+  return buffer.subarray(0, end)
+}
+
+const sliceUtf8Tail = (buffer: Buffer, maxBytes: number): Buffer => {
+  let start = Math.max(0, buffer.length - maxBytes)
+  while (start < buffer.length) {
+    const byte = buffer[start]
+    if (byte === undefined || (byte & 0xc0) !== 0x80) break
+    start += 1
+  }
+  return buffer.subarray(start)
+}
+
+const replayOmissionMarker = (omittedBytes: number): string => `\n[… ${String(omittedBytes)} bytes omitted to fit Antigravity CLI prompt limit …]\n`
+
+const fitReplayTranscript = (rendered: string, maxBytes: number): string => {
+  const buffer = Buffer.from(rendered, 'utf8')
+  if (buffer.length <= maxBytes) return rendered
+  const markerBytes = Buffer.byteLength(replayOmissionMarker(buffer.length), 'utf8')
+  const available = maxBytes - markerBytes
+  if (available <= 0) return ''
+  const headBudget = Math.floor(available * REPLAY_HEAD_SHARE)
+  const tailBudget = available - headBudget
+  const head = sliceUtf8Head(buffer, headBudget)
+  const tail = sliceUtf8Tail(buffer, tailBudget)
+  const omitted = buffer.length - head.length - tail.length
+  return `${head.toString('utf8')}${replayOmissionMarker(omitted)}${tail.toString('utf8')}`
+}
 
 /** `agy` adds its own keys (`toolSummary`) to a call's input; DSH's tool gets only the parameters it declares. */
 const declaredArguments = (tool: Tool | undefined, input: ToolArguments): ToolArguments => {
@@ -286,13 +333,16 @@ export class AntigravityAcpSessions {
     const pendingStart = CliBridge.trailingUserStart(conversation)
     const pending = conversation.slice(pendingStart).filter(message => message.role === 'user')
     const earlier = conversation.slice(0, pendingStart)
-    const opening =
-      earlier.length === 0 ? [] : [{ type: 'text', text: `The conversation so far, which you are continuing:\n${CliBridge.renderTranscript(earlier)}` }]
-    const blocks =
+    const pendingBlocks =
       pending.length === 0
-        ? [...opening, { type: 'text', text: 'Continue from where the conversation stopped.' }]
-        : [...opening, ...pending.flatMap(message => promptBlocks(message.content))]
-    this.prompt(session, blocks)
+        ? [{ type: 'text', text: 'Continue from where the conversation stopped.' }]
+        : pending.flatMap(message => promptBlocks(message.content))
+    const pendingBytes = pendingBlocks.reduce((sum, block) => sum + ('text' in block ? Buffer.byteLength(block.text, 'utf8') : 0), 0)
+    const openingPrefix = 'The conversation so far, which you are continuing:\n'
+    const openingBudget = MAX_PROMPT_BYTES - pendingBytes - Buffer.byteLength(openingPrefix, 'utf8')
+    const replay = earlier.length === 0 ? '' : fitReplayTranscript(CliBridge.renderTranscript(earlier), openingBudget)
+    const opening = replay === '' ? [] : [{ type: 'text', text: `${openingPrefix}${replay}` }]
+    this.prompt(session, [...opening, ...pendingBlocks])
     session.synced = messages.length
     session.lastFingerprint = CliBridge.fingerprint(JSON.stringify(messages.at(-1) ?? ''))
     return session
@@ -338,6 +388,7 @@ export class AntigravityAcpSessions {
       return
     }
     session.prompting = true
+    session.promptSteps = 0
     void this.runPrompt(session, blocks)
   }
 
@@ -495,6 +546,8 @@ export class AntigravityAcpSessions {
     const update = decoded.success.update
     if (update.sessionUpdate === 'agent_message_chunk' && 'content' in update) this.emit(session, { kind: 'text', text: update.content.text })
     if (update.sessionUpdate === 'agent_thought_chunk' && 'content' in update) this.emit(session, { kind: 'thought', text: update.content.text })
+    if (update.sessionUpdate === 'usage_update' && 'used' in update && update.used !== undefined && update.used > 0)
+      this.emit(session, { kind: 'usage', used: update.used })
     if (update.sessionUpdate === 'tool_call' && 'toolCallId' in update) this.onToolCall(session, update)
   }
 
@@ -586,6 +639,7 @@ export class AntigravityAcpSessions {
       tools: input.tools,
       ready,
       prompting: false,
+      promptSteps: 0,
       queued: [],
       synced: 0,
       lastFingerprint: '',
@@ -684,6 +738,17 @@ export class AntigravityAcpSessions {
     let started = false
     let finished = false
     let toolCalls = 0
+    let stepUsed: number | undefined
+    const applyStepUsage = (used: number): void => {
+      output.usage = {
+        ...output.usage,
+        input: used,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: used,
+      }
+    }
     const finish = (): void => {
       finished = true
       input.signal?.removeEventListener('abort', onAbort)
@@ -760,6 +825,9 @@ export class AntigravityAcpSessions {
           stream.push({ type: 'thinking_delta', contentIndex: open.contentIndex, delta, partial: output })
           return
         }
+        case 'usage':
+          stepUsed = event.used
+          return
         case 'toolCall': {
           begin()
           close()
@@ -771,22 +839,30 @@ export class AntigravityAcpSessions {
           return
         }
         case 'toolsHeld':
-          if (toolCalls > 0) done('toolUse')
+          if (toolCalls > 0) {
+            if (stepUsed !== undefined) applyStepUsage(stepUsed)
+            session.promptSteps += 1
+            done('toolUse')
+          }
           return
         case 'turnEnded': {
           begin()
-          const usage = event.result.usage
-          const inputTokens = usage?.inputTokens ?? 0
-          const outputTokens = usage?.outputTokens ?? 0
-          const cacheRead = usage?.cachedReadTokens ?? 0
-          const cacheWrite = usage?.cachedWriteTokens ?? 0
-          output.usage = {
-            ...output.usage,
-            input: inputTokens,
-            output: outputTokens,
-            cacheRead,
-            cacheWrite,
-            totalTokens: inputTokens + outputTokens + cacheRead + cacheWrite,
+          if (session.promptSteps > 0 && stepUsed !== undefined) {
+            applyStepUsage(stepUsed)
+          } else {
+            const usage = event.result.usage
+            const inputTokens = usage?.inputTokens ?? 0
+            const outputTokens = usage?.outputTokens ?? 0
+            const cacheRead = usage?.cachedReadTokens ?? 0
+            const cacheWrite = usage?.cachedWriteTokens ?? 0
+            output.usage = {
+              ...output.usage,
+              input: inputTokens,
+              output: outputTokens,
+              cacheRead,
+              cacheWrite,
+              totalTokens: inputTokens + outputTokens + cacheRead + cacheWrite,
+            }
           }
           output.rawStopReason = event.result.stopReason
           if (event.result.stopReason === 'cancelled') {
