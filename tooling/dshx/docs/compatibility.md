@@ -51,9 +51,9 @@ receive this stability promise.
 - The context no longer carries the plugin's config. Generated Host code
   forwards `apply(ctx, config)`'s config to `setup(ctx, config)`, unwrapping
   schemastery's resolvers first.
-- `dshx/host` re-exports cordis's `Events` augmentation, so `ctx.on` accepts DSH
+- `dshx/host` re-exports Cordis's `Events` augmentation, so `ctx.on` accepts DSH
   event names. This only holds when the plugin and the toolchain resolve one
-  cordis identity; see the repository AGENTS.md.
+  Cordis identity; see [Troubleshooting plugin development](#troubleshooting-plugin-development).
 
 ## What DSH 0.2.2-rc.1 changed
 
@@ -126,6 +126,51 @@ so search can show it before anything downloads. `dshx registry build` copies it
 from the package (`engines.dsh`, then the peer range). DSH still decides from the
 package's own manifest; only a `dsh:source` item, which DSH never sees, is checked
 by dshx.
+
+## Troubleshooting plugin development
+
+- **Missing native services or event names in TypeScript.** Keep imports and peers
+  on `@deepseek-ai/cordis`, not unscoped `cordis`, and don't bundle another
+  copy. Use `pnpm why @deepseek-ai/cordis` and TypeScript's `--traceResolution`
+  to compare what the plugin, DSH provider, and SDK resolve. A second installed
+  copy can put a module augmentation on a different `Context` or `Events`.
+  Align the peers and inspect the [workspace pins](../../../pnpm-workspace.yaml),
+  including Cordis's include and loader packages. Matching types doesn't load
+  a provider; still declare the required service injection.
+- **TS5097, missing `Buffer`, or a build that can't load its own output.**
+  The scaffold uses `NodeNext` and `ES2024` in `tsconfig.json` and writes `.js`
+  specifiers for relative imports in its TypeScript source. If a Node global
+  is missing, confirm `@types/node` is installed and `node` is in the
+  effective `types` list (`pnpm exec tsc --showConfig`). DSHX's TypeScript pass
+  doesn't emit JavaScript; the bundler writes `dist/`, and type errors block
+  publishing staged output by default (see [Build phases](guides/build.md#build-phases)).
+  Don't add `allowImportingTsExtensions`, `rewriteRelativeImportExtensions`,
+  or a `lib/` output directory just to follow a standalone `tsc` recipe.
+- **Windows junction advice.** The manual links to vendor Cordis or the
+  package manager's internal `.pnpm` paths were workarounds for source
+  snapshots. For package-based DSHX projects, install the project's declared
+  dependencies and fix resolution there; don't hand-link Cordis or `@types/node`
+  into `node_modules`.
+- **A compressed Session log appears to contain only a header.** The JSONL
+  backend appends independent Zstandard frames. On the pinned Node, a single
+  `zstdDecompressSync` call on concatenated frames returns only the first one.
+  Prefer DSH's Session APIs in plugins. For offline inspection of a disposable
+  copy, use a decoder that reads all frames (for example, `zstd -dc <file>`).
+  Don't treat the persistence package's `src/zstd.ts` as a plugin API: even
+  though the pinned `0.2.2-rc.2` package ships it, plain Node won't strip its
+  TypeScript under `node_modules`.
+- **DSH rejects a startup variable from `.env`.** Set bootstrap variables such
+  as `DSH_HOME` or `PATH` in the environment that launches DSH, not in the
+  invoking directory's `.env` or the Harness home's `.env`. Proxy settings and
+  the DeepSeek endpoint overrides are allowed in the Harness-home `.env` but
+  not the invoking directory's. See the pinned [app-boot profile documentation](https://cdn.jsdelivr.net/npm/@deepseek-ai/dsh-app-boot@0.2.2-rc.2/README.md#profiles)
+  for the exact names and case rules.
+
+Source: [omdsh-dev/dsh-plugin-dev at `2c17dc2`](https://github.com/omdsh-dev/dsh-plugin-dev/blob/2c17dc2568d630e4dd0be055723e8ccae383f018/skills/dsh-plugin-dev/references/build-pitfalls.md)
+records the original 0.1-era reports. Its README and skill identify MIT, but
+that revision has no root license file and GitHub reports no detected license.
+The guidance above is based on this workspace's scaffold and pinned packages;
+no source text or code was copied or translated.
 
 ## Status semantics
 
