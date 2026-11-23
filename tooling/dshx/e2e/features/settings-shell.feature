@@ -177,7 +177,7 @@ Feature: Settings shell
     Then default DSH and plugin categories are marked and filterable in the sidebar
 
   @scenario:settings-shell.dshfiles-plugins-page
-  Scenario: The Plugins panel's Dshfiles plugins tab lists installed dshfiles bundles with quick toggles and settings links
+  Scenario: Plugins by category lists installed dshfiles bundles with quick toggles and settings links
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
-    When the Dshfiles plugins tab is opened from the Plugins link in Settings
+    When Plugins by category is opened in Settings
     Then installed dshfiles plugins are listed with quick toggles and a Settings link for Main tabs

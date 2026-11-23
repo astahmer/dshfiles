@@ -22865,10 +22865,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "settings-shell#dshfiles-plugins-page",
       "plugin": "settings-shell",
       "id": "dshfiles-plugins-page",
-      "title": "Dshfiles plugins tab in the Plugins panel",
-      "summary": "The Plugins panel's Dshfiles plugins tab (the plugins.tab seat beside Installed) lists global @dshfiles/* bundles installed in the profile grouped by functional area, with live search, source (dshfiles / Community / All) and status (All / Enabled / Disabled) filters, quick enabl…",
+      "title": "Plugins by category: a second plugin view in Settings and as a panel",
+      "summary": "Plugins by category, a second view beside DSH core's Plugins manager, is a Settings › Plugins section and a stage panel (dshfiles-plugin-list) the sidebar can pin. It lists global @dshfiles/* bundles installed in the profile grouped by functional area, with live search, source (…",
       "destination": "settings",
-      "currentSurface": "settings: Plugins panel › Dshfiles plugins tab",
+      "currentSurface": "settings: Plugins › Plugins by category",
       "reach": [
         {
           "text": "click button \"Account menu\"",
@@ -22885,24 +22885,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Plugins\"",
+          "text": "click button \"Plugins by category\"",
           "action": "click",
           "by": "button",
-          "name": "Plugins",
-          "value": null
-        },
-        {
-          "text": "click button \"Open Plugins\"",
-          "action": "click",
-          "by": "button",
-          "name": "Open Plugins",
-          "value": null
-        },
-        {
-          "text": "click tab \"Dshfiles plugins\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Dshfiles plugins",
+          "name": "Plugins by category",
           "value": null
         },
         {
@@ -22936,24 +22922,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click option \"Plugins\"",
+          "text": "click option \"Plugins by category\"",
           "action": "click",
           "by": "option",
-          "name": "Plugins",
-          "value": null
-        },
-        {
-          "text": "click button \"Open Plugins\"",
-          "action": "click",
-          "by": "button",
-          "name": "Open Plugins",
-          "value": null
-        },
-        {
-          "text": "click tab \"Dshfiles plugins\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Dshfiles plugins",
+          "name": "Plugins by category",
           "value": null
         },
         {

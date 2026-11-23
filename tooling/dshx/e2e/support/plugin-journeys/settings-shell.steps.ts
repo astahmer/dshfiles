@@ -554,12 +554,9 @@ Then('default DSH and plugin categories are marked and filterable in the sidebar
   await finishJourneyAssertions(page)
 })
 
-When('the Dshfiles plugins tab is opened from the Plugins link in Settings', async ({ page }: { page: Page }) => {
+When('Plugins by category is opened in Settings', async ({ page }: { page: Page }) => {
   await openSettings(page)
-  await expect(settingsNavEntry(page, 'Dshfiles plugins')).toHaveCount(0)
-  await settingsNavEntry(page, 'Plugins').click()
-  await page.getByRole('button', { name: 'Open Plugins', exact: true }).click()
-  await page.getByRole('tab', { name: 'Dshfiles plugins', exact: true }).click()
+  await settingsNavEntry(page, 'Plugins by category').click()
   await expect(page.locator('[data-dshfiles-plugins-page]')).toBeVisible()
 })
 

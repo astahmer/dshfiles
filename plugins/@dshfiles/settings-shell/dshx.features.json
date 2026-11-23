@@ -897,29 +897,20 @@
     },
     {
       "id": "dshfiles-plugins-page",
-      "title": "Dshfiles plugins tab in the Plugins panel",
-      "summary": "The Plugins panel's Dshfiles plugins tab (the plugins.tab seat beside Installed) lists global @dshfiles/* bundles installed in the profile grouped by functional area, with live search, source (dshfiles / Community / All) and status (All / Enabled / Disabled) filters, quick enable/disable switches backed by PluginManager.setBundleEnabled, restart indicators, and deep links to each plugin's settings page.",
-      "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "click button \"Plugins\"",
-        "click button \"Open Plugins\"",
-        "click tab \"Dshfiles plugins\"",
-        "expect switch \"Enable *\""
-      ],
+      "title": "Plugins by category: a second plugin view in Settings and as a panel",
+      "summary": "Plugins by category, a second view beside DSH core's Plugins manager, is a Settings › Plugins section and a stage panel (dshfiles-plugin-list) the sidebar can pin. It lists global @dshfiles/* bundles installed in the profile grouped by functional area, with live search, source (dshfiles / Community / All) and status (All / Enabled / Disabled) filters, quick enable/disable switches backed by PluginManager.setBundleEnabled, restart indicators, and deep links to each plugin's settings page.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click button \"Plugins by category\"", "expect switch \"Enable *\""],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
         "click combobox \"Sections\"",
-        "click option \"Plugins\"",
-        "click button \"Open Plugins\"",
-        "click tab \"Dshfiles plugins\"",
+        "click option \"Plugins by category\"",
         "expect switch \"Enable *\""
       ],
-      "surfaces": ["client", "host"],
-      "surface": "destinationSection",
+      "surfaces": ["client", "host", "settings"],
+      "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: Plugins panel › Dshfiles plugins tab",
+      "currentSurface": "settings: Plugins › Plugins by category",
       "configuration": [],
       "states": ["loading", "ready", "filtered", "toggling", "pending-restart", "error"],
       "failureModes": [

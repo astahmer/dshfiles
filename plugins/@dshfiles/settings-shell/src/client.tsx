@@ -3,7 +3,6 @@ import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ClientReleaseChange } from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
-import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 
@@ -30,6 +29,7 @@ import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState } from 'react'
+import { LayoutListIcon } from '@dshfiles/plugin-ui/icons'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type * as Types from 'effect/Types'
@@ -63,7 +63,7 @@ import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
-import { DSHFILES_PLUGINS_TAB_ID, SettingsGroups, type GroupedEntries } from './settings-groups.js'
+import { DSHFILES_PLUGINS_SECTION_ID, SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
@@ -78,6 +78,8 @@ import {
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
+/** Plugins by category as a stage panel the sidebar can pin. */
+const PLUGIN_LIST_PANEL_ID = 'dshfiles-plugin-list'
 const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
 const MAIN_TABS_OVERLAY_ID = 'dshfiles-main-tabs'
 const PUBLISH_SETTLE_MS = 250
@@ -967,19 +969,49 @@ export default defineClient({
         ),
       ),
     )
-    ctx.slots.inject('plugins.tab', () =>
+    // A second view of the installed plugins, beside DSH core's Plugins manager: a Settings section and a stage panel.
+    const PluginsByCategory = (props: { readonly onOpenSettings?: ((sectionId: string) => void) | undefined }): JSX.Element => {
+      const grouped = useObservable(groups)
+      return (
+        <DshfilesPluginsPage
+          groups={grouped}
+          onOpenPluginManager={() => openPanel('plugins')}
+          onOpenSettings={props.onOpenSettings ?? openSettings}
+          resolveLocaleText={text => ctx.locale.resolveText(text)}
+          t={t}
+        />
+      )
+    }
+    ctx.slots.inject('settings.section', () =>
       ctx.slots.register(
         {
-          name: 'plugins.tab',
-          id: DSHFILES_PLUGINS_TAB_ID,
-          order: 5,
+          name: 'settings.section',
+          id: DSHFILES_PLUGINS_SECTION_ID,
+          order: 2,
           label: () => t('pluginsPage.nav'),
           locale: SHELL_LOCALE_NAMESPACE,
         },
-        decorate((props: { readonly t: ShellTranslate }) => {
-          const grouped = useObservable(groups)
-          return <DshfilesPluginsPage groups={grouped} onOpenSettings={openSettings} resolveLocaleText={text => ctx.locale.resolveText(text)} t={props.t} />
-        }),
+        decorate((props: { readonly openSection?: (sectionId: string) => void }) => <PluginsByCategory onOpenSettings={props.openSection} />),
+      ),
+    )
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register(
+        { name: 'sidebar.panellist', id: PLUGIN_LIST_PANEL_ID, order: 90, label: () => t('pluginsPage.nav') },
+        (props: { readonly size?: number }) => <LayoutListIcon aria-hidden size={props.size ?? 18} strokeWidth={1.6} />,
+      ),
+    )
+    ctx.slots.inject('main', () =>
+      ctx.slots.register(
+        { name: 'main', key: PLUGIN_LIST_PANEL_ID },
+        decorate(() => (
+          <section
+            aria-label={t('pluginsPage.nav')}
+            className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-4"
+          >
+            <h2 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{t('pluginsPage.nav')}</h2>
+            <PluginsByCategory />
+          </section>
+        )),
       ),
     )
     ctx.slots.inject('settings.general.item', () =>

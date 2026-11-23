@@ -14,7 +14,7 @@ import type { ShellTranslate } from './native/locales.js'
 import type { PluginBundleOrigin } from './origin.js'
 import { PLUGINS_QUERY_KEY } from './plugin-entry-card.js'
 import { SegmentedFilter } from './segmented-filter.js'
-import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
+import { DSHFILES_PLUGINS_SECTION_ID, SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { settingsShellApi, type PluginBundle, type PluginBundleChange } from './shell-api.js'
 
 const BUNDLES_QUERY_KEY = ['settings-shell', 'bundles'] as const
@@ -43,6 +43,7 @@ export const settingsEntryIdForBundle = (groups: readonly GroupedEntries[], bund
   const rowSet = new Set(bundle.rowIds)
   for (const group of groups) {
     for (const entry of group.entries) {
+      if (entry.id === DSHFILES_PLUGINS_SECTION_ID) continue
       if (entry.bundleName === bundle.name) return entry.id
       if (entry.sectionId !== undefined && rowSet.has(entry.sectionId)) return entry.id
       if (entry.pages.some(page => rowSet.has(page.ns)) || entry.hiddenPages.some(page => rowSet.has(page.ns))) return entry.id
@@ -73,6 +74,7 @@ export interface DshfilesPluginsViewProps {
   readonly refreshing: boolean
   readonly onToggle: (name: string, enabled: boolean) => Promise<PluginBundleChange>
   readonly onOpenSettings: (entryId: string) => void
+  readonly onOpenPluginManager?: (() => void) | undefined
 }
 
 export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Element => {
@@ -180,10 +182,18 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
           </div>
           <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{t('pluginsPage.subtitle')}</p>
         </div>
-        <Button disabled={props.refreshing} onClick={props.onRefresh} size="sm" variant="outline">
-          <RefreshCwIcon aria-hidden="true" className={cn('dshx:size-3.5', props.refreshing && 'dshx:animate-spin')} />
-          {t('pluginsPage.refresh')}
-        </Button>
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          {props.onOpenPluginManager === undefined ? null : (
+            <Button onClick={props.onOpenPluginManager} size="sm" variant="outline">
+              <PuzzleIcon aria-hidden="true" className="dshx:size-3.5" />
+              {t('pluginsPage.openManager')}
+            </Button>
+          )}
+          <Button disabled={props.refreshing} onClick={props.onRefresh} size="sm" variant="outline">
+            <RefreshCwIcon aria-hidden="true" className={cn('dshx:size-3.5', props.refreshing && 'dshx:animate-spin')} />
+            {t('pluginsPage.refresh')}
+          </Button>
+        </div>
       </div>
 
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
@@ -352,6 +362,7 @@ interface DshfilesPluginsPageProps {
   readonly resolveLocaleText: (text: NonNullable<PluginBundle['title']>) => string
   readonly t: ShellTranslate
   readonly onOpenSettings: (entryId: string) => void
+  readonly onOpenPluginManager?: (() => void) | undefined
 }
 
 const ConnectedDshfilesPluginsPage = (props: DshfilesPluginsPageProps): JSX.Element => {
@@ -374,6 +385,7 @@ const ConnectedDshfilesPluginsPage = (props: DshfilesPluginsPageProps): JSX.Elem
       error={bundlesQuery.isError ? errorMessage(bundlesQuery.error, props.t('pluginsPage.loadError')) : undefined}
       groups={props.groups}
       loading={bundlesQuery.isLoading}
+      onOpenPluginManager={props.onOpenPluginManager}
       onOpenSettings={props.onOpenSettings}
       onRefresh={() => {
         void bundlesQuery.refetch()

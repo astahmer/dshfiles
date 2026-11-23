@@ -10,7 +10,7 @@
 
 ![Settings sidebar distinguishing default DSH and plugin categories](docs/screenshots/settings-origin-distinction.png)
 
-![Dshfiles plugins tab in the Plugins panel](docs/screenshots/dshfiles-plugins-page.png)
+![Plugins by category](docs/screenshots/dshfiles-plugins-page.png)
 
 ![Edit plugin settings as JSON](docs/screenshots/settings-json-editor.png)
 
@@ -29,7 +29,7 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
   **Security**, **Notifications**, **Plugins**, **About**, and **Other** for anything not placed yet. The map lives in
   [`src/settings-groups.ts`](src/settings-groups.ts): native `settings.section` ids, plugin settings namespaces, and the
   stage pages other plugins own. Entries carry a person's name, never a package id (`agent-loop` reads _Agent loop_).
-- **Deep links**: **AI accounts**, **MCP servers**, **Secrets**, **Hosts** and **Plugins** are entries that open the page their plugin
+- **Deep links**: **AI accounts**, **MCP servers**, **Secrets**, **Hosts** and **Installed plugins** are entries that open the page their plugin
   owns (_Open MCP servers_); Settings links them instead of copying their UI. AI accounts appears once: its section,
   its plugin settings and the link to the accounts page share one entry. Every Jev setting (enable, key, thresholds) of
   every plugin sits under **Tools & MCP › Jev**; the plugin's own page says so and links there.
@@ -38,10 +38,10 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
   **All / DSH / Plugins** filter at the top of the sidebar (and above the compact mobile picker) narrows the list and the
   search results by source. A stock DSH category stays DSH when a dshfiles fork serves it (Agent loop). Opening an entry
   of the other source from elsewhere shows every entry again.
-- **Dshfiles plugins tab**: the **Plugins** panel (DSH core's, the one the sidebar and **Settings › Plugins** open) gains
-  a **Dshfiles plugins** tab through its `plugins.tab` seat. Settings keeps no copy of the list. It shows the profile's
-  `@dshfiles/*` bundles grouped
-  by functional area with live search, source (`dshfiles` / `Community` / `All`) and status (`All` / `Enabled` / `Disabled`)
+- **Plugins by category**: a second view of the installed plugins, beside DSH core's **Plugins** manager (which installs,
+  updates and lists them). It is both **Settings › Plugins › Plugins by category** and a stage panel
+  (`dshfiles-plugin-list`) the sidebar can pin; **Open Plugins manager** goes to the core list. It shows the profile's
+  `@dshfiles/*` bundles grouped by functional area with live search, source (`dshfiles` / `Community` / `All`) and status (`All` / `Enabled` / `Disabled`)
   filters, quick enable/disable switches backed by `PluginManager.setBundleEnabled`, restart-required and Not installed
   badges, and direct **Settings** links to jump to each plugin's configuration page. The functional area comes from
   `src/bundle-categories.ts`; its test fails when a new `plugins/@dshfiles/*` bundle is not placed there.

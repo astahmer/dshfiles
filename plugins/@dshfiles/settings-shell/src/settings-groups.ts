@@ -2,8 +2,8 @@ import { Origin, type SettingsEntryOrigin } from './origin.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
 import type { SettingField } from './schema-form/schema-model.js'
 
-/** The Plugins panel tab that lists every dshfiles bundle with its switch. */
-export const DSHFILES_PLUGINS_TAB_ID = 'dshfiles-plugins'
+/** The Settings section of the second plugin view: every bundle by area, with its switch and a Settings shortcut. */
+export const DSHFILES_PLUGINS_SECTION_ID = 'dshfiles-plugins'
 
 /**
  * The task groups of the one Settings page (plan `docs/ade-ux` §4.6). Settings are grouped by what the user is doing,
@@ -58,6 +58,7 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   'dshfiles-new-thread': { group: 'projects', order: 0 },
   'dshfiles-network-access': { group: 'hosts', order: 20 },
   plugins: { group: 'plugins', order: 0 },
+  [DSHFILES_PLUGINS_SECTION_ID]: { group: 'plugins', label: 'Plugins by category', order: 2 },
   // thread-sidebar's Update DSH (fetch, What's new, sync and rebuild, then Restart when idle).
   'dshfiles-update-dsh': { group: 'about', label: 'Update DSH', order: 5 },
   // dshmarket's own settings section: the community catalog, a full page of its own. Unplaced, it landed under "Other".
@@ -101,6 +102,7 @@ const SECTION_BUNDLES = new Map<string, string>([
   ['dshfiles-mcp-endpoint', '@dshfiles/mcp-endpoint'],
   ['dshfiles-new-thread', '@dshfiles/workspace-folder-picker'],
   ['dshfiles-network-access', '@dshfiles/phone-pairing'],
+  [DSHFILES_PLUGINS_SECTION_ID, '@dshfiles/settings-shell'],
   ['dshfiles-update-dsh', '@dshfiles/thread-sidebar'],
   ['market', 'dshmarket'],
 ])
@@ -246,13 +248,7 @@ export const PAGE_LINKS: readonly PageLink[] = [
     order: 0,
     entry: ['plugin:dshfiles-multi-host'],
   },
-  {
-    panelId: 'plugins',
-    group: 'plugins',
-    label: 'Plugins',
-    description: 'Installed plugins, dshfiles quick toggles and the marketplace.',
-    order: 1,
-  },
+  { panelId: 'plugins', group: 'plugins', label: 'Installed plugins', description: 'Every loaded plugin, its version and its own page.', order: 1 },
   { panelId: 'dshfiles-agents', group: 'agents', label: 'Agent definitions', description: 'Configured agents, their instructions and routes.', order: 0 },
 ]
 
