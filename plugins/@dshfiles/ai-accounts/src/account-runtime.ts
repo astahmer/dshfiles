@@ -14,7 +14,7 @@ import type { FastModeUsageHistoryService } from './fast-mode-usage-history.js'
 import type { ServingAccountService } from './serving-account.js'
 import type { AccountSetupService } from './account-setup-service.js'
 import type { NativeProviderSwitch } from './native-providers.js'
-import type { AntigravityAccountDescription } from './antigravity-account.js'
+import type { AntigravityAccountDescription, AntigravityQuotaReading } from './antigravity-account.js'
 
 interface AccountRuntime {
   accounts?: { config: AiAccountsConfig; pool: AccountPoolView }
@@ -41,8 +41,11 @@ interface AccountRuntime {
   fastModeUsageHistory?: FastModeUsageHistoryService
   servingAccount?: ServingAccountService
   nativeProviders?: NativeProviderSwitch
-  /** Reads an Antigravity login through `agy` on the Host's spawner; cached per home. */
-  antigravity?: { readonly describe: (home: string) => Promise<AntigravityAccountDescription> }
+  /** Reads an Antigravity login and live quota through `agy` on the Host's spawner. */
+  antigravity?: {
+    readonly describe: (home: string) => Promise<AntigravityAccountDescription>
+    readonly readQuota: (home: string, signal?: AbortSignal) => Promise<AntigravityQuotaReading>
+  }
 }
 
 const runtimes = new WeakMap<Context, AccountRuntime>()

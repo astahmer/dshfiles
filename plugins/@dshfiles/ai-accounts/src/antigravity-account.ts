@@ -9,7 +9,7 @@ import type { UsageCard } from './api.js'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { AiAccountsSchema } from './effect-schema.js'
 import { ShellCommand } from './shell-command.js'
-import { ProviderUsageModel } from './usage.js'
+import { ProviderUsageModel, type UsageWindow } from './usage.js'
 
 /**
  * Antigravity (Google AI plan) accounts.
@@ -46,6 +46,11 @@ export type AntigravityAccountDescription =
     }
   | { readonly signedIn: false; readonly detail: string }
 
+export type AntigravityQuotaReading =
+  | { readonly status: 'ok'; readonly windows: readonly UsageWindow[] }
+  | { readonly status: 'unauthenticated'; readonly detail: string }
+  | { readonly status: 'error'; readonly detail: string }
+
 const configOptionSchema = Schema.Struct({
   id: Schema.String,
   currentValue: Schema.optional(Schema.Unknown),
@@ -64,6 +69,53 @@ const newSessionSchema = Schema.Struct({
   ),
 })
 const configUpdateSchema = Schema.Struct({ configOptions: configOptionsSchema })
+
+const usageBucketSchema = Schema.Struct({
+  id: Schema.optional(Schema.String),
+  name: Schema.optional(Schema.String),
+  window: Schema.optional(Schema.String),
+  remaining_fraction: Schema.Number.check(Schema.isFinite()),
+  reset_time: Schema.optional(Schema.String),
+})
+
+const usageGroupSchema = Schema.Struct({
+  name: Schema.String,
+  buckets: Schema.Array(usageBucketSchema),
+})
+
+const usageCommandOutputSchema = Schema.Struct({
+  status: Schema.String,
+  error: Schema.optional(Schema.String),
+  command: Schema.optional(
+    Schema.Struct({
+      name: Schema.String,
+      data: Schema.optional(Schema.Struct({ groups: Schema.Array(usageGroupSchema) })),
+    }),
+  ),
+})
+
+const MAX_USAGE_WINDOWS = 6
+const USAGE_PROBE_TIMEOUT_MS = 15_000
+
+const windowOrder = (window: string | undefined): number => {
+  if (window === '5h') return 0
+  if (window === 'weekly') return 1
+  return 2
+}
+
+const shortGroupName = (name: string): string =>
+  name
+    .trim()
+    .replace(/\s+models$/iu, '')
+    .replace(/\s+and\s+/iu, ' / ')
+
+const percentFromFraction = (fraction: number): number => Math.max(0, Math.min(100, Math.round(fraction * 1000) / 10))
+
+const parseResetTime = (value: string | undefined): number | null => {
+  if (value === undefined || value.trim() === '') return null
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 const isLevel = (value: string): value is AntigravityLevel => ANTIGRAVITY_LEVELS.some(level => level === value)
 
@@ -143,21 +195,177 @@ export class AntigravityAccountModel {
   }
 
   /**
-   * The account's quota card. `agy` shows its plan's five-hour and weekly windows only in its own `/usage` panel, and
-   * ACP does not expose them, so the card names the plan and says where to look rather than inventing a percentage.
+   * The account's quota card, combining the cached plan from `describe` with live five-hour and weekly buckets from
+   * `agy -p /usage --output-format json` (which runs locally with zero turns and zero token spend).
    */
   static readUsage = async (input: {
     readonly describe: () => Promise<AntigravityAccountDescription>
+    readonly readQuota?: (() => Promise<AntigravityQuotaReading>) | undefined
     readonly onAuthenticated?: (() => void) | undefined
   }): Promise<UsageCard> => {
     const description = await input.describe()
     if (!description.signedIn) return ProviderUsageModel.emptyUsage('unauthenticated', description.detail)
     input.onAuthenticated?.()
+    if (input.readQuota === undefined) {
+      return {
+        ...ProviderUsageModel.emptyUsage('unsupported', 'Antigravity shows its five-hour and weekly limits only inside the CLI: run `agy` and type /usage.'),
+        plan: description.plan ?? null,
+      }
+    }
+    const quota = await input.readQuota()
+    if (quota.status === 'unauthenticated') return ProviderUsageModel.emptyUsage('unauthenticated', quota.detail)
+    if (quota.status === 'error') return { ...ProviderUsageModel.emptyUsage('error', quota.detail), plan: description.plan ?? null }
     return {
-      ...ProviderUsageModel.emptyUsage('unsupported', 'Antigravity shows its five-hour and weekly limits only inside the CLI: run `agy` and type /usage.'),
+      status: 'ok',
+      message: null,
+      identity: null,
       plan: description.plan ?? null,
+      windows: [...quota.windows],
+      bankedResets: 0,
+      bankedResetExpiries: [],
     }
   }
+
+  /** Parse the JSON output of `agy -p /usage --output-format json` into quota windows. */
+  static parseUsageOutput = (stdout: string, home: string): AntigravityQuotaReading => {
+    const lines = stdout
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith('{'))
+    const rawLine = lines.at(-1)
+    if (rawLine === undefined) return { status: 'error', detail: 'Antigravity CLI returned no JSON for /usage.' }
+    let parsedJson: unknown
+    try {
+      parsedJson = JSON.parse(rawLine)
+    } catch {
+      return { status: 'error', detail: 'Antigravity CLI returned unreadable JSON for /usage.' }
+    }
+    const decoded = AiAccountsSchema.decodeResult(usageCommandOutputSchema, parsedJson)
+    if (decoded._tag !== 'Success') return { status: 'error', detail: 'Antigravity CLI returned an unsupported /usage payload.' }
+    const output = decoded.success
+    if (output.status !== 'SUCCESS' || output.command?.name !== 'usage' || output.command.data === undefined) {
+      const error = output.error?.trim() ?? ''
+      if (/auth/iu.test(error)) {
+        return {
+          status: 'unauthenticated',
+          detail: `Antigravity CLI is not signed in for this account. Run: ${AntigravityAccountModel.loginHint(home)}`,
+        }
+      }
+      return { status: 'error', detail: error === '' ? 'Antigravity CLI could not read /usage.' : error }
+    }
+    const windows: UsageWindow[] = []
+    const seen = new Set<string>()
+    for (const group of output.command.data.groups) {
+      const groupName = shortGroupName(group.name)
+      const buckets = [...group.buckets].sort((left, right) => windowOrder(left.window) - windowOrder(right.window))
+      for (const bucket of buckets) {
+        if (windows.length >= MAX_USAGE_WINDOWS) break
+        const windowName = bucket.window?.trim() ?? ''
+        const fallbackName = bucket.name?.trim() ?? ''
+        const rawLabel = windowName !== '' ? `${groupName} ${windowName}` : fallbackName !== '' ? fallbackName : groupName
+        const label = rawLabel.slice(0, 32)
+        if (label === '' || seen.has(label)) continue
+        seen.add(label)
+        windows.push({
+          label,
+          percentRemaining: percentFromFraction(bucket.remaining_fraction),
+          resetsAt: parseResetTime(bucket.reset_time),
+        })
+      }
+      if (windows.length >= MAX_USAGE_WINDOWS) break
+    }
+    return { status: 'ok', windows }
+  }
+
+  /**
+   * Read the account's live quota buckets with `agy -p /usage --output-format json`. Runs locally with zero turns and
+   * zero token usage; aborts immediately if `agy` prompts for interactive sign-in.
+   */
+  static probeUsage = (input: {
+    readonly home: string
+    readonly processes: AntigravityProcessesPromise
+    readonly executable?: string
+    readonly signal?: AbortSignal | undefined
+  }): Promise<AntigravityQuotaReading> =>
+    withSpan('antigravity usage', { kind: 'client', attributes: { 'process.executable.name': ANTIGRAVITY_EXECUTABLE } }, async span => {
+      if (input.signal?.aborted) return { status: 'error', detail: 'Antigravity usage read was cancelled.' }
+      const directory = mkdtempSync(join(tmpdir(), 'dsh-agy-usage-'))
+      const lines: string[] = []
+      let stderr = ''
+      let settled = false
+      let resolveResult: (reading: AntigravityQuotaReading) => void = () => undefined
+      const done = new Promise<AntigravityQuotaReading>(resolve => {
+        resolveResult = resolve
+      })
+      const finish = (reading: AntigravityQuotaReading): void => {
+        if (settled) return
+        settled = true
+        resolveResult(reading)
+      }
+      const running = input.processes.launch({
+        executable: input.executable ?? ANTIGRAVITY_EXECUTABLE,
+        args: ['-p', '/usage', '--output-format', 'json'],
+        cwd: directory,
+        env: AntigravityAccountModel.cliEnvironment({ environment: process.env, home: input.home }),
+        onLine: line => {
+          lines.push(line)
+          if (/authentication required/iu.test(line)) {
+            finish({
+              status: 'unauthenticated',
+              detail: `Antigravity CLI is not signed in for this account. Run: ${AntigravityAccountModel.loginHint(input.home)}`,
+            })
+          }
+        },
+        onStderr: text => {
+          stderr = `${stderr}${text}`.slice(-2_000)
+          if (/authentication required/iu.test(stderr)) {
+            finish({
+              status: 'unauthenticated',
+              detail: `Antigravity CLI is not signed in for this account. Run: ${AntigravityAccountModel.loginHint(input.home)}`,
+            })
+          }
+        },
+        onEnd: outcome => {
+          if (outcome.kind === 'failed') {
+            finish({
+              status: 'error',
+              detail: outcome.missing
+                ? `Antigravity CLI (agy) is not installed on the Host. Install it with: ${ANTIGRAVITY_INSTALL_HINT}`
+                : `Antigravity CLI could not read usage: ${outcome.message}`,
+            })
+            return
+          }
+          const parsed = AntigravityAccountModel.parseUsageOutput(lines.join('\n'), input.home)
+          if (parsed.status === 'ok') {
+            finish(parsed)
+            return
+          }
+          if (outcome.code !== 0 && parsed.status === 'error' && stderr.trim() !== '') {
+            finish({ status: 'error', detail: `Antigravity CLI /usage failed: ${stderr.trim().slice(0, 200)}` })
+            return
+          }
+          finish(parsed)
+        },
+      })
+      const cancelTimeout = input.processes.after(USAGE_PROBE_TIMEOUT_MS, () => {
+        finish({ status: 'error', detail: `Antigravity CLI did not answer /usage within ${String(USAGE_PROBE_TIMEOUT_MS / 1000)} s.` })
+      })
+      const onAbort = (): void => {
+        finish({ status: 'error', detail: 'Antigravity usage read was cancelled.' })
+      }
+      input.signal?.addEventListener('abort', onAbort, { once: true })
+      try {
+        const result = await done
+        span.setAttribute('antigravity.usage.status', result.status)
+        if (result.status === 'ok') span.setAttribute('antigravity.usage.windows', result.windows.length)
+        return result
+      } finally {
+        cancelTimeout()
+        input.signal?.removeEventListener('abort', onAbort)
+        await running.stop()
+        await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(() => undefined)
+      }
+    })
 
   /** A failed description is asked again sooner than a successful one, since a sign-in usually follows it. */
   private static shortenFailure = async (input: {

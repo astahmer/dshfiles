@@ -463,6 +463,7 @@ const readQuotaResetAt = async (ctx: Context, store: AccountStorePromise, accoun
       resolveCredential: resolveKeyFromContext(ctx),
       readCopilotCredential: createCopilotCredentialsService(ctx.get('credentials')).read,
       describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
+      readAntigravityQuota: accountRuntime(ctx)?.antigravity?.readQuota,
     }),
     Date.now(),
   )
@@ -498,6 +499,7 @@ const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signa
               resolveCredential,
               readCopilotCredential,
               describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
+              readAntigravityQuota: accountRuntime(ctx)?.antigravity?.readQuota,
               signal: readSignal,
             }),
           timeoutMs: ACCOUNT_USAGE_READ_TIMEOUT_MS,

@@ -340,7 +340,8 @@ const startAccountsHost = (input: {
   })
   // Google AI plans serve only Google's own Antigravity CLI; requests run through one `agy acp` per conversation.
   const describeAntigravity = (home: string) => AntigravityAccountModel.describe({ home, processes: input.antigravity })
-  runtime.antigravity = { describe: describeAntigravity }
+  const readAntigravityQuota = (home: string, signal?: AbortSignal) => AntigravityAccountModel.probeUsage({ home, processes: input.antigravity, signal })
+  runtime.antigravity = { describe: describeAntigravity, readQuota: readAntigravityQuota }
   onRelease(() => {
     if (runtime.antigravity?.describe === describeAntigravity) delete runtime.antigravity
   })
