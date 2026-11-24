@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { stripVTControlCharacters } from 'node:util'
 import { selectTests } from './test-selection.mjs'
 
 const packages = [
@@ -63,7 +64,14 @@ test('Vitest gets one passWithNoTests option for related and narrowed runs', t =
   setConsumerTest('--passWithNoTests')
   write(`${owner}/src/input.ts`, 'export type Fixture = number\n')
   write(`${consumer}/src/empty.ts`, 'export {}\n')
-  write(`${consumer}/tests/inert.test.ts`, "import type { Fixture } from '@dshfiles/fixture-owner'\nimport { test } from 'vitest'\ntest('inert', () => {})\n")
+  write(
+    `${consumer}/tests/inert.test.ts`,
+    `import { appendFileSync } from 'node:fs'
+import type { Fixture } from '@dshfiles/fixture-owner'
+import { test } from 'vitest'
+test('inert', () => appendFileSync(new URL('./inert.runs', import.meta.url), 'inert\\n'))
+`,
+  )
   const vitest = realpathSync(resolve(import.meta.dirname, '../plugins/@dshfiles/ui-styles/node_modules/vitest'))
   mkdirSync(join(root, 'tooling/dshx/packages'), { recursive: true })
   mkdirSync(join(root, 'scripts'))
@@ -97,7 +105,7 @@ process.exit(result.status ?? 2)
       env: { ...process.env, CI: '1', PATH: `${join(root, 'bin')}:${process.env.PATH}` },
       encoding: 'utf8',
     })
-    const output = `${result.stdout}${result.stderr}`
+    const output = stripVTControlCharacters(`${result.stdout}${result.stderr}`)
     assert.equal(result.status, status, output)
     return {
       output,
@@ -113,7 +121,6 @@ process.exit(result.status ?? 2)
     ['run', 'tests/inert.test.ts', '--passWithNoTests'],
     ['related', '--run', 'src/input.ts', '--passWithNoTests'],
   ])
-  assert.match(narrowed.output, /Test Files\s+1 passed/)
   const related = run(`${consumer}/src/empty.ts`)
   assert.deepEqual(related.args, [['related', '--run', 'src/empty.ts', '--passWithNoTests']])
   assert.match(related.output, /No test files found, exiting with code 0/)
@@ -123,6 +130,8 @@ process.exit(result.status ?? 2)
     assert.deepEqual(args, [['related', '--run', 'src/empty.ts', flag]])
     assert.match(output, /No test files found, exiting with code 1/)
   }
+  // The test body must run exactly once; a successful empty run cannot write this.
+  assert.equal(readFileSync(join(root, consumer, 'tests/inert.runs'), 'utf8'), 'inert\n')
 })
 
 test('CLI rejects an unknown build mode', () => {
