@@ -210,7 +210,7 @@
           "kind": "unit-test",
           "id": "main-tabs.project-name-strip",
           "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
-          "testName": "shows the project name before thread titles only"
+          "testName": "shows the project name as a chip before thread titles only"
         },
         {
           "kind": "unit-test",

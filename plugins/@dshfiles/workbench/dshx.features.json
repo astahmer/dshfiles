@@ -590,13 +590,7 @@
           "kind": "unit-test",
           "id": "workbench.active-tab-visible",
           "file": "plugins/@dshfiles/workbench/src/tab-reveal.test.ts",
-          "testName": "re-reveals the selected tab when its strip resizes, and stops after disposal"
-        },
-        {
-          "kind": "unit-test",
-          "id": "workbench.active-tab-user-scroll",
-          "file": "plugins/@dshfiles/workbench/src/tab-reveal.test.ts",
-          "testName": "leaves a strip alone once the user scrolls it away from the selection"
+          "testName": "re-reveals every group on window resize, and stops after disposal"
         }
       ],
       "telemetry": [
