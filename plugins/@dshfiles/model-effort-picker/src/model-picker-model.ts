@@ -218,6 +218,13 @@ export class ModelPickerModel {
     return undefined
   }
 
+  /** The family mark the composer chip leads with: the catalog model in use, else its raw id. */
+  static triggerBrand = ({ groups, current }: { readonly groups: readonly ModelGroup[]; readonly current: ModelSelection | null }): BrandKey | undefined => {
+    if (current === null) return undefined
+    const model = groups.find(group => group.id === current.provider)?.models.find(candidate => candidate.id === current.model)
+    return ModelPickerModel.brandFor({ model: model ?? { id: current.model, name: current.model } })
+  }
+
   /** The current selection as a fallback rung, keeping its explicit effort only. */
   static fallbackFor = (current: ModelSelection): FallbackRoute =>
     current.reasoningEffort === undefined

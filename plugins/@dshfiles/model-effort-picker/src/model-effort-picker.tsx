@@ -16,6 +16,7 @@ import { accountColor } from './account-color.js'
 import { ModelDetails, type InspectedRoute } from './model-details.js'
 import { ModelPickerModel } from './model-picker-model.js'
 import { ModelRow } from './model-row.js'
+import { BrandMark } from './picker-atoms.js'
 import { PROVIDER_LABEL } from './provider-labels.js'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { requestFanOut } from '@dshfiles/thread-sidebar/fan-out-request'
@@ -143,6 +144,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   )
   const shortLabel = current === null ? undefined : ModelPickerModel.triggerLabel({ groups: state.groups, current })
   const triggerLabel = shortLabel?.model ?? current?.model ?? (state.status === 'loading' ? 'Loading models…' : 'Choose model')
+  const triggerBrand = ModelPickerModel.triggerBrand({ groups: state.groups, current })
 
   useEffect(() => {
     if (open && available) load()
@@ -260,6 +262,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 <TooltipContent>{shortLabel === undefined ? triggerLabel : `${triggerLabel} · ${shortLabel.title}`}</TooltipContent>
               </Tooltip>
               <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:leading-none dshx:in-data-model-icon:hidden">
+                {/* The family mark is identity beside the name; it never shrinks, the name truncates first. */}
+                {triggerBrand === undefined ? null : <BrandMark brand={triggerBrand} className="dshx:size-3.5" name={triggerLabel} />}
                 {shortLabel?.providerTag === undefined ? null : (
                   <Tooltip>
                     <TooltipTrigger asChild>

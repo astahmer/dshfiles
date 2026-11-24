@@ -22,6 +22,16 @@ describe('model brand marks', () => {
   })
 })
 
+describe('composer model chip mark', () => {
+  it('leads with the family mark of the model in use, read from its catalog name, and none for an unknown family', () => {
+    const codex = { id: 'codex', name: 'Codex', models: [{ id: 'm-1', name: 'GPT-6 Luna' }] }
+    expect(ModelPickerModel.triggerBrand({ groups: [codex], current: { provider: 'codex', model: 'm-1' } })).toBe('openai')
+    expect(ModelPickerModel.triggerBrand({ groups: [], current: { provider: 'claude', model: 'claude-haiku-5-5' } })).toBe('claude')
+    expect(ModelPickerModel.triggerBrand({ groups: [codex], current: { provider: 'acme', model: 'acme-secret' } })).toBeUndefined()
+    expect(ModelPickerModel.triggerBrand({ groups: [codex], current: null })).toBeUndefined()
+  })
+})
+
 describe('account colours', () => {
   it('uses the account accent when it is a full hex colour and a stable hue otherwise', () => {
     expect(accountColor({ accentColor: '#10A37F', instanceId: 'codex_alex' })).toBe('#10A37F')
