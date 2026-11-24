@@ -3,6 +3,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
+import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactElement } from 'react'
@@ -63,7 +64,19 @@ export const threadTabStatus = (facts: {
   readonly running: boolean
   readonly failed?: boolean
   readonly unread: boolean
+  /**
+   * The thread list's status with subagents rolled up (thread-status-client), when a list publishes one: it decides
+   * Needs you, Working and Failed, so a parent waiting on its child is Working here as in the list. Unread stays this
+   * tab's own fact, shown only where the list calls the thread Ready.
+   */
+  readonly listed?: WorkStatus | undefined
 }): TabStatus | null => {
+  if (facts.listed !== undefined) {
+    if (facts.listed === 'needs-you') return 'needsYou'
+    if (facts.listed === 'working') return 'running'
+    if (facts.listed === 'failed') return 'failed'
+    return facts.listed === 'ready' && facts.unread ? 'unread' : null
+  }
   if (facts.needsYou) return 'needsYou'
   if (facts.running) return 'running'
   if (facts.failed === true) return 'failed'

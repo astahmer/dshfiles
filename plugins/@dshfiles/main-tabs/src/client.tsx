@@ -13,6 +13,7 @@ import { handlePwaTabShortcut } from './pwa-tab-shortcuts.js'
 import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
 import type { BeforeMainOwnerProps } from '@dshfiles/frame-layout/regions'
 import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
+import { useThreadWorkStatuses } from '@dshfiles/thread-sidebar/thread-status-client'
 import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { DestinationSections, KNOWN_SECTIONS } from '@dshfiles/thread-sidebar/destinations'
 import { threadSidebarThreadDirectoriesApi, useThreadDirectories, WorkspacePaths, type ThreadDirectories } from '@dshfiles/thread-sidebar/thread-directories'
@@ -463,6 +464,8 @@ export default defineClient({
           }, [attentionRecords, clearAttention])
           const attentionSessionIds = useMemo(() => new Set(attention.views.map(record => record.sessionId)), [attention.views])
           const failedSessionIds = useFailedThreadIds(attention.views)
+          // The list's one status per thread, rolled up; null while no list publishes, and the tab keeps its own facts.
+          const listedStatuses = useThreadWorkStatuses()
           const catalog = useSyncExternalStore(subscribeCatalog, catalogSnapshot)
           const startContentVersion = useMemo(() => ({ byId, statuses, catalog, panelVersion }), [byId, statuses, catalog, panelVersion])
 
@@ -489,6 +492,7 @@ export default defineClient({
               running: status?.running ?? session?.running ?? false,
               failed: session !== undefined && failedSessionIds.has(session.id),
               unread: session !== undefined && attentionSessionIds.has(session.id),
+              listed: session === undefined ? undefined : listedStatuses?.get(session.id)?.status,
             })
             const title = session?.title ?? (session === undefined || session.blank ? translate('untitledThread') : session.displayTitle)
             const workspaceId = workspaceForThread(sessionId)

@@ -15,4 +15,15 @@ describe('threadTabStatus', () => {
     expect(threadTabStatus({ needsYou: false, running: true, failed: true, unread: false })).toBe('running')
     expect(threadTabStatus({ needsYou: true, running: false, failed: true, unread: false })).toBe('needsYou')
   })
+
+  it("takes the thread list's rolled-up status when the list publishes one", () => {
+    // The parent's own turn ended and its subagent still works: the list says Working, the tab said Finished, unread.
+    expect(threadTabStatus({ needsYou: false, running: false, unread: true, listed: 'working' })).toBe('running')
+    expect(threadTabStatus({ needsYou: false, running: true, unread: false, listed: 'needs-you' })).toBe('needsYou')
+    expect(threadTabStatus({ needsYou: false, running: false, unread: false, listed: 'failed' })).toBe('failed')
+    expect(threadTabStatus({ needsYou: false, running: false, unread: true, listed: 'ready' })).toBe('unread')
+    // Ready for work to land is not a finished turn to read.
+    expect(threadTabStatus({ needsYou: false, running: false, unread: false, listed: 'ready' })).toBeNull()
+    expect(threadTabStatus({ needsYou: false, running: false, unread: true, listed: 'idle' })).toBeNull()
+  })
 })
