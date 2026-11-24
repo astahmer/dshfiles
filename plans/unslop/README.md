@@ -36,6 +36,12 @@ Also fixed while integrating: upstream's new project-names settings namespace ha
 The kit lane found states that map to Ready without being finished work (a stopped or blocked turn, a waiting
 restart notice); the threads and pages lanes remapped them.
 
+CI parity (2026-11-24): the PR fails exactly the jobs upstream `main` (`ecdb9212`) fails, for upstream's own reasons
+(`dshx` host-tool schema snapshot and bundle-count assertion, `repo` profile-sync test, `types` ai-accounts missing
+`inject: ['subprocess']`, `lint` counts over their caps, macOS transport with no runner). A JSON comment in
+jj-integration's tsconfig broke `types` and was removed; 17 lint revisions (`xzkvswlo` … `sxvzvqoz`) bring every
+rule to at most upstream's count (oxlint 983 → 911 against upstream's 915; ast-grep 148 → 145, the same as upstream).
+
 Round two's open follow-ups: `/rebase` takes about 55 s to show in the header (needs a Host event from
 jj-integration); two of upstream's project tones (rose) sit close to Failed red; Dockview tabs have no press
 feedback; date-grouped thread views keep the older configurable dot; `ChartFrame` still maps `--ts-chart-*` onto
