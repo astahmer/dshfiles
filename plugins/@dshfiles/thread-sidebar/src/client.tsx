@@ -25,7 +25,8 @@ import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-
 import { VirtualThreadRows } from './virtual-thread-rows.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
-import { LiveActivityLine, LiveElapsed, useLiveTurns, type LiveTurnView } from './live-activity.js'
+import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
+import { LiveActivityLine, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
@@ -1789,7 +1790,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       )}
                       data-thread-time=""
                     >
-                      {liveStartedAt === undefined ? props.age : <LiveElapsed active={nearViewport} startedAt={liveStartedAt} />}
+                      {liveStartedAt === undefined ? props.age : <LiveElapsed active={nearViewport} since={liveStartedAt} />}
                     </span>
                   ) : null}
                 </span>

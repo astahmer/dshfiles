@@ -9,7 +9,7 @@ import { useSyncExternalStore } from 'react'
 import { SubagentFeedModel, type SubagentFeed } from './subagent-feed.js'
 import { useChildFeed, type SubagentPreviewBindings } from './subagent-live-preview.js'
 import { SubagentRouteLabelModel } from './route-label.js'
-import { LiveElapsed } from '../live-activity.js'
+import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { ToolSteps } from '../tool-steps.js'
 
 type DockSessions = PropsRuntime<'conversation.input.dock'>['useSessions']
@@ -75,7 +75,7 @@ export const SubagentRunCard = (props: {
       <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
         <StatusGlyph label={stateLabel} status={step.waitsForAnswer ? 'needs-you' : 'working'} />
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-medium">{props.heading}</span>
-        <LiveElapsed active className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground" startedAt={props.run.startedAt} />
+        <LiveElapsed active className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground" since={props.run.startedAt} />
       </div>
       <p className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" role="status">
         <span className={cn('dshx:min-w-0 dshx:truncate', step.waitsForAnswer && 'dshx:text-foreground')} data-subagent-run-step="">

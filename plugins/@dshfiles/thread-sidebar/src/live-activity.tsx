@@ -1,5 +1,6 @@
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
+import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
@@ -8,8 +9,9 @@ import { threadSidebarLiveTurnsApi } from './live-turns-api.js'
 /**
  * The live activity line of a working thread (polish pass b:r4et): its current step with the working shimmer and a
  * ticking elapsed time ("Running pnpm test · 1m 12s"; a list row seats the clock in its time slot). Built so 20 working rows cost nothing per
- * frame: one Host read every 3 s for all of them, one 1 s ticker for the page that writes each visible clock's text
- * directly (no React render), and a CSS shimmer phase-locked across rows that pauses off screen and under reduced motion.
+ * frame: one Host read every 3 s for all of them, the kit's one page ticker (`LiveElapsed`) that writes each visible
+ * clock's text directly (no React render), and a CSS shimmer phase-locked across rows that pauses off screen and under
+ * reduced motion.
  */
 
 /** One running turn, on this browser's clock. */
@@ -23,76 +25,6 @@ export interface LiveTurnView {
 
 const LIVE_TURNS_POLL_MS = 3_000
 const EMPTY_TURNS: ReadonlyMap<string, LiveTurnView> = new Map()
-
-/** "12s", "1m 12s", "1h 04m": the elapsed time of a running turn. */
-const formatElapsed = (ms: number): string => {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  if (total < 60) return `${String(total)}s`
-  const minutes = Math.floor(total / 60)
-  if (minutes < 60) return `${String(minutes)}m ${String(total % 60).padStart(2, '0')}s`
-  return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60).padStart(2, '0')}m`
-}
-
-type TickListener = (now: number) => void
-const tickListeners = new Set<TickListener>()
-let tickTimer: ReturnType<typeof setTimeout> | undefined
-
-/** The page's one clock: aligned to whole seconds, running only while a visible clock listens and the tab is shown. */
-const scheduleTick = (): void => {
-  if (tickTimer !== undefined || tickListeners.size === 0) return
-  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
-  tickTimer = setTimeout(
-    () => {
-      tickTimer = undefined
-      const now = Date.now()
-      for (const listener of tickListeners) listener(now)
-      scheduleTick()
-    },
-    1000 - (Date.now() % 1000),
-  )
-}
-
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      if (tickTimer !== undefined) clearTimeout(tickTimer)
-      tickTimer = undefined
-      return
-    }
-    const now = Date.now()
-    for (const listener of tickListeners) listener(now)
-    scheduleTick()
-  })
-}
-
-const subscribeTick = (listener: TickListener): (() => void) => {
-  tickListeners.add(listener)
-  scheduleTick()
-  return () => {
-    tickListeners.delete(listener)
-    if (tickListeners.size === 0 && tickTimer !== undefined) {
-      clearTimeout(tickTimer)
-      tickTimer = undefined
-    }
-  }
-}
-
-/** A running clock's text, written straight into its span by the shared ticker while `active` (on screen). */
-export const LiveElapsed = memo((props: { readonly startedAt: number; readonly active: boolean; readonly className?: string }): JSX.Element => {
-  const ref = useRef<HTMLSpanElement | null>(null)
-  useEffect(() => {
-    const element = ref.current
-    if (element === null) return
-    const write = (now: number): void => {
-      const text = formatElapsed(now - props.startedAt)
-      if (element.textContent !== text) element.textContent = text
-    }
-    write(Date.now())
-    if (!props.active) return
-    return subscribeTick(write)
-  }, [props.active, props.startedAt])
-  return <span ref={ref} className={cn('dshx:tabular-nums', props.className)} data-live-elapsed="" />
-})
 
 /** Every shimmer starts at the same phase of the page clock, so a list of working rows sweeps in step. */
 const shimmerDelay = (): string => `-${String(Math.round(('performance' in globalThis ? performance.now() : 0) % 2200))}ms`
@@ -117,7 +49,7 @@ export const LiveActivityLine = memo(
             <span aria-hidden="true" data-live-elapsed-separator="">
               ·
             </span>
-            <LiveElapsed active={props.active} className="dshx:shrink-0" startedAt={props.startedAt} />
+            <LiveElapsed active={props.active} className="dshx:shrink-0" since={props.startedAt} />
           </>
         )}
       </span>
@@ -202,6 +134,5 @@ export const useLiveTurns = (runningIds: readonly string[], listReady: boolean):
 }
 
 export class LiveActivityModel {
-  static readonly formatElapsed = formatElapsed
   static readonly stabilize = stabilize
 }

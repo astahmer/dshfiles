@@ -4,7 +4,8 @@ import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo } from 'react'
-import { LiveActivityLine, LiveElapsed, useLiveTurns, type LiveTurnView } from './live-activity.js'
+import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
+import { LiveActivityLine, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { HostSnapshotsModel } from './snapshots.js'
 
@@ -55,7 +56,7 @@ export const HeaderLiveSignal = (props: {
               <span aria-hidden="true" data-live-elapsed-separator="">
                 ·
               </span>
-              <LiveElapsed active className="dshx:shrink-0 dshx:text-muted-foreground" startedAt={props.turn.startedAt} />
+              <LiveElapsed active className="dshx:shrink-0 dshx:text-muted-foreground" since={props.turn.startedAt} />
             </>
           )}
         </span>

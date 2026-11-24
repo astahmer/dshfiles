@@ -30,12 +30,6 @@ afterEach(async () => {
 })
 
 describe('live activity line', () => {
-  it('formats elapsed time compactly', () => {
-    expect(LiveActivityModel.formatElapsed(9_400)).toBe('9s')
-    expect(LiveActivityModel.formatElapsed(72_000)).toBe('1m 12s')
-    expect(LiveActivityModel.formatElapsed(3_840_000)).toBe('1h 04m')
-  })
-
   const labels = { working: 'Working', needsYou: 'Needs you' }
 
   it('shows the Needs-you glyph, not the working spinner, while the thread waits for your answer', async () => {
