@@ -2885,7 +2885,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "antigravity-accounts",
       "title": "Use a Google AI plan through the Antigravity CLI",
-      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with DSH's system prompt, none of Antigravity's built-in tools,…",
+      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with a neutral system prompt, none of Antigravity's built-in to…",
       "destination": "settings",
       "currentSurface": "dialog: Add AI account › Antigravity",
       "reach": [
