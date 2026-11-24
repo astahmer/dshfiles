@@ -4,7 +4,7 @@ import type { TabStatus } from './tabs.js'
 /**
  * The one mapping from a thread tab's status onto the shared work-status vocabulary (DESIGN.md "Status vocabulary").
  * Both tab strips draw it, so a thread shows the same glyph on its tab as in the thread list: working is the
- * colourless spinner, Needs you the indigo diamond, failed the red cross, an unseen finish the ink dot.
+ * colourless ink ring, Needs you the indigo diamond, failed the red cross, an unseen finish (Ready) the green dot.
  */
 export const TAB_WORK_STATUS = {
   needsYou: 'needs-you',
