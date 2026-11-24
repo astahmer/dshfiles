@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import type { MainTabsTranslate } from './locales.js'
 import { OPEN_THREAD_ASIDE_EVENT } from './thread-aside.js'
 import { PANEL_ASIDE_EVENT } from './panel-aside.js'
@@ -10,6 +10,8 @@ import { TabStrip, type TabView } from './tab-strip.js'
 import type { CloseButtonPosition } from '@dshfiles/workbench/tabs'
 import { SETTLE_THREAD_EVENT } from './settle-request.js'
 import type { TabsEvent } from './tabs-machine.js'
+import { mainTabsSettings } from './settings.js'
+import { useTabProjectChips } from './project-names.js'
 
 const labels = {
   mentionThread: '@Mention thread',
@@ -197,7 +199,7 @@ describe('TabStrip layout', () => {
     expect(title.className).toContain('dshx:truncate')
   })
 
-  it('sizes tabs to their titles and hides project names by default', () => {
+  it('sizes tabs to their titles and omits chips when no project names are supplied', () => {
     mount()
     const tab = screen.getByRole('tab', { name: 'Thread, Working' })
     expect(tab.className).toContain('dshx:max-w-[190px]')
@@ -213,10 +215,61 @@ describe('TabStrip layout', () => {
     }
   })
 
+  const projectWorkspaces = [
+    { workspaceId: 'workspace-1', path: '/code/site' },
+    { workspaceId: 'workspace-2', path: '/threads/backend/thread-a1b2c3' },
+  ]
+  const threadDirectories = new Map([['/threads/backend', '/code/backend']])
+  const displayNameOf = (path: string) => (path === '/code/site' ? 'Storefront' : undefined)
+  const chipOf = (path: string) => ({ className: path === '/code/site' ? 'site-tone' : 'backend-tone' })
+
+  it('resolves custom display names and project folder fallbacks for both tab surfaces', () => {
+    const { result, rerender } = renderHook<ReturnType<typeof useTabProjectChips>, { setting: boolean | undefined }>(
+      ({ setting }) => useTabProjectChips(setting, projectWorkspaces, threadDirectories, displayNameOf, chipOf),
+      { initialProps: { setting: undefined } },
+    )
+    const names = { 'workspace-1': 'Storefront', 'workspace-2': 'backend' }
+    expect(result.current.projectNameChips).toEqual(names)
+    expect(result.current.projectNames).toEqual(new Map(Object.entries(names)))
+    expect(result.current.projectChips).toEqual({ 'workspace-1': { className: 'site-tone' }, 'workspace-2': { className: 'backend-tone' } })
+    rerender({ setting: false })
+    expect(result.current.projectNames).toBeUndefined()
+    expect(result.current.projectNameChips).toBeUndefined()
+    expect(result.current.projectChips).toBeUndefined()
+    rerender({ setting: true })
+    expect(result.current.projectNameChips).toEqual(names)
+  })
+
+  it('shows project chips by default and removes and restores them when the setting changes', () => {
+    const ConfiguredStrip = ({ setting }: { setting: boolean }) => {
+      const { projectNames, projectChips } = useTabProjectChips(setting, projectWorkspaces, threadDirectories, displayNameOf, chipOf)
+      return (
+        <TabStrip
+          tabs={tabs}
+          send={() => {}}
+          t={t}
+          newTabKeys=""
+          renameThread={async () => {}}
+          {...(projectNames === undefined ? {} : { projectNames })}
+          {...(projectChips === undefined ? {} : { projectChips })}
+        />
+      )
+    }
+    const view = render(<ConfiguredStrip setting={mainTabsSettings.schema({}).showProjectName} />)
+    expect(screen.getByRole('tab', { name: 'Storefront / Thread, Working' }).querySelector('[data-tab-project]')).not.toBeNull()
+    view.rerender(<ConfiguredStrip setting={mainTabsSettings.schema({ showProjectName: false }).showProjectName} />)
+    expect(screen.getByRole('tab', { name: 'Thread, Working' }).querySelector('[data-tab-project]')).toBeNull()
+    view.rerender(<ConfiguredStrip setting={mainTabsSettings.schema({ showProjectName: true }).showProjectName} />)
+    expect(screen.getByRole('tab', { name: 'Storefront / Thread, Working' }).querySelector('[data-tab-project]')).not.toBeNull()
+  })
+
   it('shows the project name as a chip before thread titles only', () => {
     render(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} projectNames={new Map([['workspace-1', 'dshfiles']])} />)
     const thread = screen.getByRole('tab', { name: 'dshfiles / Thread, Working' })
-    expect(within(thread).getByText('dshfiles')).toBeTruthy()
+    const chip = within(thread).getByText('dshfiles')
+    const title = within(thread).getByText('Thread')
+    expect(chip.getAttribute('data-tab-project')).toBe('')
+    expect(chip.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Workbench' }).querySelector('[data-tab-project]')).toBeNull()
   })
 })
