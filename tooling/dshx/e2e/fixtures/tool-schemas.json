@@ -1,5 +1,5 @@
 {
-  "hostBundles": 90,
+  "hostBundles": 91,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -18,6 +18,7 @@
     "@dshfiles/backlog",
     "@dshfiles/backlog-jira",
     "@dshfiles/backlog-notion",
+    "@dshfiles/browse",
     "@dshfiles/capabilities-hub",
     "@dshfiles/command-palette",
     "@dshfiles/context-compaction",
@@ -92,12 +93,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 690,
-  "apiToolBindings": 486,
-  "apiToolNameCount": 486,
-  "apiToolSchemas": 485,
+  "apiMethods": 695,
+  "apiToolBindings": 491,
+  "apiToolNameCount": 491,
+  "apiToolSchemas": 490,
   "definedTools": 24,
-  "tools": 509,
+  "tools": 514,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -4465,6 +4466,67 @@
         "required": [
           "id"
         ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browse_pair_cancel",
+      "description": "Stop the pairing in progress; its code stops being awaited. Run only when the user asked to cancel pairing.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browse_pair_start",
+      "description": "Start pairing a browser with browse: returns a one-time code the user enters in the browse extension (Extensions → browse → Options → Pairing code), valid 10 minutes. Starts the relay if needed. A pairing already running returns its code. Run only when the user asked to pair a browser.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browse_pairing_revoke",
+      "description": "Unpair one browser from browse (destructive: it disconnects until paired again with browse_pair_start). Run only when the user asked to unpair that browser; pass confirm: true, which is required.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "description": "The paired browser to remove: its profile (the stable key from browse_pairings), id or name.",
+            "type": "string"
+          },
+          "confirm": {
+            "description": "Must be true: unpairing disconnects that browser until it is paired again.",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "target",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browse_pairings",
+      "description": "List the browsers paired with browse: id, name, profile key, when paired and when last seen. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browse_status",
+      "description": "Report the local browse setup: CLI version, whether its relay runs, the extension and connected browsers, agent tabs, tabs waiting on the user (handoff message and since when) and the pairing in progress. Never starts the relay. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
         "additionalProperties": false
       }
     },

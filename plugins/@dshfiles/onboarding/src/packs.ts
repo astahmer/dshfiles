@@ -128,7 +128,7 @@ export const PACKS: readonly Pack[] = [
     id: 'agents',
     title: 'Agents & orchestration',
     summary:
-      'Persistent agents that message each other, questions that wait for you, background jobs, threads on other hosts, and the tools, skills and MCP servers agents use.',
+      'Persistent agents that message each other, questions that wait for you, background jobs, threads on other hosts, the tools, skills and MCP servers agents use, and the browser they drive.',
     core: false,
     plugins: [
       'agents',
@@ -140,6 +140,7 @@ export const PACKS: readonly Pack[] = [
       'capabilities-hub',
       'mcp-servers',
       'mcp-endpoint',
+      'browse',
     ],
     prerequisites: ['account'],
     keySettings: [{ label: 'Stop background jobs that outlive their thread', entryId: 'dshfiles-background-jobs', fieldPath: ['stopOutlivedAfterMinutes'] }],

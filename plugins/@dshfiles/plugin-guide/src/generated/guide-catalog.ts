@@ -3312,7 +3312,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/activity-timeline › inbox-push"
       ],
       "details": [
-        "Used by 84 catalog feature(s)",
+        "Used by 86 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3562,7 +3562,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › cross-thread-question-inbox"
       ],
       "details": [
-        "Used by 19 catalog feature(s)",
+        "Used by 20 catalog feature(s)",
         "Destinations in use: inbox"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

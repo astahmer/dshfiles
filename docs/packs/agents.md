@@ -2,7 +2,7 @@
 
 # Agents & orchestration
 
-Persistent agents that message each other, questions that wait for you, background jobs, threads on other hosts, and the tools, skills and MCP servers agents use.
+Persistent agents that message each other, questions that wait for you, background jobs, threads on other hosts, the tools, skills and MCP servers agents use, and the browser they drive.
 
 Pack id `agents`. Back to [all packs](README.md).
 
@@ -17,6 +17,7 @@ Pack id `agents`. Back to [all packs](README.md).
 7. [`@dshfiles/capabilities-hub`](../../plugins/@dshfiles/capabilities-hub/README.md) — A Capabilities hub page: one launch point for agent skills, MCP servers and DSH plugins that opens each owner's own manager, with skills.sh link-out guidance and separate trust labels.
 8. [`@dshfiles/mcp-servers`](../../plugins/@dshfiles/mcp-servers/README.md) — Manage profile-wide MCP server configurations and native DSH MCP clients.
 9. [`@dshfiles/mcp-endpoint`](../../plugins/@dshfiles/mcp-endpoint/README.md) — An MCP server (streamable HTTP, bearer token) on the DSH Web server, so Claude Code or Codex in a terminal can list, start, message, wait on and stop DSH threads.
+10. [`@dshfiles/browse`](../../plugins/@dshfiles/browse/README.md) — Companion panel for the browse CLI: relay and extension status, browser pairing, paired browsers and agent tabs that wait on you.
 
 ## Prerequisites
 
@@ -28,7 +29,7 @@ Pack id `agents`. Back to [all packs](README.md).
 
 ## Features
 
-From the onboarding feature catalog: 52 features, the 42 curated ones first.
+From the onboarding feature catalog: 55 features, the 42 curated ones first.
 
 ### Curated
 
@@ -87,6 +88,9 @@ From the onboarding feature catalog: 52 features, the 42 curated ones first.
 8. **Drive DSH threads from an outside agent over MCP** (`mcp-endpoint`) — Serve an MCP server (streamable HTTP, stateless, JSON responses) at /mcp on the DSH Web server. Claude Code, Codex or any MCP client with the bearer token can list projects and threads, read a thread's recent messages, create a thread with a first prompt and model, queue or stee…
 9. **Expose plugin tools to MCP clients** (`mcp-endpoint`) — Expose existing plugin agent tools through the authenticated MCP endpoint, subject to an off-by-default read-only or read-write setting.
 10. **Issue an MCP token and connect a client** (`mcp-endpoint`, settings) — Settings › MCP endpoint and the MCP endpoint: connect a client palette command open copyable setup instructions for Claude Code, Codex, Cursor, VS Code and generic JSON. The section generates, rotates and revokes a bearer token and controls LAN access; a freshly issued token app…
+11. **See the browser agents drive** (`browse`, agents) — Agents › Browser (browse), also in the command palette and the New tab view chooser, reads `browse status --json` on the Host: CLI version, whether the relay runs, the extension and connected browsers, and the agent tabs. It never starts the relay, refreshes every pollIntervalMs…
+12. **Pair a browser with a one-time code** (`browse`, agents) — Pair a browser runs `browse pair --wait-seconds 600` on the Host and shows its one-time code large with a copy button and where to enter it (Extensions → browse → Options). The process keeps waiting Host-side; the panel then shows paired, expired, failed or cancelled. One pairin…
+13. **Tabs waiting on you reach the Inbox** (`browse`, inbox) — When an agent's browse call waits on a person (sign-in, captcha, 2FA), each waiting tab becomes a blocking Inbox item with the agent's message, resolved once the call continues, and the panel header shows how many tabs wait. The Host reads `browse status --json` every pollInterv…
 
 ## Enable it
 
