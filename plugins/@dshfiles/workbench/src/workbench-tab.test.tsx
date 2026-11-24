@@ -269,6 +269,17 @@ describe('workbench semantic tab chrome', () => {
     expect(glyph()).toBeNull()
   })
 
+  it('keeps a 16 px status seat on a thread tab, so its title does not move when a thread starts or stops', () => {
+    // The glyph mounted only with a status: the title moved 24 px at each start and end of a turn (F13).
+    const tab = fixture()
+    const seat = () => tab.view.container.querySelector('[data-tab-status-slot]')
+    expect(seat()?.className).toContain('dshx:size-4')
+    expect(seat()?.childElementCount).toBe(1)
+    tab.update({ status: null })
+    expect(seat()?.className).toContain('dshx:size-4')
+    expect(seat()?.childElementCount).toBe(0)
+  })
+
   it('marks a preview tab with a muted title instead of italics, and caps the title width with an ellipsis', () => {
     const tab = fixture()
     const title = screen.getByText('Thread A')

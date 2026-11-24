@@ -142,7 +142,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
             }}
           >
             {tab?.pinned && <PinIcon aria-label={channel.label?.('pinned') || 'Pinned'} size={12} />}
-            {tab?.status && <TabStatusGlyph status={tab.status} label={channel.label?.(tab.status)} />}
+            {tab?.kind === 'thread' ? <span className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center" data-tab-status-slot="">{tab.status === null ? null : <TabStatusGlyph status={tab.status} label={channel.label?.(tab.status)} className="dshx:transition-opacity dshx:duration-(--dshx-duration-fade) dshx:starting:opacity-0" />}</span> : tab?.status && <TabStatusGlyph status={tab.status} label={channel.label?.(tab.status)} />}
             {closeButtonPosition === 'left' ? closeButton : null}
             {project === undefined ? null : (
               <span
