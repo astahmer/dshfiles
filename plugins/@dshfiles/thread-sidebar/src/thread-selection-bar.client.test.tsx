@@ -1,9 +1,20 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ThreadSelectionBar } from './thread-selection-bar.js'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
+/** The tooltip's popper measures its trigger; jsdom has no ResizeObserver. */
+class SilentResizeObserver {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
 
 const mount = (overrides: Partial<Parameters<typeof ThreadSelectionBar>[0]> = {}) => {
   const props = {
@@ -17,7 +28,11 @@ const mount = (overrides: Partial<Parameters<typeof ThreadSelectionBar>[0]> = {}
     t: (key: string, params?: { readonly count?: number }) => (params?.count === undefined ? key : `${key}:${String(params.count)}`),
     ...overrides,
   }
-  render(<ThreadSelectionBar {...props} />)
+  render(
+    <TooltipProvider>
+      <ThreadSelectionBar {...props} />
+    </TooltipProvider>,
+  )
   return props
 }
 
@@ -44,5 +59,13 @@ describe('the selection bar under the thread list', () => {
     expect(props.onSettle).toHaveBeenCalledOnce()
     expect(props.onArchive).toHaveBeenCalledOnce()
     expect(props.onClear).toHaveBeenCalledOnce()
+  })
+  it('says how to extend the selection in the kit tooltip, not a native title', () => {
+    vi.stubGlobal('ResizeObserver', SilentResizeObserver)
+    mount()
+    const bar = screen.getByRole('toolbar', { name: 'threadSidebarSelection' })
+    expect(bar.hasAttribute('title')).toBe(false)
+    fireEvent.focus(screen.getByRole('button', { name: 'threadSidebarSettle' }))
+    expect(screen.getByRole('tooltip').textContent).toContain('threadSidebarSelectionHint')
   })
 })
