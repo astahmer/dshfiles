@@ -143,6 +143,17 @@ describe('quota status line', () => {
     expect(container.querySelector('[role="group"]')?.getAttribute('aria-label')).toMatch(/^AI accounts usage\. Jarvis: Weekly limit: 51% left/u)
   })
 
+  it('keeps each provider mark in its brand colour; neutral brands and an account that is off follow the text', async () => {
+    const copilot: Card = { ...card('copilot', 'Copilot', 60), kind: 'github-copilot' }
+    const off: Card = { ...card('off', 'Off', 60), enabled: false }
+    const container = await mount({ cards: [card('jarvis', 'Jarvis', 51), copilot, off] })
+    const markColor = (id: string): string | undefined =>
+      container.querySelector<SVGElement>(`[data-quota-segment] [data-quota-account="${id}"] svg`)?.style.color
+    expect(markColor('jarvis')).toBe('rgb(16, 163, 127)')
+    expect(markColor('copilot')).toBe('inherit')
+    expect(markColor('off')).toBe('inherit')
+  })
+
   it('turns amber at 15% left or less and red only once the limit is reached', async () => {
     const container = await mount({ cards: [card('near', 'Near', 12), card('spent', 'Spent', 0), card('fine', 'Fine', 70)] })
     expect(toneOf(container, 'near')).toBe('low')

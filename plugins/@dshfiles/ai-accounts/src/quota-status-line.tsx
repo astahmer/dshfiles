@@ -126,7 +126,7 @@ const AccountLine = (props: {
   const signIn = 'unavailable' in item && item.disabled !== true && item.unavailable.label === 'Sign in again'
   return (
     <span className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1.5" data-quota-account={item.instanceId}>
-      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={item.kind} monochrome />
+      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={item.kind} monochrome={item.disabled === true} />
       <span className={cn('dshx:max-w-28 dshx:min-w-0 dshx:truncate', props.active && 'dshx:font-medium dshx:text-foreground')}>{props.name}</span>
       <Meter item={item} />
       <span
@@ -171,7 +171,7 @@ const AccountSegment = (props: {
       data-quota-account={item.instanceId}
       data-quota-off={item.disabled === true ? '' : undefined}
     >
-      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={item.kind} monochrome />
+      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={item.kind} monochrome={item.disabled === true} />
       <span className={cn(props.long === true ? 'dshx:max-w-28' : 'dshx:max-w-12', 'dshx:truncate', props.active && 'dshx:font-medium dshx:text-foreground')}>
         {props.label}
       </span>
@@ -322,7 +322,7 @@ const ActiveWithoutQuota = (props: { readonly accountId: string; readonly label:
       onClick={props.onClick}
       type="button"
     >
-      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={account.kind} monochrome />
+      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={account.kind} />
       <span className="dshx:max-w-28 dshx:min-w-0 dshx:truncate dshx:font-medium dshx:text-foreground">{account.displayName}</span>
       <span className="dshx:shrink-0">{props.label === 'In use by this thread' ? 'in use' : 'last used'}</span>
     </button>
