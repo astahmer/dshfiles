@@ -162,12 +162,18 @@ const counted = (count: number, noun: string): string => `${String(count)} ${nou
  * a chip. Three green ticks to say "nothing is wrong" spent colour on a healthy state (DESIGN.md: a healthy system is
  * quiet).
  */
+/** What the land card states as done, and what still needs the user's attention before a land. */
+export interface LandPreconditions {
+  readonly facts: readonly LandFact[]
+  readonly attention: readonly LandAttention[]
+}
+
 const preconditions = (input: {
   readonly thread: LandThread
   readonly bookmark: string
   readonly readiness: LandReadiness
   readonly checkSummary: ReturnType<typeof checks>
-}): { readonly facts: readonly LandFact[]; readonly attention: readonly LandAttention[] } => {
+}): LandPreconditions => {
   const revisions = input.thread.unlanded.length
   const behind = (input.thread.behindCount ?? (input.thread.behind ? 1 : 0)) > 0
   const facts: LandFact[] = [{ id: 'revisions', text: revisions === 0 ? 'Nothing to land' : `${counted(revisions, 'revision')} to land` }]

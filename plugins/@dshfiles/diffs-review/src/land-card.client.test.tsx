@@ -6,6 +6,7 @@ import { LandCard } from './land-card.js'
 
 const host = vi.hoisted(() => ({
   /** Whether jj-integration says a header Land shows for the thread; undefined: no provider. */
+  // SAFETY: an upcast, undefined is a `boolean | undefined`; each case sets the flag it needs.
   headerLand: undefined as boolean | undefined,
   thread: {
     path: '/work/sample-threads/thread-31057e',
