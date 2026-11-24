@@ -1,7 +1,7 @@
 {
   "totals": {
-    "plugin-prefix": 11,
-    "session": 53,
+    "plugin-prefix": 12,
+    "session": 54,
     "conversation": 22,
     "new-chat": 2,
     "integrate": 2,
@@ -38,7 +38,7 @@
     "package-name/main-tabs": 1,
     "plugin-prefix/activity-timeline": 1,
     "plugin-prefix/agent-toolkit": 1,
-    "plugin-prefix/ai-accounts": 3,
+    "plugin-prefix/ai-accounts": 4,
     "plugin-prefix/background-jobs": 1,
     "plugin-prefix/mcp-servers": 1,
     "plugin-prefix/traces": 1,
@@ -52,7 +52,7 @@
     "raw-error-echo/sidebar-terminal": 2,
     "session/activity-timeline": 1,
     "session/agentsview": 2,
-    "session/ai-accounts": 1,
+    "session/ai-accounts": 2,
     "session/attachment-gallery": 1,
     "session/chat": 3,
     "session/command-palette": 5,
