@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { arrangeWorkspaceMenuSections, type WorkspaceMenuSection } from './workspace-menu-sections.js'
 
-const section = (id: string, order?: number): WorkspaceMenuSection => ({ id, ...(order === undefined ? {} : { order }), Component: () => null })
+const section = (id: string, order?: number): WorkspaceMenuSection => {
+  const Component = (): null => null
+  return order === undefined ? { id, Component } : { id, order, Component }
+}
 
 describe('workspace menu sections', () => {
   it('keeps one section per id and sorts by order, then by registration', () => {

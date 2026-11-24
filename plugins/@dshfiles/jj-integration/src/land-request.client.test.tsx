@@ -18,6 +18,7 @@ const english: JjIntegrationTranslate = (() => {
   for (const match of block.matchAll(/^ {2}(\w+):\s*\n?\s*'((?:[^'\\]|\\.)*)',$/gmu)) entries.set(match[1] ?? '', match[2] ?? '')
   const translate = (key: string, values?: Readonly<Record<string, string | number>>): string =>
     (entries.get(key) ?? key).replace(/\{(\w+)\}/gu, (_whole, name: string) => String(values?.[name] ?? `{${name}}`))
+  // SAFETY: the table holds every English entry of locales.ts, and a key it lacks prints itself, as the Host's does.
   return translate as JjIntegrationTranslate
 })()
 
@@ -29,7 +30,7 @@ const api = vi.hoisted(() => ({
 }))
 
 vi.mock('./use-session-thread-api.js', () => ({ useSessionThreadApi: () => api }))
-vi.mock('./project-bookmark-query.js', () => ({ useProjectBookmark: (_path: unknown, fallback: string) => fallback }))
+vi.mock('./project-bookmark-query.js', () => ({ useProjectBookmark: (_path: string | null | undefined, fallback: string) => fallback }))
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   Toast: (props: { readonly text: string; readonly onDone: () => void }) => (
     <div role="status">
@@ -47,15 +48,17 @@ const { ThreadWorkspaceControl } = await import('./thread-workspace-control.js')
 const SESSION = 'session-row'
 const PATH = '/repo-threads/thread-row'
 
-const thread = (overrides: Partial<ThreadView> = {}): ThreadView =>
-  ({
-    name: 'thread-row',
-    path: PATH,
-    behind: false,
-    sessionIds: [SESSION],
-    unlanded: [{ changeId: 'kxyzabcd1234', commitId: 'c0ffee12', description: 'feat(row): land me', conflict: false }],
-    ...overrides,
-  }) as unknown as ThreadView
+const thread = (overrides: Partial<ThreadView> = {}): ThreadView => ({
+  name: 'thread-row',
+  path: PATH,
+  workspaceId: null,
+  finished: false,
+  missing: false,
+  behind: false,
+  sessionIds: [SESSION],
+  unlanded: [{ changeId: 'kxyzabcd1234', commitId: 'c0ffee12', description: 'feat(row): land me', conflict: false }],
+  ...overrides,
+})
 
 const sessions = (running = false): ISessions => {
   // One snapshot object: the control reads it through useSyncExternalStore, which compares by identity.
@@ -64,7 +67,8 @@ const sessions = (running = false): ISessions => {
       [SESSION]: { id: SESSION, cwd: PATH, running, title: 'Row thread', displayTitle: 'Row thread', projectionValues: { userQuestions: { active: [] } } },
     },
   }
-  return { list: { getSnapshot: () => snapshot, subscribe: () => () => undefined } } as unknown as ISessions
+  // SAFETY: the control reads only the session list's snapshot and subscription, and this snapshot holds the row's session.
+  return { list: { getSnapshot: () => snapshot, subscribe: () => () => undefined } } as never
 }
 
 const renderRequest = (options: { readonly running?: boolean; readonly onDone?: () => void } = {}) =>
@@ -85,7 +89,11 @@ const renderRequest = (options: { readonly running?: boolean; readonly onDone?: 
 
 beforeEach(() => {
   api.threadAt.mockResolvedValue({ thread: thread() })
-  api.land.mockResolvedValue({ status: 'landed', bookmark: 'main', revisions: [{ changeId: 'kxyzabcd1234', commitId: 'c0ffee12', description: 'feat(row): land me' }] })
+  api.land.mockResolvedValue({
+    status: 'landed',
+    bookmark: 'main',
+    revisions: [{ changeId: 'kxyzabcd1234', commitId: 'c0ffee12', description: 'feat(row): land me' }],
+  })
 })
 
 afterEach(() => {
@@ -133,7 +141,7 @@ describe('a Land asked for from another view (ThreadHeaderLand.confirm)', () => 
   })
 
   it('keeps the header guards: an undescribed revision gets the reason, never the dialog', async () => {
-    api.threadAt.mockResolvedValue({ thread: thread({ unlanded: [{ changeId: 'kundescribed', commitId: 'c1', description: '', conflict: false }] as ThreadView['unlanded'] }) })
+    api.threadAt.mockResolvedValue({ thread: thread({ unlanded: [{ changeId: 'kundescribed', commitId: 'c1', description: '', conflict: false }] }) })
     renderRequest()
     const reason = await screen.findByRole('status')
     expect(reason.textContent).toContain('kundescr')
