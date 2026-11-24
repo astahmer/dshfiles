@@ -15,7 +15,7 @@ Pack id `core`, always on: every other pack builds on it. Back to [all packs](RE
 5. [`@dshfiles/session-controller`](../../plugins/@dshfiles/session-controller/README.md) — Owned fork of DSH's native Session controller that sends the browser only what it renders.
 6. [`@dshfiles/settings-shell`](../../plugins/@dshfiles/settings-shell/README.md) — VS Code-style DSH Settings shell with plugin settings, search, and notices for new DSH releases.
 7. [`@dshfiles/onboarding`](../../plugins/@dshfiles/onboarding/README.md) — Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs, what changed in owned plugins since your last visit and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and read-only onboarding_overview and…
-8. [`@dshfiles/ai-accounts`](../../plugins/@dshfiles/ai-accounts/README.md) — Per-account Codex, Claude, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.
+8. [`@dshfiles/ai-accounts`](../../plugins/@dshfiles/ai-accounts/README.md) — Per-account Codex, Claude, Antigravity, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.
 9. [`@dshfiles/frame-layout`](../../plugins/@dshfiles/frame-layout/README.md) — Owned fork of DSH's native layout package: the three-column AppFrame with browser-persisted panel widths.
 10. [`@dshfiles/workbench`](../../plugins/@dshfiles/workbench/README.md) — Docking workbench in the main slot: registered panels move, split, tab and float without remounting; the layout persists.
 11. [`@dshfiles/ui-styles`](../../plugins/@dshfiles/ui-styles/README.md) — The one bundle that compiles and injects the shared plugin-ui Tailwind stylesheet (the ordered union of every owned plugin's classes) and owns the Appearance theme: presets, palette and font settings, and the theme agent tools
@@ -44,7 +44,7 @@ Pack id `core`, always on: every other pack builds on it. Back to [all packs](RE
 
 ## Features
 
-From the onboarding feature catalog: 206 features, the 99 curated ones first.
+From the onboarding feature catalog: 207 features, the 100 curated ones first.
 
 ### Curated
 
@@ -123,30 +123,31 @@ From the onboarding feature catalog: 206 features, the 99 curated ones first.
 73. **Connect an account without leaving the chat** (`ai-accounts`, settings) — Sign in to a provider from a short dialog without leaving the thread.
 74. **Edit and remove accounts** (`ai-accounts`, settings) — Edit an account's settings or remove it, and a new account is saved only once it signs in.
 75. **Manage account Models, Settings and Usage** (`ai-accounts`, settings) — Each account has Models, Settings and Usage tabs, with rename and sign-out.
-76. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers and how requests spread across accounts with the same model.
-77. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
-78. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.
-79. **Review usage history and cost forecasts** (`ai-accounts`, observe) — Chart past usage and cost, set your own prices, and see what a draft or a turn costs.
-80. **Forecast when each account runs out** (`ai-accounts`, observe) — See when each account will run out at the current pace and which account to use next.
-81. **Route exhausted Luna accounts through Reserve** (`ai-accounts`, settings) — Once the weekly Luna limit is spent, requests move to the separate Reserve model and its own limit.
-82. **Recover failed account requests per failure kind** (`ai-accounts`, settings) — Choose what happens when a request fails: retry, switch account, wait, or stop.
-83. **Retry exhausted quota when its reset arrives** (`ai-accounts`, inbox) — A thread stopped by a usage limit resumes on its own when the limit resets, or now on another account.
-84. **Open credential setup from failed turns** (`ai-accounts`, transcript) — A turn that failed on missing or rejected credentials links straight to AI Accounts.
-85. **Explain turns stopped by a stalled model stream** (`ai-accounts`, transcript) — A turn whose model went silent says for how long and offers Resume or another model.
-86. **Turn on the fallback chain for stalled streams** (`ai-accounts`, settings) — Let a stalled model fall back to the thread's next model.
-87. **Quota-blocked threads in the Inbox, resumable in place** (`ai-accounts`, inbox) — A thread stopped by a usage limit shows in the Inbox with when it resets and a Resume button.
-88. **Warn before re-sending an idle thread past its prompt-cache lifetime** (`ai-accounts`, composer) — After a long pause, a chip warns that the next message costs more because the prompt cache expired.
-89. **Add projects from the folder browser** (`workspace-folder-picker`, composer) — Add a project by browsing folders, or open your system's folder dialog.
-90. **Add a project by cloning a repository** (`workspace-folder-picker`, composer) — Add a project by cloning a repository, with progress and Cancel.
-91. **Remove a project** (`workspace-folder-picker`, composer) — Remove a project from the picker without deleting its folder or files.
-92. **Create a new project** (`workspace-folder-picker`, composer) — Create a new project folder with a Jujutsu repository and a first commit.
-93. **Search projects and browse folder paths** (`workspace-folder-picker`, composer) — Search your projects and browse folder paths, including ones under your home folder.
-94. **Select project folders with keyboard navigation** (`workspace-folder-picker`, composer) — Move through folders with the arrow keys.
-95. **Offer recent folders not yet registered as projects** (`workspace-folder-picker`, composer) — Recent folders that are not projects yet are offered first.
-96. **Start in the folder browser** (`workspace-folder-picker`, composer) — Some pickers open straight on the folder browser, without your projects.
-97. **Inspect a folder before adding it** (`workspace-folder-picker`, composer) — Choosing a folder first says what it is, such as a git or Jujutsu repository, before you add it.
-98. **Read a project's declared settings** (`workspace-folder-picker`, settings) — Settings › Projects lists your projects and the settings other features add for each one.
-99. **Choose an agent preset before typing** (`agent-preset`, composer) — Pick a preset for a new thread before you type its first message.
+76. **Use a Google AI plan through the Antigravity CLI** (`ai-accounts`, settings) — Use Gemini and the other models of a Google AI plan through the official Antigravity CLI.
+77. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers and how requests spread across accounts with the same model.
+78. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
+79. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.
+80. **Review usage history and cost forecasts** (`ai-accounts`, observe) — Chart past usage and cost, set your own prices, and see what a draft or a turn costs.
+81. **Forecast when each account runs out** (`ai-accounts`, observe) — See when each account will run out at the current pace and which account to use next.
+82. **Route exhausted Luna accounts through Reserve** (`ai-accounts`, settings) — Once the weekly Luna limit is spent, requests move to the separate Reserve model and its own limit.
+83. **Recover failed account requests per failure kind** (`ai-accounts`, settings) — Choose what happens when a request fails: retry, switch account, wait, or stop.
+84. **Retry exhausted quota when its reset arrives** (`ai-accounts`, inbox) — A thread stopped by a usage limit resumes on its own when the limit resets, or now on another account.
+85. **Open credential setup from failed turns** (`ai-accounts`, transcript) — A turn that failed on missing or rejected credentials links straight to AI Accounts.
+86. **Explain turns stopped by a stalled model stream** (`ai-accounts`, transcript) — A turn whose model went silent says for how long and offers Resume or another model.
+87. **Turn on the fallback chain for stalled streams** (`ai-accounts`, settings) — Let a stalled model fall back to the thread's next model.
+88. **Quota-blocked threads in the Inbox, resumable in place** (`ai-accounts`, inbox) — A thread stopped by a usage limit shows in the Inbox with when it resets and a Resume button.
+89. **Warn before re-sending an idle thread past its prompt-cache lifetime** (`ai-accounts`, composer) — After a long pause, a chip warns that the next message costs more because the prompt cache expired.
+90. **Add projects from the folder browser** (`workspace-folder-picker`, composer) — Add a project by browsing folders, or open your system's folder dialog.
+91. **Add a project by cloning a repository** (`workspace-folder-picker`, composer) — Add a project by cloning a repository, with progress and Cancel.
+92. **Remove a project** (`workspace-folder-picker`, composer) — Remove a project from the picker without deleting its folder or files.
+93. **Create a new project** (`workspace-folder-picker`, composer) — Create a new project folder with a Jujutsu repository and a first commit.
+94. **Search projects and browse folder paths** (`workspace-folder-picker`, composer) — Search your projects and browse folder paths, including ones under your home folder.
+95. **Select project folders with keyboard navigation** (`workspace-folder-picker`, composer) — Move through folders with the arrow keys.
+96. **Offer recent folders not yet registered as projects** (`workspace-folder-picker`, composer) — Recent folders that are not projects yet are offered first.
+97. **Start in the folder browser** (`workspace-folder-picker`, composer) — Some pickers open straight on the folder browser, without your projects.
+98. **Inspect a folder before adding it** (`workspace-folder-picker`, composer) — Choosing a folder first says what it is, such as a git or Jujutsu repository, before you add it.
+99. **Read a project's declared settings** (`workspace-folder-picker`, settings) — Settings › Projects lists your projects and the settings other features add for each one.
+100. **Choose an agent preset before typing** (`agent-preset`, composer) — Pick a preset for a new thread before you type its first message.
 
 ### More
 

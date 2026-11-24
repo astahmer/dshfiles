@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-568 features from 121 plugins.
+569 features from 121 plugins.
 
 ## Counts
 
@@ -19,7 +19,7 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
 | Observe |  |  |  |  | 23 | 2 |  |  | 3 |  |  | 1 |  |  | 29 |
 | Knowledge |  |  |  |  | 7 | 4 | 1 |  | 2 |  |  |  |  |  | 14 |
-| Settings |  |  |  |  | 3 |  |  |  | 1 |  | 63 |  |  |  | 67 |
+| Settings |  |  |  |  | 3 |  |  |  | 1 |  | 64 |  |  |  | 68 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 32 |  | 32 |
 | Composer |  |  |  | 70 |  |  |  |  |  |  |  |  |  |  | 70 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 42 | 42 |
@@ -88,7 +88,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | conversation composer seat of a mirrored thread | 1 | Composer 1 |
 | conversation-view | 1 | Thread panel 1 |
 | conversation.chat.assistant-actions | 1 | Work 1 |
-| dialog | 3 | No place of its own 1, Settings 1, Thread panel 1 |
+| dialog | 4 | Settings 2, No place of its own 1, Thread panel 1 |
 | empty thread view (first run); palette | 1 | Threads 1 |
 | host | 71 | No place of its own 71 |
 | host and client | 1 | No place of its own 1 |
@@ -348,7 +348,7 @@ rail destination; 14 features.
 
 ### Settings
 
-rail destination (bottom); 67 features.
+rail destination (bottom); 68 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -357,6 +357,7 @@ rail destination (bottom); 67 features.
 | plugin-guide/plugin-guide: Browse where a plugin can extend DSH | destinationSection | rail: Settings › Developer › Plugin guide |
 | mcp-servers/batch-server-actions: Batch enable, disable and remove MCP servers | rowAction | left-nav: MCP Servers: Servers › batch actions |
 | ai-accounts/account-lifecycle: Edit and remove accounts | settingsSection | left-nav: AI Accounts: Accounts |
+| ai-accounts/antigravity-accounts: Use a Google AI plan through the Antigravity CLI | settingsSection | dialog: Add AI account › Antigravity |
 | ai-accounts/failure-recovery: Recover failed account requests per failure kind | settingsSection | settings: AI Accounts › failure recovery |
 | ai-accounts/luna-reserve-routing: Route exhausted Luna accounts through Reserve | settingsSection | settings: AI Accounts › failure recovery |
 | ai-accounts/model-routing: Curate models and choose account routes | settingsSection | left-nav: AI Accounts: Accounts › Models |
