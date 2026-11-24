@@ -1,4 +1,5 @@
-import type { AttentionItem, AttentionSeverity, AttentionView } from './attention-api.js'
+import type { AttentionItem, AttentionSeverity, AttentionSubjectKind, AttentionView } from './attention-api.js'
+import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import type { RowSwipeSide } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { InboxPreview } from './inbox-preview.js'
 
@@ -37,6 +38,21 @@ const snoozeTarget = (choice: SnoozeChoice, now: number): { readonly until: numb
 /** One glyph per severity; colour comes from the row, never from a new token (plan §4.7). */
 const SEVERITY_GLYPH = { blocking: '◆', failed: '✕', ready: '●', info: '·' } as const satisfies Record<AttentionSeverity, string>
 const severityGlyph = (severity: AttentionSeverity): string => SEVERITY_GLYPH[severity]
+
+/** Subjects whose Ready item is finished work to collect: a turn that ended, a workspace ready to land. */
+const FINISHED_WORK: ReadonlySet<AttentionSubjectKind> = new Set(['session', 'workspace'])
+
+/**
+ * Plan §4.7: blocking items are Needs you, failed stay Failed, anything closed reads as Done. Ready (the green dot) is
+ * kept for finished work; any other Ready item (a waiting backlog item, an update that waits for a restart) is a notice
+ * and stays quiet.
+ */
+const statusOf = (item: AttentionItem, view: AttentionView): WorkStatus => {
+  if (view === 'closed') return 'done'
+  if (item.severity === 'blocking') return 'needs-you'
+  if (item.severity === 'failed') return 'failed'
+  return item.severity === 'ready' && FINISHED_WORK.has(item.subject.kind) ? 'ready' : 'idle'
+}
 
 const relativeAge = (at: number, now: number): string => {
   const seconds = Math.max(0, Math.round((now - at) / 1000))
@@ -145,6 +161,7 @@ export class InboxView {
   static readonly sourceLabel = sourceLabel
   static readonly snoozeTarget = snoozeTarget
   static readonly severityGlyph = severityGlyph
+  static readonly statusOf = statusOf
   static readonly relativeAge = relativeAge
   static readonly undoOf = undoOf
   static readonly resumableIds = resumableIds

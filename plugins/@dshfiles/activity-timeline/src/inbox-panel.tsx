@@ -114,13 +114,7 @@ export const useInboxOpener = (navigation: Navigation): ((subject: AttentionSubj
   )
 }
 
-/** Plan §4.7: blocking items are Needs you, failed stay Failed, ready is Ready; anything closed reads as Done. */
-const statusOf = (item: AttentionItem, view: AttentionView): WorkStatus => {
-  if (view === 'closed') return 'done'
-  if (item.severity === 'blocking') return 'needs-you'
-  if (item.severity === 'failed') return 'failed'
-  return 'ready'
-}
+const statusOf = InboxView.statusOf
 
 const statusLabelOf = (status: WorkStatus, t: InboxTranslate): string => {
   switch (status) {
@@ -130,6 +124,8 @@ const statusLabelOf = (status: WorkStatus, t: InboxTranslate): string => {
       return t('severityFailed')
     case 'ready':
       return t('severityReady')
+    case 'idle':
+      return t('severityInfo')
     default:
       return t('closed')
   }

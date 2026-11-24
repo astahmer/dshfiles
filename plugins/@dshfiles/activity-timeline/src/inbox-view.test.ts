@@ -159,3 +159,15 @@ describe('a subagent question in its parent thread', () => {
     expect(InboxView.threadQuestions([native, noChoices, answered, done], 'parent')).toEqual([])
   })
 })
+
+describe('inbox row status', () => {
+  it('draws Ready (green) only for finished work; a waiting backlog item or a restart notice stays quiet', () => {
+    expect(InboxView.statusOf(item({ severity: 'ready', subject: { kind: 'session', id: 'session-1' } }), 'other')).toBe('ready')
+    expect(InboxView.statusOf(item({ severity: 'ready', subject: { kind: 'workspace', id: '/repo/ws' } }), 'other')).toBe('ready')
+    expect(InboxView.statusOf(item({ severity: 'ready', subject: { kind: 'backlog-item', id: '12' } }), 'other')).toBe('idle')
+    expect(InboxView.statusOf(item({ severity: 'ready', subject: { kind: 'host', id: 'local' } }), 'other')).toBe('idle')
+    expect(InboxView.statusOf(item({ severity: 'blocking' }), 'needs-you')).toBe('needs-you')
+    expect(InboxView.statusOf(item({ severity: 'failed' }), 'needs-you')).toBe('failed')
+    expect(InboxView.statusOf(item({ severity: 'ready' }), 'closed')).toBe('done')
+  })
+})
