@@ -1,5 +1,6 @@
 /** Pure model of an agent's todo plan over time: step N of M and per-step timing from successive `todo/write` events. */
 
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { Wire } from './wire.js'
 
 export type PlanStatus = 'pending' | 'in_progress' | 'completed'
@@ -62,21 +63,12 @@ const parseItems = (value: unknown): readonly PlanItem[] | undefined => {
   return items
 }
 
-const formatDuration = (ms: number): string => {
-  const seconds = Math.max(0, Math.round(ms / 1000))
-  if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`
-  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`
-}
-
 export const PlanProgress = {
   itemsOf: parseItems,
-  formatDuration,
 
-  /** A step's time for the plan list, or undefined when it never started or took under a second: "0s" reads as noise. */
+  /** A step's time for the plan list in the kit's grammar, or undefined when it never started or took under a whole second: "0s" reads as noise. */
   shownDuration(elapsedMs: number | undefined): string | undefined {
-    return elapsedMs === undefined || Math.round(elapsedMs / 1000) < 1 ? undefined : formatDuration(elapsedMs)
+    return elapsedMs === undefined || Math.floor(elapsedMs / 1000) < 1 ? undefined : formatElapsed(elapsedMs)
   },
 
   /** `todos` from a `todo_write` call's raw JSON arguments, or undefined while incomplete or invalid. */

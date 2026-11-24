@@ -1,3 +1,4 @@
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { ListTodoIcon } from '@dshfiles/plugin-ui/icons'
 import type { ReactNode } from 'react'
@@ -42,7 +43,7 @@ export const PlanPin = (props: {
           <ListTodoIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
           <span className="dshx:shrink-0 dshx:font-medium dshx:text-foreground">{label}</span>
           {step !== undefined && <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-compact:hidden">{step.content}</span>}
-          {elapsed !== undefined && <span className="dshx:shrink-0 dshx:tabular-nums">{PlanProgress.formatDuration(elapsed)}</span>}
+          {elapsed !== undefined && <span className="dshx:shrink-0 dshx:tabular-nums">{formatElapsed(elapsed)}</span>}
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="dshx-root dshx:w-80 dshx:p-3" side="top">

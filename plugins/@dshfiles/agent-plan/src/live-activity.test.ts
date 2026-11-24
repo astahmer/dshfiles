@@ -19,7 +19,8 @@ describe('LiveActivity', () => {
     expect(activity.tools.map(tool => tool.callId)).toEqual(['a'])
     expect(activity.jobs.map(job => job.jobId)).toEqual(['j1'])
     expect(activity.subagents.map(job => job.jobId)).toEqual(['j2'])
-    expect(LiveActivity.summary(activity)).toBe('bash · 1 job · 1 subagent')
+    // C7: the dock above the composer shows jobs and subagents; the strip names only the open calls.
+    expect(LiveActivity.summary(activity)).toBe('bash')
     expect(activity.turn).toBe(1)
   })
 

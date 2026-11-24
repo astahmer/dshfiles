@@ -139,8 +139,8 @@
     {
       "id": "live-activity-strip",
       "title": "Live activity strip beside the composer controls",
-      "summary": "While the agent works, a strip beside the composer shows the running tool, jobs and subagents with timers.",
-      "details": "While anything runs, a strip beside the native composer activity says what: the running tool call, background jobs and subagents, with a live timer; it opens the full list with a timer per row. It reads Session events only (tool/call, tool/result, job/registered, job/settled) and renders nothing while idle.",
+      "summary": "While the agent runs a tool, a strip beside the composer names it with a timer.",
+      "details": "While a tool call is open, a strip beside the native composer activity names it with a live timer and opens the list of open calls with a timer per row. Background jobs and subagents have their own rows above the composer, so the strip does not count them and renders nothing while only they run. It reads Session events only (tool/call, tool/result, job/registered, job/settled) and renders nothing while idle.",
       "reach": [
         "seed jev-setup-chat-thread",
         "fill textbox \"Message or run a task, / commands, @ files or threads\" \"[[call bash {\\\"command\\\":\\\"sleep 20\\\",\\\"description\\\":\\\"Wait twenty seconds\\\"}]]\"",
@@ -160,7 +160,7 @@
           "coveredBy": ["agent-plan.activity-strip"]
         }
       ],
-      "states": ["idle-hidden", "tool-running", "jobs-running", "subagents-running", "disabled"],
+      "states": ["idle-hidden", "tool-running", "only-jobs-hidden", "disabled"],
       "failureModes": [
         "Background jobs registered before the loaded history window are not listed until their next event.",
         "Queued messages are not counted here: the native queue dock above the composer already lists them."

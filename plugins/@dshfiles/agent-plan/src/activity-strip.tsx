@@ -2,42 +2,26 @@ import { AgentRunSteps, type AgentRunStep } from '@dshfiles/plugin-ui/components
 import { StepGlyph } from '@dshfiles/plugin-ui/components/motion/step-glyph'
 import { ShimmerText } from '@dshfiles/plugin-ui/components/motion/text'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import type { ReactNode } from 'react'
 import { LiveActivity, type LiveActivity as LiveActivityView } from './live-activity.js'
-import { PlanProgress } from './plan-progress.js'
 import { useNow } from './use-now.js'
 
-/** Tool calls, then background jobs, then subagents, each ticking from its own start. */
-const runSteps = (activity: LiveActivityView): AgentRunStep[] => [
-  ...activity.tools.map((tool): AgentRunStep => ({ id: tool.callId, kind: 'tool', label: tool.name, status: 'running', startedAt: tool.startedAt })),
-  ...activity.jobs.map((job): AgentRunStep => ({
-    id: job.jobId,
-    kind: 'run',
-    label: job.kind,
-    target: job.label,
-    status: 'running',
-    startedAt: job.startedAt,
-  })),
-  ...activity.subagents.map((job): AgentRunStep => ({
-    id: job.jobId,
-    kind: 'agent',
-    label: 'Subagent',
-    target: job.label,
-    status: 'running',
-    startedAt: job.startedAt,
-  })),
-]
+/** The open tool calls, each ticking from its own start. */
+const runSteps = (activity: LiveActivityView): AgentRunStep[] =>
+  activity.tools.map((tool): AgentRunStep => ({ id: tool.callId, kind: 'tool', label: tool.name, status: 'running', startedAt: tool.startedAt }))
 
 /**
- * What runs now, beside the native composer activity: the oldest running tool call with a live timer and counts of
- * background jobs and subagents, opening the full list. Renders nothing while the Session is idle.
+ * What the turn runs now, beside the native composer activity: the oldest open tool call with a live timer, opening
+ * the full list. It says only what the dock does not (unslop r3 item 26): background jobs and subagents have their own
+ * rows above the composer, so with only those running the strip renders nothing.
  */
 export const ActivityStrip = (props: { readonly activity: LiveActivityView | undefined }): ReactNode => {
   const activity = props.activity
-  const busy = activity !== undefined && !LiveActivity.isIdle(activity)
+  const busy = activity !== undefined && activity.tools.length > 0
   const now = useNow(busy)
   if (!busy) return null
-  const oldest = [...activity.tools, ...activity.jobs, ...activity.subagents].reduce((min, row) => Math.min(min, row.startedAt), now)
+  const oldest = activity.tools.reduce((min, row) => Math.min(min, row.startedAt), now)
   const summary = LiveActivity.summary(activity)
   return (
     <Popover>
@@ -52,7 +36,7 @@ export const ActivityStrip = (props: { readonly activity: LiveActivityView | und
           <ShimmerText active className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:sr-only">
             {summary}
           </ShimmerText>
-          <span className="dshx:shrink-0 dshx:tabular-nums">{PlanProgress.formatDuration(now - oldest)}</span>
+          <span className="dshx:shrink-0 dshx:tabular-nums">{formatElapsed(now - oldest)}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="dshx-root dshx:w-80 dshx:p-0 dshx:pt-3 dshx:pb-1" side="top">
