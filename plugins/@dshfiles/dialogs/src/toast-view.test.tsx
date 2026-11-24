@@ -59,20 +59,27 @@ describe('toasts', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('is a plain bordered card with a tone icon, and spends colour on a failure only', () => {
+  it('is a plain bordered card whose icon alone carries the tone: green for success, red for a failure', () => {
+    const iconOf = (toast: HTMLElement): string => toast.querySelector('[data-toast-icon]')?.getAttribute('class') ?? ''
     act(() => void stack.service.show({ title: 'Draft saved', tone: 'success', duration: 0 }))
     const saved = screen.getByRole('status')
     expect(saved.className).not.toMatch(/border-l-/u)
     expect(saved.className).toContain('dshx:rounded-xl')
-    const savedIcon = saved.querySelector('[data-toast-icon]')
-    expect(savedIcon?.getAttribute('class')).toContain('dshx:text-muted-foreground')
-    expect(saved.innerHTML).not.toMatch(/text-success|text-warning|bg-success|bg-warning/u)
+    expect(iconOf(saved)).toContain('dshx:text-success')
+    // Green is the glyph only: the words stay ink.
+    expect(saved.querySelector('p')?.className ?? '').not.toMatch(/text-success/u)
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    for (const tone of ['info', 'warning'] as const) {
+      act(() => void stack.service.show({ title: tone, tone, duration: 0 }))
+      expect(iconOf(screen.getByRole('status'))).toContain('dshx:text-muted-foreground')
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    }
 
     act(() => void stack.service.show({ title: 'Could not save', tone: 'danger', duration: 0 }))
     const failed = screen.getByRole('alert')
     expect(failed.className).not.toMatch(/border-l-/u)
-    expect(failed.querySelector('[data-toast-icon]')?.getAttribute('class')).toContain('dshx:text-destructive')
+    expect(iconOf(failed)).toContain('dshx:text-destructive')
   })
 
   it('sits above a composer it would cover and returns to the corner without one', () => {

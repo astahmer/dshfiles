@@ -5,7 +5,17 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useToastBottom } from './toast-placement.js'
 import type { ToastEntry, ToastStack } from './toast-stack.js'
 
-/** The tone is a small icon, never a coloured edge; only a failure spends colour (DESIGN.md "Colors"). */
+/**
+ * The tone is a small icon, never a coloured edge or tint. Two tones spend colour on that icon alone: a success is the
+ * green check of a confirmed result, a failure red; info and warning stay muted (DESIGN.md colour rules 3 and 7).
+ */
+const toneIconClass = {
+  info: 'dshx:text-muted-foreground',
+  success: 'dshx:text-success',
+  warning: 'dshx:text-muted-foreground',
+  danger: 'dshx:text-destructive',
+} satisfies Record<ToastTone, string>
+
 const toneIcon = {
   info: InfoIcon,
   success: CheckIcon,
@@ -18,16 +28,14 @@ const Toast = (props: { readonly entry: ToastEntry; readonly onDismiss: () => vo
   const tone = input.tone ?? 'info'
   const Icon = toneIcon[tone]
   return (
+    // A replaced toast fades out in the kit's exit time while the stack holds the next one; reduced motion skips the fade.
     <li
       role={tone === 'danger' ? 'alert' : 'status'}
       data-tone={tone}
-      className="dshx:pointer-events-auto dshx:flex dshx:w-80 dshx:max-w-full dshx:items-start dshx:gap-2.5 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-3 dshx:text-popover-foreground dshx:shadow-s2"
+      data-state={props.entry.leaving === true ? 'closed' : 'open'}
+      className="dshx:pointer-events-auto dshx:flex dshx:w-80 dshx:max-w-full dshx:items-start dshx:gap-2.5 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-3 dshx:text-popover-foreground dshx:shadow-s2 dshx:transition-opacity dshx:duration-(--dshx-duration-exit) dshx:ease-exit dshx:data-[state=closed]:pointer-events-none dshx:data-[state=closed]:opacity-0 dshx:motion-reduce:transition-none"
     >
-      <Icon
-        aria-hidden
-        data-toast-icon=""
-        className={cn('dshx:mt-0.5 dshx:size-4 dshx:shrink-0', tone === 'danger' ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}
-      />
+      <Icon aria-hidden data-toast-icon="" className={cn('dshx:mt-0.5 dshx:size-4 dshx:shrink-0', toneIconClass[tone])} />
       <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
         <p className="dshx:text-sm dshx:font-medium">{input.title}</p>
         {input.description !== undefined && <p className="dshx:text-xs dshx:text-muted-foreground">{input.description}</p>}
