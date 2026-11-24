@@ -25,7 +25,7 @@ import { KIND_LABEL, planLabel, routedKind } from './account-labels.js'
 import type { AccountOrderDirection, AccountProfile, AccountsUsage } from './api.js'
 import { ActionHint, ProviderGlyph } from './panel-primitives.js'
 import { accountConnectionStatus, type AccountSection } from './account-connection-status.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { HealthDot, healthTextClass } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 /** Selection is cosmetic; ordering always uses the full canonical provider group. */
 export const AccountGroup = (props: {
@@ -90,17 +90,22 @@ export const AccountGroup = (props: {
                     <PencilIcon className="dshx:size-3" />
                   </Button>
                 ) : null}
-                {/* Healthy is quiet: the switch says enabled. Only a state that blocks routing gets a label and colour. */}
-                {status.tone === 'warning' ? (
+                {/* One health dot. Healthy is only the dot; a limited or down account also names its state in the dot's colour. */}
+                {status.health === 'limited' || status.health === 'down' ? (
                   <ActionHint label={status.detail ?? status.label}>
-                    <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-warning">
-                      <StatusDot tone="current" />
+                    <span className={cn('dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs', healthTextClass[status.health])}>
+                      <HealthDot health={status.health} />
                       {status.label}
                     </span>
                   </ActionHint>
                 ) : identity !== '' && status.label === 'Not signed in' ? (
-                  <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">{status.label}</span>
-                ) : null}
+                  <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
+                    <HealthDot health={status.health} />
+                    {status.label}
+                  </span>
+                ) : (
+                  <HealthDot aria-label={status.label} health={status.health} />
+                )}
                 <Switch
                   aria-label={
                     routedKind(profile.kind)

@@ -1,3 +1,4 @@
+import { HealthDot, healthTextClass, type Health } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 
@@ -12,7 +13,7 @@ export const DetailHeader = (props: {
   readonly mark: ReactNode
   readonly title: ReactNode
   readonly detail?: string
-  readonly state?: { readonly text: string; readonly tone: 'muted' | 'warning' } | null
+  readonly state?: { readonly text: string; readonly tone?: 'muted' | 'warning'; readonly health?: Health } | null
   readonly children?: ReactNode
 }): JSX.Element => (
   <header className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-2 dshx:border-b dshx:px-4 dshx:py-3">
@@ -26,7 +27,18 @@ export const DetailHeader = (props: {
     </div>
     <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
       {props.state === undefined || props.state === null ? null : (
-        <span className={cn('dshx:text-xs', props.state.tone === 'warning' ? 'dshx:text-warning' : 'dshx:text-muted-foreground')} role="status">
+        <span
+          className={cn(
+            'dshx:inline-flex dshx:items-center dshx:gap-1.5 dshx:text-xs',
+            props.state.health === undefined
+              ? props.state.tone === 'warning'
+                ? 'dshx:text-warning'
+                : 'dshx:text-muted-foreground'
+              : healthTextClass[props.state.health],
+          )}
+          role="status"
+        >
+          {props.state.health === undefined ? null : <HealthDot health={props.state.health} />}
           {props.state.text}
         </span>
       )}

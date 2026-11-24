@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { AccountDraftModel } from './account-draft.js'
 import { AccountGroup } from './account-group.js'
+import { DetailHeader } from './detail-header.js'
 import { accountConnectionStatus, accountStateLine } from './account-connection-status.js'
 import { accountProfileSchema, accountsUsageSchema, type AccountProfile } from './api.js'
 
@@ -22,7 +23,7 @@ const account = (patch: Partial<AccountProfile> = {}): AccountProfile =>
     detail: null,
     ...patch,
   })
-const usage = Schema.decodeUnknownSync(accountsUsageSchema)({
+const usageWith = (status: 'ok' | 'unauthenticated') => Schema.decodeUnknownSync(accountsUsageSchema)({
   readAt: Date.UTC(2026, 10, 16, 15, 18),
   hostName: 'synthetic-host',
   cards: [
@@ -31,12 +32,13 @@ const usage = Schema.decodeUnknownSync(accountsUsageSchema)({
       displayName: 'Work',
       kind: 'codex',
       enabled: true,
-      usage: { status: 'ok', identity: null, message: 'Authenticated quota response', windows: [], plan: null, bankedResets: 0, bankedResetExpiries: [] },
+      usage: { status, identity: null, message: 'Authenticated quota response', windows: [], plan: null, bankedResets: 0, bankedResetExpiries: [] },
     },
   ],
 })
+const usage = usageWith('ok')
 const noop = (): void => undefined
-const row = (profile: AccountProfile, selectedId: string | null): string =>
+const row = (profile: AccountProfile, selectedId: string | null, reading: typeof usage | null = usage): string =>
   renderToStaticMarkup(
     <TooltipProvider>
       <AccountGroup
@@ -47,11 +49,13 @@ const row = (profile: AccountProfile, selectedId: string | null): string =>
         onToggle={noop}
         reorderingDisabled={false}
         selectedId={selectedId}
-        usage={usage}
+        usage={reading}
         visibleIds={[profile.instanceId]}
       />
     </TooltipProvider>,
   )
+
+const dots = (markup: string): string[] => [...markup.matchAll(/data-health="([a-z]+)"/gu)].map(match => match[1] ?? '')
 
 describe('a healthy accounts page is quiet', () => {
   it('leaves every switch on the kit colour', () => {
@@ -60,10 +64,11 @@ describe('a healthy accounts page is quiet', () => {
       .filter(name => readFileSync(new URL(name, import.meta.url), 'utf8').includes('data-[state=checked]:bg-'))
     expect(sources).toEqual([])
   })
-  it('draws no dot, green text or indigo for a connected account', () => {
+  it('gives a connected account one green health dot, no green text and no indigo', () => {
     const markup = row(account(), null)
-    expect(markup).not.toContain('data-slot="status-dot"')
-    expect(markup).not.toContain('text-success')
+    expect(dots(markup)).toEqual(['ok'])
+    expect(markup).toContain('aria-label="Connected"')
+    expect(markup).not.toMatch(/text-(success|health-ok)/u)
     expect(markup).not.toMatch(/(bg|border|ring|border-l)-info/u)
   })
   it('marks the selected account with the selected-row fill, not a side border', () => {
@@ -73,25 +78,42 @@ describe('a healthy accounts page is quiet', () => {
     expect(markup).not.toContain('border-l-')
     expect(markup).not.toMatch(/(bg|border|ring)-info/u)
   })
-  it('keeps colour for a state that blocks routing', () => {
+  it('draws a rate-limited account amber, with its label', () => {
     const markup = row(account({ state: 'cooling' }), null)
+    expect(dots(markup)).toEqual(['limited'])
     expect(markup).toContain('Rate limited')
-    expect(markup).toContain('dshx:text-warning')
+    expect(markup).toContain('dshx:text-health-limited')
+  })
+  it('draws an account whose saved sign-in the provider rejected red', () => {
+    const markup = row(account(), null, usageWith('unauthenticated'))
+    expect(dots(markup)).toEqual(['down'])
+    expect(markup).toContain('Sign-in expired')
+    expect(markup).toContain('dshx:text-health-down')
+  })
+  it('draws an account that was never checked as an off ring', () => {
+    expect(dots(row(account({ signedIn: false }), null, null))).toEqual(['off'])
+    expect(dots(row(account(), null, null))).toEqual(['off'])
   })
 })
 
 describe('account state line', () => {
   const time = (at: number): string => `at ${at}`
-  it('says when a healthy account was checked, in muted text', () => {
-    expect(accountStateLine(accountConnectionStatus(account(), usage), time)).toEqual({ text: `Checked at ${usage.readAt}`, tone: 'muted' })
+  it('names a connected account and when it was checked, beside a green dot', () => {
+    expect(accountStateLine(accountConnectionStatus(account(), usage), time)).toEqual({ text: `Connected · checked at ${usage.readAt}`, health: 'ok' })
   })
-  it('names a blocking state and keeps its colour', () => {
+  it('names a blocking state with its health', () => {
     expect(accountStateLine(accountConnectionStatus(account({ state: 'cooling' }), usage), time)).toEqual({
       text: `Rate limited · checked at ${usage.readAt}`,
-      tone: 'warning',
+      health: 'limited',
     })
   })
   it('falls back to the plain state when the provider was never asked', () => {
-    expect(accountStateLine(accountConnectionStatus(account({ signedIn: false }), null), time)).toEqual({ text: 'Not signed in', tone: 'muted' })
+    expect(accountStateLine(accountConnectionStatus(account({ signedIn: false }), null), time)).toEqual({ text: 'Not signed in', health: 'off' })
+  })
+  it('draws the header state as one health dot and muted text while healthy', () => {
+    const header = renderToStaticMarkup(<DetailHeader mark={null} state={{ text: 'Connected · checked 08:30', health: 'ok' }} title={<h2>Work</h2>} />)
+    expect(dots(header)).toEqual(['ok'])
+    expect(header).toContain('dshx:text-muted-foreground')
+    expect(header).not.toMatch(/text-(success|health-ok)/u)
   })
 })

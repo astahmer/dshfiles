@@ -54,7 +54,8 @@ describe('reference dashboard observed authentication state', () => {
   })
   it('provider authentication rejection takes precedence over saved credentials', () => {
     expect(accountConnectionStatus(account, quota('codex_work', 'unauthenticated'))).toMatchObject({
-      label: 'Not signed in',
+      label: 'Sign-in expired',
+      health: 'down',
       authenticated: false,
       checkedAt: 1234,
     })
