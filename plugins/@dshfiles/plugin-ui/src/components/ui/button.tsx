@@ -3,18 +3,24 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../../lib/utils.js'
 import { Slot } from 'radix-ui'
 
+/**
+ * Press feedback (DESIGN.md › Motion: controls answer a press within 80ms): every variant washes darker on `:active`,
+ * and under a coarse pointer, where there is no hover to show the target first, the button also gives a 3% press.
+ * Only colour, shadow and that scale transition, so nothing moves the layout.
+ */
 const buttonVariants = cva(
-  'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:gap-2 dshx:rounded-md dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:transition-all dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:pointer-events-none dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:dark:aria-invalid:ring-destructive/40 dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4',
+  'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:gap-2 dshx:rounded-md dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:transition-[color,background-color,border-color,box-shadow,scale] dshx:duration-(--dshx-duration-hover) dshx:pointer-coarse:motion-safe:active:scale-[0.97] dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:pointer-events-none dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:dark:aria-invalid:ring-destructive/40 dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4',
   {
     variants: {
       variant: {
-        default: 'dshx:bg-primary dshx:text-primary-foreground dshx:hover:bg-primary/90',
+        default: 'dshx:bg-primary dshx:text-primary-foreground dshx:hover:bg-primary/90 dshx:active:bg-primary/80',
         destructive:
-          'dshx:bg-destructive dshx:text-white dshx:hover:bg-destructive/90 dshx:focus-visible:ring-destructive/20 dshx:dark:bg-destructive/60 dshx:dark:focus-visible:ring-destructive/40',
+          'dshx:bg-destructive dshx:text-white dshx:hover:bg-destructive/90 dshx:active:bg-destructive/80 dshx:focus-visible:ring-destructive/20 dshx:dark:bg-destructive/60 dshx:dark:focus-visible:ring-destructive/40',
         outline:
-          'dshx:border dshx:bg-background dshx:shadow-xs dshx:hover:bg-accent dshx:hover:text-accent-foreground dshx:dark:border-input dshx:dark:bg-input/30 dshx:dark:hover:bg-input/50',
-        secondary: 'dshx:bg-secondary dshx:text-secondary-foreground dshx:hover:bg-secondary/80',
-        ghost: 'dshx:hover:bg-accent dshx:hover:text-accent-foreground dshx:dark:hover:bg-accent/50',
+          'dshx:border dshx:bg-background dshx:shadow-xs dshx:hover:bg-accent dshx:hover:text-accent-foreground dshx:dark:border-input dshx:dark:bg-input/30 dshx:dark:hover:bg-input/50 dshx:active:bg-(--dsw-alias-interactive-bg-active) dshx:dark:active:bg-(--dsw-alias-interactive-bg-active)',
+        secondary: 'dshx:bg-secondary dshx:text-secondary-foreground dshx:hover:bg-secondary/80 dshx:active:bg-secondary/70',
+        ghost:
+          'dshx:hover:bg-accent dshx:hover:text-accent-foreground dshx:dark:hover:bg-accent/50 dshx:active:bg-(--dsw-alias-interactive-bg-active) dshx:dark:active:bg-(--dsw-alias-interactive-bg-active)',
         link: 'dshx:text-primary dshx:underline-offset-4 dshx:hover:underline',
       },
       size: {

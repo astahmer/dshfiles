@@ -3,8 +3,12 @@ import { cn } from '../../lib/utils.js'
 import { KeyHint } from './kbd.js'
 import { Tooltip as TooltipPrimitive } from 'radix-ui'
 
-function TooltipProvider({ delayDuration = 0, ...props }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
-  return <TooltipPrimitive.Provider data-slot="tooltip-provider" delayDuration={delayDuration} {...props} />
+/**
+ * A tooltip waits 400ms, so passing the pointer over a toolbar does not flash labels, and its neighbours then open at
+ * once for 300ms. A surface that must label instantly (a dense icon rail) passes its own `delayDuration`.
+ */
+function TooltipProvider({ delayDuration = 400, skipDelayDuration = 300, ...props }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
+  return <TooltipPrimitive.Provider data-slot="tooltip-provider" delayDuration={delayDuration} skipDelayDuration={skipDelayDuration} {...props} />
 }
 
 function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
