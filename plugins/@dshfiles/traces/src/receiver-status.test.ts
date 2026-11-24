@@ -33,9 +33,11 @@ const status = (state: ReceiverStatus['state']): ReceiverStatus => ({
   },
 })
 const t = (key: string): string => key
+/** The one prop of a drawn badge this test reads. */
+type BadgeProps = { readonly 'data-state'?: string }
 
 test('a healthy receiver puts no chip in the page header; a held port or a failed start does', () => {
-  const badge = (state: ReceiverStatus['state']) => ReceiverBadge({ status: status(state), t })?.props as Record<string, unknown> | undefined
+  const badge = (state: ReceiverStatus['state']): BadgeProps | undefined => ReceiverBadge({ status: status(state), t })?.props
   for (const state of ['listening', 'starting', 'disabled'] as const) expect(badge(state)).toBeUndefined()
   expect(badge('failed')?.['data-state']).toBe('failed')
   expect(badge('port-in-use')?.['data-state']).toBe('port-in-use')
