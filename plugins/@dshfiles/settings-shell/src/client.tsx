@@ -28,7 +28,7 @@ import { PaletteActions, type PaletteAction } from '@dshfiles/command-palette/pa
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type * as Types from 'effect/Types'
@@ -39,6 +39,7 @@ import { DesktopUpdateBadge, DesktopUpdateSource, desktopUpdateBridge } from './
 import { SettingsDocumentStore } from './native/document-action.js'
 import { OpenConfigAction, type ConfigFileOpeners } from './open-config-action.js'
 import { CloseLabel, CurrentVersionRow, DeveloperToolsRow, GeneralSection, HeaderContent, TriggerContent } from './native/general-section.js'
+import { LanguageCoverageNote } from './native/language-note.js'
 import { HostReleasePrompt } from './native/host-release-prompt.js'
 import { SHELL_LOCALE_NAMESPACE, shellLocale, type ShellTranslate } from './native/locales.js'
 import { ConnectionBanner } from './native/connection-banner.js'
@@ -152,7 +153,8 @@ export default defineClient({
   inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout', 'modules', 'remoteAccess'],
   setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
-    // A newer DSH release is a quiet banner above the General rows, not a preference row (visual refresh T4.4).
+    // A newer DSH release is a quiet banner after the General rows, not a preference row (visual refresh T4.4); it
+    // arrives after the first paint, so it sits where it moves nothing (round three item 30).
     const ReleaseBanner = decorate((props: { readonly t: ShellTranslate }) => (
       <PluginQueryProvider>
         <DshReleaseBanner t={props.t} />
@@ -955,6 +957,17 @@ export default defineClient({
         },
         (props: PropsRenderSlots<'settings.general.item'> & SettingsSectionSearchProps) => (
           <GeneralSection banner={<ReleaseBanner t={t} />} renderSlot={props.renderSlot} target={props.target} />
+        ),
+      ),
+    )
+    // Round three item 30: right under core's Language row (order 0), what a language other than English and 中文 covers.
+    const subscribeLocale = (listener: () => void): (() => void) => ctx.locale.subscribe(listener)
+    const activeLocale = (): string => ctx.locale.getSnapshot().active
+    ctx.slots.inject('settings.general.item', () =>
+      ctx.slots.register(
+        { name: 'settings.general.item', id: 'dshfiles-language-note', order: 1, locale: SHELL_LOCALE_NAMESPACE },
+        (props: { readonly t: ShellTranslate }) => (
+          <LanguageCoverageNote locale={useSyncExternalStore(subscribeLocale, activeLocale, activeLocale)} t={props.t} />
         ),
       ),
     )

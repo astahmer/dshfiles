@@ -65,7 +65,15 @@ These are presentation-only panel registrations; setting reads/writes retain the
 
 ### DSH release notices
 
-The Settings trigger shows a small badge when GitHub has a release newer than the DSH version running on the Host. **Settings › About › Update DSH › Release check** (`releaseCheck`) turns the automatic check off: nothing asks GitHub on its own, the badge stays hidden, and **Check for DSH updates** still asks once when pressed. **General** links the installed and latest version numbers to their GitHub releases, dates each (relative, full date on hover or focus) and counts the releases between them, lists those releases, offers a concise English TL;DR, and links to the official release notes. Dismissal is browser-local and lasts until another release appears. Release checks run on the Host against the fixed public GitHub Releases API, are cached for one hour, and can be retried from General; an unavailable or unmatched history never guesses that an update exists. The read-only `dsh_release_status` Agent tool uses the same checked result.
+The Settings trigger shows a small badge when GitHub has a release newer than the DSH version running on the Host. **Settings › About › Update DSH › Release check** (`releaseCheck`) turns the automatic check off: nothing asks GitHub on its own, the badge stays hidden, and **Check for DSH updates** still asks once when pressed. **General** links the installed and latest version numbers to their GitHub releases, dates each (relative, full date on hover or focus) and counts the releases between them, lists those releases, offers a concise English TL;DR, and links to the official release notes. Dismissal is browser-local and lasts until another release appears. Release checks run on the Host against the fixed public GitHub Releases API, are cached for one hour, and can be retried from General; an unavailable or unmatched history never guesses that an update exists. The read-only `dsh_release_status` Agent tool uses the same checked result. The General notice sits after the rows and fades in (120ms): the check answers after the page painted,
+and above the rows it pushed them down 71px.
+
+### Language
+
+DSH picks the browser's language until one is chosen, and only DSH's built-in parts are translated into languages
+other than English and 中文; dshfiles plugins are written in English. With such a language active, one muted line
+under **General › Language** says so (`src/native/language-note.tsx`); choosing English there persists on the Host
+and fixes every device at once.
 
 ### Search
 

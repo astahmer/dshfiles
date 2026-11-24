@@ -26,7 +26,10 @@ const revealSettingsEntry = (input: { readonly container: HTMLElement; readonly 
 export const GeneralSection = (
   props: Pick<PropsRenderSlots<'settings.general.item'>, 'renderSlot'> & {
     readonly target?: string | undefined
-    /** A notice above the rows (a newer DSH release); it never sits among the preferences. */
+    /**
+     * A notice after the rows (a newer DSH release); it never sits among the preferences. Round three item 30: it arrives
+     * after the first paint, so above the rows it pushed them down 71px; below them it moves nothing.
+     */
     readonly banner?: React.ReactNode
   },
 ): JSX.Element => {
@@ -44,11 +47,13 @@ export const GeneralSection = (
         "dshx:flex dshx:w-full dshx:flex-col dshx:[&>[data-slot='settings.general.item']>:last-child]:border-b-0",
         'dshx:@max-pane-narrow:[&_[class$=row]]:flex-wrap dshx:@max-pane-narrow:[&_[class$=row]]:gap-y-2',
         'dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:flex-[1_1_12rem]!',
+        // Round three item 30: the Language note reads as the Language row's own caption, under one divider.
+        'dshx:[&_[class$=row]:has(+[data-settings-language-note])]:border-b-0! dshx:[&_[class$=row]:has(+[data-settings-language-note])]:pb-1!',
       )}
       ref={column}
     >
-      {props.banner}
       {props.renderSlot('settings.general.item', {})}
+      {props.banner}
     </div>
   )
 }
