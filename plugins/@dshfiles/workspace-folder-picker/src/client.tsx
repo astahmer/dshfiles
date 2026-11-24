@@ -4,7 +4,7 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { DirectoryFlowOwnerProps, DirectoryFlowSlotName } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, useApi } from '@dshfiles/dshx/client'
+import { defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { FolderPlusIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
@@ -18,19 +18,40 @@ import { ProjectCloneDialog } from './project-clone-dialog.js'
 import { ProjectCreateDialog } from './project-create-dialog.js'
 import { ProjectFolderSetup } from './project-folder-setup.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
+import { ProjectAddChooser } from './project-add-chooser.js'
+import { ProjectColorPanel } from './project-color-panel.js'
+import { ProjectSettingsPanels } from './project-settings-panels.js'
+import { ProjectTone, type ProjectColorChoice } from './project-tone.js'
+import { workspaceFolderPickerSettings } from './settings.js'
 import { ProjectSettingsSection } from './project-settings-section.js'
 
 const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']
 
 const directoryFlowLabels = { heading: 'Add a project' } satisfies { readonly heading: string }
 
-type DirectoryFlowView = 'browse' | 'clone' | 'create' | 'inspect'
+type DirectoryFlowView = 'choose' | 'browse' | 'clone' | 'create' | 'inspect'
 
-const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): JSX.Element => {
+const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts & { readonly initialView?: DirectoryFlowView }): JSX.Element => {
   const browserApi = useApi(workspaceFolderBrowserApi)
   const lifecycleApi = useApi(projectLifecycleApi)
-  // A surface that asked for New project or Clone (ProjectAddFlow.request) opens the flow on that view.
-  const [view, setView] = useState<DirectoryFlowView>(() => ProjectAddFlow.take())
+  const settings = useSettings(workspaceFolderPickerSettings)
+  /** The colour chosen in the import dialog outlives it: chips and project labels read the same entry. */
+  const picked = (path: string, choice: ProjectColorChoice): void => {
+    void settings.set('projectColors', ProjectTone.upsertColor(settings.value?.projectColors ?? [], path, choice)).catch(() => undefined)
+    props.onPicked(path)
+  }
+  // A surface that asked for New project or Clone (ProjectAddFlow.request) opens the flow on that view; the Host's own
+  // add-workspace hole opens on the chooser instead of dropping the operator into a filesystem listing.
+  const [view, setView] = useState<DirectoryFlowView>(() => props.initialView ?? 'choose')
+  const [returnView, setReturnView] = useState<'choose' | 'browse' | null>(() => (props.initialView === undefined ? 'choose' : null))
+  const openSubView = (next: 'create' | 'clone', from: 'choose' | 'browse'): void => {
+    setReturnView(from)
+    setView(next)
+  }
+  const closeSubView = (): void => {
+    if (returnView === null) props.onCancel()
+    else setView(returnView)
+  }
   const [candidate, setCandidate] = useState<string | null>(null)
   const tools = useQuery({ queryKey: ['workspace-folder-picker', 'project-tools'], queryFn: () => lifecycleApi.tools({}), retry: false, staleTime: 60_000 })
   const pickerCapabilities = useQuery({
@@ -47,12 +68,24 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
     list: (path, signal) => browserApi.list(path === undefined ? {} : { path }, { signal }),
     createDirectory: (path, name) => browserApi.createDirectory({ path, name }),
   }
+  if (view === 'choose') {
+    return (
+      <ProjectAddChooser
+        gitHubAvailable={tools.data?.gh === true}
+        onBrowse={() => setView('browse')}
+        onClone={() => openSubView('clone', 'choose')}
+        onClose={props.onCancel}
+        onCreate={() => openSubView('create', 'choose')}
+        open
+      />
+    )
+  }
   if (view === 'inspect' && candidate !== null) {
     return (
       <ProjectFolderSetup
         api={lifecycleApi}
         path={candidate}
-        onAdded={path => props.onPicked(path)}
+        onAdded={picked}
         onClose={() => {
           setCandidate(null)
           setView('browse')
@@ -61,27 +94,32 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
     )
   }
   if (view === 'clone') {
-    return <ProjectCloneDialog api={lifecycleApi} home={tools.data?.home} onClose={() => setView('browse')} onCloned={path => props.onPicked(path)} />
+    return <ProjectCloneDialog api={lifecycleApi} home={tools.data?.home} onClose={closeSubView} onCloned={picked} />
   }
   if (view === 'create') {
     return (
       <ProjectCreateDialog
         api={lifecycleApi}
+        defaultParent={settings.value?.projectParent}
         gitHubAvailable={tools.data?.gh === true}
         home={tools.data?.home}
-        onClose={() => setView('browse')}
-        onCreated={path => props.onPicked(path)}
+        onClose={closeSubView}
+        onCreated={picked}
+        onRememberParent={parent => {
+          void settings.set('projectParent', parent.trim()).catch(() => undefined)
+        }}
       />
     )
   }
-  // New project and Clone were hidden behind a "New ▾" button (productivity pass Q5, T5.5): both are direct buttons.
+  // Creating a project and cloning were hidden behind a "New ▾" button (productivity pass Q5, T5.5): both are direct
+  // buttons, and each says whether it creates a project or adds a folder that already exists.
   const addActions = tools.isSuccess ? (
     <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-      <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.jj} type="button" variant="outline" onClick={() => setView('create')}>
+      <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.jj} type="button" variant="outline" onClick={() => openSubView('create', 'browse')}>
         <FolderPlusIcon aria-hidden />
-        New project…
+        Create project…
       </Button>
-      <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.git} type="button" variant="outline" onClick={() => setView('clone')}>
+      <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.git} type="button" variant="outline" onClick={() => openSubView('clone', 'browse')}>
         <GitBranchIcon aria-hidden />
         Clone repository…
       </Button>
@@ -137,7 +175,7 @@ const ProjectAddFlowHost = (props: WorkspacePickerPorts): JSX.Element | null => 
   const close = (): void => setOpen(false)
   return (
     <PluginQueryProvider>
-      <DirectoryFlowContent {...props} open busy={false} onPicked={close} onCancel={close} onError={() => undefined} />
+      <DirectoryFlowContent {...props} initialView={ProjectAddFlow.take()} open busy={false} onPicked={close} onCancel={close} onError={() => undefined} />
     </PluginQueryProvider>
   )
 }
@@ -158,10 +196,17 @@ export default defineClient({
     const ports = createWorkspacePickerPorts(ctx.remote)
     // Users asked agents to create or add projects (productivity pass Q5, T5.5): ⌘K offers both directly.
     const plugin = metadata?.plugin
+    // Settings › Projects row for a colour chosen at import: the swatches and custom picker stay reachable afterwards.
+    if (plugin !== undefined) plugin.add(ProjectSettingsPanels, { id: 'project-color', order: -10, Panel: plugin.bind(ProjectColorPanel) })
     if (plugin !== undefined)
       for (const row of [
-        { id: 'new-project', label: 'New project…', view: 'create', aliases: ['Create project', 'Initialize repository', 'New repository'] },
-        { id: 'add-folder', label: 'Add folder as project…', view: 'browse', aliases: ['Open folder', 'Add workspace', 'Register project'] },
+        { id: 'new-project', label: 'Create project…', view: 'create', aliases: ['New project', 'Add project', 'Initialize repository', 'New repository'] },
+        {
+          id: 'add-folder',
+          label: 'Add folder…',
+          view: 'browse',
+          aliases: ['Add existing folder', 'Add folder as project', 'Open folder', 'Add workspace', 'Register project'],
+        },
         { id: 'clone-repository', label: 'Clone repository…', view: 'clone', aliases: ['git clone', 'Clone project'] },
       ] as const)
         plugin.add(PaletteActions, {

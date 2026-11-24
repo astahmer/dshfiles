@@ -34,18 +34,24 @@
   --dv-floating-titlebar-background-color: var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1));
   --dv-floating-titlebar-border-bottom: var(--dv-floating-border);
   --dv-group-view-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
-  --dv-tabs-and-actions-container-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-layer-1));
+  --dv-tabs-and-actions-container-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
   --dv-activegroup-visiblepanel-tab-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
-  --dv-activegroup-hiddenpanel-tab-background-color: transparent;
-  --dv-inactivegroup-visiblepanel-tab-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
-  --dv-inactivegroup-hiddenpanel-tab-background-color: transparent;
-  --dv-tab-divider-color: transparent;
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--dsh-main-tab-bg);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--dsh-main-tab-bg);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--dsh-main-tab-bg);
+  --dv-tab-divider-color: var(--dsw-alias-border-l3);
   --dv-activegroup-visiblepanel-tab-color: var(--dsw-alias-label-primary);
   --dv-activegroup-hiddenpanel-tab-color: var(--dsw-alias-label-secondary);
   --dv-inactivegroup-visiblepanel-tab-color: var(--dsw-alias-label-secondary);
   --dv-inactivegroup-hiddenpanel-tab-color: var(--dsw-alias-label-tertiary);
   --dv-separator-border: var(--dshx-tone-line, var(--dsw-alias-border-l2));
   --dv-paneview-header-border-color: var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  /* One tab chrome for both surfaces (the native strip declares the same names in main-tabs): the selected tab
+   * sits on the content background, the others stay one tint above it, and a hairline divides them. Derived from
+   * the label colour so the same mix reads on the light and the dark palette. */
+  --dsh-main-tab-bg: color-mix(in srgb, var(--dsw-alias-label-primary) 6%, var(--dsw-alias-bg-base));
+  --dsh-main-tab-bg-hover: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, var(--dsw-alias-bg-base));
+  --dsh-main-tab-chip: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
   color: var(--dsw-alias-label-primary);
 }
 
@@ -56,12 +62,28 @@
   box-shadow: inset 0 -1px 0 var(--dshx-tone-line, var(--dsw-alias-border-l2));
 }
 
-.dshfiles-workbench-theme .dv-tab:hover {
-  background-color: var(--dsw-alias-interactive-bg-hover);
+.dshfiles-workbench-theme .dv-groupview > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-inactive-tab:hover {
+  background-color: var(--dsh-main-tab-bg-hover);
+}
+
+/* The divider stops at a selected tab: the tab merges with the content below instead of sitting in a box. */
+.dshfiles-workbench-theme .dv-tabs-container > .dv-tab.dv-active-tab + .dv-tab::before {
+  background-color: transparent;
+}
+
+/* Dockview only draws its own tab divider on a `.dv-horizontal` strip, which its chip renderer never sets. Draw the
+ * hairline as an inset shadow instead: no layout change, and it works with the flat tab strip. */
+.dshfiles-workbench-theme .dv-tabs-container > .dv-tab + .dv-tab {
+  box-shadow: inset 1px 0 0 var(--dv-tab-divider-color);
+}
+
+.dshfiles-workbench-theme .dv-tabs-container > .dv-tab.dv-active-tab,
+.dshfiles-workbench-theme .dv-tabs-container > .dv-tab.dv-active-tab + .dv-tab {
+  box-shadow: none;
 }
 
 /* Tab chrome: the selected tab carries an accent top edge (muted outside the focused group) on the base
- * background, and close buttons appear on the selected tab, on hover and with keyboard focus. */
+ * background. Close buttons stay visible on every tab, pinned tabs excepted. */
 .dshfiles-workbench-theme .dv-tabs-container > .dv-tab.dv-active-tab::before {
   content: '';
   position: absolute;
@@ -78,16 +100,8 @@
   background-color: var(--dshx-tone-accent, var(--dsw-alias-state-business-primary));
 }
 
-.dshfiles-workbench-theme .dv-tab.dv-inactive-tab:not(:hover):not(:focus-within) [data-workbench-tab-close] {
-  opacity: 0;
-}
-
-/* Touch has no hover (visual refresh T5.4): a tab's close stays visible and answers a 44pt tap. */
+/* Touch has no hover (visual refresh T5.4): a tab's close answers a 44pt tap. */
 @media (pointer: coarse) {
-  .dshfiles-workbench-theme .dv-tab.dv-inactive-tab:not(:hover):not(:focus-within) [data-workbench-tab-close] {
-    opacity: 1;
-  }
-
   .dshfiles-workbench-theme [data-workbench-tab-close] {
     position: relative;
   }

@@ -167,6 +167,7 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
 import { projectTextTone } from './project-tone.js'
+import { useSavedProjectChip } from './project-colors.js'
 import { useThreadDirectories } from './use-thread-directories.js'
 import {
   failedResumeNotice,
@@ -611,6 +612,9 @@ interface ThreadRowProps {
   readonly workspaceTitle: string | undefined
   /** The project folder behind the workspace id, for a thread whose Session summary carries no cwd. */
   readonly workspacePath: string | undefined
+  /** Saved project colour overrides (primitives so memoized rows keep prop equality). */
+  readonly projectChipClassName: string | undefined
+  readonly projectChipColor: string | undefined
   /**
    * Set when the thread runs in its own jj workspace rather than in the project checkout (b:212a): the row shows a quiet
    * branch indicator and at most one state word, never the workspace's folder name, which only its tooltip carries.
@@ -1676,9 +1680,14 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       className={cn(
                         // The first text to give way on a short row: it truncates, then hides, before the mark does.
                         'dshx:min-w-0 dshx:shrink dshx:truncate dshx:@max-[11rem]/row:hidden',
-                        rowStyle.projectColor && props.workspaceTitle !== undefined && projectTextTone(props.workspaceTitle, props.rowStyle.projectPalette),
+                        rowStyle.projectColor &&
+                          props.workspaceTitle !== undefined &&
+                          props.projectChipColor === undefined &&
+                          // A colour chosen at import wins; without one the name keeps its palette tint.
+                          (props.projectChipClassName ?? projectTextTone(props.workspaceTitle, props.rowStyle.projectPalette)),
                       )}
                       data-testid="thread-row-project"
+                      style={rowStyle.projectColor && props.projectChipColor !== undefined ? { color: props.projectChipColor } : undefined}
                     >
                       {props.workspaceTitle ?? t('threadSidebarUnassigned')}
                     </span>
@@ -5599,6 +5608,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     estimateSize: rowStyle.density === 'compact' ? 34 : 50,
     enabled: !isBoard,
   }
+  const savedProjectChipOf = useSavedProjectChip()
   const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel'], section?: SidebarSection): JSX.Element => {
     const lineage = SidebarOrganization.sessionLineage(session, sessionState.byId)
     const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
@@ -5621,6 +5631,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       t: tSidebar,
       threadDirectories,
     })
+    const workspacePath = workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)
+    const savedProjectChip = workspacePath === undefined ? undefined : savedProjectChipOf(workspacePath)
     return (
       <ThreadRow
         key={session.id}
@@ -5638,7 +5650,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         parentTitle={lineage.parentTitle}
         workspaceId={workspaceId}
         workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
-        workspacePath={workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)}
+        workspacePath={workspacePath}
+        projectChipClassName={savedProjectChip?.className}
+        projectChipColor={savedProjectChip?.color}
         ownWorkspaceName={ownWorkspace?.name}
         ownWorkspacePath={ownWorkspace?.path}
         ownWorkspaceState={ownWorkspace?.state?.kind}

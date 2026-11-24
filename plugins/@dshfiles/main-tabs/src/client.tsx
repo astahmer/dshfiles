@@ -23,6 +23,7 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
 import { Effect, Fiber, Schema } from 'effect'
 import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
+import { useProjectChip, useProjectDisplayName } from '@dshfiles/thread-sidebar/project-colors'
 import { ProjectNames } from './project-names.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
@@ -424,11 +425,26 @@ export default defineClient({
             () => createThreadWorkspaceResolver({ byId, workspaces: workspaceItems, threadDirectories }),
             [byId, threadDirectories, workspaceItems],
           )
-          const showProjectName = settings.value?.showProjectName ?? false
-          const projectNames = useMemo(
-            () => (showProjectName ? ProjectNames.byWorkspaceId(workspaceItems, threadDirectories) : undefined),
-            [showProjectName, threadDirectories, workspaceItems],
-          )
+          const showProjectName = settings.value?.showProjectName ?? true
+          const displayNameOf = useProjectDisplayName()
+          const projectNames = useMemo(() => {
+            if (!showProjectName) return undefined
+            const paths = ProjectNames.pathsByWorkspaceId(workspaceItems, threadDirectories)
+            return new Map(
+              [...paths].map(([workspaceId, path]) => [workspaceId, displayNameOf(path) ?? path.split(/[\\/]/u).filter(Boolean).at(-1) ?? path] as const),
+            )
+          }, [displayNameOf, showProjectName, threadDirectories, workspaceItems])
+          const chipOf = useProjectChip()
+          // Workbench draws its own header, so it receives the resolved paint (palette class or custom colour) and writes
+          // no colour logic of its own.
+          const projectChips = useMemo(() => {
+            if (!showProjectName) return undefined
+            const paths = ProjectNames.pathsByWorkspaceId(workspaceItems, threadDirectories)
+            return Object.fromEntries([...paths].map(([workspaceId, path]) => [workspaceId, chipOf(path)] as const))
+          }, [chipOf, showProjectName, threadDirectories, workspaceItems])
+          // Plain record, memoized: the publication fingerprints its snapshot as JSON, and a fresh object per render
+          // would wake every tab. A Map would stringify to `{}` and hide changes entirely.
+          const projectNameChips = useMemo(() => (projectNames === undefined ? undefined : Object.fromEntries(projectNames)), [projectNames])
           const statuses = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
           // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges,
           // and both read the one page-wide poll instead of each holding their own interval.
@@ -581,17 +597,16 @@ export default defineClient({
           }
 
           useLayoutEffect(() => {
-            publication.update(
-              {
-                enabled: snapshot.matches('on'),
-                closeButtonPosition,
-                scopeKey: snapshot.context.scopeKey,
-                activeTabId: set?.activeTabId ?? null,
-                tabs,
-              },
-              () => <StartPage sections={startSections()} t={props.t} />,
-              startContentVersion,
-            )
+            const published = {
+              enabled: snapshot.matches('on'),
+              closeButtonPosition,
+              scopeKey: snapshot.context.scopeKey,
+              activeTabId: set?.activeTabId ?? null,
+              tabs,
+            }
+            const withProjects = projectNameChips === undefined ? published : { ...published, projectNames: projectNameChips }
+            const snapshotWithProjects = projectChips === undefined ? withProjects : { ...withProjects, projectChips }
+            publication.update(snapshotWithProjects, () => <StartPage sections={startSections()} t={props.t} />, startContentVersion)
           })
           if (!showStrip) return null
 
@@ -606,6 +621,7 @@ export default defineClient({
                 closeButtonPosition={closeButtonPosition}
                 fixedWidth={settings.value?.fixedTabWidth ?? false}
                 {...(projectNames === undefined ? {} : { projectNames })}
+                {...(projectChips === undefined ? {} : { projectChips })}
               />
               {startShown ? <StartPage sections={startSections()} t={props.t} /> : null}
             </div>
