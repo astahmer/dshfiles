@@ -2,8 +2,9 @@ import * as React from 'react'
 import { animate, motionSafe, springs, durations, easings } from '../../motion/index.js'
 import { useEnter, usePrefersReducedMotion } from '../../motion/react.js'
 import { cn } from '../../lib/utils.js'
-import { ArrowUpRightIcon, AsteriskIcon, CheckIcon, CircleXIcon, PauseIcon, PlayIcon, SquareIcon, type LucideIcon } from '../../icons.js'
+import { ArrowUpRightIcon, PauseIcon, PlayIcon, SquareIcon, type LucideIcon } from '../../icons.js'
 import { Button } from '../ui/button.js'
+import { StatusGlyph, type StatusGlyphState } from '../work-status.js'
 import { ShimmerText, RollingNumber } from './text.js'
 import { ElapsedClock } from './elapsed-clock.js'
 
@@ -33,8 +34,6 @@ export interface AgentRunStatusProps extends Omit<React.HTMLAttributes<HTMLEleme
   readonly startedAt: number
   readonly endedAt?: number
   readonly state: AgentRunState
-  /** Glyph in the spinner ring; defaults to an asterisk. */
-  readonly glyph?: LucideIcon
   /** Override any visible string; each defaults to English. */
   readonly labels?: Partial<AgentRunStatusLabels>
   readonly onPauseToggle?: () => void
@@ -59,9 +58,9 @@ export interface AgentRunStatusLabels {
 }
 
 const defaultLabels: AgentRunStatusLabels = {
-  running: 'Running',
+  running: 'Working',
   paused: 'Paused',
-  done: 'Completed',
+  done: 'Done',
   stopped: 'Stopped',
   failed: 'Failed',
   step: 'Step',
@@ -72,11 +71,20 @@ const defaultLabels: AgentRunStatusLabels = {
   elapsed: 'Elapsed',
 }
 
+/** The kit's status glyph for each run state; a paused run waits on nobody, so it draws the idle ring. */
+const glyphByState = {
+  running: 'working',
+  paused: 'idle',
+  done: 'done',
+  stopped: 'stopped',
+  failed: 'failed',
+} as const satisfies Record<AgentRunState, StatusGlyphState>
+
 /**
- * Compact live status card for one agent run: a spinning ring around the agent glyph, the current step shimmering,
+ * Compact live status card for one agent run: the kit's status glyph (DESIGN.md › Components), the current step shimmering,
  * a live clock, "Step n of N" with a segmented progress rail when the total is known, and the actions the caller
  * really has — Pause, Stop and Open run each render only when their handler is passed. Step changes blur in,
- * segments fill on a spring, and the ring settles into a check (or cross) when the run ends.
+ * segments fill on a spring, and the glyph cross-fades to a check (or cross) when the run ends.
  */
 export function AgentRunStatus({
   heading,
@@ -87,7 +95,6 @@ export function AgentRunStatus({
   startedAt,
   endedAt,
   state,
-  glyph,
   labels: labelOverrides,
   onPauseToggle,
   onStop,
@@ -115,7 +122,7 @@ export function AgentRunStatus({
       {...props}
     >
       <header className="dshx:flex dshx:items-center dshx:gap-3">
-        <RunRing state={state} glyph={glyph ?? AsteriskIcon} />
+        <StatusGlyph status={glyphByState[state]} decorative className="dshx:shrink-0" />
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <ShimmerText active={active} className={cn('dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium', !active && 'dshx:text-foreground')}>
             {heading}
@@ -129,7 +136,7 @@ export function AgentRunStatus({
           endedAt={endedAt}
           running={active}
           aria-label={labels.elapsed}
-          className="dshx:shrink-0 dshx:font-mono dshx:text-sm dshx:text-muted-foreground"
+          className="dshx:shrink-0 dshx:text-sm dshx:text-muted-foreground"
         />
       </header>
 
@@ -231,66 +238,6 @@ function SwapInner({
     <div ref={ref} className={className}>
       {children}
     </div>
-  )
-}
-
-function RunRing({ state, glyph: Glyph }: { readonly state: AgentRunState; readonly glyph: LucideIcon }) {
-  const arc = React.useRef<SVGSVGElement>(null)
-  const badge = React.useRef<HTMLSpanElement>(null)
-  const reduced = usePrefersReducedMotion()
-  const spinning = state === 'running' && !reduced
-  React.useEffect(() => {
-    if (!spinning || arc.current == null) return
-    const controls = animate(arc.current, { rotate: [0, 360] }, { duration: 1.1, ease: 'linear', repeat: Infinity })
-    return () => controls.stop()
-  }, [spinning])
-  React.useLayoutEffect(() => {
-    if (badge.current == null || state === 'running' || state === 'paused') return
-    const controls = animate(badge.current, { transform: ['scale(0.4)', 'scale(1)'], opacity: [0, 1] }, motionSafe(springs.bouncy))
-    return () => controls.complete()
-  }, [state])
-  const ended = state === 'done' || state === 'stopped' || state === 'failed'
-  return (
-    <span
-      className="dshx:relative dshx:inline-flex dshx:size-9 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted"
-      aria-hidden
-    >
-      <svg ref={arc} viewBox="0 0 36 36" className={cn('dshx:absolute dshx:inset-0 dshx:size-9', ended && 'dshx:opacity-0')}>
-        <circle cx="18" cy="18" r="16.5" fill="none" stroke="currentColor" strokeWidth="1.5" className="dshx:text-border" />
-        <circle
-          cx="18"
-          cy="18"
-          r="16.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeDasharray="26 200"
-          className={cn(state === 'paused' ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}
-        />
-      </svg>
-      {ended ? (
-        <span
-          ref={badge}
-          className={cn(
-            'dshx:inline-flex dshx:size-9 dshx:items-center dshx:justify-center dshx:rounded-full',
-            state === 'done' && 'dshx:bg-success/15 dshx:text-success',
-            state === 'failed' && 'dshx:bg-destructive/15 dshx:text-destructive',
-            state === 'stopped' && 'dshx:bg-muted dshx:text-muted-foreground',
-          )}
-        >
-          {state === 'done' ? (
-            <CheckIcon className="dshx:size-4" />
-          ) : state === 'failed' ? (
-            <CircleXIcon className="dshx:size-4" />
-          ) : (
-            <SquareIcon className="dshx:size-3.5" />
-          )}
-        </span>
-      ) : (
-        <Glyph className={cn('dshx:size-4', state === 'paused' ? 'dshx:text-muted-foreground' : 'dshx:text-chart-3')} />
-      )}
-    </span>
   )
 }
 

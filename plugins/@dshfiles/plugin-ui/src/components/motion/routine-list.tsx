@@ -62,7 +62,16 @@ export interface RoutineListProps extends Omit<React.HTMLAttributes<HTMLElement>
   readonly onNew?: () => void
   /** Bars kept per routine. */
   readonly historyLength?: number
+  /** Override visible strings; each defaults to English. */
+  readonly labels?: Partial<RoutineListLabels>
 }
+
+export interface RoutineListLabels {
+  /** A routine whose run is in progress; one of the six status words (DESIGN.md › Components). */
+  readonly runningNow: string
+}
+
+const defaultLabels: RoutineListLabels = { runningNow: 'Working' }
 
 /** "2 h 14 min", "14 min 27 s", "3 d 9 h". */
 export const formatCountdown = (ms: number): string => {
@@ -82,7 +91,18 @@ export const formatCountdown = (ms: number): string => {
  * writes, and keeps a strip of recent runs whose newest bar pops in. Hover reveals Run now; the switch pauses it.
  * Scheduled threads, cron-like agent jobs, backlog triage runs.
  */
-export function RoutineList({ routines, heading = 'Routines', onToggle, onRunNow, onNew, historyLength = 12, className, ...props }: RoutineListProps) {
+export function RoutineList({
+  routines,
+  heading = 'Routines',
+  onToggle,
+  onRunNow,
+  onNew,
+  historyLength = 12,
+  labels: labelOverrides,
+  className,
+  ...props
+}: RoutineListProps) {
+  const labels = { ...defaultLabels, ...labelOverrides }
   const rootRef = React.useRef<HTMLElement>(null)
   const onSchedule = routines.filter(routine => routine.enabled).length
 
@@ -121,6 +141,7 @@ export function RoutineList({ routines, heading = 'Routines', onToggle, onRunNow
             routine={routine}
             last={index === routines.length - 1}
             historyLength={historyLength}
+            labels={labels}
             onToggle={onToggle}
             onRunNow={onRunNow}
           />
@@ -134,12 +155,14 @@ function RoutineRow({
   routine,
   last,
   historyLength,
+  labels,
   onToggle,
   onRunNow,
 }: {
   readonly routine: Routine
   readonly last: boolean
   readonly historyLength: number
+  readonly labels: RoutineListLabels
   readonly onToggle: RoutineListProps['onToggle']
   readonly onRunNow: RoutineListProps['onRunNow']
 }) {
@@ -179,7 +202,7 @@ function RoutineRow({
                 <span aria-hidden className="dshx:@max-pane-narrow:hidden">
                   ·
                 </span>
-                <NextRun routine={routine} />
+                <NextRun routine={routine} runningLabel={labels.runningNow} />
               </>
             )}
           </p>
@@ -243,14 +266,14 @@ function RoutineRow({
   )
 }
 
-function NextRun({ routine }: { readonly routine: Routine }) {
+function NextRun({ routine, runningLabel }: { readonly routine: Routine; readonly runningLabel: string }) {
   const ref = React.useRef<HTMLSpanElement>(null)
   const state = !routine.enabled ? 'paused' : routine.running ? 'running' : 'scheduled'
   useEnter(ref, 'blurIn', { duration: 0.3 }, state)
   return (
     <span ref={ref} className="dshx:max-w-full dshx:min-w-0 dshx:truncate">
       {state === 'paused' ? 'Paused' : null}
-      {state === 'running' ? 'Running now' : null}
+      {state === 'running' ? runningLabel : null}
       {state === 'scheduled' && routine.nextRunAt !== undefined ? (
         <>
           Next run in <Countdown to={routine.nextRunAt} />
