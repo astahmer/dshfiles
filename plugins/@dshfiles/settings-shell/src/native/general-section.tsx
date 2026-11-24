@@ -2,9 +2,10 @@
  * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.2 (MIT): `GeneralSection.js`,
  * `CurrentVersionRow.js`, `DeveloperToolsRow.js` and `chrome.js`.
  */
+import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import { IconSettingsOutlineMedium, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconSettingsOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { useEffect, useRef, useState } from 'react'
 import type { ShellTranslate } from './locales.js'
@@ -59,15 +60,27 @@ export const CurrentVersionRow = (props: { readonly t: ShellTranslate; readonly 
   </div>
 )
 
-/** The shared developer-tool visibility switch. */
+/**
+ * The shared developer-tool visibility switch. Round three item 29: it moves at once and stays usable while the Host
+ * saves (`aria-busy`, never `disabled`, which dropped focus to the page and held the thumb for 660 ms); a refused write
+ * moves it back over the same 120ms transition and says so. The kit switch replaces the native one, which takes no
+ * `aria-busy`.
+ */
 export const DeveloperToolsRow = (props: {
   readonly t: ShellTranslate
   readonly enabled: ObservableSnapshot<boolean>
   readonly setEnabled: (enabled: boolean) => Promise<void>
 }): JSX.Element => {
   const enabled = useObservable(props.enabled)
-  const [busy, setBusy] = useState(false)
+  /** The value the last click asked for, until its write settles; a newer click supersedes an older write. */
+  const [asked, setAsked] = useState<{ readonly value: boolean; readonly sequence: number } | undefined>(undefined)
+  const sequence = useRef(0)
   const [failed, setFailed] = useState(false)
+  const settle = (written: number, refused: boolean): void => {
+    if (written !== sequence.current) return
+    setAsked(undefined)
+    setFailed(refused)
+  }
   return (
     <div
       className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-6 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:py-4"
@@ -79,16 +92,19 @@ export const DeveloperToolsRow = (props: {
         {failed && <div role="alert">{props.t('developerTools.error')}</div>}
       </div>
       <Switch
-        checked={enabled}
-        disabled={busy}
-        label={props.t('developerTools.title')}
-        onChange={next => {
+        aria-busy={asked === undefined ? undefined : true}
+        aria-label={props.t('developerTools.title')}
+        checked={asked?.value ?? enabled}
+        className="dshx-root dshx:shrink-0"
+        onCheckedChange={next => {
+          sequence.current += 1
+          const written = sequence.current
           setFailed(false)
-          setBusy(true)
-          props
-            .setEnabled(next)
-            .catch(() => setFailed(true))
-            .finally(() => setBusy(false))
+          setAsked({ value: next, sequence: written })
+          props.setEnabled(next).then(
+            () => settle(written, false),
+            () => settle(written, true),
+          )
         }}
       />
     </div>

@@ -308,11 +308,21 @@ const ScalarInput = (props: {
   readonly disabled: boolean
   readonly t: ShellTranslate
   readonly className?: string
+  /** The row's write is in flight: the control already shows the value asked for and stays usable (round three item 29). */
+  readonly busy?: boolean | undefined
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
   const { control } = props
   if (control.kind === 'boolean') {
-    return <Switch aria-label={props.label} checked={props.value === true} disabled={props.disabled} onCheckedChange={checked => props.onChange(checked)} />
+    return (
+      <Switch
+        aria-busy={props.busy === true ? true : undefined}
+        aria-label={props.label}
+        checked={props.value === true}
+        disabled={props.disabled}
+        onCheckedChange={checked => props.onChange(checked)}
+      />
+    )
   }
   if (control.kind === 'choice')
     return <ChoiceInput disabled={props.disabled} label={props.label} onChange={props.onChange} options={control.options} value={props.value} />
@@ -528,6 +538,7 @@ const SettingControlInput = (props: {
   readonly control: SettingControl
   readonly value: JsonValue | undefined
   readonly disabled: boolean
+  readonly busy?: boolean | undefined
   readonly t: ShellTranslate
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
@@ -540,7 +551,7 @@ const SettingControlInput = (props: {
   if (control.kind === 'json') {
     return <JsonInput disabled={props.disabled} label={props.label} onChange={props.onChange} shape={control.shape} t={props.t} value={props.value} />
   }
-  return <ScalarInput control={control} disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
+  return <ScalarInput busy={props.busy} control={control} disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
 }
 
 /** How long a deep-linked row stays highlighted after it scrolls into view. */
@@ -559,6 +570,8 @@ const SettingRow = (props: {
   readonly focused: boolean
   /** The Host refused this row's last write. */
   readonly refused: boolean
+  /** This row's write is in flight. */
+  readonly saving: boolean
   readonly t: ShellTranslate
   readonly write: (field: SettingField, value: JsonValue) => Promise<boolean>
 }): JSX.Element => {
@@ -582,7 +595,9 @@ const SettingRow = (props: {
   const key = field.path.join('.')
   const keyShown = keyMatches(key, props.highlight)
   const sourceShown = showsSource(props.provenance)
-  const control = <SettingControlInput control={field.control} disabled={props.disabled} label={field.title} onChange={save} t={props.t} value={props.value} />
+  const control = (
+    <SettingControlInput busy={props.saving} control={field.control} disabled={props.disabled} label={field.title} onChange={save} t={props.t} value={props.value} />
+  )
   return (
     <div
       className={cn(
@@ -730,6 +745,7 @@ export const SettingsForm = (props: {
             provenance={SettingProvenanceModel.of({ field, value: values, base, user })}
             refused={outcome?.status === 'refused'}
             reset={reset}
+            saving={outcome?.status === 'saving'}
             t={props.t}
             value={displayedValue({ edit, field, values, base })}
             write={write}

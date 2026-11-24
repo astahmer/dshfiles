@@ -91,6 +91,30 @@ describe('settings form rows', () => {
     expect(row('maxTabs')?.querySelector('code mark')?.textContent).toBe('maxTabs')
     expect(row('focusThreadInSidebar')?.querySelector('code')).toBeNull()
   })
+
+  it('flips a switch at once, marks it busy (never disabled) while the Host saves, and reverts a refusal', async () => {
+    let settle: (accepted: boolean) => void = () => undefined
+    const pending = formOf(
+      { status: 'ready', value: { focusThreadInSidebar: true, maxTabs: 8 }, base: {}, user: {}, revision: 1, writable: true },
+      () =>
+        new Promise<boolean>(resolvePromise => {
+          settle = resolvePromise
+        }),
+    )
+    await act(async () => root.render(<SettingsForm fields={fields} form={pending} namespace="example" t={t} />))
+    const toggle = (): HTMLButtonElement | null | undefined => row('focusThreadInSidebar')?.querySelector<HTMLButtonElement>('[role="switch"]')
+    toggle()?.focus()
+    await act(async () => toggle()?.click())
+    expect(toggle()?.getAttribute('aria-checked')).toBe('false')
+    expect(toggle()?.getAttribute('aria-busy')).toBe('true')
+    expect(toggle()?.disabled).toBe(false)
+    expect(document.activeElement).toBe(toggle())
+
+    await act(async () => settle(false))
+    expect(toggle()?.getAttribute('aria-checked')).toBe('true')
+    expect(toggle()?.hasAttribute('aria-busy')).toBe(false)
+    expect(row('focusThreadInSidebar')?.querySelector('[role="alert"]')?.textContent).toBe('form.refused')
+  })
 })
 
 describe('a setting edited as JSON', () => {

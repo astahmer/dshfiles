@@ -119,7 +119,8 @@ and secret fields never show. Controls by type:
 Edits save at once (switches, choices) or on Enter/blur (text, numbers) through the shared `ConfigForm`, the store
 native rows and `useSettings` read, so every surface stays in step. A Host write takes seconds (it persists the profile
 and reloads the entry), so a row shows the requested value until the write settles; a refused value shows under its
-row.
+row. A switch moves at once and stays usable while it saves (`aria-busy`, never `disabled`, which dropped focus); a
+refusal moves it back over the same 120ms transition. General's _Show coding view_ switch does the same.
 
 **Plugin entries.** Under its scope line a page shows the Loader entry behind it (a dshx plugin's settings namespace is
 its entry id; a page whose namespace no entry carries shows none), read from the plugin manager through the same
