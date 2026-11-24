@@ -8,7 +8,7 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Fragment, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import * as Schema from 'effect/Schema'
 import * as Option from 'effect/Option'
 import type { ShellTranslate } from '../native/locales.js'
@@ -402,6 +402,7 @@ const RecordInput = (props: {
 /** The fallback for shapes no control fits: the value as JSON, saved when it parses. */
 const JsonInput = (props: {
   readonly label: string
+  readonly descriptionId: string | undefined
   readonly value: JsonValue | undefined
   readonly disabled: boolean
   readonly t: ShellTranslate
@@ -416,6 +417,7 @@ const JsonInput = (props: {
   return (
     <div className="dshx:flex dshx:w-full dshx:flex-col dshx:gap-1">
       <Textarea
+        aria-describedby={props.descriptionId}
         aria-invalid={invalid}
         aria-label={props.label}
         className="dshx:min-h-24 dshx:w-full dshx:font-mono! dshx:text-xs"
@@ -452,6 +454,7 @@ const isBlockControl = (control: SettingControl): boolean =>
 
 const SettingControlInput = (props: {
   readonly label: string
+  readonly descriptionId: string | undefined
   readonly control: SettingControl
   readonly value: JsonValue | undefined
   readonly disabled: boolean
@@ -464,7 +467,10 @@ const SettingControlInput = (props: {
   if (control.kind === 'record') {
     return <RecordInput disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} valueControl={control.value} />
   }
-  if (control.kind === 'json') return <JsonInput disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
+  if (control.kind === 'json')
+    return (
+      <JsonInput descriptionId={props.descriptionId} disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
+    )
   return <ScalarInput control={control} disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
 }
 
@@ -488,6 +494,7 @@ const SettingRow = (props: {
   readonly write: (field: SettingField, value: JsonValue) => Promise<boolean>
 }): JSX.Element => {
   const { field } = props
+  const descriptionId = useId()
   const row = useRef<HTMLDivElement>(null)
   const [flashing, setFlashing] = useState(false)
   useEffect(() => {
@@ -504,7 +511,17 @@ const SettingRow = (props: {
     void props.reset(field)
   }
   const block = isBlockControl(field.control)
-  const control = <SettingControlInput control={field.control} disabled={props.disabled} label={field.title} onChange={save} t={props.t} value={props.value} />
+  const control = (
+    <SettingControlInput
+      control={field.control}
+      descriptionId={field.description === '' ? undefined : descriptionId}
+      disabled={props.disabled}
+      label={field.title}
+      onChange={save}
+      t={props.t}
+      value={props.value}
+    />
+  )
   return (
     <div
       className={cn(
@@ -544,7 +561,7 @@ const SettingRow = (props: {
             )}
           </span>
           {field.description !== '' && (
-            <span className="dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">
+            <span className="dshx:text-xs dshx:leading-[18px] dshx:whitespace-pre-line dshx:text-muted-foreground" id={descriptionId}>
               <Highlight query={props.highlight} text={field.description} />
             </span>
           )}
