@@ -13,8 +13,8 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 import { useState } from 'react'
 import type { RuntimeSummary } from '../api.js'
 import { ConnectionDiagnostics } from './connection-diagnostics.js'
-import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
-import { hostGlyph, hostState } from './host-status.js'
+import { HealthDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { hostHealth, hostState } from './host-status.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 import { setHostDestination } from './state.js'
@@ -36,7 +36,7 @@ const failure = (result: { readonly ok: boolean; readonly code?: string; readonl
 export { hostState } from './host-status.js'
 
 /** The host's state as a shared status glyph; the text beside it says which state. */
-export const StatusDot = (props: { readonly tone: 'online' | 'idle' | 'error' }) => <StatusGlyph decorative status={hostGlyph(props.tone)} />
+export const StatusDot = (props: { readonly tone: 'online' | 'idle' | 'error' }) => <HealthDot health={hostHealth(props.tone)} />
 
 const HostForm = (props: { readonly api: MultiHostClient; readonly initial: HostDraft; readonly onDone: () => void; readonly onCancel: () => void }) => {
   const { api } = props

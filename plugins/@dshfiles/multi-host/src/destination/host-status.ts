@@ -1,11 +1,12 @@
+import type { Health } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import type { StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
 import type { RuntimeSummary } from '../api.js'
 
 /**
- * A host on the shared status vocabulary. A connected host is quiet (the faint ring), one that never connected or
- * was last seen a while ago is the dashed ring, and only a failed one is coloured.
+ * A host is a resource that is up or down, so it shows one health dot (DESIGN.md › Colour roles 4): green connected,
+ * a faint ring when idle or never connected, red on error. Its label carries the recovery step.
  */
-export const hostGlyph = (tone: 'online' | 'idle' | 'error'): StatusGlyphState => (tone === 'error' ? 'failed' : tone === 'online' ? 'idle' : 'stale')
+export const hostHealth = (tone: 'online' | 'idle' | 'error'): Health => (tone === 'error' ? 'down' : tone === 'online' ? 'ok' : 'off')
 
 /** A connection-test step: passed is the muted check, failed the red cross. */
 export const stepGlyph = (ok: boolean): StatusGlyphState => (ok ? 'done' : 'failed')

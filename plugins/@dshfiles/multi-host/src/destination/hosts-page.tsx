@@ -25,7 +25,7 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
-import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
+import { HealthDot, healthTextClass } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -56,6 +56,7 @@ import { ConnectionDiagnostics } from './connection-diagnostics.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
 import { FleetUpdateDialog } from './fleet-update-dialog.js'
 import { hostTargetLabel } from './host-target.js'
+import { hostHealth } from './host-status.js'
 import { HostsHeader } from './hosts-header.js'
 import { LinkThisMachineDialog, PairMachineDialog } from './link-machines.js'
 import { linkBackNeedsPlainHttpConsent } from './link-urls.js'
@@ -114,9 +115,6 @@ const ResourceUsage = (props: { readonly hostName: string; readonly resource: Re
 /** Menu verbs that open a dialog or a picker, which then owns keyboard focus. */
 const DIALOG_VERBS: ReadonlySet<HostRowVerb> = new Set(['clone', 'sync', 'add-folder', 'link-back', 'edit', 'remove'])
 
-/** Hosts on the one status vocabulary: a healthy or idle host is quiet, only a failed one is coloured. */
-const hostWorkStatus = (tone: 'online' | 'idle' | 'error'): WorkStatus => (tone === 'error' ? 'failed' : 'idle')
-
 const HostRow = (props: {
   readonly api: MultiHostClient
   readonly host: HostSummary
@@ -142,6 +140,7 @@ const HostRow = (props: {
   const { api, host, runtime } = props
   const queryClient = useQueryClient()
   const state = DisconnectGrace.use(hostState(runtime))
+  const health = hostHealth(state.tone)
   const outdatedVersion = ConnectionDiagnostics.versionMismatch({ localVersion: props.localVersion, remoteVersion: runtime?.identity?.dshVersion })
   const [confirming, setConfirming] = useState(false)
   const [popupBlocked, setPopupBlocked] = useState(false)
@@ -261,8 +260,6 @@ const HostRow = (props: {
     <EntityRow
       role="listitem"
       data-testid={`host-row-${host.id}`}
-      status={hostWorkStatus(state.tone)}
-      statusDecorative
       className={cn(
         props.dragging && 'dshx:opacity-50',
         props.dropTarget && 'dshx:ring-2 dshx:ring-ring/40 dshx:ring-inset',
@@ -298,7 +295,12 @@ const HostRow = (props: {
           <TooltipContent>Drag to reorder</TooltipContent>
         </Tooltip>
       }
-      heading={<span className={cn('dshx:font-medium', host.hidden && 'dshx:text-muted-foreground')}>{host.name}</span>}
+      heading={
+        <span className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          <HealthDot health={health} />
+          <span className={cn('dshx:font-medium', host.hidden && 'dshx:text-muted-foreground')}>{host.name}</span>
+        </span>
+      }
       meta={
         <>
           {runtime?.remoteHome === undefined ? (
@@ -323,7 +325,7 @@ const HostRow = (props: {
       }
       description={
         <>
-          <span className="dshx:min-w-0 dshx:truncate">{state.label}</span>
+          <span className={cn('dshx:min-w-0 dshx:truncate', healthTextClass[health])}>{state.label}</span>
           {props.resource === undefined ? null : <ResourceUsage hostName={host.name} resource={props.resource} />}
           {outdatedVersion === undefined ? null : (
             <span data-testid={`host-version-mismatch-${host.id}`} className="dshx:text-warning">
