@@ -10,4 +10,15 @@ describe('the turn summary line', () => {
     expect(rootClasses).toContain('dshx:w-fit')
     expect(rootClasses).toContain('dshx:max-w-[var(--dsh-chat-prose-measure,100%)]')
   })
+
+  it('shares the tool rows\' size: the kit\'s text-sm, 13px (15px on a phone), not text-xs (round three C16)', () => {
+    expect(rootClasses).toContain('dshx:text-sm')
+    expect(rootClasses).not.toContain('dshx:text-xs')
+  })
+
+  it('draws its icon on the first line\'s baseline, beside "Ran N commands" even when a 44px touch target sets that line (F23)', () => {
+    const row = /<div className="([^"]*)">\s*<span aria-hidden className="[^"]*">\s*\{'\\u200b'\}\s*<ListChecksIcon/.exec(line)
+    expect(row?.[1]).toContain('dshx:items-baseline')
+    expect(line).not.toContain('dshx:mt-0.5 dshx:size-3.5')
+  })
 })

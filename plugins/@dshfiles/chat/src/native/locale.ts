@@ -346,7 +346,7 @@ export const en = {
   'message.trigger.github': 'GitHub event received',
   'message.trigger.webhook': 'External event received',
   'message.trigger.schedule': 'Automation task',
-  'message.trigger.job': 'Background task updated',
+  'message.trigger.job': 'Background job updated',
   'message.trigger.plugin': 'Plugin status updated',
   'message.trigger.explanation': 'This notification triggered this response.',
   'message.turnProcess.worked': 'Worked',

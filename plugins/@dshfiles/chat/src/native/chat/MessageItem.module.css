@@ -315,6 +315,15 @@
   margin-top: 5px;
 }
 
+/* dshfiles (unslop C15): the failure card leads with the 16px status glyph instead of the 10px dot. */
+.turnErrorRow:has(> .turnErrorGlyph) {
+  grid-template-columns: 16px minmax(0, 1fr);
+}
+
+.turnErrorGlyph {
+  margin-top: 2px;
+}
+
 .turnErrorCopy {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -322,7 +331,7 @@
 
 .turnErrorTitle {
   margin-right: 6px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-label-primary);
   font-weight: 600;
 }
 

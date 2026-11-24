@@ -13,7 +13,9 @@
   background: none;
   color: var(--dsw-alias-label-tertiary);
   font: inherit;
-  font-size: var(--dsh-content-font-size, 14px);
+  /* dshfiles (unslop C16): the tool rows' size (the kit density's UI step: 13px, 15px on a phone), so one turn's rows
+     share one size; never below the Settings font-size preference. */
+  font-size: max(var(--dsh-content-font-size-secondary, 13px), var(--dshx-density-text-ui, 13px));
   cursor: pointer;
   text-align: left;
   transition: color 100ms ease;

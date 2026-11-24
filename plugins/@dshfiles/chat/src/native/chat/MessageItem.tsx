@@ -4,6 +4,7 @@ import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/
 import type { PropsRenderFactories, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UserTextFacts } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { JsonBlock, StateDot, TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import type {
   ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, UserContentAttachment, UserContentData, UserContentInput,
 } from '../contract/slots.ts'
@@ -156,11 +157,14 @@ function TurnErrorItem({ node, t, action, extraActions }: {
 }) {
   const sentence = failureMessage(node.message, node.code, t)
   const details = node.code === 'INTERRUPTED' ? null : failureDetails(node.message, node.code, sentence)
+  const stopped = node.code === 'ACCOUNT_SIGNED_OUT' || node.code === 'INTERRUPTED'
   return (
     <div className={css.turnErrorRow} role="status">
-      <StateDot state="error" className={css.turnErrorDot} />
+      {/* dshfiles (unslop C15): the state's glyph from the list and the tabs (a red cross, or the stopped square);
+          the words beside it stay ink. */}
+      <StatusGlyph status={stopped ? 'stopped' : 'failed'} decorative className={css.turnErrorGlyph} />
       <div className={css.turnErrorCopy}>
-        <span className={css.turnErrorTitle}>{node.code === 'ACCOUNT_SIGNED_OUT' || node.code === 'INTERRUPTED' ? t('message.taskStopped') : t('message.turnError')}</span>
+        <span className={css.turnErrorTitle}>{stopped ? t('message.taskStopped') : t('message.turnError')}</span>
         <span className={css.turnErrorMessage} data-turn-error-message>{sentence}</span>
         <div className={css.turnErrorActions} data-turn-error-actions>
           {action}

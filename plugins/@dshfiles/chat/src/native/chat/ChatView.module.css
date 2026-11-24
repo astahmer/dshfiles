@@ -404,6 +404,7 @@
 }
 
 .toBottom {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -425,6 +426,16 @@
 @media (hover: hover) {
   .toBottom:hover {
     background: var(--dsw-alias-button-floating-hover);
+  }
+}
+
+/* dshfiles (unslop F11): a 44px target on a touch screen; the control keeps its 34px face and its gutter. */
+@media (pointer: coarse) {
+  .toBottom::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: inherit;
   }
 }
 
