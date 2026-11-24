@@ -6,7 +6,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/p
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 import type { ServerDraft } from './api.js'
 import type { McpServersTranslate } from './locales.js'
