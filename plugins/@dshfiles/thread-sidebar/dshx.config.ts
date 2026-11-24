@@ -13,6 +13,8 @@ export default defineConfig({
     'auto-settle-api': 'src/auto-settle-api.ts',
     'thread-actions-api': 'src/thread-actions-api.ts',
     'attention-client': 'src/attention-client.ts',
+    // The thread list's one status per thread, rolled up, for the tab, the header and the palette (DESIGN.md R2).
+    'thread-status-client': 'src/thread-status-client.ts',
     'thread-views-api': 'src/thread-views-api.ts',
     snapshots: 'src/snapshots.ts',
     'thread-mention': 'src/thread-mention.ts',

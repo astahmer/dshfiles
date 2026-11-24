@@ -52,6 +52,8 @@ import { SubagentPreviewDock } from './subagent-provenance/subagent-preview-dock
 import { SubagentProvenanceToolRow, type SubagentToolViewProps } from './subagent-provenance/subagent-tool-row.js'
 import { subagentRunFold } from './subagent-provenance/subagent-run-fold.js'
 import { TranscriptRunFolds } from '@dshfiles/chat/run-folds'
+import { ThreadWorkStatusSources } from './thread-status-client.js'
+import { threadWorkStatusStore } from './thread-work-status-store.js'
 import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.js'
 import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
@@ -1016,6 +1018,8 @@ export default defineClient({
     const SubagentRow = decorate((props: SubagentToolViewProps) => <SubagentProvenanceToolRow {...props} preview={subagentPreview} />)
     // Two or more consecutive subagent rows fold into one transcript row (b:7rv2).
     plugin?.add(TranscriptRunFolds, subagentRunFold({ t: translate, count: subagentCount }))
+    // The list's one status per thread, for the tab, the header and the palette (thread-status-client).
+    plugin?.add(ThreadWorkStatusSources, { getSnapshot: threadWorkStatusStore.getSnapshot, subscribe: threadWorkStatusStore.subscribe })
     for (const key of ['subagent', 'subagent_fork'])
       ctx.slots.inject('tool.call.toolview', () =>
         ctx.slots.register(

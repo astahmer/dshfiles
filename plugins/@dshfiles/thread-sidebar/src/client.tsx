@@ -214,6 +214,7 @@ import {
 import { createThreadMultiSelectionStore, useThreadMultiSelected, useThreadMultiSelectedIds, type ThreadMultiSelectionStore } from './thread-multi-selection.js'
 import { ThreadSelectionBar } from './thread-selection-bar.js'
 import { workingThreadIds, WorkingThreadsProjection } from './working-threads.js'
+import { threadWorkStatusStore } from './thread-work-status-store.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -4076,6 +4077,19 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [isPrimarySurface, projectedWorkingCount, sessionState.phase])
   // The strip falls back to its own count once no list publishes.
   useEffect(() => (isPrimarySurface ? () => WorkingThreadsProjection.publish(null) : undefined), [isPrimarySurface])
+  // The one status per thread, rolled up (DESIGN.md R2): the tab, the header and the palette read what this row shows.
+  useEffect(() => {
+    if (!isPrimarySurface || sessionState.phase !== 'ready') return
+    if (!statusGlyphs) {
+      threadWorkStatusStore.publish(null)
+      return
+    }
+    const projected = new Map<string, { readonly status: WorkStatus; readonly detail: string | undefined }>()
+    for (const [sessionId, status] of childStatusById) projected.set(sessionId, { status: status.status, detail: status.detail })
+    for (const [sessionId, status] of threadStatusById) projected.set(sessionId, { status: status.status, detail: status.detail })
+    threadWorkStatusStore.publish(projected)
+  }, [childStatusById, isPrimarySurface, sessionState.phase, statusGlyphs, threadStatusById])
+  useEffect(() => (isPrimarySurface ? () => threadWorkStatusStore.publish(null) : undefined), [isPrimarySurface])
   const workingThreadCountsBySource = useMemo(
     () => ({
       all: projectedWorkingCount,
