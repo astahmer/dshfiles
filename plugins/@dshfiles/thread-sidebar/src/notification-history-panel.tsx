@@ -34,13 +34,18 @@ type HistoryAction =
 
 /**
  * b:ysaj: an unread entry reads with the glyph of what it asked for (an approval or a question is Needs you, a failure
- * is Failed, the rest Ready); a read one is Idle, seen with nothing pending.
+ * is Failed, a turn that stopped short Stopped, the rest Ready); a read one is Idle, seen with nothing pending.
  */
-const statusOf = (entry: NotificationHistoryEntry): StatusGlyphState => {
+const statusOf = (entry: Pick<NotificationHistoryEntry, 'category' | 'read'>): StatusGlyphState => {
   if (entry.read) return 'idle'
   if (entry.category === 'approval-needed' || entry.category === 'input-needed') return 'needs-you'
   if (entry.category === 'failed') return 'failed'
+  if (entry.category === 'stopped') return 'stopped'
   return 'ready'
+}
+
+export class NotificationHistoryPresentation {
+  static readonly statusOf = statusOf
 }
 
 /** "5m ago", the way the other pages say it; the full date and time stay in the accessible name. */

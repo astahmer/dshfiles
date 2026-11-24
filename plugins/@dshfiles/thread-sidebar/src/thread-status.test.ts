@@ -34,6 +34,32 @@ describe('thread status', () => {
     expect(ThreadStatusModel.statusOf(input({ archived: true, unread: true })).group).toBe('done')
   })
 
+  it('shows a stopped turn or one that ran no step as Idle, not Ready', () => {
+    for (const reason of ['aborted', 'blocked'] as const) {
+      // The unacknowledged finish, its label and the finished-turn item an older Host still publishes as ready.
+      const stopped = input({
+        unread: true,
+        labels: ['threadSidebarTurnFinished'],
+        stoppedTurn: reason,
+        inbox: { itemId: 'item-1', source: FINISHED_TURN_SOURCE, severity: 'ready', reason: 'Turn stopped before it finished.', verb: undefined, openedAt: NOW },
+      })
+      expect(ThreadStatusModel.statusOf(stopped).status).toBe('idle')
+    }
+    // Another provider's ready item (work to land) still makes it Ready, and so does work left unlanded.
+    const toLand = input({
+      unread: true,
+      stoppedTurn: 'aborted',
+      inbox: { itemId: 'item-2', source: 'jj-integration.land', severity: 'ready', reason: 'Ready to land', verb: 'Land', openedAt: NOW },
+    })
+    expect(ThreadStatusModel.statusOf(toLand)).toMatchObject({ status: 'ready', verb: 'Land' })
+    expect(ThreadStatusModel.statusOf(input({ unread: true, stoppedTurn: 'aborted', unlanded: 2 })).status).toBe('ready')
+    expect(ThreadStatusModel.statusOf(input({ unread: true })).status).toBe('ready')
+    // A hand-made unread mark wins over the stopped finish it sits on.
+    expect(ThreadStatusModel.stoppedTurnOf({ finishedReason: 'aborted', manuallyUnread: false })).toBe('aborted')
+    expect(ThreadStatusModel.stoppedTurnOf({ finishedReason: 'blocked', manuallyUnread: true })).toBeUndefined()
+    expect(ThreadStatusModel.stoppedTurnOf({ finishedReason: 'completed', manuallyUnread: false })).toBeUndefined()
+  })
+
   it('folds a thread idle for 72 hours into Done, unless pinned', () => {
     const stale = input({ activityAt: NOW - DONE_AFTER_IDLE_MS - 1 })
     expect(ThreadStatusModel.statusOf(stale).group).toBe('done')

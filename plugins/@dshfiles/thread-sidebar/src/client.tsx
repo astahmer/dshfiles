@@ -4021,6 +4021,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             labels: attentionLabelsBySession.get(entry.session.id) ?? [],
             inbox: inbox.signals.get(entry.session.id),
             failedTurn: failedTurn === undefined ? undefined : { at: failedTurn.failedAt, reason: failedTurn.reason },
+            stoppedTurn: ThreadStatusModel.stoppedTurnOf(attention.records.get(entry.session.id)),
             unlanded: jjThreadBySession.get(entry.session.id)?.unlanded.length,
             activityAt: entry.activity.updatedAt,
             settledAt: preferences.settledAt[entry.session.id],

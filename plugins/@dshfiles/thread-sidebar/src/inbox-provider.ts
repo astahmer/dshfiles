@@ -17,13 +17,15 @@ const RECONCILE_DEBOUNCE = '250 millis'
  */
 const FINISH_COPY = {
   completed: { reason: 'Turn finished; ready to review.', titled: 'finished · ready to review', severity: 'ready' },
-  aborted: { reason: 'Turn stopped before it finished.', titled: 'stopped before it finished', severity: 'ready' },
-  blocked: { reason: 'Turn ended without running a step.', titled: 'ended without running a step', severity: 'ready' },
+  // Stopped by the user, or refused by a gate before any step ran: nothing to collect, so an info item rather than Ready.
+  // A gate the user must clear (a usage limit) publishes its own blocking item.
+  aborted: { reason: 'Turn stopped before it finished.', titled: 'stopped before it finished', severity: 'info' },
+  blocked: { reason: 'Turn ended without running a step.', titled: 'ended without running a step', severity: 'info' },
   error: { reason: 'Turn failed.', titled: 'failed', severity: 'failed' },
   'max-tokens': { reason: 'Turn stopped at the output token limit.', titled: 'stopped at the output token limit', severity: 'failed' },
 } as const satisfies Record<
   NonNullable<ThreadAttentionView['finishedReason']>,
-  { readonly reason: string; readonly titled: string; readonly severity: 'ready' | 'failed' }
+  { readonly reason: string; readonly titled: string; readonly severity: 'ready' | 'failed' | 'info' }
 >
 
 /** Inbox reasons cap at 500 characters; a long title is cut so the state words always show. */

@@ -71,6 +71,11 @@ export interface ThreadStatusInput {
   readonly inbox: InboxThreadSignal | undefined
   /** Set while the thread's last finished turn is a failed one, read or not. */
   readonly failedTurn?: FailedTurnSignal | undefined
+  /**
+   * Set while the unacknowledged finish is a turn the user stopped (`aborted`) or a gate refused before any step ran
+   * (`blocked`): it is not Ready, since nothing in it is the user's to collect.
+   */
+  readonly stoppedTurn?: 'aborted' | 'blocked' | undefined
   /** Revisions in the thread's own workspace that have not landed; 0 or undefined for none or no workspace. */
   readonly unlanded?: number | undefined
   /** Last activity: the newest of its update, finish or mute time. */
@@ -140,7 +145,11 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
   if (input.failedTurn !== undefined) {
     return { status: 'failed', detail: FAILED_TURN_DETAIL[input.failedTurn.reason], verb: undefined, itemId: undefined, since: input.failedTurn.at }
   }
-  if (input.unread || input.labels.includes('threadSidebarTurnFinished') || inbox?.severity === 'ready') {
+  // A stopped finish leaves only its own finished-turn signals (an older Host still publishes that item as ready); another
+  // provider's ready item, such as work to land, still counts.
+  const otherReady = inbox?.severity === 'ready' && inbox.source !== FINISHED_TURN_SOURCE
+  const stoppedOnly = input.stoppedTurn !== undefined && !otherReady
+  if (!stoppedOnly && (input.unread || input.labels.includes('threadSidebarTurnFinished') || inbox?.severity === 'ready')) {
     const fromInbox = inbox?.severity === 'ready'
     return {
       status: 'ready',
@@ -261,7 +270,16 @@ const createTransitionClock = (): ((sessionId: string, group: ThreadStatusGroup,
   }
 }
 
+/** The stopped finish a thread's attention record holds, unless the user marked it unread by hand. */
+const stoppedTurnOf = (
+  record: { readonly finishedReason: string | null; readonly manuallyUnread: boolean } | undefined,
+): ThreadStatusInput['stoppedTurn'] => {
+  if (record === undefined || record.manuallyUnread) return undefined
+  return record.finishedReason === 'aborted' || record.finishedReason === 'blocked' ? record.finishedReason : undefined
+}
+
 export class ThreadStatusModel {
+  static readonly stoppedTurnOf = stoppedTurnOf
   static readonly statusOf = statusOf
   static readonly ownStatus = ownStatus
   static readonly groupOf = groupOf
