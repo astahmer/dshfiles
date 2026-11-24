@@ -544,6 +544,37 @@ describe('WorkbenchView', () => {
     expect(Object.keys(store.get()?.panels ?? {})).toEqual([])
   })
 
+  it('reopens the right pane on the view it last showed, not on the chooser', async () => {
+    // Opening Changes, closing it and reopening the pane took two clicks: the chooser, then Changes (F20).
+    const { api, onClose, setVisible } = renderRightWorkbench('changes')
+    act(() => api.getPanel('changes')?.api.close())
+    await flushLayoutChange()
+    expect(onClose).toHaveBeenCalledOnce()
+    setVisible(false)
+    setVisible(true)
+    await flushLayoutChange()
+    expect(api.panels.map(panel => panel.id)).toEqual(['changes'])
+    expect(screen.queryByLabelText('Choose a view')).toBeNull()
+  })
+
+  it('opens the chooser when the pane has no last view, or that view now lives in another pane', async () => {
+    const { api, setVisible } = renderRightWorkbench('changes')
+    let mainApi: DockviewApi | undefined
+    render(
+      <WorkbenchView registry={registryWith('changes')} store={createLayoutStore({ storage: memoryStorage() })} t={t} region="main" onApi={ready => (mainApi = ready)} />,
+    )
+    act(() => api.getPanel('changes')?.api.close())
+    await flushLayoutChange()
+    // The main view's default layout shows the same view now.
+    expect(mainApi?.getPanel('changes')).toBeDefined()
+    expect(workbenchRegions().holds('changes')).toBe(true)
+    setVisible(false)
+    setVisible(true)
+    await flushLayoutChange()
+    expect(api.panels).toHaveLength(1)
+    expect(NewViewTabs.isChooser(api.panels[0]!.id)).toBe(true)
+  })
+
   it('keeps the right pane open after a partial close and closes its final chooser too', async () => {
     const { api, onClose } = renderRightWorkbench('a', 'b')
     act(() => api.getPanel('a')?.api.close())
@@ -640,7 +671,7 @@ describe('WorkbenchView', () => {
     expect(Object.keys(store.get()?.panels ?? {})).toEqual([])
   })
 
-  it('reopens an auto-closed empty right pane with one chooser using the same API without reset or handoff replay', async () => {
+  it('reopens an auto-closed right pane on its last view using the same API without reset or handoff replay', async () => {
     const { api, onClose, onApi, setVisible, view } = renderRightWorkbench('a')
     const native = view.container.querySelector('.dv-dockview')
     act(() => api.getPanel('a')?.api.close())
@@ -651,8 +682,7 @@ describe('WorkbenchView', () => {
     expect(workbenchRegions().get('right')).toBe(api)
     expect(view.container.querySelector('.dv-dockview')).toBe(native)
     setVisible(true)
-    expect(api.panels).toHaveLength(1)
-    expect(NewViewTabs.isChooser(api.panels[0]!.id)).toBe(true)
+    expect(api.panels.map(panel => panel.id)).toEqual(['a'])
     await flushLayoutChange()
     expect(onClose).toHaveBeenCalledOnce()
     expect(onApi).toHaveBeenCalledOnce()
@@ -685,8 +715,10 @@ describe('WorkbenchView', () => {
   })
 
   it("puts the empty right pane's own chooser away once a view arrives, and keeps a chooser the user opened", async () => {
-    const { api, registry, setVisible } = renderRightWorkbench('a')
-    act(() => api.getPanel('a')?.api.close())
+    // A pane emptied of choosers only has no last view, so it reopens on its own chooser.
+    const { api, registry, setVisible } = renderRightWorkbench()
+    await flushLayoutChange()
+    act(() => api.panels[0]?.api.close())
     setVisible(false)
     await flushLayoutChange()
     setVisible(true)

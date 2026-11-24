@@ -293,6 +293,15 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
 
   const emptyPane = useRef({ visible: props.visible, onClose: props.onClose })
   emptyPane.current = { visible: props.visible, onClose: props.onClose }
+  // The right pane's last view, so reopening an emptied pane brings it back in one click instead of the chooser (F20).
+  const lastRightView = useRef<{ readonly id: string; readonly title: string; readonly params: object | undefined } | undefined>(undefined)
+  useLayoutEffect(() => {
+    if (api === null || region !== 'right') return
+    const removal = api.onDidRemovePanel(panel => {
+      if (!NewViewTabs.isChooser(panel.id)) lastRightView.current = { id: panel.id, title: panel.title ?? panel.id, params: panel.params }
+    })
+    return () => removal.dispose()
+  }, [api, region])
   useLayoutEffect(() => {
     if (api === null || region !== 'right') return
     let panelCount = api.panels.length
@@ -311,9 +320,14 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   }, [api, region])
 
   useLayoutEffect(() => {
-    // The retained API stays empty after auto-close. A manual reopen needs a
-    // chooser, but an explicit resource admission already populated it first.
-    if (api !== null && region === 'right' && props.visible !== false && api.panels.length === 0) NewViewTabs.openPlaceholder(api)
+    // The retained API stays empty after auto-close. A manual reopen restores the
+    // view it last showed, unless another pane holds it now; with none it needs a
+    // chooser. An explicit resource admission already populated it first.
+    if (api === null || region !== 'right' || props.visible === false || api.panels.length > 0) return
+    const last = lastRightView.current
+    if (last === undefined || workbenchRegions().holds(last.id)) NewViewTabs.openPlaceholder(api)
+    else if (last.params === undefined) api.addPanel({ id: last.id, title: last.title, component: WORKBENCH_COMPONENT })
+    else api.addPanel({ id: last.id, title: last.title, component: WORKBENCH_COMPONENT, params: last.params })
   }, [api, region, props.visible])
 
   // Admission is checked before native mutation too, not only after a drop.

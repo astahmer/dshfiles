@@ -51,7 +51,7 @@
       "id": "last-right-tab-close",
       "title": "Close the right pane when its final tab closes",
       "summary": "Closing the last tab of the right pane closes the pane.",
-      "details": "Closing the final actual right-pane tab, including its empty chooser, closes the existing browser-owned right pane instead of replacing it with a chooser. Other tabs and right-owned floating windows keep it open. Explicit manual reopen supplies one chooser; an explicit resource/view open can adopt directly. Reload retains closed visibility. Completed native mutation observation avoids transient-zero close during moves and layout restoration; the permanent main grid keeps its separate chooser policy.",
+      "details": "Closing the final actual right-pane tab, including its empty chooser, closes the existing browser-owned right pane instead of replacing it with a chooser. Other tabs and right-owned floating windows keep it open. Explicit manual reopen restores the view the pane last showed, in one click, unless another pane holds it now; a pane with no last view supplies one chooser. An explicit resource/view open can adopt directly. Reload retains closed visibility. Completed native mutation observation avoids transient-zero close during moves and layout restoration; the permanent main grid keeps its separate chooser policy.",
       "reach": [
         "click button \"Search threads\"",
         "click tab \"Everything\"",
@@ -98,7 +98,7 @@
           "kind": "unit-test",
           "id": "workbench.right-empty-reopen",
           "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
-          "testName": "reopens an auto-closed empty right pane with one chooser using the same API without reset or handoff replay"
+          "testName": "reopens an auto-closed right pane on its last view using the same API without reset or handoff replay"
         }
       ],
       "telemetry": [
