@@ -38,7 +38,7 @@ const CONNECTION_NOTES = new Map<AccountProfile['kind'], string>([
   ['cursor', 'Cursor tracks quota only, without a DSH model route. CLI login and named credentials stay separate.'],
   [
     'antigravity',
-    'DSH never reads this Google login: each conversation runs the official `agy acp` server, which signs in from the account home. Verification opens one ACP session without a prompt to read the plan and its models, so it spends no quota.',
+    'DSH never reads this Google login: each thread runs the official `agy acp` server, which signs in from the account home. Verification opens one ACP session without a prompt to read the plan and its models, so it spends no quota.',
   ],
 ])
 
